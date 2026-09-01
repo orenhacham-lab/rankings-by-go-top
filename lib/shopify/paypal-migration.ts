@@ -31,6 +31,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { cancelPayPalSubscription } from '@/lib/paypal/client'
+import { markMigrationCompleted } from '@/lib/billing/governance'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -188,6 +189,16 @@ export async function confirmShopifyActiveAndAdvance(
       console.error('[shopify-migration] PayPal cancelled but the "completed" DB write could not be confirmed after retries', { migrationId: migration.id, userId })
       return { status: migration.status, cancelFailed: false, dbWriteUnconfirmed: true }
     }
+
+    // BILLING AUTHORITY moves to Shopify HERE and only here for a migrating
+    // account — on the single CONFIRMED 'completed' transition, after Shopify
+    // was verified active AND the PayPal subscription was actually cancelled.
+    // A 'pending', 'shopify_confirmed' or 'paypal_cancel_failed' migration
+    // deliberately leaves the account on website/PayPal authority, so an
+    // abandoned or half-finished migration can never silently switch who bills
+    // it. Reached only after `confirmed`, so an unconfirmed write cannot move
+    // authority either.
+    await markMigrationCompleted(admin, userId)
     // Best-effort local mirror — PayPal's own BILLING.SUBSCRIPTION.CANCELLED
     // webhook will also arrive and apply the same update idempotently. Not
     // retried: a miss here just means the mirror catches up via that webhook.

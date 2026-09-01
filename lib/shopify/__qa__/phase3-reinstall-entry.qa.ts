@@ -109,7 +109,7 @@ async function main() {
 
     const fresh = await createPendingInstall(admin as never, {
       shop_domain: SHOP, shop_gid: 'gid://shopify/Shop/123',
-      access_token_encrypted: 'enc(FRESH)', api_version: '2026-07',
+      access_token_encrypted: 'enc(FRESH)', install_origin: 'shopify_app_store', api_version: '2026-07',
       granted_scopes: ['read_products', 'read_content', 'write_content'],
       storefront_domain: null,
     })

@@ -17,6 +17,7 @@ import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue, loadValidPendingInstall, consumePendingInstall } from '@/lib/shopify/pending-link'
 import { claimShopForProject } from '@/lib/shopify/connection-ownership'
+import { markShopifyAppStoreInstall } from '@/lib/billing/governance'
 import { missingScopes } from '@/lib/shopify/constants'
 import { buildShopifyAdminAppUrl } from '@/lib/shopify/billing-urls'
 
@@ -83,6 +84,46 @@ export async function POST(request: Request) {
   if (!claim.ok) {
     const status = claim.reason === 'save_failed' ? 500 : 409
     return NextResponse.json({ error: claim.reason }, { status })
+  }
+
+  // ── BILLING AUTHORITY ────────────────────────────────────────────────────
+  //
+  // Only a pending install whose provenance was stamped SERVER-SIDE as a
+  // direct Shopify App Store install may make this account Shopify-governed.
+  // That value was written by app/api/shopify/embedded-install (after
+  // verifying an App Bridge session token for the shop) or by the pre-auth
+  // branch of the OAuth callback (after verifying the callback HMAC, the
+  // signed nonce and the one-time state). It is NEVER taken from this
+  // request's body, which carries only `projectId`.
+  //
+  // A website-initiated connection reaches this account through a different
+  // path entirely and leaves authority alone — connecting a store as a
+  // publishing destination is an integration, not a change of who bills you.
+  //
+  // ANTI-BYPASS (App Store review): a merchant who installs from the App Store
+  // and then signs into a website account does NOT escape Shopify Billing —
+  // the provenance travels with the pending install, not with the session, so
+  // the switch happens whichever account is linked.
+  //
+  // PayPal exception: an account with an ACTIVE PayPal subscription is not
+  // switched by the install. It goes through the repository's explicit
+  // PayPal→Shopify migration workflow (initiateMigrationIfPayPalSubscriber ran
+  // inside claimShopForProject above), and authority moves only when that
+  // migration is CONFIRMED complete.
+  if (pending.install_origin === 'shopify_app_store') {
+    // Same shape initiateMigrationIfPayPalSubscriber uses to detect a real
+    // PayPal subscriber: an ACTIVE row carrying a paypal_subscription_id. A
+    // trial row has none and is not a PayPal subscriber.
+    const { data: activePayPal } = await admin
+      .from('subscriptions')
+      .select('paypal_subscription_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const paypalSubscriptionId = (activePayPal as { paypal_subscription_id?: string | null } | null)?.paypal_subscription_id ?? null
+    await markShopifyAppStoreInstall(admin, user.id, { deferForPayPalMigration: !!paypalSubscriptionId })
   }
 
   await consumePendingInstall(admin, token)

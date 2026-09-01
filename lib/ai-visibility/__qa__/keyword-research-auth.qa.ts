@@ -69,6 +69,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       projects: [{ id: 'p1', user_id: 'shopify-user' }],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       shopify_connections: [{ id: 'c1', user_id: 'shopify-user', project_id: 'p1', shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, connection_status: 'connected', shopify_plan_handle: null, shopify_subscription_status: null, shopify_current_period_end: null, shopify_billing_verified_at: null }],
       shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
@@ -88,6 +89,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       projects: [{ id: 'p1', user_id: 'shopify-user-2' }],
+      billing_governance: [{ user_id: 'shopify-user-2', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       shopify_connections: [{ id: 'c2', user_id: 'shopify-user-2', project_id: 'p1', shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, connection_status: 'connected', shopify_plan_handle: null, shopify_subscription_status: null, shopify_current_period_end: null, shopify_billing_verified_at: null }],
       shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })

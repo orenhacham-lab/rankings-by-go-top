@@ -89,7 +89,7 @@ async function main() {
       // the cache-read mapping (the path getUserEntitlement actually uses
       // per-request) is correct for every supported handle.
       const cached = new FakeAdmin({
-        shopify_connections: [connectionRow({ shopify_plan_handle: handle, shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
+        billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: handle, shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
         shopify_billing_migrations: [],
       })
       const cr = await resolveShopifyGovernedEntitlement(cached as unknown as Admin, 'u1')
@@ -103,7 +103,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       subscriptions: [{ id: 'sub-1', user_id: 'u1', plan_code: 'large_agency', status: 'active', paypal_subscription_id: null }],
-      shopify_connections: [connectionRow({ shopify_subscription_status: 'none', shopify_billing_verified_at: nowIso() })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'none', shopify_billing_verified_at: nowIso() })],
       shopify_billing_migrations: [],
     })
     const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
@@ -113,7 +113,7 @@ async function main() {
   console.log('\n4) resolveShopifyGovernedEntitlement — an in-progress PayPal migration never grants a Shopify plan_code, even with a stale-active cache')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [connectionRow({ shopify_plan_handle: 'premium', shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: 'premium', shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 }],
     })
     const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
@@ -122,11 +122,11 @@ async function main() {
 
   console.log('\n5) isShopifyGovernedAndActive (hasAccess hot-path) — cache-only, fails closed on a never-verified connection')
   {
-    const neverVerified = new FakeAdmin({ shopify_connections: [connectionRow({ shopify_billing_verified_at: null })] })
+    const neverVerified = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_billing_verified_at: null })] })
     const r1 = await isShopifyGovernedAndActive(neverVerified as unknown as Admin, 'u1')
     check('governed:true, active:false (no live call possible on this hot path)', r1.governed === true && r1.active === false)
 
-    const freshActive = new FakeAdmin({ shopify_connections: [connectionRow({ shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
+    const freshActive = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
     const r2 = await isShopifyGovernedAndActive(freshActive as unknown as Admin, 'u1')
     check('governed:true, active:true with a fresh active cache', r2.governed === true && r2.active === true)
 
@@ -151,7 +151,8 @@ async function main() {
   {
     const admin = new FakeAdmin({ shopify_pending_installs: [] })
     const token = await createPendingInstall(admin as unknown as Admin, {
-      shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, access_token_encrypted: 'enc', api_version: '2026-07',
+      shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, access_token_encrypted: 'enc',
+      install_origin: 'shopify_app_store', api_version: '2026-07',
       granted_scopes: ['read_products'], storefront_domain: null,
     })
     const loaded = await loadValidPendingInstall(admin as unknown as Admin, token)

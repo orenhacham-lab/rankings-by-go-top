@@ -67,11 +67,31 @@ export function hasPendingShopifyLinkCookie(request: Request): boolean {
   return readPendingLinkTokenFromRequest(request) !== null
 }
 
+/**
+ * How the install that produced this pending row was initiated. Stamped
+ * SERVER-SIDE by the route that created it, from which verified flow it was —
+ * never from a request body, query parameter or header:
+ *
+ *   'shopify_app_store'  a verified App Bridge session token (embedded
+ *                        install) or a signed App-Store-initiated pre-auth
+ *                        OAuth callback. This is the provenance that may make
+ *                        the linked account Shopify-billing-governed.
+ *   'website_connector'  an authenticated website user connecting a store from
+ *                        the dashboard. Billing authority stays with the
+ *                        website.
+ *
+ * Nullable only so a row written before this column existed still reads; every
+ * writer in the codebase supplies it, and an absent value is treated as the
+ * SAFE value ('website_connector') by the consumer.
+ */
+export type PendingInstallOrigin = 'shopify_app_store' | 'website_connector'
+
 export interface PendingInstallRow {
   token: string
   shop_domain: string
   shop_gid: string | null
   access_token_encrypted: string
+  install_origin: PendingInstallOrigin | null
   api_version: string
   granted_scopes: string[]
   storefront_domain: string | null

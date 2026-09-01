@@ -198,6 +198,13 @@ export async function POST(request: Request) {
     shop_domain: shopDomain,
     shop_gid: shopGid,
     access_token_encrypted: tokenEncrypted,
+    // TRUSTED PROVENANCE. This route is reachable only with a verified App
+    // Bridge session token for this exact shop (step 1 above), i.e. the
+    // merchant is inside Shopify Admin — a direct App Store install. The value
+    // is written here, server-side, from which flow this is; it is never read
+    // from the request body, a query parameter or a header, so a browser
+    // cannot claim App Store provenance to change who bills the account.
+    install_origin: 'shopify_app_store',
     api_version: SHOPIFY_API_VERSION,
     granted_scopes: grantedScopes,
     storefront_domain: storefront,

@@ -37,6 +37,17 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 const SHOP = 'admin-store.myshopify.com'
 
 /** A connected Shopify row with NO verified plan — the exact production shape. */
+/**
+ * Shopify authority is now a DURABLE record, not an inference from a
+ * connection row (lib/billing/governance.ts). These fixtures therefore declare
+ * it explicitly — otherwise the account is website-governed and the Shopify
+ * billing question never arises at all.
+ */
+const shopifyGoverned = (userId: string) => ({
+  user_id: userId, signup_origin: 'shopify_app_store', billing_authority: 'shopify',
+  authority_reason: 'shopify_app_store_install', authority_changed_at: null,
+})
+
 const unbilledConnection = (userId: string, over: Record<string, unknown> = {}) => ({
   id: `conn-${userId}`, user_id: userId, project_id: `proj-${userId}`, shop_domain: SHOP,
   connection_status: 'connected', archived_at: null, granted_scopes: ['read_products', 'read_content', 'write_content'],
@@ -61,6 +72,7 @@ async function main() {
     for (const [label, connections] of cases) {
       const admin = new FakeAdmin({
         profiles: [{ id: 'admin-1', role: 'admin' }],
+        billing_governance: [shopifyGoverned('admin-1')],
         shopify_connections: connections,
         shopify_billing_migrations: [],
       })
@@ -79,6 +91,7 @@ async function main() {
     }
     const admin = new FakeAdmin({
       profiles: [{ id: 'admin-1', role: 'admin' }],
+      billing_governance: [shopifyGoverned('admin-1')],
       shopify_connections: [unbilledConnection('admin-1')],
       shopify_billing_migrations: [],
     })
@@ -99,6 +112,7 @@ async function main() {
     ] as [string, string | null][]) {
       const admin = new FakeAdmin({
         profiles: [{ id: 'u-1', role }],
+        billing_governance: [shopifyGoverned('u-1')],
         shopify_connections: [unbilledConnection('u-1')],
         shopify_billing_migrations: [],
       })
@@ -107,7 +121,8 @@ async function main() {
         r.allowed === false && r.reason === 'shopify_billing_required')
     }
     const noProfile = new FakeAdmin({
-      profiles: [], shopify_connections: [unbilledConnection('ghost')], shopify_billing_migrations: [],
+      profiles: [], billing_governance: [shopifyGoverned('ghost')],
+      shopify_connections: [unbilledConnection('ghost')], shopify_billing_migrations: [],
     })
     const r = await assertContentGenerationAllowedForUser(noProfile as never, 'ghost')
     check('3f: a user with NO profile row is not an admin (fails closed)', r.allowed === false)
@@ -127,6 +142,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       profiles: [{ id: 'admin-1', role: 'admin' }],
+      billing_governance: [shopifyGoverned('admin-1')],
       projects: [{ id: 'p-1', user_id: 'admin-1' }],
       shopify_connections: [unbilledConnection('admin-1')],
       shopify_billing_migrations: [],
@@ -136,6 +152,7 @@ async function main() {
 
     const nonAdmin = new FakeAdmin({
       profiles: [{ id: 'u-1', role: 'user' }],
+      billing_governance: [shopifyGoverned('u-1')],
       projects: [{ id: 'p-2', user_id: 'u-1' }],
       shopify_connections: [unbilledConnection('u-1')],
       shopify_billing_migrations: [],

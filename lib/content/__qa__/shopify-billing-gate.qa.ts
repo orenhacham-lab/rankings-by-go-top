@@ -89,14 +89,14 @@ async function main() {
 
   console.log('\n2) assertContentGenerationAllowedForUser — Shopify-connected, NO verified plan -> blocked')
   {
-    const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const r = await withFetch(fakePartnerFetch(() => ({ status: 200, body: noSubBody })), () => assertContentGenerationAllowedForUser(admin as unknown as Admin, 'shopify-user'))
     check('allowed:false, reason shopify_billing_required', r.allowed === false && r.reason === 'shopify_billing_required')
   }
 
   console.log('\n3) assertContentGenerationAllowedForUser — Shopify-connected WITH a verified active plan -> allowed')
   {
-    const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const r = await withFetch(fakePartnerFetch(() => ({ status: 200, body: activeSubBody('regular') })), () => assertContentGenerationAllowedForUser(admin as unknown as Admin, 'shopify-user'))
     check('allowed:true', r.allowed === true)
   }
@@ -105,7 +105,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       projects: [{ id: 'p-shopify', user_id: 'shopify-user' }],
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
     const r = await withFetch(fakePartnerFetch(() => ({ status: 200, body: noSubBody })), () => assertContentGenerationAllowedForProject(admin as unknown as Admin, 'p-shopify'))
     check('allowed:false, reason shopify_billing_required', r.allowed === false && r.reason === 'shopify_billing_required')
@@ -115,7 +115,7 @@ async function main() {
   {
     // No article_topics row seeded at all — if the gate ran AFTER the topic
     // lookup, this would return 'topic_not_found' instead.
-    const admin = new FakeAdmin({ article_topics: [], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ article_topics: [], billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const r = await withFetch(fakePartnerFetch(() => ({ status: 200, body: noSubBody })), () =>
       generateArticleForTopic(admin as unknown as Admin, { topicId: 't1', userId: 'shopify-user' }))
     check('kind billing_required (gate ran first)', !r.ok && r.kind === 'billing_required')
@@ -135,7 +135,7 @@ async function main() {
       article_topics: [{ id: 't1', project_id: 'p-shopify' }],
       projects: [{ id: 'p-shopify', user_id: 'shopify-user' }],
       generated_articles: [],
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
     const result = await withFetch(f, () => generatePoolItem(admin as unknown as Admin, 'item-1'))
@@ -153,7 +153,7 @@ async function main() {
       article_topics: [{ id: 't1', project_id: 'p-shopify' }],
       projects: [{ id: 'p-shopify', user_id: 'shopify-user' }],
       generated_articles: [],
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
     for (let i = 0; i < 3; i++) {
@@ -173,7 +173,7 @@ async function main() {
       article_topics: [{ id: 't1', project_id: 'p-shopify' }],
       projects: [{ id: 'p-shopify', user_id: 'shopify-user' }],
       generated_articles: [],
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody })) // "lost entitlement" at execution time
     const result = await withFetch(f, () => generatePoolItem(admin as unknown as Admin, 'item-2'))
@@ -185,7 +185,7 @@ async function main() {
     const admin = new FakeAdmin({
       generated_articles: [{ id: 'art-1', project_id: 'p-shopify', title: 'T', topic_id: null, excerpt: null, meta_description: null, featured_image_storage_path: null }],
       projects: [{ id: 'p-shopify', user_id: 'shopify-user' }],
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
     const result = await withFetch(f, () => createFeaturedImageForArticle(admin as unknown as Admin, 'art-1'))
@@ -198,7 +198,7 @@ async function main() {
       article_inline_images: [{ id: 'img-1', project_id: 'p-shopify', article_id: 'art-1', prompt: 'x', alt_text: null, storage_path: null, status: 'ready' }],
       generated_articles: [{ id: 'art-1', title: 'T', topic_id: null }],
       projects: [{ id: 'p-shopify', user_id: 'shopify-user' }],
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
+      billing_governance: [{ user_id: 'shopify-user', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
     const result = await withFetch(f, () => generateInlineImage(admin as unknown as Admin, 'img-1'))

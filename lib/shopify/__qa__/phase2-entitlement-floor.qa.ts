@@ -87,7 +87,7 @@ async function main() {
 
   console.log('\n2) Shopify-connected merchant, activeSubscription = null -> ZERO product entitlement')
   {
-    const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const e = await withFetch(fakePartnerFetch(() => ({ status: 200, body: noSubBody })), () => getUserEntitlement('u1', admin as unknown as Admin))
     check('plan is "shopify_billing_required" (never "trial")', e.plan === 'shopify_billing_required')
     check('all limits are zero', e.limits.maxProjects === 0 && e.limits.maxKeywordsPerProject === 0 && e.limits.maxKeywordChecksPerPeriodPerProject === 0 && e.limits.maxAIScansPerPeriodPerProject === 0)
@@ -96,7 +96,7 @@ async function main() {
 
   console.log('\n3) Shopify-connected merchant, Partner API OUTAGE -> ZERO product entitlement (fails closed)')
   {
-    const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const e = await withFetch(fakePartnerFetch(() => ({ status: 500, body: {} })), () => getUserEntitlement('u1', admin as unknown as Admin))
     check('plan is "shopify_billing_required"', e.plan === 'shopify_billing_required')
     check('all limits zero even during an outage', e.limits.maxProjects === 0)
@@ -104,7 +104,7 @@ async function main() {
 
   console.log('\n4) Shopify-connected merchant on the obsolete "free-plan" handle -> ZERO product entitlement')
   {
-    const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const e = await withFetch(fakePartnerFetch(() => ({ status: 200, body: activeSubBody('free-plan') })), () => getUserEntitlement('u1', admin as unknown as Admin))
     check('plan is "shopify_billing_required"', e.plan === 'shopify_billing_required')
     check('all limits zero', e.limits.maxProjects === 0)
@@ -113,7 +113,7 @@ async function main() {
   console.log('\n5) manually-granted "large_agency" subscriptions row, Shopify connected but NO verified plan -> ZERO product entitlement (reviewer scenario)')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [],
       subscriptions: [{ id: 'sub-1', user_id: 'u1', plan_code: 'large_agency', status: 'active', paypal_subscription_id: null }],
     })
     const e = await withFetch(fakePartnerFetch(() => ({ status: 200, body: noSubBody })), () => getUserEntitlement('u1', admin as unknown as Admin))
@@ -123,7 +123,7 @@ async function main() {
 
   console.log('\n6) VERIFIED Shopify App Pricing trial on "regular" -> exact Regular limits')
   {
-    const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const e = await withFetch(fakePartnerFetch(() => ({ status: 200, body: activeSubBody('regular') })), () => getUserEntitlement('u1', admin as unknown as Admin))
     check('plan is "regular"', e.plan === 'regular')
     check('hasActiveSubscription true (Shopify trial IS an active contract)', e.hasActiveSubscription === true)
@@ -134,7 +134,7 @@ async function main() {
   {
     const HANDLE_TO_CODE: Record<string, keyof typeof PLAN_LIMITS> = { advanced: 'advanced', premium: 'premium', 'large-agency': 'large_agency' }
     for (const handle of SHOPIFY_SUPPORTED_PLAN_HANDLES.filter((h) => h !== 'regular')) {
-      const admin = new FakeAdmin({ shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
+      const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
       const e = await withFetch(fakePartnerFetch(() => ({ status: 200, body: activeSubBody(handle) })), () => getUserEntitlement('u1', admin as unknown as Admin))
       const expected = HANDLE_TO_CODE[handle]
       check(`${handle} -> ${expected} limits`, e.plan === expected && e.limits === PLAN_LIMITS[expected])

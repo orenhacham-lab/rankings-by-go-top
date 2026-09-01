@@ -50,7 +50,7 @@ async function main() {
 
   console.log('1) Live check caches BOTH currentBillingCycle.startTime AND endTime from the Partner API')
   {
-    const admin = new FakeAdmin({ shopify_connections: [connRow()], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow()], shopify_billing_migrations: [] })
     const f = fakePartnerFetch(() => ({
       status: 200,
       body: { data: { activeSubscription: { shop: { id: SHOP_GID, myshopifyDomain: SHOP_DOMAIN }, trialEndsAt: null, cancelAtEndOfCycle: false, currentBillingCycle: { startTime: '2026-08-01T00:00:00Z', endTime: '2026-09-01T00:00:00Z' }, items: [{ handle: 'premium', price: { __typename: 'FlatRatePrice', active: true } }] } } },
@@ -65,7 +65,7 @@ async function main() {
   {
     // Cache from BEFORE the upgrade — an old cycle.
     const admin = new FakeAdmin({
-      shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
       shopify_billing_migrations: [],
     })
     // Live check (cache is stale by construction of the test — 6+ min old
@@ -87,7 +87,7 @@ async function main() {
   console.log('\n3) Inactive subscription clears both period fields (no stale boundaries survive a cancellation)')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
       shopify_billing_migrations: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: { data: { activeSubscription: null } } }))

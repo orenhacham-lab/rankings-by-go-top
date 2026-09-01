@@ -94,6 +94,12 @@ async function completePreAuthInstall(
     shop_domain: shop,
     shop_gid: shopGid,
     access_token_encrypted: tokenEncrypted,
+    // TRUSTED PROVENANCE. This is completePreAuthInstall: an
+    // App-Store-initiated OAuth completion with NO authenticated Rankings user
+    // yet — the merchant arrived from Shopify, not from the dashboard. The
+    // callback HMAC, the signed nonce and the one-time state were all verified
+    // before this point. Stamped server-side; never from request input.
+    install_origin: 'shopify_app_store',
     api_version: SHOPIFY_API_VERSION,
     granted_scopes: grantedScopes,
     storefront_domain: storefront,

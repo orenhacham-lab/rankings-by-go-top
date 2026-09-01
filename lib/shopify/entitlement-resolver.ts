@@ -32,6 +32,7 @@ import { getActiveShopifySubscription } from './partner-client'
 import { recordShopifyBillingCache } from './billing-cache'
 import type { ShopifyPlanHandle } from './constants'
 import { getActiveMigration } from './paypal-migration'
+import { isShopifyBillingAuthority } from '@/lib/billing/governance'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -100,13 +101,29 @@ function fromCache(c: ConnectionRow): ShopifyGovernedEntitlement {
 }
 
 /**
- * Returns null when this user is NOT Shopify-governed at all (no connected
- * store) — caller must fall back to the normal PayPal/trial resolution
- * unchanged. Never returns null for a Shopify-connected user, even mid
- * PayPal→Shopify migration or with unverifiable billing — those cases return
- * `planCode: null` (floor/trial-tier), never silently defer to PayPal data.
+ * Returns null when this user is NOT Shopify-governed — caller must fall back
+ * to the normal PayPal/trial resolution unchanged.
+ *
+ * GOVERNANCE FIX (production). This used to mean "has no connected Shopify
+ * store", which made the mere existence of an integration record decide who
+ * bills the account. A website customer connecting Shopify purely to publish
+ * was switched onto Shopify billing and, having no Shopify App Pricing
+ * subscription, dropped to the zero-entitlement `shopify_billing_required`
+ * state. Authority now comes from the durable, server-controlled
+ * `billing_governance` record (lib/billing/governance.ts), which changes only
+ * through a trusted transition — a verified direct App Store install, or a
+ * COMPLETED PayPal→Shopify migration. Creating, disconnecting, revoking,
+ * refreshing or failing a connection never changes it.
+ *
+ * For a Shopify-governed user the behaviour below is unchanged: mid-migration
+ * or unverifiable billing returns `planCode: null` (floor tier), never a
+ * silent fallback to PayPal data.
  */
 export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: string): Promise<ShopifyGovernedEntitlement | null> {
+  // AUTHORITY FIRST — before any connection lookup. A website-governed account
+  // is not a Shopify billing question at all, however many stores it connects.
+  if (!(await isShopifyBillingAuthority(admin, userId))) return null
+
   const { data } = await admin
     .from('shopify_connections')
     .select('id, shop_domain, shop_gid, shopify_plan_handle, shopify_subscription_status, shopify_current_period_end, shopify_current_period_start, shopify_billing_verified_at')
@@ -117,7 +134,16 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
     .limit(1)
     .maybeSingle()
 
-  if (!data) return null
+  // A Shopify-governed account whose store is currently unusable — failed
+  // token, uninstalled, disconnected, archived — is STILL Shopify-governed.
+  // Returning null here would fall through to the website trial/PayPal
+  // resolution and hand the merchant a fresh website trial as a side effect of
+  // a token failure, which is exactly what must never happen. It resolves to
+  // the zero-entitlement floor instead: the account keeps its Shopify
+  // authority and is told to reconnect / choose a plan.
+  if (!data) {
+    return { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'no_active_shopify_connection' }
+  }
   const connection = data as ConnectionRow
 
   // An in-progress PayPal→Shopify migration means Shopify is not yet the
@@ -199,6 +225,10 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
  * fresh cache almost all the time.
  */
 export async function isShopifyGovernedAndActive(admin: Admin, userId: string): Promise<{ governed: boolean; active: boolean }> {
+  // Same authority rule as resolveShopifyGovernedEntitlement — a connection
+  // row never decides governance on its own.
+  if (!(await isShopifyBillingAuthority(admin, userId))) return { governed: false, active: false }
+
   const { data } = await admin
     .from('shopify_connections')
     .select('shopify_subscription_status, shopify_billing_verified_at')
