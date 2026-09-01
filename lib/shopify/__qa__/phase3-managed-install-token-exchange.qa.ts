@@ -83,14 +83,14 @@ async function main() {
     // The response is an EXPIRING offline grant — the only shape the exchange
     // accepts since Shopify stopped honouring non-expiring Admin API tokens.
     const { impl, calls } = stubFetch(200, {
-      access_token: 'shpat_offline_xyz', refresh_token: 'shpr_offline_xyz',
+      access_token: 'unit-test-access-token', refresh_token: 'unit-test-refresh-token',
       expires_in: 86400, refresh_token_expires_in: 2592000,
       scope: 'read_products,write_content',
     })
     const out = await exchangeSessionTokenForOfflineToken({
       shop: SHOP, sessionToken: 'the.session.token', clientId: 'pub-id', clientSecret: 'pub-secret', fetchImpl: impl,
     })
-    check('1a: returns the offline access token', out.accessToken === 'shpat_offline_xyz')
+    check('1a: returns the offline access token', out.accessToken === 'unit-test-access-token')
     check('1a: returns the granted scope string', out.scope === 'read_products,write_content')
     check('1b: posts to the shop\'s access_token endpoint', calls[0].url === `https://${SHOP}/admin/oauth/access_token`)
     const body = JSON.parse(String(calls[0].init.body))
@@ -106,7 +106,7 @@ async function main() {
     check('1d2: expiring=1 is requested, so Shopify issues an EXPIRING offline token',
       body.expiring === '1')
     check('1d3: and the refresh half is returned to the caller for storage',
-      out.refreshToken === 'shpr_offline_xyz' && out.expiresIn === 86400 && out.refreshTokenExpiresIn === 2592000)
+      out.refreshToken === 'unit-test-refresh-token' && out.expiresIn === 86400 && out.refreshTokenExpiresIn === 2592000)
     check('1f: never follows a redirect (a redirect would mean something other than the token endpoint answered)',
       calls[0].init.redirect === 'error')
   }
@@ -127,7 +127,7 @@ async function main() {
 
     // A 200 carrying only an access token is the NON-EXPIRING grant production
     // received. It is refused for the same fail-closed reason.
-    const nonExpiring = stubFetch(200, { access_token: 'shpat_offline_xyz', scope: 'read_products' })
+    const nonExpiring = stubFetch(200, { access_token: 'unit-test-access-token', scope: 'read_products' })
     let threw2b = false
     try { await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 'x', clientId: 'a', clientSecret: 'b', fetchImpl: nonExpiring.impl }) }
     catch (e) { threw2b = e instanceof Error && e.message === 'token_exchange_not_expiring' }

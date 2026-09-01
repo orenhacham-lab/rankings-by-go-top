@@ -53,7 +53,18 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
 
 const SHOP = 'go-top-seo-test.myshopify.com'
-const RAW_TOKEN = 'shpat_raw_offline_token_value'
+/**
+ * A plain credential STAND-IN: these tests only check that it is sent verbatim
+ * in the header and round-trips through encryption, so it deliberately carries
+ * no Shopify-shaped prefix.
+ *
+ * The `shpat_`/`shpca_`/`shpss_` values further down are a different thing and
+ * are intentionally left as they are: there, the PREFIX is the subject under
+ * test — classifyShopifyToken maps it to a fixed label, and
+ * sanitizeShopifyMessage must recognise and redact it. Renaming those would
+ * leave the tests passing while proving nothing.
+ */
+const RAW_TOKEN = 'unit-test-access-token'
 
 /** Captures exactly what reaches Shopify, so the header can be asserted. */
 type StubResponse = { status: number; body: unknown; headers?: Record<string, string> }
