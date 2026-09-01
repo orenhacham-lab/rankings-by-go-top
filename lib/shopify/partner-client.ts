@@ -32,6 +32,7 @@
  */
 
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from './constants'
+import type { ShopifyAppEdition } from './oauth'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_TRANSIENT_RETRIES = 2
@@ -60,6 +61,20 @@ interface PartnerApiConfig {
   organizationId: string
   appGid: string
   apiVersion: string
+  /** WHICH app's credentials these are — carried so a result can say which app was asked. */
+  edition: ShopifyAppEdition
+}
+
+/**
+ * The app's numeric Shopify ID, extracted from a validated
+ * `gid://shopify/App/<digits>` value. A PUBLIC identifier (it is the app's id
+ * in the Shopify Dev Dashboard URL), never a secret — safe to put in a
+ * diagnostic so a "no subscription" answer can be attributed to the app that
+ * was actually queried.
+ */
+function appNumericId(appGid: string): string | null {
+  const m = /^gid:\/\/shopify\/App\/(\d+)$/.exec(appGid)
+  return m ? m[1] : null
 }
 
 /**
@@ -80,14 +95,51 @@ const PARTNER_APP_GID_PATTERN = /^gid:\/\/shopify\/App\/\d+$/
  * either known GID namespace — callers must fail closed on null. Never logs
  * the token or any config value.
  */
-function loadPartnerApiConfig(): PartnerApiConfig | null {
-  const accessToken = process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN?.trim()
-  const organizationId = process.env.SHOPIFY_PARTNER_ORGANIZATION_ID?.trim()
-  const appGid = process.env.SHOPIFY_PARTNER_APP_GID?.trim()
+/**
+ * WHY THIS IS EDITION-AWARE (production incident, Sep 2).
+ *
+ * A merchant bought and activated the Advanced plan; Shopify's own plan picker
+ * showed it as Current. The embedded app still displayed "No active plan" —
+ * which, per app-home's mapping, means this query returned
+ * `{ ok: true, active: false }`: it SUCCEEDED and reported no subscription.
+ *
+ * `activeSubscription(appId:, shopId:)` is scoped to one app inside one
+ * Partner organization (the organization is part of the endpoint URL). This
+ * codebase runs TWO Shopify apps — the PUBLIC "Go Top SEO" App Store app and
+ * the LEGACY custom app — and every connection already records which one
+ * issued its credential in `oauth_app_edition`. Billing verification did not:
+ * it read a single global app GID and organization for every shop. Asking app
+ * A whether a shop is subscribed, when the subscription belongs to app B,
+ * returns a perfectly successful `null` — indistinguishable, to the old code,
+ * from "this merchant has not paid".
+ *
+ * So the app being queried is now chosen by the connection's OWN edition.
+ * `SHOPIFY_PARTNER_*_PUBLIC` override the shared values for public-edition
+ * connections; if none of them is set the shared values are used exactly as
+ * before, so a correctly-configured single-app deployment is unaffected. A
+ * PARTIALLY configured override fails closed as `missing_config` — "we could
+ * not verify", which the UI shows honestly — rather than silently answering
+ * "no active plan" for the wrong app.
+ */
+function loadPartnerApiConfig(edition: ShopifyAppEdition = 'legacy'): PartnerApiConfig | null {
   const apiVersion = process.env.SHOPIFY_PARTNER_API_VERSION?.trim()
+
+  const publicAccessToken = process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN_PUBLIC?.trim()
+  const publicOrganizationId = process.env.SHOPIFY_PARTNER_ORGANIZATION_ID_PUBLIC?.trim()
+  const publicAppGid = process.env.SHOPIFY_PARTNER_APP_GID_PUBLIC?.trim()
+  // ANY public override present means the operator has split the two apps —
+  // from then on the public edition uses only its own values, so a half-done
+  // configuration can never silently fall back to the other app's identity.
+  const publicConfigured = !!(publicAccessToken || publicOrganizationId || publicAppGid)
+
+  const usePublic = edition === 'public' && publicConfigured
+  const accessToken = usePublic ? publicAccessToken : process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN?.trim()
+  const organizationId = usePublic ? publicOrganizationId : process.env.SHOPIFY_PARTNER_ORGANIZATION_ID?.trim()
+  const appGid = usePublic ? publicAppGid : process.env.SHOPIFY_PARTNER_APP_GID?.trim()
+
   if (!accessToken || !organizationId || !appGid || !apiVersion) return null
   if (!PARTNER_APP_GID_PATTERN.test(appGid)) return null
-  return { accessToken, organizationId, appGid, apiVersion }
+  return { accessToken, organizationId, appGid, apiVersion, edition }
 }
 
 function endpoint(config: PartnerApiConfig): string {
@@ -201,6 +253,17 @@ interface ActiveSubscriptionData {
   } | null
 }
 
+/**
+ * WHICH app was asked, in publicly-safe terms. Attached to every result so a
+ * `no_subscription` answer is attributable — that is precisely the fact the
+ * Sep 2 incident could not be established from the outside.
+ */
+export interface PartnerQueryIdentity {
+  edition: ShopifyAppEdition
+  /** Public Shopify Dev Dashboard app id. Never a token, secret or org token. */
+  appId: string | null
+}
+
 export type ActiveSubscriptionResult =
   | {
       ok: true; active: true; planHandle: ShopifyPlanHandle; trialEndsAt: string | null
@@ -212,9 +275,10 @@ export type ActiveSubscriptionResult =
        *  boundaries; there is no special-cased "never reset" logic. */
       currentPeriodStart: string | null
       cancelAtEndOfCycle: boolean
+      queried?: PartnerQueryIdentity
     }
-  | { ok: true; active: false; reason: 'no_subscription' | 'unrecognized_plan_handle'; rawHandles?: string[] }
-  | { ok: false; reason: PartnerApiErrorKind }
+  | { ok: true; active: false; reason: 'no_subscription' | 'unrecognized_plan_handle'; rawHandles?: string[]; queried?: PartnerQueryIdentity }
+  | { ok: false; reason: PartnerApiErrorKind; queried?: PartnerQueryIdentity }
 
 /**
  * The ONLY Partner API query this app ever calls. FAILS CLOSED: every error
@@ -241,10 +305,15 @@ export async function getActiveShopifySubscription(
   shopGid: string,
   fetchImpl: typeof fetch = fetch,
   expectedMyshopifyDomain?: string,
+  /** The connection's own `oauth_app_edition`. Null/absent behaves as 'legacy'
+   *  (the pre-existing single-app behaviour) so old rows keep working. */
+  edition?: ShopifyAppEdition | null,
 ): Promise<ActiveSubscriptionResult> {
-  const config = loadPartnerApiConfig()
-  if (!config) return { ok: false, reason: 'missing_config' }
-  if (!shopGid || typeof shopGid !== 'string') return { ok: false, reason: 'malformed_response' }
+  const resolvedEdition: ShopifyAppEdition = edition === 'public' ? 'public' : 'legacy'
+  const config = loadPartnerApiConfig(resolvedEdition)
+  if (!config) return { ok: false, reason: 'missing_config', queried: { edition: resolvedEdition, appId: null } }
+  const queried: PartnerQueryIdentity = { edition: resolvedEdition, appId: appNumericId(config.appGid) }
+  if (!shopGid || typeof shopGid !== 'string') return { ok: false, reason: 'malformed_response', queried }
 
   let data: ActiveSubscriptionData
   try {
@@ -254,18 +323,18 @@ export async function getActiveShopifySubscription(
     }, fetchImpl)
   } catch (err) {
     const kind = err instanceof PartnerApiError ? err.kind : 'api_error'
-    return { ok: false, reason: kind }
+    return { ok: false, reason: kind, queried }
   }
 
   const sub = data.activeSubscription
-  if (!sub) return { ok: true, active: false, reason: 'no_subscription' }
+  if (!sub) return { ok: true, active: false, reason: 'no_subscription', queried }
 
   // Integrity check: the subscription Shopify returned must be for the exact
   // shop we asked about — both by GID and (when the caller supplies it, e.g.
   // from the shopify_connections row) by canonical .myshopify.com domain.
-  if (sub.shop?.id !== shopGid) return { ok: false, reason: 'shop_identity_mismatch' }
+  if (sub.shop?.id !== shopGid) return { ok: false, reason: 'shop_identity_mismatch', queried }
   if (expectedMyshopifyDomain && sub.shop?.myshopifyDomain !== expectedMyshopifyDomain) {
-    return { ok: false, reason: 'shop_identity_mismatch' }
+    return { ok: false, reason: 'shop_identity_mismatch', queried }
   }
 
   // Only items whose price is not explicitly inactive count — `price.active`
@@ -279,7 +348,7 @@ export async function getActiveShopifySubscription(
   const recognized = handles.find(isSupportedShopifyPlanHandle)
   if (!recognized) {
     const allHandles = items.map((i) => i?.handle).filter((h): h is string => typeof h === 'string' && h.length > 0)
-    return { ok: true, active: false, reason: 'unrecognized_plan_handle', rawHandles: allHandles }
+    return { ok: true, active: false, reason: 'unrecognized_plan_handle', rawHandles: allHandles, queried }
   }
 
   return {
@@ -290,5 +359,6 @@ export async function getActiveShopifySubscription(
     currentPeriodEnd: sub.currentBillingCycle?.endTime ?? null,
     currentPeriodStart: sub.currentBillingCycle?.startTime ?? null,
     cancelAtEndOfCycle: sub.cancelAtEndOfCycle === true,
+    queried,
   }
 }

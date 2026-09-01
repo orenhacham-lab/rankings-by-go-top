@@ -51,7 +51,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { buildShopifyPricingUrl } from '@/lib/shopify/billing-urls'
-import { createBillingIntent, signBillingIntentHandoff, BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS, BILLING_INTENT_RESUME_PATH } from '@/lib/shopify/billing-intent'
+import { createBillingIntent, signBillingIntentHandoff, BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS, BILLING_INTENT_RESUME_PATH, BILLING_INTENT_ACTION_EMBEDDED, BILLING_INTENT_ACTION_WEBSITE } from '@/lib/shopify/billing-intent'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 
 interface ResolvedConnection {
@@ -169,6 +169,12 @@ export async function GET(request: Request) {
     connectionId: connection.id,
     shopDomain: connection.shop_domain,
     shopGid: connection.shop_gid,
+    // WHERE this flow started, stamped server-side from which authenticated
+    // caller reached us — never from request input. The return leg reads it to
+    // send an embedded merchant back INTO the Shopify app instead of to the
+    // website dashboard, whose login screen cannot work inside the Admin
+    // iframe (production incident, Sep 2).
+    intendedAction: isApiCall ? BILLING_INTENT_ACTION_EMBEDDED : BILLING_INTENT_ACTION_WEBSITE,
   })
 
   // EMBEDDED CALLER — hand back a signed, opaque handoff instead of a cookie.

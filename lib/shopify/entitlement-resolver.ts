@@ -92,6 +92,9 @@ interface ConnectionRow {
   id: string
   shop_domain: string
   shop_gid: string | null
+  /** WHICH Shopify app issued this credential — billing must be verified
+   *  against that same app (see lib/shopify/partner-client.ts). */
+  oauth_app_edition: 'public' | 'legacy' | null
   shopify_plan_handle: string | null
   shopify_subscription_status: 'active' | 'none' | 'unknown' | null
   shopify_current_period_end: string | null
@@ -143,7 +146,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
 
   const { data, error } = await admin
     .from('shopify_connections')
-    .select('id, shop_domain, shop_gid, shopify_plan_handle, shopify_subscription_status, shopify_current_period_end, shopify_current_period_start, shopify_billing_verified_at')
+    .select('id, shop_domain, shop_gid, oauth_app_edition, shopify_plan_handle, shopify_subscription_status, shopify_current_period_end, shopify_current_period_start, shopify_billing_verified_at')
     .eq('user_id', userId)
     .eq('connection_status', 'connected')
     .is('archived_at', null)
@@ -187,7 +190,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
     return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' } }
   }
 
-  const result = await getActiveShopifySubscription(connection.shop_gid, fetch, connection.shop_domain)
+  const result = await getActiveShopifySubscription(connection.shop_gid, fetch, connection.shop_domain, connection.oauth_app_edition)
 
   if (!result.ok) {
     await recordShopifyBillingCache(admin, connection.id, {

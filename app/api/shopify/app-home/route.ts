@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   const admin = createAdminClient()
   const { data } = await admin
     .from('shopify_connections')
-    .select('id, user_id, project_id, shop_gid, connection_status, granted_scopes, last_error')
+    .select('id, user_id, project_id, shop_gid, connection_status, granted_scopes, last_error, oauth_app_edition')
     .eq('shop_domain', shopDomain)
     .is('archived_at', null)
     .maybeSingle()
@@ -92,6 +92,10 @@ export async function GET(request: Request) {
   const connection = data as {
     id: string; user_id: string; project_id: string; shop_gid: string | null
     connection_status: 'untested' | 'connected' | 'failed'; granted_scopes: string[] | null; last_error: string | null
+    // WHICH Shopify app issued this connection's credential. Billing must be
+    // verified against THAT app: asking the other one returns a successful
+    // "no subscription" for a merchant who is in fact subscribed.
+    oauth_app_edition: 'public' | 'legacy' | null
   }
 
   const { data: project } = await admin
@@ -148,7 +152,7 @@ export async function GET(request: Request) {
     // shopDomain is from the VERIFIED session token (never a query param) —
     // passed as the expected canonical domain for the cross-check inside
     // getActiveShopifySubscription.
-    const result = await getActiveShopifySubscription(connection.shop_gid, fetch, shopDomain)
+    const result = await getActiveShopifySubscription(connection.shop_gid, fetch, shopDomain, connection.oauth_app_edition)
     if (!result.ok) {
       billing = { status: 'unknown', planHandle: null, trialEndsAt: null, currentPeriodEnd: null, verificationError: result.reason }
       await recordShopifyBillingCache(admin, connection.id, {
