@@ -111,6 +111,7 @@ async function main() {
       shop_domain: SHOP, shop_gid: 'gid://shopify/Shop/123',
       access_token_encrypted: 'enc(FRESH)', install_origin: 'shopify_app_store',
       refresh_token_encrypted: 'enc(FRESH_refresh)',
+      oauth_app_edition: 'public' as const,
       access_token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
       refresh_token_expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
       api_version: '2026-07',

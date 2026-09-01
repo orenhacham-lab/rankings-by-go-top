@@ -31,7 +31,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { SHOPIFY_API_VERSION, SHOPIFY_REQUIRED_SCOPES, missingScopes } from '@/lib/shopify/constants'
 import { testShopifyConnection, getShopIdentity } from '@/lib/shopify/client'
-import { getShopifyOAuthConfig, exchangeSessionTokenForOfflineToken, TokenExchangeError, expiryFromNow } from '@/lib/shopify/oauth'
+import { getShopifyOAuthConfigForEdition, exchangeSessionTokenForOfflineToken, TokenExchangeError, expiryFromNow } from '@/lib/shopify/oauth'
 import type { TokenExchangeDiagnostics } from '@/lib/shopify/oauth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
@@ -89,7 +89,12 @@ function fail(status: number, reason: string, diag?: Record<string, unknown>) {
 export async function POST(request: Request) {
   if (!isContentModuleEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const config = getShopifyOAuthConfig()
+  // The embedded/App Store flow belongs to the PUBLIC "Go Top SEO" app and to
+  // no other: its session tokens are signed by that app's secret, and any token
+  // it obtains can later be refreshed only with that app's pair. Resolved
+  // EXPLICITLY, with no fallback to the legacy custom app — silently using the
+  // other app's credentials would produce a credential nothing can refresh.
+  const config = getShopifyOAuthConfigForEdition('public')
   if (!config) return fail(500, 'shopify_oauth_not_configured')
 
   // 1) Identity — a verified App Bridge session token and nothing else.
@@ -286,6 +291,8 @@ export async function POST(request: Request) {
     // from the request body, a query parameter or a header, so a browser
     // cannot claim App Store provenance to change who bills the account.
     install_origin: 'shopify_app_store',
+    // The issuing app travels with the credential it issued.
+    oauth_app_edition: config.edition,
     refresh_token_encrypted: refreshTokenEncrypted,
     // Absolute expiries, derived server-side ONCE from Shopify's relative
     // lifetimes, so every later reader compares against the same instant.

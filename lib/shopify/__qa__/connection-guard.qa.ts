@@ -22,6 +22,13 @@ function makeRow(status: 'connected' | 'failed' | 'untested') {
   return {
     id: 'c1', user_id: 'u1', project_id: 'p1', shop_domain: 'acme.myshopify.com',
     storefront_domain: null, access_token_encrypted: ENC_TOKEN, api_version: '2026-07',
+    // A healthy MODERN credential: an expiring grant with life left in it, so
+    // the resolver's fast path returns it without contacting Shopify. A row
+    // with an expiry but no refresh material, or an unrecorded issuing app, is
+    // deliberately refused now — see expiring-offline-tokens.qa.ts section 6b.
+    refresh_token_encrypted: 'enc(refresh)', oauth_app_edition: 'public',
+    access_token_expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+    refresh_token_expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     connection_status: status, last_tested_at: null, last_synced_at: null, last_error: null,
     default_blog_id: null, granted_scopes: ['read_products', 'read_content', 'write_content'],
     auth_method: 'oauth', created_at: 't', updated_at: 't',

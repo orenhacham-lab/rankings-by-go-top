@@ -3,80 +3,63 @@
  *
  * Every Admin API call in this application takes its access token from here,
  * through lib/shopify/api-auth.ts's loadShopifyConnection — the single place a
- * stored Shopify credential is decrypted for use. Individual callers
- * (connection testing, blog loading, sync, manual and automatic publishing,
- * embedded-install verification) never implement refresh logic of their own.
+ * stored Shopify credential is decrypted for use. Individual callers never
+ * implement refresh logic of their own.
  *
- * WHY THIS EXISTS
- * ---------------
- * Shopify no longer accepts non-expiring Admin API access tokens:
+ * WHY THIS EXISTS. Shopify no longer accepts non-expiring Admin API access
+ * tokens, so a store stays usable only if its expiring grant is rotated before
+ * expiry — from any call site, including background publishing that runs with
+ * no merchant session.
  *
- *   "Non-expiring access tokens are no longer accepted for the Admin API"
+ * SERIALIZATION — one refresh per connection, before the external call.
+ * Optimistic concurrency on the write alone is not enough. Shopify's guidance
+ * is explicit: refresh a store one at a time, because two workers refreshing
+ * the same store concurrently can leave one holding a token the other has
+ * already replaced. So a DB-backed LEASE is acquired first
+ * (begin_shopify_token_refresh); only the lease owner calls Shopify. Others are
+ * told 'locked', wait briefly, and re-read — and when the winner has stored a
+ * safely valid token, they simply use it and never call Shopify at all. The
+ * lease is time-bounded, so a crashed worker's lease expires and is reclaimed.
+ * The rotation write is ADDITIONALLY conditioned on the exact ciphertext the
+ * lease owner was given, so even a lease holder cannot overwrite a pair that
+ * changed underneath it.
  *
- * An expiring offline grant is a PAIR — a short-lived access token plus a
- * refresh token — so keeping a store usable means rotating before expiry, from
- * any call site, including background publishing that runs with no merchant
- * session at all.
+ * ISSUING APP. A token can only be refreshed with the credentials of the app
+ * that issued it. The connection records that edition, and the refresh resolves
+ * that app's pair explicitly — never "whichever pair is configured". An unknown
+ * edition is never guessed: the merchant is asked to reauthorize.
  *
- * THE RULES
- * ---------
- *   * Use the stored access token while it is safely valid (more than
- *     REFRESH_SKEW_SECONDS of life left).
- *   * Otherwise rotate through Shopify with the stored refresh token and store
- *     the WHOLE new pair — Shopify rotates the refresh token too, so both
- *     halves move together or neither does.
- *   * A TERMINAL refresh failure (Shopify rejecting the refresh token) fails
- *     closed: no Admin API call is attempted with the dead access token, and
- *     the connection is marked with the stable `refresh_token_invalid` state
- *     that lib/shopify/connection-health.ts classifies as reconnect.
- *   * A TRANSIENT failure changes no stored state at all, so a network blip
- *     never costs a merchant their connection.
- *   * BILLING AUTHORITY IS NEVER TOUCHED HERE. A token problem is not a change
- *     of who bills the account (lib/billing/governance.ts).
- *   * A LEGACY connection (no refresh material and no recorded expiry) is
- *     returned as-is; its token either still works or is refused with 401/403,
- *     which the existing classifier already routes to a reconnect.
- *
- * CONCURRENCY — optimistic, no lock, no new RPC
- * --------------------------------------------
- * The rotation write is conditioned on the EXACT `access_token_encrypted` this
- * request loaded. Two concurrent requests both see an expiring token and both
- * call Shopify; the first to write matches the row and wins, and the second
- * matches ZERO rows — its pair is retired and is discarded rather than
- * overwriting the winner's. The loser then re-reads and uses the credential
- * that actually landed. Ciphertext equality is exact here because it compares a
- * stored value with the same stored value the caller read, never two separate
- * encryptions of the same plaintext (encryptCredential uses a random IV, so
- * those would never match).
- *
- * SECRECY. Plaintext exists here only as local values: the access token handed
- * back to the immediate caller, and the refresh token used for one rotation
- * request. Nothing plaintext is logged, returned to a client, or written.
+ * FAILURE POLICY.
+ *   * TERMINAL (Shopify rejected the refresh token) → no Admin API call is
+ *     attempted, and the connection is marked `refresh_token_invalid`, but only
+ *     while this caller still owns the lease AND the credential has not been
+ *     replaced. The `app_uninstalled` tombstone is never overwritten.
+ *   * TRANSIENT → nothing stored changes at all.
+ *   * BILLING AUTHORITY is never touched by either.
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { decryptCredential, encryptCredential, CredentialsCryptoError } from '@/lib/security/credentials-crypto'
-import { getShopifyOAuthConfig, refreshOfflineAccessToken, TokenRefreshError, expiryFromNow } from './oauth'
+import { getShopifyOAuthConfigForEdition, refreshOfflineAccessToken, TokenRefreshError, expiryFromNow } from './oauth'
+import type { ShopifyAppEdition } from './oauth'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-/**
- * Refresh this long before the access token expires. Comfortably longer than a
- * serverless request's own lifetime, so a token that passes this check cannot
- * expire midway through the work it was fetched for.
- */
+/** Refresh this long before expiry — longer than a serverless request's life. */
 export const REFRESH_SKEW_SECONDS = 300
-/** How many times a caller that LOSES the optimistic race re-reads and retries. */
-export const MAX_ROTATION_ATTEMPTS = 3
+/** How long one invocation may hold the lease before it is reclaimable. */
+export const REFRESH_LEASE_SECONDS = 60
+/** Bounded wait for another invocation's in-flight rotation. */
+export const LOCK_RETRY_DELAYS_MS = [200, 400, 800]
 
 export type ResolvedTokenFailure =
-  /** Stored ciphertext could not be decrypted, or the new pair could not be encrypted. */
+  /** Stored ciphertext could not be decrypted, or a new pair could not be encrypted. */
   | 'credential_unreadable'
-  /** Shopify rejected the refresh token itself. Terminal — reconnect required. */
+  /** The merchant must reconnect: refresh refused, refresh material missing, or issuing app unknown. */
   | 'reauthorization_required'
-  /** Shopify was unreachable or returned 5xx/429. Transient — retry later. */
+  /** Transient: Shopify unreachable/5xx, or another worker still rotating. */
   | 'token_refresh_failed'
-  /** The app's Shopify credentials are not configured. */
+  /** This app's credentials for the stored edition are not configured. */
   | 'not_configured'
 
 export type ResolvedToken =
@@ -91,7 +74,10 @@ export interface ResolvableConnection {
   refresh_token_encrypted?: string | null
   access_token_expires_at?: string | null
   refresh_token_expires_at?: string | null
+  oauth_app_edition?: string | null
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** True when this expiry is far enough away to use the token it belongs to. PURE. */
 export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, now: number = Date.now()): boolean {
@@ -102,24 +88,43 @@ export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, n
 }
 
 /**
- * A row with neither refresh material nor a recorded access-token expiry
- * predates expiring grants. It cannot be rotated, so it is used as-is. PURE.
+ * Classify a stored credential's SHAPE. PURE.
+ *
+ *   'expiring'      an expiry and refresh material — the normal modern grant.
+ *   'incomplete'    an expiry but NO refresh material. Inconsistent: it cannot
+ *                   be rotated and its access token may already be dead, so it
+ *                   must never be sent to the Admin API on the strength of
+ *                   having once had an expiry.
+ *   'legacy'        no expiry and no refresh material, issued by the LEGACY
+ *                   custom app, whose tokens are non-expiring by design.
+ *   'unusable'      no expiry and no refresh material, but issued by the public
+ *                   app or by an unrecorded app. A public non-expiring token is
+ *                   exactly the deprecated kind the Admin API now refuses, and
+ *                   an unknown issuer is never guessed at.
  */
-export function isLegacyNonExpiringConnection(c: ResolvableConnection): boolean {
-  return !c.refresh_token_encrypted && !c.access_token_expires_at
+export function classifyStoredCredential(c: ResolvableConnection): 'expiring' | 'incomplete' | 'legacy' | 'unusable' {
+  const hasRefresh = !!c.refresh_token_encrypted
+  const hasExpiry = !!c.access_token_expires_at
+  if (hasRefresh) return 'expiring'
+  if (hasExpiry) return 'incomplete'
+  return c.oauth_app_edition === 'legacy' ? 'legacy' : 'unusable'
 }
 
 function decrypt(value: string): string | null {
   try {
     return decryptCredential(value)
   } catch (err) {
-    // A fixed classification from credentials-crypto — never ciphertext or key
-    // material.
+    // A fixed classification from credentials-crypto — never ciphertext or key material.
     console.error('[shopify-tokens] credential decryption failed', {
       reason: err instanceof CredentialsCryptoError ? err.message : 'decryption_failed',
     })
     return null
   }
+}
+
+function storedTokenResult(ciphertext: string, rotated = false): ResolvedToken {
+  const plain = decrypt(ciphertext)
+  return plain ? { ok: true, accessToken: plain, rotated } : { ok: false, reason: 'credential_unreadable' }
 }
 
 /**
@@ -130,37 +135,97 @@ function decrypt(value: string): string | null {
  * ciphertext, an expiry, or the refresh token.
  */
 export async function resolveShopifyAccessToken(admin: Admin, connection: ResolvableConnection): Promise<ResolvedToken> {
-  // Fast path — a token with life left in it. No Shopify call, no write.
+  // Fast path — a token with life left in it. No lease, no Shopify call.
   if (isAccessTokenSafelyValid(connection.access_token_expires_at)) {
-    const plain = decrypt(connection.access_token_encrypted)
-    return plain ? { ok: true, accessToken: plain, rotated: false } : { ok: false, reason: 'credential_unreadable' }
+    return storedTokenResult(connection.access_token_encrypted)
   }
 
-  // Legacy path — nothing to rotate with. Hand back what is stored and let the
-  // Admin API's own 401/403 classification decide, exactly as before.
-  if (isLegacyNonExpiringConnection(connection)) {
-    const plain = decrypt(connection.access_token_encrypted)
-    return plain ? { ok: true, accessToken: plain, rotated: false } : { ok: false, reason: 'credential_unreadable' }
-  }
+  const shape = classifyStoredCredential(connection)
 
-  const config = getShopifyOAuthConfig()
-  if (!config) return { ok: false, reason: 'not_configured' }
+  // A proven legacy non-expiring credential is used as-is: the legacy custom
+  // app's tokens do not expire and there is nothing to rotate.
+  if (shape === 'legacy') return storedTokenResult(connection.access_token_encrypted)
 
-  let current = connection
-  for (let attempt = 0; attempt < MAX_ROTATION_ATTEMPTS; attempt++) {
-    if (!current.refresh_token_encrypted) {
-      // Nothing to rotate with (cleared on uninstall, or never issued).
-      const plain = decrypt(current.access_token_encrypted)
-      return plain ? { ok: true, accessToken: plain, rotated: false } : { ok: false, reason: 'credential_unreadable' }
+  // An INCOMPLETE expiring row (an expiry, no refresh material) cannot be
+  // rotated, and its access token is at or past expiry — returning it would
+  // send a dead credential to the Admin API. Likewise a non-expiring token from
+  // the public app, or one whose issuing app was never recorded: neither can be
+  // refreshed and neither may be guessed at.
+  if (shape === 'incomplete' || shape === 'unusable') return { ok: false, reason: 'reauthorization_required' }
+
+  for (let attempt = 0; ; attempt++) {
+    // ── 1) Serialize BEFORE contacting Shopify ────────────────────────────
+    const { data, error } = await admin.rpc('begin_shopify_token_refresh', {
+      p_connection_id: connection.id,
+      p_lease_seconds: REFRESH_LEASE_SECONDS,
+      p_min_valid_seconds: REFRESH_SKEW_SECONDS,
+    })
+    if (error) return { ok: false, reason: 'token_refresh_failed' }
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      outcome?: string
+      lease_token?: string | null
+      access_token_encrypted?: string | null
+      refresh_token_encrypted?: string | null
+      oauth_app_edition?: string | null
+    } | null | undefined
+    const outcome = row?.outcome
+
+    if (outcome === 'not_found') return { ok: false, reason: 'reauthorization_required' }
+    // The app was uninstalled: a late refresh must not resurrect it.
+    if (outcome === 'uninstalled') return { ok: false, reason: 'reauthorization_required' }
+    if (outcome === 'no_refresh_material') return { ok: false, reason: 'reauthorization_required' }
+    if (outcome === 'unknown_edition') return { ok: false, reason: 'reauthorization_required' }
+
+    // Someone else rotated while we waited — use what is stored NOW, never the
+    // copy this request read before the lease.
+    if (outcome === 'fresh') {
+      return row?.access_token_encrypted
+        ? storedTokenResult(row.access_token_encrypted)
+        : { ok: false, reason: 'credential_unreadable' }
     }
 
-    const refreshToken = decrypt(current.refresh_token_encrypted)
-    if (!refreshToken) return { ok: false, reason: 'credential_unreadable' }
+    if (outcome === 'locked') {
+      // Another invocation is mid-rotation. WAIT — never refresh in parallel.
+      if (attempt < LOCK_RETRY_DELAYS_MS.length) {
+        await sleep(LOCK_RETRY_DELAYS_MS[attempt])
+        continue
+      }
+      return { ok: false, reason: 'token_refresh_failed' }
+    }
+
+    if (outcome !== 'granted' || !row?.lease_token || !row?.refresh_token_encrypted) {
+      return { ok: false, reason: 'token_refresh_failed' }
+    }
+
+    // ── 2) We alone hold the lease. Rotate exactly once. ──────────────────
+    const leaseToken = row.lease_token
+    const expectedAccess = row.access_token_encrypted ?? connection.access_token_encrypted
+    const edition = row.oauth_app_edition === 'public' || row.oauth_app_edition === 'legacy'
+      ? (row.oauth_app_edition as ShopifyAppEdition)
+      : null
+    if (!edition) {
+      await releaseLease(admin, connection.id, leaseToken, expectedAccess, false)
+      return { ok: false, reason: 'reauthorization_required' }
+    }
+
+    // The credentials of the app that ISSUED this token — never whichever pair
+    // happens to be configured.
+    const config = getShopifyOAuthConfigForEdition(edition)
+    if (!config) {
+      await releaseLease(admin, connection.id, leaseToken, expectedAccess, false)
+      return { ok: false, reason: 'not_configured' }
+    }
+
+    const refreshToken = decrypt(row.refresh_token_encrypted)
+    if (!refreshToken) {
+      await releaseLease(admin, connection.id, leaseToken, expectedAccess, false)
+      return { ok: false, reason: 'credential_unreadable' }
+    }
 
     let rotated
     try {
       rotated = await refreshOfflineAccessToken({
-        shop: current.shop_domain,
+        shop: connection.shop_domain,
         refreshToken,
         clientId: config.clientId,
         clientSecret: config.clientSecret,
@@ -168,22 +233,19 @@ export async function resolveShopifyAccessToken(admin: Admin, connection: Resolv
     } catch (err) {
       const terminal = err instanceof TokenRefreshError ? err.terminal : false
       // Diagnostics only: a stable code, Shopify's HTTP status and its opaque
-      // x-request-id. No token, no body, no header, no ciphertext.
+      // x-request-id. No token, no body, no header, no ciphertext, no secret.
       console.warn('[shopify-tokens] refresh failed', {
         route: 'token_refresh',
-        shopDomain: current.shop_domain,
+        shopDomain: connection.shop_domain,
+        edition,
         terminal,
         kind: err instanceof Error ? err.message : 'unknown',
         httpStatus: err instanceof TokenRefreshError ? err.diagnostics.httpStatus : null,
         shopifyRequestId: err instanceof TokenRefreshError ? err.diagnostics.shopifyRequestId : null,
         missingFields: err instanceof TokenRefreshError ? err.diagnostics.missingFields : undefined,
       })
-      if (terminal) {
-        await markReauthorizationRequired(admin, current.id)
-        return { ok: false, reason: 'reauthorization_required' }
-      }
-      // TRANSIENT — nothing stored changes, and the Admin API is NOT called.
-      return { ok: false, reason: 'token_refresh_failed' }
+      await releaseLease(admin, connection.id, leaseToken, expectedAccess, terminal)
+      return { ok: false, reason: terminal ? 'reauthorization_required' : 'token_refresh_failed' }
     }
 
     let accessEncrypted: string
@@ -192,68 +254,58 @@ export async function resolveShopifyAccessToken(admin: Admin, connection: Resolv
       accessEncrypted = encryptCredential(rotated.accessToken)
       refreshEncrypted = encryptCredential(rotated.refreshToken)
     } catch {
+      await releaseLease(admin, connection.id, leaseToken, expectedAccess, false)
       return { ok: false, reason: 'credential_unreadable' }
     }
 
+    // ── 3) Store the WHOLE pair atomically, still holding the lease. ──────
     const now = Date.now()
-    // OPTIMISTIC CONCURRENCY. Conditioned on the exact ciphertext this request
-    // loaded, so a pair rotated by someone else in the meantime is not
-    // overwritten — this update simply matches nothing.
-    const { data: updated } = await admin
-      .from('shopify_connections')
-      .update({
-        access_token_encrypted: accessEncrypted,
-        refresh_token_encrypted: refreshEncrypted,
-        access_token_expires_at: expiryFromNow(rotated.expiresIn, now),
-        refresh_token_expires_at: rotated.refreshTokenExpiresIn === null
-          ? null
-          : expiryFromNow(rotated.refreshTokenExpiresIn, now),
-        updated_at: new Date(now).toISOString(),
-      })
-      .eq('id', current.id)
-      .eq('access_token_encrypted', current.access_token_encrypted)
-      .select('id')
-      .maybeSingle()
+    const { data: doneData, error: doneErr } = await admin.rpc('complete_shopify_token_refresh', {
+      p_connection_id: connection.id,
+      p_lease_token: leaseToken,
+      p_expected_access_token_encrypted: expectedAccess,
+      p_access_token_encrypted: accessEncrypted,
+      p_refresh_token_encrypted: refreshEncrypted,
+      p_access_token_expires_at: expiryFromNow(rotated.expiresIn, now),
+      p_refresh_token_expires_at: rotated.refreshTokenExpiresIn === null
+        ? null
+        : expiryFromNow(rotated.refreshTokenExpiresIn, now),
+    })
+    if (doneErr) return { ok: false, reason: 'token_refresh_failed' }
+    const doneOutcome = ((Array.isArray(doneData) ? doneData[0] : doneData) as { outcome?: string } | null)?.outcome
 
-    if (updated) return { ok: true, accessToken: rotated.accessToken, rotated: true }
+    if (doneOutcome === 'rotated') return { ok: true, accessToken: rotated.accessToken, rotated: true }
 
-    // We LOST the race: another request already rotated this connection. Our
-    // pair is retired and was deliberately not written. Reload and use the one
-    // that actually landed.
-    const { data: reloaded } = await admin
-      .from('shopify_connections')
-      .select('id, shop_domain, access_token_encrypted, refresh_token_encrypted, access_token_expires_at, refresh_token_expires_at')
-      .eq('id', current.id)
-      .maybeSingle()
-    if (!reloaded) return { ok: false, reason: 'token_refresh_failed' }
-    current = reloaded as ResolvableConnection
-
-    if (isAccessTokenSafelyValid(current.access_token_expires_at)) {
-      const plain = decrypt(current.access_token_encrypted)
-      return plain ? { ok: true, accessToken: plain, rotated: false } : { ok: false, reason: 'credential_unreadable' }
-    }
-    // Still not valid — the winner's token is itself near expiry. Try again.
+    // 'lease_lost' — our lease expired, or the credential was replaced or the
+    // store uninstalled while we were talking to Shopify. Our pair is retired
+    // and was NOT written. Re-read and use whatever actually landed.
+    if (doneOutcome === 'lease_lost' && attempt < LOCK_RETRY_DELAYS_MS.length) continue
+    return { ok: false, reason: 'token_refresh_failed' }
   }
-
-  return { ok: false, reason: 'token_refresh_failed' }
 }
 
 /**
- * Record that this connection needs the merchant to reconnect, because Shopify
- * refused the refresh token. Writes ONLY the stable, non-sensitive state — no
- * Shopify response body, no token — and deliberately never touches billing
- * authority or the `app_uninstalled` tombstone, which is what
- * claim_shopify_shop_ownership uses to supersede a shop.
+ * Release this caller's lease, recording terminality.
+ *
+ * `terminal: true` writes the stable `refresh_token_invalid` state — but the
+ * database applies it ONLY while this caller still owns the lease AND the
+ * stored credential is still the one it was given, so a stale worker cannot
+ * mark a connection failed after someone else fixed it, and the
+ * `app_uninstalled` tombstone is never overwritten. Billing authority is never
+ * touched.
  */
-async function markReauthorizationRequired(admin: Admin, connectionId: string): Promise<void> {
-  const { data } = await admin
-    .from('shopify_connections')
-    .select('last_error')
-    .eq('id', connectionId)
-    .maybeSingle()
-  if ((data as { last_error?: string | null } | null)?.last_error === 'app_uninstalled') return
-  await admin
-    .from('shopify_connections')
-    .update({ connection_status: 'failed', last_error: 'refresh_token_invalid', updated_at: new Date().toISOString() })
-    .eq('id', connectionId)
+async function releaseLease(
+  admin: Admin,
+  connectionId: string,
+  leaseToken: string,
+  expectedAccessTokenEncrypted: string,
+  terminal: boolean,
+): Promise<void> {
+  await admin.rpc('fail_shopify_token_refresh', {
+    p_connection_id: connectionId,
+    p_lease_token: leaseToken,
+    p_expected_access_token_encrypted: expectedAccessTokenEncrypted,
+    p_terminal: terminal,
+    p_last_error: 'refresh_token_invalid',
+  })
 }

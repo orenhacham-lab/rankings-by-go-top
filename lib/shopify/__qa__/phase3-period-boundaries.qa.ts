@@ -4,11 +4,8 @@
  * the cycle (no hardcoded "never resets" logic). Run:
  *   npx tsx lib/shopify/__qa__/phase3-period-boundaries.qa.ts
  */
-import type { createAdminClient } from '@/lib/supabase/admin'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { resolveShopifyGovernedEntitlement } from '../entitlement-resolver'
-
-type Admin = ReturnType<typeof createAdminClient>
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {

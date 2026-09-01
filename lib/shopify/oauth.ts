@@ -43,6 +43,34 @@ export interface ShopifyOAuthConfig {
  * deployment that has not yet been given public credentials keeps behaving
  * exactly as it does today rather than breaking.
  */
+/**
+ * The credential pair for ONE named app, with NO fallback to the other.
+ *
+ * A stored access token can only be refreshed with the credentials of the app
+ * that ISSUED it: signing a refresh for a legacy-app token with the public
+ * app's client id and secret simply fails. getShopifyOAuthConfig() below picks
+ * whichever pair is configured, preferring public — correct for STARTING a new
+ * flow, and wrong for refreshing an existing credential, which must name its
+ * edition explicitly.
+ *
+ * Returns null when that specific app's pair is not fully configured, so the
+ * caller fails closed rather than silently using the other app's secret.
+ */
+export function getShopifyOAuthConfigForEdition(edition: ShopifyAppEdition): ShopifyOAuthConfig | null {
+  const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
+  if (!appUrl || !/^https:\/\//.test(appUrl)) return null
+  if (edition === 'public') {
+    const clientId = (process.env.SHOPIFY_PUBLIC_CLIENT_ID || '').trim()
+    const clientSecret = (process.env.SHOPIFY_PUBLIC_CLIENT_SECRET || '').trim()
+    if (!clientId || !clientSecret) return null
+    return { clientId, clientSecret, appUrl, edition: 'public' }
+  }
+  const clientId = (process.env.SHOPIFY_CLIENT_ID || '').trim()
+  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || '').trim()
+  if (!clientId || !clientSecret) return null
+  return { clientId, clientSecret, appUrl, edition: 'legacy' }
+}
+
 export function getShopifyOAuthConfig(): ShopifyOAuthConfig | null {
   const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
   if (!appUrl || !/^https:\/\//.test(appUrl)) return null

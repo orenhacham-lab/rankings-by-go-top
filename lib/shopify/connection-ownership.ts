@@ -83,6 +83,8 @@ export async function claimShopForProject(admin: Admin, args: {
   refreshTokenEncrypted: string | null
   accessTokenExpiresAt: string | null
   refreshTokenExpiresAt: string | null
+  /** The app that issued the credential. Only it can refresh the token later. */
+  oauthAppEdition: 'public' | 'legacy' | null
   apiVersion: string
   grantedScopes: string[]
   storefrontDomain: string | null
@@ -112,6 +114,7 @@ export async function claimShopForProject(admin: Admin, args: {
     p_refresh_token_encrypted: args.refreshTokenEncrypted,
     p_access_token_expires_at: args.accessTokenExpiresAt,
     p_refresh_token_expires_at: args.refreshTokenExpiresAt,
+    p_oauth_app_edition: args.oauthAppEdition,
   })
 
   if (error) return { ok: false, reason: 'save_failed' }

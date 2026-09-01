@@ -41,7 +41,10 @@ async function completePreAuthInstall(
   admin: Admin,
   pst: { state: string; shop_domain: string; expires_at: string; used_at: string | null },
   params: Record<string, string>,
-  config: { clientId: string; clientSecret: string; appUrl: string },
+  // `edition` is required: the token this flow obtains can later be refreshed
+  // only with the credentials of the app that issued it, so which app that was
+  // must be recorded alongside the credential.
+  config: { clientId: string; clientSecret: string; appUrl: string; edition: 'public' | 'legacy' },
   nonceCookieRaw: string | undefined,
 ): Promise<NextResponse> {
   const appUrl = config.appUrl
@@ -112,6 +115,9 @@ async function completePreAuthInstall(
     // callback HMAC, the signed nonce and the one-time state were all verified
     // before this point. Stamped server-side; never from request input.
     install_origin: 'shopify_app_store',
+    // Whichever app this flow actually resolved is recorded with the token it
+    // issued, so a later refresh signs with the right pair.
+    oauth_app_edition: config.edition,
     refresh_token_encrypted: refreshTokenEncrypted,
     access_token_expires_at: expiryFromNow(token.expiresIn, grantIssuedAt),
     refresh_token_expires_at: token.refreshTokenExpiresIn === null
@@ -302,6 +308,7 @@ export async function GET(request: Request) {
     accessTokenEncrypted: tokenEncrypted,
     // The whole expiring grant moves in ONE claim call — see the RPC.
     refreshTokenEncrypted,
+    oauthAppEdition: config.edition,
     accessTokenExpiresAt: expiryFromNow(token.expiresIn, claimIssuedAt),
     refreshTokenExpiresAt: token.refreshTokenExpiresIn === null
       ? null

@@ -74,6 +74,7 @@ function baseConnection(overrides: Partial<ShopifyConnectionRow> = {}): ShopifyC
     id: 'conn-1', user_id: 'user-1', project_id: 'project-1', shop_domain: 'test-shop.myshopify.com',
     storefront_domain: null, access_token_encrypted: 'enc',
     refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+    oauth_app_edition: null,
     api_version: '2026-07',
     connection_status: 'connected', last_tested_at: null, last_synced_at: null, last_error: null,
     default_blog_id: null, granted_scopes: ['read_products', 'read_content', 'write_content'], auth_method: 'oauth',

@@ -103,6 +103,12 @@ export interface PendingInstallRow {
   refresh_token_encrypted: string | null
   access_token_expires_at: string | null
   refresh_token_expires_at: string | null
+  /**
+   * WHICH Shopify app issued this credential — recorded at acquisition and
+   * carried to the live connection, because only that app's client id and
+   * secret can refresh it.
+   */
+  oauth_app_edition: 'public' | 'legacy' | null
   api_version: string
   granted_scopes: string[]
   storefront_domain: string | null

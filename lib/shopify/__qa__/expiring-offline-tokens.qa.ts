@@ -61,7 +61,7 @@ async function main() {
     exchangeSessionTokenForOfflineToken, exchangeCodeForToken, parseExpiringOfflineToken,
     buildAuthorizeUrl, expiryFromNow, TokenExchangeError,
   } = await import('../oauth')
-  const { resolveShopifyAccessToken, isAccessTokenSafelyValid, REFRESH_SKEW_SECONDS } = await import('../token-resolver')
+  const { resolveShopifyAccessToken, isAccessTokenSafelyValid, classifyStoredCredential, REFRESH_SKEW_SECONDS } = await import('../token-resolver')
   const { encryptCredential, decryptCredential } = await import('@/lib/security/credentials-crypto')
   const { classifyReinstallNeed } = await import('../connection-health')
   const { applyAppUninstalled } = await import('../shop-cleanup')
@@ -76,6 +76,9 @@ async function main() {
     refresh_token_encrypted: encryptCredential(REFRESH),
     access_token_expires_at: new Date(Date.now() + 86400_000).toISOString(),
     refresh_token_expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+    // WHICH app issued the credential — required before any refresh.
+    oauth_app_edition: 'public',
+    token_refresh_lease_token: null, token_refresh_lease_until: null,
     ...over,
   })
 
@@ -134,7 +137,7 @@ async function main() {
       refresh_token_encrypted: encryptCredential(REFRESH),
       access_token_expires_at: expiryFromNow(86400, t0),
       refresh_token_expires_at: expiryFromNow(30 * 86400, t0),
-      install_origin: 'shopify_app_store',
+      install_origin: 'shopify_app_store', oauth_app_edition: 'public',
       api_version: '2026-07', granted_scopes: ['read_products', 'read_content', 'write_content'], storefront_domain: null,
     })
     const pending = await loadValidPendingInstall(admin as never, token)
@@ -151,11 +154,14 @@ async function main() {
       refreshTokenEncrypted: pending!.refresh_token_encrypted,
       accessTokenExpiresAt: pending!.access_token_expires_at,
       refreshTokenExpiresAt: pending!.refresh_token_expires_at,
+      oauthAppEdition: pending!.oauth_app_edition,
       apiVersion: '2026-07', grantedScopes: ['read_products', 'read_content', 'write_content'],
       storefrontDomain: null, connectionStatus: 'connected', lastError: null,
       proof: 'session_token_exchange_verified',
     })
     const row = admin.tables.shopify_connections[0]
+    check('3d2: the issuing app travels with the pair',
+      admin.tables.shopify_connections[0].oauth_app_edition === 'public')
     check('3d: the ownership claim transfers ALL FOUR values to the live row',
       claim.ok === true && row.access_token_encrypted === pending!.access_token_encrypted
       && row.refresh_token_encrypted === pending!.refresh_token_encrypted
@@ -204,34 +210,103 @@ async function main() {
     }
   }
 
-  console.log('\n5) Concurrency — a lost race never overwrites newer credentials')
+  console.log('\n5) BLOCKER 5 — refresh is SERIALIZED per connection, before the Shopify call')
   {
     const originalFetch = globalThis.fetch
-    const staleRow = conn({ access_token_expires_at: new Date(Date.now() - 1000).toISOString() })
-    const admin = new FakeAdmin({ shopify_connections: [staleRow] })
-    // Request A loaded this row; request B rotates FIRST, in between.
-    const snapshotA = { ...admin.tables.shopify_connections[0] } as Record<string, unknown>
-    const winner = { access: 'unit-test-access-token-winner', refresh: 'unit-test-refresh-token-winner' }
-    Object.assign(admin.tables.shopify_connections[0], {
-      access_token_encrypted: encryptCredential(winner.access),
-      refresh_token_encrypted: encryptCredential(winner.refresh),
-      access_token_expires_at: new Date(Date.now() + 86400_000).toISOString(),
-    })
-    globalThis.fetch = fakeFetch(200, expiring({ access_token: 'unit-test-access-token-loser', refresh_token: 'unit-test-refresh-token-loser' }))
-    let res
-    try { res = await resolveShopifyAccessToken(admin as never, snapshotA as never) }
+    const stale = (over: Record<string, unknown> = {}) =>
+      conn({ access_token_expires_at: new Date(Date.now() - 1000).toISOString(), ...over })
+
+    // TRUE CONCURRENCY: two resolver calls started together on one connection.
+    const admin = new FakeAdmin({ shopify_connections: [stale()] })
+    let fetchCalls = 0
+    globalThis.fetch = (async () => {
+      fetchCalls++
+      // Hold the "network" open so the second caller is genuinely in flight.
+      await new Promise((r) => setTimeout(r, 30))
+      return {
+        ok: true, status: 200,
+        headers: { get: () => 'req-1' },
+        json: async () => expiring({ access_token: 'unit-test-access-token-winner', refresh_token: 'unit-test-refresh-token-winner' }),
+      } as unknown as Response
+    }) as unknown as typeof fetch
+    let both
+    try {
+      const row = admin.tables.shopify_connections[0] as never
+      both = await Promise.all([
+        resolveShopifyAccessToken(admin as never, row),
+        resolveShopifyAccessToken(admin as never, row),
+      ])
+    } finally { globalThis.fetch = originalFetch }
+
+    check('5a: Shopify refresh was called EXACTLY ONCE for the two callers', fetchCalls === 1)
+    check('5b: both callers succeed', both[0].ok === true && both[1].ok === true)
+    check('5c: both receive the SAME persisted access token',
+      both[0].ok && both[1].ok && both[0].accessToken === both[1].accessToken
+      && both[0].accessToken === 'unit-test-access-token-winner')
+    check('5d: exactly one rotated pair is stored',
+      decryptCredential(admin.tables.shopify_connections[0].access_token_encrypted as string) === 'unit-test-access-token-winner'
+      && decryptCredential(admin.tables.shopify_connections[0].refresh_token_encrypted as string) === 'unit-test-refresh-token-winner')
+    check('5e: neither caller marked the connection failed',
+      admin.tables.shopify_connections[0].connection_status === 'connected'
+      && admin.tables.shopify_connections[0].last_error === null)
+    check('5f: the lease was released', admin.tables.shopify_connections[0].token_refresh_lease_token === null)
+
+    // An ACTIVE lease prevents a second Shopify call outright.
+    const locked = new FakeAdmin({ shopify_connections: [stale({
+      token_refresh_lease_token: 'someone-else', token_refresh_lease_until: new Date(Date.now() + 60_000).toISOString(),
+    })] })
+    let lockedCalls = 0
+    globalThis.fetch = (async () => { lockedCalls++; throw new Error('must not be called') }) as unknown as typeof fetch
+    let lockedResult
+    try { lockedResult = await resolveShopifyAccessToken(locked as never, locked.tables.shopify_connections[0] as never) }
     finally { globalThis.fetch = originalFetch }
-    const row = admin.tables.shopify_connections[0]
-    check('5a: the loser does NOT overwrite the winner’s pair',
-      decryptCredential(row.access_token_encrypted as string) === winner.access
-      && decryptCredential(row.refresh_token_encrypted as string) === winner.refresh)
-    check('5b: the loser reloads and returns the credential that actually landed',
-      res.ok === true && res.accessToken === winner.access && res.rotated === false)
+    check('5g: an unexpired lease held by another worker blocks the Shopify call entirely', lockedCalls === 0)
+    check('5h: and the blocked caller reports a TRANSIENT failure, not a credential one',
+      lockedResult.ok === false && lockedResult.reason === 'token_refresh_failed')
+    check('5i: without touching the connection', locked.tables.shopify_connections[0].connection_status === 'connected')
+
+    // An EXPIRED lease (crashed worker) is reclaimable.
+    const abandoned = new FakeAdmin({ shopify_connections: [stale({
+      token_refresh_lease_token: 'crashed-worker', token_refresh_lease_until: new Date(Date.now() - 1000).toISOString(),
+    })] })
+    globalThis.fetch = fakeFetch(200, expiring({ access_token: 'unit-test-access-token-recovered', refresh_token: 'unit-test-refresh-token-recovered' }))
+    let recovered
+    try { recovered = await resolveShopifyAccessToken(abandoned as never, abandoned.tables.shopify_connections[0] as never) }
+    finally { globalThis.fetch = originalFetch }
+    check('5j: a crashed worker’s expired lease is reclaimed', recovered.ok === true && recovered.accessToken === 'unit-test-access-token-recovered')
+
+    // A stale worker cannot overwrite a newer pair, nor resurrect an uninstall.
+    const staleWorker = new FakeAdmin({ shopify_connections: [stale()] })
+    const snapshot = { ...staleWorker.tables.shopify_connections[0] } as Record<string, unknown>
+    Object.assign(staleWorker.tables.shopify_connections[0], {
+      access_token_encrypted: encryptCredential('unit-test-access-token-newer'),
+      refresh_token_encrypted: encryptCredential('unit-test-refresh-token-newer'),
+      access_token_expires_at: new Date(Date.now() + 86400_000).toISOString(),
+      token_refresh_lease_token: null, token_refresh_lease_until: null,
+    })
+    globalThis.fetch = fakeFetch(200, expiring({ access_token: 'unit-test-access-token-retired', refresh_token: 'unit-test-refresh-token-retired' }))
+    let staleResult
+    try { staleResult = await resolveShopifyAccessToken(staleWorker as never, snapshot as never) }
+    finally { globalThis.fetch = originalFetch }
+    check('5k: a worker holding a retired credential cannot overwrite the newer one',
+      decryptCredential(staleWorker.tables.shopify_connections[0].access_token_encrypted as string) === 'unit-test-access-token-newer')
+    check('5l: it reloads and uses the token that actually landed',
+      staleResult.ok === true && staleResult.accessToken === 'unit-test-access-token-newer')
+
+    const uninstalled = new FakeAdmin({ shopify_connections: [stale({ connection_status: 'failed', last_error: 'app_uninstalled' })] })
+    let uninstalledCalls = 0
+    globalThis.fetch = (async () => { uninstalledCalls++; throw new Error('must not be called') }) as unknown as typeof fetch
+    let uninstalledResult
+    try { uninstalledResult = await resolveShopifyAccessToken(uninstalled as never, uninstalled.tables.shopify_connections[0] as never) }
+    finally { globalThis.fetch = originalFetch }
+    check('5m: an uninstalled store is never refreshed at all', uninstalledCalls === 0)
+    check('5n: it reports reauthorization_required', uninstalledResult.ok === false && uninstalledResult.reason === 'reauthorization_required')
+    check('5o: and the tombstone survives', uninstalled.tables.shopify_connections[0].last_error === 'app_uninstalled')
+
     const resolver = strip(read('lib/shopify/token-resolver.ts'))
-    check('5c: the write is conditioned on the exact ciphertext the caller loaded',
-      /\.eq\('access_token_encrypted', current\.access_token_encrypted\)/.test(resolver))
-    check('5d: and no lock or new RPC was introduced for it',
-      !/\.rpc\(/.test(resolver) && !/advisory/i.test(resolver))
+    const beginIdx = resolver.indexOf("admin.rpc('begin_shopify_token_refresh'")
+    const fetchIdx = resolver.indexOf('refreshOfflineAccessToken({')
+    check('5p: the lease is acquired BEFORE the external Shopify call', beginIdx !== -1 && fetchIdx !== -1 && beginIdx < fetchIdx)
   }
 
   console.log('\n6) Refresh failure fails CLOSED and changes no billing authority')
@@ -277,13 +352,131 @@ async function main() {
     check('6h: a terminal failure never overwrites app_uninstalled',
       admin3.tables.shopify_connections[0].last_error === 'app_uninstalled')
 
-    // Legacy rows are used as-is rather than failed.
+    // A PROVEN legacy credential — the legacy custom app's tokens are
+    // non-expiring by design, and the edition says so — is used as-is. An
+    // UNRECORDED edition is not (see 6b5): that is the difference between
+    // proving a legacy token and guessing at one.
     const legacy = new FakeAdmin({ shopify_connections: [] })
     const res = await resolveShopifyAccessToken(legacy as never, {
       id: 'legacy', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
       refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+      oauth_app_edition: 'legacy',
     })
-    check('6i: a legacy non-expiring connection is used as-is, not failed', res.ok === true && res.rotated === false)
+    check('6i: a PROVEN legacy non-expiring credential is used as-is', res.ok === true && res.rotated === false)
+  }
+
+  console.log('\n6b) BLOCKER 7 — an incomplete or unprovable credential is never sent to the Admin API')
+  {
+    const originalFetch = globalThis.fetch
+    let calls = 0
+    globalThis.fetch = (async () => { calls++; throw new Error('must not be called') }) as unknown as typeof fetch
+    try {
+      // An expiry but NO refresh material: inconsistent, and the access token is
+      // at or past expiry. Returning it would send a dead credential upstream.
+      const incomplete = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
+        id: 'c-incomplete', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
+        refresh_token_encrypted: null,
+        access_token_expires_at: new Date(Date.now() - 60_000).toISOString(),
+        refresh_token_expires_at: null, oauth_app_edition: 'public',
+      })
+      check('6b1: an expiring row with no refresh material demands reauthorization',
+        incomplete.ok === false && incomplete.reason === 'reauthorization_required')
+      check('6b2: and no token is handed back at all', !('accessToken' in incomplete))
+
+      // A NEAR-expiry incomplete row is refused too, not squeaked through.
+      const near = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
+        id: 'c-near', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
+        refresh_token_encrypted: null,
+        access_token_expires_at: new Date(Date.now() + 30_000).toISOString(),
+        refresh_token_expires_at: null, oauth_app_edition: 'public',
+      })
+      check('6b3: a near-expiry incomplete row is refused as well',
+        near.ok === false && near.reason === 'reauthorization_required')
+
+      // A public-app NON-EXPIRING token is exactly the deprecated kind.
+      const publicLegacyShape = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
+        id: 'c-pub', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
+        refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+        oauth_app_edition: 'public',
+      })
+      check('6b4: a PUBLIC-app non-expiring token is never sent to the Admin API',
+        publicLegacyShape.ok === false && publicLegacyShape.reason === 'reauthorization_required')
+
+      // An UNRECORDED issuing app is never guessed at.
+      const unknownEdition = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
+        id: 'c-unknown', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
+        refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+        oauth_app_edition: null,
+      })
+      check('6b5: an unrecorded issuing app is not guessed — reauthorization is required',
+        unknownEdition.ok === false && unknownEdition.reason === 'reauthorization_required')
+      check('6b6: none of these contacted Shopify', calls === 0)
+
+      check('6b7: the shape classifier names each case exactly', (() => {
+        const base = { id: 'x', shop_domain: SHOP, access_token_encrypted: 'e' }
+        return classifyStoredCredential({ ...base, refresh_token_encrypted: 'r', access_token_expires_at: 'now' }) === 'expiring'
+          && classifyStoredCredential({ ...base, access_token_expires_at: 'now' }) === 'incomplete'
+          && classifyStoredCredential({ ...base, oauth_app_edition: 'legacy' }) === 'legacy'
+          && classifyStoredCredential({ ...base, oauth_app_edition: 'public' }) === 'unusable'
+          && classifyStoredCredential({ ...base }) === 'unusable'
+      })())
+    } finally { globalThis.fetch = originalFetch }
+  }
+
+  console.log('\n6c) BLOCKER 6 — refresh signs with the app that ISSUED the credential')
+  {
+    const originalFetch = globalThis.fetch
+    const stale = (edition: string | null) => ({
+      id: 'c1', shop_domain: SHOP, project_id: 'p1', user_id: 'u1', archived_at: null,
+      connection_status: 'connected', last_error: null,
+      access_token_encrypted: encryptCredential(ACCESS),
+      refresh_token_encrypted: encryptCredential(REFRESH),
+      access_token_expires_at: new Date(Date.now() - 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+      oauth_app_edition: edition, token_refresh_lease_token: null, token_refresh_lease_until: null,
+    })
+
+    process.env.SHOPIFY_CLIENT_ID = 'unit-test-legacy-client-id'
+    process.env.SHOPIFY_CLIENT_SECRET = 'unit-test-legacy-shopify-secret'
+
+    for (const [label, edition, expectId, expectSecret] of [
+      ['a PUBLIC token uses the public pair', 'public', 'unit-test-public-client-id', 'unit-test-shopify-secret'],
+      ['a LEGACY token uses the legacy pair', 'legacy', 'unit-test-legacy-client-id', 'unit-test-legacy-shopify-secret'],
+    ] as [string, string, string, string][]) {
+      const admin = new FakeAdmin({ shopify_connections: [stale(edition)] })
+      const sink = { calls: [] as { url: string; body: Json }[] }
+      globalThis.fetch = fakeFetch(200, expiring({ access_token: 'unit-test-access-token-r', refresh_token: 'unit-test-refresh-token-r' }), sink)
+      try { await resolveShopifyAccessToken(admin as never, admin.tables.shopify_connections[0] as never) }
+      finally { globalThis.fetch = originalFetch }
+      check(`6c: ${label}`, sink.calls[0]?.body.client_id === expectId && sink.calls[0]?.body.client_secret === expectSecret)
+    }
+
+    // Missing credentials for the STORED edition fail closed rather than
+    // silently signing with the other app's pair.
+    const savedId = process.env.SHOPIFY_CLIENT_ID
+    const savedSecret = process.env.SHOPIFY_CLIENT_SECRET
+    delete process.env.SHOPIFY_CLIENT_ID
+    delete process.env.SHOPIFY_CLIENT_SECRET
+    let noCreds
+    let credCalls = 0
+    globalThis.fetch = (async () => { credCalls++; throw new Error('must not be called') }) as unknown as typeof fetch
+    const legacyAdmin = new FakeAdmin({ shopify_connections: [stale('legacy')] })
+    try { noCreds = await resolveShopifyAccessToken(legacyAdmin as never, legacyAdmin.tables.shopify_connections[0] as never) }
+    finally {
+      globalThis.fetch = originalFetch
+      if (savedId) process.env.SHOPIFY_CLIENT_ID = savedId
+      if (savedSecret) process.env.SHOPIFY_CLIENT_SECRET = savedSecret
+    }
+    check('6c4: a legacy token with no legacy credentials fails closed', noCreds.ok === false && noCreds.reason === 'not_configured')
+    check('6c5: and NEVER falls back to the public pair', credCalls === 0)
+    check('6c6: the lease it took was released', legacyAdmin.tables.shopify_connections[0].token_refresh_lease_token === null)
+
+    const oauth = strip(read('lib/shopify/oauth.ts'))
+    check('6c7: the per-edition resolver has no cross-app fallback',
+      /if \(edition === 'public'\)[\s\S]{0,320}return \{ clientId, clientSecret, appUrl, edition: 'public' \}/.test(oauth))
+    const install = strip(read('app/api/shopify/embedded-install/route.ts'))
+    check('6c8: the embedded install REQUIRES the public app explicitly',
+      /getShopifyOAuthConfigForEdition\('public'\)/.test(install) && !/getShopifyOAuthConfig\(\)/.test(install))
   }
 
   console.log('\n7) Uninstall clears refresh credentials')

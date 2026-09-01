@@ -197,7 +197,7 @@ async function main() {
       const claim = await claimShopForProject(admin as never, {
         userId: 'web-1', projectId: 'p1', shopDomain: SHOP, shopGid: 'gid://shopify/Shop/1',
         accessTokenEncrypted: 'enc(a)', refreshTokenEncrypted: 'enc(r)',
-        accessTokenExpiresAt: fresh(), refreshTokenExpiresAt: fresh(),
+        accessTokenExpiresAt: fresh(), refreshTokenExpiresAt: fresh(), oauthAppEdition: 'public',
         apiVersion: '2026-07', grantedScopes: ['read_products'], storefrontDomain: null,
         connectionStatus: 'connected', lastError: null, proof: 'oauth_callback_verified',
       })

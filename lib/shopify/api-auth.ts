@@ -23,6 +23,9 @@ export type ShopifyConnectionRow = {
   refresh_token_encrypted: string | null
   access_token_expires_at: string | null
   refresh_token_expires_at: string | null
+  // WHICH Shopify app issued this credential. Refresh must use that app's
+  // client id + secret; NULL means it was never recorded and is never guessed.
+  oauth_app_edition: 'public' | 'legacy' | null
   api_version: string
   connection_status: 'untested' | 'connected' | 'failed'
   last_tested_at: string | null
@@ -106,6 +109,9 @@ export async function loadShopifyConnection(
       // TERMINAL: Shopify refused the refresh token. The connection is already
       // marked so the UI can offer a reconnect. Billing authority is untouched.
       return { error: 'Shopify authorization expired — reconnect the store', status: 409 }
+    }
+    if (resolved.reason === 'not_configured') {
+      return { error: 'Shopify app credentials are not configured for this connection', status: 500 }
     }
     if (resolved.reason === 'token_refresh_failed') {
       // TRANSIENT: Shopify was unreachable or briefly failing. Retry later;

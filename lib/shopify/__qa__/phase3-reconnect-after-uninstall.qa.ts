@@ -72,6 +72,7 @@ const freshArgs = (who: { user: string; project: string }, over: Record<string, 
   accessTokenEncrypted: 'enc(FRESH_token)',
   // Expiring offline grant — carried through the claim in one statement.
   refreshTokenEncrypted: 'enc(FRESH_refresh)',
+  oauthAppEdition: 'public' as const,
   accessTokenExpiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
   refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
   apiVersion: '2026-07',
