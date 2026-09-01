@@ -12,6 +12,10 @@
  * reason; the route layer is the actual narrowest shared point there, since
  * that subsystem has no queue/cron/retry indirection).
  *
+ * Evaluation order (matches lib/subscription.ts's getUserEntitlement):
+ *   1. a verified administrator is allowed through, before any billing check;
+ *   2. otherwise Shopify governance decides, when it governs this account.
+ *
  * Deliberately narrow in scope: this enforces ONLY the new
  * 'shopify_billing_required' zero-entitlement state introduced by Phase 2.
  * A website-only trial or PayPal user's content-generation behavior is
@@ -33,6 +37,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
+import { isAdminUser } from '@/lib/auth/admin-role'
 import { resolveShopifyGovernedEntitlement } from '@/lib/shopify/entitlement-resolver'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -48,6 +53,22 @@ export type ContentGenerationGateResult =
  * contract).
  */
 export async function assertContentGenerationAllowedForUser(admin: Admin, userId: string): Promise<ContentGenerationGateResult> {
+  // PRODUCTION BUG this closes. lib/subscription.ts's getUserEntitlement() and
+  // hasAccess() both let a verified administrator through BEFORE consulting
+  // Shopify governance, and app/api/shopify/billing/start-intent keeps admins
+  // away from Shopify billing entirely. This gate — which every AI-generation
+  // action funnels through — went straight to resolveShopifyGovernedEntitlement
+  // with no such check, so an administrator whose account happened to carry a
+  // Shopify connection was refused with `billing_required` while the rest of
+  // the app treated them as fully entitled.
+  //
+  // The role is read server-side from profiles.role with the service-role
+  // client (lib/auth/admin-role.ts). It cannot be asserted by a request
+  // parameter, a body field or a header, and it fails closed: an unreadable or
+  // absent role is NOT an admin. Ownership and authentication checks upstream
+  // are untouched — this only decides billing entitlement, never access.
+  if (await isAdminUser(admin, userId)) return { allowed: true }
+
   const governed = await resolveShopifyGovernedEntitlement(admin, userId)
   if (governed && governed.planCode === null) return { allowed: false, reason: 'shopify_billing_required' }
   return { allowed: true }

@@ -24,6 +24,7 @@
  * Shopify.
  */
 
+import { isAdminUser } from '@/lib/auth/admin-role'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -40,22 +41,17 @@ interface ResolvedConnection {
   shop_gid: string | null
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Admin = any
-
 /**
  * Hotfix (defense in depth) — an admin must never reach a Shopify
  * billing-management destination, even if their account happens to have a
- * connected (possibly test/unverified) Shopify store. Exported as a plain,
- * FakeAdmin-testable gate function (same convention as isAllowedOrigin /
- * isValidJsonContentType in app/api/billing-market/select/route.ts) — GET
- * below calls it, but the actual role-resolution logic is unit-tested
- * directly, independent of Request/NextResponse.
+ * connected (possibly test/unverified) Shopify store.
+ *
+ * The role lookup itself now lives in lib/auth/admin-role.ts, so this route,
+ * lib/subscription.ts and lib/content/entitlement-guard.ts all resolve
+ * "is this an administrator" through ONE implementation. Re-exported here
+ * because app/api/shopify/app-home/route.ts imports it from this module.
  */
-export async function isAdminUser(admin: Admin, userId: string): Promise<boolean> {
-  const { data: profile } = await admin.from('profiles').select('role').eq('id', userId).maybeSingle()
-  return (profile as { role?: string } | null)?.role === 'admin'
-}
+export { isAdminUser }
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
