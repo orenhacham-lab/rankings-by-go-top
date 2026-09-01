@@ -68,6 +68,19 @@ function connectionRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * The resolver now returns a DISCRIMINATED result so that an infrastructure
+ * failure can never be mistaken for "not Shopify-governed". These helpers keep
+ * the existing assertions readable: `governedEntitlement` is the old
+ * `ShopifyGovernedEntitlement | null` shape, and it THROWS on 'unavailable' so
+ * a test can never silently pass through an outage.
+ */
+async function governedEntitlement(adminClient: unknown, userId: string) {
+  const r = await resolveShopifyGovernedEntitlement(adminClient as never, userId)
+  if (r.kind === 'unavailable') throw new Error(`unexpected unavailable: ${r.reason}`)
+  return r.kind === 'governed' ? r.entitlement : null
+}
+
 async function main() {
   console.log('Phase 2 blocker-fix QA\n')
 
@@ -75,7 +88,7 @@ async function main() {
   console.log('1) resolveShopifyGovernedEntitlement — a non-Shopify user is untouched (returns null)')
   {
     const admin = new FakeAdmin({ shopify_connections: [], shopify_billing_migrations: [] })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u-no-shopify')
+    const r = await governedEntitlement(admin, 'u-no-shopify')
     check('null — caller falls back to normal PayPal/trial logic', r === null)
   }
 
@@ -92,7 +105,7 @@ async function main() {
         billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: handle, shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
         shopify_billing_migrations: [],
       })
-      const cr = await resolveShopifyGovernedEntitlement(cached as unknown as Admin, 'u1')
+      const cr = await governedEntitlement(cached, 'u1')
       check(`${handle} -> ${expectedCode}: governed with the right planCode`, cr?.governed === true && cr.planCode === expectedCode)
       check(`${handle} -> ${expectedCode}: limits are EXACTLY PLAN_LIMITS.${expectedCode} (same object identity)`,
         cr?.planCode != null && PLAN_LIMITS[cr.planCode] === PLAN_LIMITS[expectedCode as keyof typeof PLAN_LIMITS])
@@ -106,7 +119,7 @@ async function main() {
       billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'none', shopify_billing_verified_at: nowIso() })],
       shopify_billing_migrations: [],
     })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const r = await governedEntitlement(admin, 'u1')
     check('governed:true but planCode is null (NOT large_agency) — the subscriptions row is never read for this user', r?.governed === true && r.planCode === null)
   }
 
@@ -116,7 +129,7 @@ async function main() {
       billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: 'premium', shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 }],
     })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const r = await governedEntitlement(admin, 'u1')
     check('governed:true, planCode null, verificationError paypal_migration_incomplete', r?.governed === true && r.planCode === null && r.verificationError === 'paypal_migration_incomplete')
   }
 

@@ -63,6 +63,19 @@ function connRow(overrides: Record<string, unknown> = {}) {
 }
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
+/**
+ * The resolver now returns a DISCRIMINATED result so that an infrastructure
+ * failure can never be mistaken for "not Shopify-governed". These helpers keep
+ * the existing assertions readable: `governedEntitlement` is the old
+ * `ShopifyGovernedEntitlement | null` shape, and it THROWS on 'unavailable' so
+ * a test can never silently pass through an outage.
+ */
+async function governedEntitlement(adminClient: unknown, userId: string) {
+  const r = await resolveShopifyGovernedEntitlement(adminClient as never, userId)
+  if (r.kind === 'unavailable') throw new Error(`unexpected unavailable: ${r.reason}`)
+  return r.kind === 'governed' ? r.entitlement : null
+}
+
 async function main() {
   console.log('Cache-tightening fix — TTL + invalidation QA\n')
 
@@ -70,7 +83,7 @@ async function main() {
   {
     liveCallCount = 0
     const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(4) })], shopify_billing_migrations: [] })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const r = await governedEntitlement(admin, 'u1')
     check('planCode resolved from cache (premium)', r?.planCode === 'premium')
     check('zero live Partner API calls made', liveCallCount === 0)
   }
@@ -80,7 +93,7 @@ async function main() {
     liveCallCount = 0
     const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(6) })], shopify_billing_migrations: [] })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody })) // the REAL current state has since changed
-    const r = await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    const r = await withFetch(f, () => governedEntitlement(admin, 'u1'))
     check('a live Partner API call was made', liveCallCount === 1)
     check('the STALE cached "active" value is NOT trusted — reflects the live (now inactive) result', r?.planCode === null)
   }
@@ -118,7 +131,7 @@ async function main() {
     row.connection_status = 'connected'
     liveCallCount = 0
     const f = fakePartnerFetch(() => ({ status: 200, body: activeSubBody('regular') }))
-    const r = await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    const r = await withFetch(f, () => governedEntitlement(admin, 'u1'))
     check('a live check was forced immediately after reinstall (cache was invalidated, not stale-trusted)', liveCallCount === 1)
     check('the live (current) plan is what gets granted, not the pre-uninstall cached one', r?.planCode === 'regular')
   }
@@ -129,14 +142,14 @@ async function main() {
       billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })], // fresh active cache
       shopify_billing_migrations: [],
     })
-    const before = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const before = await governedEntitlement(admin, 'u1')
     check('before any migration: cache-derived plan granted', before?.planCode === 'premium')
 
     // A migration starts (e.g. this user just connected while still a real
     // PayPal payer) — nothing "invalidates" the cache; the migration check
     // itself is a fresh read on every call.
     admin.tables.shopify_billing_migrations.push({ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 })
-    const during = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const during = await governedEntitlement(admin, 'u1')
     check('immediately after a migration starts (same fresh cache, no TTL change): entitlement is blocked', during?.planCode === null && during?.verificationError === 'paypal_migration_incomplete')
   }
 

@@ -19,11 +19,17 @@
 --                        'website'           registered on the website
 --                        'shopify_app_store' created by a verified direct
 --                                            Shopify App Store install
+--                        'unknown'           genuinely not known. Used for
+--                                            every pre-existing account, and
+--                                            whenever the server cannot PROVE
+--                                            how an account began. Provenance
+--                                            is never invented.
 --   billing_authority  who bills it RIGHT NOW.
 --                        'website'  website trial / PayPal
 --                        'shopify'  Shopify App Pricing
 --
--- signup_origin is provenance and does not change once set. billing_authority
+-- signup_origin is provenance and does not change once set — not even when an
+-- existing website account later installs from the App Store. billing_authority
 -- may change, but only through an explicit trusted transition (a verified
 -- direct App Store install being linked, or a COMPLETED PayPal→Shopify
 -- migration) — never because a connection was created, disconnected, revoked,
@@ -47,8 +53,13 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.billing_governance (
   user_id               uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  signup_origin         text NOT NULL DEFAULT 'website'
-                          CHECK (signup_origin IN ('website', 'shopify_app_store')),
+  -- Provenance of the ACCOUNT. Set once and never rewritten: an account that
+  -- registered on the website stays 'website' even after the same person
+  -- installs from the App Store, because how the account BEGAN and how a given
+  -- store was installed are different facts. The install fact is recorded by
+  -- billing_authority + authority_reason instead.
+  signup_origin         text NOT NULL DEFAULT 'unknown'
+                          CHECK (signup_origin IN ('website', 'shopify_app_store', 'unknown')),
   billing_authority     text NOT NULL DEFAULT 'website'
                           CHECK (billing_authority IN ('website', 'shopify')),
   -- Stable, non-sensitive code naming the trusted transition that last set
@@ -99,6 +110,12 @@ GRANT SELECT, INSERT, UPDATE ON TABLE public.billing_governance TO service_role;
 --      after a successful Shopify Partner API check, so it is an authoritative
 --      Shopify billing record, not an inference from the connection existing.
 --
+-- Note the split: signup_origin is backfilled as 'unknown' for everyone,
+-- because provenance genuinely was not recorded; billing_authority still
+-- defaults to 'website', because that is the safe and almost always correct
+-- answer for who bills a website-first product. An unknown origin therefore
+-- never implies Shopify authority.
+--
 -- KNOWN AMBIGUOUS CATEGORY, deliberately NOT guessed: an account that
 -- installed directly from the Shopify App Store but has not yet chosen a plan
 -- has no surviving authoritative marker — shopify_pending_installs rows are
@@ -111,8 +128,11 @@ GRANT SELECT, INSERT, UPDATE ON TABLE public.billing_governance TO service_role;
 INSERT INTO public.billing_governance (user_id, signup_origin, billing_authority, authority_reason, authority_changed_at)
 SELECT
   u.id,
-  -- Provenance is unknown for pre-existing accounts and is never invented.
-  'website',
+  -- Provenance is genuinely UNKNOWN for pre-existing accounts: nothing durable
+  -- recorded how they began. 'unknown' says exactly that. Writing 'website'
+  -- here would be inventing a fact, even though website is the safe default for
+  -- billing AUTHORITY (the next column), which is a different question.
+  'unknown',
   CASE WHEN proof.user_id IS NOT NULL THEN 'shopify' ELSE 'website' END,
   CASE WHEN proof.user_id IS NOT NULL THEN proof.reason ELSE 'backfill_website_default' END,
   CASE WHEN proof.user_id IS NOT NULL THEN pg_catalog.now() ELSE NULL END

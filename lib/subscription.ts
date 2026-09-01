@@ -11,7 +11,7 @@ import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
  * migration) gets ZERO product entitlement — never the local website
  * trial's limits. See lib/shopify/entitlement-resolver.ts.
  */
-export type PlanType = 'trial' | 'shopify_billing_required' | SubscriptionPlan
+export type PlanType = 'trial' | 'shopify_billing_required' | 'entitlement_unavailable' | SubscriptionPlan
 
 export interface PlanLimits {
   maxProjects: number
@@ -96,6 +96,18 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     maxScansPerPeriod: 0, maxArticlesPerPeriodAccountWide: 0,
     price: 0, priceUSD: 0, label: 'נדרש חיוב דרך Shopify',
   },
+  // The entitlement could not be DETERMINED (governance/connection/migration
+  // read failure). Zero limits, exactly like shopify_billing_required — but a
+  // DIFFERENT state, because the user is not being told to buy anything: the
+  // system does not currently know what they are entitled to. Never persisted;
+  // it exists only for the lifetime of a failed resolution.
+  entitlement_unavailable: {
+    maxProjects: 0, maxClients: 0, maxKeywordsPerProject: 0,
+    maxKeywordChecksPerPeriodPerProject: 0,  maxKeywordChecksTotal: 0,
+    maxAIScansPerPeriodPerProject: 0,        maxAIScansTotal: 0,
+    maxScansPerPeriod: 0, maxArticlesPerPeriodAccountWide: 0,
+    price: 0, priceUSD: 0, label: 'לא ניתן לאמת כרגע את ההרשאות',
+  },
   // Phase 3 — regular/advanced/premium/large_agency numeric limits + prices
   // are ALL derived from lib/plans/catalog.ts (the single source of truth
   // also consumed by public marketing pages) — never hand-duplicated here.
@@ -108,6 +120,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
   trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות גוגל בתקופת הניסיון', 'עד 3 בדיקות AI בתקופת הניסיון', 'מאמר AI אחד בתקופת הניסיון', '7 ימי ניסיון'],
   shopify_billing_required: ['יש לבחור תוכנית ב-Shopify App Pricing כדי להשתמש במערכת'],
+  entitlement_unavailable: ['לא ניתן לאמת כרגע את ההרשאות. נסו שוב בעוד רגע.'],
   regular: ['פרויקט אחד', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 10 בדיקות AI בכל מחזור חיוב לפרויקט', '4 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
   advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 10 בדיקות AI בכל מחזור חיוב לפרויקט', '20 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
   premium: ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 20 בדיקות AI בכל מחזור חיוב לפרויקט', '50 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
@@ -169,8 +182,28 @@ export async function getUserEntitlement(
   // manually-granted row, or PayPal history is never read for entitlement —
   // see lib/shopify/entitlement-resolver.ts's header for why (this is
   // exactly what closes the shopify@gotop.co.il reviewer-bypass gap).
-  const shopifyGoverned = await resolveShopifyGovernedEntitlement(supabase, userId)
-  if (shopifyGoverned) {
+  const resolution = await resolveShopifyGovernedEntitlement(supabase, userId)
+
+  // FAIL CLOSED on an infrastructure failure. Falling through to the
+  // subscriptions table here would hand a Shopify-governed merchant the website
+  // trial, and reporting 'shopify_billing_required' would tell a paying
+  // customer to buy a plan because a query failed. Neither is acceptable, so
+  // this is its own zero-entitlement state that says only "not known right now".
+  if (resolution.kind === 'unavailable') {
+    return {
+      plan: 'entitlement_unavailable',
+      limits: PLAN_LIMITS.entitlement_unavailable,
+      isAdmin: false,
+      trialActive: false,
+      trialEndsAt: null,
+      hasActiveSubscription: false,
+      subscriptionEndsAt: null,
+      subscriptionId: null,
+    }
+  }
+
+  if (resolution.kind === 'governed') {
+    const shopifyGoverned = resolution.entitlement
     // Blocker fix — a Shopify-connected merchant with no VERIFIED Shopify
     // App Pricing plan gets ZERO product entitlement, never the local
     // website trial's limits (PLAN_LIMITS.shopify_billing_required is all

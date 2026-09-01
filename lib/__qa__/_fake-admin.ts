@@ -223,7 +223,12 @@ export class FakeAdmin {
    * project-integrity guard in finalize_article_generation below (a real
    * guard, not a locking artifact — JS can and does reproduce it exactly).
    */
+  /** Per-RPC error injectors, so atomic-transition failure paths are testable. */
+  public rpcHooks: Record<string, () => { message: string; code?: string } | null> = {}
+
   async rpc(name: string, params: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }> {
+    const injected = this.rpcHooks[name]?.() ?? null
+    if (injected) return { data: null, error: injected }
     const reservations = (this.tables.usage_reservations ??= [])
     const TTL_MS = 30 * 60 * 1000
     const nowIso = () => new Date(this.now()).toISOString()
@@ -377,6 +382,7 @@ export class FakeAdmin {
           live.storefront_domain = p.p_storefront_domain
           live.access_token_encrypted = p.p_access_token_encrypted
           live.refresh_token_encrypted = p.p_refresh_token_encrypted ?? null
+          live.oauth_app_edition = p.p_oauth_app_edition ?? null
           live.access_token_expires_at = p.p_access_token_expires_at ?? null
           live.refresh_token_expires_at = p.p_refresh_token_expires_at ?? null
           live.api_version = p.p_api_version
@@ -423,6 +429,7 @@ export class FakeAdmin {
           refresh_token_encrypted: p.p_refresh_token_encrypted ?? null,
           access_token_expires_at: p.p_access_token_expires_at ?? null,
           refresh_token_expires_at: p.p_refresh_token_expires_at ?? null,
+          oauth_app_edition: p.p_oauth_app_edition ?? null,
           api_version: p.p_api_version,
           granted_scopes: p.p_granted_scopes, connection_status: p.p_connection_status,
           last_error: p.p_last_error, last_tested_at: now, updated_at: now,
@@ -439,11 +446,205 @@ export class FakeAdmin {
         refresh_token_encrypted: p.p_refresh_token_encrypted ?? null,
         access_token_expires_at: p.p_access_token_expires_at ?? null,
         refresh_token_expires_at: p.p_refresh_token_expires_at ?? null,
+        oauth_app_edition: p.p_oauth_app_edition ?? null,
         api_version: p.p_api_version, granted_scopes: p.p_granted_scopes,
         connection_status: p.p_connection_status, last_error: p.p_last_error,
         last_tested_at: now, created_at: now, updated_at: now, archived_at: null, archived_reason: null,
       })
       return finish('claimed', id)
+    }
+
+    // ── Refresh lease (20260901010000) ────────────────────────────────────
+    // Mirrors the SQL branch for branch: serialize BEFORE the external call,
+    // and let only the lease owner holding the expected ciphertext store a
+    // rotated pair.
+    if (name === 'begin_shopify_token_refresh') {
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | number>
+      const row = rows.find((r) => r.id === p.p_connection_id && !r.archived_at)
+      const nowMs = this.now()
+      const one = (o: Record<string, unknown>) => ({ data: [o], error: null })
+      const base = (r: Row) => ({
+        access_token_encrypted: r.access_token_encrypted ?? null,
+        oauth_app_edition: r.oauth_app_edition ?? null,
+      })
+      if (!row) return one({ outcome: 'not_found', lease_token: null, access_token_encrypted: null, refresh_token_encrypted: null, oauth_app_edition: null })
+      if (row.last_error === 'app_uninstalled') return one({ outcome: 'uninstalled', lease_token: null, refresh_token_encrypted: null, ...base(row) })
+      const minValid = Number(p.p_min_valid_seconds ?? 300)
+      const exp = row.access_token_expires_at ? new Date(String(row.access_token_expires_at)).getTime() : null
+      if (exp !== null && exp > nowMs + minValid * 1000) {
+        return one({ outcome: 'fresh', lease_token: null, refresh_token_encrypted: null, ...base(row) })
+      }
+      if (!row.refresh_token_encrypted) return one({ outcome: 'no_refresh_material', lease_token: null, refresh_token_encrypted: null, ...base(row) })
+      if (!row.oauth_app_edition) return one({ outcome: 'unknown_edition', lease_token: null, refresh_token_encrypted: null, access_token_encrypted: row.access_token_encrypted ?? null, oauth_app_edition: null })
+      const leaseUntil = row.token_refresh_lease_until ? new Date(String(row.token_refresh_lease_until)).getTime() : null
+      if (row.token_refresh_lease_token && leaseUntil !== null && leaseUntil > nowMs) {
+        return one({ outcome: 'locked', lease_token: null, refresh_token_encrypted: null, ...base(row) })
+      }
+      const lease = `fake-lease-${++fakeRpcIdCounter}`
+      row.token_refresh_lease_token = lease
+      row.token_refresh_lease_until = new Date(nowMs + Number(p.p_lease_seconds ?? 60) * 1000).toISOString()
+      row.updated_at = nowIso()
+      return one({ outcome: 'granted', lease_token: lease, refresh_token_encrypted: row.refresh_token_encrypted, ...base(row) })
+    }
+
+    if (name === 'complete_shopify_token_refresh') {
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | null>
+      const row = rows.find((r) => r.id === p.p_connection_id && !r.archived_at)
+      const one = (outcome: string) => ({ data: [{ outcome }], error: null })
+      if (!p.p_lease_token || !p.p_access_token_encrypted || !p.p_refresh_token_encrypted || !p.p_access_token_expires_at) return one('invalid_rotation')
+      if (!row) return one('lease_lost')
+      // THE anti-clobber rule: still the lease owner AND the credential is
+      // still the one this caller was given, and never over an uninstall.
+      if (row.last_error === 'app_uninstalled') return one('lease_lost')
+      if (row.token_refresh_lease_token !== p.p_lease_token) return one('lease_lost')
+      if (row.access_token_encrypted !== p.p_expected_access_token_encrypted) return one('lease_lost')
+      row.access_token_encrypted = p.p_access_token_encrypted
+      row.refresh_token_encrypted = p.p_refresh_token_encrypted
+      row.access_token_expires_at = p.p_access_token_expires_at
+      row.refresh_token_expires_at = p.p_refresh_token_expires_at
+      row.token_refresh_lease_token = null
+      row.token_refresh_lease_until = null
+      row.connection_status = 'connected'
+      if (row.last_error === 'invalid_token' || row.last_error === 'refresh_token_invalid') row.last_error = null
+      row.updated_at = nowIso()
+      return one('rotated')
+    }
+
+    if (name === 'fail_shopify_token_refresh') {
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | boolean | null>
+      const row = rows.find((r) => r.id === p.p_connection_id && !r.archived_at)
+      const one = (outcome: string) => ({ data: [{ outcome }], error: null })
+      if (!row) return one('lease_lost')
+      if (row.token_refresh_lease_token !== p.p_lease_token) return one('lease_lost')
+      row.token_refresh_lease_token = null
+      row.token_refresh_lease_until = null
+      row.updated_at = nowIso()
+      if (p.p_terminal !== true) return one('released')
+      if (row.last_error === 'app_uninstalled' || row.access_token_encrypted !== p.p_expected_access_token_encrypted) {
+        return one('stale_terminal_ignored')
+      }
+      row.connection_status = 'failed'
+      row.last_error = (p.p_last_error as string) ?? 'refresh_token_invalid'
+      return one('terminal')
+    }
+
+    // ── Atomic billing transitions (20260901020000) ───────────────────────
+    if (name === 'complete_shopify_app_store_link') {
+      const p = params as Record<string, string>
+      const pendings = (this.tables.shopify_pending_installs ??= [])
+      const now = nowIso()
+      const one = (o: Record<string, unknown>) => ({ data: [o], error: null })
+      const pending = pendings.find((r) => r.token === p.p_pending_token && !r.consumed_at
+        && new Date(String(r.expires_at)).getTime() > this.now())
+      if (!pending) return one({ outcome: 'pending_invalid', connection_id: null, billing_authority: null, migration_created: false })
+
+      // Snapshot for rollback: everything below either all lands or none does.
+      const connSnapshot = JSON.parse(JSON.stringify(this.tables.shopify_connections ?? []))
+      const govSnapshot = JSON.parse(JSON.stringify(this.tables.billing_governance ?? []))
+      const migSnapshot = JSON.parse(JSON.stringify(this.tables.shopify_billing_migrations ?? []))
+      pending.consumed_at = now
+
+      const claim = await this.rpc('claim_shopify_shop_ownership', {
+        p_user_id: p.p_user_id, p_project_id: p.p_project_id,
+        p_shop_domain: pending.shop_domain, p_shop_gid: pending.shop_gid,
+        p_access_token_encrypted: pending.access_token_encrypted, p_api_version: pending.api_version,
+        p_granted_scopes: pending.granted_scopes, p_storefront_domain: pending.storefront_domain,
+        p_connection_status: p.p_connection_status, p_last_error: p.p_last_error,
+        p_refresh_token_encrypted: pending.refresh_token_encrypted,
+        p_access_token_expires_at: pending.access_token_expires_at,
+        p_refresh_token_expires_at: pending.refresh_token_expires_at,
+        p_oauth_app_edition: pending.oauth_app_edition,
+      })
+      const claimRow = (claim.data as { outcome?: string; connection_id?: string }[] | null)?.[0]
+      const rollback = () => {
+        pending.consumed_at = null
+        this.tables.shopify_connections = connSnapshot
+        this.tables.billing_governance = govSnapshot
+        this.tables.shopify_billing_migrations = migSnapshot
+      }
+      if (!claimRow || (claimRow.outcome !== 'claimed' && claimRow.outcome !== 'reactivated') || !claimRow.connection_id) {
+        rollback()
+        return { data: null, error: { message: `shopify_link_blocked:${claimRow?.outcome ?? 'save_failed'}` } }
+      }
+
+      // Billing moves ONLY for verified App Store provenance.
+      if (pending.install_origin !== 'shopify_app_store') {
+        return one({ outcome: 'linked', connection_id: claimRow.connection_id, billing_authority: null, migration_created: false })
+      }
+
+      const subs = (this.tables.subscriptions ??= [])
+      const paypal = subs.find((r) => r.user_id === p.p_user_id && r.status === 'active' && r.paypal_subscription_id)
+      const gov = (this.tables.billing_governance ??= [])
+      const existing = gov.find((r) => r.user_id === p.p_user_id)
+      // PROVENANCE IS NEVER REWRITTEN.
+      const origin = (existing?.signup_origin as string | undefined) ?? 'unknown'
+      let authority: string
+      let reason: string
+      let migrationCreated = false
+      if (paypal) {
+        authority = (existing?.billing_authority as string | undefined) ?? 'website'
+        reason = 'shopify_app_store_install_deferred_paypal_migration'
+        const migs = (this.tables.shopify_billing_migrations ??= [])
+        const active = migs.find((m) => m.user_id === p.p_user_id
+          && ['pending', 'shopify_confirmed', 'paypal_cancel_failed'].includes(String(m.status)))
+        if (!active) {
+          migs.push({ id: `fake-mig-${++fakeRpcIdCounter}`, user_id: p.p_user_id, project_id: p.p_project_id,
+            shopify_connection_id: claimRow.connection_id, paypal_subscription_id: paypal.paypal_subscription_id,
+            status: 'pending', created_at: now, updated_at: now })
+          migrationCreated = true
+        } else {
+          active.project_id = p.p_project_id
+          active.shopify_connection_id = claimRow.connection_id
+          active.updated_at = now
+        }
+      } else {
+        authority = 'shopify'
+        reason = 'shopify_app_store_install'
+      }
+      if (existing) {
+        existing.billing_authority = authority
+        existing.authority_reason = reason
+        existing.updated_at = now
+      } else {
+        gov.push({ user_id: p.p_user_id, signup_origin: origin, billing_authority: authority,
+          authority_reason: reason, authority_changed_at: now, created_at: now, updated_at: now })
+      }
+      return one({ outcome: 'linked', connection_id: claimRow.connection_id, billing_authority: authority, migration_created: migrationCreated })
+    }
+
+    if (name === 'complete_shopify_paypal_migration') {
+      const p = params as Record<string, string>
+      const migs = (this.tables.shopify_billing_migrations ??= [])
+      const now = nowIso()
+      const one = (outcome: string) => ({ data: [{ outcome }], error: null })
+      const mig = migs.find((m) => m.id === p.p_migration_id && m.user_id === p.p_user_id
+        && ['pending', 'shopify_confirmed', 'paypal_cancel_failed'].includes(String(m.status)))
+      if (!mig) return one('unexpected_status')
+      mig.status = 'completed'
+      mig.last_error = null
+      mig.updated_at = now
+      const gov = (this.tables.billing_governance ??= [])
+      const existing = gov.find((r) => r.user_id === p.p_user_id)
+      if (existing) {
+        existing.billing_authority = 'shopify'
+        existing.authority_reason = 'paypal_migration_completed'
+        existing.authority_changed_at = now
+        existing.updated_at = now
+      } else {
+        gov.push({ user_id: p.p_user_id, signup_origin: 'unknown', billing_authority: 'shopify',
+          authority_reason: 'paypal_migration_completed', authority_changed_at: now, created_at: now, updated_at: now })
+      }
+      if (p.p_paypal_subscription_id) {
+        for (const sub of (this.tables.subscriptions ??= [])) {
+          if (sub.paypal_subscription_id === p.p_paypal_subscription_id && sub.status !== 'cancelled') {
+            sub.status = 'cancelled'; sub.updated_at = now
+          }
+        }
+      }
+      return one('completed')
     }
 
     return { data: null, error: { message: `unknown rpc: ${name}` } }

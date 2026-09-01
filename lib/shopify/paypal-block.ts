@@ -27,7 +27,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getActiveMigration } from './paypal-migration'
+import { getActiveMigrationResult } from './paypal-migration'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -50,6 +50,10 @@ export async function hasActiveShopifyConnection(admin: Admin, userId: string): 
  */
 export async function isShopifyBillingRequiredForUser(admin: Admin, userId: string): Promise<boolean> {
   if (await hasActiveShopifyConnection(admin, userId)) return true
-  const migration = await getActiveMigration(admin, userId)
-  return !!migration
+  // FAIL CLOSED: an unreadable migration state blocks PayPal rather than
+  // letting a database error open a second billing channel for an account that
+  // may already be mid-migration to Shopify.
+  const migration = await getActiveMigrationResult(admin, userId)
+  if (!migration.ok) return true
+  return !!migration.migration
 }

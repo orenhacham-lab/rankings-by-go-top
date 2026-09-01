@@ -31,8 +31,8 @@ import type { SubscriptionPlan } from '@/lib/supabase/types'
 import { getActiveShopifySubscription } from './partner-client'
 import { recordShopifyBillingCache } from './billing-cache'
 import type { ShopifyPlanHandle } from './constants'
-import { getActiveMigration } from './paypal-migration'
-import { isShopifyBillingAuthority } from '@/lib/billing/governance'
+import { getActiveMigrationResult } from './paypal-migration'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -44,6 +44,19 @@ const SHOPIFY_HANDLE_TO_PLAN_CODE: Record<ShopifyPlanHandle, SubscriptionPlan> =
   premium: 'premium',
   'large-agency': 'large_agency',
 }
+
+/**
+ * The three genuinely different answers to "does Shopify bill this user, and
+ * what are they entitled to". `unavailable` is the one that used to be missing:
+ * an infrastructure failure must never be reported as "not Shopify-governed",
+ * because that falls through to the website trial/PayPal resolution and can
+ * hand a Shopify merchant free entitlement — or, in the other direction, tell a
+ * paying customer to buy a plan because a query failed.
+ */
+export type ShopifyEntitlementResolution =
+  | { kind: 'not_governed' }
+  | { kind: 'governed'; entitlement: ShopifyGovernedEntitlement }
+  | { kind: 'unavailable'; reason: string }
 
 export interface ShopifyGovernedEntitlement {
   governed: true
@@ -119,12 +132,16 @@ function fromCache(c: ConnectionRow): ShopifyGovernedEntitlement {
  * or unverifiable billing returns `planCode: null` (floor tier), never a
  * silent fallback to PayPal data.
  */
-export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: string): Promise<ShopifyGovernedEntitlement | null> {
+export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: string): Promise<ShopifyEntitlementResolution> {
   // AUTHORITY FIRST — before any connection lookup. A website-governed account
   // is not a Shopify billing question at all, however many stores it connects.
-  if (!(await isShopifyBillingAuthority(admin, userId))) return null
+  // A governance READ FAILURE is not "website": it is an outage, and it stops
+  // the resolution here rather than falling through to trial/PayPal data.
+  const authority = await resolveBillingAuthority(admin, userId)
+  if (!authority.ok) return { kind: 'unavailable', reason: authority.reason }
+  if (authority.authority !== 'shopify') return { kind: 'not_governed' }
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from('shopify_connections')
     .select('id, shop_domain, shop_gid, shopify_plan_handle, shopify_subscription_status, shopify_current_period_end, shopify_current_period_start, shopify_billing_verified_at')
     .eq('user_id', userId)
@@ -134,32 +151,40 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
     .limit(1)
     .maybeSingle()
 
+  // A FAILED connection lookup is not "no connection": it is an outage. Saying
+  // "no connection" here would be harmless for entitlement (both give the
+  // Shopify floor) but would misreport WHY, so it is surfaced honestly.
+  if (error) return { kind: 'unavailable', reason: 'connection_query_failed' }
+
   // A Shopify-governed account whose store is currently unusable — failed
   // token, uninstalled, disconnected, archived — is STILL Shopify-governed.
-  // Returning null here would fall through to the website trial/PayPal
-  // resolution and hand the merchant a fresh website trial as a side effect of
-  // a token failure, which is exactly what must never happen. It resolves to
-  // the zero-entitlement floor instead: the account keeps its Shopify
-  // authority and is told to reconnect / choose a plan.
+  // Returning "not governed" here would fall through to the website
+  // trial/PayPal resolution and hand the merchant a fresh website trial as a
+  // side effect of a token failure, which must never happen. It resolves to the
+  // zero-entitlement floor instead: the account keeps its Shopify authority and
+  // is told to reconnect or choose a plan.
   if (!data) {
-    return { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'no_active_shopify_connection' }
+    return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'no_active_shopify_connection' } }
   }
   const connection = data as ConnectionRow
 
   // An in-progress PayPal→Shopify migration means Shopify is not yet the
   // safely-confirmed sole provider — never grant Shopify-plan entitlement
   // (or fall back to PayPal data) while that's unresolved; floor tier only.
-  const activeMigration = await getActiveMigration(admin, userId)
-  if (activeMigration) {
-    return { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'paypal_migration_incomplete' }
+  // A migration LOOKUP FAILURE must never read as "no migration in flight" —
+  // that would grant full Shopify entitlement to an account mid-migration.
+  const migration = await getActiveMigrationResult(admin, userId)
+  if (!migration.ok) return { kind: 'unavailable', reason: 'migration_query_failed' }
+  if (migration.migration) {
+    return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'paypal_migration_incomplete' } }
   }
 
   const fresh = connection.shopify_billing_verified_at
     && Date.now() - new Date(connection.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS
-  if (fresh) return fromCache(connection)
+  if (fresh) return { kind: 'governed', entitlement: fromCache(connection) }
 
   if (!connection.shop_gid) {
-    return { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' }
+    return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' } }
   }
 
   const result = await getActiveShopifySubscription(connection.shop_gid, fetch, connection.shop_domain)
@@ -178,7 +203,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
     // never touches or removes access for users who never installed
     // Shopify (they never reach this function at all: it returned null
     // above for them).
-    return { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: result.reason }
+    return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: result.reason } }
   }
 
   if (!result.active) {
@@ -191,7 +216,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
       shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: null,
     })
-    return { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: null }
+    return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: null } }
   }
 
   await recordShopifyBillingCache(admin, connection.id, {
@@ -207,11 +232,14 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
     shopify_billing_last_error: null,
   })
   return {
-    governed: true,
-    planCode: SHOPIFY_HANDLE_TO_PLAN_CODE[result.planHandle],
-    hasActiveSubscription: true,
-    currentPeriodEnd: result.currentPeriodEnd,
-    verificationError: null,
+    kind: 'governed',
+    entitlement: {
+      governed: true,
+      planCode: SHOPIFY_HANDLE_TO_PLAN_CODE[result.planHandle],
+      hasActiveSubscription: true,
+      currentPeriodEnd: result.currentPeriodEnd,
+      verificationError: null,
+    },
   }
 }
 
@@ -224,12 +252,16 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
  * load, and pricing-return — a user actively using the product will have a
  * fresh cache almost all the time.
  */
-export async function isShopifyGovernedAndActive(admin: Admin, userId: string): Promise<{ governed: boolean; active: boolean }> {
-  // Same authority rule as resolveShopifyGovernedEntitlement — a connection
-  // row never decides governance on its own.
-  if (!(await isShopifyBillingAuthority(admin, userId))) return { governed: false, active: false }
+export async function isShopifyGovernedAndActive(admin: Admin, userId: string): Promise<{ governed: boolean; active: boolean; unavailable?: true }> {
+  // Same authority rule as resolveShopifyGovernedEntitlement — a connection row
+  // never decides governance on its own — and the same fail-closed rule: an
+  // unreadable governance record reports `unavailable`, never
+  // `{ governed: false }`, which would grant website access on a DB outage.
+  const authority = await resolveBillingAuthority(admin, userId)
+  if (!authority.ok) return { governed: true, active: false, unavailable: true }
+  if (authority.authority !== 'shopify') return { governed: false, active: false }
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from('shopify_connections')
     .select('shopify_subscription_status, shopify_billing_verified_at')
     .eq('user_id', userId)
@@ -238,7 +270,11 @@ export async function isShopifyGovernedAndActive(admin: Admin, userId: string): 
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  if (!data) return { governed: false, active: false }
+  // A Shopify-governed account is STILL governed when its connection is
+  // missing, failed or unreadable — it is simply not active. Reporting
+  // `governed: false` here would send it back to website access.
+  if (error) return { governed: true, active: false, unavailable: true }
+  if (!data) return { governed: true, active: false }
   const row = data as { shopify_subscription_status: string | null; shopify_billing_verified_at: string | null }
   const fresh = row.shopify_billing_verified_at
     && Date.now() - new Date(row.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS

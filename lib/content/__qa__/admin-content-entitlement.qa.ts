@@ -86,7 +86,8 @@ async function main() {
     // The pre-fix implementation, reproduced verbatim: no role check at all.
     const { resolveShopifyGovernedEntitlement } = await import('../../shopify/entitlement-resolver')
     const preFix = async (adminClient: unknown, userId: string) => {
-      const governed = await resolveShopifyGovernedEntitlement(adminClient, userId)
+      const r = await resolveShopifyGovernedEntitlement(adminClient as never, userId)
+      const governed = r.kind === 'governed' ? r.entitlement : null
       return governed && governed.planCode === null ? { allowed: false } : { allowed: true }
     }
     const admin = new FakeAdmin({

@@ -18,6 +18,9 @@ export type AiQuestionsAuthResult =
   | { ok: false; status: 401; error: 'Unauthorized' }
   | { ok: false; status: 403; error: 'Forbidden' }
   | { ok: false; status: 403; error: 'Shopify billing required'; reason: 'shopify_billing_required' }
+  /** The entitlement could not be determined — an outage, so retryable (503),
+   *  and deliberately NOT phrased as a billing requirement. */
+  | { ok: false; status: 503; error: 'Entitlement temporarily unavailable'; reason: 'entitlement_unavailable' }
 
 /**
  * Runs BEFORE any billable provider call: session presence, project
@@ -38,7 +41,14 @@ export async function authorizeAiQuestionGeneration(
   }
 
   const gate = await assertContentGenerationAllowedForUser(admin, userId)
-  if (!gate.allowed) return { ok: false, status: 403, error: 'Shopify billing required', reason: gate.reason }
+  if (!gate.allowed) {
+    // An infrastructure failure is a 503 the caller may retry — never a 403
+    // telling the customer to buy a plan.
+    if (gate.reason === 'entitlement_unavailable') {
+      return { ok: false, status: 503, error: 'Entitlement temporarily unavailable', reason: 'entitlement_unavailable' }
+    }
+    return { ok: false, status: 403, error: 'Shopify billing required', reason: gate.reason }
+  }
 
   return { ok: true, userId }
 }

@@ -67,7 +67,7 @@ async function main() {
   const { applyAppUninstalled } = await import('../shop-cleanup')
   const { createPendingInstall, loadValidPendingInstall } = await import('../pending-link')
   const { claimShopForProject } = await import('../connection-ownership')
-  const { getBillingGovernance } = await import('@/lib/billing/governance')
+  const { resolveBillingAuthority } = await import('@/lib/billing/governance')
 
   const conn = (over: Record<string, unknown> = {}) => ({
     id: 'c1', shop_domain: SHOP, project_id: 'p1', user_id: 'u1', archived_at: null,
@@ -254,7 +254,7 @@ async function main() {
     check('6d: which app-home classifies as needsInstall',
       classifyReinstallNeed(row as never).needsInstall === true && classifyReinstallNeed(row as never).reason === 'credential_revoked')
     check('6e: BILLING AUTHORITY is unchanged',
-      (await getBillingGovernance(admin as never, 'u1')).billingAuthority === 'shopify')
+      (await resolveBillingAuthority(admin as never, 'u1') as { authority: string }).authority === 'shopify')
 
     // TRANSIENT — nothing changes at all.
     const admin2 = mk()
@@ -302,7 +302,7 @@ async function main() {
       && decryptCredential(row.access_token_encrypted as string) === '__revoked__')
     check('7e: tombstone semantics unchanged', row.connection_status === 'failed' && row.last_error === 'app_uninstalled')
     check('7f: and billing authority is untouched by the uninstall',
-      (await getBillingGovernance(admin as never, 'u1')).billingAuthority === 'shopify')
+      (await resolveBillingAuthority(admin as never, 'u1') as { authority: string }).authority === 'shopify')
   }
 
   console.log('\n8) No token reaches a log, a client response, or the wrong app secret')

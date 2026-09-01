@@ -44,7 +44,15 @@ type Admin = ReturnType<typeof createAdminClient>
 
 export type ContentGenerationGateResult =
   | { allowed: true }
+  /** Shopify governs this account and it has no verified plan — a real billing answer. */
   | { allowed: false; reason: 'shopify_billing_required' }
+  /**
+   * The entitlement could not be DETERMINED: the governance record, the
+   * connection or the migration state was unreadable. This is an infrastructure
+   * failure, and it must never be presented as "buy a plan" — the caller should
+   * surface a retryable 503-shaped error.
+   */
+  | { allowed: false; reason: 'entitlement_unavailable'; detail: string }
 
 /**
  * Resolve straight from a known, already-trusted userId (e.g.
@@ -69,8 +77,15 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
   // are untouched — this only decides billing entitlement, never access.
   if (await isAdminUser(admin, userId)) return { allowed: true }
 
-  const governed = await resolveShopifyGovernedEntitlement(admin, userId)
-  if (governed && governed.planCode === null) return { allowed: false, reason: 'shopify_billing_required' }
+  const resolution = await resolveShopifyGovernedEntitlement(admin, userId)
+  // An outage is NOT a billing verdict. Telling a paying customer to purchase a
+  // plan because a query failed is worse than refusing the request honestly.
+  if (resolution.kind === 'unavailable') {
+    return { allowed: false, reason: 'entitlement_unavailable', detail: resolution.reason }
+  }
+  if (resolution.kind === 'governed' && resolution.entitlement.planCode === null) {
+    return { allowed: false, reason: 'shopify_billing_required' }
+  }
   return { allowed: true }
 }
 

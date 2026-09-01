@@ -31,7 +31,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { cancelPayPalSubscription } from '@/lib/paypal/client'
-import { markMigrationCompleted } from '@/lib/billing/governance'
+
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -50,15 +50,41 @@ export interface MigrationRow {
 
 const nowIso = () => new Date().toISOString()
 
-/** The user's current non-terminal migration row, if any. Null when there is none. */
+/**
+ * The user's current non-terminal migration row — reporting whether the QUERY
+ * itself succeeded.
+ *
+ * A failed lookup is not "no migration in flight". Collapsing the two would let
+ * a database error grant full Shopify entitlement to an account that is halfway
+ * through a PayPal migration, so every caller that makes an entitlement or
+ * billing decision must use this and fail closed.
+ */
+export async function getActiveMigrationResult(
+  admin: Admin,
+  userId: string,
+): Promise<{ ok: true; migration: MigrationRow | null } | { ok: false; reason: string }> {
+  try {
+    const { data, error } = await admin
+      .from('shopify_billing_migrations')
+      .select('*')
+      .eq('user_id', userId)
+      .in('status', ACTIVE_STATUSES as string[])
+      .maybeSingle()
+    if (error) return { ok: false, reason: (error.code || error.message || 'migration_query_failed').slice(0, 120) }
+    return { ok: true, migration: (data as MigrationRow | null) ?? null }
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message.slice(0, 120) : 'migration_query_threw' }
+  }
+}
+
+/**
+ * Convenience wrapper for DISPLAY-only callers, which have no billing decision
+ * to make and treat an unreadable migration the same as none. Every
+ * entitlement/billing decision must use getActiveMigrationResult instead.
+ */
 export async function getActiveMigration(admin: Admin, userId: string): Promise<MigrationRow | null> {
-  const { data } = await admin
-    .from('shopify_billing_migrations')
-    .select('*')
-    .eq('user_id', userId)
-    .in('status', ACTIVE_STATUSES as string[])
-    .maybeSingle()
-  return (data as MigrationRow | null) ?? null
+  const result = await getActiveMigrationResult(admin, userId)
+  return result.ok ? result.migration : null
 }
 
 /**
@@ -175,38 +201,40 @@ export async function confirmShopifyActiveAndAdvance(
     // retry (new intent, or any other call) safely re-attempts the same
     // write (re-cancelling an already-cancelled PayPal subscription is
     // itself idempotent — see lib/paypal/client.ts).
-    let confirmed = false
-    for (let i = 0; i < 3 && !confirmed; i++) {
-      const { data: updated, error } = await admin
-        .from('shopify_billing_migrations')
-        .update({ status: 'completed', last_error: null, updated_at: nowIso() })
-        .eq('id', migration.id)
-        .select('id')
-        .maybeSingle()
-      if (!error && updated) confirmed = true
+    // ATOMIC COMPLETION. The migration status, the billing authority and the
+    // local PayPal mirror are three consequences of ONE fact — that PayPal was
+    // actually cancelled — and they now land together or not at all
+    // (complete_shopify_paypal_migration, 20260901020000). Writing them as
+    // separate statements is what allowed the dangerous half-state: PayPal
+    // cancelled while the app still billed the account as a website customer.
+    //
+    // No external call happens inside the database. Shopify was verified and
+    // PayPal was cancelled ABOVE; this only persists that verified result.
+    let completed = false
+    let lastRpcError: string | null = null
+    for (let i = 0; i < 3 && !completed; i++) {
+      const { data, error } = await admin.rpc('complete_shopify_paypal_migration', {
+        p_migration_id: migration.id,
+        p_user_id: userId,
+        p_paypal_subscription_id: migration.paypal_subscription_id,
+      })
+      if (error) { lastRpcError = error.code || error.message || 'rpc_failed'; continue }
+      const outcome = ((Array.isArray(data) ? data[0] : data) as { outcome?: string } | null)?.outcome
+      if (outcome === 'completed') { completed = true; break }
+      // 'unexpected_status' means a concurrent transition already moved this
+      // migration; retrying cannot help and must not be reported as success.
+      lastRpcError = outcome ?? 'no_outcome'
+      break
     }
-    if (!confirmed) {
-      console.error('[shopify-migration] PayPal cancelled but the "completed" DB write could not be confirmed after retries', { migrationId: migration.id, userId })
+    if (!completed) {
+      // Never report 'completed' without a confirmed write. The publish guard
+      // reads the row directly — never this return value — so publishing stays
+      // correctly locked, and a later retry re-attempts the same idempotent
+      // transition (re-cancelling an already-cancelled PayPal subscription is
+      // itself idempotent — see lib/paypal/client.ts).
+      console.error('[shopify-migration] PayPal cancelled but the atomic completion could not be confirmed', { migrationId: migration.id, userId, reason: lastRpcError })
       return { status: migration.status, cancelFailed: false, dbWriteUnconfirmed: true }
     }
-
-    // BILLING AUTHORITY moves to Shopify HERE and only here for a migrating
-    // account — on the single CONFIRMED 'completed' transition, after Shopify
-    // was verified active AND the PayPal subscription was actually cancelled.
-    // A 'pending', 'shopify_confirmed' or 'paypal_cancel_failed' migration
-    // deliberately leaves the account on website/PayPal authority, so an
-    // abandoned or half-finished migration can never silently switch who bills
-    // it. Reached only after `confirmed`, so an unconfirmed write cannot move
-    // authority either.
-    await markMigrationCompleted(admin, userId)
-    // Best-effort local mirror — PayPal's own BILLING.SUBSCRIPTION.CANCELLED
-    // webhook will also arrive and apply the same update idempotently. Not
-    // retried: a miss here just means the mirror catches up via that webhook.
-    await admin
-      .from('subscriptions')
-      .update({ status: 'cancelled', updated_at: nowIso() })
-      .eq('paypal_subscription_id', migration.paypal_subscription_id)
-      .eq('status', 'active')
     return { status: 'completed', cancelFailed: false }
   }
 
