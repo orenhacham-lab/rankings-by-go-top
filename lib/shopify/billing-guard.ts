@@ -80,7 +80,7 @@ export async function checkShopifyPublishEntitlement(
   // 3) The live, authoritative check. Every failure mode of this call is
   //    ALREADY fail-closed (see partner-client.ts) — never treat an
   //    unverifiable result as entitled.
-  const result = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain, connection.oauth_app_edition)
+  const result = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain)
 
   if (!result.ok) {
     await recordBillingCache(admin, connection.id, {

@@ -16,7 +16,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeShopDomain } from './domain'
-import { getActiveShopifySubscription } from './partner-client'
+import { getActiveShopifySubscription, describeInactiveSubscription } from './partner-client'
 import { recordShopifyBillingCache } from './billing-cache'
 import { confirmShopifyActiveAndAdvance } from './paypal-migration'
 import { loadBillingIntentByNonce, consumeBillingIntent, hashBillingIntentNonce, isEmbeddedBillingIntent } from './billing-intent'
@@ -70,22 +70,6 @@ export interface BillingReturnResult {
   /** The connection's OWN canonical shop domain, for building that embedded
    *  destination server-side. Never a value from the request. */
   shopDomain: string | null
-}
-
-/**
- * A stable, non-sensitive note for shopify_billing_last_error, naming WHICH
- * app was actually asked. The app id is the public Shopify Dev Dashboard
- * identifier — never a token, secret, org token or shop credential. This is
- * the fact that made the Sep 2 incident invisible: "no active plan" and "we
- * asked the wrong app" were recorded identically.
- */
-function billingErrorNote(
-  code: string,
-  reason: string | null,
-  queried: { edition: string; appId: string | null } | undefined,
-): string {
-  const base = reason ? `${code}: ${reason}` : code
-  return queried ? `${base} (app=${queried.appId ?? 'unknown'} edition=${queried.edition})` : base
 }
 
 /**
@@ -162,12 +146,12 @@ async function reconcileFromVerifiedShopifyCallback(
   const route = { embedded: true, shopDomain: connection.shop_domain }
 
   // 3) The LIVE check — the only thing that may grant anything.
-  const verified = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain, connection.oauth_app_edition)
+  const verified = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain)
   if (!verified.ok) {
     await recordShopifyBillingCache(admin, connection.id, {
       shopify_plan_handle: null, shopify_subscription_status: 'unknown',
       shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
-      shopify_billing_last_error: billingErrorNote('verification_failed', verified.reason, verified.queried),
+      shopify_billing_last_error: `verification_failed: ${verified.reason}`,
     })
     return result('billing_verification_unavailable', connection.project_id, route)
   }
@@ -175,9 +159,7 @@ async function reconcileFromVerifiedShopifyCallback(
     await recordShopifyBillingCache(admin, connection.id, {
       shopify_plan_handle: null, shopify_subscription_status: 'none',
       shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
-      shopify_billing_last_error: verified.reason === 'unrecognized_plan_handle'
-        ? billingErrorNote(`unrecognized_plan_handle: ${(verified.rawHandles ?? []).join(',')}`, null, verified.queried)
-        : billingErrorNote('no_subscription_for_app', null, verified.queried),
+      shopify_billing_last_error: describeInactiveSubscription(verified.reason, verified.rawHandles),
     })
     return result(verified.reason === 'unrecognized_plan_handle' ? 'unrecognized_plan' : 'no_active_plan', connection.project_id, route)
   }
@@ -243,13 +225,12 @@ export async function processShopifyBillingReturn(
 
   const { data: connData } = await admin
     .from('shopify_connections')
-    .select('id, project_id, user_id, shop_domain, shop_gid, oauth_app_edition')
+    .select('id, project_id, user_id, shop_domain, shop_gid')
         .eq('id', intent.connection_id)
     .is('archived_at', null)
     .maybeSingle()
   const connection = connData as {
-    id: string; project_id: string; user_id: string; shop_domain: string
-    shop_gid: string | null; oauth_app_edition: ShopifyAppEdition | null
+    id: string; project_id: string; user_id: string; shop_domain: string; shop_gid: string | null
   } | null
   if (!connection) return result('connection_not_found', intent.project_id, route)
 
@@ -272,13 +253,13 @@ export async function processShopifyBillingReturn(
   const consumedNow = await consumeBillingIntent(admin, hashBillingIntentNonce(nonce))
   if (!consumedNow) return result('billing_intent_already_processed', intent.project_id, route)
 
-  const verified = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain, connection.oauth_app_edition)
+  const verified = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain)
 
   if (!verified.ok) {
     await recordShopifyBillingCache(admin, connection.id, {
       shopify_plan_handle: null, shopify_subscription_status: 'unknown',
       shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
-      shopify_billing_last_error: billingErrorNote('verification_failed', verified.reason, verified.queried),
+      shopify_billing_last_error: `verification_failed: ${verified.reason}`,
     })
     return result('billing_verification_unavailable', intent.project_id, route)
   }
@@ -287,9 +268,7 @@ export async function processShopifyBillingReturn(
     await recordShopifyBillingCache(admin, connection.id, {
       shopify_plan_handle: null, shopify_subscription_status: 'none',
       shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
-      shopify_billing_last_error: verified.reason === 'unrecognized_plan_handle'
-        ? billingErrorNote(`unrecognized_plan_handle: ${(verified.rawHandles ?? []).join(',')}`, null, verified.queried)
-        : billingErrorNote('no_subscription_for_app', null, verified.queried),
+      shopify_billing_last_error: describeInactiveSubscription(verified.reason, verified.rawHandles),
     })
     return result(verified.reason === 'unrecognized_plan_handle' ? 'unrecognized_plan' : 'no_active_plan', intent.project_id, route)
   }

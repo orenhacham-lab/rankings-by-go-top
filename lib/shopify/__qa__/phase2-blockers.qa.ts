@@ -268,8 +268,13 @@ async function main() {
     check('active:true with cancelAtEndOfCycle=true propagated', r.ok === true && r.active === true && r.cancelAtEndOfCycle === true)
   }
 
-  console.log('\n17) getActiveShopifySubscription — an item with price.active=false is excluded even when its handle is supported')
+  console.log('\n17) getActiveShopifySubscription — a supported handle is NOT rejected because price.active is false (Sep 2 incident)')
   {
+    // CORRECTED. This test used to assert the opposite, and that assertion was
+    // the production bug: Shopify reports price.active=false for a real,
+    // current managed-pricing contract that is still inside its free trial.
+    // Liveness is `activeSubscription` being non-null; price.active describes
+    // the price line's billing state, not the merchant's entitlement.
     const body = {
       data: {
         activeSubscription: {
@@ -282,7 +287,21 @@ async function main() {
     }
     const f = fakePartnerFetch(() => ({ status: 200, body }))
     const r = await getActiveShopifySubscription(SHOP_GID, f)
-    check('active:false — an inactive-priced item never grants entitlement even with a recognized handle', r.ok === true && !r.active)
+    check('a supported handle still grants entitlement when price.active is false',
+      r.ok === true && r.active === true && r.planHandle === 'premium')
+    // The unsupported-handle gate is what actually refuses a plan, and it is
+    // unchanged — proven here so removing the price filter cannot be mistaken
+    // for removing entitlement checking altogether.
+    const unsupported = fakePartnerFetch(() => ({ status: 200, body: {
+      data: { activeSubscription: {
+        shop: { id: SHOP_GID, myshopifyDomain: SHOP_DOMAIN },
+        trialEndsAt: null, cancelAtEndOfCycle: false, currentBillingCycle: null,
+        items: [{ handle: 'free-plan', price: { __typename: 'FlatRatePrice', active: false } }],
+      } },
+    } }))
+    const ru = await getActiveShopifySubscription(SHOP_GID, unsupported)
+    check('an UNSUPPORTED handle is still refused regardless of price.active',
+      ru.ok === true && ru.active === false && ru.reason === 'unrecognized_plan_handle')
   }
 
   console.log('\n18) getActiveShopifySubscription — a trial with trialEndsAt set and currentBillingCycle null does not crash and still resolves the plan')

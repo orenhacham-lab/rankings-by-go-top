@@ -32,7 +32,6 @@
  */
 
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from './constants'
-import type { ShopifyAppEdition } from './oauth'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_TRANSIENT_RETRIES = 2
@@ -61,20 +60,6 @@ interface PartnerApiConfig {
   organizationId: string
   appGid: string
   apiVersion: string
-  /** WHICH app's credentials these are — carried so a result can say which app was asked. */
-  edition: ShopifyAppEdition
-}
-
-/**
- * The app's numeric Shopify ID, extracted from a validated
- * `gid://shopify/App/<digits>` value. A PUBLIC identifier (it is the app's id
- * in the Shopify Dev Dashboard URL), never a secret — safe to put in a
- * diagnostic so a "no subscription" answer can be attributed to the app that
- * was actually queried.
- */
-function appNumericId(appGid: string): string | null {
-  const m = /^gid:\/\/shopify\/App\/(\d+)$/.exec(appGid)
-  return m ? m[1] : null
 }
 
 /**
@@ -95,51 +80,14 @@ const PARTNER_APP_GID_PATTERN = /^gid:\/\/shopify\/App\/\d+$/
  * either known GID namespace — callers must fail closed on null. Never logs
  * the token or any config value.
  */
-/**
- * WHY THIS IS EDITION-AWARE (production incident, Sep 2).
- *
- * A merchant bought and activated the Advanced plan; Shopify's own plan picker
- * showed it as Current. The embedded app still displayed "No active plan" —
- * which, per app-home's mapping, means this query returned
- * `{ ok: true, active: false }`: it SUCCEEDED and reported no subscription.
- *
- * `activeSubscription(appId:, shopId:)` is scoped to one app inside one
- * Partner organization (the organization is part of the endpoint URL). This
- * codebase runs TWO Shopify apps — the PUBLIC "Go Top SEO" App Store app and
- * the LEGACY custom app — and every connection already records which one
- * issued its credential in `oauth_app_edition`. Billing verification did not:
- * it read a single global app GID and organization for every shop. Asking app
- * A whether a shop is subscribed, when the subscription belongs to app B,
- * returns a perfectly successful `null` — indistinguishable, to the old code,
- * from "this merchant has not paid".
- *
- * So the app being queried is now chosen by the connection's OWN edition.
- * `SHOPIFY_PARTNER_*_PUBLIC` override the shared values for public-edition
- * connections; if none of them is set the shared values are used exactly as
- * before, so a correctly-configured single-app deployment is unaffected. A
- * PARTIALLY configured override fails closed as `missing_config` — "we could
- * not verify", which the UI shows honestly — rather than silently answering
- * "no active plan" for the wrong app.
- */
-function loadPartnerApiConfig(edition: ShopifyAppEdition = 'legacy'): PartnerApiConfig | null {
+function loadPartnerApiConfig(): PartnerApiConfig | null {
+  const accessToken = process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN?.trim()
+  const organizationId = process.env.SHOPIFY_PARTNER_ORGANIZATION_ID?.trim()
+  const appGid = process.env.SHOPIFY_PARTNER_APP_GID?.trim()
   const apiVersion = process.env.SHOPIFY_PARTNER_API_VERSION?.trim()
-
-  const publicAccessToken = process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN_PUBLIC?.trim()
-  const publicOrganizationId = process.env.SHOPIFY_PARTNER_ORGANIZATION_ID_PUBLIC?.trim()
-  const publicAppGid = process.env.SHOPIFY_PARTNER_APP_GID_PUBLIC?.trim()
-  // ANY public override present means the operator has split the two apps —
-  // from then on the public edition uses only its own values, so a half-done
-  // configuration can never silently fall back to the other app's identity.
-  const publicConfigured = !!(publicAccessToken || publicOrganizationId || publicAppGid)
-
-  const usePublic = edition === 'public' && publicConfigured
-  const accessToken = usePublic ? publicAccessToken : process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN?.trim()
-  const organizationId = usePublic ? publicOrganizationId : process.env.SHOPIFY_PARTNER_ORGANIZATION_ID?.trim()
-  const appGid = usePublic ? publicAppGid : process.env.SHOPIFY_PARTNER_APP_GID?.trim()
-
   if (!accessToken || !organizationId || !appGid || !apiVersion) return null
   if (!PARTNER_APP_GID_PATTERN.test(appGid)) return null
-  return { accessToken, organizationId, appGid, apiVersion, edition }
+  return { accessToken, organizationId, appGid, apiVersion }
 }
 
 function endpoint(config: PartnerApiConfig): string {
@@ -253,17 +201,6 @@ interface ActiveSubscriptionData {
   } | null
 }
 
-/**
- * WHICH app was asked, in publicly-safe terms. Attached to every result so a
- * `no_subscription` answer is attributable — that is precisely the fact the
- * Sep 2 incident could not be established from the outside.
- */
-export interface PartnerQueryIdentity {
-  edition: ShopifyAppEdition
-  /** Public Shopify Dev Dashboard app id. Never a token, secret or org token. */
-  appId: string | null
-}
-
 export type ActiveSubscriptionResult =
   | {
       ok: true; active: true; planHandle: ShopifyPlanHandle; trialEndsAt: string | null
@@ -275,10 +212,9 @@ export type ActiveSubscriptionResult =
        *  boundaries; there is no special-cased "never reset" logic. */
       currentPeriodStart: string | null
       cancelAtEndOfCycle: boolean
-      queried?: PartnerQueryIdentity
     }
-  | { ok: true; active: false; reason: 'no_subscription' | 'unrecognized_plan_handle'; rawHandles?: string[]; queried?: PartnerQueryIdentity }
-  | { ok: false; reason: PartnerApiErrorKind; queried?: PartnerQueryIdentity }
+  | { ok: true; active: false; reason: 'no_subscription' | 'unrecognized_plan_handle'; rawHandles?: string[] }
+  | { ok: false; reason: PartnerApiErrorKind }
 
 /**
  * The ONLY Partner API query this app ever calls. FAILS CLOSED: every error
@@ -288,15 +224,20 @@ export type ActiveSubscriptionResult =
  * publishing, never silently treat it as "no active subscription."
  *
  * `active: true` requires ALL of:
- *   - a non-null activeSubscription;
+ *   - a non-null activeSubscription — this is Shopify's own liveness answer
+ *     for this app + shop, and it is true throughout a free trial;
  *   - Shopify's OWN `shop.id` on the returned subscription matches the
  *     `shopGid` we asked for (defends against ever trusting a response for
  *     the wrong shop);
  *   - at least one subscription item whose handle is in
- *     SHOPIFY_SUPPORTED_PLAN_HANDLES AND whose `price.active` is not
- *     explicitly `false` (an active contract for an unrecognized/obsolete
- *     handle, e.g. a leftover `free-plan`, or a superseded/inactive line
- *     item, is `active: false`, never a valid entitlement).
+ *     SHOPIFY_SUPPORTED_PLAN_HANDLES (an active contract for an
+ *     unrecognized/obsolete handle, e.g. a leftover `free-plan`, is
+ *     `active: false`, never a valid entitlement).
+ *
+ * `price.active` is deliberately NOT part of that test — see the Sep 2
+ * incident note at the check itself. `currentBillingCycle` may legitimately be
+ * null during a trial, so currentPeriodStart/End are simply null then; a plan
+ * is never rejected for lacking a billing cycle.
  * Only CURRENT `items` are read — `pendingUpdate` is never consulted (see
  * above), so a plan change that hasn't taken effect yet cannot grant early
  * entitlement.
@@ -305,15 +246,10 @@ export async function getActiveShopifySubscription(
   shopGid: string,
   fetchImpl: typeof fetch = fetch,
   expectedMyshopifyDomain?: string,
-  /** The connection's own `oauth_app_edition`. Null/absent behaves as 'legacy'
-   *  (the pre-existing single-app behaviour) so old rows keep working. */
-  edition?: ShopifyAppEdition | null,
 ): Promise<ActiveSubscriptionResult> {
-  const resolvedEdition: ShopifyAppEdition = edition === 'public' ? 'public' : 'legacy'
-  const config = loadPartnerApiConfig(resolvedEdition)
-  if (!config) return { ok: false, reason: 'missing_config', queried: { edition: resolvedEdition, appId: null } }
-  const queried: PartnerQueryIdentity = { edition: resolvedEdition, appId: appNumericId(config.appGid) }
-  if (!shopGid || typeof shopGid !== 'string') return { ok: false, reason: 'malformed_response', queried }
+  const config = loadPartnerApiConfig()
+  if (!config) return { ok: false, reason: 'missing_config' }
+  if (!shopGid || typeof shopGid !== 'string') return { ok: false, reason: 'malformed_response' }
 
   let data: ActiveSubscriptionData
   try {
@@ -323,32 +259,49 @@ export async function getActiveShopifySubscription(
     }, fetchImpl)
   } catch (err) {
     const kind = err instanceof PartnerApiError ? err.kind : 'api_error'
-    return { ok: false, reason: kind, queried }
+    return { ok: false, reason: kind }
   }
 
   const sub = data.activeSubscription
-  if (!sub) return { ok: true, active: false, reason: 'no_subscription', queried }
+  if (!sub) return { ok: true, active: false, reason: 'no_subscription' }
 
   // Integrity check: the subscription Shopify returned must be for the exact
   // shop we asked about — both by GID and (when the caller supplies it, e.g.
   // from the shopify_connections row) by canonical .myshopify.com domain.
-  if (sub.shop?.id !== shopGid) return { ok: false, reason: 'shop_identity_mismatch', queried }
+  if (sub.shop?.id !== shopGid) return { ok: false, reason: 'shop_identity_mismatch' }
   if (expectedMyshopifyDomain && sub.shop?.myshopifyDomain !== expectedMyshopifyDomain) {
-    return { ok: false, reason: 'shop_identity_mismatch', queried }
+    return { ok: false, reason: 'shop_identity_mismatch' }
   }
 
-  // Only items whose price is not explicitly inactive count — `price.active`
-  // missing/undefined is treated as active (fail-open on an absent field the
-  // schema doesn't guarantee everywhere), but an explicit `false` excludes it.
+  // LIVENESS IS THE SUBSCRIPTION, NOT THE PRICE (production incident, Sep 2).
+  //
+  // This code used to drop any item whose `price.active` was explicitly
+  // `false`. Shopify returns exactly that during a managed-pricing FREE TRIAL:
+  // the merchant has a real, current contract, but no money is moving yet.
+  // Verified live against the Partner API for the incident store:
+  //
+  //   activeSubscription: { trialEndsAt: "2026-09-08T23:28:48Z",
+  //     currentBillingCycle: null,
+  //     items: [{ handle: "advanced", price: { active: false } }] }
+  //
+  // The only supported item was filtered out, no handle survived, and a
+  // paying-in-trial merchant was cached as having no plan at all — while
+  // Shopify's own screen showed Advanced as Current with 7 trial days left.
+  //
+  // `activeSubscription` being non-null IS Shopify's answer to "is there a live
+  // contract for this app and shop"; there is no separate status field. The
+  // plan is therefore identified from the item HANDLES alone, and `price.active`
+  // is not consulted — it describes the price line's billing state, not whether
+  // the merchant is entitled. Every other gate is unchanged: a null
+  // subscription, a shop-identity mismatch, a malformed response and an
+  // unsupported handle all still fail closed.
   const items = Array.isArray(sub.items) ? sub.items : []
   const handles = items
-    .filter((i) => i?.price?.active !== false)
     .map((i) => i?.handle)
     .filter((h): h is string => typeof h === 'string' && h.length > 0)
   const recognized = handles.find(isSupportedShopifyPlanHandle)
   if (!recognized) {
-    const allHandles = items.map((i) => i?.handle).filter((h): h is string => typeof h === 'string' && h.length > 0)
-    return { ok: true, active: false, reason: 'unrecognized_plan_handle', rawHandles: allHandles, queried }
+    return { ok: true, active: false, reason: 'unrecognized_plan_handle', rawHandles: handles }
   }
 
   return {
@@ -359,6 +312,32 @@ export async function getActiveShopifySubscription(
     currentPeriodEnd: sub.currentBillingCycle?.endTime ?? null,
     currentPeriodStart: sub.currentBillingCycle?.startTime ?? null,
     cancelAtEndOfCycle: sub.cancelAtEndOfCycle === true,
-    queried,
   }
+}
+
+/**
+ * A SHORT, SANITIZED note for shopify_billing_last_error explaining why a
+ * verification came back inactive.
+ *
+ * app-home used to write `null` here on every inactive result, discarding both
+ * the reason and the handles Shopify actually returned — which is why the Sep 2
+ * incident could not be told apart from genuine non-payment without a live
+ * Partner API query. Handles are Shopify's own public plan identifiers; they
+ * are capped in count and length and stripped to a conservative character set,
+ * so nothing free-form (and no token, secret or customer data) can reach the
+ * column.
+ */
+const MAX_NOTE_HANDLES = 5
+const MAX_NOTE_HANDLE_CHARS = 40
+
+export function describeInactiveSubscription(
+  reason: 'no_subscription' | 'unrecognized_plan_handle',
+  rawHandles?: string[],
+): string {
+  if (reason !== 'unrecognized_plan_handle') return 'no_subscription'
+  const safe = (rawHandles ?? [])
+    .slice(0, MAX_NOTE_HANDLES)
+    .map((h) => String(h).replace(/[^a-zA-Z0-9._-]/g, '').slice(0, MAX_NOTE_HANDLE_CHARS))
+    .filter((h) => h.length > 0)
+  return safe.length > 0 ? `unrecognized_plan_handle:${safe.join(',')}` : 'unrecognized_plan_handle'
 }
