@@ -596,7 +596,11 @@ export const dashboardEn = {
       approve: 'Approve',
       reject: 'Reject',
       staleWarn: 'The plan is stale — regenerating is recommended',
-      cacheMissing: 'The index has not been scanned — refresh the index first',
+      // The site index is OPTIONAL: it powers internal-link suggestions and is
+      // never a condition of writing or queueing an article. Worded as
+      // information, not as a blocker (it used to read as the latter).
+      cacheMissing: 'The site index has not been scanned, so there are no internal-link suggestions. You can still add the topic to the queue.',
+      queueWithoutLinks: 'Add to queue without internal links',
       cacheStale: 'The index is stale — a refresh is recommended',
       cacheChanged: 'The index changed since review — refresh and review again before saving.',
       versionStale: 'Scanner version is out of date — a refresh is recommended',

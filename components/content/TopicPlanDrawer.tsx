@@ -17,6 +17,8 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
+import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
+import { LatestRequest, isAbortError } from '@/lib/content/latest-request'
 
 const REASON_HE: Record<string, string> = {
   low_relevance: 'רלוונטיות נמוכה',
@@ -79,13 +81,29 @@ export default function TopicPlanDrawer({
   onPlanSaved?: () => void
   // Phase 3F.3.6 (Part G) — streamlined "save links and add to queue". When
   // provided, the drawer offers a one-click save+enqueue; returns queue success.
-  onSaveAndQueue?: (topicId: string) => Promise<boolean>
+  //
+  // `expectsLinks` is passed EXPLICITLY rather than inferred downstream: it is
+  // the drawer that knows whether a link plan was reviewed and persisted, and
+  // approve-and-queue verifies a saved plan only when it is true.
+  onSaveAndQueue?: (topicId: string, expectsLinks: boolean) => Promise<boolean>
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.topicPlan, [language])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ exists: boolean; batch: SavedBatch | null; links: SavedLink[]; stale: boolean; staleReasons: string[] } | null>(null)
   const [dry, setDry] = useState<{ selected: DryItem[]; rejected: DryItem[]; summary: string; cacheState: string; warnings: string[]; moneyTargetUrl: string | null } | null>(null)
+  /**
+   * Whether each lookup POSITIVELY completed, tracked separately from its data.
+   *
+   * A failed request is not a fact about the project: a thrown preview does not
+   * mean the site index is missing, and a failed saved-plan lookup does not mean
+   * no plan exists. Conflating the two is what would let an infrastructure blip
+   * queue an article without the internal links it was supposed to have. Both
+   * start 'pending' and are reset on every open/topic change, so a result
+   * belonging to a previously opened topic can never take part in the decision.
+   */
+  const [previewStatus, setPreviewStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
+  const [savedStatus, setSavedStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
   // Manually-selected reviewable candidates for the current dry-run (mkey set).
   const [manualSel, setManualSel] = useState<Set<string>>(new Set())
   // Phase 3F.3.4b — recommended links CHECKED for the plan (default all checked).
@@ -99,6 +117,14 @@ export default function TopicPlanDrawer({
   // responses; abortRef cancels an in-flight load when topic/open changes.
   const reqIdRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
+  /**
+   * The PREVIEW's own supersede guard. It used to have none: switching topics
+   * mid-flight let the previous topic's preview write its dry-run, cache state
+   * and default selection into the new topic's drawer — and the queue decision
+   * reads that cache state. Separate from the saved-plan guard above because
+   * the two lookups run concurrently and each must supersede only itself.
+   */
+  const previewRequest = useRef(new LatestRequest())
   // Identity of the cached snapshot under review (from the dry-run GET), echoed on save so
   // the server persists THIS reviewed plan and refuses (typed 409) only if the cache changed.
   const reviewedSnapshotRef = useRef<{ scannerVersion: string | null; scanCompletedAt: string | null } | null>(null)
@@ -124,15 +150,21 @@ export default function TopicPlanDrawer({
       const res = await fetch(`/api/content/automation/internal-links/plan/saved?projectId=${encodeURIComponent(projectId)}&topicId=${encodeURIComponent(topic.id)}`, { signal: controller.signal })
       const data = await res.json().catch(() => ({}))
       if (reqIdRef.current !== myId) return
-      if (!res.ok) { setError(t.loadError); setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); return }
-      if (!data.exists) { setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); emitStatus({ exists: false, links: [], batch: null, stale: false }); return }
+      // A non-2xx is an UNAVAILABLE lookup, not a confirmed "no saved plan".
+      // It used to write exists:false, which the queue decision would have read
+      // as proof that nothing was saved.
+      if (!res.ok) { setError(t.loadError); setSaved(null); setSavedStatus('unavailable'); return }
+      if (!data.exists) { setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); setSavedStatus('loaded'); emitStatus({ exists: false, links: [], batch: null, stale: false }); return }
       const batch: SavedBatch = { id: data.batch.id, status: data.batch.status, linkCount: data.batch.linkCount ?? 0, cacheState: data.batch.cacheState }
       const links: SavedLink[] = Array.isArray(data.links) ? data.links : []
       setSaved({ exists: true, batch, links, stale: !!data.stale, staleReasons: Array.isArray(data.staleReasons) ? data.staleReasons : [] })
+      setSavedStatus('loaded')
       emitStatus({ exists: true, links, batch, stale: !!data.stale })
     } catch (e) {
+      // An abort is a supersede, not a failure — the newer request owns the
+      // state. Any other throw leaves the fact unknown, never assumed.
       if (reqIdRef.current !== myId || (e as { name?: string })?.name === 'AbortError') return
-      setError(t.loadError)
+      setError(t.loadError); setSaved(null); setSavedStatus('unavailable')
     } finally {
       if (reqIdRef.current === myId) setLoading(false)
     }
@@ -151,21 +183,51 @@ export default function TopicPlanDrawer({
   // retrigger it. Cleanup aborts any in-flight request on topic/open change.
   useEffect(() => {
     if (!open || !topic) return
-    setDry(null); setJustSaved(false)
+    // Captured for the cleanup: the LatestRequest instance is stable for the
+    // life of the component, but reading a ref inside cleanup is flagged, and
+    // the local also makes it obvious that THIS effect's preview is the one
+    // being superseded.
+    const preview = previewRequest.current
+    // Reset every lookup, so nothing from a previously opened topic survives
+    // into this topic's decision.
+    setDry(null); setPreviewStatus('pending')
+    setSaved(null); setSavedStatus('pending')
+    setJustSaved(false)
     loadSavedRef.current()
     // Phase 3F.3.4b — auto-preview recommended links so they are always visible
     // and directly checkable (no need to click "find recommended" first).
     runPlanRef.current()
-    return () => { abortRef.current?.abort() }
+    // Supersede BOTH in-flight lookups. cancel() bumps the preview's sequence
+    // as well as aborting, so a response already past its abort check still
+    // fails isCurrent and writes nothing.
+    return () => { abortRef.current?.abort(); preview.cancel() }
   }, [open, projectId, topic?.id])
 
   const runPlan = useCallback(async () => {
-    if (!topic || running) return
-    setRunning(true); setError(null); setJustSaved(false)
+    if (!topic) return
+    // NO `running` GUARD. It is shared state, so while topic A's preview was in
+    // flight it made topic B's preview return immediately — B then had no
+    // preview of its own, and A's response arrived to fill the gap. Concurrency
+    // is safe here precisely because every write below is gated on `token`:
+    // starting a second preview supersedes the first rather than being refused.
+    const { token, signal } = previewRequest.current.start()
+    const current = () => previewRequest.current.isCurrent(token)
+    setRunning(true); setError(null); setJustSaved(false); setPreviewStatus('pending')
     try {
-      const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`)
+      const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`, { signal })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean), moneyTargetUrl: null }); return }
+      if (!current()) return
+      if (!res.ok) {
+        // A non-2xx counts as a LOADED preview only when the response itself
+        // states the cache state (e.g. an explicit 'missing'). Defaulting to
+        // 'missing' here — which this used to do — turned any server error into
+        // a false claim that the site has no index.
+        const reported = typeof data.cacheState === 'string' && data.cacheState.length > 0 ? data.cacheState : null
+        if (!reported) { setDry(null); setPreviewStatus('unavailable'); setError(t.loadError); return }
+        setDry({ selected: [], rejected: [], summary: '', cacheState: reported, warnings: data.warnings || [data.warning].filter(Boolean), moneyTargetUrl: null })
+        setPreviewStatus('loaded')
+        return
+      }
       reviewedSnapshotRef.current = { scannerVersion: typeof data.scannerVersion === 'string' ? data.scannerVersion : null, scanCompletedAt: typeof data.scanCompletedAt === 'string' ? data.scanCompletedAt : null }
       const plan = Array.isArray(data.topics) ? data.topics[0] : null
       const selected: DryItem[] = plan?.selected ?? []
@@ -179,10 +241,20 @@ export default function TopicPlanDrawer({
         warnings: data.warnings ?? [],
         moneyTargetUrl: typeof plan?.moneyTargetUrl === 'string' ? plan.moneyTargetUrl : null,
       })
+      setPreviewStatus('loaded')
+    } catch (e) {
+      // An abort is a supersede, not a failure — the newer attempt owns the
+      // state. Any other throw says the lookup did not complete, which is
+      // nothing about whether the site has an index: it is reported as the
+      // ordinary load error with a retry, never as a confirmed missing cache.
+      if (!current() || isAbortError(e)) return
+      setDry(null); setPreviewStatus('unavailable'); setError(t.loadError)
     } finally {
-      setRunning(false)
+      // Even the loading flag is gated: a superseded attempt clearing it would
+      // wrongly present the NEWER request as finished.
+      if (current()) setRunning(false)
     }
-  }, [projectId, topic, running])
+  }, [projectId, topic, t.loadError])
   // Keep the auto-preview effect pointing at the latest runPlan (Phase 3F.3.4b).
   runPlanRef.current = runPlan
 
@@ -195,17 +267,53 @@ export default function TopicPlanDrawer({
   // אושרו" articles). Plain "save plan" keeps approve=false. The server's
   // approval count is VERIFIED — a shortfall or dropped links surface a warning
   // instead of silently continuing.
+  // The EXACT links that would be saved, computed once so the save payload and
+  // the "is anything selected?" decision below can never disagree — a mismatch
+  // there is what would let a checked link be silently dropped.
+  const checkedLinks = useMemo(() => {
+    if (!topic || !dry) return { recommended: [], manual: [] }
+    return {
+      recommended: dry.selected
+        .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
+        .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string })),
+      manual: dry.rejected
+        .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
+        .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string })),
+    }
+  }, [topic, dry, recSel, manualSel])
+  const checkedLinkCount = checkedLinks.recommended.length + checkedLinks.manual.length
+
+  /**
+   * Whether this queue action must persist and claim a link plan.
+   *
+   * The internal-link index is OPTIONAL. When the project has no index and the
+   * user selected nothing, there is no plan to save and none to verify, so the
+   * topic is queued on its own instead of being blocked by a bulk-save that
+   * correctly refuses a missing cache. Every other case keeps the existing
+   * save-then-server-verify flow untouched. See lib/content/queue-link-expectation.ts.
+   */
+  const queueDecision = useMemo(() => resolveQueueLinkExpectation({
+    // `running` keeps a refresh in flight as 'pending' even while stale data is
+    // still on screen, so a re-run can never be decided on the previous answer.
+    preview: running || previewStatus === 'pending' || !dry
+      ? { status: 'pending' as const }
+      : previewStatus === 'unavailable'
+        ? { status: 'unavailable' as const }
+        : { status: 'loaded' as const, cacheState: dry.cacheState },
+    savedPlan: savedStatus === 'pending' || (savedStatus === 'loaded' && !saved)
+      ? { status: 'pending' as const }
+      : savedStatus === 'unavailable'
+        ? { status: 'unavailable' as const }
+        : { status: 'loaded' as const, exists: saved!.exists },
+    checkedLinkCount,
+  }), [dry, running, previewStatus, savedStatus, saved, checkedLinkCount])
+
   const persistSelection = useCallback(async (approve: boolean): Promise<{ ok: boolean; warning: string | null }> => {
     if (!topic) return { ok: false, warning: null }
     let warning: string | null = null
     let res: Response
     if (dry) {
-      const recommended = dry.selected
-        .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
-        .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string }))
-      const manual = dry.rejected
-        .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
-        .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
+      const { recommended, manual } = checkedLinks
       const checkedCount = recommended.length + manual.length
       res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -235,7 +343,7 @@ export default function TopicPlanDrawer({
       }
     }
     return { ok: true, warning }
-  }, [projectId, topic, dry, manualSel, recSel, t])
+  }, [projectId, topic, dry, checkedLinks, t])
 
   const savePlan = useCallback(async () => {
     if (!topic || saving) return
@@ -255,14 +363,28 @@ export default function TopicPlanDrawer({
   // provides an enqueue handler.
   const saveAndQueue = useCallback(async () => {
     if (!topic || saving || savingQueue || !onSaveAndQueue) return
+    // RACE GUARD. The button is also disabled until BOTH lookups confirm their
+    // fact, but a programmatic or rapid click must not be able to act on an
+    // unconfirmed state: the two requests run concurrently, so the preview
+    // resolving first is not enough on its own.
+    if (!queueDecision.canQueue) return
     setSavingQueue(true); setError(null)
     try {
-      // Phase 3G.7 — enqueue intent ⇒ APPROVE the checked links, so generation
-      // auto-inserts them (planned-only links are never inserted).
-      const { ok, warning } = await persistSelection(true)
-      if (!ok) return
-      onPlanSaved?.()
-      const queued = await onSaveAndQueue(topic.id)
+      let warning: string | null = null
+      if (queueDecision.persistPlan) {
+        // Phase 3G.7 — enqueue intent ⇒ APPROVE the checked links, so generation
+        // auto-inserts them (planned-only links are never inserted).
+        const saveResult = await persistSelection(true)
+        if (!saveResult.ok) return
+        warning = saveResult.warning
+        onPlanSaved?.()
+      }
+      // NOTHING IS SAVED on the no-links path — no plan/save, no bulk-save, and
+      // no empty batch invented to satisfy the queue. `expectsLinks: false`
+      // tells the server there is no plan to verify; every other check it
+      // performs (ownership, manual-topic approval, queue validation) is
+      // unchanged.
+      const queued = await onSaveAndQueue(topic.id, queueDecision.expectsLinks)
       setManualSel(new Set()); setRecSel(new Set())
       // An approval warning keeps the drawer OPEN so the user actually sees it
       // (set AFTER loadSaved, which clears the error state).
@@ -275,7 +397,7 @@ export default function TopicPlanDrawer({
     } finally {
       setSavingQueue(false)
     }
-  }, [topic, saving, savingQueue, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
+  }, [topic, saving, savingQueue, queueDecision, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -419,7 +541,18 @@ export default function TopicPlanDrawer({
           <Button size="sm" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
           {/* Phase 3F.3.6 (Part G) — streamlined save + enqueue in one click. */}
           {onSaveAndQueue && (
-            <Button size="sm" onClick={saveAndQueue} loading={savingQueue} disabled={saving || savingQueue}>{savingQueue ? t.savingQueue : t.saveAndQueue}</Button>
+            /* The label states what the click will actually do. With no site
+               index and nothing selected there is no plan to save, so promising
+               "save links and add to queue" would be untrue. Disabled until the
+               preview resolves, so the label can never describe the wrong path. */
+            <Button
+              size="sm"
+              onClick={saveAndQueue}
+              loading={savingQueue}
+              disabled={saving || savingQueue || !queueDecision.canQueue}
+            >
+              {savingQueue ? t.savingQueue : queueDecision.canQueue && !queueDecision.expectsLinks ? t.queueWithoutLinks : t.saveAndQueue}
+            </Button>
           )}
           {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
         </div>

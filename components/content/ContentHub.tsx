@@ -188,7 +188,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   // Phase 3F.3.6/3F.3.7 (Part G) — ensure the project's pool exists (never flips an
   // active pool to paused) and add the given topics to its publishing queue.
   // Returns success. Used by the drawer and the batch link-review panel.
-  const ensurePoolAndEnqueue = useCallback(async (topicIds: string[]): Promise<boolean> => {
+  const ensurePoolAndEnqueue = useCallback(async (topicIds: string[], expectsLinks: boolean): Promise<boolean> => {
     if (!projectId || topicIds.length === 0) return false
     try {
       let poolId: string | null = null
@@ -209,13 +209,20 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
       // + enqueue per topic, with typed per-topic results. Never reports full success
       // when a topic's links did not persist. expectsLinks=true → the server confirms
       // the review-panel's saved link plan (a zero-link topic still has a batch).
+      //
+      // `expectsLinks` comes from the CALLER, the only place that knows whether a
+      // plan was saved. It used to be hard-coded true, so a project with no
+      // internal-link site index could never queue a topic at all: no plan could
+      // be saved, so the server's verification could never pass. It is still true
+      // for every flow that saves a plan — the server-side verification itself is
+      // untouched.
       // P0 Part J — NO unconditional allowNonArticle override: an article topic
       // enqueues normally (server defaults page type to 'article'); a non-article
       // recommendation is blocked server-side and requires a deliberate, visible
       // user override, never an invisible client flag.
       const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topics: topicIds.map((topicId) => ({ topicId, expectsLinks: true })) }),
+        body: JSON.stringify({ topics: topicIds.map((topicId) => ({ topicId, expectsLinks })) }),
       })
       if (!ir.ok && ir.status !== 207) return false
       const d = await ir.json().catch(() => ({}))
@@ -231,7 +238,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
       return false
     }
   }, [projectId, handleScheduled])
-  const handleSaveAndQueue = useCallback((topicId: string) => ensurePoolAndEnqueue([topicId]), [ensurePoolAndEnqueue])
+  const handleSaveAndQueue = useCallback((topicId: string, expectsLinks: boolean) => ensurePoolAndEnqueue([topicId], expectsLinks), [ensurePoolAndEnqueue])
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
 
   // ── Batch article creation (client-side, sequential) ──

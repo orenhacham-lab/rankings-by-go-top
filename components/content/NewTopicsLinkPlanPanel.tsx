@@ -62,7 +62,7 @@ export default function NewTopicsLinkPlanPanel({
   onSaved: (results: { topicId: string; summary: TopicPlanSummary }[]) => void
   // Phase 3F.3.7 (Part G) — save the plans AND add the topics to the publishing
   // queue in one action. Returns success. When absent, only plain save is shown.
-  onEnqueue?: (topicIds: string[]) => Promise<boolean>
+  onEnqueue?: (topicIds: string[], expectsLinks: boolean) => Promise<boolean>
   // Phase 3F.3.7b — per topic-id, recommended-link URLs the user UNCHECKED at the
   // idea stage; the panel starts those unchecked (preserving the user's choice).
   initialUnchecked?: Record<string, string[]>
@@ -277,7 +277,10 @@ export default function NewTopicsLinkPlanPanel({
       // TRUTHFUL enqueue — only topics whose plan actually SAVED are queued (never a blind
       // fallback to all requested ids). If none saved, do not enqueue or claim success.
       if (r.okIds.length === 0) { setError(t.saveError); return }
-      const queued = await onEnqueue(r.okIds)
+      // This panel enqueues ONLY topics whose link plan it just saved
+      // (runSave above), so it always claims a plan and the server must
+      // verify it.
+      const queued = await onEnqueue(r.okIds, true)
       // Links were saved regardless. If the enqueue itself failed, KEEP the panel
       // open and show the exact failure — never claim a false success. A dropped
       // link also keeps the panel open so the warning is actually seen.
