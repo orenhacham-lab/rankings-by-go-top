@@ -72,6 +72,13 @@ export type QueueLinkExpectationReason =
   | 'links_selected'
   /** A saved plan exists and is being claimed; the server must confirm it. */
   | 'saved_plan_claimed'
+  /**
+   * A saved plan exists, nothing new was selected, and the site index is
+   * confirmed missing — so it is claimed WITHOUT a save. bulk-save refuses a
+   * missing cache (409 `cacheState: 'missing'`), which means persisting is not
+   * merely unnecessary here, it is impossible.
+   */
+  | 'saved_plan_claimed_no_index'
   /** An index exists, so the normal plan flow applies. */
   | 'cache_available'
   /** Confirmed: no index and nothing selected — queue the article on its own. */
@@ -90,7 +97,7 @@ export type QueueLinkExpectationDecision =
       expectsLinks: boolean
       /** Whether the client must call plan/save or plan/bulk-save first. */
       persistPlan: boolean
-      reason: Extract<QueueLinkExpectationReason, 'links_selected' | 'saved_plan_claimed' | 'cache_available' | 'no_links_no_index'>
+      reason: Extract<QueueLinkExpectationReason, 'links_selected' | 'saved_plan_claimed' | 'saved_plan_claimed_no_index' | 'cache_available' | 'no_links_no_index'>
     }
 
 /**
@@ -105,6 +112,14 @@ export type QueueLinkExpectationDecision =
  *      be enough on its own;
  *   3. zero links are checked — one checked link means the user reviewed and
  *      chose it, and it must be persisted and server-verified.
+ *
+ * A saved plan that already exists is CLAIMED rather than re-saved when the
+ * index is missing (`saved_plan_claimed_no_index`): `expectsLinks` stays true,
+ * so the server still verifies the plan, but no impossible write is attempted.
+ * BATCH CALLERS MUST NOTE: this decision takes a single aggregated saved-plan
+ * fact. A caller enqueueing several topics at once on that path must ensure
+ * they ALL have a plan — claiming for a topic that has none would fail its
+ * server verification and partially queue the batch.
  *
  * A present-but-stale index still goes through the normal plan flow, including
  * its cache-changed protection. Anything unconfirmed refuses the action
@@ -122,10 +137,23 @@ export function resolveQueueLinkExpectation(input: QueueLinkExpectationInput): Q
   const ready = (reason: 'links_selected' | 'saved_plan_claimed' | 'cache_available'): QueueLinkExpectationDecision =>
     ({ canQueue: true, expectsLinks: true, persistPlan: true, reason })
 
-  // 2) Anything the user chose, or any plan that already exists, keeps the
-  //    existing save-then-server-verify flow.
+  // 2) Anything the user chose keeps the existing save-then-server-verify flow.
+  //    With a missing index the save will fail — truthfully, with the save
+  //    error — which is right: a checked link must never be silently dropped.
   if (input.checkedLinkCount > 0) return ready('links_selected')
-  if (input.savedPlan.exists) return ready('saved_plan_claimed')
+
+  // 3) A plan already exists and nothing new was selected. Normally it is
+  //    re-saved and then claimed. But when the index is CONFIRMED MISSING the
+  //    save cannot succeed at all — bulk-save answers 409 `cacheState:
+  //    'missing'` — so re-saving would strand the topic exactly the way the
+  //    original incident did. There is nothing to write in this case anyway:
+  //    the plan is already persisted, and `expectsLinks: true` asks the server
+  //    to VERIFY it, which is the whole guarantee. So it is claimed directly.
+  if (input.savedPlan.exists) {
+    return input.preview.cacheState === 'missing'
+      ? { canQueue: true, expectsLinks: true, persistPlan: false, reason: 'saved_plan_claimed_no_index' }
+      : ready('saved_plan_claimed')
+  }
   if (input.preview.cacheState !== 'missing') return ready('cache_available')
 
   // 3) Confirmed: no index, no saved plan, nothing checked. Nothing to save and

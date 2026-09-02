@@ -21,6 +21,7 @@ import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { Link2, X } from 'lucide-react'
+import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
 
 export interface NewTopic { id: string; topic: string; primary_keyword: string | null }
 
@@ -84,6 +85,36 @@ export default function NewTopicsLinkPlanPanel({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [warnNote, setWarnNote] = useState<string | null>(null)
+  /**
+   * What the mount-time preview POSITIVELY reported, kept separate from its data.
+   *
+   * A failed lookup is not a fact about the project: a network error, a
+   * malformed body or a non-2xx that carries no explicit `cacheState` says the
+   * lookup did not complete — nothing about whether the site has an index. Only
+   * an explicitly reported state counts as 'loaded'. Same rule as
+   * TopicPlanDrawer; the policy itself is shared, not copied (see queueDecision).
+   */
+  const [previewStatus, setPreviewStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
+  const [cacheState, setCacheState] = useState<string | null>(null)
+  /** Informational note about link SUGGESTIONS — never a blocker for queueing. */
+  const [cacheNote, setCacheNote] = useState<string | null>(null)
+  /**
+   * AUTHORITATIVE saved-plan fact per topic, from /internal-links/plan/saved.
+   *
+   * This panel is NOT limited to freshly inserted topics: topics/bulk resolves
+   * each chosen idea to either a created row or an EXISTING one
+   * (`resolvedTopics[].source === 'existing'`), and AutomationIdeas passes both
+   * kinds here. An existing topic can already own a saved link plan — it is even
+   * reported back with a linkCount — so "this panel has not saved anything yet"
+   * is no evidence at all about the database. Deriving exists:false from the
+   * panel's own session state was a fabricated confirmation and broke
+   * queue-link-expectation.ts's fail-closed contract; it is now looked up.
+   *
+   * A topic absent from the map has NO answer and is treated as unconfirmed,
+   * never as "no plan".
+   */
+  const [savedStatus, setSavedStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
+  const [savedExistsByTopic, setSavedExistsByTopic] = useState<Record<string, boolean>>({})
   const [plans, setPlans] = useState<Record<string, DryPlan>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // Checked RECOMMENDED links per topic (mkey set) — default all recommended.
@@ -129,7 +160,25 @@ export default function NewTopicsLinkPlanPanel({
       try {
         const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(ids)}`)
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.loadError); return }
+        if (!res.ok) {
+          // A CONFIRMED missing site index is not a failure of this panel — the
+          // index feeds internal-link SUGGESTIONS, and an article can be written
+          // and queued without any. This used to set a blocking error and return
+          // before checking the topics, so `topicIdsToSave` stayed empty and both
+          // buttons were dead: the topic was created and then stranded, never
+          // queued. Only an EXPLICIT 'missing' takes this path; every other
+          // non-2xx (and any body without a cache state) stays fail-closed.
+          if (data.cacheState === 'missing') {
+            setCacheState('missing'); setPreviewStatus('loaded'); setCacheNote(t.cacheMissing)
+            // Same default as the success path: every new topic is checked, so it
+            // can be queued link-free.
+            setSelected(new Set(topics.map((tp) => tp.id)))
+            return
+          }
+          setError(t.loadError); setPreviewStatus('unavailable'); return
+        }
+        setCacheState(typeof data.cacheState === 'string' && data.cacheState.length > 0 ? data.cacheState : 'ok')
+        setPreviewStatus('loaded')
         reviewedSnapshotRef.current = { scannerVersion: typeof data.scannerVersion === 'string' ? data.scannerVersion : null, scanCompletedAt: typeof data.scanCompletedAt === 'string' ? data.scanCompletedAt : null }
         if (Array.isArray(data.warnings) && (data.warnings.includes('cache_stale') || data.warnings.includes('cache_version_stale'))) setWarnNote(t.cacheStale)
         const map: Record<string, DryPlan> = {}
@@ -168,12 +217,52 @@ export default function NewTopicsLinkPlanPanel({
         // updates. Users can uncheck any topic they don't want saved.
         setSelected(new Set(topics.map((tp) => tp.id)))
       } catch {
-        setError(t.loadError)
+        // Network error or malformed response — the lookup did not complete, so
+        // the cache state stays UNKNOWN and the link-free path is not authorized.
+        setError(t.loadError); setPreviewStatus('unavailable')
       } finally {
         setLoading(false)
       }
     })()
   }, [projectId, topics, t])
+
+  /**
+   * One read-only lookup per topic, in parallel. The endpoint is single-topic
+   * (`?projectId=&topicId=`) and returns an explicit `exists` boolean; the topic
+   * counts here are the ideas the user just approved, so a handful of parallel
+   * GETs is the whole cost and no server change is needed.
+   *
+   * ANY failure — a throw, a non-2xx, or a body whose `exists` is not a boolean
+   * — makes the WHOLE fact unavailable. A partial answer must not authorize
+   * anything: not knowing about one topic is not knowing.
+   */
+  const savedRan = useRef(false)
+  const loadSavedPlans = useCallback(async () => {
+    setSavedStatus('pending')
+    const ids = topics.map((tp) => tp.id)
+    try {
+      const results = await Promise.all(ids.map(async (topicId) => {
+        const res = await fetch(`/api/content/automation/internal-links/plan/saved?projectId=${encodeURIComponent(projectId)}&topicId=${encodeURIComponent(topicId)}`)
+        if (!res.ok) throw new Error('saved_lookup_failed')
+        const body = await res.json().catch(() => null)
+        if (!body || typeof body.exists !== 'boolean') throw new Error('saved_lookup_malformed')
+        return [topicId, body.exists as boolean] as const
+      }))
+      setSavedExistsByTopic(Object.fromEntries(results))
+      setSavedStatus('loaded')
+    } catch {
+      // VISIBLE and RECOVERABLE. Failing closed is correct, but a disabled
+      // button with no explanation is indistinguishable from a broken page —
+      // the merchant is told what could not be checked and given a retry.
+      setSavedExistsByTopic({})
+      setSavedStatus('unavailable')
+    }
+  }, [projectId, topics])
+  useEffect(() => {
+    if (savedRan.current) return
+    savedRan.current = true
+    void loadSavedPlans()
+  }, [loadSavedPlans])
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
@@ -205,16 +294,85 @@ export default function NewTopicsLinkPlanPanel({
   // how many checked links the server refused, so callers can keep the panel
   // open and show the warning), or null on request error. Shared by "Save" and
   // "Save + add to queue".
-  const runSave = useCallback(async (forceApprove = false): Promise<{ okIds: string[]; droppedCount: number } | null> => {
-    const selectedLinks: { topicId: string; targetUrl: string; anchorText: string }[] = []
+  // The EXACT links a save would send, computed once so the save payload and the
+  // "is anything selected?" decision below can never disagree — a mismatch there
+  // is what would let a checked link be silently dropped.
+  const selectedLinksForSave = useMemo(() => {
+    const out: { topicId: string; targetUrl: string; anchorText: string }[] = []
     for (const tid of topicIdsToSave) {
       const recs = plans[tid]?.selected ?? []
       const lset = linkSel[tid] ?? new Set(recs.map((l) => mkey(l)))
-      for (const l of recs) if (lset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
+      for (const l of recs) if (lset.has(mkey(l)) && l.anchorText) out.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
       const rev = plans[tid]?.reviewable ?? []
       const mset = manualSel[tid] ?? new Set<string>()
-      for (const l of rev) if (mset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
+      for (const l of rev) if (mset.has(mkey(l)) && l.anchorText) out.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
     }
+    return out
+  }, [topicIdsToSave, plans, linkSel, manualSel])
+
+  /**
+   * Whether this queue action must persist and claim a link plan — the SAME
+   * pure policy TopicPlanDrawer uses (lib/content/queue-link-expectation.ts),
+   * reused unchanged rather than restated here, so the two surfaces cannot
+   * drift apart.
+   *
+   * Both facts are LOOKED UP, never inferred from the panel's own lifecycle.
+   * The saved-plan fact is aggregated over the SELECTED topics: it counts as
+   * "a plan exists" if ANY of them has one, so a single existing topic that
+   * already owns a plan forces expectsLinks:true for the whole batch. A
+   * selected topic with no answer in the map makes the fact unavailable, which
+   * refuses the action outright.
+   */
+  const savedFacts = useMemo(() => {
+    const values = topicIdsToSave.map((id) => savedExistsByTopic[id])
+    const allKnown = values.length > 0 && values.every((v) => typeof v === 'boolean')
+    return {
+      allKnown,
+      allExist: allKnown && values.every((v) => v === true),
+      anyExist: allKnown && values.some((v) => v === true),
+    }
+  }, [topicIdsToSave, savedExistsByTopic])
+
+  /** The index is confirmed absent, so NOTHING can be persisted right now. */
+  const cannotPersist = previewStatus === 'loaded' && cacheState === 'missing'
+
+  /**
+   * MIXED BATCH, on the no-write path only.
+   *
+   * With no index and nothing newly checked, topics that already have a plan
+   * are claimed (expectsLinks:true, verified server-side) and topics that have
+   * none are queued plain (expectsLinks:false). Those are different calls, and
+   * onEnqueue carries ONE flag for the whole batch — so a mixed selection could
+   * only be handled by claiming for a topic with no plan (its verification
+   * fails and it is silently left out) or by splitting into two calls (a
+   * partial queue on failure). Neither is acceptable, so the batch is refused
+   * with an explanation and the user separates the two groups.
+   *
+   * This is a BATCH constraint, not a second copy of the policy: the shared
+   * decision takes one aggregated fact and cannot express "mixed".
+   */
+  const mixedSavedPlans = cannotPersist && selectedLinksForSave.length === 0 && savedFacts.allKnown && savedFacts.anyExist && !savedFacts.allExist
+
+  const queueDecision = useMemo(() => {
+    const missingAnswer = topicIdsToSave.some((id) => typeof savedExistsByTopic[id] !== 'boolean')
+    return resolveQueueLinkExpectation({
+      preview: previewStatus === 'loaded'
+        ? { status: 'loaded' as const, cacheState: cacheState ?? 'ok' }
+        : { status: previewStatus },
+      savedPlan: savedStatus !== 'loaded'
+        ? { status: savedStatus }
+        : missingAnswer
+          ? { status: 'unavailable' as const }
+          // ALL selected topics must own a plan for the batch to claim one; a
+          // mixed selection is refused separately by `mixedSavedPlans` above.
+          : { status: 'loaded' as const, exists: savedFacts.allExist },
+      checkedLinkCount: selectedLinksForSave.length,
+    })
+  }, [previewStatus, cacheState, savedStatus, savedExistsByTopic, savedFacts.allExist, topicIdsToSave, selectedLinksForSave])
+  const canQueue = queueDecision.canQueue && !mixedSavedPlans
+
+  const runSave = useCallback(async (forceApprove = false): Promise<{ okIds: string[]; droppedCount: number } | null> => {
+    const selectedLinks = selectedLinksForSave
     const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // Phase 3G — "Save + add to queue" APPROVES the checked links (the user
@@ -243,12 +401,16 @@ export default function NewTopicsLinkPlanPanel({
       okIds.push(r.topicId)
     }
     setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
+    // The panel just created these plans, so it KNOWS they exist now. Only ever
+    // an upgrade to true — never a downgrade to false, which would be exactly
+    // the fabricated confirmation this lookup replaced.
+    if (okIds.length > 0) setSavedExistsByTopic((prev) => ({ ...prev, ...Object.fromEntries(okIds.map((id) => [id, true])) }))
     setDroppedByTopic((prev) => ({ ...prev, ...nextDropped }))
     setApprovalShort(anyApprovalShort)
     onSaved(summaries)
     // An approval shortfall behaves like a dropped link: warn + keep panel open.
     return { okIds, droppedCount: Object.values(nextDropped).reduce((n, a) => n + a.length, 0) + (anyApprovalShort ? 1 : 0) }
-  }, [topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved])
+  }, [topicIdsToSave, selectedLinksForSave, projectId, autoApprove, t, onSaved])
 
   const save = useCallback(async () => {
     if (saving || queuing || topicIdsToSave.length === 0) return
@@ -269,8 +431,30 @@ export default function NewTopicsLinkPlanPanel({
   // queue in one action, then show final success and close.
   const saveAndQueue = useCallback(async () => {
     if (saving || queuing || topicIdsToSave.length === 0 || !onEnqueue) return
+    // Refuse while either fact is unconfirmed, or when the batch mixes topics
+    // that have a saved plan with topics that do not.
+    if (!canQueue) return
     setQueuing(true); setError(null)
     try {
+      // LINK-FREE PATH. The index is CONFIRMED missing and nothing is checked, so
+      // there is no plan to save and none to verify: bulk-save is not called (it
+      // would refuse the missing cache and strand the topic, which is the bug),
+      // no empty batch is invented, `onSaved` is NOT invoked and no link plan is
+      // claimed. The topics are simply queued.
+      // NO-WRITE PATHS. Two shapes reach here, both with nothing to persist:
+      //   * no index and no plan anywhere → queue the topics plain
+      //     (expectsLinks:false);
+      //   * no index but EVERY selected topic already owns a plan → claim it
+      //     (expectsLinks:true) so the server still verifies it. Re-saving is
+      //     impossible: bulk-save answers 409 for a missing cache, which is the
+      //     original incident. Nothing is written, so `onSaved` is not invoked
+      //     and no new plan is claimed to have been created.
+      if (!queueDecision.persistPlan) {
+        const queuedNoWrite = await onEnqueue(topicIdsToSave, queueDecision.expectsLinks)
+        if (queuedNoWrite) { setQueuedOk(true); window.setTimeout(() => onClose(), 8000) }
+        else setError(t.enqueueFailed)
+        return
+      }
       // Phase 3G — approve the checked links so generation inserts them automatically.
       const r = await runSave(true)
       if (r === null) return
@@ -292,7 +476,7 @@ export default function NewTopicsLinkPlanPanel({
     } finally {
       setQueuing(false)
     }
-  }, [saving, queuing, topicIdsToSave, onEnqueue, runSave, onClose, t])
+  }, [saving, queuing, topicIdsToSave, canQueue, queueDecision, onEnqueue, runSave, onClose, t])
 
   // Summary counts (session-only, from the dry-run + save results).
   const topicsWithLinks = Object.values(plans).filter((p) => p.selected.length > 0).length
@@ -350,6 +534,20 @@ export default function NewTopicsLinkPlanPanel({
         <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.sessionOnlyNote} {t.alsoFromRow}</p>
 
         {warnNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{warnNote}</p>}
+        {/* A confirmed missing index is INFORMATION about link suggestions, not a
+            blocker: it is shown in the same amber note style as other advisories,
+            never as the red error that used to stop the flow here. */}
+        {cacheNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{cacheNote}</p>}
+        {/* A failed saved-plan lookup fails CLOSED, but it must never look like
+            an unexplained dead button: say what could not be checked and offer
+            a retry. */}
+        {savedStatus === 'unavailable' && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-red-600 dark:text-red-400">
+            {t.savedLookupError}
+            <Button size="sm" variant="outline" onClick={() => { void loadSavedPlans() }}>{t.savedLookupRetry}</Button>
+          </p>
+        )}
+        {mixedSavedPlans && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.mixedSavedPlans}</p>}
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
         {queuedOk ? (
@@ -530,8 +728,16 @@ export default function NewTopicsLinkPlanPanel({
                   {saving ? t.saving : t.save}
                 </Button>
                 {onEnqueue && (
-                  <Button size="sm" onClick={saveAndQueue} loading={queuing} disabled={saving || queuing || topicIdsToSave.length === 0}>
-                    {queuing ? t.savingQueue : t.saveAndQueue}
+                  /* The label states what the click will actually do: with a
+                     confirmed missing index and nothing selected there is no plan
+                     to save, so promising "save links and add to queue" would be
+                     untrue. Disabled until the preview confirms its state. */
+                  <Button size="sm" onClick={saveAndQueue} loading={queuing} disabled={saving || queuing || topicIdsToSave.length === 0 || !canQueue}>
+                    {queuing ? t.savingQueue
+                      : !canQueue ? t.saveAndQueue
+                        : !queueDecision.expectsLinks ? t.queueWithoutLinks
+                          : !queueDecision.persistPlan ? t.queueWithSavedPlan
+                            : t.saveAndQueue}
                   </Button>
                 )}
               </div>
