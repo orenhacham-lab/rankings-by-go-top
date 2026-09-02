@@ -411,10 +411,23 @@ async function main() {
   {
     // No index and nothing newly checked, but a plan already exists for the
     // topic — it must still be claimed so the server verifies it.
+    //
+    // UPDATED with the panel fix (PR #49): re-saving here is IMPOSSIBLE, because
+    // bulk-save answers 409 { cacheState: 'missing' } for a missing index — so
+    // the drawer would have hit the very dead end this whole line of work is
+    // about. The already-persisted plan is now claimed WITHOUT a write, and
+    // expectsLinks stays true so the server still verifies it.
     const r = await simulateSaveAndQueue(input({ preview: CONFIRMED_MISSING_INDEX, savedPlan: CONFIRMED_SAVED_PLAN, checkedLinkCount: 0 }))
-    check('7B-a: the plan is persisted first', r.calls.some((c) => c.includes('/plan/bulk-save')))
+    check('7B-a: with NO index the plan is claimed without an impossible save',
+      !r.calls.some((c) => c.includes('/plan/bulk-save')))
     check('7B-b: and enqueued with expectsLinks:true', r.enqueuedWith === true)
-    check('7B-c: the decision names the claim', r.decision.reason === 'saved_plan_claimed')
+    check('7B-c: the decision names the claim', r.decision.reason === 'saved_plan_claimed_no_index')
+    // With an index present the pre-existing behaviour is untouched: re-save,
+    // then claim.
+    const withIndex = await simulateSaveAndQueue(input({ preview: CONFIRMED_INDEX_OK, savedPlan: CONFIRMED_SAVED_PLAN, checkedLinkCount: 0 }))
+    check('7B-c2: with an index it is still re-saved first, then claimed',
+      withIndex.calls.some((c) => c.includes('/plan/bulk-save'))
+      && withIndex.enqueuedWith === true && withIndex.decision.reason === 'saved_plan_claimed')
     check('7B-d: the server then verifies it and refuses if it is not really there',
       serverOutcome({ linkPlanRequested: true, linkPlanSaved: false, approved: false, enqueued: false }).state === 'link_plan_failed')
     check('7B-e: and succeeds when it is', serverOutcome({ linkPlanRequested: true, linkPlanSaved: true }).state === 'success')

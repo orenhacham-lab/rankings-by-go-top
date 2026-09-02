@@ -468,6 +468,12 @@ export const dashboardEn = {
       // panel treated it as one — the topic was created and then stranded).
       cacheMissing: 'The site index has not been scanned, so there are no internal-link suggestions. You can still add these topics to the queue.',
       queueWithoutLinks: 'Add to queue without internal links',
+      // The topics already have a saved link plan and there is no site index, so
+      // nothing can be re-saved — the existing plan is claimed and verified.
+      queueWithSavedPlan: 'Add to queue with the saved links',
+      savedLookupError: 'We couldn’t check whether these topics already have a saved link plan.',
+      savedLookupRetry: 'Try again',
+      mixedSavedPlans: 'Some of these topics already have a saved link plan and some don’t. Without a site index they can’t be added together — uncheck one group and add them separately.',
       cacheStale: 'Site index is stale — refresh before saving is recommended.',
       cacheChanged: 'The site index changed since review — refresh and review the links again before saving.',
       primaryKeyword: 'Keyword',
