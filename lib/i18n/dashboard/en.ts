@@ -462,7 +462,12 @@ export const dashboardEn = {
       noneFound: 'No suitable internal links were found for the new topics. You can close and continue.',
       savedSuccess: 'Internal link planning saved successfully.',
       loadError: 'Failed to load suggestions',
-      cacheMissing: 'Site index missing — refresh the index and try again.',
+      // The site index is OPTIONAL: it powers internal-link SUGGESTIONS and is
+      // never a condition of writing or queueing an article. Worded as
+      // information, not as a blocker (it used to read as the latter, and the
+      // panel treated it as one — the topic was created and then stranded).
+      cacheMissing: 'The site index has not been scanned, so there are no internal-link suggestions. You can still add these topics to the queue.',
+      queueWithoutLinks: 'Add to queue without internal links',
       cacheStale: 'Site index is stale — refresh before saving is recommended.',
       cacheChanged: 'The site index changed since review — refresh and review the links again before saving.',
       primaryKeyword: 'Keyword',
