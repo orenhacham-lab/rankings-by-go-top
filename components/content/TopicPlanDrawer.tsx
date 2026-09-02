@@ -91,6 +91,18 @@ export default function TopicPlanDrawer({
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ exists: boolean; batch: SavedBatch | null; links: SavedLink[]; stale: boolean; staleReasons: string[] } | null>(null)
   const [dry, setDry] = useState<{ selected: DryItem[]; rejected: DryItem[]; summary: string; cacheState: string; warnings: string[]; moneyTargetUrl: string | null } | null>(null)
+  /**
+   * Whether each lookup POSITIVELY completed, tracked separately from its data.
+   *
+   * A failed request is not a fact about the project: a thrown preview does not
+   * mean the site index is missing, and a failed saved-plan lookup does not mean
+   * no plan exists. Conflating the two is what would let an infrastructure blip
+   * queue an article without the internal links it was supposed to have. Both
+   * start 'pending' and are reset on every open/topic change, so a result
+   * belonging to a previously opened topic can never take part in the decision.
+   */
+  const [previewStatus, setPreviewStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
+  const [savedStatus, setSavedStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
   // Manually-selected reviewable candidates for the current dry-run (mkey set).
   const [manualSel, setManualSel] = useState<Set<string>>(new Set())
   // Phase 3F.3.4b — recommended links CHECKED for the plan (default all checked).
@@ -129,15 +141,21 @@ export default function TopicPlanDrawer({
       const res = await fetch(`/api/content/automation/internal-links/plan/saved?projectId=${encodeURIComponent(projectId)}&topicId=${encodeURIComponent(topic.id)}`, { signal: controller.signal })
       const data = await res.json().catch(() => ({}))
       if (reqIdRef.current !== myId) return
-      if (!res.ok) { setError(t.loadError); setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); return }
-      if (!data.exists) { setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); emitStatus({ exists: false, links: [], batch: null, stale: false }); return }
+      // A non-2xx is an UNAVAILABLE lookup, not a confirmed "no saved plan".
+      // It used to write exists:false, which the queue decision would have read
+      // as proof that nothing was saved.
+      if (!res.ok) { setError(t.loadError); setSaved(null); setSavedStatus('unavailable'); return }
+      if (!data.exists) { setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); setSavedStatus('loaded'); emitStatus({ exists: false, links: [], batch: null, stale: false }); return }
       const batch: SavedBatch = { id: data.batch.id, status: data.batch.status, linkCount: data.batch.linkCount ?? 0, cacheState: data.batch.cacheState }
       const links: SavedLink[] = Array.isArray(data.links) ? data.links : []
       setSaved({ exists: true, batch, links, stale: !!data.stale, staleReasons: Array.isArray(data.staleReasons) ? data.staleReasons : [] })
+      setSavedStatus('loaded')
       emitStatus({ exists: true, links, batch, stale: !!data.stale })
     } catch (e) {
+      // An abort is a supersede, not a failure — the newer request owns the
+      // state. Any other throw leaves the fact unknown, never assumed.
       if (reqIdRef.current !== myId || (e as { name?: string })?.name === 'AbortError') return
-      setError(t.loadError)
+      setError(t.loadError); setSaved(null); setSavedStatus('unavailable')
     } finally {
       if (reqIdRef.current === myId) setLoading(false)
     }
@@ -156,7 +174,11 @@ export default function TopicPlanDrawer({
   // retrigger it. Cleanup aborts any in-flight request on topic/open change.
   useEffect(() => {
     if (!open || !topic) return
-    setDry(null); setJustSaved(false)
+    // Reset every lookup, so nothing from a previously opened topic survives
+    // into this topic's decision.
+    setDry(null); setPreviewStatus('pending')
+    setSaved(null); setSavedStatus('pending')
+    setJustSaved(false)
     loadSavedRef.current()
     // Phase 3F.3.4b — auto-preview recommended links so they are always visible
     // and directly checkable (no need to click "find recommended" first).
@@ -166,11 +188,21 @@ export default function TopicPlanDrawer({
 
   const runPlan = useCallback(async () => {
     if (!topic || running) return
-    setRunning(true); setError(null); setJustSaved(false)
+    setRunning(true); setError(null); setJustSaved(false); setPreviewStatus('pending')
     try {
       const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`)
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean), moneyTargetUrl: null }); return }
+      if (!res.ok) {
+        // A non-2xx counts as a LOADED preview only when the response itself
+        // states the cache state (e.g. an explicit 'missing'). Defaulting to
+        // 'missing' here — which this used to do — turned any server error into
+        // a false claim that the site has no index.
+        const reported = typeof data.cacheState === 'string' && data.cacheState.length > 0 ? data.cacheState : null
+        if (!reported) { setDry(null); setPreviewStatus('unavailable'); setError(t.loadError); return }
+        setDry({ selected: [], rejected: [], summary: '', cacheState: reported, warnings: data.warnings || [data.warning].filter(Boolean), moneyTargetUrl: null })
+        setPreviewStatus('loaded')
+        return
+      }
       reviewedSnapshotRef.current = { scannerVersion: typeof data.scannerVersion === 'string' ? data.scannerVersion : null, scanCompletedAt: typeof data.scanCompletedAt === 'string' ? data.scanCompletedAt : null }
       const plan = Array.isArray(data.topics) ? data.topics[0] : null
       const selected: DryItem[] = plan?.selected ?? []
@@ -184,16 +216,16 @@ export default function TopicPlanDrawer({
         warnings: data.warnings ?? [],
         moneyTargetUrl: typeof plan?.moneyTargetUrl === 'string' ? plan.moneyTargetUrl : null,
       })
+      setPreviewStatus('loaded')
     } catch {
-      // The preview must ALWAYS resolve to a state: the save+queue button is
-      // disabled until it does, so a thrown fetch that left `dry` null would
-      // strand the user on a permanently disabled button. A failed preview is
-      // indistinguishable from an absent index for our purposes — no links.
-      setDry({ selected: [], rejected: [], summary: '', cacheState: 'missing', warnings: [], moneyTargetUrl: null })
+      // A thrown fetch says the lookup did not complete — nothing about whether
+      // the site has an index. It is reported as the ordinary load error with a
+      // retry, never as a confirmed missing cache.
+      setDry(null); setPreviewStatus('unavailable'); setError(t.loadError)
     } finally {
       setRunning(false)
     }
-  }, [projectId, topic, running])
+  }, [projectId, topic, running, t.loadError])
   // Keep the auto-preview effect pointing at the latest runPlan (Phase 3F.3.4b).
   runPlanRef.current = runPlan
 
@@ -232,12 +264,20 @@ export default function TopicPlanDrawer({
    * save-then-server-verify flow untouched. See lib/content/queue-link-expectation.ts.
    */
   const queueDecision = useMemo(() => resolveQueueLinkExpectation({
-    previewLoaded: dry !== null,
-    previewRunning: running,
-    cacheState: dry?.cacheState ?? null,
+    // `running` keeps a refresh in flight as 'pending' even while stale data is
+    // still on screen, so a re-run can never be decided on the previous answer.
+    preview: running || previewStatus === 'pending' || !dry
+      ? { status: 'pending' as const }
+      : previewStatus === 'unavailable'
+        ? { status: 'unavailable' as const }
+        : { status: 'loaded' as const, cacheState: dry.cacheState },
+    savedPlan: savedStatus === 'pending' || (savedStatus === 'loaded' && !saved)
+      ? { status: 'pending' as const }
+      : savedStatus === 'unavailable'
+        ? { status: 'unavailable' as const }
+        : { status: 'loaded' as const, exists: saved!.exists },
     checkedLinkCount,
-    savedPlanExists: saved?.exists === true,
-  }), [dry, running, checkedLinkCount, saved])
+  }), [dry, running, previewStatus, savedStatus, saved, checkedLinkCount])
 
   const persistSelection = useCallback(async (approve: boolean): Promise<{ ok: boolean; warning: string | null }> => {
     if (!topic) return { ok: false, warning: null }
@@ -294,12 +334,11 @@ export default function TopicPlanDrawer({
   // provides an enqueue handler.
   const saveAndQueue = useCallback(async () => {
     if (!topic || saving || savingQueue || !onSaveAndQueue) return
-    // RACE GUARD. The button is also disabled until the preview resolves, but a
-    // programmatic or rapid double click must not be able to reach the no-links
-    // path before `cacheState` is known — queueDecision would still say
-    // 'preview_pending' (expectsLinks: true), so nothing could bypass link-plan
-    // verification; refusing outright is simply clearer than half-acting.
-    if (!dry || running) return
+    // RACE GUARD. The button is also disabled until BOTH lookups confirm their
+    // fact, but a programmatic or rapid click must not be able to act on an
+    // unconfirmed state: the two requests run concurrently, so the preview
+    // resolving first is not enough on its own.
+    if (!queueDecision.canQueue) return
     setSavingQueue(true); setError(null)
     try {
       let warning: string | null = null
@@ -329,7 +368,7 @@ export default function TopicPlanDrawer({
     } finally {
       setSavingQueue(false)
     }
-  }, [topic, saving, savingQueue, dry, running, queueDecision, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
+  }, [topic, saving, savingQueue, queueDecision, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -481,9 +520,9 @@ export default function TopicPlanDrawer({
               size="sm"
               onClick={saveAndQueue}
               loading={savingQueue}
-              disabled={saving || savingQueue || running || !dry}
+              disabled={saving || savingQueue || !queueDecision.canQueue}
             >
-              {savingQueue ? t.savingQueue : queueDecision.expectsLinks ? t.saveAndQueue : t.queueWithoutLinks}
+              {savingQueue ? t.savingQueue : queueDecision.canQueue && !queueDecision.expectsLinks ? t.queueWithoutLinks : t.saveAndQueue}
             </Button>
           )}
           {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
