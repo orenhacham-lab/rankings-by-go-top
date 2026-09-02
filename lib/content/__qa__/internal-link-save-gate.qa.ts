@@ -75,7 +75,11 @@ async function main() {
 
     const panelSrc = read('../../../components/content/NewTopicsLinkPlanPanel.tsx')
     check('E. NewTopicsLinkPlanPanel captures + sends reviewedSnapshot', /reviewedSnapshotRef\.current = \{ scannerVersion/.test(panelSrc) && /reviewedSnapshot: reviewedSnapshotRef\.current/.test(panelSrc) && /cache_changed_replan_required/.test(panelSrc))
-    check('E. NewTopicsLinkPlanPanel enqueues ONLY saved topic ids (no blind fallback)', /if \(r\.okIds\.length === 0\)/.test(panelSrc) && /onEnqueue\(r\.okIds\)/.test(panelSrc) && !/idsToQueue = r\.okIds\.length > 0 \? r\.okIds : topicIdsToSave/.test(panelSrc))
+    // The enqueue call now carries an explicit expectsLinks argument (this panel
+    // always saves a plan first, so it is always true). The invariant under test
+    // is unchanged: ONLY ids whose plan actually saved are enqueued.
+    check('E. NewTopicsLinkPlanPanel enqueues ONLY saved topic ids (no blind fallback)', /if \(r\.okIds\.length === 0\)/.test(panelSrc) && /onEnqueue\(r\.okIds, true\)/.test(panelSrc) && !/idsToQueue = r\.okIds\.length > 0 \? r\.okIds : topicIdsToSave/.test(panelSrc))
+    check('E. and it still CLAIMS a link plan, so the server verifies it', /onEnqueue\(r\.okIds, true\)/.test(panelSrc))
 
     const drawerSrc = read('../../../components/content/TopicPlanDrawer.tsx')
     check('E. TopicPlanDrawer captures + sends reviewedSnapshot + handles cache_changed', /reviewedSnapshotRef\.current = \{ scannerVersion/.test(drawerSrc) && /reviewedSnapshot: reviewedSnapshotRef\.current/.test(drawerSrc) && /cache_changed_replan_required/.test(drawerSrc))

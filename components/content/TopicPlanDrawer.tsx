@@ -17,6 +17,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
+import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
 
 const REASON_HE: Record<string, string> = {
   low_relevance: 'רלוונטיות נמוכה',
@@ -79,7 +80,11 @@ export default function TopicPlanDrawer({
   onPlanSaved?: () => void
   // Phase 3F.3.6 (Part G) — streamlined "save links and add to queue". When
   // provided, the drawer offers a one-click save+enqueue; returns queue success.
-  onSaveAndQueue?: (topicId: string) => Promise<boolean>
+  //
+  // `expectsLinks` is passed EXPLICITLY rather than inferred downstream: it is
+  // the drawer that knows whether a link plan was reviewed and persisted, and
+  // approve-and-queue verifies a saved plan only when it is true.
+  onSaveAndQueue?: (topicId: string, expectsLinks: boolean) => Promise<boolean>
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.topicPlan, [language])
   const [loading, setLoading] = useState(false)
@@ -179,6 +184,12 @@ export default function TopicPlanDrawer({
         warnings: data.warnings ?? [],
         moneyTargetUrl: typeof plan?.moneyTargetUrl === 'string' ? plan.moneyTargetUrl : null,
       })
+    } catch {
+      // The preview must ALWAYS resolve to a state: the save+queue button is
+      // disabled until it does, so a thrown fetch that left `dry` null would
+      // strand the user on a permanently disabled button. A failed preview is
+      // indistinguishable from an absent index for our purposes — no links.
+      setDry({ selected: [], rejected: [], summary: '', cacheState: 'missing', warnings: [], moneyTargetUrl: null })
     } finally {
       setRunning(false)
     }
@@ -195,17 +206,45 @@ export default function TopicPlanDrawer({
   // אושרו" articles). Plain "save plan" keeps approve=false. The server's
   // approval count is VERIFIED — a shortfall or dropped links surface a warning
   // instead of silently continuing.
+  // The EXACT links that would be saved, computed once so the save payload and
+  // the "is anything selected?" decision below can never disagree — a mismatch
+  // there is what would let a checked link be silently dropped.
+  const checkedLinks = useMemo(() => {
+    if (!topic || !dry) return { recommended: [], manual: [] }
+    return {
+      recommended: dry.selected
+        .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
+        .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string })),
+      manual: dry.rejected
+        .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
+        .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string })),
+    }
+  }, [topic, dry, recSel, manualSel])
+  const checkedLinkCount = checkedLinks.recommended.length + checkedLinks.manual.length
+
+  /**
+   * Whether this queue action must persist and claim a link plan.
+   *
+   * The internal-link index is OPTIONAL. When the project has no index and the
+   * user selected nothing, there is no plan to save and none to verify, so the
+   * topic is queued on its own instead of being blocked by a bulk-save that
+   * correctly refuses a missing cache. Every other case keeps the existing
+   * save-then-server-verify flow untouched. See lib/content/queue-link-expectation.ts.
+   */
+  const queueDecision = useMemo(() => resolveQueueLinkExpectation({
+    previewLoaded: dry !== null,
+    previewRunning: running,
+    cacheState: dry?.cacheState ?? null,
+    checkedLinkCount,
+    savedPlanExists: saved?.exists === true,
+  }), [dry, running, checkedLinkCount, saved])
+
   const persistSelection = useCallback(async (approve: boolean): Promise<{ ok: boolean; warning: string | null }> => {
     if (!topic) return { ok: false, warning: null }
     let warning: string | null = null
     let res: Response
     if (dry) {
-      const recommended = dry.selected
-        .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
-        .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string }))
-      const manual = dry.rejected
-        .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
-        .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
+      const { recommended, manual } = checkedLinks
       const checkedCount = recommended.length + manual.length
       res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -235,7 +274,7 @@ export default function TopicPlanDrawer({
       }
     }
     return { ok: true, warning }
-  }, [projectId, topic, dry, manualSel, recSel, t])
+  }, [projectId, topic, dry, checkedLinks, t])
 
   const savePlan = useCallback(async () => {
     if (!topic || saving) return
@@ -255,14 +294,29 @@ export default function TopicPlanDrawer({
   // provides an enqueue handler.
   const saveAndQueue = useCallback(async () => {
     if (!topic || saving || savingQueue || !onSaveAndQueue) return
+    // RACE GUARD. The button is also disabled until the preview resolves, but a
+    // programmatic or rapid double click must not be able to reach the no-links
+    // path before `cacheState` is known — queueDecision would still say
+    // 'preview_pending' (expectsLinks: true), so nothing could bypass link-plan
+    // verification; refusing outright is simply clearer than half-acting.
+    if (!dry || running) return
     setSavingQueue(true); setError(null)
     try {
-      // Phase 3G.7 — enqueue intent ⇒ APPROVE the checked links, so generation
-      // auto-inserts them (planned-only links are never inserted).
-      const { ok, warning } = await persistSelection(true)
-      if (!ok) return
-      onPlanSaved?.()
-      const queued = await onSaveAndQueue(topic.id)
+      let warning: string | null = null
+      if (queueDecision.persistPlan) {
+        // Phase 3G.7 — enqueue intent ⇒ APPROVE the checked links, so generation
+        // auto-inserts them (planned-only links are never inserted).
+        const saveResult = await persistSelection(true)
+        if (!saveResult.ok) return
+        warning = saveResult.warning
+        onPlanSaved?.()
+      }
+      // NOTHING IS SAVED on the no-links path — no plan/save, no bulk-save, and
+      // no empty batch invented to satisfy the queue. `expectsLinks: false`
+      // tells the server there is no plan to verify; every other check it
+      // performs (ownership, manual-topic approval, queue validation) is
+      // unchanged.
+      const queued = await onSaveAndQueue(topic.id, queueDecision.expectsLinks)
       setManualSel(new Set()); setRecSel(new Set())
       // An approval warning keeps the drawer OPEN so the user actually sees it
       // (set AFTER loadSaved, which clears the error state).
@@ -275,7 +329,7 @@ export default function TopicPlanDrawer({
     } finally {
       setSavingQueue(false)
     }
-  }, [topic, saving, savingQueue, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
+  }, [topic, saving, savingQueue, dry, running, queueDecision, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -419,7 +473,18 @@ export default function TopicPlanDrawer({
           <Button size="sm" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
           {/* Phase 3F.3.6 (Part G) — streamlined save + enqueue in one click. */}
           {onSaveAndQueue && (
-            <Button size="sm" onClick={saveAndQueue} loading={savingQueue} disabled={saving || savingQueue}>{savingQueue ? t.savingQueue : t.saveAndQueue}</Button>
+            /* The label states what the click will actually do. With no site
+               index and nothing selected there is no plan to save, so promising
+               "save links and add to queue" would be untrue. Disabled until the
+               preview resolves, so the label can never describe the wrong path. */
+            <Button
+              size="sm"
+              onClick={saveAndQueue}
+              loading={savingQueue}
+              disabled={saving || savingQueue || running || !dry}
+            >
+              {savingQueue ? t.savingQueue : queueDecision.expectsLinks ? t.saveAndQueue : t.queueWithoutLinks}
+            </Button>
           )}
           {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
         </div>

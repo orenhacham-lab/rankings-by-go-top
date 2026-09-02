@@ -67,7 +67,8 @@ export default function TopicsList({
   onReturnToQueue?: () => void
   onPlanSaved?: () => void
   // Phase 3F.3.6 (Part G) — save the plan AND enqueue the topic from the drawer.
-  onSaveAndQueue?: (topicId: string) => Promise<boolean>
+  /** `expectsLinks` is decided by the drawer and passed straight through. */
+  onSaveAndQueue?: (topicId: string, expectsLinks: boolean) => Promise<boolean>
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
