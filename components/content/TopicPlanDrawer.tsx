@@ -18,6 +18,7 @@ import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
+import { LatestRequest, isAbortError } from '@/lib/content/latest-request'
 
 const REASON_HE: Record<string, string> = {
   low_relevance: 'רלוונטיות נמוכה',
@@ -116,6 +117,14 @@ export default function TopicPlanDrawer({
   // responses; abortRef cancels an in-flight load when topic/open changes.
   const reqIdRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
+  /**
+   * The PREVIEW's own supersede guard. It used to have none: switching topics
+   * mid-flight let the previous topic's preview write its dry-run, cache state
+   * and default selection into the new topic's drawer — and the queue decision
+   * reads that cache state. Separate from the saved-plan guard above because
+   * the two lookups run concurrently and each must supersede only itself.
+   */
+  const previewRequest = useRef(new LatestRequest())
   // Identity of the cached snapshot under review (from the dry-run GET), echoed on save so
   // the server persists THIS reviewed plan and refuses (typed 409) only if the cache changed.
   const reviewedSnapshotRef = useRef<{ scannerVersion: string | null; scanCompletedAt: string | null } | null>(null)
@@ -174,6 +183,11 @@ export default function TopicPlanDrawer({
   // retrigger it. Cleanup aborts any in-flight request on topic/open change.
   useEffect(() => {
     if (!open || !topic) return
+    // Captured for the cleanup: the LatestRequest instance is stable for the
+    // life of the component, but reading a ref inside cleanup is flagged, and
+    // the local also makes it obvious that THIS effect's preview is the one
+    // being superseded.
+    const preview = previewRequest.current
     // Reset every lookup, so nothing from a previously opened topic survives
     // into this topic's decision.
     setDry(null); setPreviewStatus('pending')
@@ -183,15 +197,26 @@ export default function TopicPlanDrawer({
     // Phase 3F.3.4b — auto-preview recommended links so they are always visible
     // and directly checkable (no need to click "find recommended" first).
     runPlanRef.current()
-    return () => { abortRef.current?.abort() }
+    // Supersede BOTH in-flight lookups. cancel() bumps the preview's sequence
+    // as well as aborting, so a response already past its abort check still
+    // fails isCurrent and writes nothing.
+    return () => { abortRef.current?.abort(); preview.cancel() }
   }, [open, projectId, topic?.id])
 
   const runPlan = useCallback(async () => {
-    if (!topic || running) return
+    if (!topic) return
+    // NO `running` GUARD. It is shared state, so while topic A's preview was in
+    // flight it made topic B's preview return immediately — B then had no
+    // preview of its own, and A's response arrived to fill the gap. Concurrency
+    // is safe here precisely because every write below is gated on `token`:
+    // starting a second preview supersedes the first rather than being refused.
+    const { token, signal } = previewRequest.current.start()
+    const current = () => previewRequest.current.isCurrent(token)
     setRunning(true); setError(null); setJustSaved(false); setPreviewStatus('pending')
     try {
-      const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`)
+      const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`, { signal })
       const data = await res.json().catch(() => ({}))
+      if (!current()) return
       if (!res.ok) {
         // A non-2xx counts as a LOADED preview only when the response itself
         // states the cache state (e.g. an explicit 'missing'). Defaulting to
@@ -217,15 +242,19 @@ export default function TopicPlanDrawer({
         moneyTargetUrl: typeof plan?.moneyTargetUrl === 'string' ? plan.moneyTargetUrl : null,
       })
       setPreviewStatus('loaded')
-    } catch {
-      // A thrown fetch says the lookup did not complete — nothing about whether
-      // the site has an index. It is reported as the ordinary load error with a
-      // retry, never as a confirmed missing cache.
+    } catch (e) {
+      // An abort is a supersede, not a failure — the newer attempt owns the
+      // state. Any other throw says the lookup did not complete, which is
+      // nothing about whether the site has an index: it is reported as the
+      // ordinary load error with a retry, never as a confirmed missing cache.
+      if (!current() || isAbortError(e)) return
       setDry(null); setPreviewStatus('unavailable'); setError(t.loadError)
     } finally {
-      setRunning(false)
+      // Even the loading flag is gated: a superseded attempt clearing it would
+      // wrongly present the NEWER request as finished.
+      if (current()) setRunning(false)
     }
-  }, [projectId, topic, running, t.loadError])
+  }, [projectId, topic, t.loadError])
   // Keep the auto-preview effect pointing at the latest runPlan (Phase 3F.3.4b).
   runPlanRef.current = runPlan
 

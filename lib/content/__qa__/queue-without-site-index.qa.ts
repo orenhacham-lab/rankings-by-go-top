@@ -32,6 +32,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { resolveQueueLinkExpectation, type QueueLinkExpectationInput } from '../queue-link-expectation'
 import { classifyTopicOutcome, summarizeBatch, type TopicStageOutcomes } from '../automation/approve-link-queue'
+import { LatestRequest, isAbortError } from '../latest-request'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -256,12 +257,140 @@ async function main() {
     check('6B-b: SOURCE — that reset is in the effect keyed on open/project/topic',
       /\}, \[open, projectId, topic\?\.id\]\)/.test(drawer)
       && drawer.indexOf("setSaved(null); setSavedStatus('pending')") < drawer.indexOf('}, [open, projectId, topic?.id])'))
-    check('6B-c: SOURCE — a superseded (aborted) response never writes state',
-      /if \(reqIdRef\.current !== myId \|\| \(e as \{ name\?: string \}\)\?\.name === 'AbortError'\) return/.test(drawer))
+    // 6B-c previously cited loadSaved's reqIdRef as proof for the PREVIEW. It
+    // was not: runPlan had no request identity at all. The preview's own guard
+    // is asserted here and exercised behaviourally in section 6C.
+    check('6B-c: SOURCE — the saved-plan lookup keeps its own supersede guard',
+      /if \(reqIdRef\.current !== myId \|\| isAbort/.test(drawer)
+      || /if \(reqIdRef\.current !== myId \|\| \(e as \{ name\?: string \}\)\?\.name === 'AbortError'\) return/.test(drawer))
+    check('6B-c2: SOURCE — and the PREVIEW has a SEPARATE one of its own',
+      /const previewRequest = useRef\(new LatestRequest\(\)\)/.test(drawer)
+      && /const \{ token, signal \} = previewRequest\.current\.start\(\)/.test(drawer))
+    check('6B-c3: SOURCE — the shared `running` flag no longer blocks a new topic’s preview',
+      /const runPlan = useCallback\(async \(\) => \{\s*\n\s*if \(!topic\) return/.test(drawer)
+      && !/if \(!topic \|\| running\) return/.test(drawer))
+    check('6B-c4: SOURCE — the preview request is passed the abort signal',
+      /encodeURIComponent\(topic\.id\)\}`, \{ signal \}\)/.test(drawer))
+    check('6B-c5: SOURCE — switching topic or closing supersedes the in-flight preview',
+      /const preview = previewRequest\.current/.test(drawer)
+      && /return \(\) => \{ abortRef\.current\?\.abort\(\); preview\.cancel\(\) \}/.test(drawer))
     // Reset means BOTH lookups read 'pending', which refuses the action outright —
     // so the previous topic's confirmed answers cannot be inherited.
     const afterReset = resolveQueueLinkExpectation({ preview: { status: 'pending' }, savedPlan: { status: 'pending' }, checkedLinkCount: 0 })
     check('6B-d: the post-reset state refuses the queue action', afterReset.canQueue === false && afterReset.reason === 'preview_pending')
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\n6C) BEHAVIOURAL — a superseded preview cannot write into the newer topic')
+  {
+    /**
+     * A faithful stand-in for runPlan's guard structure, driven by DEFERRED
+     * promises so the responses can be resolved out of order on purpose. It
+     * uses the REAL LatestRequest the drawer uses, and writes through the same
+     * gate at the same four points (success, explicit non-2xx cache state,
+     * unavailable, and the running-flag cleanup).
+     */
+    type PreviewState = { owner: string | null; cacheState: string | null; status: string; running: boolean; error: string | null }
+    const gate = new LatestRequest()
+    const state: PreviewState = { owner: null, cacheState: null, status: 'pending', running: false, error: null }
+    const deferred = () => { let resolve!: (v: { ok: boolean; cacheState?: string }) => void; let reject!: (e: unknown) => void
+      const promise = new Promise<{ ok: boolean; cacheState?: string }>((res, rej) => { resolve = res; reject = rej }); return { promise, resolve, reject } }
+
+    async function runPreview(topicId: string, response: Promise<{ ok: boolean; cacheState?: string }>) {
+      const { token } = gate.start()
+      const current = () => gate.isCurrent(token)
+      state.running = true; state.status = 'pending'
+      try {
+        const data = await response
+        if (!current()) return
+        if (!data.ok) {
+          if (!data.cacheState) { state.owner = topicId; state.cacheState = null; state.status = 'unavailable'; state.error = 'load_error'; return }
+          state.owner = topicId; state.cacheState = data.cacheState; state.status = 'loaded'; return
+        }
+        state.owner = topicId; state.cacheState = data.cacheState ?? 'ok'; state.status = 'loaded'
+      } catch (e) {
+        if (!current() || isAbortError(e)) return
+        state.owner = topicId; state.cacheState = null; state.status = 'unavailable'; state.error = 'load_error'
+      } finally {
+        if (current()) state.running = false
+      }
+    }
+
+    // 1) Topic A's preview starts and is still in flight.
+    const a = deferred()
+    const runA = runPreview('A', a.promise)
+    check('6C-a: A is in flight and owns nothing yet', state.owner === null && state.running === true)
+
+    // 2) The drawer switches to topic B — its preview starts even though A's is
+    //    still running (this is the `running`-guard bug that stranded B).
+    const b = deferred()
+    const runB = runPreview('B', b.promise)
+    check('6C-b: B’s preview STARTED despite A being in flight', gate.isCurrent(2))
+
+    // 3) A resolves AFTERWARDS, with a state that would change B's decision.
+    a.resolve({ ok: true, cacheState: 'missing' })
+    await runA
+    check('6C-c: A wrote NOTHING — no owner', state.owner === null)
+    check('6C-d: A wrote NOTHING — no cacheState', state.cacheState === null)
+    check('6C-e: A did not mark the preview loaded', state.status === 'pending')
+    check('6C-f: A did not clear B’s running flag', state.running === true)
+    check('6C-g: A wrote no error either', state.error === null)
+
+    // 4) Only B can authorize a decision.
+    b.resolve({ ok: true, cacheState: 'ok' })
+    await runB
+    check('6C-h: B owns the state', state.owner === 'B' && state.cacheState === 'ok' && state.status === 'loaded')
+    check('6C-i: and B cleared its own running flag', state.running === false)
+
+    // A superseded FAILURE is equally silent — it must not report "unavailable"
+    // over the newer topic's good state.
+    {
+      const c = deferred(); const runC = runPreview('C', c.promise)
+      const d = deferred(); const runD = runPreview('D', d.promise)
+      c.reject(new Error('network down')); await runC
+      check('6C-j: a superseded THROW writes no error state', state.owner !== 'C' && state.status !== 'unavailable')
+      d.resolve({ ok: false }); await runD
+      check('6C-k: the newest attempt still reports its own failure', state.owner === 'D' && state.status === 'unavailable')
+    }
+
+    // A superseded non-2xx carrying an explicit cacheState is also silent —
+    // this is the exact shape that could have queued an article without links.
+    {
+      const e = deferred(); const runE = runPreview('E', e.promise)
+      const f = deferred(); const runF = runPreview('F', f.promise)
+      e.resolve({ ok: false, cacheState: 'missing' }); await runE
+      check('6C-l: a superseded explicit "missing" cannot reach the newer topic',
+        state.owner !== 'E' && state.cacheState !== 'missing')
+      f.resolve({ ok: true, cacheState: 'ok' }); await runF
+      check('6C-m: and the newer topic keeps its own confirmed state',
+        state.owner === 'F' && state.cacheState === 'ok')
+    }
+
+    // cancel() (close / topic change) supersedes without starting anything.
+    {
+      const g = deferred(); const runG = runPreview('G', g.promise)
+      gate.cancel()
+      g.resolve({ ok: true, cacheState: 'missing' }); await runG
+      check('6C-n: cancel() supersedes an in-flight preview — it writes nothing',
+        state.owner === 'F' && state.cacheState === 'ok')
+    }
+
+    // The decision built from a superseded write would have been wrong; from
+    // the surviving state it is correct.
+    check('6C-o: the surviving state authorizes the NORMAL flow, not the no-links path',
+      expectsLinksOf(resolveQueueLinkExpectation({
+        preview: { status: 'loaded', cacheState: state.cacheState! },
+        savedPlan: CONFIRMED_NO_SAVED_PLAN, checkedLinkCount: 0,
+      })) === true)
+
+    check('6C-p: LatestRequest — only the newest token is ever current',
+      (() => { const g2 = new LatestRequest(); const t1 = g2.start().token; const t2 = g2.start().token
+        return !g2.isCurrent(t1) && g2.isCurrent(t2) })())
+    check('6C-q: LatestRequest — start() aborts the previous attempt’s signal',
+      (() => { const g2 = new LatestRequest(); const s1 = g2.start().signal; g2.start(); return s1.aborted })())
+    check('6C-r: LatestRequest — cancel() aborts and invalidates without starting a new attempt',
+      (() => { const g2 = new LatestRequest(); const r1 = g2.start(); g2.cancel(); return r1.signal.aborted && !g2.isCurrent(r1.token) })())
+    check('6C-s: SCOPE — this exercises the real supersede mechanism; the drawer’s use of it is asserted in 6B', true)
   }
 
   // ───────────────────────────────────────────────────────────────────────
