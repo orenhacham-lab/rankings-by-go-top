@@ -98,6 +98,23 @@ export default function NewTopicsLinkPlanPanel({
   const [cacheState, setCacheState] = useState<string | null>(null)
   /** Informational note about link SUGGESTIONS — never a blocker for queueing. */
   const [cacheNote, setCacheNote] = useState<string | null>(null)
+  /**
+   * AUTHORITATIVE saved-plan fact per topic, from /internal-links/plan/saved.
+   *
+   * This panel is NOT limited to freshly inserted topics: topics/bulk resolves
+   * each chosen idea to either a created row or an EXISTING one
+   * (`resolvedTopics[].source === 'existing'`), and AutomationIdeas passes both
+   * kinds here. An existing topic can already own a saved link plan — it is even
+   * reported back with a linkCount — so "this panel has not saved anything yet"
+   * is no evidence at all about the database. Deriving exists:false from the
+   * panel's own session state was a fabricated confirmation and broke
+   * queue-link-expectation.ts's fail-closed contract; it is now looked up.
+   *
+   * A topic absent from the map has NO answer and is treated as unconfirmed,
+   * never as "no plan".
+   */
+  const [savedStatus, setSavedStatus] = useState<'pending' | 'unavailable' | 'loaded'>('pending')
+  const [savedExistsByTopic, setSavedExistsByTopic] = useState<Record<string, boolean>>({})
   const [plans, setPlans] = useState<Record<string, DryPlan>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // Checked RECOMMENDED links per topic (mkey set) — default all recommended.
@@ -209,6 +226,39 @@ export default function NewTopicsLinkPlanPanel({
     })()
   }, [projectId, topics, t])
 
+  /**
+   * One read-only lookup per topic, in parallel. The endpoint is single-topic
+   * (`?projectId=&topicId=`) and returns an explicit `exists` boolean; the topic
+   * counts here are the ideas the user just approved, so a handful of parallel
+   * GETs is the whole cost and no server change is needed.
+   *
+   * ANY failure — a throw, a non-2xx, or a body whose `exists` is not a boolean
+   * — makes the WHOLE fact unavailable. A partial answer must not authorize
+   * anything: not knowing about one topic is not knowing.
+   */
+  const savedRan = useRef(false)
+  useEffect(() => {
+    if (savedRan.current) return
+    savedRan.current = true
+    const ids = topics.map((tp) => tp.id)
+    ;(async () => {
+      try {
+        const results = await Promise.all(ids.map(async (topicId) => {
+          const res = await fetch(`/api/content/automation/internal-links/plan/saved?projectId=${encodeURIComponent(projectId)}&topicId=${encodeURIComponent(topicId)}`)
+          if (!res.ok) throw new Error('saved_lookup_failed')
+          const body = await res.json().catch(() => null)
+          if (!body || typeof body.exists !== 'boolean') throw new Error('saved_lookup_malformed')
+          return [topicId, body.exists as boolean] as const
+        }))
+        setSavedExistsByTopic(Object.fromEntries(results))
+        setSavedStatus('loaded')
+      } catch {
+        setSavedExistsByTopic({})
+        setSavedStatus('unavailable')
+      }
+    })()
+  }, [projectId, topics])
+
   const toggle = useCallback((id: string) => {
     setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }, [])
@@ -261,21 +311,27 @@ export default function NewTopicsLinkPlanPanel({
    * reused unchanged rather than restated here, so the two surfaces cannot
    * drift apart.
    *
-   * The saved-plan input is the one thing that differs. This panel is mounted
-   * only for topics created moments earlier by the create-topics action, and a
-   * link-plan batch can be produced only by bulk-save — so before this panel
-   * saves anything there is provably no plan to claim, and afterwards it knows
-   * exactly which topics it saved. `saveStatus` is therefore the panel's own
-   * observation, not an assumption about the database. The dangerous direction
-   * is unreachable regardless: any checked link forces expectsLinks:true.
+   * Both facts are LOOKED UP, never inferred from the panel's own lifecycle.
+   * The saved-plan fact is aggregated over the SELECTED topics: it counts as
+   * "a plan exists" if ANY of them has one, so a single existing topic that
+   * already owns a plan forces expectsLinks:true for the whole batch. A
+   * selected topic with no answer in the map makes the fact unavailable, which
+   * refuses the action outright.
    */
-  const queueDecision = useMemo(() => resolveQueueLinkExpectation({
-    preview: previewStatus === 'loaded'
-      ? { status: 'loaded' as const, cacheState: cacheState ?? 'ok' }
-      : { status: previewStatus },
-    savedPlan: { status: 'loaded' as const, exists: Object.keys(saveStatus).length > 0 },
-    checkedLinkCount: selectedLinksForSave.length,
-  }), [previewStatus, cacheState, saveStatus, selectedLinksForSave])
+  const queueDecision = useMemo(() => {
+    const missingAnswer = topicIdsToSave.some((id) => typeof savedExistsByTopic[id] !== 'boolean')
+    return resolveQueueLinkExpectation({
+      preview: previewStatus === 'loaded'
+        ? { status: 'loaded' as const, cacheState: cacheState ?? 'ok' }
+        : { status: previewStatus },
+      savedPlan: savedStatus !== 'loaded'
+        ? { status: savedStatus }
+        : missingAnswer
+          ? { status: 'unavailable' as const }
+          : { status: 'loaded' as const, exists: topicIdsToSave.some((id) => savedExistsByTopic[id] === true) },
+      checkedLinkCount: selectedLinksForSave.length,
+    })
+  }, [previewStatus, cacheState, savedStatus, savedExistsByTopic, topicIdsToSave, selectedLinksForSave])
 
   const runSave = useCallback(async (forceApprove = false): Promise<{ okIds: string[]; droppedCount: number } | null> => {
     const selectedLinks = selectedLinksForSave
@@ -307,6 +363,10 @@ export default function NewTopicsLinkPlanPanel({
       okIds.push(r.topicId)
     }
     setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
+    // The panel just created these plans, so it KNOWS they exist now. Only ever
+    // an upgrade to true — never a downgrade to false, which would be exactly
+    // the fabricated confirmation this lookup replaced.
+    if (okIds.length > 0) setSavedExistsByTopic((prev) => ({ ...prev, ...Object.fromEntries(okIds.map((id) => [id, true])) }))
     setDroppedByTopic((prev) => ({ ...prev, ...nextDropped }))
     setApprovalShort(anyApprovalShort)
     onSaved(summaries)

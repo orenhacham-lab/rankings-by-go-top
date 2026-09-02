@@ -43,6 +43,13 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 
 const TOPIC_IDS = ['t1', 't2']
 
+/**
+ * Saved-plan lookups, always stated explicitly. There is deliberately no
+ * "assume nothing is saved" shortcut: `exists: false` must come from an answer.
+ */
+const NO_SAVED_PLANS = { status: 'loaded' as const, existsByTopic: { t1: false, t2: false } }
+const ALL_HAVE_PLANS = { status: 'loaded' as const, existsByTopic: { t1: true, t2: true } }
+
 /** What the panel's mount-time preview handler derives from one response. */
 type PanelPreview =
   | { status: 'pending' }
@@ -71,14 +78,41 @@ function handlePreviewResponse(r:
 }
 
 /**
+ * What the panel's saved-plan LOOKUP reported. There is no "assume false"
+ * variant on purpose: every test below must supply a real per-topic answer or
+ * an explicit pending/unavailable state.
+ */
+type SavedLookup =
+  | { status: 'pending' }
+  | { status: 'unavailable' }
+  | { status: 'loaded'; existsByTopic: Record<string, boolean> }
+
+/**
+ * Replays the panel's mount-time saved-plan lookup: one GET per topic, and ANY
+ * failure (throw, non-2xx, or a body whose `exists` is not a boolean) makes the
+ * whole fact unavailable — a partial answer authorizes nothing.
+ */
+function handleSavedLookup(responses: Record<string, { kind: 'throw' } | { kind: 'response'; ok: boolean; body: unknown }>): SavedLookup {
+  const existsByTopic: Record<string, boolean> = {}
+  for (const [topicId, r] of Object.entries(responses)) {
+    if (r.kind === 'throw' || !r.ok) return { status: 'unavailable' }
+    const body = r.body as { exists?: unknown } | null
+    if (!body || typeof body.exists !== 'boolean') return { status: 'unavailable' }
+    existsByTopic[topicId] = body.exists
+  }
+  return { status: 'loaded', existsByTopic }
+}
+
+/**
  * Replays the panel's saveAndQueue against a fetch spy, using the REAL decision
- * function with the panel's inputs.
+ * function with the panel's inputs — including the aggregation over selected
+ * topics and the "no answer for a selected topic" guard.
  */
 async function simulateSaveAndQueue(opts: {
   preview: PanelPreview
+  savedLookup: SavedLookup
   checkedLinkCount: number
   topicIdsToSave: string[]
-  alreadySavedInSession?: boolean
   bulkSaveOk?: boolean
   bulkSaveOkIds?: string[]
 }) {
@@ -87,9 +121,17 @@ async function simulateSaveAndQueue(opts: {
   let onSavedCalled = false
   let errorShown: string | null = null
 
+  const lookup = opts.savedLookup
+  const savedPlan = lookup.status !== 'loaded'
+    ? { status: lookup.status }
+    // A selected topic with no answer means the fact is not known for the batch.
+    : opts.topicIdsToSave.some((id) => typeof lookup.existsByTopic[id] !== 'boolean')
+      ? { status: 'unavailable' as const }
+      // ANY selected topic that already owns a plan forces the claim for all.
+      : { status: 'loaded' as const, exists: opts.topicIdsToSave.some((id) => lookup.existsByTopic[id] === true) }
   const decision = resolveQueueLinkExpectation({
     preview: opts.preview,
-    savedPlan: { status: 'loaded', exists: opts.alreadySavedInSession === true },
+    savedPlan,
     checkedLinkCount: opts.checkedLinkCount,
   })
   if (opts.topicIdsToSave.length === 0) return { calls, enqueuedWith, onSavedCalled, errorShown, decision, refused: true as const }
@@ -132,7 +174,7 @@ async function main() {
     check('1c: and the new topics are still CHECKED, so they can be queued',
       mount.selectedTopicIds.length === TOPIC_IDS.length)
 
-    const r = await simulateSaveAndQueue({ preview: mount.preview, checkedLinkCount: 0, topicIdsToSave: mount.selectedTopicIds })
+    const r = await simulateSaveAndQueue({ preview: mount.preview, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 0, topicIdsToSave: mount.selectedTopicIds })
     check('1d: bulk-save is NOT called', !r.calls.some((c) => c.includes('bulk-save')))
     check('1e: onEnqueue IS called with expectsLinks:false',
       r.enqueuedWith?.expectsLinks === false && JSON.stringify(r.enqueuedWith?.ids) === JSON.stringify(TOPIC_IDS))
@@ -157,11 +199,11 @@ async function main() {
     for (const c of cases) {
       check(`2: ${c.label} → the preview is UNAVAILABLE, not "missing"`, c.r.preview.status === 'unavailable')
       check(`2: ${c.label} → the ordinary load error is shown`, c.r.blockingError === true && c.r.cacheNote === false)
-      const q = await simulateSaveAndQueue({ preview: c.r.preview, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+      const q = await simulateSaveAndQueue({ preview: c.r.preview, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
       check(`2: ${c.label} → the queue action is REFUSED and nothing is called`,
         q.refused === true && q.calls.length === 0 && q.enqueuedWith === null)
     }
-    const pending = await simulateSaveAndQueue({ preview: { status: 'pending' }, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+    const pending = await simulateSaveAndQueue({ preview: { status: 'pending' }, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
     check('2a: a PENDING preview also refuses',
       pending.refused === true && pending.calls.length === 0 && pending.decision.reason === 'preview_pending')
     check('2b: an unconfirmed decision has no expectsLinks to misread',
@@ -170,7 +212,7 @@ async function main() {
     const okNoState = handlePreviewResponse({ kind: 'response', ok: true, body: {} })
     check('2c: a 200 without a cache state defaults to ok, so the link-free path is not taken',
       okNoState.preview.status === 'loaded' && okNoState.preview.cacheState === 'ok')
-    const q2 = await simulateSaveAndQueue({ preview: okNoState.preview, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+    const q2 = await simulateSaveAndQueue({ preview: okNoState.preview, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
     check('2d: and it goes through the normal save flow', q2.calls.some((c) => c.includes('bulk-save')))
   }
 
@@ -178,32 +220,32 @@ async function main() {
   console.log('\n3) The normal link-plan flow is unchanged')
   {
     const mount = handlePreviewResponse({ kind: 'response', ok: true, body: { cacheState: 'ok' } })
-    const r = await simulateSaveAndQueue({ preview: mount.preview, checkedLinkCount: 3, topicIdsToSave: [...TOPIC_IDS] })
+    const r = await simulateSaveAndQueue({ preview: mount.preview, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 3, topicIdsToSave: [...TOPIC_IDS] })
     check('3a: bulk-save is called first', r.calls[0]?.includes('bulk-save') === true)
     check('3b: onSaved is invoked', r.onSavedCalled === true)
     check('3c: and onEnqueue claims the plan with expectsLinks:true', r.enqueuedWith?.expectsLinks === true)
     check('3d: the decision names the selection', r.decision.reason === 'links_selected')
 
     // Links checked even with NO index still save — never silently discarded.
-    const withLinks = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'missing' }, checkedLinkCount: 1, topicIdsToSave: [...TOPIC_IDS] })
+    const withLinks = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'missing' }, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 1, topicIdsToSave: [...TOPIC_IDS] })
     check('3e: a checked link is never dropped to take the link-free path',
       withLinks.calls.some((c) => c.includes('bulk-save')) && withLinks.enqueuedWith?.expectsLinks === true)
 
     // A plan already saved in this panel session is claimed, not skipped.
-    const second = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'missing' }, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS], alreadySavedInSession: true })
-    check('3f: once this panel has saved a plan, it is claimed with expectsLinks:true',
+    const second = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'missing' }, savedLookup: ALL_HAVE_PLANS, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+    check('3f: a CONFIRMED existing plan is claimed with expectsLinks:true',
       second.decision.reason === 'saved_plan_claimed' && second.enqueuedWith?.expectsLinks === true)
   }
 
   // ───────────────────────────────────────────────────────────────────────
   console.log('\n4) Partial results, failures and truthfulness are preserved')
   {
-    const failed = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'ok' }, checkedLinkCount: 2, topicIdsToSave: [...TOPIC_IDS], bulkSaveOk: false })
+    const failed = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'ok' }, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 2, topicIdsToSave: [...TOPIC_IDS], bulkSaveOk: false })
     check('4a: a failed bulk-save aborts BEFORE the queue', failed.enqueuedWith === null && failed.errorShown === 'save_error')
-    const partial = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'ok' }, checkedLinkCount: 2, topicIdsToSave: [...TOPIC_IDS], bulkSaveOkIds: ['t1'] })
+    const partial = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'ok' }, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 2, topicIdsToSave: [...TOPIC_IDS], bulkSaveOkIds: ['t1'] })
     check('4b: only topics whose plan SAVED are queued — no blind fallback',
       JSON.stringify(partial.enqueuedWith?.ids) === JSON.stringify(['t1']))
-    const noneSaved = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'ok' }, checkedLinkCount: 2, topicIdsToSave: [...TOPIC_IDS], bulkSaveOkIds: [] })
+    const noneSaved = await simulateSaveAndQueue({ preview: { status: 'loaded', cacheState: 'ok' }, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 2, topicIdsToSave: [...TOPIC_IDS], bulkSaveOkIds: [] })
     check('4c: when nothing saved, nothing is queued and an error is shown',
       noneSaved.enqueuedWith === null && noneSaved.errorShown === 'save_error')
     check('4d: SOURCE — dropped-link and approval-shortfall handling is untouched',
@@ -219,11 +261,17 @@ async function main() {
   }
 
   // ───────────────────────────────────────────────────────────────────────
-  console.log('\n5) END TO END — create a manual topic, then queue it immediately')
+  // NOT an end-to-end test: it drives the panel's own decision inputs and the
+  // server's pure per-topic contract, with no React component and no HTTP route
+  // in the loop. Named for what it actually covers.
+  console.log('\n5) The fresh manual-topic path — decision inputs through the server contract')
   {
-    // The panel mounts for the freshly-created topic; the project has no index.
+    // The panel mounts for freshly-created topics; the project has no index, and
+    // the saved-plan lookup CONFIRMS neither topic owns a plan.
     const mount = handlePreviewResponse({ kind: 'response', ok: false, body: { cacheState: 'missing' } })
-    const r = await simulateSaveAndQueue({ preview: mount.preview, checkedLinkCount: 0, topicIdsToSave: mount.selectedTopicIds })
+    const saved = handleSavedLookup({ t1: { kind: 'response', ok: true, body: { exists: false } }, t2: { kind: 'response', ok: true, body: { exists: false } } })
+    check('5-pre: the lookup positively reported no saved plans', saved.status === 'loaded')
+    const r = await simulateSaveAndQueue({ preview: mount.preview, savedLookup: saved, checkedLinkCount: 0, topicIdsToSave: mount.selectedTopicIds })
     check('5a: the panel is usable — the topics are checked and the action is allowed',
       mount.selectedTopicIds.length > 0 && r.refused === false)
     check('5b: no internal-link endpoint is touched at all',
@@ -236,6 +284,93 @@ async function main() {
     check('5e: the batch reports them all as added', s.ok === true && s.added === TOPIC_IDS.length && s.failed === 0)
     const replay = serverOutcome({ linkPlanRequested: false, enqueued: false, alreadyQueued: true })
     check('5f: a repeat is idempotent, not a failure', replay.state === 'already_queued')
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\n5B) THE BLOCKER — an EXISTING topic with a saved plan is never queued link-free')
+  {
+    // topics/bulk resolves a chosen idea to an EXISTING topic
+    // (resolvedTopics[].source === 'existing'), and AutomationIdeas passes it to
+    // this panel like any other. That topic can already own a link plan — the
+    // bulk response even reports its linkCount. "This panel has not saved
+    // anything yet" is no evidence about the database.
+    const mount = handlePreviewResponse({ kind: 'response', ok: false, body: { cacheState: 'missing' } })
+    const saved = handleSavedLookup({
+      t1: { kind: 'response', ok: true, body: { exists: true } },  // pre-existing topic, plan already saved
+      t2: { kind: 'response', ok: true, body: { exists: false } },
+    })
+    const r = await simulateSaveAndQueue({ preview: mount.preview, savedLookup: saved, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+
+    check('5B-a: the index IS confirmed missing and NOTHING is newly checked',
+      mount.preview.status === 'loaded' && mount.preview.cacheState === 'missing')
+    check('5B-b: yet onEnqueue(..., false) is NEVER called',
+      !(r.enqueuedWith?.expectsLinks === false))
+    check('5B-c: the existing saved plan is CLAIMED instead', r.decision.reason === 'saved_plan_claimed')
+    check('5B-d: so the batch is enqueued with expectsLinks:true', r.enqueuedWith?.expectsLinks === true)
+    check('5B-e: and the plan is persisted/verified first', r.calls[0]?.includes('bulk-save') === true)
+
+    // Even one existing plan in a larger batch forces the claim for all.
+    const oneOfMany = await simulateSaveAndQueue({
+      preview: mount.preview,
+      savedLookup: { status: 'loaded', existsByTopic: { t1: false, t2: true } },
+      checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS],
+    })
+    check('5B-f: ANY selected topic with a plan forces expectsLinks:true for the whole batch',
+      oneOfMany.enqueuedWith?.expectsLinks === true && oneOfMany.decision.reason === 'saved_plan_claimed')
+
+    // The link-free path survives only when EVERY selected topic confirms no plan.
+    const allClear = await simulateSaveAndQueue({
+      preview: mount.preview, savedLookup: NO_SAVED_PLANS, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS],
+    })
+    check('5B-g: only an all-clear batch takes the link-free path',
+      allClear.enqueuedWith?.expectsLinks === false && allClear.decision.reason === 'no_links_no_index')
+
+    // Selecting only the clear topic is legitimate — the aggregation is over the
+    // SELECTED ids, not the whole panel.
+    const clearSubset = await simulateSaveAndQueue({
+      preview: mount.preview,
+      savedLookup: { status: 'loaded', existsByTopic: { t1: true, t2: false } },
+      checkedLinkCount: 0, topicIdsToSave: ['t2'],
+    })
+    check('5B-h: deselecting the topic that has a plan restores the link-free path',
+      clearSubset.enqueuedWith?.expectsLinks === false && JSON.stringify(clearSubset.enqueuedWith?.ids) === JSON.stringify(['t2']))
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\n5C) The saved-plan fact must be LOOKED UP — pending, failed and partial all refuse')
+  {
+    const mount = handlePreviewResponse({ kind: 'response', ok: false, body: { cacheState: 'missing' } })
+
+    const pending = await simulateSaveAndQueue({ preview: mount.preview, savedLookup: { status: 'pending' }, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+    check('5C-a: a PENDING lookup refuses the action, even with a confirmed missing index',
+      pending.refused === true && pending.calls.length === 0 && pending.decision.reason === 'saved_plan_pending')
+
+    for (const [label, responses] of [
+      ['one lookup throws', { t1: { kind: 'throw' as const }, t2: { kind: 'response' as const, ok: true, body: { exists: false } } }],
+      ['one lookup is non-2xx', { t1: { kind: 'response' as const, ok: false, body: {} }, t2: { kind: 'response' as const, ok: true, body: { exists: false } } }],
+      ['one body has no exists field', { t1: { kind: 'response' as const, ok: true, body: {} }, t2: { kind: 'response' as const, ok: true, body: { exists: false } } }],
+      ['one body has a non-boolean exists', { t1: { kind: 'response' as const, ok: true, body: { exists: 'no' } }, t2: { kind: 'response' as const, ok: true, body: { exists: false } } }],
+    ] as const) {
+      const lookup = handleSavedLookup(responses)
+      check(`5C: ${label} → the WHOLE fact is unavailable (a partial answer authorizes nothing)`, lookup.status === 'unavailable')
+      const q = await simulateSaveAndQueue({ preview: mount.preview, savedLookup: lookup, checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS] })
+      check(`5C: ${label} → the queue action is REFUSED and nothing is called`,
+        q.refused === true && q.calls.length === 0 && q.enqueuedWith === null)
+      check(`5C: ${label} → the reason names the saved-plan lookup`, q.decision.reason === 'saved_plan_unavailable')
+    }
+
+    // A selected topic the lookup never covered is NOT "no plan".
+    const partial = await simulateSaveAndQueue({
+      preview: mount.preview,
+      savedLookup: { status: 'loaded', existsByTopic: { t1: false } },
+      checkedLinkCount: 0, topicIdsToSave: [...TOPIC_IDS],
+    })
+    check('5C-b: a selected topic with NO answer refuses the action',
+      partial.refused === true && partial.decision.reason === 'saved_plan_unavailable')
+    check('5C-c: nothing is enqueued in that case', partial.enqueuedWith === null && partial.calls.length === 0)
+
+    check('5C-d: the harness has no way to manufacture exists:false — it must come from an answer',
+      handleSavedLookup({ t1: { kind: 'response', ok: true, body: { exists: false } } }).status === 'loaded')
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -266,6 +401,22 @@ async function main() {
       /topics: topicIds\.map\(\(topicId\) => \(\{ topicId, expectsLinks \}\)\)/.test(hub))
     check('6k: no second copy of the policy — the panel defines no cacheState rule of its own',
       !/cacheState !== 'missing'/.test(panel) && !/expectsLinks: true/.test(panel))
+    check('6l: the saved-plan fact is LOOKED UP from the real endpoint, per topic',
+      /internal-links\/plan\/saved\?projectId=\$\{encodeURIComponent\(projectId\)\}&topicId=\$\{encodeURIComponent\(topicId\)\}/.test(panel))
+    check('6m: it is NEVER inferred from the panel session or the topic lifecycle',
+      !/exists: Object\.keys\(saveStatus\)\.length > 0/.test(panel)
+      && !/savedPlan: \{ status: 'loaded' as const, exists: [^}]*saveStatus/.test(panel))
+    check('6n: any failed or malformed per-topic lookup makes the WHOLE fact unavailable',
+      /if \(!res\.ok\) throw new Error\('saved_lookup_failed'\)/.test(panel)
+      && /if \(!body \|\| typeof body\.exists !== 'boolean'\) throw new Error\('saved_lookup_malformed'\)/.test(panel)
+      && /setSavedExistsByTopic\(\{\}\)\s*\n\s*setSavedStatus\('unavailable'\)/.test(panel))
+    check('6o: a selected topic with no answer is treated as unconfirmed',
+      /const missingAnswer = topicIdsToSave\.some\(\(id\) => typeof savedExistsByTopic\[id\] !== 'boolean'\)/.test(panel)
+      && /missingAnswer\s*\n?\s*\? \{ status: 'unavailable' as const \}/.test(panel))
+    check('6p: the fact is aggregated over the SELECTED topics — any plan forces the claim',
+      /exists: topicIdsToSave\.some\(\(id\) => savedExistsByTopic\[id\] === true\)/.test(panel))
+    check('6q: a successful save may only UPGRADE a topic to "has a plan", never downgrade',
+      /okIds\.map\(\(id\) => \[id, true\]\)/.test(panel) && !/\[id, false\]/.test(panel))
   }
 
   // ───────────────────────────────────────────────────────────────────────
