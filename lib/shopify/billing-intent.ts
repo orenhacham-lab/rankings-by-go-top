@@ -42,6 +42,32 @@ export const BILLING_INTENT_TTL_MS = 15 * 60_000
 export const BILLING_INTENT_RESUME_PATH = '/api/shopify/billing/resume'
 
 /**
+ * WHERE the billing flow started, recorded on the intent row itself.
+ *
+ * Production incident (Sep 2): a merchant who bought a plan from INSIDE the
+ * embedded app was returned by Shopify to /api/shopify/billing/return, which
+ * redirected — as it does for every caller — to the external Rankings
+ * dashboard. Inside the Shopify Admin iframe that dashboard has no Supabase
+ * session (its auth cookie is SameSite=Lax and is not sent in a third-party
+ * context), so the merchant was shown the website's Hebrew login page framed
+ * in Shopify Admin, and logging in there could never complete.
+ *
+ * The origin is stamped SERVER-SIDE at mint time, from which authenticated
+ * caller it was (App Bridge session token vs Supabase session) — never from a
+ * request body, query parameter or header, so a browser cannot choose its own
+ * return destination. It reuses the existing `intended_action` column: no
+ * schema change, and an older row with the plain value is treated as the
+ * website flow, which is what it was.
+ */
+export const BILLING_INTENT_ACTION_WEBSITE = 'select_plan'
+export const BILLING_INTENT_ACTION_EMBEDDED = 'select_plan_embedded'
+
+/** True when this intent was minted by the EMBEDDED (App Bridge) caller. PURE. */
+export function isEmbeddedBillingIntent(intendedAction: string | null | undefined): boolean {
+  return intendedAction === BILLING_INTENT_ACTION_EMBEDDED
+}
+
+/**
  * Domain separator mixed into the handoff HMAC. The pending-link handoff
  * (lib/shopify/pending-link.ts) signs with the SAME app secret in the same
  * `${value}.${mac}` shape, so without this a valid pending-link handoff would

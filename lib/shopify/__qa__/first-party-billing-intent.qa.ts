@@ -353,12 +353,15 @@ async function main() {
     check('7a: resume consumes nothing, verifies nothing, writes nothing',
       !/consumeBillingIntent|recordShopifyBillingCache|confirmShopifyActiveAndAdvance|getActiveShopifySubscription|billing_governance/.test(resumeSrc))
     check('7b: the return route is still the one that delegates to the processor',
-      /processShopifyBillingReturn\(admin, \{ nonce, suppliedShopRaw \}\)/.test(strip(read('app/api/shopify/billing/return/route.ts'))))
+      /processShopifyBillingReturn\(admin, \{ nonce, suppliedShopRaw, callbackParams \}\)/.test(strip(read('app/api/shopify/billing/return/route.ts'))))
     check('7c: it still reads its authorization from the intent COOKIE only',
       /cookieStore\.get\(BILLING_INTENT_COOKIE\)\?\.value/.test(returnRoute))
     check('7d: charge_id and plan_handle are never read as authorization anywhere',
       !/charge_id/.test(returnRoute) && !/plan_handle/.test(returnRoute)
       && !/charge_id/.test(strip(read('lib/shopify/billing-return-processing.ts'))))
+    check('7d2: the full query is passed ONLY so Shopify’s own HMAC over it can be verified',
+      /callbackParams\[k\] = v/.test(returnRoute)
+      && /verifyShopifyHmac\(callbackParams, config\.clientSecret\)/.test(strip(read('lib/shopify/billing-return-processing.ts'))))
     check('7e: the `shop` query parameter is only an equality CHECK, never a lookup key',
       /searchParams\.get\('shop'\)/.test(returnRoute) && /suppliedShopRaw/.test(returnRoute))
 

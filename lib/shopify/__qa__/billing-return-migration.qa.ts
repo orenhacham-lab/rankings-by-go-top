@@ -139,7 +139,7 @@ async function main() {
     check('5b: cancellation failure, unconfirmed write and any non-completed status all block success',
       /advanced\.cancelFailed \|\| advanced\.dbWriteUnconfirmed \|\| advanced\.status !== 'completed'/.test(code))
     check('5c: and yield migration_incomplete rather than success',
-      /return \{ outcome: 'migration_incomplete'/.test(code))
+      /return result\('migration_incomplete'/.test(code))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

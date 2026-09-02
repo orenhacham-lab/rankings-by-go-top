@@ -171,11 +171,38 @@ async function main() {
     const src = strip(read('lib/shopify/billing-return-processing.ts'))
     check('the connection lookup is keyed by intent.connection_id', /\.eq\('id', intent\.connection_id\)/.test(src))
     check('`shop` is read only as args.suppliedShopRaw and never used in a .eq()/.from() lookup', !/\.eq\([^)]*suppliedShop/.test(src))
-    const consumeIdx = src.indexOf('consumeBillingIntent(')
-    const cacheIdx = src.indexOf('recordShopifyBillingCache(')
-    const migrateIdx = src.indexOf('confirmShopifyActiveAndAdvance(')
+    // Scoped to the INTENT-AUTHORIZED path. The module also contains
+    // reconcileFromVerifiedShopifyCallback, the cookie-less recovery that runs
+    // when Shopify frames the return and our SameSite=Lax cookie is not sent.
+    // That function is defined earlier in the file and writes the billing cache
+    // WITHOUT consuming an intent — deliberately, because there is no intent to
+    // consume — so a whole-file index comparison would compare two unrelated
+    // paths. The ordering invariant belongs to the intent path and is asserted
+    // there; the recovery path's own guarantee (it consumes nothing and never
+    // advances a migration) is asserted immediately below.
+    const intentPath = src.slice(src.indexOf('export async function processShopifyBillingReturn('))
+    const consumeIdx = intentPath.indexOf('consumeBillingIntent(')
+    const cacheIdx = intentPath.indexOf('recordShopifyBillingCache(')
+    const migrateIdx = intentPath.indexOf('confirmShopifyActiveAndAdvance(')
     check('the intent is consumed BEFORE any cache write', consumeIdx !== -1 && cacheIdx !== -1 && consumeIdx < cacheIdx)
     check('the intent is consumed BEFORE the migration is ever advanced', consumeIdx !== -1 && migrateIdx !== -1 && consumeIdx < migrateIdx)
+    const recovery = src.slice(
+      src.indexOf('async function reconcileFromVerifiedShopifyCallback('),
+      src.indexOf('export async function processShopifyBillingReturn('))
+    check('the cookie-less recovery path consumes NO intent and advances NO migration',
+      recovery.length > 0
+      && !/consumeBillingIntent\(/.test(recovery)
+      && !/confirmShopifyActiveAndAdvance\(/.test(recovery))
+    // Narrow on purpose: `shopify_plan_handle` / `unrecognized_plan_handle` are
+    // DB column names and legitimately appear. What must never happen is
+    // READING either Shopify query parameter off the callback.
+    check('and it never reads charge_id or plan_handle off the callback as authorization',
+      !/callbackParams[.[]\s*['"]?charge_id/.test(recovery)
+      && !/callbackParams[.[]\s*['"]?plan_handle/.test(recovery)
+      && !/\bcharge_id\b/.test(recovery)
+      && !/get\(['"]plan_handle['"]\)/.test(recovery))
+    check('the ONLY callback fields it reads are the signature and the shop',
+      (recovery.match(/callbackParams[.[][a-z_'"[\]]*/g) ?? []).every((r) => /hmac|shop/.test(r)))
   }
 
   console.log('\n13) Blocker C (resolved) — only the gid://shopify/App/... Partner app-ID GID namespace is accepted; gid://partners/App/... is no longer accepted anywhere in production source')

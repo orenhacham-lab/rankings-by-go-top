@@ -19,7 +19,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
-import { getActiveShopifySubscription } from '@/lib/shopify/partner-client'
+import { getActiveShopifySubscription, describeInactiveSubscription } from '@/lib/shopify/partner-client'
 import { recordShopifyBillingCache } from '@/lib/shopify/billing-cache'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { classifyReinstallNeed } from '@/lib/shopify/connection-health'
@@ -161,7 +161,13 @@ export async function GET(request: Request) {
       await recordShopifyBillingCache(admin, connection.id, {
         shopify_plan_handle: null, shopify_subscription_status: 'none',
         shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
-        shopify_billing_last_error: null,
+        // PRESERVE THE REASON. This wrote `null` on every inactive result, so
+        // "Shopify has no contract for this shop" and "Shopify has a contract
+        // whose handle we did not recognise" were recorded identically — and
+        // this is the path that actually ran during the Sep 2 incident, which
+        // is why the database held no evidence at all. The note is a short,
+        // sanitized code plus (at most) Shopify's own public plan handles.
+        shopify_billing_last_error: describeInactiveSubscription(result.reason, result.rawHandles),
       })
     } else {
       billing = { status: 'active', planHandle: result.planHandle, trialEndsAt: result.trialEndsAt, currentPeriodEnd: result.currentPeriodEnd, verificationError: null }
