@@ -10,6 +10,8 @@
 import { authContentProject } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { eligibleSections, generateInlineImage, INLINE_IMAGE_MAX } from '@/lib/content/inline-images'
+import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
+
 
 async function loadArticle(articleId: string) {
   const admin = createAdminClient()
@@ -70,7 +72,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return Response.json({ error: 'Failed to create image' }, { status: 500 })
   }
   const imageId = (created as { id: string }).id
-  if (body.generate === true) await generateInlineImage(auth.admin, imageId)
+  let generation: { ok: true; url: string } | { ok: false; error: string; transient?: boolean } | null = null
+  if (body.generate === true) generation = await generateInlineImage(auth.admin, imageId)
   const { data: row } = await auth.admin.from('article_inline_images').select('*').eq('id', imageId).maybeSingle()
+  // The row is still returned (it exists and the client should render it), but
+  // the STATUS now tells the truth about the generation attempt.
+  if (generation && !generation.ok) {
+    return Response.json({ image: row, error: 'image_generation_failed', reason: generation.error },
+      { status: imageGenerationHttpStatus(generation.error) })
+  }
   return Response.json({ image: row })
 }

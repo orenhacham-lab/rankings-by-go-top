@@ -132,7 +132,14 @@ function fromCache(c: ConnectionRow): ShopifyGovernedEntitlement {
  * or unverifiable billing returns `planCode: null` (floor tier), never a
  * silent fallback to PayPal data.
  */
-export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: string): Promise<ShopifyEntitlementResolution> {
+export async function resolveShopifyGovernedEntitlement(
+  admin: Admin,
+  userId: string,
+  /** Injectable clock (repo convention — see getUserEntitlement). Used ONLY for
+   *  the cache-freshness comparison below, so a test with a fixed clock is not
+   *  silently governed by the wall clock. Production passes nothing. */
+  nowFn: () => Date = () => new Date(),
+): Promise<ShopifyEntitlementResolution> {
   // AUTHORITY FIRST — before any connection lookup. A website-governed account
   // is not a Shopify billing question at all, however many stores it connects.
   // A governance READ FAILURE is not "website": it is an outage, and it stops
@@ -180,7 +187,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
   }
 
   const fresh = connection.shopify_billing_verified_at
-    && Date.now() - new Date(connection.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS
+    && nowFn().getTime() - new Date(connection.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS
   if (fresh) return { kind: 'governed', entitlement: fromCache(connection) }
 
   if (!connection.shop_gid) {
@@ -253,7 +260,11 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
  * load, and pricing-return — a user actively using the product will have a
  * fresh cache almost all the time.
  */
-export async function isShopifyGovernedAndActive(admin: Admin, userId: string): Promise<{ governed: boolean; active: boolean; unavailable?: true }> {
+export async function isShopifyGovernedAndActive(
+  admin: Admin,
+  userId: string,
+  nowFn: () => Date = () => new Date(),
+): Promise<{ governed: boolean; active: boolean; unavailable?: true }> {
   // Same authority rule as resolveShopifyGovernedEntitlement — a connection row
   // never decides governance on its own — and the same fail-closed rule: an
   // unreadable governance record reports `unavailable`, never
@@ -278,6 +289,6 @@ export async function isShopifyGovernedAndActive(admin: Admin, userId: string): 
   if (!data) return { governed: true, active: false }
   const row = data as { shopify_subscription_status: string | null; shopify_billing_verified_at: string | null }
   const fresh = row.shopify_billing_verified_at
-    && Date.now() - new Date(row.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS
+    && nowFn().getTime() - new Date(row.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS
   return { governed: true, active: fresh === true && row.shopify_subscription_status === 'active' }
 }

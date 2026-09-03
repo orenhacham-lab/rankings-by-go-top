@@ -53,11 +53,22 @@ export type GenerateForTopicFailure =
   // Blocker D fix — the project owner is Shopify-billing-required (no
   // verified Shopify App Pricing plan). Checked BEFORE any Gemini call.
   | { ok: false; kind: 'billing_required' }
+  // The entitlement could not be DETERMINED (governance, connection or Partner
+  // API failure). An outage, not a verdict: retryable, and never presented to
+  // the merchant as "buy a plan". No provider call is made in either state.
+  | { ok: false; kind: 'entitlement_unavailable'; detail: string }
   // Phase 3 — the account's article allowance for the current billing
   // period is exhausted. Checked BEFORE any Gemini call, via an atomic
   // reservation (lib/billing/usage-reservations.ts) — never a plain
   // count-then-insert (race-prone under concurrent generation jobs).
   | { ok: false; kind: 'quota_exceeded' }
+  // The account's billing period could not be RESOLVED — a different fact
+  // entirely from an exhausted allowance, and the two must never be conflated.
+  // Production incident: a Shopify managed-pricing TRIAL reports an active
+  // subscription with no billing cycle, no period resolved, and the merchant
+  // was told their 20-article allowance was used up before generating one.
+  // Nothing is reserved and no Gemini call is made; it is retryable.
+  | { ok: false; kind: 'usage_period_unavailable' }
   // A DIFFERENT in-flight attempt already holds this topic's reservation
   // (concurrent retry of the same logical request) — transient, safe to
   // retry shortly; never a permanent failure.
@@ -67,12 +78,44 @@ export type GenerateForTopicFailure =
 export type GenerateForTopicResult = GenerateForTopicSuccess | GenerateForTopicFailure
 
 /**
+ * The two PROVIDER calls this function makes, injectable so the generation
+ * path can be exercised end-to-end in a test without reaching Gemini.
+ *
+ * Production never passes this — the defaults below are the real
+ * implementations, and every existing call site is a two-argument call that
+ * behaves exactly as before. It exists because the alternative proofs are not
+ * proofs: a global `fetch` stub does NOT intercept @google/generative-ai (the
+ * SDK reaches the network anyway), and a test that merely counts its own
+ * bookkeeping after reserveUsage succeeds proves nothing about whether
+ * generation was ever reached.
+ */
+export interface ArticleGenerationDeps {
+  generate: typeof generateValidatedArticle
+  createFeaturedImage: typeof createFeaturedImageForArticle
+  /**
+   * The clock, threaded to EVERY time-dependent decision this function makes:
+   * the entitlement gate's Shopify cache-freshness check, getUserEntitlement's
+   * trial/period expiry, and the usage-period resolution (including the Shopify
+   * trial's "is it still in the future?" test). Without it a behavioural test
+   * pinned to a fixed trial date silently starts failing once the wall clock
+   * passes that date.
+   */
+  now: () => Date
+}
+const REAL_GENERATION_DEPS: ArticleGenerationDeps = {
+  generate: generateValidatedArticle,
+  createFeaturedImage: createFeaturedImageForArticle,
+  now: () => new Date(),
+}
+
+/**
  * Generate + persist an article draft for a topic. `userId` is stamped as
  * generated_articles.user_id (the project owner). Ownership is the caller's job.
  */
 export async function generateArticleForTopic(
   admin: Admin,
   opts: { topicId: string; userId: string; autoApplyInternalLinks?: boolean },
+  deps: ArticleGenerationDeps = REAL_GENERATION_DEPS,
 ): Promise<GenerateForTopicResult> {
   const { topicId, userId } = opts
 
@@ -83,8 +126,12 @@ export async function generateArticleForTopic(
   // which is itself the sole caller reachable from cron/queue/retry. Checked
   // FIRST, before any DB read beyond what's needed, and before any Gemini
   // call (generateValidatedArticle / createFeaturedImageForArticle).
-  const gate = await assertContentGenerationAllowedForUser(admin, userId)
-  if (!gate.allowed) return { ok: false, kind: 'billing_required' }
+  const gate = await assertContentGenerationAllowedForUser(admin, userId, deps.now)
+  if (!gate.allowed) {
+    return gate.reason === 'entitlement_unavailable'
+      ? { ok: false, kind: 'entitlement_unavailable', detail: gate.detail }
+      : { ok: false, kind: 'billing_required' }
+  }
 
   const { data: topic } = await admin.from('article_topics').select('*').eq('id', topicId).maybeSingle()
   if (!topic) return { ok: false, kind: 'topic_not_found' }
@@ -193,12 +240,16 @@ export async function generateArticleForTopic(
   // the Gemini call (never before it — validation failures above never
   // touch the ledger). Admins bypass the ledger entirely (same convention as
   // every other quota check in this app) and fall through to a plain insert.
-  const entitlement = await getUserEntitlement(userId, admin)
+  const entitlement = await getUserEntitlement(userId, admin, deps.now)
   let reservationId: string | null = null
   let reservationToken: string | null = null
   if (!entitlement.isAdmin) {
-    const period = await resolveCurrentUsagePeriod(admin, userId)
-    if (!period) return { ok: false, kind: 'quota_exceeded' }
+    const period = await resolveCurrentUsagePeriod(admin, userId, deps.now)
+    // NOT quota_exceeded. No period means we could not determine WHICH window
+    // to count against — the allowance itself is untouched, nothing is
+    // reserved, and the caller should retry rather than tell the merchant they
+    // are out of articles.
+    if (!period) return { ok: false, kind: 'usage_period_unavailable' }
     const reservation = await reserveUsage(admin, {
       userId, projectId: null, usageType: 'article', amount: 1,
       periodStart: period.start, periodEnd: period.end,
@@ -222,7 +273,7 @@ export async function generateArticleForTopic(
     reservationToken = reservation.reservationToken
   }
 
-  const gen = await generateValidatedArticle(brief)
+  const gen = await deps.generate(brief)
   if ('error' in gen) {
     const reason = gen.reason || 'unknown'
     console.log(`[content-article-generation] failed reason=${reason} attempts=${gen.attempts}`)
@@ -341,7 +392,7 @@ export async function generateArticleForTopic(
   let imageGenerated = false
   if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
     try {
-      const img = await createFeaturedImageForArticle(admin, inserted.id)
+      const img = await deps.createFeaturedImage(admin, inserted.id)
       imageGenerated = !('error' in img)
       if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
     } catch (e) {

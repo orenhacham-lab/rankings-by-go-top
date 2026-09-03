@@ -889,6 +889,14 @@ export const dashboardHe = {
       gemini_init_failed: 'שגיאה באתחול Gemini. נסו שוב.',
       gemini_request_failed: 'הבקשה ל-Gemini נכשלה. נסו שוב עוד רגע.',
       // Phase 3G.2 — precise Gemini failure reasons.
+      // מכסת המאמרים של החשבון מול מכסת הספק של Gemini — שני דברים שונים,
+      // ואין להציג למשתמש אף אחד מהקודים הגולמיים.
+      quota_exceeded: 'ניצלתם את כל המאמרים בחשבון לתקופת החיוב הנוכחית.',
+      // generatePoolItem שומר את gen.kind כ-last_error של הפריט, והתור מציג
+      // אותו דרך המילון הזה — בלי שתי השורות האלה הוצג הקוד הגולמי.
+      billing_required: 'נדרשת תוכנית Shopify פעילה כדי ליצור תוכן. בחרו תוכנית כדי להמשיך.',
+      entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
+      usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב. נסו שוב בעוד רגע.',
       gemini_quota_exceeded: 'חריגה ממכסת Gemini / הגבלת קצב. נסו שוב מאוחר יותר.',
       gemini_overloaded: 'שרתי Gemini עמוסים כרגע. נסו שוב עוד מספר רגעים.',
       gemini_timeout: 'הבקשה ל-Gemini עברה את זמן ההמתנה. נסו שוב.',
@@ -961,6 +969,8 @@ export const dashboardHe = {
         image_generation_failed: 'מנוע התמונות לא החזיר תמונה. נסו שוב.',
         image_model_unavailable: 'מודל יצירת התמונה לא זמין במפתח ה-Gemini הנוכחי. יש לבחור מודל תמונה נתמך ב-GEMINI_IMAGE_MODEL.',
         image_upload_failed: 'שמירת התמונה נכשלה. נסו שוב.',
+        billing_required: 'נדרשת תוכנית Shopify פעילה כדי ליצור תמונות. בחרו תוכנית כדי להמשיך.',
+        entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
         image_save_failed: 'שמירת התמונה נכשלה. נסו שוב.',
         unknown: 'יצירת התמונה נכשלה. נסו שוב.',
       },
@@ -1015,6 +1025,10 @@ export const dashboardHe = {
           file_too_large: 'הקובץ גדול מדי (מקסימום 5MB).',
           no_file: 'לא נבחר קובץ.',
           image_upload_failed: 'העלאת התמונה נכשלה. נסו שוב.',
+          // תוצאות זכאות שמגיעות מצינור התמונות. בלעדיהן הפאנל הציג קוד גולמי.
+          billing_required: 'נדרשת תוכנית Shopify פעילה כדי ליצור תמונות. בחרו תוכנית כדי להמשיך.',
+          entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
+          image_generation_failed: 'יצירת התמונה נכשלה. נסו שוב.',
           unknown: 'הפעולה נכשלה. נסו שוב.',
         },
       },

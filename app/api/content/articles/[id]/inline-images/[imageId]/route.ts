@@ -11,6 +11,8 @@ import { authContentProject } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { eligibleSections, generateInlineImage } from '@/lib/content/inline-images'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
+
 
 // Manual-replace upload guardrails (mirrors the existing project upload route).
 const REPLACE_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -52,8 +54,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   await auth.admin.from('article_inline_images').update(patch).eq('id', imageId)
 
-  if (body.action === 'regenerate') await generateInlineImage(auth.admin, imageId)
+  let generation: { ok: true; url: string } | { ok: false; error: string; transient?: boolean } | null = null
+  if (body.action === 'regenerate') generation = await generateInlineImage(auth.admin, imageId)
   const { data: row } = await auth.admin.from('article_inline_images').select('*').eq('id', imageId).maybeSingle()
+  if (generation && !generation.ok) {
+    return Response.json({ image: row, error: 'image_generation_failed', reason: generation.error },
+      { status: imageGenerationHttpStatus(generation.error) })
+  }
   return Response.json({ image: row })
 }
 

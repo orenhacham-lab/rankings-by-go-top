@@ -127,6 +127,9 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [{ id: 'conn-1', user_id: 'u6', connection_status: 'connected', shopify_current_period_start: null, shopify_current_period_end: null, updated_at: '2026-08-01T00:00:00Z' }],
+      // Shopify governance is what makes this a Shopify case — the connection
+      // row alone no longer decides billing authority.
+      billing_governance: [{ user_id: 'u6', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{
         id: 'shopify-user-sub', user_id: 'u6', status: 'active', plan_code: 'premium',
         trial_ends_at: null, current_period_start: null, current_period_end: null,
@@ -140,6 +143,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [{ id: 'conn-2', user_id: 'u6b', connection_status: 'connected', shopify_current_period_start: 'garbage', shopify_current_period_end: 'also-garbage', updated_at: '2026-08-01T00:00:00Z' }],
+      billing_governance: [{ user_id: 'u6b', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{
         id: 'shopify-user-sub-2', user_id: 'u6b', status: 'active', plan_code: 'premium',
         trial_ends_at: null, current_period_start: null, current_period_end: null,
@@ -152,7 +156,8 @@ async function main() {
   console.log('\n6c) A CONNECTED Shopify user WITH a valid period still resolves via Shopify — legacy/manual is never even considered')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [{ id: 'conn-3', user_id: 'u6c', connection_status: 'connected', shopify_current_period_start: '2026-08-01T00:00:00Z', shopify_current_period_end: '2026-09-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z' }],
+      shopify_connections: [{ id: 'conn-3', user_id: 'u6c', connection_status: 'connected', shopify_subscription_status: 'active', shopify_plan_handle: 'advanced', shopify_current_period_start: '2026-08-01T00:00:00Z', shopify_current_period_end: '2026-09-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z' }],
+      billing_governance: [{ user_id: 'u6c', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{
         id: 'shopify-user-sub-3', user_id: 'u6c', status: 'active', plan_code: 'premium',
         trial_ends_at: null, current_period_start: null, current_period_end: null,

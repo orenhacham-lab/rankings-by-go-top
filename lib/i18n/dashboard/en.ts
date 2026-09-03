@@ -886,6 +886,15 @@ export const dashboardEn = {
       gemini_init_failed: 'Failed to initialize Gemini. Please try again.',
       gemini_request_failed: 'The Gemini request failed. Please try again in a moment.',
       // Phase 3G.2 — precise Gemini failure reasons.
+      // ACCOUNT-level article allowance vs Gemini's own provider quota — two
+      // different things, and the merchant must never be shown either raw code.
+      quota_exceeded: 'Your account has used all its articles for the current billing period.',
+      // generatePoolItem persists gen.kind as the item's last_error, and the
+      // queue renders it through this dictionary — without these two entries it
+      // showed the raw machine code.
+      billing_required: 'An active Shopify plan is required to generate content. Choose a plan to continue.',
+      entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
+      usage_period_unavailable: 'We couldn’t verify your billing period just now. Please try again shortly.',
       gemini_quota_exceeded: 'Gemini quota / rate limit exceeded. Please try again later.',
       gemini_overloaded: 'Gemini is overloaded right now. Please try again in a few moments.',
       gemini_timeout: 'The Gemini request timed out. Please try again.',
@@ -958,6 +967,8 @@ export const dashboardEn = {
         image_generation_failed: 'The image engine returned no image. Please try again.',
         image_model_unavailable: 'The image model is not available on the current Gemini key. Set a supported image model in GEMINI_IMAGE_MODEL.',
         image_upload_failed: 'Saving the image failed. Please try again.',
+        billing_required: 'An active Shopify plan is required to generate images. Choose a plan to continue.',
+        entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
         image_save_failed: 'Saving the image failed. Please try again.',
         unknown: 'Image generation failed. Please try again.',
       },
@@ -1012,6 +1023,11 @@ export const dashboardEn = {
           file_too_large: 'File is too large (max 5MB).',
           no_file: 'No file selected.',
           image_upload_failed: 'Image upload failed. Please try again.',
+          // Entitlement outcomes surfaced by the image pipeline. Without these
+          // the panel rendered the raw code (e.g. "billing_required").
+          billing_required: 'An active Shopify plan is required to generate images. Choose a plan to continue.',
+          entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
+          image_generation_failed: 'Image generation failed. Please try again.',
           unknown: 'The action failed. Please try again.',
         },
       },

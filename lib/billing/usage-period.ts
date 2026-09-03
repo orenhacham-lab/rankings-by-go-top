@@ -40,6 +40,21 @@
  */
 
 import { parseInstantMs } from '@/lib/paypal/timestamp'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from '@/lib/shopify/constants'
+
+/** Shopify App Pricing handle → internal plan code. Same mapping as
+ *  lib/shopify/entitlement-resolver.ts; the only spelling difference is the
+ *  hyphen in `large-agency`. */
+const SHOPIFY_HANDLE_TO_PLAN_CODE: Record<ShopifyPlanHandle, PlanCode> = {
+  regular: 'regular',
+  advanced: 'advanced',
+  premium: 'premium',
+  'large-agency': 'large_agency',
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -68,10 +83,13 @@ function utcCalendarMonthPeriod(reference: Date): { start: Date; end: Date } {
 export interface UsagePeriod {
   start: Date
   end: Date
-  source: 'shopify' | 'paypal' | 'trial' | 'legacy_manual'
+  source: 'shopify' | 'shopify_trial' | 'paypal' | 'trial' | 'legacy_manual'
 }
 
 interface ShopifyPeriodRow {
+  shopify_subscription_status: string | null
+  shopify_plan_handle: string | null
+  shopify_trial_ends_at: string | null
   shopify_current_period_start: string | null
   shopify_current_period_end: string | null
 }
@@ -94,9 +112,31 @@ export async function resolveCurrentUsagePeriod(
   userId: string,
   nowFn: () => Date = () => new Date(),
 ): Promise<UsagePeriod | null> {
+  // BILLING AUTHORITY FIRST — a connected store is NOT billing authority.
+  //
+  // This used to treat the mere EXISTENCE of a connected shopify_connections
+  // row as "Shopify bills this account", then fail closed on it. Almost every
+  // customer registers on the website and may connect Shopify purely as a
+  // publishing destination: for them the Shopify billing columns are empty by
+  // design, so their perfectly valid PayPal or trial period was never even
+  // consulted and no period resolved at all. Authority comes from
+  // billing_governance — the same rule lib/shopify/entitlement-resolver.ts and
+  // every other billing decision already follow.
+  //
+  // A governance READ FAILURE is not "website": it is an outage, and it stops
+  // here rather than falling through to PayPal/trial data.
+  const authority = await resolveBillingAuthority(admin, userId)
+  if (!authority.ok) return null
+
+  if (authority.authority !== 'shopify') {
+    // Website-billed: the Shopify billing fields are ignored entirely, however
+    // many stores this account has connected.
+    return resolveWebsitePeriod(admin, userId, nowFn)
+  }
+
   const { data: shopifyConn } = await admin
     .from('shopify_connections')
-    .select('shopify_current_period_start, shopify_current_period_end')
+    .select('shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_start, shopify_current_period_end')
     .eq('user_id', userId)
         .eq('connection_status', 'connected')
     .is('archived_at', null)
@@ -106,6 +146,18 @@ export async function resolveCurrentUsagePeriod(
 
   if (shopifyConn) {
     const row = shopifyConn as ShopifyPeriodRow
+
+    // PLAN STATE FIRST, for BOTH the cycle and the trial.
+    //
+    // The stored cycle used to be returned before any of this was checked, so a
+    // cancelled, unverifiable ('unknown') or unsupported-handle connection kept
+    // resolving a period from stale cache columns and kept granting its
+    // allowance. A period may only come from a subscription this app actually
+    // recognises as active.
+    const status = (row.shopify_subscription_status ?? '').trim()
+    const handle = (row.shopify_plan_handle ?? '').trim()
+    if (status !== 'active' || !isSupportedShopifyPlanHandle(handle)) return null
+
     const shopifyStart = parseStoredInstant(row.shopify_current_period_start)
     const shopifyEnd = parseStoredInstant(row.shopify_current_period_end)
     // Corrective pass — a stored value that fails to parse is treated
@@ -115,13 +167,56 @@ export async function resolveCurrentUsagePeriod(
     if (shopifyStart && shopifyEnd) {
       return { start: shopifyStart, end: shopifyEnd, source: 'shopify' }
     }
+
+    // SHOPIFY MANAGED-PRICING TRIAL (production incident).
+    //
+    // During the free trial Shopify reports a real, ACTIVE subscription with
+    // `currentBillingCycle: null` — no money has moved yet, so there is no
+    // billing cycle to report — while `trialEndsAt` is populated. Requiring a
+    // cycle therefore resolved NO period for a paying-in-trial merchant, and
+    // article generation converted that into `quota_exceeded`: the account was
+    // told its 20-article allowance was used up before a single article had
+    // been generated.
+    //
+    // The trial IS the current usage period. Its authoritative end is the
+    // stored `shopify_trial_ends_at`; the start is that minus the plan's own
+    // catalog trialDays (the documented fallback pattern already used for the
+    // website trial above), never an unrelated hard-coded duration.
+    const trialEnd = parseStoredInstant(row.shopify_trial_ends_at)
+    if (
+      trialEnd
+      // A trial that has already ended is NOT a current period. With no
+      // billing cycle beside it there is nothing to resolve, so it falls
+      // through and fails closed — never a silent extra allowance.
+      && trialEnd.getTime() > nowFn().getTime()
+    ) {
+      const trialDays = PLAN_CATALOG[SHOPIFY_HANDLE_TO_PLAN_CODE[handle]].trialDays
+      return { start: new Date(trialEnd.getTime() - trialDays * DAY_MS), end: trialEnd, source: 'shopify_trial' }
+    }
+
     // Shopify-governed but no verified (or a corrupt) period yet (never
-    // checked, verification failed, or malformed data) — no PayPal/trial
-    // fallback is ever consulted for a Shopify-governed user (same rule as
-    // the general entitlement resolver). Fail closed: no resolvable period.
+    // checked, verification failed, malformed data, or an expired trial with
+    // no billing cycle) — no PayPal/trial fallback is ever consulted for a
+    // Shopify-governed user (same rule as the general entitlement resolver).
+    // Fail closed: no resolvable period.
     return null
   }
 
+  // Shopify-governed with NO connection row at all — still Shopify-governed,
+  // and still fail-closed. Falling through here would hand a Shopify merchant
+  // the website trial period as a side effect of a disconnected store.
+  return null
+}
+
+/**
+ * PayPal → legacy/manual → website trial, for accounts the WEBSITE bills.
+ * Extracted so the Shopify-authority branch above can never reach it.
+ */
+async function resolveWebsitePeriod(
+  admin: Admin,
+  userId: string,
+  nowFn: () => Date,
+): Promise<UsagePeriod | null> {
   const { data: sub } = await admin
     .from('subscriptions')
     .select('status, plan_code, trial_ends_at, current_period_start, current_period_end, created_at, paypal_subscription_id')

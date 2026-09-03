@@ -25,7 +25,7 @@ import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
 import { currentGitSha, isPreviewEnv } from '@/lib/runtime-info'
-import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForUser, gateDenialHttp } from '@/lib/content/entitlement-guard'
 
 // This route uses Node-only APIs (node:https / node:dns / node:crypto via the
 // WordPress client + credential decryption). Pin the Node runtime EXPLICITLY so a
@@ -248,7 +248,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // are mutually exclusive per project), so this specifically covers a
     // Shopify-billing-required user's OTHER, unrelated WordPress project.
     const billingGate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
-    if (!billingGate.allowed) return Response.json({ error: 'Shopify billing required', reason: billingGate.reason }, { status: 403 })
+    // An infrastructure failure is a retryable 503, never a billing 403.
+    if (!billingGate.allowed) { const d = gateDenialHttp(billingGate); return Response.json({ error: d.error, reason: d.reason }, { status: d.status }) }
 
     // Duplicate protection. Once exported (wp_post_id present) a plain re-export is
     // ambiguous, so require an explicit intent:

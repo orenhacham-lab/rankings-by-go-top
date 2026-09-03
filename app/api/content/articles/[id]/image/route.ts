@@ -14,6 +14,7 @@
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createFeaturedImageForArticle, CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
 
 async function loadOwnedArticle(articleId: string) {
   const admin = createAdminClient()
@@ -42,7 +43,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const result = await createFeaturedImageForArticle(owned.admin, id)
   if ('error' in result) {
     console.log('[content-article-image] failed reason=' + result.error)
-    return Response.json({ error: 'image_generation_failed', reason: result.error }, { status: 502 })
+    // A flat 502 for EVERY failure told a merchant with a verified billing
+    // denial, and a merchant hitting a transient entitlement outage, that "the
+    // image engine returned no image". The status comes from the ONE shared
+    // mapping, so this route cannot drift back to a flat 502 on its own.
+    return Response.json({ error: 'image_generation_failed', reason: result.error },
+      { status: imageGenerationHttpStatus(result.error) })
   }
   return Response.json({ featured_image_url: result.featured_image_url })
 }

@@ -60,7 +60,12 @@ export type ContentGenerationGateResult =
  * project owner — see that file's own header comment on the ownership
  * contract).
  */
-export async function assertContentGenerationAllowedForUser(admin: Admin, userId: string): Promise<ContentGenerationGateResult> {
+export async function assertContentGenerationAllowedForUser(
+  admin: Admin,
+  userId: string,
+  /** Injectable clock, threaded to the Shopify cache-freshness check. */
+  nowFn: () => Date = () => new Date(),
+): Promise<ContentGenerationGateResult> {
   // PRODUCTION BUG this closes. lib/subscription.ts's getUserEntitlement() and
   // hasAccess() both let a verified administrator through BEFORE consulting
   // Shopify governance, and app/api/shopify/billing/start-intent keeps admins
@@ -77,7 +82,7 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
   // are untouched — this only decides billing entitlement, never access.
   if (await isAdminUser(admin, userId)) return { allowed: true }
 
-  const resolution = await resolveShopifyGovernedEntitlement(admin, userId)
+  const resolution = await resolveShopifyGovernedEntitlement(admin, userId, nowFn)
   // An outage is NOT a billing verdict. Telling a paying customer to purchase a
   // plan because a query failed is worse than refusing the request honestly.
   if (resolution.kind === 'unavailable') {
@@ -95,7 +100,11 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
  * owner can't be resolved is NOT a Shopify-governance concern — let the
  * caller's own not-found/ownership handling take over downstream.
  */
-export async function assertContentGenerationAllowedForProject(admin: Admin, projectId: string): Promise<ContentGenerationGateResult> {
+export async function assertContentGenerationAllowedForProject(
+  admin: Admin,
+  projectId: string,
+  nowFn: () => Date = () => new Date(),
+): Promise<ContentGenerationGateResult> {
   const { data, error } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
   // A FAILED owner lookup used to fall through to `allowed: true`, so a
   // database error opened the gate for everyone. It is an infrastructure
@@ -105,5 +114,51 @@ export async function assertContentGenerationAllowedForProject(admin: Admin, pro
   // A project with no resolvable owner is not a Shopify-governance question —
   // the caller's own not-found/ownership handling takes over downstream.
   if (!userId) return { allowed: true }
-  return assertContentGenerationAllowedForUser(admin, userId)
+  return assertContentGenerationAllowedForUser(admin, userId, nowFn)
+}
+
+/** A denied gate result — the only shape the mappings below accept. */
+export type DeniedContentGenerationGate = Extract<ContentGenerationGateResult, { allowed: false }>
+
+/**
+ * THE ONE MAPPING every consumer uses. Blocker D left the two denial reasons
+ * distinguished at the source and then collapsed at every consumer: a
+ * governance/connection/Partner-API failure was reported to the merchant as
+ * "Shopify billing required" with a 403. That is wrong twice over — it tells a
+ * PAYING customer to buy a plan because a query failed, and 403 tells the
+ * caller not to retry something that is purely transient.
+ *
+ * Centralised so the routes cannot drift apart again:
+ *
+ *   shopify_billing_required → 403, a verified billing verdict, terminal;
+ *   entitlement_unavailable  → 503, an infrastructure failure, retryable.
+ *
+ * An `entitlement_unavailable` is NEVER rewritten as a billing failure.
+ */
+export type GateDenialHttp =
+  | { status: 403; reason: 'shopify_billing_required'; error: 'Shopify billing required' }
+  | { status: 503; reason: 'entitlement_unavailable'; error: 'Entitlement temporarily unavailable' }
+
+export function gateDenialHttp(gate: DeniedContentGenerationGate): GateDenialHttp {
+  return gate.reason === 'entitlement_unavailable'
+    ? { status: 503, reason: 'entitlement_unavailable', error: 'Entitlement temporarily unavailable' }
+    : { status: 403, reason: 'shopify_billing_required', error: 'Shopify billing required' }
+}
+
+/**
+ * The stable failure CODE for non-HTTP consumers (the generation core, the
+ * image pipelines) — the same distinction, in the vocabulary those callers
+ * already store in `last_error` / return as `error`.
+ */
+export function gateDenialCode(gate: DeniedContentGenerationGate): 'billing_required' | 'entitlement_unavailable' {
+  return gate.reason === 'entitlement_unavailable' ? 'entitlement_unavailable' : 'billing_required'
+}
+
+/**
+ * True when the denial is an OUTAGE rather than a verdict: safe and correct to
+ * retry, and it must not burn an automation retry attempt or permanently mark
+ * a row as a billing failure.
+ */
+export function isTransientGateDenial(gate: DeniedContentGenerationGate): boolean {
+  return gate.reason === 'entitlement_unavailable'
 }

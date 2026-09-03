@@ -140,7 +140,7 @@ export default function ArticleInlineImagesPanel({
         body: JSON.stringify({ sectionId: addSection }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { notify(errText(data.error), false); return }
+      if (!res.ok) { notify(errText(data.reason ?? data.error), false); return }
       setAddSection('')
       await load()
       notify(t.created, true)
@@ -155,10 +155,13 @@ export default function ArticleInlineImagesPanel({
         body: JSON.stringify({ action: 'regenerate' }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { notify(errText(data.error), false); return }
       const img = data.image as InlineImage | undefined
       if (img) applyImages(images.map((i) => (i.id === id ? img : i)))
-      if (img && img.status === 'failed') notify(img.last_error || t.failed, false)
+      // A failed generation now answers 403/503/502 with a typed `reason`
+      // instead of a bare 200. Both the response reason and the row's own
+      // last_error go through errText — a machine code is never shown raw.
+      if (!res.ok) { notify(errText(data.reason ?? data.error), false); return }
+      if (img && img.status === 'failed') notify(errText(img.last_error), false)
       else notify(t.generated, true)
     } catch { notify(t.failed, false) } finally { setBusy(null) }
   }
@@ -283,7 +286,7 @@ export default function ArticleInlineImagesPanel({
                     <img src={url} alt={img.alt_text || ''} className="w-full max-h-56 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
                   )}
                   {img.status === 'failed' && img.last_error && (
-                    <p className="text-[11px] text-red-600 dark:text-red-400 break-words">{img.last_error}</p>
+                    <p className="text-[11px] text-red-600 dark:text-red-400 break-words">{errText(img.last_error)}</p>
                   )}
 
                   <div className="flex flex-col gap-1">

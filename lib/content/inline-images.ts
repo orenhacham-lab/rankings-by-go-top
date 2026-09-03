@@ -16,7 +16,7 @@ import { uploadMedia, WordPressClientError } from '@/lib/wordpress/client'
 import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
 import { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages, type InlineImage, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
-import { assertContentGenerationAllowedForProject } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForProject, gateDenialCode, isTransientGateDenial } from '@/lib/content/entitlement-guard'
 
 // Re-export the pure engine (back-compat for existing server-side imports).
 export { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages }
@@ -31,7 +31,14 @@ function extFor(mime: string): string { return mime.includes('png') ? 'png' : mi
  * in the content bucket, and update the row (storage_url/status). Best-effort:
  * on failure the row is marked 'failed' with last_error. Never throws.
  */
-export async function generateInlineImage(admin: Admin, imageId: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+export async function generateInlineImage(
+  admin: Admin,
+  imageId: string,
+  /** Injectable clock, threaded to the entitlement gate's cache-freshness
+   *  check — same convention as generateArticleForTopic. Production passes
+   *  nothing and uses the real clock. */
+  nowFn: () => Date = () => new Date(),
+): Promise<{ ok: true; url: string } | { ok: false; error: string; transient?: boolean }> {
   const { data } = await admin.from('article_inline_images').select('id, project_id, article_id, prompt, alt_text, storage_path').eq('id', imageId).maybeSingle()
   const row = data as { id: string; project_id: string; article_id: string; prompt: string | null; alt_text: string | null; storage_path: string | null } | null
   if (!row) return { ok: false, error: 'image_not_found' }
@@ -39,10 +46,23 @@ export async function generateInlineImage(admin: Admin, imageId: string): Promis
 
   // Blocker D fix — central gate, checked BEFORE marking the row
   // 'generating' and before any Gemini call.
-  const gate = await assertContentGenerationAllowedForProject(admin, row.project_id)
+  const gate = await assertContentGenerationAllowedForProject(admin, row.project_id, nowFn)
   if (!gate.allowed) {
-    await admin.from('article_inline_images').update({ status: 'failed', last_error: 'billing_required', updated_at: nowIso() }).eq('id', imageId)
-    return { ok: false, error: 'billing_required' }
+    // The row records WHICH denial this was — an entitlement OUTAGE is never
+    // written as 'billing_required'.
+    //
+    // It IS still marked 'failed'. An earlier revision left the status
+    // untouched for the transient case, reasoning that an outage should not
+    // look permanent — but ArticleInlineImagesPanel surfaces a failure ONLY via
+    // `status === 'failed'`, so that turned a visible error into a silent one:
+    // the row sat at 'pending' forever and the merchant was told nothing.
+    // 'failed' here means "this attempt failed", not "you did not pay"; the row
+    // stays regenerable, and the DISTINCT code is what the UI localizes.
+    const code = gateDenialCode(gate)
+    await admin.from('article_inline_images')
+      .update({ status: 'failed', last_error: code, updated_at: nowIso() })
+      .eq('id', imageId)
+    return { ok: false, error: code, transient: isTransientGateDenial(gate) }
   }
 
   await admin.from('article_inline_images').update({ status: 'generating', last_error: null, updated_at: nowIso() }).eq('id', imageId)
