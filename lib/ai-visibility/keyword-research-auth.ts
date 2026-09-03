@@ -9,7 +9,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForUser, gateDenialHttp } from '@/lib/content/entitlement-guard'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -42,12 +42,12 @@ export async function authorizeAiQuestionGeneration(
 
   const gate = await assertContentGenerationAllowedForUser(admin, userId)
   if (!gate.allowed) {
-    // An infrastructure failure is a 503 the caller may retry — never a 403
-    // telling the customer to buy a plan.
-    if (gate.reason === 'entitlement_unavailable') {
-      return { ok: false, status: 503, error: 'Entitlement temporarily unavailable', reason: 'entitlement_unavailable' }
-    }
-    return { ok: false, status: 403, error: 'Shopify billing required', reason: gate.reason }
+    // Through the SHARED mapping, so this route cannot drift from the others:
+    // an infrastructure failure is a retryable 503, a verified no-plan is 403.
+    const d = gateDenialHttp(gate)
+    return d.status === 503
+      ? { ok: false, status: 503, error: d.error, reason: 'entitlement_unavailable' }
+      : { ok: false, status: 403, error: d.error, reason: 'shopify_billing_required' }
   }
 
   return { ok: true, userId }

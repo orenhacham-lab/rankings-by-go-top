@@ -77,6 +77,10 @@ export async function POST(request: Request) {
     }
     case 'billing_required':
       return Response.json({ error: 'Shopify billing required', reason: 'shopify_billing_required' }, { status: 403 })
+    // An entitlement OUTAGE is retryable and is never phrased as a billing
+    // requirement — same distinction the shared gateDenialHttp mapping makes.
+    case 'entitlement_unavailable':
+      return Response.json({ error: 'Entitlement temporarily unavailable', reason: 'entitlement_unavailable' }, { status: 503 })
     case 'quota_exceeded':
       return Response.json({ error: 'Article quota exceeded', reason: 'quota_exceeded' }, { status: 429 })
     // A period we could not resolve is a TRANSIENT server-side condition, not

@@ -32,6 +32,9 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { resolveCurrentUsagePeriod } from '../usage-period'
+import { gateDenialHttp, gateDenialCode, isTransientGateDenial, assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
+import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
+import { generateInlineImage } from '@/lib/content/inline-images'
 import { generateArticleForTopic, type ArticleGenerationDeps } from '@/lib/content/article-generation'
 import type { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
@@ -463,6 +466,179 @@ async function main() {
       await resolveCurrentUsagePeriod(adminWith() as never, USER, afterTrial) === null)
     check('A3C-i: and with the fixed NOW it still resolves — the clock is what decides',
       (await resolveCurrentUsagePeriod(adminWith() as never, USER, now))?.source === 'shopify_trial')
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\nA3D) A Shopify cycle needs an ACTIVE, SUPPORTED plan — validated before the cycle')
+  {
+    // The stored cycle used to be returned before any plan-state check, so a
+    // cancelled or unverifiable connection kept resolving a period from stale
+    // cache columns and kept granting its allowance.
+    const CYCLE = { shopify_current_period_start: '2026-09-01T00:00:00Z', shopify_current_period_end: '2026-10-01T00:00:00Z' }
+    for (const [label, over] of [
+      ["status 'none'", { ...CYCLE, shopify_subscription_status: 'none' }],
+      ["status 'unknown'", { ...CYCLE, shopify_subscription_status: 'unknown' }],
+      ['status empty', { ...CYCLE, shopify_subscription_status: '' }],
+      ['status null', { ...CYCLE, shopify_subscription_status: null }],
+      ['unsupported handle', { ...CYCLE, shopify_plan_handle: 'free-plan' }],
+      ['missing handle', { ...CYCLE, shopify_plan_handle: null }],
+      ['empty handle', { ...CYCLE, shopify_plan_handle: '' }],
+    ] as const) {
+      const r = await resolveCurrentUsagePeriod(adminWith(over as Record<string, unknown>) as never, USER, now)
+      check(`A3D: valid cycle dates but ${label} → resolves NULL`, r === null, JSON.stringify(r))
+    }
+    const good = await resolveCurrentUsagePeriod(adminWith(CYCLE) as never, USER, now)
+    check('A3D-a: NEGATIVE CONTROL — active + supported still resolves the cycle', good?.source === 'shopify')
+    check('A3D-b: with Shopify’s exact dates',
+      good?.start.toISOString() === '2026-09-01T00:00:00.000Z' && good?.end.toISOString() === '2026-10-01T00:00:00.000Z')
+    check('A3D-c: the same gate protects the TRIAL path (no cycle, bad status)',
+      await resolveCurrentUsagePeriod(adminWith({ shopify_subscription_status: 'unknown' }) as never, USER, now) === null)
+    check('A3D-d: SOURCE — plan state is validated BEFORE the cycle is read',
+      (() => { const src = strip(read('lib/billing/usage-period.ts'))
+        return src.indexOf("if (status !== 'active' || !isSupportedShopifyPlanHandle(handle)) return null")
+          < src.indexOf('const shopifyStart = parseStoredInstant') })())
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\nA3E) BLOCKER D — an entitlement OUTAGE is never a billing verdict')
+  {
+    // Two DIFFERENT denials that consumers used to collapse into one:
+    const VERDICT = { allowed: false, reason: 'shopify_billing_required' } as const
+    const OUTAGE = { allowed: false, reason: 'entitlement_unavailable', detail: 'governance_unavailable' } as const
+
+    // D/E — the shared mapping.
+    check('A3E-a: a verified no-plan is 403 + billing_required',
+      gateDenialHttp(VERDICT).status === 403 && gateDenialHttp(VERDICT).reason === 'shopify_billing_required')
+    check('A3E-b: an infrastructure failure is 503 + entitlement_unavailable',
+      gateDenialHttp(OUTAGE).status === 503 && gateDenialHttp(OUTAGE).reason === 'entitlement_unavailable')
+    check('A3E-c: the outage is never phrased as a billing requirement',
+      !/billing/i.test(gateDenialHttp(OUTAGE).error))
+    check('A3E-d: the non-HTTP code keeps the distinction too',
+      gateDenialCode(VERDICT) === 'billing_required' && gateDenialCode(OUTAGE) === 'entitlement_unavailable')
+    check('A3E-e: only the outage is transient',
+      isTransientGateDenial(OUTAGE) === true && isTransientGateDenial(VERDICT) === false)
+
+    // A — a governance DB failure at each generation family, through the REAL gate.
+    const governanceDown = (extra: Record<string, unknown> = {}) => new FakeAdmin(
+      { billing_governance: [SHOPIFY_AUTHORITY], shopify_connections: [shopifyConn()], shopify_billing_migrations: [], profiles: [{ id: USER, role: 'user' }], ...extra },
+      { billing_governance: { select: () => ({ code: '57014', message: 'statement timeout' }) } },
+      () => NOW.getTime(),
+    )
+    {
+      const gate = await assertContentGenerationAllowedForUser(governanceDown() as never, USER, () => NOW)
+      check('A3E-A1: a governance DB failure denies with entitlement_unavailable',
+        gate.allowed === false && gate.reason === 'entitlement_unavailable')
+      check('A3E-A2: NOT shopify_billing_required',
+        !(gate.allowed === false && gate.reason === 'shopify_billing_required'))
+    }
+    // B — a Partner API verification failure (stale cache forces the live call,
+    // which cannot succeed with no Partner config) also denies as an outage.
+    {
+      const stale = new FakeAdmin(
+        { billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [], profiles: [{ id: USER, role: 'user' }],
+          shopify_connections: [shopifyConn({ shopify_billing_verified_at: new Date(NOW.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString() })] },
+        {}, () => NOW.getTime(),
+      )
+      const gate = await assertContentGenerationAllowedForUser(stale as never, USER, () => NOW)
+      check('A3E-B1: a Partner API verification failure denies as an outage',
+        gate.allowed === false && gate.reason === 'entitlement_unavailable', JSON.stringify(gate))
+    }
+    // E — a CONFIRMED no-plan is still a billing verdict.
+    {
+      const noPlan = new FakeAdmin(
+        { billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [], profiles: [{ id: USER, role: 'user' }],
+          shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })] },
+        {}, () => NOW.getTime(),
+      )
+      const gate = await assertContentGenerationAllowedForUser(noPlan as never, USER, () => NOW)
+      check('A3E-E1: a confirmed no-plan is shopify_billing_required',
+        gate.allowed === false && gate.reason === 'shopify_billing_required')
+      check('A3E-E2: which maps to 403', gate.allowed === false && gateDenialHttp(gate).status === 403)
+    }
+
+    // A + C + D — the ARTICLE family, through the real generateArticleForTopic.
+    {
+      const admin = governanceDown({
+        subscriptions: [], projects: [{ id: 'p1', user_id: USER }],
+        article_topics: [{ id: 'topic-1', project_id: 'p1', topic: 'נושא', primary_keyword: 'מילה', language: 'he', status: 'approved', anchors_json: [], brief_notes: null, cta_preference: '' }],
+        wordpress_connections: [], generated_articles: [], ai_usage_logs: [], usage_reservations: [],
+      })
+      let generateCalls = 0
+      const r = await generateArticleForTopic(admin as never, { topicId: 'topic-1', userId: USER }, {
+        generate: async () => { generateCalls++; throw new Error('must never be called') },
+        createFeaturedImage: async () => { generateCalls++; throw new Error('must never be called') },
+        now: () => NOW,
+      } as unknown as ArticleGenerationDeps)
+      check('A3E-C1: article generation reports entitlement_unavailable, not billing_required',
+        r.ok === false && r.kind === 'entitlement_unavailable', JSON.stringify(r))
+      check('A3E-C2: ZERO provider calls', generateCalls === 0)
+      check('A3E-C3: nothing reserved', (admin.tables.usage_reservations as unknown[]).length === 0)
+      check('A3E-D1: SOURCE — the manual route maps it to a retryable 503',
+        /case 'entitlement_unavailable':[\s\S]{0,220}reason: 'entitlement_unavailable' \}, \{ status: 503 \}/
+          .test(strip(read('app/api/content/articles/generate/route.ts'))))
+    }
+
+    // G — the IMAGE families keep the distinct reason and do not mislabel a row.
+    {
+      const admin = governanceDown({
+        generated_articles: [{ id: 'a1', project_id: 'p1', title: 'T', topic_id: null, excerpt: null, meta_description: null, featured_image_storage_path: null }],
+        projects: [{ id: 'p1', user_id: USER }],
+      })
+      const img = await createFeaturedImageForArticle(admin as never, 'a1')
+      check('A3E-G1: the FEATURED image reports entitlement_unavailable',
+        'error' in img && img.error === 'entitlement_unavailable', JSON.stringify(img))
+      check('A3E-G2: never billing_required during an outage', !('error' in img && img.error === 'billing_required'))
+    }
+    {
+      const admin = governanceDown({
+        article_inline_images: [{ id: 'img-1', project_id: 'p1', article_id: 'a1', prompt: 'p', alt_text: null, storage_path: null, status: 'queued', last_error: null }],
+        generated_articles: [{ id: 'a1', project_id: 'p1', title: 'T', topic_id: null }],
+        projects: [{ id: 'p1', user_id: USER }],
+      })
+      const res = await generateInlineImage(admin as never, 'img-1')
+      const row = (admin.tables.article_inline_images as Record<string, unknown>[])[0]!
+      check('A3E-G3: the INLINE image reports entitlement_unavailable',
+        res.ok === false && res.error === 'entitlement_unavailable', JSON.stringify(res))
+      check('A3E-G4: the row records that reason, NOT billing_required', row.last_error === 'entitlement_unavailable')
+      check('A3E-G5: and an outage does not permanently mark it failed', row.status === 'queued')
+      check('A3E-G6: SOURCE — a verified verdict still marks the row failed',
+        /isTransientGateDenial\(gate\)\s*\n?\s*\? \{ last_error: code[\s\S]{0,120}: \{ status: 'failed', last_error: code/
+          .test(strip(read('lib/content/inline-images.ts'))))
+    }
+
+    // F — the automation retry counter is preserved for an outage.
+    {
+      const item = strip(read('lib/content/automation/generate-item.ts'))
+      check('A3E-F1: entitlement_unavailable is treated as transient',
+        /const transient = [\s\S]{0,600}gen\.kind === 'entitlement_unavailable'/.test(item))
+      check('A3E-F2: a transient failure does NOT advance the attempt counter',
+        /transient \? \(item\.attempts \?\? 0\) : undefined/.test(item))
+      check('A3E-F3: and the reason is carried through, never rewritten',
+        /let reason: string = gen\.kind/.test(item) && !/entitlement_unavailable[\s\S]{0,60}billing_required/.test(item))
+    }
+
+    // Every consumer goes through the SHARED mapping — none may drift.
+    {
+      const consumers = [
+        'app/api/content/topic-suggestions/route.ts',
+        'app/api/content/automation/recommendations/route.ts',
+        'app/api/content/automation/topic-ideas/improve/route.ts',
+        'app/api/content/articles/[id]/wordpress/route.ts',
+        'lib/ai-visibility/keyword-research-auth.ts',
+      ]
+      for (const rel of consumers) {
+        const src = strip(read(rel))
+        check(`A3E-H: ${rel.split('/').pop()} uses the shared mapping`, /gateDenialHttp\(/.test(src))
+        check(`A3E-H: ${rel.split('/').pop()} no longer hard-codes a 403 for every denial`,
+          !/!\w*[Gg]ate\.allowed\) return Response\.json\(\{ error: 'Shopify billing required', reason: \w+\.reason \}, \{ status: 403 \}\)/.test(src))
+      }
+      for (const rel of ['lib/content/featured-image.ts', 'lib/content/inline-images.ts']) {
+        check(`A3E-H: ${rel.split('/').pop()} uses the shared code mapping`, /gateDenialCode\(gate\)/.test(strip(read(rel))))
+      }
+      check('A3E-H2: no consumer hard-codes billing_required for every denial',
+        !/if \(!gate\.allowed\) return \{ error: 'billing_required' \}/.test(strip(read('lib/content/featured-image.ts')))
+        && !/last_error: 'billing_required'/.test(strip(read('lib/content/inline-images.ts'))))
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────

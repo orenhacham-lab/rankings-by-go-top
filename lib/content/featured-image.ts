@@ -11,7 +11,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
-import { assertContentGenerationAllowedForProject } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForProject, gateDenialCode } from '@/lib/content/entitlement-guard'
 
 export const CONTENT_IMAGE_BUCKET = 'content-article-images'
 
@@ -38,7 +38,9 @@ export async function createFeaturedImageForArticle(
   // (the auto-image call from generateArticleForTopic is already gated
   // there; this covers the path that does NOT go through it).
   const gate = await assertContentGenerationAllowedForProject(admin, String(a.project_id))
-  if (!gate.allowed) return { error: 'billing_required' }
+  // The DISTINCT reason survives: an outage is 'entitlement_unavailable', not
+  // a billing verdict the caller would surface as "buy a plan".
+  if (!gate.allowed) return { error: gateDenialCode(gate) }
 
   // Language + topical context from the linked topic (best-effort).
   let language: 'he' | 'en' = 'he'

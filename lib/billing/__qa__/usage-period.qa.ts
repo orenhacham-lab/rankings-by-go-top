@@ -79,7 +79,7 @@ async function main() {
   console.log('\n6) Shopify-governed user — uses shopify_current_period_start/end, never PayPal/trial data')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [{ id: 'c1', user_id: 'u6', connection_status: 'connected', shopify_current_period_start: '2026-08-10T00:00:00Z', shopify_current_period_end: '2026-09-10T00:00:00Z', updated_at: '2026-08-10T00:00:00Z' }],
+      shopify_connections: [{ id: 'c1', user_id: 'u6', connection_status: 'connected', shopify_subscription_status: 'active', shopify_plan_handle: 'advanced', shopify_current_period_start: '2026-08-10T00:00:00Z', shopify_current_period_end: '2026-09-10T00:00:00Z', updated_at: '2026-08-10T00:00:00Z' }],
       // Billing authority is now a FACT from billing_governance — a connected
       // store no longer implies it (a website customer may connect Shopify only
       // to publish). These cases are ABOUT Shopify governance, so they state it.
@@ -94,7 +94,7 @@ async function main() {
   console.log('\n7) Shopify-governed user with no verified period yet — fails closed, never falls back to PayPal/trial')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [{ id: 'c2', user_id: 'u7', connection_status: 'connected', shopify_current_period_start: null, shopify_current_period_end: null, updated_at: '2026-08-10T00:00:00Z' }],
+      shopify_connections: [{ id: 'c2', user_id: 'u7', connection_status: 'connected', shopify_subscription_status: 'active', shopify_plan_handle: 'advanced', shopify_current_period_start: null, shopify_current_period_end: null, updated_at: '2026-08-10T00:00:00Z' }],
       billing_governance: [{ user_id: 'u7', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{ id: 's7', user_id: 'u7', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2026-08-01T00:00:00Z', current_period_end: '2026-09-01T00:00:00Z', created_at: '2026-08-01T00:00:00Z' }],
     })

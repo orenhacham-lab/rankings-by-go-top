@@ -31,7 +31,7 @@ import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/lib/content/recommendations/model'
 import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
 import { runtimeInfo } from '@/lib/runtime-info'
-import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForUser, gateDenialHttp } from '@/lib/content/entitlement-guard'
 import { randomUUID } from 'crypto'
 
 // Node runtime (uses node:crypto for run ids + SHA-256 domain fingerprints).
@@ -101,7 +101,8 @@ export async function POST(request: Request) {
   // a pure DB-free function shared by 7 callers — this route is the
   // narrowest shared point with project/DB context). Before any model call.
   const gate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
-  if (!gate.allowed) return Response.json({ error: 'Shopify billing required', reason: gate.reason }, { status: 403 })
+  // An infrastructure failure is a retryable 503, never a billing 403.
+  if (!gate.allowed) { const d = gateDenialHttp(gate); return Response.json({ error: d.error, reason: d.reason }, { status: d.status }) }
 
   // FAIL-CLOSED (Scope 1): a REQUESTED dry run that could not be honored (isolation
   // diagnostics disabled OR Production) must NEVER silently continue as a normal,

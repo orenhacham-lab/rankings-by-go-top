@@ -53,6 +53,10 @@ export type GenerateForTopicFailure =
   // Blocker D fix — the project owner is Shopify-billing-required (no
   // verified Shopify App Pricing plan). Checked BEFORE any Gemini call.
   | { ok: false; kind: 'billing_required' }
+  // The entitlement could not be DETERMINED (governance, connection or Partner
+  // API failure). An outage, not a verdict: retryable, and never presented to
+  // the merchant as "buy a plan". No provider call is made in either state.
+  | { ok: false; kind: 'entitlement_unavailable'; detail: string }
   // Phase 3 — the account's article allowance for the current billing
   // period is exhausted. Checked BEFORE any Gemini call, via an atomic
   // reservation (lib/billing/usage-reservations.ts) — never a plain
@@ -123,7 +127,11 @@ export async function generateArticleForTopic(
   // FIRST, before any DB read beyond what's needed, and before any Gemini
   // call (generateValidatedArticle / createFeaturedImageForArticle).
   const gate = await assertContentGenerationAllowedForUser(admin, userId, deps.now)
-  if (!gate.allowed) return { ok: false, kind: 'billing_required' }
+  if (!gate.allowed) {
+    return gate.reason === 'entitlement_unavailable'
+      ? { ok: false, kind: 'entitlement_unavailable', detail: gate.detail }
+      : { ok: false, kind: 'billing_required' }
+  }
 
   const { data: topic } = await admin.from('article_topics').select('*').eq('id', topicId).maybeSingle()
   if (!topic) return { ok: false, kind: 'topic_not_found' }

@@ -116,3 +116,49 @@ export async function assertContentGenerationAllowedForProject(
   if (!userId) return { allowed: true }
   return assertContentGenerationAllowedForUser(admin, userId, nowFn)
 }
+
+/** A denied gate result — the only shape the mappings below accept. */
+export type DeniedContentGenerationGate = Extract<ContentGenerationGateResult, { allowed: false }>
+
+/**
+ * THE ONE MAPPING every consumer uses. Blocker D left the two denial reasons
+ * distinguished at the source and then collapsed at every consumer: a
+ * governance/connection/Partner-API failure was reported to the merchant as
+ * "Shopify billing required" with a 403. That is wrong twice over — it tells a
+ * PAYING customer to buy a plan because a query failed, and 403 tells the
+ * caller not to retry something that is purely transient.
+ *
+ * Centralised so the routes cannot drift apart again:
+ *
+ *   shopify_billing_required → 403, a verified billing verdict, terminal;
+ *   entitlement_unavailable  → 503, an infrastructure failure, retryable.
+ *
+ * An `entitlement_unavailable` is NEVER rewritten as a billing failure.
+ */
+export type GateDenialHttp =
+  | { status: 403; reason: 'shopify_billing_required'; error: 'Shopify billing required' }
+  | { status: 503; reason: 'entitlement_unavailable'; error: 'Entitlement temporarily unavailable' }
+
+export function gateDenialHttp(gate: DeniedContentGenerationGate): GateDenialHttp {
+  return gate.reason === 'entitlement_unavailable'
+    ? { status: 503, reason: 'entitlement_unavailable', error: 'Entitlement temporarily unavailable' }
+    : { status: 403, reason: 'shopify_billing_required', error: 'Shopify billing required' }
+}
+
+/**
+ * The stable failure CODE for non-HTTP consumers (the generation core, the
+ * image pipelines) — the same distinction, in the vocabulary those callers
+ * already store in `last_error` / return as `error`.
+ */
+export function gateDenialCode(gate: DeniedContentGenerationGate): 'billing_required' | 'entitlement_unavailable' {
+  return gate.reason === 'entitlement_unavailable' ? 'entitlement_unavailable' : 'billing_required'
+}
+
+/**
+ * True when the denial is an OUTAGE rather than a verdict: safe and correct to
+ * retry, and it must not burn an automation retry attempt or permanently mark
+ * a row as a billing failure.
+ */
+export function isTransientGateDenial(gate: DeniedContentGenerationGate): boolean {
+  return gate.reason === 'entitlement_unavailable'
+}

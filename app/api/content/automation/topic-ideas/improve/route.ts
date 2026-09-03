@@ -15,7 +15,7 @@ import { loadPendingIdeaById, ideaToSuggestion, applyProImprovement } from '@/li
 import { improveRecommendationWithPro } from '@/lib/content/recommendations/improve-one'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import { BillingExhaustedError } from '@/lib/content/recommendations/model'
-import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForUser, gateDenialHttp } from '@/lib/content/entitlement-guard'
 import { randomUUID } from 'crypto'
 
 export const runtime = 'nodejs'
@@ -33,7 +33,8 @@ export async function POST(request: Request) {
 
   // Blocker D fix — central gate, before any Pro model call.
   const gate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
-  if (!gate.allowed) return Response.json({ error: 'Shopify billing required', reason: gate.reason }, { status: 403 })
+  // An infrastructure failure is a retryable 503, never a billing 403.
+  if (!gate.allowed) { const d = gateDenialHttp(gate); return Response.json({ error: d.error, reason: d.reason }, { status: d.status }) }
 
   if (!ideaId) return Response.json({ error: 'idea_required' }, { status: 400 })
 

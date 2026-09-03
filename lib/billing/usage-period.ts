@@ -146,6 +146,18 @@ export async function resolveCurrentUsagePeriod(
 
   if (shopifyConn) {
     const row = shopifyConn as ShopifyPeriodRow
+
+    // PLAN STATE FIRST, for BOTH the cycle and the trial.
+    //
+    // The stored cycle used to be returned before any of this was checked, so a
+    // cancelled, unverifiable ('unknown') or unsupported-handle connection kept
+    // resolving a period from stale cache columns and kept granting its
+    // allowance. A period may only come from a subscription this app actually
+    // recognises as active.
+    const status = (row.shopify_subscription_status ?? '').trim()
+    const handle = (row.shopify_plan_handle ?? '').trim()
+    if (status !== 'active' || !isSupportedShopifyPlanHandle(handle)) return null
+
     const shopifyStart = parseStoredInstant(row.shopify_current_period_start)
     const shopifyEnd = parseStoredInstant(row.shopify_current_period_end)
     // Corrective pass — a stored value that fails to parse is treated
@@ -170,13 +182,9 @@ export async function resolveCurrentUsagePeriod(
     // stored `shopify_trial_ends_at`; the start is that minus the plan's own
     // catalog trialDays (the documented fallback pattern already used for the
     // website trial above), never an unrelated hard-coded duration.
-    const status = (row.shopify_subscription_status ?? '').trim()
-    const handle = (row.shopify_plan_handle ?? '').trim()
     const trialEnd = parseStoredInstant(row.shopify_trial_ends_at)
     if (
-      status === 'active'
-      && isSupportedShopifyPlanHandle(handle)
-      && trialEnd
+      trialEnd
       // A trial that has already ended is NOT a current period. With no
       // billing cycle beside it there is nothing to resolve, so it falls
       // through and fails closed — never a silent extra allowance.

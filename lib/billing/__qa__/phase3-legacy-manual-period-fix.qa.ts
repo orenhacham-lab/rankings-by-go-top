@@ -156,7 +156,7 @@ async function main() {
   console.log('\n6c) A CONNECTED Shopify user WITH a valid period still resolves via Shopify — legacy/manual is never even considered')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [{ id: 'conn-3', user_id: 'u6c', connection_status: 'connected', shopify_current_period_start: '2026-08-01T00:00:00Z', shopify_current_period_end: '2026-09-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z' }],
+      shopify_connections: [{ id: 'conn-3', user_id: 'u6c', connection_status: 'connected', shopify_subscription_status: 'active', shopify_plan_handle: 'advanced', shopify_current_period_start: '2026-08-01T00:00:00Z', shopify_current_period_end: '2026-09-01T00:00:00Z', updated_at: '2026-08-01T00:00:00Z' }],
       billing_governance: [{ user_id: 'u6c', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{
         id: 'shopify-user-sub-3', user_id: 'u6c', status: 'active', plan_code: 'premium',

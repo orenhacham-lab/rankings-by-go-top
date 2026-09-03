@@ -16,7 +16,7 @@ import { uploadMedia, WordPressClientError } from '@/lib/wordpress/client'
 import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
 import { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages, type InlineImage, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
-import { assertContentGenerationAllowedForProject } from '@/lib/content/entitlement-guard'
+import { assertContentGenerationAllowedForProject, gateDenialCode, isTransientGateDenial } from '@/lib/content/entitlement-guard'
 
 // Re-export the pure engine (back-compat for existing server-side imports).
 export { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages }
@@ -41,8 +41,17 @@ export async function generateInlineImage(admin: Admin, imageId: string): Promis
   // 'generating' and before any Gemini call.
   const gate = await assertContentGenerationAllowedForProject(admin, row.project_id)
   if (!gate.allowed) {
-    await admin.from('article_inline_images').update({ status: 'failed', last_error: 'billing_required', updated_at: nowIso() }).eq('id', imageId)
-    return { ok: false, error: 'billing_required' }
+    // The row records WHICH denial this was. An entitlement OUTAGE is not a
+    // billing failure and must not be written as one — it also leaves the row
+    // in its previous state rather than marking it permanently 'failed', so a
+    // transient governance/Partner-API blip does not look like a merchant who
+    // never paid. A verified no-plan verdict still marks the row failed.
+    const code = gateDenialCode(gate)
+    const patch = isTransientGateDenial(gate)
+      ? { last_error: code, updated_at: nowIso() }
+      : { status: 'failed', last_error: code, updated_at: nowIso() }
+    await admin.from('article_inline_images').update(patch).eq('id', imageId)
+    return { ok: false, error: code }
   }
 
   await admin.from('article_inline_images').update({ status: 'generating', last_error: null, updated_at: nowIso() }).eq('id', imageId)
