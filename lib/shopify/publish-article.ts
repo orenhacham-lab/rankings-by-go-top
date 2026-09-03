@@ -182,7 +182,11 @@ export async function publishArticleToShopify(
   }
 
   const title = String(article.title || 'Article')
-  const input = buildArticleInput({
+  // The payload is built PER BRANCH, because create and update are different
+  // Shopify input types: ArticleCreateInput requires a non-null author, while
+  // sending one on an update would overwrite whatever author the article
+  // already has. One shared object cannot be correct for both.
+  const inputArgs = {
     blogId,
     title,
     handle: String(article.slug || '') || null,
@@ -194,7 +198,7 @@ export async function publishArticleToShopify(
     publishDate: opts.publishDate || null,
     imageUrl,
     imageAlt: title,
-  })
+  }
 
   const host = connection.storefront_domain || connection.shop_domain
   const action = decideArticleAction(article.shopify_article_id)
@@ -216,7 +220,7 @@ export async function publishArticleToShopify(
     }
 
     try {
-      const res = await shopifyArticleUpdate(creds, storedId, input)
+      const res = await shopifyArticleUpdate(creds, storedId, buildArticleInput({ ...inputArgs, mode: 'update' }))
       if (!res.ok) {
         const detail = summarizeUserErrors(res.userErrors)
         await persistError(admin, article.id, 'article_update_failed', detail)
@@ -233,7 +237,7 @@ export async function publishArticleToShopify(
   // 5) CREATE path — persist the new article id IMMEDIATELY (before url/status)
   //    so a later DB failure can never cause a duplicate on retry.
   try {
-    const res = await shopifyArticleCreate(creds, input)
+    const res = await shopifyArticleCreate(creds, buildArticleInput({ ...inputArgs, mode: 'create' }))
     if (!res.ok) {
       const detail = summarizeUserErrors(res.userErrors)
       await persistError(admin, article.id, 'article_create_failed', detail)

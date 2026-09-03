@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * ACCEPTANCE AUDIT — the real merchant journey for a Shopify publishing
  * destination, end to end, across module boundaries.
@@ -28,6 +29,12 @@
 // replaced. This keeps the production import graph, the real call sites and
 // the real argument shapes — only the network edge is swapped.
 // ---------------------------------------------------------------------------
+/*
+ * `require()` is deliberate and cannot be an import here: tsx runs this file as
+ * CommonJS, and the Module._load hook below must be installed BEFORE the modules
+ * under test are loaded. A static `import` is hoisted above it and would load
+ * them first, defeating the substitution entirely. Scoped to this harness.
+ */
 const Module: any = require('module')
 const origLoad = Module._load
 /**
@@ -84,9 +91,25 @@ const CONN = 'conn-1'
 /** Everything the Shopify Admin API edge did during one run. */
 interface Spy {
   blogCalls: number
-  createCalls: { blogId: string }[]
+  createCalls: { blogId: string; author: unknown }[]
   updateCalls: number
   getCalls: number
+}
+
+/**
+ * Validate an ArticleCreateInput the way Shopify's 2026-07 schema does, and
+ * throw the SAME variable-coercion error it does. A permissive stub that only
+ * read input.blogId is exactly why this suite passed while production failed —
+ * see lib/shopify/__qa__/article-author-required.qa.ts for the dedicated
+ * coverage of this invariant.
+ */
+function assertValidArticleCreateInput(input: any) {
+  if (!('author' in input) || input.author === null || input.author === undefined) {
+    throw new Error('Variable $article of type ArticleCreateInput! was provided invalid value for author (Expected value to not be null)')
+  }
+  if (typeof input.author.name !== 'string' || input.author.name.trim() === '') {
+    throw new Error('Variable $article of type ArticleCreateInput! was provided invalid value for author.name (Expected value to not be null)')
+  }
 }
 
 /** A world with a healthy connected store and ONE already-generated article. */
@@ -129,7 +152,8 @@ function installEdge(blogs: typeof BLOG_ONE[] | 'outage'): Spy {
       return blogs
     },
     shopifyArticleCreate: async (_creds: unknown, input: any) => {
-      spy.createCalls.push({ blogId: input.blogId })
+      assertValidArticleCreateInput(input)
+      spy.createCalls.push({ blogId: input.blogId, author: input.author })
       return { ok: true, article: { id: 'gid://shopify/Article/1', handle: 'how-to-brew', isPublished: true, publishedAt: '2026-09-03T00:00:00Z', blogHandle: 'news' } }
     },
     shopifyArticleUpdate: async () => { spy.updateCalls++; return { ok: true, article: { id: 'gid://shopify/Article/1', handle: 'h', isPublished: true, publishedAt: null, blogHandle: 'news' } } },
@@ -185,6 +209,7 @@ async function main() {
     check('1f: the article carries the resolved blog', art(admin).shopify_blog_id === BLOG_ONE.id)
     check('1g: the article id was stored (idempotent retry anchor)', art(admin).shopify_article_id === 'gid://shopify/Article/1')
     check('1h: the pool item is published', item(admin).status === 'published')
+    check('1i: and the create payload carried a schema-valid author', JSON.stringify(spy.createCalls[0]?.author) === JSON.stringify({ name: 'Go Top SEO' }))
   }
 
   // -----------------------------------------------------------------------
@@ -205,7 +230,7 @@ async function main() {
         if (spy.blogCalls > 1) throw new Error('second blog lookup — the destination was resolved twice')
         return [BLOG_ONE]
       },
-      shopifyArticleCreate: async (_c: unknown, input: any) => { spy.createCalls.push({ blogId: input.blogId }); return { ok: true, article: { id: 'gid://shopify/Article/2', handle: 'h', isPublished: true, publishedAt: null, blogHandle: 'news' } } },
+      shopifyArticleCreate: async (_c: unknown, input: any) => { assertValidArticleCreateInput(input); spy.createCalls.push({ blogId: input.blogId, author: input.author }); return { ok: true, article: { id: 'gid://shopify/Article/2', handle: 'h', isPublished: true, publishedAt: null, blogHandle: 'news' } } },
       shopifyArticleUpdate: async () => ({ ok: true, article: { id: 'x', handle: 'h', isPublished: true, publishedAt: null, blogHandle: null } }),
       shopifyGetArticle: async () => null,
     })
