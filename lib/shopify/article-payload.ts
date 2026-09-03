@@ -37,13 +37,28 @@ export function isStableImageUrl(url: string | null | undefined): boolean {
   return true
 }
 
+/** Deterministic safe author when the article has no configured author name. */
+export const DEFAULT_SHOPIFY_AUTHOR = 'Go Top'
+
+/** Trimmed configured author, or the safe fallback. Never empty. */
+export function resolveAuthorName(name: string | null | undefined): string {
+  return (name || '').trim() || DEFAULT_SHOPIFY_AUTHOR
+}
+
 /**
  * Build the Shopify ArticleCreateInput / ArticleUpdateInput object, including
- * ONLY the fields that are actually set (Shopify rejects unknown/empty inputs
- * inconsistently). `blogId` is included for create; callers may omit it on
- * update. Image is included only when the URL is stable.
+ * ONLY the fields that are set (Shopify rejects unknown/empty inputs
+ * inconsistently). Image is included only when the URL is stable.
+ *
+ * `forCreate` controls the REQUIRED author field:
+ *   - create → author is ALWAYS a valid AuthorInput ({ name } — configured name
+ *     or the "Go Top" fallback), never null/empty (ArticleCreateInput.author is
+ *     required and non-null).
+ *   - update → author is included ONLY when an explicit non-empty name is given
+ *     (an intentional author change); otherwise omitted so the remote author is
+ *     preserved. Never overwrites with the fallback on a normal update.
  */
-export function buildArticleInput(args: ShopifyArticleInputArgs): Record<string, unknown> {
+export function buildArticleInput(args: ShopifyArticleInputArgs, forCreate = true): Record<string, unknown> {
   const input: Record<string, unknown> = {
     blogId: args.blogId,
     title: String(args.title || '').trim(),
@@ -64,8 +79,10 @@ export function buildArticleInput(args: ShopifyArticleInputArgs): Record<string,
     tags.push(s)
   }
   if (tags.length) input.tags = tags
-  const author = (args.authorName || '').trim()
-  if (author) input.author = { name: author }
+  // Author — required on create (with fallback); explicit-only on update.
+  const explicitAuthor = (args.authorName || '').trim()
+  if (forCreate) input.author = { name: explicitAuthor || DEFAULT_SHOPIFY_AUTHOR }
+  else if (explicitAuthor) input.author = { name: explicitAuthor }
   if (args.published && args.publishDate && /^\d{4}-\d{2}-\d{2}/.test(args.publishDate)) input.publishDate = args.publishDate
   if (args.imageUrl && isStableImageUrl(args.imageUrl)) {
     input.image = { url: args.imageUrl, altText: (args.imageAlt || '').trim() || undefined }

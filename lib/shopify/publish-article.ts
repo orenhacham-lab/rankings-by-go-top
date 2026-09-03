@@ -151,7 +151,7 @@ export async function publishArticleToShopify(
   }
 
   const title = String(article.title || 'Article')
-  const input = buildArticleInput({
+  const inputArgs = {
     blogId,
     title,
     handle: String(article.slug || '') || null,
@@ -163,7 +163,7 @@ export async function publishArticleToShopify(
     publishDate: opts.publishDate || null,
     imageUrl,
     imageAlt: title,
-  })
+  }
 
   const host = connection.storefront_domain || connection.shop_domain
   const action = decideArticleAction(article.shopify_article_id)
@@ -185,7 +185,10 @@ export async function publishArticleToShopify(
     }
 
     try {
-      const res = await shopifyArticleUpdate(creds, storedId, input)
+      // Update: omit author (no explicit-change UI in v1) so the REMOTE author is
+      // preserved and never overwritten with the fallback on a normal update.
+      const updateInput = buildArticleInput({ ...inputArgs, authorName: null }, false)
+      const res = await shopifyArticleUpdate(creds, storedId, updateInput)
       if (!res.ok) {
         const detail = summarizeUserErrors(res.userErrors)
         await persistError(admin, article.id, 'article_update_failed', detail)
@@ -200,9 +203,11 @@ export async function publishArticleToShopify(
   }
 
   // 5) CREATE path — persist the new article id IMMEDIATELY (before url/status)
-  //    so a later DB failure can never cause a duplicate on retry.
+  //    so a later DB failure can never cause a duplicate on retry. author is
+  //    ALWAYS a valid AuthorInput on create (configured name or "Go Top").
   try {
-    const res = await shopifyArticleCreate(creds, input)
+    const createInput = buildArticleInput(inputArgs, true)
+    const res = await shopifyArticleCreate(creds, createInput)
     if (!res.ok) {
       const detail = summarizeUserErrors(res.userErrors)
       await persistError(admin, article.id, 'article_create_failed', detail)
