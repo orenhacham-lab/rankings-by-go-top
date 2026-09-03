@@ -35,6 +35,7 @@ import { resolveCurrentUsagePeriod } from '../usage-period'
 import { gateDenialHttp, gateDenialCode, isTransientGateDenial, assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { generateInlineImage } from '@/lib/content/inline-images'
+import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
 import { generateArticleForTopic, type ArticleGenerationDeps } from '@/lib/content/article-generation'
 import type { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
@@ -698,21 +699,19 @@ async function main() {
         return /generation = await generateInlineImage\(/.test(a) && /generation = await generateInlineImage\(/.test(b)
           && !/if \(body\.generate === true\) await generateInlineImage\(auth\.admin, imageId\)\s*\n\s*const \{ data: row \}/.test(a) })())
     check('A3F-3b: SOURCE — a failed generation answers a non-2xx with a typed reason',
-      /return Response\.json\(\{ image: row, error: 'image_generation_failed', reason: generation\.error \},\s*\n?\s*\{ status: inlineImageFailureStatus\(generation\.error\) \}\)/
+      /return Response\.json\(\{ image: row, error: 'image_generation_failed', reason: generation\.error \},\s*\n?\s*\{ status: imageGenerationHttpStatus\(generation\.error\) \}\)/
         .test(strip(read('app/api/content/articles/[id]/inline-images/[imageId]/route.ts'))))
-    // The mapping function itself, exercised for every branch.
-    const inlineStatus = (e: string) => e === 'billing_required' ? 403 : e === 'entitlement_unavailable' ? 503 : 502
-    check('A3F-3c: a verdict is 403', inlineStatus('billing_required') === 403)
-    check('A3F-3d: an outage is 503 — retryable', inlineStatus('entitlement_unavailable') === 503)
-    check('A3F-3e: a provider failure is 502', inlineStatus('image_generation_failed') === 502 && inlineStatus('gemini_timeout') === 502)
-    check('A3F-3f: SOURCE — that mapping lives in both routes',
-      /function inlineImageFailureStatus/.test(strip(read('app/api/content/articles/[id]/inline-images/route.ts')))
-      && /function inlineImageFailureStatus/.test(strip(read('app/api/content/articles/[id]/inline-images/[imageId]/route.ts'))))
-    check('A3F-3g: SOURCE — the FEATURED-image route no longer collapses every denial into 502',
-      (() => { const src = strip(read('app/api/content/articles/[id]/image/route.ts'))
-        return /result\.error === 'billing_required' \? 403/.test(src)
-          && /result\.error === 'entitlement_unavailable' \? 503/.test(src)
-          && !/reason: result\.error \}, \{ status: 502 \}\)/.test(src) })())
+    // BEHAVIOURAL — the one shared mapping, exercised for every branch.
+    check('A3F-3c: a verdict is 403', imageGenerationHttpStatus('billing_required') === 403)
+    check('A3F-3d: an outage is 503 — retryable', imageGenerationHttpStatus('entitlement_unavailable') === 503)
+    check('A3F-3e: a provider failure is 502',
+      imageGenerationHttpStatus('image_generation_failed') === 502
+      && imageGenerationHttpStatus('gemini_timeout') === 502
+      && imageGenerationHttpStatus('image_upload_failed') === 502
+      && imageGenerationHttpStatus('') === 502
+      && imageGenerationHttpStatus('anything_unknown') === 502)
+    check('A3F-3f: it never returns a 2xx for a failure',
+      (['billing_required', 'entitlement_unavailable', 'x'] as const).every((e) => imageGenerationHttpStatus(e) >= 400))
 
     // ── CLIENT layer: failure can never read as success, and never raw ──
     {
@@ -759,6 +758,28 @@ async function main() {
       check('A3F-6c: SOURCE — same for the featured image',
         fsrc.indexOf('assertContentGenerationAllowedForProject(admin, String(a.project_id), nowFn)') < fsrc.indexOf('generateArticleImage('))
     }
+    // ── ONE mapping, three routes: no local duplicate may remain ──
+    {
+      const routes = [
+        'app/api/content/articles/[id]/image/route.ts',
+        'app/api/content/articles/[id]/inline-images/route.ts',
+        'app/api/content/articles/[id]/inline-images/[imageId]/route.ts',
+      ]
+      for (const rel of routes) {
+        const src = strip(read(rel))
+        check(`A3F-8: ${rel.split('/').slice(-2).join('/')} imports the shared mapping`,
+          /import \{ imageGenerationHttpStatus \} from '@\/lib\/content\/image-generation-http'/.test(src))
+        check(`A3F-8: ${rel.split('/').slice(-2).join('/')} uses it for the status`,
+          /status: imageGenerationHttpStatus\(/.test(src))
+        check(`A3F-8: ${rel.split('/').slice(-2).join('/')} has NO local duplicate of the rule`,
+          !/function inlineImageFailureStatus/.test(src)
+          && !/=== 'billing_required' \? 403/.test(src)
+          && !/=== 'entitlement_unavailable' \? 503/.test(src))
+      }
+      check('A3F-8a: the rule exists in exactly ONE production file',
+        /if \(error === 'billing_required'\) return 403/.test(strip(read('lib/content/image-generation-http.ts'))))
+    }
+
     check('A3F-7: SCOPE — the route/client layers here are SOURCE checks; no HTTP request or browser was executed', true)
   }
 
@@ -809,13 +830,69 @@ async function main() {
       /gemini_quota_exceeded: 'Gemini quota \/ rate limit exceeded/.test(en))
     check('A5-f: SOURCE — the queue UI resolves codes through the dictionary, not raw',
       /const label = genErrors\[base\] \?\? base/.test(strip(read('components/content/AutomationSchedule.tsx'))))
-    // Both codes must actually be IN the dictionary the UI looks them up in,
-    // otherwise the lookup falls through to the raw string.
-    for (const [lang, src] of [['en', en], ['he', he]] as const) {
-      const block = src.slice(src.indexOf('genErrors: {'), src.indexOf('genErrors: {') + 4000)
-      check(`A5-g: '${lang}' genErrors contains BOTH codes, so neither falls through raw`,
-        /\bquota_exceeded:/.test(block) && /usage_period_unavailable:/.test(block))
+    // THE QUEUE'S OWN DICTIONARY, matched by BRACE DEPTH rather than a fixed
+    // slice. The previous version cut the block at 4000 characters while the EN
+    // block is 4369 — the truncation is precisely why two missing codes went
+    // unnoticed here.
+    const genErrorsBlock = (src: string): string => {
+      const start = src.indexOf('genErrors: {')
+      let depth = 0
+      for (let k = start + 'genErrors: '.length; k < src.length; k++) {
+        if (src[k] === '{') depth++
+        else if (src[k] === '}') { depth--; if (depth === 0) return src.slice(start, k) }
+      }
+      return ''
     }
+    // Every code generatePoolItem can persist as an item's last_error, i.e.
+    // every account/gate outcome AutomationSchedule can be asked to render.
+    const QUEUE_CODES = ['billing_required', 'entitlement_unavailable', 'quota_exceeded', 'usage_period_unavailable'] as const
+    for (const [lang, src] of [['en', en], ['he', he]] as const) {
+      const block = genErrorsBlock(src)
+      check(`A5-g: '${lang}' genErrors block was located by brace depth (not truncated)`, block.length > 0)
+      for (const code of QUEUE_CODES) {
+        check(`A5-g: '${lang}' genErrors contains '${code}'`, new RegExp(`\\b${code}: '`).test(block))
+      }
+    }
+
+    // reasonLabel (AutomationSchedule) must never fall back to the raw value for
+    // a KNOWN code. This replays its exact lookup — base = the part before ':',
+    // then genErrors[base] ?? base — against the real dictionaries.
+    {
+      const parseDict = (block: string): Record<string, string> => {
+        const out: Record<string, string> = {}
+        for (const m of block.matchAll(/^\s{6,}([a-z0-9_]+): '((?:[^'\\]|\\.)*)'/gm)) out[m[1]!] = m[2]!
+        return out
+      }
+      for (const [lang, src] of [['en', en], ['he', he]] as const) {
+        const dict = parseDict(genErrorsBlock(src))
+        const reasonLabel = (code: string): string => {
+          const idx = code.indexOf(':')
+          const base = (idx >= 0 ? code.slice(0, idx) : code).trim()
+          const tail = idx >= 0 ? code.slice(idx + 1).trim() : ''
+          const label = dict[base] ?? base
+          return tail ? `${label} — ${tail}` : label
+        }
+        for (const code of QUEUE_CODES) {
+          const label = reasonLabel(code)
+          check(`A5-h: '${lang}' reasonLabel('${code}') resolves to prose, never the raw code`,
+            label !== code && label.length > 0 && !/^[a-z0-9_]+$/.test(label), label)
+        }
+        // The same holds for the ':detail' shape the pipeline can emit.
+        const withDetail = reasonLabel('entitlement_unavailable: governance_unavailable')
+        check(`A5-h: '${lang}' a code carrying a detail still resolves its label`,
+          !withDetail.startsWith('entitlement_unavailable') && withDetail.includes('governance_unavailable'))
+        // Negative control: an UNKNOWN code does still fall back, which is the
+        // documented behaviour — so the checks above are not vacuous.
+        check(`A5-h: '${lang}' NEGATIVE CONTROL — an unknown code does fall back to raw`,
+          reasonLabel('totally_unknown_code') === 'totally_unknown_code')
+      }
+    }
+    check('A5-i: the billing message states a plan is REQUIRED, not that an existing plan excludes the feature',
+      /billing_required: 'An active Shopify plan is required to generate content/.test(en)
+      && !/doesn’t cover/.test(en) && !/אינה כוללת/.test(he))
+    check('A5-j: the outage message invites a retry and never mentions purchasing',
+      /entitlement_unavailable: 'We couldn’t verify your plan just now\. This is temporary — please try again shortly\.'/.test(en)
+      && !/entitlement_unavailable: '[^']*(plan to continue|purchase|buy)/.test(en))
   }
 
   // ───────────────────────────────────────────────────────────────────────
