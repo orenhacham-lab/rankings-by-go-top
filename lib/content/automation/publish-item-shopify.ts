@@ -11,6 +11,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 import { publishArticleToShopify, type ShopifyPublishArticleRow } from '@/lib/shopify/publish-article'
+import { resolvePublishBlogTarget, isDeterministicBlogBlocker } from '@/lib/shopify/resolve-publish-blog'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
@@ -61,10 +62,21 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
 
     // Publishing prerequisite — a config gate that won't change on retry.
     if (!hasWriteContent(loaded.connection.granted_scopes)) { await blockShopifyItem(admin, item, 'missing_write_content_scope', articleTitle); return { itemId: item.id, status: 'paused', articleId, reason: 'missing_write_content_scope' } }
-    // NOTE: the target blog is NOT checked here — publishArticleToShopify resolves
-    // the article-level blog OR the project default. A missing blog fails through
-    // the normal publish path below (retry-bounded + alert after max attempts), so
-    // a never-opened queue article publishes to the project default automatically.
+    // TARGET BLOG — resolved BEFORE the claim below, so a deterministic blocker
+    // never burns a retry attempt.
+    //
+    // This used to be left to publishArticleToShopify, which meant a store with
+    // exactly one blog and no saved default failed as `no_shopify_blog` and
+    // consumed an attempt every run, until the item hit the retry cap. Now:
+    // one blog resolves automatically (and is persisted), zero blogs or several
+    // without a default PAUSE the item with an immediate alert and no attempt
+    // increment, and a failed lookup falls through to the normal retry-bounded
+    // path because it is transient.
+    const blogTarget = await resolvePublishBlogTarget(admin, loaded.connection, loaded.creds, article)
+    if (!blogTarget.ok && isDeterministicBlogBlocker(blogTarget.reason)) {
+      await blockShopifyItem(admin, item, blogTarget.reason, articleTitle)
+      return { itemId: item.id, status: 'paused', articleId, reason: blogTarget.reason }
+    }
 
     // Retry cap (same bound as WordPress).
     if (item.status === 'failed' && (item.attempts ?? 0) >= AUTOMATION_MAX_ATTEMPTS) {

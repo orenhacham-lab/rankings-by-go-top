@@ -895,6 +895,18 @@ export const dashboardHe = {
       // generatePoolItem שומר את gen.kind כ-last_error של הפריט, והתור מציג
       // אותו דרך המילון הזה — בלי שתי השורות האלה הוצג הקוד הגולמי.
       billing_required: 'נדרשת תוכנית Shopify פעילה כדי ליצור תוכן. בחרו תוכנית כדי להמשיך.',
+      // חסימות פרסום ל-Shopify. blockShopifyItem שומר את הקוד ללא תחילית,
+      // ונתיב הפרסום שומר אותו עם shopify_. התור מחפש את הערך המדויק, ולכן
+      // שתי הצורות מופיעות כאן.
+      no_shopify_blog: 'בחנות ה-Shopify שלכם אין עדיין בלוג. צרו בלוג ב-Shopify ונסו לפרסם שוב.',
+      shopify_no_shopify_blog: 'בחנות ה-Shopify שלכם אין עדיין בלוג. צרו בלוג ב-Shopify ונסו לפרסם שוב.',
+      missing_default_blog: 'בחנות שלכם יש כמה בלוגים. בחרו לאיזה מהם לפרסם בהגדרות חיבור ה-Shopify.',
+      shopify_missing_default_blog: 'בחנות שלכם יש כמה בלוגים. בחרו לאיזה מהם לפרסם בהגדרות חיבור ה-Shopify.',
+      blog_lookup_failed: 'לא הצלחנו לקרוא כרגע את הבלוגים שלכם ב-Shopify. זו תקלה זמנית — הפרסום ינוסה שוב.',
+      shopify_blog_lookup_failed: 'לא הצלחנו לקרוא כרגע את הבלוגים שלכם ב-Shopify. זו תקלה זמנית — הפרסום ינוסה שוב.',
+      missing_write_content_scope: 'לאפליקציה חסרה הרשאה לפרסם מאמרים בחנות. חברו מחדש את החנות כדי להעניק אותה.',
+      shopify_missing_write_content_scope: 'לאפליקציה חסרה הרשאה לפרסם מאמרים בחנות. חברו מחדש את החנות כדי להעניק אותה.',
+      no_shopify_connection: 'לפרויקט הזה אין חנות Shopify מחוברת.',
       entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
       usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב. נסו שוב בעוד רגע.',
       gemini_quota_exceeded: 'חריגה ממכסת Gemini / הגבלת קצב. נסו שוב מאוחר יותר.',
@@ -1678,7 +1690,9 @@ export const dashboardHe = {
         grantedScopesLabel: 'הרשאות שהוענקו',
         defaultBlogLabel: 'בלוג ברירת מחדל לפרסום',
         defaultBlogSelect: 'בחרו בלוג…',
-        defaultBlogSave: 'שמור ברירת מחדל',
+        defaultBlogNeedsScope: 'חסרה הרשאת פרסום — חברו מחדש את החנות כדי להעניק אותה. אפשר עדיין לראות למטה לאיזה בלוג יפורסם.',
+      defaultBlogAuto: 'נבחר אוטומטית — בחנות שלכם יש בלוג אחד.',
+      defaultBlogSave: 'שמור ברירת מחדל',
         defaultBlogSaved: 'בלוג ברירת המחדל נשמר.',
         defaultBlogError: 'שמירת בלוג ברירת המחדל נכשלה.',
         defaultBlogMissing: 'בחרו בלוג ברירת מחדל כדי לאפשר פרסום אוטומטי מתוזמן.',

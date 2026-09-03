@@ -19,8 +19,9 @@ import type { ShopifyConnectionRow } from './api-auth'
 import { hasWriteContent } from './constants'
 import { buildCanonicalUrl } from './domain'
 import { ShopifyClientError, shopifyArticleCreate, shopifyArticleUpdate, shopifyGetArticle } from './client'
-import { buildArticleInput, isStableImageUrl, summarizeUserErrors, decideArticleAction, resolveTargetBlogId, type ShopifyUserError } from './article-payload'
+import { buildArticleInput, isStableImageUrl, summarizeUserErrors, decideArticleAction, type ShopifyUserError } from './article-payload'
 import { checkShopifyPublishEntitlement } from './billing-guard'
+import { resolvePublishBlogTarget } from './resolve-publish-blog'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
 
@@ -28,6 +29,11 @@ type Admin = ReturnType<typeof createAdminClient>
 
 export type ShopifyPublishReason =
   | 'missing_write_content_scope' | 'no_shopify_blog' | 'invalid_blog' | 'permission_error'
+  // Several blogs exist and none is selected — a choice only the merchant can
+  // make. DISTINCT from no_shopify_blog: the store does have blogs.
+  | 'missing_default_blog'
+  // The Blogs lookup itself failed — transient, and never a claim about the store.
+  | 'blog_lookup_failed'
   | 'article_create_failed' | 'article_update_failed' | 'graphql_user_error' | 'remote_article_missing'
   | 'token_invalid' | 'rate_limited' | 'exact_failure'
   // Phase 2 — the central billing entitlement guard denied this publish.
@@ -129,8 +135,12 @@ export async function publishArticleToShopify(
   // 2) Resolve the target blog: article-level selection overrides the project
   //    default. Persist the resolved id on the article so retries are
   //    deterministic and a later default change never moves a published article.
-  const blogId = resolveTargetBlogId(article.shopify_blog_id, connection.default_blog_id)
-  if (!blogId) return { ok: false, reason: 'no_shopify_blog', imageWarnings: [] }
+  // A store with exactly ONE blog needs no decision from anyone: ask Shopify,
+  // use it, and persist it as the connection default. With several, refuse
+  // rather than guess. See lib/shopify/resolve-publish-blog.ts.
+  const target = await resolvePublishBlogTarget(admin, connection, creds, article)
+  if (!target.ok) return { ok: false, reason: target.reason, imageWarnings: [] }
+  const blogId = target.blogId
   if (!article.shopify_blog_id) {
     await admin.from('generated_articles').update({ shopify_blog_id: blogId, updated_at: nowIso() }).eq('id', article.id)
     article.shopify_blog_id = blogId

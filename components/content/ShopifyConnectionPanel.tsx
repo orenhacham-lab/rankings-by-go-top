@@ -81,7 +81,7 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
 
   // Load Blogs for the default-Blog selector once publishing is enabled.
   useEffect(() => {
-    if (!connection?.can_publish) return
+    if (!connection) return
     let cancelled = false
     ;(async () => {
       try {
@@ -96,7 +96,7 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection?.can_publish, projectId])
+  }, [connection, projectId])
 
   async function saveDefaultBlog() {
     setSavingDefault(true); setMessage(null)
@@ -242,15 +242,39 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
             <div className={`text-xs ${connection.connection_status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{connection.last_error}</div>
           )}
 
-          {/* Phase 4F.2 — default publishing Blog (used by automation for
-              never-opened articles). Only shown once publishing is enabled. */}
-          {connection.can_publish && (
+          {/* Default publishing Blog.
+              RECONCILIATION. This section was gated on `connection.can_publish`
+              — and so was the blogs FETCH above — so a connection without
+              write_content showed nothing at all: no selector, no explanation,
+              no way to act. That is what a merchant reported. The gate is not
+              removed blindly: `can_publish` and the publishing service both
+              read hasWriteContent(granted_scopes), i.e. the SAME predicate on
+              the SAME column, so they cannot disagree — a store that reached
+              `no_shopify_blog` in the service HAD the scope, and its section
+              should already have rendered. Two separate concerns were being
+              conflated: whether the app MAY publish (a scope), and WHERE it
+              would publish (a destination). The destination is now always shown
+              for a live connection, and the missing scope is stated in words
+              instead of hiding the whole block. (Note: ContentHubPlatformCard,
+              the other Shopify card, has never contained this section at all —
+              if that is the card in the screenshot, this panel was simply not
+              on screen.) */}
+          {(
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.defaultBlogLabel}</label>
+              {!connection.can_publish && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">{t.defaultBlogNeedsScope}</p>
+              )}
               {blogs.length === 0 ? (
                 <p className="text-xs text-amber-700 dark:text-amber-400">{t.defaultBlogNone}</p>
               ) : blogs.length === 1 ? (
-                <div className="text-sm text-slate-700 dark:text-slate-200">{blogs[0].title}</div>
+                /* Exactly one blog: nothing to choose. The server resolves and
+                   saves it automatically on the first publish, so this states
+                   the destination rather than demanding an action. */
+                <div className="text-sm text-slate-700 dark:text-slate-200">
+                  {blogs[0].title}
+                  <span className="ms-2 text-[11px] text-emerald-700 dark:text-emerald-400">{t.defaultBlogAuto}</span>
+                </div>
               ) : (
                 <select value={defaultBlogId} onChange={(e) => setDefaultBlogId(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                   <option value="">{t.defaultBlogSelect}</option>
