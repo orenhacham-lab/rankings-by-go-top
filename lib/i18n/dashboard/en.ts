@@ -1695,6 +1695,11 @@ export const dashboardEn = {
         defaultBlogError: 'Failed to save the default blog.',
         defaultBlogMissing: 'Choose a default blog to enable scheduled automated publishing.',
         defaultBlogNone: 'No blog found in the store. Create a blog in Shopify.',
+        defaultBlogLoading: 'Loading your store’s blogs…',
+        // An OUTAGE, stated as one. Never collapsed into "no blog found" — that
+        // would be a false claim about the merchant's store.
+        defaultBlogLoadError: 'We couldn’t read your Shopify blogs just now. This is temporary.',
+        defaultBlogRetry: 'Try again',
         connect: 'Connect Shopify',
         guide: {
           openGuide: 'Shopify connection guide',

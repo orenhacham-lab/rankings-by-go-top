@@ -34,7 +34,28 @@ export type BlogTargetReason =
   | 'blog_lookup_failed'
 
 export type BlogTargetResolution =
-  | { ok: true; blogId: string; autoResolved: boolean }
+  | {
+      ok: true
+      blogId: string
+      autoResolved: boolean
+      /**
+       * Whether the auto-resolved id was actually written to
+       * shopify_connections.default_blog_id.
+       *
+       * HONESTY. Supabase returns `{ error }`; it does not throw. The write used
+       * to sit in a bare try/catch, so a REJECTED update still reported a clean
+       * auto-resolution and the code claimed the question would never be asked
+       * again — while the row was unchanged and it would be asked on every
+       * publish. The result is inspected now and reported as it happened.
+       *
+       * A failed write does NOT fail the publish: the destination is known and
+       * correct, and refusing to publish over a bookkeeping failure would be a
+       * strictly worse outcome for the merchant. The only consequence is that
+       * the next attempt resolves again. Always true when nothing was written
+       * (`autoResolved: false`) — there was no write to fail.
+       */
+      persisted: boolean
+    }
   | { ok: false; reason: BlogTargetReason }
 
 /** Only `no_shopify_blog` / `missing_default_blog` are deterministic and
@@ -54,7 +75,7 @@ export async function resolvePublishBlogTarget(
   // existing helper — this module adds the Shopify lookup, it does not restate
   // which stored id wins.
   const stored = resolveTargetBlogId(article.shopify_blog_id, connection.default_blog_id)
-  if (stored) return { ok: true, blogId: stored, autoResolved: false }
+  if (stored) return { ok: true, blogId: stored, autoResolved: false, persisted: true }
 
   const listBlogs = deps.listBlogs ?? getShopifyBlogs
   let blogs: Awaited<ReturnType<typeof getShopifyBlogs>>
@@ -72,12 +93,18 @@ export async function resolvePublishBlogTarget(
 
   const blogId = blogs[0]!.id
   // Persist it as the connection default so this resolution happens once, not
-  // on every publish. Best-effort: a failed write must not block a publish that
-  // is otherwise ready — the id is returned either way.
+  // on every publish. Non-fatal, but NOT unexamined: the `{ error }` result is
+  // read (Supabase does not throw) and a throw is caught, so `persisted`
+  // states what actually happened rather than assuming success.
+  let persisted = false
   try {
-    await admin.from('shopify_connections')
+    const { error } = await admin.from('shopify_connections')
       .update({ default_blog_id: blogId, updated_at: new Date().toISOString() })
       .eq('id', connection.id)
-  } catch { /* non-fatal */ }
-  return { ok: true, blogId, autoResolved: true }
+    persisted = !error
+  } catch { persisted = false }
+  // Keep the in-memory connection consistent with what was written, so a caller
+  // that reuses this object in the same request does not re-read a stale null.
+  if (persisted) connection.default_blog_id = blogId
+  return { ok: true, blogId, autoResolved: true, persisted }
 }

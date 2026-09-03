@@ -209,26 +209,37 @@ async function main() {
       /missing_default_blog: 'Your store has several blogs\. Choose which one/.test(en))
   }
 
-  console.log('\n10) SOURCE — the connection panel no longer hides the whole section')
+  console.log('\n10) SOURCE — the destination control is shared, and neither card hides it')
   {
+    // This section used to assert the destination markup INSIDE
+    // ShopifyConnectionPanel. It now lives in ShopifyDestinationSection, which
+    // both Shopify cards render — the panel had the markup and the hub's card
+    // (the one a connected merchant actually sees) did not, and that divergence
+    // is the defect. The behavioral journey for all of this is in
+    // lib/shopify/__qa__/publish-destination-journey.qa.ts.
+    const dest = strip(read('components/content/ShopifyDestinationSection.tsx'))
     const panel = strip(read('components/content/ShopifyConnectionPanel.tsx'))
-    check('10a: the blogs fetch is no longer gated on the publish scope',
-      /if \(!connection\) return/.test(panel) && !/if \(!connection\?\.can_publish\) return/.test(panel))
-    check('10b: nor is the section itself',
-      !/\{connection\.can_publish && \(\s*\n\s*<div className="pt-2 border-t/.test(panel))
+    const card = strip(read('components/content/ContentHubPlatformCard.tsx'))
+    check('10a: the blogs fetch is not gated on the publish scope',
+      !/if \(!canPublish\)/.test(dest) && /fetch\(`\/api\/shopify\/blogs/.test(dest))
+    check('10b: nor is the section itself — canPublish never short-circuits a render',
+      !/if \(!canPublish\) return null/.test(dest))
     check('10c: a missing scope is STATED instead of hiding everything',
-      /!connection\.can_publish && \(/.test(panel) && /t\.defaultBlogNeedsScope/.test(panel))
+      /!canPublish && \(/.test(dest) && /t\.defaultBlogNeedsScope/.test(dest))
     check('10d: with one blog the merchant is told it was selected automatically',
-      /t\.defaultBlogAuto/.test(panel))
+      /t\.defaultBlogAuto/.test(dest))
     check('10e: with several blogs a selector and a Save action are rendered',
-      /<option value="">\{t\.defaultBlogSelect\}<\/option>/.test(panel) && /t\.defaultBlogSave/.test(panel))
-    check('10f: with zero blogs a truthful message is shown', /t\.defaultBlogNone/.test(panel))
+      /<option value="">\{t\.defaultBlogSelect\}<\/option>/.test(dest) && /t\.defaultBlogSave/.test(dest))
+    check('10f: with zero blogs a truthful message is shown', /t\.defaultBlogNone/.test(dest))
+    check('10g: BOTH Shopify cards render the SAME component — no second copy to drift',
+      panel.includes('<ShopifyDestinationSection') && card.includes('<ShopifyDestinationSection'))
     for (const lang of ['en', 'he'] as const) {
       const src = read(`lib/i18n/dashboard/${lang}.ts`)
-      check(`10g: '${lang}' the two new labels exist`,
-        /defaultBlogNeedsScope: '/.test(src) && /defaultBlogAuto: '/.test(src))
+      check(`10h: '${lang}' the destination labels exist`,
+        /defaultBlogNeedsScope: '/.test(src) && /defaultBlogAuto: '/.test(src)
+        && /defaultBlogLoadError: '/.test(src) && /defaultBlogRetry: '/.test(src))
     }
-    check('10h: SCOPE — a source contract on the panel; no browser was run', true)
+    check('10i: SCOPE — a source contract on components; no browser was run', true)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -59,7 +59,17 @@ async function main() {
 
     const hub = read('../../../components/content/ContentHub.tsx')
     check('ContentHub routes row + batch by activePlatform to the Shopify route', /activePlatform: ActivePlatform = data\?\.platform\?\.platform/.test(hub) && /articles\/\$\{a\.id\}\/shopify/.test(hub) && /articles\/\$\{id\}\/shopify/.test(hub) && /if \(activePlatform === 'shopify'\) \{ await exportRowShopify/.test(hub))
-    check('ContentHub Shopify row is idempotent + surfaces corrective scope/blog errors', /missing_write_content_scope/.test(hub) && /no_shopify_blog/.test(hub) && /shopify_article_id/.test(hub))
+    // The corrective codes used to be an inline three-way ternary here. They now
+    // go through ONE localizer (lib/i18n/dashboard/shopify-publish-error.ts),
+    // which covers every code in every shape the server emits instead of three
+    // of them — so the contract is that the localizer is used, and that the
+    // shared dictionary really carries the corrective codes.
+    check('ContentHub Shopify row is idempotent + surfaces corrective scope/blog errors',
+      /shopifyPublishError\(/.test(hub) && /localizeShopifyPublishError/.test(hub) && /shopify_article_id/.test(hub))
+    const genErrors = read('../../i18n/dashboard/en.ts')
+    check('the shared dictionary carries the corrective Shopify publish codes',
+      /missing_write_content_scope: '/.test(genErrors) && /no_shopify_blog: '/.test(genErrors)
+      && /missing_default_blog: '/.test(genErrors) && /blog_lookup_failed: '/.test(genErrors))
 
     const gate = read('../../../components/content/ArticleEditorPublishGate.tsx')
     check('ArticleEditorPublishGate resolves by validity via the shared resolver', /resolveActivePlatform\(/.test(gate) && /platform === 'conflict'/.test(gate) && /platform === 'wordpress'/.test(gate) && /platform === 'shopify'/.test(gate) && !/setWpConnected\(!!wp\.connection\)/.test(gate))

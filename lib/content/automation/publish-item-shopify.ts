@@ -99,16 +99,33 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     if (!claimed) return { itemId: item.id, status: item.status, articleId, noop: 'already_claimed' }
     await admin.from('generated_articles').update({ status: 'publishing', updated_at: nowIso() }).eq('id', articleId).in('status', ['draft', 'ready', 'generated', 'failed'])
 
-    // Idempotent create/update (scheduled publish → published). The orchestrator
-    // persists shopify_article_id BEFORE the final state and never duplicates.
-    const result = await publishArticleToShopify(admin, loaded.connection, loaded.creds, article, { published: true, authorName: null })
-    if (!result.ok) {
+    // A retry-bounded (transient) failure of THIS attempt: restore the article,
+    // record the prefixed reason the queue UI localizes, and alert if this was
+    // the last attempt. Shared so the transient blog-lookup outage below and a
+    // publish failure are finalized identically.
+    const failAttempt = async (code: string, detail?: string): Promise<PublishItemResult> => {
       await admin.from('generated_articles').update({ status: 'draft', updated_at: nowIso() }).eq('id', articleId)
-      const reason = `shopify_${result.reason}${result.detail ? `: ${result.detail.slice(0, 120)}` : ''}`
+      const reason = `shopify_${code}${detail ? `: ${detail.slice(0, 120)}` : ''}`
       await finalizeItem(admin, item.id, 'failed', reason)
       await alertOnFinalFailure(reason)
-      return { itemId: item.id, status: 'failed', articleId, reason: result.reason }
+      return { itemId: item.id, status: 'failed', articleId, reason: code }
     }
+
+    // The only remaining unresolved case is the TRANSIENT lookup outage. It is
+    // finalized here rather than by calling the publisher, because calling the
+    // publisher would perform a SECOND Blogs lookup for the same attempt — the
+    // exact duplication this preflight exists to remove. It stays after the
+    // claim so it still consumes an attempt and remains retry-bounded.
+    if (!blogTarget.ok) return await failAttempt(blogTarget.reason)
+
+    // Idempotent create/update (scheduled publish → published). The orchestrator
+    // persists shopify_article_id BEFORE the final state and never duplicates.
+    // `blogTarget` is passed through so the destination resolved above is the
+    // EXACT id used for the Shopify article — resolved once per publish attempt.
+    const result = await publishArticleToShopify(admin, loaded.connection, loaded.creds, article, {
+      published: true, authorName: null, blogTarget: { blogId: blogTarget.blogId },
+    })
+    if (!result.ok) return await failAttempt(result.reason as string, result.detail)
 
     await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', articleId)
     await admin.from('article_pool_items').update({ status: 'published', published_at: nowIso(), last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', item.id)

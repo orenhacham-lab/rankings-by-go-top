@@ -1697,6 +1697,10 @@ export const dashboardHe = {
         defaultBlogError: 'שמירת בלוג ברירת המחדל נכשלה.',
         defaultBlogMissing: 'בחרו בלוג ברירת מחדל כדי לאפשר פרסום אוטומטי מתוזמן.',
         defaultBlogNone: 'לא נמצא בלוג בחנות. צרו בלוג ב-Shopify.',
+        defaultBlogLoading: 'טוענים את הבלוגים של החנות…',
+        // An OUTAGE, stated as one. Never collapsed into "no blog found".
+        defaultBlogLoadError: 'לא הצלחנו לקרוא כרגע את הבלוגים שלכם ב-Shopify. זו תקלה זמנית.',
+        defaultBlogRetry: 'נסו שוב',
         connect: 'חבר Shopify',
         guide: {
           openGuide: 'מדריך חיבור Shopify',

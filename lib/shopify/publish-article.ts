@@ -112,7 +112,23 @@ export async function publishArticleToShopify(
   connection: ShopifyConnectionRow,
   creds: ShopifyCredentials,
   article: ShopifyPublishArticleRow,
-  opts: { published: boolean; publishDate?: string | null; authorName?: string | null },
+  opts: {
+    published: boolean
+    publishDate?: string | null
+    authorName?: string | null
+    /**
+     * A destination ALREADY resolved by the caller for this same publish
+     * attempt (the automation queue resolves it as a pre-claim prerequisite).
+     *
+     * ONE RESOLUTION PER ATTEMPT. Without this the queue resolved the blog and
+     * then this function resolved it a second time — two Shopify Blogs calls
+     * for one publish, and a window in which the second answer could differ
+     * from the one the queue made its pause/retry decision on. When supplied,
+     * this id is used verbatim and no lookup happens here. Direct callers (the
+     * manual publish route) omit it and this function resolves internally.
+     */
+    blogTarget?: { blogId: string }
+  },
 ): Promise<ShopifyPublishResult> {
   const base = { imageWarnings: [] as string[] }
 
@@ -138,9 +154,14 @@ export async function publishArticleToShopify(
   // A store with exactly ONE blog needs no decision from anyone: ask Shopify,
   // use it, and persist it as the connection default. With several, refuse
   // rather than guess. See lib/shopify/resolve-publish-blog.ts.
-  const target = await resolvePublishBlogTarget(admin, connection, creds, article)
-  if (!target.ok) return { ok: false, reason: target.reason, imageWarnings: [] }
-  const blogId = target.blogId
+  let blogId: string
+  if (opts.blogTarget) {
+    blogId = opts.blogTarget.blogId
+  } else {
+    const target = await resolvePublishBlogTarget(admin, connection, creds, article)
+    if (!target.ok) return { ok: false, reason: target.reason, imageWarnings: [] }
+    blogId = target.blogId
+  }
   if (!article.shopify_blog_id) {
     await admin.from('generated_articles').update({ shopify_blog_id: blogId, updated_at: nowIso() }).eq('id', article.id)
     article.shopify_blog_id = blogId

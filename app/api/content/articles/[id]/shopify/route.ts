@@ -55,7 +55,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!result.ok) {
     // A publishing failure is NEVER reported as success. Post-item metadata is
     // preserved by the orchestrator (never erased on transient failure).
-    const httpStatus = result.reason === 'missing_write_content_scope' || result.reason === 'no_shopify_blog' ? 400
+    // A DESTINATION VERDICT vs a DESTINATION OUTAGE are different answers and
+    // must not share a status. `no_shopify_blog` (the store has none) and
+    // `missing_default_blog` (it has several and none is chosen) are settled
+    // facts the merchant must act on → 400. `blog_lookup_failed` is our
+    // inability to read Shopify right now, says nothing about the store, and is
+    // retryable → 503. Everything else keeps its existing mapping.
+    const httpStatus = result.reason === 'missing_write_content_scope' || result.reason === 'no_shopify_blog' || result.reason === 'missing_default_blog' ? 400
+      : result.reason === 'blog_lookup_failed' ? 503
       : result.reason === 'permission_error' || result.reason === 'token_invalid' ? 403
       : result.reason === 'remote_article_missing' ? 409
       : 502
