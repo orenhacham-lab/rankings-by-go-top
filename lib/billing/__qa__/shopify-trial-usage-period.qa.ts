@@ -32,8 +32,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { resolveCurrentUsagePeriod } from '../usage-period'
-import { reserveUsage, releaseUsageReservation } from '../usage-reservations'
-import type { createAdminClient } from '@/lib/supabase/admin'
+import { generateArticleForTopic, type ArticleGenerationDeps } from '@/lib/content/article-generation'
+import type { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
 
 let pass = 0, fail = 0
@@ -50,7 +50,6 @@ const TRIAL_ENDS_AT = '2026-09-08T23:28:48Z'
 const NOW = new Date('2026-09-02T00:00:00Z')
 const now = () => NOW
 const DAY_MS = 24 * 60 * 60 * 1000
-type Admin = ReturnType<typeof createAdminClient>
 const ADVANCED_LIMIT = PLAN_CATALOG.advanced.maxArticlesPerPeriodAccountWide
 
 function shopifyConn(over: Record<string, unknown> = {}) {
@@ -62,6 +61,12 @@ function shopifyConn(over: Record<string, unknown> = {}) {
     shopify_trial_ends_at: TRIAL_ENDS_AT,
     shopify_current_period_start: null,
     shopify_current_period_end: null,
+    // lib/shopify/entitlement-resolver.ts checks cache freshness against the
+    // REAL Date.now() (not the injected period clock), so this is real time —
+    // it stands for a connection whose billing was just verified.
+    shopify_billing_verified_at: new Date().toISOString(),
+    shop_domain: 'go-top-seo-test.myshopify.com',
+    shop_gid: 'gid://shopify/Shop/77989445789',
     ...over,
   }
 }
@@ -104,79 +109,159 @@ async function main() {
   }
 
   // ───────────────────────────────────────────────────────────────────────
-  console.log('\nA1B) BEHAVIOURAL — the trial period actually admits a reservation')
+  console.log('\nA1B) BEHAVIOURAL — the REAL generateArticleForTopic path, with a stubbed Gemini')
   {
-    // The full pre-Gemini gate, run for real: resolve the period from the
-    // incident's own connection row, then take the atomic reservation the
-    // generator takes, against FakeAdmin's reserve_usage RPC.
-    const admin = new FakeAdmin(
-      { shopify_connections: [shopifyConn()], subscriptions: [], projects: [{ id: 'p1', user_id: USER }], usage_reservations: [], generated_articles: [] },
-      {}, () => NOW.getTime(),
-    )
-    const period = await resolveCurrentUsagePeriod(admin as never, USER, now)
-    check('A1B-a: the period resolves', period !== null)
-
-    let geminiCalls = 0
-    const reservation = await reserveUsage(admin as unknown as Admin, {
-      userId: USER, projectId: null, usageType: 'article', amount: 1,
-      periodStart: period!.start, periodEnd: period!.end,
-      limit: ADVANCED_LIMIT, idempotencyKey: 'topic:incident',
-    })
-    check('A1B-b: the reservation is GRANTED — not quota_exceeded', reservation.outcome === 'reserved', reservation.outcome)
-    check('A1B-c: bounded by the Advanced allowance of 20', ADVANCED_LIMIT === 20)
-    // The generator calls Gemini only after the reservation succeeds; a stub
-    // stands in for it so "did we get past the gate?" is observable.
-    if (reservation.outcome === 'reserved') geminiCalls++
-    check('A1B-d: generation REACHES the Gemini call instead of stopping at quota', geminiCalls === 1)
-    check('A1B-e: exactly one ledger row was created',
-      (admin.tables.usage_reservations as unknown[]).length === 1)
-
-    // A failed generation releases the reservation and consumes no article.
-    const { reservationId, reservationToken } = reservation as { reservationId: string; reservationToken: string }
-    await releaseUsageReservation(admin as unknown as Admin, { reservationId, userId: USER, reservationToken, reason: 'generation_failed:gemini_timeout' })
-    const row = (admin.tables.usage_reservations as Record<string, unknown>[])[0]!
-    check('A1B-f: a failed generation RELEASES the reservation', row.status === 'released')
-    check('A1B-g: and consumes no article credit', row.consumed_amount === 0)
-    check('A1B-h: no article row was written', (admin.tables.generated_articles as unknown[]).length === 0)
-
-    // 19 more topics fit; the 21st does not.
-    const more = await Promise.all(Array.from({ length: ADVANCED_LIMIT }, (_, i) => reserveUsage(admin as unknown as Admin, {
-      userId: USER, projectId: null, usageType: 'article', amount: 1,
-      periodStart: period!.start, periodEnd: period!.end, limit: ADVANCED_LIMIT, idempotencyKey: `topic:fill-${i}`,
-    })))
-    check('A1B-i: the released credit is reusable — all 20 fit',
-      more.filter((r) => r.outcome === 'reserved').length === ADVANCED_LIMIT)
-  }
-
-  // ───────────────────────────────────────────────────────────────────────
-  console.log('\nA1C) BEHAVIOURAL — a genuinely exhausted 20/20 allowance still says quota_exceeded')
-  {
-    const period = await resolveCurrentUsagePeriod(adminWith(), USER, now)
-    const admin = new FakeAdmin(
-      {
-        shopify_connections: [shopifyConn()], subscriptions: [], projects: [{ id: 'p1', user_id: USER }],
-        generated_articles: [],
-        usage_reservations: [{
-          id: 'r-full', user_id: USER, project_id: null, usage_type: 'article',
-          reserved_amount: ADVANCED_LIMIT, consumed_amount: ADVANCED_LIMIT, released_amount: 0,
-          period_start: period!.start.toISOString(), period_end: period!.end.toISOString(),
-          idempotency_key: 'topic:spent', status: 'consumed', created_at: '2026-09-02T00:00:00Z',
-        }],
+    // These call the production function. The two provider calls are injected
+    // (lib/content/article-generation.ts's ArticleGenerationDeps), because a
+    // global fetch stub does NOT intercept @google/generative-ai — the SDK
+    // reaches the network regardless — and counting one's own bookkeeping after
+    // reserveUsage proves nothing about whether generation was reached.
+    const VALID_ARTICLE = {
+      article: {
+        title: 'כותרת', slug: 'kotert', metaTitle: 'מטא', metaDescription: 'תיאור',
+        excerpt: 'תקציר', contentHtml: '<p>גוף</p>', contentMarkdown: 'גוף',
+        faq: [], imagePrompt: '', warnings: [],
       },
-      {}, () => NOW.getTime(),
-    )
-    let geminiCalls = 0
-    const r = await reserveUsage(admin as unknown as Admin, {
-      userId: USER, projectId: null, usageType: 'article', amount: 1,
-      periodStart: period!.start, periodEnd: period!.end, limit: ADVANCED_LIMIT, idempotencyKey: 'topic:one-too-many',
-    })
-    if (r.outcome === 'reserved') geminiCalls++
-    check('A1C-a: a REAL exhaustion still reports quota_exceeded', r.outcome === 'quota_exceeded')
-    check('A1C-b: and Gemini is never called', geminiCalls === 0)
-    check('A1C-c: no extra ledger row is created',
-      (admin.tables.usage_reservations as unknown[]).length === 1)
-    check('A1C-d: so the fix did not turn a real limit into an unlimited allowance',
-      r.outcome === 'quota_exceeded' && ADVANCED_LIMIT === 20)
+      safeHtml: '<p>גוף</p>',
+      slug: 'kotert',
+      usage: { model: 'gemini-stub', inputTokens: 10, outputTokens: 20 },
+      audit: { score: 90, warnings: [], blockers: [] },
+      model: 'gemini-stub',
+    } as unknown as Awaited<ReturnType<typeof generateValidatedArticle>>
+
+    /** A world in which the incident's Shopify trial connection is the only billing state. */
+    function world(over: { reservations?: Record<string, unknown>[]; conn?: Record<string, unknown> } = {}) {
+      return new FakeAdmin({
+        shopify_connections: [shopifyConn(over.conn ?? {})],
+        billing_governance: [{ user_id: USER, signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
+        shopify_billing_migrations: [],
+        subscriptions: [],
+        projects: [{ id: 'p1', user_id: USER }],
+        article_topics: [{ id: 'topic-1', project_id: 'p1', topic: 'נושא', primary_keyword: 'מילה', language: 'he', status: 'approved', anchors_json: [], brief_notes: null, cta_preference: '' }],
+        wordpress_connections: [],
+        generated_articles: [],
+        ai_usage_logs: [],
+        usage_reservations: over.reservations ?? [],
+        profiles: [{ id: USER, role: 'user' }],
+      }, {}, () => NOW.getTime())
+    }
+    /** Counts REAL invocations of the generation dependency. */
+    function stub(impl: () => Awaited<ReturnType<typeof generateValidatedArticle>>) {
+      const calls = { generate: 0, image: 0 }
+      return {
+        calls,
+        deps: {
+          generate: async () => { calls.generate++; return impl() },
+          createFeaturedImage: async () => { calls.image++; return { error: 'stubbed' } },
+        } as unknown as ArticleGenerationDeps,
+      }
+    }
+    const ledgerOf = (a: FakeAdmin) => a.tables.usage_reservations as Record<string, unknown>[]
+
+    // 1) THE EXACT INCIDENT STATE reaches the Gemini stub, and succeeds.
+    {
+      const admin = world()
+      const g = stub(() => VALID_ARTICLE)
+      const r = await generateArticleForTopic(admin as never, { topicId: 'topic-1', userId: USER }, g.deps)
+      check('A1B-1a: the active Advanced trial REACHES the Gemini stub', g.calls.generate === 1)
+      check('A1B-1b: and the generation succeeds', r.ok === true, JSON.stringify(r))
+      check('A1B-1c: it is NOT quota_exceeded', !(r.ok === false && r.kind === 'quota_exceeded'))
+      check('A1B-1d: an article row was written', (admin.tables.generated_articles as unknown[]).length === 1)
+      // 2) a successful generation FINALIZES the reservation.
+      const row = ledgerOf(admin)[0]
+      check('A1B-2a: exactly one ledger row exists', ledgerOf(admin).length === 1)
+      check('A1B-2b: the reservation is CONSUMED, not left reserved', row?.status === 'consumed')
+      check('A1B-2c: it consumed exactly one article credit', row?.consumed_amount === 1)
+      check('A1B-2d: bounded by the resolved trial period',
+        row?.period_end === new Date(TRIAL_ENDS_AT).toISOString())
+    }
+
+    // 3) a Gemini FAILURE releases the reservation and consumes nothing.
+    {
+      const admin = world()
+      const g = stub(() => ({ error: 'gemini_timeout', reason: 'gemini_timeout', attempts: 2 } as unknown as Awaited<ReturnType<typeof generateValidatedArticle>>))
+      const r = await generateArticleForTopic(admin as never, { topicId: 'topic-1', userId: USER }, g.deps)
+      check('A1B-3a: the stub WAS reached (the failure is a generation failure)', g.calls.generate === 1)
+      check('A1B-3b: the result is a generation failure, not a quota one',
+        r.ok === false && r.kind === 'generation' && (r as { reason: string }).reason === 'gemini_timeout')
+      const row = ledgerOf(admin)[0]
+      check('A1B-3c: the reservation is RELEASED', row?.status === 'released')
+      check('A1B-3d: no article credit was consumed', row?.consumed_amount === 0)
+      check('A1B-3e: and no article row was written', (admin.tables.generated_articles as unknown[]).length === 0)
+    }
+
+    // 4) REAL 20/20 exhaustion never invokes Gemini.
+    {
+      const period = await resolveCurrentUsagePeriod(adminWith(), USER, now)
+      const admin = world({ reservations: [{
+        id: 'r-full', user_id: USER, project_id: null, usage_type: 'article',
+        reserved_amount: ADVANCED_LIMIT, consumed_amount: ADVANCED_LIMIT, released_amount: 0,
+        period_start: period!.start.toISOString(), period_end: period!.end.toISOString(),
+        idempotency_key: 'topic:spent', status: 'consumed', created_at: '2026-09-02T00:00:00Z',
+      }] })
+      const g = stub(() => VALID_ARTICLE)
+      const r = await generateArticleForTopic(admin as never, { topicId: 'topic-1', userId: USER }, g.deps)
+      check('A1B-4a: a genuinely exhausted 20/20 allowance returns quota_exceeded',
+        r.ok === false && r.kind === 'quota_exceeded', JSON.stringify(r))
+      check('A1B-4b: and Gemini is NEVER invoked', g.calls.generate === 0)
+      check('A1B-4c: no article row was written', (admin.tables.generated_articles as unknown[]).length === 0)
+      check('A1B-4d: so the fix did not turn a real limit into an unlimited allowance', ADVANCED_LIMIT === 20)
+    }
+
+    // 5) an UNRESOLVED period returns usage_period_unavailable and never invokes Gemini.
+    {
+      // An expired trial with no billing cycle — the fail-closed case.
+      const admin = world({ conn: { shopify_trial_ends_at: '2026-08-01T00:00:00Z' } })
+      const g = stub(() => VALID_ARTICLE)
+      const r = await generateArticleForTopic(admin as never, { topicId: 'topic-1', userId: USER }, g.deps)
+      check('A1B-5a: an unresolved period returns usage_period_unavailable',
+        r.ok === false && r.kind === 'usage_period_unavailable', JSON.stringify(r))
+      check('A1B-5b: NOT quota_exceeded', !(r.ok === false && r.kind === 'quota_exceeded'))
+      check('A1B-5c: Gemini is never invoked', g.calls.generate === 0)
+      check('A1B-5d: and NOTHING is reserved', ledgerOf(admin).length === 0)
+    }
+
+    // 6) the central entitlement gate runs BEFORE any provider call.
+    {
+      // Shopify-governed with NO active plan → billing_required, before Gemini.
+      const admin = new FakeAdmin({
+        shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
+        billing_governance: [{ user_id: USER, signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
+        shopify_billing_migrations: [],
+        subscriptions: [], projects: [{ id: 'p1', user_id: USER }],
+        article_topics: [{ id: 'topic-1', project_id: 'p1', topic: 'נושא', primary_keyword: 'מילה', language: 'he', status: 'approved', anchors_json: [], brief_notes: null, cta_preference: '' }],
+        wordpress_connections: [], generated_articles: [], ai_usage_logs: [], usage_reservations: [],
+        profiles: [{ id: USER, role: 'user' }],
+      }, {}, () => NOW.getTime())
+      const g = stub(() => VALID_ARTICLE)
+      const r = await generateArticleForTopic(admin as never, { topicId: 'topic-1', userId: USER }, g.deps)
+      check('A1B-6a: an unentitled account is refused with billing_required',
+        r.ok === false && r.kind === 'billing_required', JSON.stringify(r))
+      check('A1B-6b: the gate ran BEFORE any provider call', g.calls.generate === 0 && g.calls.image === 0)
+      check('A1B-6c: and before any reservation', ledgerOf(admin).length === 0)
+      const src = strip(read('lib/content/article-generation.ts'))
+      check('A1B-6d: SOURCE — the shared gate is the FIRST thing generateArticleForTopic does',
+        /const gate = await assertContentGenerationAllowedForUser\(admin, userId\)/.test(src)
+        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId)') < src.indexOf("from('article_topics')"))
+      check('A1B-6e: SOURCE — generatePoolItem (cron/queue/retry) funnels through it',
+        /generateArticleForTopic\(admin, \{ topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
+      check('A1B-6f: SOURCE — the manual route funnels through it too',
+        /generateArticleForTopic\(/.test(strip(read('app/api/content/articles/generate/route.ts'))))
+      check('A1B-6g: SOURCE — the featured image is behind the same gate (same function)',
+        src.indexOf('assertContentGenerationAllowedForUser(admin, userId)') < src.indexOf('deps.createFeaturedImage'))
+    }
+
+    // 7) the injectable seam is a TEST seam only — production is unchanged.
+    {
+      const src = strip(read('lib/content/article-generation.ts'))
+      check('A1B-7a: the deps parameter defaults to the REAL implementations',
+        /deps: ArticleGenerationDeps = REAL_GENERATION_DEPS/.test(src)
+        && /generate: generateValidatedArticle/.test(src)
+        && /createFeaturedImage: createFeaturedImageForArticle/.test(src))
+      check('A1B-7b: no production call site passes a stub',
+        !/generateArticleForTopic\([^)]*,\s*\{[^}]*generate:/.test(strip(read('lib/content/automation/generate-item.ts')))
+        && !/generateArticleForTopic\([^)]*,\s*\{[^}]*generate:/.test(strip(read('app/api/content/articles/generate/route.ts'))))
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -242,7 +327,7 @@ async function main() {
     check('A4-d: SOURCE — the period is resolved BEFORE any reservation, so nothing is reserved',
       generation.indexOf('const period = await resolveCurrentUsagePeriod') < generation.indexOf('const reservation = await reserveUsage'))
     check('A4-e: SOURCE — and before any Gemini call',
-      generation.indexOf("kind: 'usage_period_unavailable'") < generation.indexOf('const gen = await generateValidatedArticle(brief)'))
+      generation.indexOf("kind: 'usage_period_unavailable'") < generation.indexOf('const gen = await deps.generate(brief)'))
     check('A4-f: SOURCE — the HTTP route maps it to a retryable 503',
       /case 'usage_period_unavailable':[\s\S]{0,200}reason: 'usage_period_unavailable' \}, \{ status: 503 \}/.test(route))
     check('A4-g: SOURCE — quota_exceeded still returns 429',

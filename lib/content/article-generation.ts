@@ -74,12 +74,34 @@ export type GenerateForTopicFailure =
 export type GenerateForTopicResult = GenerateForTopicSuccess | GenerateForTopicFailure
 
 /**
+ * The two PROVIDER calls this function makes, injectable so the generation
+ * path can be exercised end-to-end in a test without reaching Gemini.
+ *
+ * Production never passes this — the defaults below are the real
+ * implementations, and every existing call site is a two-argument call that
+ * behaves exactly as before. It exists because the alternative proofs are not
+ * proofs: a global `fetch` stub does NOT intercept @google/generative-ai (the
+ * SDK reaches the network anyway), and a test that merely counts its own
+ * bookkeeping after reserveUsage succeeds proves nothing about whether
+ * generation was ever reached.
+ */
+export interface ArticleGenerationDeps {
+  generate: typeof generateValidatedArticle
+  createFeaturedImage: typeof createFeaturedImageForArticle
+}
+const REAL_GENERATION_DEPS: ArticleGenerationDeps = {
+  generate: generateValidatedArticle,
+  createFeaturedImage: createFeaturedImageForArticle,
+}
+
+/**
  * Generate + persist an article draft for a topic. `userId` is stamped as
  * generated_articles.user_id (the project owner). Ownership is the caller's job.
  */
 export async function generateArticleForTopic(
   admin: Admin,
   opts: { topicId: string; userId: string; autoApplyInternalLinks?: boolean },
+  deps: ArticleGenerationDeps = REAL_GENERATION_DEPS,
 ): Promise<GenerateForTopicResult> {
   const { topicId, userId } = opts
 
@@ -233,7 +255,7 @@ export async function generateArticleForTopic(
     reservationToken = reservation.reservationToken
   }
 
-  const gen = await generateValidatedArticle(brief)
+  const gen = await deps.generate(brief)
   if ('error' in gen) {
     const reason = gen.reason || 'unknown'
     console.log(`[content-article-generation] failed reason=${reason} attempts=${gen.attempts}`)
@@ -352,7 +374,7 @@ export async function generateArticleForTopic(
   let imageGenerated = false
   if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
     try {
-      const img = await createFeaturedImageForArticle(admin, inserted.id)
+      const img = await deps.createFeaturedImage(admin, inserted.id)
       imageGenerated = !('error' in img)
       if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
     } catch (e) {
