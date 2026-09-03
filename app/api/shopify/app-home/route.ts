@@ -174,6 +174,11 @@ export async function GET(request: Request) {
       await recordShopifyBillingCache(admin, connection.id, {
         shopify_plan_handle: result.planHandle, shopify_subscription_status: 'active',
         shopify_trial_ends_at: result.trialEndsAt, shopify_current_period_end: result.currentPeriodEnd,
+        // The period START must be cached too. Omitting it left a normal PAID
+        // billing cycle half-written, and lib/billing/usage-period.ts requires
+        // BOTH ends — so after an app-home refresh the period could not be
+        // resolved and article generation reported a quota that was not spent.
+        shopify_current_period_start: result.currentPeriodStart,
         shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
         shopify_billing_last_error: null,
       })

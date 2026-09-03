@@ -886,6 +886,10 @@ export const dashboardEn = {
       gemini_init_failed: 'Failed to initialize Gemini. Please try again.',
       gemini_request_failed: 'The Gemini request failed. Please try again in a moment.',
       // Phase 3G.2 — precise Gemini failure reasons.
+      // ACCOUNT-level article allowance vs Gemini's own provider quota — two
+      // different things, and the merchant must never be shown either raw code.
+      quota_exceeded: 'Your account has used all its articles for the current billing period.',
+      usage_period_unavailable: 'We couldn’t verify your billing period just now. Please try again shortly.',
       gemini_quota_exceeded: 'Gemini quota / rate limit exceeded. Please try again later.',
       gemini_overloaded: 'Gemini is overloaded right now. Please try again in a few moments.',
       gemini_timeout: 'The Gemini request timed out. Please try again.',

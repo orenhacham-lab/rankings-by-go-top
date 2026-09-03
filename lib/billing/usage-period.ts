@@ -40,6 +40,20 @@
  */
 
 import { parseInstantMs } from '@/lib/paypal/timestamp'
+import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from '@/lib/shopify/constants'
+
+/** Shopify App Pricing handle → internal plan code. Same mapping as
+ *  lib/shopify/entitlement-resolver.ts; the only spelling difference is the
+ *  hyphen in `large-agency`. */
+const SHOPIFY_HANDLE_TO_PLAN_CODE: Record<ShopifyPlanHandle, PlanCode> = {
+  regular: 'regular',
+  advanced: 'advanced',
+  premium: 'premium',
+  'large-agency': 'large_agency',
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -68,10 +82,13 @@ function utcCalendarMonthPeriod(reference: Date): { start: Date; end: Date } {
 export interface UsagePeriod {
   start: Date
   end: Date
-  source: 'shopify' | 'paypal' | 'trial' | 'legacy_manual'
+  source: 'shopify' | 'shopify_trial' | 'paypal' | 'trial' | 'legacy_manual'
 }
 
 interface ShopifyPeriodRow {
+  shopify_subscription_status: string | null
+  shopify_plan_handle: string | null
+  shopify_trial_ends_at: string | null
   shopify_current_period_start: string | null
   shopify_current_period_end: string | null
 }
@@ -96,7 +113,7 @@ export async function resolveCurrentUsagePeriod(
 ): Promise<UsagePeriod | null> {
   const { data: shopifyConn } = await admin
     .from('shopify_connections')
-    .select('shopify_current_period_start, shopify_current_period_end')
+    .select('shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_start, shopify_current_period_end')
     .eq('user_id', userId)
         .eq('connection_status', 'connected')
     .is('archived_at', null)
@@ -115,10 +132,42 @@ export async function resolveCurrentUsagePeriod(
     if (shopifyStart && shopifyEnd) {
       return { start: shopifyStart, end: shopifyEnd, source: 'shopify' }
     }
+
+    // SHOPIFY MANAGED-PRICING TRIAL (production incident).
+    //
+    // During the free trial Shopify reports a real, ACTIVE subscription with
+    // `currentBillingCycle: null` — no money has moved yet, so there is no
+    // billing cycle to report — while `trialEndsAt` is populated. Requiring a
+    // cycle therefore resolved NO period for a paying-in-trial merchant, and
+    // article generation converted that into `quota_exceeded`: the account was
+    // told its 20-article allowance was used up before a single article had
+    // been generated.
+    //
+    // The trial IS the current usage period. Its authoritative end is the
+    // stored `shopify_trial_ends_at`; the start is that minus the plan's own
+    // catalog trialDays (the documented fallback pattern already used for the
+    // website trial above), never an unrelated hard-coded duration.
+    const status = (row.shopify_subscription_status ?? '').trim()
+    const handle = (row.shopify_plan_handle ?? '').trim()
+    const trialEnd = parseStoredInstant(row.shopify_trial_ends_at)
+    if (
+      status === 'active'
+      && isSupportedShopifyPlanHandle(handle)
+      && trialEnd
+      // A trial that has already ended is NOT a current period. With no
+      // billing cycle beside it there is nothing to resolve, so it falls
+      // through and fails closed — never a silent extra allowance.
+      && trialEnd.getTime() > nowFn().getTime()
+    ) {
+      const trialDays = PLAN_CATALOG[SHOPIFY_HANDLE_TO_PLAN_CODE[handle]].trialDays
+      return { start: new Date(trialEnd.getTime() - trialDays * DAY_MS), end: trialEnd, source: 'shopify_trial' }
+    }
+
     // Shopify-governed but no verified (or a corrupt) period yet (never
-    // checked, verification failed, or malformed data) — no PayPal/trial
-    // fallback is ever consulted for a Shopify-governed user (same rule as
-    // the general entitlement resolver). Fail closed: no resolvable period.
+    // checked, verification failed, malformed data, or an expired trial with
+    // no billing cycle) — no PayPal/trial fallback is ever consulted for a
+    // Shopify-governed user (same rule as the general entitlement resolver).
+    // Fail closed: no resolvable period.
     return null
   }
 

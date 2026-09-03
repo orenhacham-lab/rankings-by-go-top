@@ -167,6 +167,9 @@ async function reconcileFromVerifiedShopifyCallback(
   await recordShopifyBillingCache(admin, connection.id, {
     shopify_plan_handle: verified.planHandle, shopify_subscription_status: 'active',
     shopify_trial_ends_at: verified.trialEndsAt, shopify_current_period_end: verified.currentPeriodEnd,
+    // Cache the period START alongside the end — usage-period.ts needs both,
+    // and a half-written cycle resolves to no period at all.
+    shopify_current_period_start: verified.currentPeriodStart,
     shopify_cancel_at_end_of_cycle: verified.cancelAtEndOfCycle, shopify_billing_last_error: null,
   })
   return result('reconciled_without_intent', connection.project_id, route)
@@ -276,6 +279,9 @@ export async function processShopifyBillingReturn(
   await recordShopifyBillingCache(admin, connection.id, {
     shopify_plan_handle: verified.planHandle, shopify_subscription_status: 'active',
     shopify_trial_ends_at: verified.trialEndsAt, shopify_current_period_end: verified.currentPeriodEnd,
+    // Cache the period START alongside the end — usage-period.ts needs both,
+    // and a half-written cycle resolves to no period at all.
+    shopify_current_period_start: verified.currentPeriodStart,
     shopify_cancel_at_end_of_cycle: verified.cancelAtEndOfCycle, shopify_billing_last_error: null,
   })
   // The migration's own result decides the outcome. It used to be discarded,

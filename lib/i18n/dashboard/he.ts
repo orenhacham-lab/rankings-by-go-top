@@ -889,6 +889,10 @@ export const dashboardHe = {
       gemini_init_failed: 'שגיאה באתחול Gemini. נסו שוב.',
       gemini_request_failed: 'הבקשה ל-Gemini נכשלה. נסו שוב עוד רגע.',
       // Phase 3G.2 — precise Gemini failure reasons.
+      // מכסת המאמרים של החשבון מול מכסת הספק של Gemini — שני דברים שונים,
+      // ואין להציג למשתמש אף אחד מהקודים הגולמיים.
+      quota_exceeded: 'ניצלתם את כל המאמרים בחשבון לתקופת החיוב הנוכחית.',
+      usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב. נסו שוב בעוד רגע.',
       gemini_quota_exceeded: 'חריגה ממכסת Gemini / הגבלת קצב. נסו שוב מאוחר יותר.',
       gemini_overloaded: 'שרתי Gemini עמוסים כרגע. נסו שוב עוד מספר רגעים.',
       gemini_timeout: 'הבקשה ל-Gemini עברה את זמן ההמתנה. נסו שוב.',

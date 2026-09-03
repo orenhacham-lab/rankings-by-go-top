@@ -58,6 +58,13 @@ export type GenerateForTopicFailure =
   // reservation (lib/billing/usage-reservations.ts) — never a plain
   // count-then-insert (race-prone under concurrent generation jobs).
   | { ok: false; kind: 'quota_exceeded' }
+  // The account's billing period could not be RESOLVED — a different fact
+  // entirely from an exhausted allowance, and the two must never be conflated.
+  // Production incident: a Shopify managed-pricing TRIAL reports an active
+  // subscription with no billing cycle, no period resolved, and the merchant
+  // was told their 20-article allowance was used up before generating one.
+  // Nothing is reserved and no Gemini call is made; it is retryable.
+  | { ok: false; kind: 'usage_period_unavailable' }
   // A DIFFERENT in-flight attempt already holds this topic's reservation
   // (concurrent retry of the same logical request) — transient, safe to
   // retry shortly; never a permanent failure.
@@ -198,7 +205,11 @@ export async function generateArticleForTopic(
   let reservationToken: string | null = null
   if (!entitlement.isAdmin) {
     const period = await resolveCurrentUsagePeriod(admin, userId)
-    if (!period) return { ok: false, kind: 'quota_exceeded' }
+    // NOT quota_exceeded. No period means we could not determine WHICH window
+    // to count against — the allowance itself is untouched, nothing is
+    // reserved, and the caller should retry rather than tell the merchant they
+    // are out of articles.
+    if (!period) return { ok: false, kind: 'usage_period_unavailable' }
     const reservation = await reserveUsage(admin, {
       userId, projectId: null, usageType: 'article', amount: 1,
       periodStart: period.start, periodEnd: period.end,

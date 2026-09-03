@@ -79,6 +79,11 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Shopify billing required', reason: 'shopify_billing_required' }, { status: 403 })
     case 'quota_exceeded':
       return Response.json({ error: 'Article quota exceeded', reason: 'quota_exceeded' }, { status: 429 })
+    // A period we could not resolve is a TRANSIENT server-side condition, not
+    // a spent allowance: 503 and retryable, never the 429 that tells the
+    // merchant they have used up their articles.
+    case 'usage_period_unavailable':
+      return Response.json({ error: 'Billing period unavailable', reason: 'usage_period_unavailable' }, { status: 503 })
     case 'generation_in_progress':
       return Response.json({ error: 'A generation for this topic is already in progress', reason: 'generation_in_progress' }, { status: 409 })
     case 'reservation_error':

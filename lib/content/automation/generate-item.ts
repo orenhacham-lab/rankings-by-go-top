@@ -168,6 +168,10 @@ export async function generatePoolItem(
       // that isn't the item's own problem.
       const transient = (gen.kind === 'generation' && TRANSIENT_GEN_REASONS.has(gen.reason))
         || gen.kind === 'billing_required' || gen.kind === 'quota_exceeded'
+        // An unresolved billing period is transient and is NOT the item's
+        // fault — and it is carried through as its own reason, never
+        // rewritten into quota_exceeded.
+        || gen.kind === 'usage_period_unavailable'
         || gen.kind === 'generation_in_progress' || gen.kind === 'reservation_error'
       await finalize(admin, itemId, status, reason, transient ? (item.attempts ?? 0) : undefined)
       return { itemId, status, articleId: null, reason }

@@ -1085,16 +1085,25 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                         queueSuccessSignal={ideasSuccessSignal}
                         onGoToQueue={() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                       />
-                      <div ref={scheduleSectionRef} className="scroll-mt-4">
-                        <AutomationSchedule
-                          projectId={projectId}
-                          language={language}
-                          refreshKey={automationRefresh}
-                          onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
-                        />
-                      </div>
                     </>
                   )}
+
+                  {/* The publishing queue belongs to BOTH sub-tabs. It used to
+                      live inside the automatic branch, so a merchant working on
+                      the manual-topic tab could not see the queue their manual
+                      topics were being added to. It is rendered ONCE here,
+                      outside the auto/manual conditional and still inside
+                      automationEnabled — one component, one state, one
+                      scheduleSectionRef, so switching tabs neither duplicates it
+                      nor loses its refreshed state. */}
+                  <div ref={scheduleSectionRef} className="scroll-mt-4">
+                    <AutomationSchedule
+                      projectId={projectId}
+                      language={language}
+                      refreshKey={automationRefresh}
+                      onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+                    />
+                  </div>
                 </div>
               )}
 
