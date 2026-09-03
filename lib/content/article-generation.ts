@@ -88,10 +88,20 @@ export type GenerateForTopicResult = GenerateForTopicSuccess | GenerateForTopicF
 export interface ArticleGenerationDeps {
   generate: typeof generateValidatedArticle
   createFeaturedImage: typeof createFeaturedImageForArticle
+  /**
+   * The clock, threaded to EVERY time-dependent decision this function makes:
+   * the entitlement gate's Shopify cache-freshness check, getUserEntitlement's
+   * trial/period expiry, and the usage-period resolution (including the Shopify
+   * trial's "is it still in the future?" test). Without it a behavioural test
+   * pinned to a fixed trial date silently starts failing once the wall clock
+   * passes that date.
+   */
+  now: () => Date
 }
 const REAL_GENERATION_DEPS: ArticleGenerationDeps = {
   generate: generateValidatedArticle,
   createFeaturedImage: createFeaturedImageForArticle,
+  now: () => new Date(),
 }
 
 /**
@@ -112,7 +122,7 @@ export async function generateArticleForTopic(
   // which is itself the sole caller reachable from cron/queue/retry. Checked
   // FIRST, before any DB read beyond what's needed, and before any Gemini
   // call (generateValidatedArticle / createFeaturedImageForArticle).
-  const gate = await assertContentGenerationAllowedForUser(admin, userId)
+  const gate = await assertContentGenerationAllowedForUser(admin, userId, deps.now)
   if (!gate.allowed) return { ok: false, kind: 'billing_required' }
 
   const { data: topic } = await admin.from('article_topics').select('*').eq('id', topicId).maybeSingle()
@@ -222,11 +232,11 @@ export async function generateArticleForTopic(
   // the Gemini call (never before it — validation failures above never
   // touch the ledger). Admins bypass the ledger entirely (same convention as
   // every other quota check in this app) and fall through to a plain insert.
-  const entitlement = await getUserEntitlement(userId, admin)
+  const entitlement = await getUserEntitlement(userId, admin, deps.now)
   let reservationId: string | null = null
   let reservationToken: string | null = null
   if (!entitlement.isAdmin) {
-    const period = await resolveCurrentUsagePeriod(admin, userId)
+    const period = await resolveCurrentUsagePeriod(admin, userId, deps.now)
     // NOT quota_exceeded. No period means we could not determine WHICH window
     // to count against — the allowance itself is untouched, nothing is
     // reserved, and the caller should retry rather than tell the merchant they

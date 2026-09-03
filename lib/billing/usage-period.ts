@@ -40,6 +40,7 @@
  */
 
 import { parseInstantMs } from '@/lib/paypal/timestamp'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from '@/lib/shopify/constants'
 
@@ -111,6 +112,28 @@ export async function resolveCurrentUsagePeriod(
   userId: string,
   nowFn: () => Date = () => new Date(),
 ): Promise<UsagePeriod | null> {
+  // BILLING AUTHORITY FIRST — a connected store is NOT billing authority.
+  //
+  // This used to treat the mere EXISTENCE of a connected shopify_connections
+  // row as "Shopify bills this account", then fail closed on it. Almost every
+  // customer registers on the website and may connect Shopify purely as a
+  // publishing destination: for them the Shopify billing columns are empty by
+  // design, so their perfectly valid PayPal or trial period was never even
+  // consulted and no period resolved at all. Authority comes from
+  // billing_governance — the same rule lib/shopify/entitlement-resolver.ts and
+  // every other billing decision already follow.
+  //
+  // A governance READ FAILURE is not "website": it is an outage, and it stops
+  // here rather than falling through to PayPal/trial data.
+  const authority = await resolveBillingAuthority(admin, userId)
+  if (!authority.ok) return null
+
+  if (authority.authority !== 'shopify') {
+    // Website-billed: the Shopify billing fields are ignored entirely, however
+    // many stores this account has connected.
+    return resolveWebsitePeriod(admin, userId, nowFn)
+  }
+
   const { data: shopifyConn } = await admin
     .from('shopify_connections')
     .select('shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_start, shopify_current_period_end')
@@ -171,6 +194,21 @@ export async function resolveCurrentUsagePeriod(
     return null
   }
 
+  // Shopify-governed with NO connection row at all — still Shopify-governed,
+  // and still fail-closed. Falling through here would hand a Shopify merchant
+  // the website trial period as a side effect of a disconnected store.
+  return null
+}
+
+/**
+ * PayPal → legacy/manual → website trial, for accounts the WEBSITE bills.
+ * Extracted so the Shopify-authority branch above can never reach it.
+ */
+async function resolveWebsitePeriod(
+  admin: Admin,
+  userId: string,
+  nowFn: () => Date,
+): Promise<UsagePeriod | null> {
   const { data: sub } = await admin
     .from('subscriptions')
     .select('status, plan_code, trial_ends_at, current_period_start, current_period_end, created_at, paypal_subscription_id')

@@ -171,7 +171,7 @@ async function main() {
     const guard = strip(read('lib/content/entitlement-guard.ts'))
     const helper = strip(read('lib/auth/admin-role.ts'))
     const adminIdx = guard.indexOf('await isAdminUser(admin, userId)')
-    const governedIdx = guard.indexOf('resolveShopifyGovernedEntitlement(admin, userId)')
+    const governedIdx = guard.indexOf('resolveShopifyGovernedEntitlement(admin, userId, nowFn)')
     check('6a: the gate imports the SHARED role helper',
       /import \{ isAdminUser \} from '@\/lib\/auth\/admin-role'/.test(guard))
     check('6b: the admin check runs BEFORE Shopify governance is resolved',

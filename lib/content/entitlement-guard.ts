@@ -60,7 +60,12 @@ export type ContentGenerationGateResult =
  * project owner — see that file's own header comment on the ownership
  * contract).
  */
-export async function assertContentGenerationAllowedForUser(admin: Admin, userId: string): Promise<ContentGenerationGateResult> {
+export async function assertContentGenerationAllowedForUser(
+  admin: Admin,
+  userId: string,
+  /** Injectable clock, threaded to the Shopify cache-freshness check. */
+  nowFn: () => Date = () => new Date(),
+): Promise<ContentGenerationGateResult> {
   // PRODUCTION BUG this closes. lib/subscription.ts's getUserEntitlement() and
   // hasAccess() both let a verified administrator through BEFORE consulting
   // Shopify governance, and app/api/shopify/billing/start-intent keeps admins
@@ -77,7 +82,7 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
   // are untouched — this only decides billing entitlement, never access.
   if (await isAdminUser(admin, userId)) return { allowed: true }
 
-  const resolution = await resolveShopifyGovernedEntitlement(admin, userId)
+  const resolution = await resolveShopifyGovernedEntitlement(admin, userId, nowFn)
   // An outage is NOT a billing verdict. Telling a paying customer to purchase a
   // plan because a query failed is worse than refusing the request honestly.
   if (resolution.kind === 'unavailable') {
@@ -95,7 +100,11 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
  * owner can't be resolved is NOT a Shopify-governance concern — let the
  * caller's own not-found/ownership handling take over downstream.
  */
-export async function assertContentGenerationAllowedForProject(admin: Admin, projectId: string): Promise<ContentGenerationGateResult> {
+export async function assertContentGenerationAllowedForProject(
+  admin: Admin,
+  projectId: string,
+  nowFn: () => Date = () => new Date(),
+): Promise<ContentGenerationGateResult> {
   const { data, error } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
   // A FAILED owner lookup used to fall through to `allowed: true`, so a
   // database error opened the gate for everyone. It is an infrastructure
@@ -105,5 +114,5 @@ export async function assertContentGenerationAllowedForProject(admin: Admin, pro
   // A project with no resolvable owner is not a Shopify-governance question —
   // the caller's own not-found/ownership handling takes over downstream.
   if (!userId) return { allowed: true }
-  return assertContentGenerationAllowedForUser(admin, userId)
+  return assertContentGenerationAllowedForUser(admin, userId, nowFn)
 }

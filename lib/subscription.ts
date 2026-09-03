@@ -182,7 +182,7 @@ export async function getUserEntitlement(
   // manually-granted row, or PayPal history is never read for entitlement —
   // see lib/shopify/entitlement-resolver.ts's header for why (this is
   // exactly what closes the shopify@gotop.co.il reviewer-bypass gap).
-  const resolution = await resolveShopifyGovernedEntitlement(supabase, userId)
+  const resolution = await resolveShopifyGovernedEntitlement(supabase, userId, nowFn)
 
   // FAIL CLOSED on an infrastructure failure. Falling through to the
   // subscriptions table here would hand a Shopify-governed merchant the website

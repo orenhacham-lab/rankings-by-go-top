@@ -61,17 +61,25 @@ function shopifyConn(over: Record<string, unknown> = {}) {
     shopify_trial_ends_at: TRIAL_ENDS_AT,
     shopify_current_period_start: null,
     shopify_current_period_end: null,
-    // lib/shopify/entitlement-resolver.ts checks cache freshness against the
-    // REAL Date.now() (not the injected period clock), so this is real time —
-    // it stands for a connection whose billing was just verified.
-    shopify_billing_verified_at: new Date().toISOString(),
+    // Freshness is now compared against the INJECTED clock too, so this is a
+    // fixture time relative to NOW — never the wall clock.
+    shopify_billing_verified_at: new Date(NOW.getTime() - 60_000).toISOString(),
     shop_domain: 'go-top-seo-test.myshopify.com',
     shop_gid: 'gid://shopify/Shop/77989445789',
     ...over,
   }
 }
+/** Governance rows — billing authority is a FACT, never inferred from a connection. */
+const SHOPIFY_AUTHORITY = { user_id: USER, signup_origin: 'shopify_app_store', billing_authority: 'shopify' }
+const WEBSITE_AUTHORITY = { user_id: USER, signup_origin: 'website', billing_authority: 'website' }
+
 const adminWith = (over: Record<string, unknown> = {}) =>
-  new FakeAdmin({ shopify_connections: [shopifyConn(over)], subscriptions: [] })
+  new FakeAdmin({
+    shopify_connections: [shopifyConn(over)],
+    billing_governance: [SHOPIFY_AUTHORITY],
+    shopify_billing_migrations: [],
+    subscriptions: [],
+  }, {}, () => NOW.getTime())
 
 async function main() {
   console.log('Shopify trial usage period + the manual-tab publishing queue\n')
@@ -153,6 +161,10 @@ async function main() {
         deps: {
           generate: async () => { calls.generate++; return impl() },
           createFeaturedImage: async () => { calls.image++; return { error: 'stubbed' } },
+          // THE FIXED CLOCK, threaded through the gate, getUserEntitlement and
+          // the usage-period resolution. Nothing here reads the wall clock, so
+          // the suite stays valid after TRIAL_ENDS_AT has passed in real time.
+          now: () => NOW,
         } as unknown as ArticleGenerationDeps,
       }
     }
@@ -241,14 +253,14 @@ async function main() {
       check('A1B-6c: and before any reservation', ledgerOf(admin).length === 0)
       const src = strip(read('lib/content/article-generation.ts'))
       check('A1B-6d: SOURCE — the shared gate is the FIRST thing generateArticleForTopic does',
-        /const gate = await assertContentGenerationAllowedForUser\(admin, userId\)/.test(src)
-        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId)') < src.indexOf("from('article_topics')"))
+        /const gate = await assertContentGenerationAllowedForUser\(admin, userId, deps\.now\)/.test(src)
+        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf("from('article_topics')"))
       check('A1B-6e: SOURCE — generatePoolItem (cron/queue/retry) funnels through it',
         /generateArticleForTopic\(admin, \{ topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
       check('A1B-6f: SOURCE — the manual route funnels through it too',
         /generateArticleForTopic\(/.test(strip(read('app/api/content/articles/generate/route.ts'))))
       check('A1B-6g: SOURCE — the featured image is behind the same gate (same function)',
-        src.indexOf('assertContentGenerationAllowedForUser(admin, userId)') < src.indexOf('deps.createFeaturedImage'))
+        src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf('deps.createFeaturedImage'))
     }
 
     // 7) the injectable seam is a TEST seam only — production is unchanged.
@@ -313,6 +325,144 @@ async function main() {
     check('A3-h: SOURCE — the lookup reads every field the resolution needs',
       /shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_start, shopify_current_period_end/
         .test(strip(read('lib/billing/usage-period.ts'))))
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\nA3B) BILLING AUTHORITY decides — a connected store never does')
+  {
+    // A connected shopify_connections row used to BE the authority: the
+    // resolver saw one, took the Shopify branch and failed closed. Almost every
+    // customer registers on the website and may connect Shopify purely as a
+    // publishing destination — for them the Shopify billing columns are empty
+    // by design, so their perfectly valid PayPal or trial period was never
+    // consulted and NOTHING resolved. Authority comes from billing_governance.
+    const paypalSub = {
+      user_id: USER, status: 'active', plan_code: 'advanced', trial_ends_at: null,
+      current_period_start: '2026-08-20T00:00:00Z', current_period_end: '2026-09-20T00:00:00Z',
+      created_at: '2026-01-01T00:00:00Z', paypal_subscription_id: 'I-PAYPAL-1',
+    }
+    const websiteWorld = (subs: Record<string, unknown>[], governance = WEBSITE_AUTHORITY) => new FakeAdmin({
+      // A CONNECTED Shopify store, with Shopify billing fields empty — exactly
+      // the publishing-only integration.
+      shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
+      billing_governance: [governance],
+      shopify_billing_migrations: [],
+      subscriptions: subs,
+    }, {}, () => NOW.getTime())
+
+    // A. website authority + connected Shopify + active PayPal.
+    {
+      const r = await resolveCurrentUsagePeriod(websiteWorld([paypalSub]) as never, USER, now)
+      check('A3B-A1: the PayPal period resolves (it used to resolve NOTHING)', r !== null)
+      check('A3B-A2: from PayPal, not Shopify', r?.source === 'paypal')
+      check('A3B-A3: with PayPal’s exact dates',
+        r?.start.toISOString() === '2026-08-20T00:00:00.000Z' && r?.end.toISOString() === '2026-09-20T00:00:00.000Z')
+      check('A3B-A4: so generation would NOT report usage_period_unavailable', r !== null)
+    }
+
+    // B. website authority + connected Shopify + website trial.
+    {
+      const trialSub = {
+        user_id: USER, status: 'trial', plan_code: null, trial_ends_at: '2026-09-10T00:00:00Z',
+        current_period_start: null, current_period_end: null,
+        created_at: '2026-09-03T00:00:00Z', paypal_subscription_id: null,
+      }
+      const r = await resolveCurrentUsagePeriod(websiteWorld([trialSub]) as never, USER, now)
+      check('A3B-B1: the WEBSITE trial resolves', r?.source === 'trial')
+      check('A3B-B2: ending at its own trial_ends_at', r?.end.toISOString() === '2026-09-10T00:00:00.000Z')
+      check('A3B-B3: starting at the stored created_at', r?.start.toISOString() === '2026-09-03T00:00:00.000Z')
+    }
+
+    // C. Shopify authority + active Advanced trial.
+    {
+      const r = await resolveCurrentUsagePeriod(adminWith() as never, USER, now)
+      check('A3B-C1: the SHOPIFY trial resolves', r?.source === 'shopify_trial')
+      check('A3B-C2: ending at Shopify’s trialEndsAt',
+        r?.end.toISOString() === new Date(TRIAL_ENDS_AT).toISOString())
+    }
+
+    // D. Shopify authority can never fall back to PayPal.
+    {
+      const shopifyWithPaypal = new FakeAdmin({
+        // Shopify-governed, but the Shopify billing fields are empty.
+        shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
+        billing_governance: [SHOPIFY_AUTHORITY],
+        shopify_billing_migrations: [],
+        // A PayPal row that MUST NOT be consulted.
+        subscriptions: [paypalSub],
+      }, {}, () => NOW.getTime())
+      const r = await resolveCurrentUsagePeriod(shopifyWithPaypal as never, USER, now)
+      check('A3B-D1: a Shopify-governed account NEVER falls back to PayPal', r === null)
+      // Nor to a website trial, nor when it has no connection row at all.
+      const noConn = new FakeAdmin({
+        shopify_connections: [], billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [],
+        subscriptions: [{ user_id: USER, status: 'trial', plan_code: null, trial_ends_at: '2026-09-30T00:00:00Z', current_period_start: null, current_period_end: null, created_at: '2026-09-01T00:00:00Z', paypal_subscription_id: null }],
+      }, {}, () => NOW.getTime())
+      check('A3B-D2: nor to a website trial, even with NO Shopify connection row',
+        await resolveCurrentUsagePeriod(noConn as never, USER, now) === null)
+    }
+
+    // E. an authority LOOKUP FAILURE resolves nothing.
+    {
+      const broken = new FakeAdmin(
+        { shopify_connections: [shopifyConn()], billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [], subscriptions: [paypalSub] },
+        { billing_governance: { select: () => ({ code: '57014', message: 'statement timeout' }) } },
+        () => NOW.getTime(),
+      )
+      const r = await resolveCurrentUsagePeriod(broken as never, USER, now)
+      check('A3B-E1: a governance read failure resolves NOTHING — never "website"', r === null)
+      check('A3B-E2: so it cannot silently grant a PayPal period on an outage', r === null)
+    }
+
+    // A Shopify cycle/trial is accepted only with active + supported plan state.
+    {
+      const wrongState = await resolveCurrentUsagePeriod(
+        adminWith({ shopify_subscription_status: 'none' }) as never, USER, now)
+      check('A3B-F1: Shopify authority + non-active subscription resolves nothing', wrongState === null)
+      const badHandle = await resolveCurrentUsagePeriod(
+        adminWith({ shopify_plan_handle: 'free-plan' }) as never, USER, now)
+      check('A3B-F2: Shopify authority + unsupported handle resolves nothing', badHandle === null)
+    }
+
+    check('A3B-G1: SOURCE — authority is resolved BEFORE the connection lookup',
+      (() => { const src = strip(read('lib/billing/usage-period.ts'))
+        return src.indexOf('const authority = await resolveBillingAuthority(admin, userId)') < src.indexOf("from('shopify_connections')") })())
+    check('A3B-G2: SOURCE — a failed authority lookup fails closed',
+      /if \(!authority\.ok\) return null/.test(strip(read('lib/billing/usage-period.ts'))))
+    check('A3B-G3: SOURCE — website authority skips the Shopify fields entirely',
+      /if \(authority\.authority !== 'shopify'\) \{[\s\S]{0,200}return resolveWebsitePeriod\(admin, userId, nowFn\)/.test(strip(read('lib/billing/usage-period.ts'))))
+    check('A3B-G4: SOURCE — the Shopify branch cannot reach the website resolver',
+      (() => { const src = strip(read('lib/billing/usage-period.ts'))
+        const websiteFn = src.indexOf('async function resolveWebsitePeriod')
+        return src.indexOf("from('subscriptions')") > websiteFn })())
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\nA3C) The whole suite is CLOCK-INDEPENDENT')
+  {
+    check('A3C-a: no fixture is built from the wall clock',
+      !/new Date\(\)/.test(read('lib/billing/__qa__/shopify-trial-usage-period.qa.ts')))
+    check('A3C-b: the injected clock is the only "now" the generator sees',
+      /now: \(\) => NOW/.test(read('lib/billing/__qa__/shopify-trial-usage-period.qa.ts')))
+    check('A3C-c: SOURCE — the clock reaches the entitlement gate',
+      /assertContentGenerationAllowedForUser\(admin, userId, deps\.now\)/.test(strip(read('lib/content/article-generation.ts'))))
+    check('A3C-d: SOURCE — and getUserEntitlement',
+      /getUserEntitlement\(userId, admin, deps\.now\)/.test(strip(read('lib/content/article-generation.ts'))))
+    check('A3C-e: SOURCE — and the usage-period resolution',
+      /resolveCurrentUsagePeriod\(admin, userId, deps\.now\)/.test(strip(read('lib/content/article-generation.ts'))))
+    check('A3C-f: SOURCE — and the Shopify cache-freshness check no longer reads Date.now()',
+      /nowFn\(\)\.getTime\(\) - new Date\(connection\.shopify_billing_verified_at\)\.getTime\(\)/.test(strip(read('lib/shopify/entitlement-resolver.ts')))
+      && !/Date\.now\(\) - new Date\(connection\.shopify_billing_verified_at\)/.test(strip(read('lib/shopify/entitlement-resolver.ts'))))
+    check('A3C-g: SOURCE — production still defaults to the real clock',
+      /now: \(\) => new Date\(\),/.test(strip(read('lib/content/article-generation.ts')))
+      && /nowFn: \(\) => Date = \(\) => new Date\(\)/.test(strip(read('lib/shopify/entitlement-resolver.ts'))))
+    // The decisive one: a clock LATER than the trial end must change the
+    // answer, proving the injected clock — not the wall clock — governs.
+    const afterTrial = () => new Date('2027-01-01T00:00:00Z')
+    check('A3C-h: with a clock AFTER the trial end the same fixture resolves nothing',
+      await resolveCurrentUsagePeriod(adminWith() as never, USER, afterTrial) === null)
+    check('A3C-i: and with the fixed NOW it still resolves — the clock is what decides',
+      (await resolveCurrentUsagePeriod(adminWith() as never, USER, now))?.source === 'shopify_trial')
   }
 
   // ───────────────────────────────────────────────────────────────────────

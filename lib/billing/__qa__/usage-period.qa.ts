@@ -80,6 +80,10 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [{ id: 'c1', user_id: 'u6', connection_status: 'connected', shopify_current_period_start: '2026-08-10T00:00:00Z', shopify_current_period_end: '2026-09-10T00:00:00Z', updated_at: '2026-08-10T00:00:00Z' }],
+      // Billing authority is now a FACT from billing_governance — a connected
+      // store no longer implies it (a website customer may connect Shopify only
+      // to publish). These cases are ABOUT Shopify governance, so they state it.
+      billing_governance: [{ user_id: 'u6', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{ id: 's6', user_id: 'u6', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2020-01-01T00:00:00Z', current_period_end: '2020-02-01T00:00:00Z', created_at: '2020-01-01T00:00:00Z', paypal_subscription_id: 'I-STALE-SUB' }],
     })
     const period = await resolveCurrentUsagePeriod(admin as unknown as Admin, 'u6')
@@ -91,6 +95,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [{ id: 'c2', user_id: 'u7', connection_status: 'connected', shopify_current_period_start: null, shopify_current_period_end: null, updated_at: '2026-08-10T00:00:00Z' }],
+      billing_governance: [{ user_id: 'u7', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       subscriptions: [{ id: 's7', user_id: 'u7', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2026-08-01T00:00:00Z', current_period_end: '2026-09-01T00:00:00Z', created_at: '2026-08-01T00:00:00Z' }],
     })
     const period = await resolveCurrentUsagePeriod(admin as unknown as Admin, 'u7')
