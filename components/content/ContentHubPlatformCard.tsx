@@ -5,8 +5,14 @@
  *
  * Derives the active platform from the connection state and renders exactly one:
  *   - Shopify connected → a COMPACT Shopify status card (store, last sync, per-
- *     type counts, Sync now, Test connection). Connection MANAGEMENT (connect/
- *     disconnect) stays on the project page — this is status-only.
+ *     type counts, the PUBLISHING DESTINATION, Sync now, Test connection).
+ *     Connection MANAGEMENT (connect/disconnect) stays on the project page.
+ *
+ *     The destination is here because this is the ONLY Shopify card a connected
+ *     merchant sees in the hub: ShopifyConnectionPanel is rendered just while
+ *     `activePlatform === 'none'`. Without it, a queue blocked on "choose a
+ *     default blog" pointed at a control that was not on screen. It is the same
+ *     shared component that panel renders — see ShopifyDestinationSection.
  *   - otherwise (WordPress / neither / both) → the existing WordPress subtree
  *     (passed as children), unchanged.
  *
@@ -22,8 +28,20 @@ import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
+import ShopifyDestinationSection from './ShopifyDestinationSection'
 
-type Conn = { shop_domain: string; storefront_domain: string | null; connection_status: 'untested' | 'connected' | 'failed'; last_synced_at: string | null; last_error: string | null } | null
+// `can_publish` and `default_blog_id` are already returned by
+// /api/shopify/connection (sanitizeShopifyConnection) — this card simply never
+// read them, which is why it could not show a publishing destination.
+type Conn = {
+  shop_domain: string
+  storefront_domain: string | null
+  connection_status: 'untested' | 'connected' | 'failed'
+  last_synced_at: string | null
+  last_error: string | null
+  can_publish: boolean
+  default_blog_id: string | null
+} | null
 type Counts = { product: number; collection: number; page: number; blog: number; article: number }
 const ZERO: Counts = { product: 0, collection: 0, page: 0, blog: 0, article: 0 }
 
@@ -160,7 +178,14 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
         <div className={`text-xs mb-2 ${shopify.connection_status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{shopify.last_error}</div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <ShopifyDestinationSection
+        projectId={projectId}
+        canPublish={shopify.can_publish}
+        defaultBlogId={shopify.default_blog_id}
+        onSaved={load}
+      />
+
+      <div className="flex flex-wrap gap-2 mt-2">
         <Button size="sm" onClick={sync} loading={syncing} disabled={syncing || testing}>{t.syncNow}</Button>
         <Button size="sm" variant="outline" onClick={test} loading={testing} disabled={testing || syncing}>{t.testConnection}</Button>
       </div>

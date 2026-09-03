@@ -893,6 +893,18 @@ export const dashboardEn = {
       // queue renders it through this dictionary — without these two entries it
       // showed the raw machine code.
       billing_required: 'An active Shopify plan is required to generate content. Choose a plan to continue.',
+      // Shopify publishing blockers. blockShopifyItem persists the bare code;
+      // the publish path persists it prefixed with `shopify_`. AutomationSchedule
+      // looks up the EXACT stored value, so both forms are listed.
+      no_shopify_blog: 'Your Shopify store has no blog yet. Create a blog in Shopify, then retry publishing.',
+      shopify_no_shopify_blog: 'Your Shopify store has no blog yet. Create a blog in Shopify, then retry publishing.',
+      missing_default_blog: 'Your store has several blogs. Choose which one to publish to in the Shopify connection settings.',
+      shopify_missing_default_blog: 'Your store has several blogs. Choose which one to publish to in the Shopify connection settings.',
+      blog_lookup_failed: 'We couldn’t read your Shopify blogs just now. This is temporary — publishing will be retried.',
+      shopify_blog_lookup_failed: 'We couldn’t read your Shopify blogs just now. This is temporary — publishing will be retried.',
+      missing_write_content_scope: 'The app is missing permission to publish articles to your store. Reconnect the store to grant it.',
+      shopify_missing_write_content_scope: 'The app is missing permission to publish articles to your store. Reconnect the store to grant it.',
+      no_shopify_connection: 'This project has no connected Shopify store.',
       entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
       usage_period_unavailable: 'We couldn’t verify your billing period just now. Please try again shortly.',
       gemini_quota_exceeded: 'Gemini quota / rate limit exceeded. Please try again later.',
@@ -1676,11 +1688,18 @@ export const dashboardEn = {
         grantedScopesLabel: 'Granted scopes',
         defaultBlogLabel: 'Default publishing blog',
         defaultBlogSelect: 'Select a blog…',
-        defaultBlogSave: 'Save default',
+        defaultBlogNeedsScope: 'Publishing permission is missing — reconnect the store to grant it. You can still review the target blog below.',
+      defaultBlogAuto: 'Selected automatically — your store has one blog.',
+      defaultBlogSave: 'Save default',
         defaultBlogSaved: 'Default blog saved.',
         defaultBlogError: 'Failed to save the default blog.',
         defaultBlogMissing: 'Choose a default blog to enable scheduled automated publishing.',
         defaultBlogNone: 'No blog found in the store. Create a blog in Shopify.',
+        defaultBlogLoading: 'Loading your store’s blogs…',
+        // An OUTAGE, stated as one. Never collapsed into "no blog found" — that
+        // would be a false claim about the merchant's store.
+        defaultBlogLoadError: 'We couldn’t read your Shopify blogs just now. This is temporary.',
+        defaultBlogRetry: 'Try again',
         connect: 'Connect Shopify',
         guide: {
           openGuide: 'Shopify connection guide',

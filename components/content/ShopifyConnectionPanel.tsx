@@ -18,6 +18,7 @@ import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
+import ShopifyDestinationSection from './ShopifyDestinationSection'
 
 type SanitizedConnection = {
   id: string
@@ -33,7 +34,6 @@ type SanitizedConnection = {
   default_blog_id: string | null
 }
 type Counts = { product: number; collection: number; page: number; blog: number; article: number }
-type Blog = { id: string; title: string; handle: string }
 
 const ZERO: Counts = { product: 0, collection: 0, page: 0, blog: 0, article: 0 }
 
@@ -54,10 +54,6 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
   const [disconnecting, setDisconnecting] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  // Phase 4F.2 — project default publishing Blog.
-  const [blogs, setBlogs] = useState<Blog[]>([])
-  const [defaultBlogId, setDefaultBlogId] = useState<string>('')
-  const [savingDefault, setSavingDefault] = useState(false)
 
   function mapErr(code: unknown): string {
     const k = String(code || '')
@@ -69,46 +65,13 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
       const res = await fetch(`/api/shopify/connection?projectId=${projectId}`)
       if (res.ok) {
         const data = await res.json()
-        const conn = data.connection ?? null
-        setConnection(conn)
+        setConnection(data.connection ?? null)
         setCounts(data.counts ?? ZERO)
-        setDefaultBlogId(conn?.default_blog_id ?? '')
       }
     } catch { /* leave not-connected */ } finally { setLoading(false) }
   }, [projectId])
 
   useEffect(() => { load() }, [load])
-
-  // Load Blogs for the default-Blog selector once publishing is enabled.
-  useEffect(() => {
-    if (!connection?.can_publish) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch(`/api/shopify/blogs?projectId=${projectId}`)
-        const data = await res.json().catch(() => ({}))
-        if (!cancelled && res.ok && Array.isArray(data.blogs)) {
-          setBlogs(data.blogs)
-          // One blog → preselect (persisted only on explicit Save).
-          if (data.blogs.length === 1 && !defaultBlogId) setDefaultBlogId(data.blogs[0].id)
-        }
-      } catch { /* selector just stays empty */ }
-    })()
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection?.can_publish, projectId])
-
-  async function saveDefaultBlog() {
-    setSavingDefault(true); setMessage(null)
-    try {
-      const res = await fetch('/api/shopify/connection', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, defaultBlogId: defaultBlogId || null }),
-      })
-      setMessage(res.ok ? { text: t.defaultBlogSaved, ok: true } : { text: t.defaultBlogError, ok: false })
-      if (res.ok) await load()
-    } catch { setMessage({ text: t.defaultBlogError, ok: false }) } finally { setSavingDefault(false) }
-  }
 
   // Surface the OAuth callback result (?shopify=connected|warning|error&reason=)
   // then strip it from the URL so a refresh doesn't repeat the message.
@@ -242,29 +205,17 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
             <div className={`text-xs ${connection.connection_status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{connection.last_error}</div>
           )}
 
-          {/* Phase 4F.2 — default publishing Blog (used by automation for
-              never-opened articles). Only shown once publishing is enabled. */}
-          {connection.can_publish && (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.defaultBlogLabel}</label>
-              {blogs.length === 0 ? (
-                <p className="text-xs text-amber-700 dark:text-amber-400">{t.defaultBlogNone}</p>
-              ) : blogs.length === 1 ? (
-                <div className="text-sm text-slate-700 dark:text-slate-200">{blogs[0].title}</div>
-              ) : (
-                <select value={defaultBlogId} onChange={(e) => setDefaultBlogId(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-                  <option value="">{t.defaultBlogSelect}</option>
-                  {blogs.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
-              )}
-              {blogs.length > 1 && !connection.default_blog_id && (
-                <p className="text-[11px] text-amber-700 dark:text-amber-400">{t.defaultBlogMissing}</p>
-              )}
-              {blogs.length >= 1 && (
-                <Button size="sm" variant="outline" onClick={saveDefaultBlog} loading={savingDefault} disabled={savingDefault || (blogs.length > 1 && !defaultBlogId)}>{t.defaultBlogSave}</Button>
-              )}
-            </div>
-          )}
+          {/* Publishing destination — the SHARED component, also rendered by
+              ContentHubPlatformCard. It used to be an inline block here only,
+              and gated on `can_publish`, so a merchant on the hub's Shopify
+              card saw no destination control at all. One implementation now,
+              rendered by both cards, so they cannot drift. */}
+          <ShopifyDestinationSection
+            projectId={projectId}
+            canPublish={connection.can_publish}
+            defaultBlogId={connection.default_blog_id}
+            onSaved={load}
+          />
 
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={sync} loading={syncing} disabled={syncing || testing}>{t.syncNow}</Button>

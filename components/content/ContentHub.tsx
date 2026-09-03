@@ -20,6 +20,7 @@ import Badge from '@/components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import WordPressConnectionPanel from '@/components/content/WordPressConnectionPanel'
 import ShopifyConnectionPanel from '@/components/content/ShopifyConnectionPanel'
+import { localizeShopifyPublishError } from '@/lib/i18n/dashboard/shopify-publish-error'
 import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import GscPanel from '@/components/content/GscPanel'
@@ -93,6 +94,15 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   const t = useMemo(() => getDashboardDictionary(language).contentHub, [language])
   const isHebrew = language === 'he'
   const toast = useToasts()
+
+  // ONE localizer for every Shopify publish failure the row/batch actions can
+  // receive, in any of the shapes the server produces. genErrors is the shared
+  // dictionary the automation queue already renders through, so the manual and
+  // the automatic path say the same thing about the same failure.
+  const shopifyPublishError = useCallback(
+    (code: unknown) => localizeShopifyPublishError(code, { codes: t.genErrors as Record<string, string>, fallback: t.rowShopify.errGeneric }),
+    [t],
+  )
 
   const [data, setData] = useState<Overview | null>(null)
   // The project's ACTIVE publishing platform (resolved server-side by connection validity).
@@ -394,13 +404,12 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
         load()
         return
       }
-      const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
-      toast.error(
-        reason === 'no_shopify_connection' ? t.rowShopify.errNoConn
-          : reason === 'missing_write_content_scope' ? t.rowShopify.errScope
-            : reason === 'no_shopify_blog' ? t.rowShopify.errBlog
-              : t.rowShopify.errGeneric,
-      )
+      // Every KNOWN reason gets a localized sentence, in all three shapes the
+      // server can produce (bare, `shopify_`-prefixed, and `code: detail`).
+      // The old three-code list turned a missing default blog and a blogs
+      // outage alike into "the Shopify action failed", which told the merchant
+      // nothing they could act on.
+      toast.error(shopifyPublishError(d.reason ?? d.error))
     } catch {
       toast.error(t.rowShopify.errGeneric)
     } finally {
@@ -595,8 +604,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
         })
         const d = await res.json().catch(() => ({}))
         if (res.ok && d.ok) return { ok: true, patch: publishedPatch({ shopify_article_id: d.shopify_article_id ?? null, shopify_article_url: d.shopify_article_url ?? null, shopify_status: d.shopify_status ?? (mode === 'publish' ? 'published' : 'draft') }) }
-        const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
-        return { ok: false, error: reason === 'no_shopify_connection' ? t.rowShopify.errNoConn : reason === 'missing_write_content_scope' ? t.rowShopify.errScope : reason === 'no_shopify_blog' ? t.rowShopify.errBlog : t.rowShopify.errGeneric }
+        return { ok: false, error: shopifyPublishError(d.reason ?? d.error) }
       }
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
