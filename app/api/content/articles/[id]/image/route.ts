@@ -42,7 +42,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const result = await createFeaturedImageForArticle(owned.admin, id)
   if ('error' in result) {
     console.log('[content-article-image] failed reason=' + result.error)
-    return Response.json({ error: 'image_generation_failed', reason: result.error }, { status: 502 })
+    // A flat 502 for EVERY failure told a merchant with a verified billing
+    // denial, and a merchant hitting a transient entitlement outage, that "the
+    // image engine returned no image". The status now matches the cause:
+    // 403 a verified verdict, 503 a retryable outage, 502 a provider failure.
+    const status = result.error === 'billing_required' ? 403
+      : result.error === 'entitlement_unavailable' ? 503
+        : 502
+    return Response.json({ error: 'image_generation_failed', reason: result.error }, { status })
   }
   return Response.json({ featured_image_url: result.featured_image_url })
 }

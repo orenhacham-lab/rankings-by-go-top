@@ -24,7 +24,11 @@ function extFor(mime: string): string {
 
 export async function createFeaturedImageForArticle(
   admin: ReturnType<typeof createAdminClient>,
-  articleId: string
+  articleId: string,
+  /** Injectable clock, threaded to the entitlement gate's cache-freshness
+   *  check — same convention as generateArticleForTopic. Production passes
+   *  nothing and uses the real clock. */
+  nowFn: () => Date = () => new Date(),
 ): Promise<{ featured_image_url: string } | { error: string }> {
   const { data: article } = await admin
     .from('generated_articles')
@@ -37,7 +41,7 @@ export async function createFeaturedImageForArticle(
   // Blocker D fix — central gate for the STANDALONE image-regenerate route
   // (the auto-image call from generateArticleForTopic is already gated
   // there; this covers the path that does NOT go through it).
-  const gate = await assertContentGenerationAllowedForProject(admin, String(a.project_id))
+  const gate = await assertContentGenerationAllowedForProject(admin, String(a.project_id), nowFn)
   // The DISTINCT reason survives: an outage is 'entitlement_unavailable', not
   // a billing verdict the caller would surface as "buy a plan".
   if (!gate.allowed) return { error: gateDenialCode(gate) }

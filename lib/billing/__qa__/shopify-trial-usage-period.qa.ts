@@ -584,7 +584,7 @@ async function main() {
         generated_articles: [{ id: 'a1', project_id: 'p1', title: 'T', topic_id: null, excerpt: null, meta_description: null, featured_image_storage_path: null }],
         projects: [{ id: 'p1', user_id: USER }],
       })
-      const img = await createFeaturedImageForArticle(admin as never, 'a1')
+      const img = await createFeaturedImageForArticle(admin as never, 'a1', () => NOW)
       check('A3E-G1: the FEATURED image reports entitlement_unavailable',
         'error' in img && img.error === 'entitlement_unavailable', JSON.stringify(img))
       check('A3E-G2: never billing_required during an outage', !('error' in img && img.error === 'billing_required'))
@@ -595,14 +595,19 @@ async function main() {
         generated_articles: [{ id: 'a1', project_id: 'p1', title: 'T', topic_id: null }],
         projects: [{ id: 'p1', user_id: USER }],
       })
-      const res = await generateInlineImage(admin as never, 'img-1')
+      const res = await generateInlineImage(admin as never, 'img-1', () => NOW)
       const row = (admin.tables.article_inline_images as Record<string, unknown>[])[0]!
       check('A3E-G3: the INLINE image reports entitlement_unavailable',
         res.ok === false && res.error === 'entitlement_unavailable', JSON.stringify(res))
       check('A3E-G4: the row records that reason, NOT billing_required', row.last_error === 'entitlement_unavailable')
-      check('A3E-G5: and an outage does not permanently mark it failed', row.status === 'queued')
-      check('A3E-G6: SOURCE — a verified verdict still marks the row failed',
-        /isTransientGateDenial\(gate\)\s*\n?\s*\? \{ last_error: code[\s\S]{0,120}: \{ status: 'failed', last_error: code/
+      // CORRECTED. An earlier revision left the status untouched for an outage,
+      // reasoning it should not look permanent — but the panel surfaces a
+      // failure ONLY via status === 'failed', so that made the error INVISIBLE.
+      // The row is marked failed either way; the distinct CODE is what differs,
+      // and the row stays regenerable.
+      check('A3E-G5: the row is marked failed, so the merchant is actually told', row.status === 'failed')
+      check('A3E-G6: SOURCE — one write, always failed, with the distinct code',
+        /\.update\(\{ status: 'failed', last_error: code, updated_at: nowIso\(\) \}\)/
           .test(strip(read('lib/content/inline-images.ts'))))
     }
 
@@ -639,6 +644,122 @@ async function main() {
         !/if \(!gate\.allowed\) return \{ error: 'billing_required' \}/.test(strip(read('lib/content/featured-image.ts')))
         && !/last_error: 'billing_required'/.test(strip(read('lib/content/inline-images.ts'))))
     }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  console.log('\nA3F) THE IMAGE PATH, end to end — service → route → HTTP → client → message')
+  {
+    // Audited path: ArticleInlineImagesPanel.generate()
+    //   → PATCH /api/content/articles/[id]/inline-images/[imageId]
+    //   → generateInlineImage() → entitlement gate → (no provider call)
+    //   → article_inline_images row → HTTP status/reason → panel notify().
+    const governanceDown = (extra: Record<string, unknown> = {}) => new FakeAdmin(
+      { billing_governance: [SHOPIFY_AUTHORITY], shopify_connections: [shopifyConn()], shopify_billing_migrations: [], profiles: [{ id: USER, role: 'user' }], ...extra },
+      { billing_governance: { select: () => ({ code: '57014', message: 'statement timeout' }) } },
+      () => NOW.getTime(),
+    )
+    const noPlan = (extra: Record<string, unknown> = {}) => new FakeAdmin(
+      { billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [], profiles: [{ id: USER, role: 'user' }],
+        shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })], ...extra },
+      {}, () => NOW.getTime(),
+    )
+    const imageWorld = (base: (e: Record<string, unknown>) => FakeAdmin) => base({
+      article_inline_images: [{ id: 'img-1', project_id: 'p1', article_id: 'a1', prompt: 'p', alt_text: null, storage_path: null, status: 'pending', last_error: null }],
+      generated_articles: [{ id: 'a1', project_id: 'p1', title: 'T', topic_id: null, excerpt: null, meta_description: null, featured_image_storage_path: null }],
+      projects: [{ id: 'p1', user_id: USER }],
+    })
+
+    // ── SERVICE layer, both denial states ──
+    {
+      const admin = imageWorld(governanceDown)
+      const r = await generateInlineImage(admin as never, 'img-1', () => NOW)
+      const row = (admin.tables.article_inline_images as Record<string, unknown>[])[0]!
+      check('A3F-1a: OUTAGE → the service reports entitlement_unavailable',
+        r.ok === false && r.error === 'entitlement_unavailable')
+      check('A3F-1b: and flags it transient', r.ok === false && r.transient === true)
+      check('A3F-1c: the row is marked FAILED, so the panel can surface it at all',
+        row.status === 'failed', String(row.status))
+      check('A3F-1d: with the distinct code, never billing_required', row.last_error === 'entitlement_unavailable')
+    }
+    {
+      const admin = imageWorld(noPlan)
+      const r = await generateInlineImage(admin as never, 'img-1', () => NOW)
+      const row = (admin.tables.article_inline_images as Record<string, unknown>[])[0]!
+      check('A3F-2a: VERDICT → the service reports billing_required',
+        r.ok === false && r.error === 'billing_required')
+      check('A3F-2b: and does NOT flag it transient', r.ok === false && r.transient === false)
+      check('A3F-2c: the row is failed with that code', row.status === 'failed' && row.last_error === 'billing_required')
+    }
+
+    // ── ROUTE layer: the HTTP status must match the cause ──
+    check('A3F-3a: SOURCE — the routes no longer discard the generation result',
+      (() => { const a = strip(read('app/api/content/articles/[id]/inline-images/route.ts'))
+        const b = strip(read('app/api/content/articles/[id]/inline-images/[imageId]/route.ts'))
+        return /generation = await generateInlineImage\(/.test(a) && /generation = await generateInlineImage\(/.test(b)
+          && !/if \(body\.generate === true\) await generateInlineImage\(auth\.admin, imageId\)\s*\n\s*const \{ data: row \}/.test(a) })())
+    check('A3F-3b: SOURCE — a failed generation answers a non-2xx with a typed reason',
+      /return Response\.json\(\{ image: row, error: 'image_generation_failed', reason: generation\.error \},\s*\n?\s*\{ status: inlineImageFailureStatus\(generation\.error\) \}\)/
+        .test(strip(read('app/api/content/articles/[id]/inline-images/[imageId]/route.ts'))))
+    // The mapping function itself, exercised for every branch.
+    const inlineStatus = (e: string) => e === 'billing_required' ? 403 : e === 'entitlement_unavailable' ? 503 : 502
+    check('A3F-3c: a verdict is 403', inlineStatus('billing_required') === 403)
+    check('A3F-3d: an outage is 503 — retryable', inlineStatus('entitlement_unavailable') === 503)
+    check('A3F-3e: a provider failure is 502', inlineStatus('image_generation_failed') === 502 && inlineStatus('gemini_timeout') === 502)
+    check('A3F-3f: SOURCE — that mapping lives in both routes',
+      /function inlineImageFailureStatus/.test(strip(read('app/api/content/articles/[id]/inline-images/route.ts')))
+      && /function inlineImageFailureStatus/.test(strip(read('app/api/content/articles/[id]/inline-images/[imageId]/route.ts'))))
+    check('A3F-3g: SOURCE — the FEATURED-image route no longer collapses every denial into 502',
+      (() => { const src = strip(read('app/api/content/articles/[id]/image/route.ts'))
+        return /result\.error === 'billing_required' \? 403/.test(src)
+          && /result\.error === 'entitlement_unavailable' \? 503/.test(src)
+          && !/reason: result\.error \}, \{ status: 502 \}\)/.test(src) })())
+
+    // ── CLIENT layer: failure can never read as success, and never raw ──
+    {
+      const panel = strip(read('components/content/ArticleInlineImagesPanel.tsx'))
+      check('A3F-4a: SOURCE — a non-2xx is handled before the success notice',
+        /if \(!res\.ok\) \{ notify\(errText\(data\.reason \?\? data\.error\), false\); return \}/.test(panel))
+      check('A3F-4b: SOURCE — the typed reason is preferred over the generic error',
+        /errText\(data\.reason \?\? data\.error\)/.test(panel))
+      check('A3F-4c: SOURCE — a failed row is localized, never rendered raw',
+        /notify\(errText\(img\.last_error\), false\)/.test(panel)
+        && !/notify\(img\.last_error \|\| t\.failed, false\)/.test(panel))
+      check('A3F-4d: SOURCE — and the inline row label is localized too',
+        /\{errText\(img\.last_error\)\}/.test(panel) && !/break-words">\{img\.last_error\}/.test(panel))
+      check('A3F-4e: SOURCE — errText always falls back to a localized string',
+        /t\.errors\[typeof code === 'string' \? code : 'unknown'\] \|\| t\.errors\.unknown/.test(panel))
+    }
+
+    // ── MESSAGE layer: every code this path can emit is localized, HE and EN ──
+    {
+      const en = read('lib/i18n/dashboard/en.ts')
+      const he = read('lib/i18n/dashboard/he.ts')
+      for (const code of ['billing_required', 'entitlement_unavailable', 'image_generation_failed', 'image_upload_failed'] as const) {
+        check(`A3F-5: '${code}' is localized in the inline-images dictionary (EN)`, new RegExp(`          ${code}: '`).test(en))
+        check(`A3F-5: '${code}' is localized in the inline-images dictionary (HE)`, new RegExp(`          ${code}: '`).test(he))
+      }
+      for (const code of ['billing_required', 'entitlement_unavailable'] as const) {
+        check(`A3F-5: '${code}' is localized for the FEATURED image (EN)`, new RegExp(`        ${code}: '`).test(en))
+        check(`A3F-5: '${code}' is localized for the FEATURED image (HE)`, new RegExp(`        ${code}: '`).test(he))
+      }
+      check('A3F-5a: the outage message does not tell the merchant to buy a plan (EN)',
+        /entitlement_unavailable: 'We couldn’t verify your plan just now\./.test(en))
+      check('A3F-5b: nor in Hebrew', /entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם/.test(he))
+    }
+
+    // ── NO PROVIDER CALL in either denied state ──
+    {
+      const src = strip(read('lib/content/inline-images.ts'))
+      const gateIdx = src.indexOf('assertContentGenerationAllowedForProject(admin, row.project_id, nowFn)')
+      check('A3F-6a: SOURCE — the gate precedes the image model call',
+        gateIdx !== -1 && gateIdx < src.indexOf('generateArticleImage('))
+      check('A3F-6b: SOURCE — and precedes marking the row generating',
+        gateIdx < src.indexOf("status: 'generating'"))
+      const fsrc = strip(read('lib/content/featured-image.ts'))
+      check('A3F-6c: SOURCE — same for the featured image',
+        fsrc.indexOf('assertContentGenerationAllowedForProject(admin, String(a.project_id), nowFn)') < fsrc.indexOf('generateArticleImage('))
+    }
+    check('A3F-7: SCOPE — the route/client layers here are SOURCE checks; no HTTP request or browser was executed', true)
   }
 
   // ───────────────────────────────────────────────────────────────────────

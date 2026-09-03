@@ -12,6 +12,22 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { eligibleSections, generateInlineImage } from '@/lib/content/inline-images'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
 
+/**
+ * The generation outcome, as an HTTP answer. The routes used to `await` the
+ * service and DISCARD its result, then answer 200 with the row — so a denied or
+ * failed generation was indistinguishable from a successful one at the HTTP
+ * layer, and the client had to infer it from the row.
+ *
+ *   billing_required        403 — a verified billing verdict
+ *   entitlement_unavailable 503 — an outage; retryable
+ *   anything else           502 — the image provider failed
+ */
+function inlineImageFailureStatus(error: string): 403 | 503 | 502 {
+  if (error === 'billing_required') return 403
+  if (error === 'entitlement_unavailable') return 503
+  return 502
+}
+
 // Manual-replace upload guardrails (mirrors the existing project upload route).
 const REPLACE_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const REPLACE_MAX_SIZE = 5 * 1024 * 1024 // 5MB
@@ -52,8 +68,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   await auth.admin.from('article_inline_images').update(patch).eq('id', imageId)
 
-  if (body.action === 'regenerate') await generateInlineImage(auth.admin, imageId)
+  let generation: { ok: true; url: string } | { ok: false; error: string; transient?: boolean } | null = null
+  if (body.action === 'regenerate') generation = await generateInlineImage(auth.admin, imageId)
   const { data: row } = await auth.admin.from('article_inline_images').select('*').eq('id', imageId).maybeSingle()
+  if (generation && !generation.ok) {
+    return Response.json({ image: row, error: 'image_generation_failed', reason: generation.error },
+      { status: inlineImageFailureStatus(generation.error) })
+  }
   return Response.json({ image: row })
 }
 

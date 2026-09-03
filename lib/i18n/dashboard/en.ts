@@ -962,6 +962,8 @@ export const dashboardEn = {
         image_generation_failed: 'The image engine returned no image. Please try again.',
         image_model_unavailable: 'The image model is not available on the current Gemini key. Set a supported image model in GEMINI_IMAGE_MODEL.',
         image_upload_failed: 'Saving the image failed. Please try again.',
+        billing_required: 'Your Shopify plan doesn’t cover image generation. Choose a plan to continue.',
+        entitlement_unavailable: 'We couldn’t verify your plan just now. Please try again shortly.',
         image_save_failed: 'Saving the image failed. Please try again.',
         unknown: 'Image generation failed. Please try again.',
       },
@@ -1016,6 +1018,11 @@ export const dashboardEn = {
           file_too_large: 'File is too large (max 5MB).',
           no_file: 'No file selected.',
           image_upload_failed: 'Image upload failed. Please try again.',
+          // Entitlement outcomes surfaced by the image pipeline. Without these
+          // the panel rendered the raw code (e.g. "billing_required").
+          billing_required: 'Your Shopify plan doesn’t cover image generation. Choose a plan to continue.',
+          entitlement_unavailable: 'We couldn’t verify your plan just now. Please try again shortly.',
+          image_generation_failed: 'Image generation failed. Please try again.',
           unknown: 'The action failed. Please try again.',
         },
       },

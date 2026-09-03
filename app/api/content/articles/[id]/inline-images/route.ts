@@ -11,6 +11,22 @@ import { authContentProject } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { eligibleSections, generateInlineImage, INLINE_IMAGE_MAX } from '@/lib/content/inline-images'
 
+/**
+ * The generation outcome, as an HTTP answer. The routes used to `await` the
+ * service and DISCARD its result, then answer 200 with the row — so a denied or
+ * failed generation was indistinguishable from a successful one at the HTTP
+ * layer, and the client had to infer it from the row.
+ *
+ *   billing_required        403 — a verified billing verdict
+ *   entitlement_unavailable 503 — an outage; retryable
+ *   anything else           502 — the image provider failed
+ */
+function inlineImageFailureStatus(error: string): 403 | 503 | 502 {
+  if (error === 'billing_required') return 403
+  if (error === 'entitlement_unavailable') return 503
+  return 502
+}
+
 async function loadArticle(articleId: string) {
   const admin = createAdminClient()
   const { data } = await admin.from('generated_articles').select('id, project_id, content_html').eq('id', articleId).maybeSingle()
@@ -70,7 +86,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return Response.json({ error: 'Failed to create image' }, { status: 500 })
   }
   const imageId = (created as { id: string }).id
-  if (body.generate === true) await generateInlineImage(auth.admin, imageId)
+  let generation: { ok: true; url: string } | { ok: false; error: string; transient?: boolean } | null = null
+  if (body.generate === true) generation = await generateInlineImage(auth.admin, imageId)
   const { data: row } = await auth.admin.from('article_inline_images').select('*').eq('id', imageId).maybeSingle()
+  // The row is still returned (it exists and the client should render it), but
+  // the STATUS now tells the truth about the generation attempt.
+  if (generation && !generation.ok) {
+    return Response.json({ image: row, error: 'image_generation_failed', reason: generation.error },
+      { status: inlineImageFailureStatus(generation.error) })
+  }
   return Response.json({ image: row })
 }
