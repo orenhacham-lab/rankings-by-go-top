@@ -135,6 +135,16 @@ function redirectToBilling(request: NextRequest) {
  * A service-role Supabase client for the entitlement decision only. Returns
  * null (rather than throwing and 500-ing every page) when the key is absent.
  * The key is read server-side and never reaches the browser.
+ *
+ * DEPENDENCY, stated explicitly: this works because Supabase's `service_role`
+ * carries BYPASSRLS. billing_governance has RLS enabled with NO policies, so a
+ * role WITHOUT bypassrls reads zero rows even when it holds SELECT — see
+ * supabase/migrations/__qa__/governance-rls-middleware.probe.sql, which
+ * executes both cases against a disposable cluster (test 3 vs test 4). The
+ * dependency is corroborated in Production, not assumed: /api/shopify/app-home
+ * uses createAdminClient() and does read billing_authority for this account.
+ * If it ever stopped holding, the guard degrades to `governanceRow: "missing"`
+ * in the log below rather than failing silently.
  */
 function createEntitlementClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
