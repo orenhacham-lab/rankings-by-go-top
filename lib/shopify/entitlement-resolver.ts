@@ -30,7 +30,7 @@
 import type { SubscriptionPlan } from '@/lib/supabase/types'
 import { getActiveShopifySubscription } from './partner-client'
 import { recordShopifyBillingCache } from './billing-cache'
-import type { ShopifyPlanHandle } from './constants'
+import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from './constants'
 import { getActiveMigrationResult } from './paypal-migration'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 
@@ -254,17 +254,40 @@ export async function resolveShopifyGovernedEntitlement(
 /**
  * Lightweight, CACHE-ONLY variant for hasAccess() (middleware hot path) —
  * never makes a live Partner API call (that would put an external network
- * dependency in front of every page load). A never-verified or long-stale
- * cache fails closed (no access) rather than granting anything; the cache is
- * kept fresh by every publish attempt, billing-page load, connector-home
- * load, and pricing-return — a user actively using the product will have a
- * fresh cache almost all the time.
+ * dependency in front of every page load). Fails closed when it cannot stand
+ * on an authoritative statement from Shopify.
+ *
+ * PRODUCTION INCIDENT (Shopify submission blocker). This used to grant access
+ * on ONE condition: `shopify_billing_verified_at` within CACHE_FRESHNESS_MS
+ * (5 minutes) AND status 'active'. `shopify_billing_verified_at` is written
+ * only by recordShopifyBillingCache — from the connector home, the billing
+ * return, the publish guard and resolveShopifyGovernedEntitlement's live path.
+ * NOTHING on the /dashboard, /projects, /clients, /keywords, /scans, /reports
+ * journey writes it, because this path is deliberately cache-only. So an
+ * Advanced merchant on an active Shopify trial got exactly five minutes of
+ * access after leaving the embedded app and was then redirected to /billing
+ * on every page, permanently, with no way back except reopening the embedded
+ * app. The old docstring's premise — "a user actively using the product will
+ * have a fresh cache almost all the time" — was false precisely for the
+ * journey that matters: ordinary dashboard browsing refreshes nothing.
+ *
+ * The correction is not a longer TTL (that only moves the cliff) and not a
+ * live API call in middleware (that puts Shopify's uptime in front of every
+ * page load). It is a distinction the old predicate never drew:
+ *
+ *   Freshness bounds how long we trust a cached GUESS about billing state.
+ *   A trial end or a period end is NOT a guess — it is a date Shopify itself
+ *   gave us, stating how long this entitlement runs.
+ *
+ * So access is granted while the cache is recently verified OR while a window
+ * Shopify declared is still open. Outside every such window, with no recent
+ * verification, it fails closed exactly as before. See decideShopifyRouteAccess.
  */
 export async function isShopifyGovernedAndActive(
   admin: Admin,
   userId: string,
   nowFn: () => Date = () => new Date(),
-): Promise<{ governed: boolean; active: boolean; unavailable?: true }> {
+): Promise<{ governed: boolean; active: boolean; unavailable?: true; reason?: ShopifyRouteAccessReason }> {
   // Same authority rule as resolveShopifyGovernedEntitlement — a connection row
   // never decides governance on its own — and the same fail-closed rule: an
   // unreadable governance record reports `unavailable`, never
@@ -275,7 +298,7 @@ export async function isShopifyGovernedAndActive(
 
   const { data, error } = await admin
     .from('shopify_connections')
-    .select('shopify_subscription_status, shopify_billing_verified_at')
+    .select('shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_end, shopify_billing_verified_at')
     .eq('user_id', userId)
     .eq('connection_status', 'connected')
     .is('archived_at', null)
@@ -285,10 +308,75 @@ export async function isShopifyGovernedAndActive(
   // A Shopify-governed account is STILL governed when its connection is
   // missing, failed or unreadable — it is simply not active. Reporting
   // `governed: false` here would send it back to website access.
-  if (error) return { governed: true, active: false, unavailable: true }
-  if (!data) return { governed: true, active: false }
-  const row = data as { shopify_subscription_status: string | null; shopify_billing_verified_at: string | null }
-  const fresh = row.shopify_billing_verified_at
-    && nowFn().getTime() - new Date(row.shopify_billing_verified_at).getTime() < CACHE_FRESHNESS_MS
-  return { governed: true, active: fresh === true && row.shopify_subscription_status === 'active' }
+  if (error) return { governed: true, active: false, unavailable: true, reason: 'connection_unreadable' }
+  if (!data) return { governed: true, active: false, reason: 'no_connection' }
+  const decision = decideShopifyRouteAccess(data as ShopifyRouteAccessRow, nowFn())
+  return { governed: true, active: decision.allowed, reason: decision.reason }
+}
+
+/** The cached billing columns the route-access decision reads. Nothing else. */
+export interface ShopifyRouteAccessRow {
+  shopify_subscription_status: string | null
+  shopify_plan_handle: string | null
+  shopify_trial_ends_at: string | null
+  shopify_current_period_end: string | null
+  shopify_billing_verified_at: string | null
+}
+
+/** WHY access was granted or denied — for tests, logs and honest diagnostics. */
+export type ShopifyRouteAccessReason =
+  | 'recently_verified'
+  | 'shopify_trial_window'
+  | 'shopify_paid_cycle'
+  | 'not_active'
+  | 'unsupported_plan_handle'
+  | 'stale_unverified'
+  | 'no_connection'
+  | 'connection_unreadable'
+
+/** A timestamp strictly in the future, or false for null/blank/invalid input. */
+function isFuture(iso: string | null | undefined, now: Date): boolean {
+  if (!iso) return false
+  const t = new Date(iso).getTime()
+  return Number.isFinite(t) && t > now.getTime()
+}
+
+/**
+ * PURE — should a Shopify-governed account be allowed onto the protected page
+ * routes right now, given only its cached billing columns?
+ *
+ * Every one of these must hold; there is no path that grants on a connection
+ * merely existing:
+ *
+ *   1. shopify_subscription_status === 'active'
+ *   2. shopify_plan_handle is one we actually sell (this was NOT checked
+ *      before — an 'active' row with a NULL or unrecognized handle used to get
+ *      full route access, which is the opposite defect and is now closed)
+ *   3. at least one authoritative window is open:
+ *        - the cache was verified within CACHE_FRESHNESS_MS, or
+ *        - Shopify's own trial end is still in the future, or
+ *        - Shopify's own current period end is still in the future
+ *
+ * `shopify_current_period_start` and `shopify_current_period_end` may both be
+ * NULL during a Shopify managed-pricing free trial — the Partner API reports
+ * `currentBillingCycle: null` until the trial converts — so NULL period dates
+ * are never treated as a denial. Route access is not quota: the billing period
+ * is still required for usage accounting, and lib/billing/usage-period.ts is
+ * untouched by this.
+ */
+export function decideShopifyRouteAccess(
+  row: ShopifyRouteAccessRow,
+  now: Date,
+): { allowed: boolean; reason: ShopifyRouteAccessReason } {
+  if (row.shopify_subscription_status !== 'active') return { allowed: false, reason: 'not_active' }
+  if (!isSupportedShopifyPlanHandle(row.shopify_plan_handle)) return { allowed: false, reason: 'unsupported_plan_handle' }
+
+  const verifiedAt = row.shopify_billing_verified_at ? new Date(row.shopify_billing_verified_at).getTime() : NaN
+  if (Number.isFinite(verifiedAt) && now.getTime() - verifiedAt < CACHE_FRESHNESS_MS) {
+    return { allowed: true, reason: 'recently_verified' }
+  }
+  // Past the recheck window: stand on a date Shopify itself stated, or deny.
+  if (isFuture(row.shopify_trial_ends_at, now)) return { allowed: true, reason: 'shopify_trial_window' }
+  if (isFuture(row.shopify_current_period_end, now)) return { allowed: true, reason: 'shopify_paid_cycle' }
+  return { allowed: false, reason: 'stale_unverified' }
 }
