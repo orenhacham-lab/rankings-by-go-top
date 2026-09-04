@@ -139,9 +139,18 @@ async function main() {
     const r1 = await isShopifyGovernedAndActive(neverVerified as unknown as Admin, 'u1')
     check('governed:true, active:false (no live call possible on this hot path)', r1.governed === true && r1.active === false)
 
-    const freshActive = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
+    // CONTRACT TIGHTENED (Shopify submission blocker fix). A fresh 'active'
+    // cache alone is no longer sufficient: the plan handle must be one we
+    // actually sell. This fixture's handle is null, which the old predicate
+    // wrongly ALLOWED — a Shopify-governed row with no recognised plan got full
+    // route access. Both directions are asserted now.
+    const freshActiveNoHandle = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
+    const rNoHandle = await isShopifyGovernedAndActive(freshActiveNoHandle as unknown as Admin, 'u1')
+    check('governed:true, active:FALSE — a fresh active cache with NO plan handle grants nothing', rNoHandle.governed === true && rNoHandle.active === false)
+
+    const freshActive = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: 'advanced', shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
     const r2 = await isShopifyGovernedAndActive(freshActive as unknown as Admin, 'u1')
-    check('governed:true, active:true with a fresh active cache', r2.governed === true && r2.active === true)
+    check('governed:true, active:true with a fresh active cache AND a supported handle', r2.governed === true && r2.active === true)
 
     const notGoverned = new FakeAdmin({ shopify_connections: [] })
     const r3 = await isShopifyGovernedAndActive(notGoverned as unknown as Admin, 'u1')
