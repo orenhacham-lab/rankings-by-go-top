@@ -29,8 +29,17 @@ import {
 
 interface ActiveProjectContextValue {
   activeProjectId: string | null
+  /** The AUTHORITATIVE owned+active list. `setActiveProject` accepts only these. */
   projects: ActiveProjectLite[]
   isResolved: boolean
+  /**
+   * The accessible-project list could NOT be loaded. Distinct from "this account
+   * has no projects": a consumer must not render an empty state, or an
+   * unselectable dropdown, for what is actually a failed request.
+   */
+  projectsError: boolean
+  /** Retry the accessible-project list after a failure. */
+  reloadProjects: () => void
   setActiveProject: (id: string) => void
 }
 
@@ -44,6 +53,7 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
   const [projects, setProjects] = useState<ActiveProjectLite[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [isResolved, setIsResolved] = useState(false)
+  const [projectsError, setProjectsError] = useState(false)
 
   // Refs mirror latest state for the storage listener (registered once).
   const projectsRef = useRef<ActiveProjectLite[]>([])
@@ -70,29 +80,46 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
     router.replace(`${pathname}?${next.toString()}`, { scroll: false })
   }, [router, pathname, searchParams])
 
-  // ── Mount: load the owned+active list, then resolve the initial active project. ──
+  // ── Load the owned+active list, then resolve the active project. ──
+  //
+  // A FAILED load is recorded, not swallowed. It used to fall through to an
+  // empty list, which is indistinguishable from "this account has no projects"
+  // — and because setActiveProject validates against this list, an empty list
+  // silently makes EVERY project unselectable everywhere. Consumers can now
+  // tell the two apart and offer a retry.
+  const loadProjects = useCallback(async (signal?: { cancelled: boolean }) => {
+    let list: ActiveProjectLite[] = []
+    let failed = false
+    try {
+      const res = await fetch('/api/projects/active')
+      if (res.ok) {
+        const d = await res.json()
+        if (Array.isArray(d?.projects)) list = d.projects
+        else failed = true
+      } else failed = true
+    } catch { failed = true }
+    if (signal?.cancelled) return
+    let persisted: string | null = null
+    try { persisted = localStorage.getItem(storageKey) } catch { /* ignore */ }
+    const { id: urlId, fromLegacy } = readUrlProjectId(searchParams)
+    const resolved = resolveActiveProject({ urlId, persistedId: persisted, projects: list })
+    setProjects(list)
+    setProjectsError(failed)
+    setActiveProjectId(resolved.id)
+    setIsResolved(true)
+    // A deep-link wins and updates persistence; a fallback also persists its pick.
+    if (resolved.id && (resolved.source === 'url' || resolved.id !== persisted)) persist(resolved.id)
+    // Standardize a legacy project_id deep-link onto the canonical projectId.
+    if (resolved.id && resolved.source === 'url' && fromLegacy) syncUrl(resolved.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, persist])
+
+  const reloadProjects = useCallback(() => { void loadProjects() }, [loadProjects])
+
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      let list: ActiveProjectLite[] = []
-      try {
-        const res = await fetch('/api/projects/active')
-        if (res.ok) { const d = await res.json(); if (Array.isArray(d?.projects)) list = d.projects }
-      } catch { /* keep empty — sections handle the null active state */ }
-      if (cancelled) return
-      let persisted: string | null = null
-      try { persisted = localStorage.getItem(storageKey) } catch { /* ignore */ }
-      const { id: urlId, fromLegacy } = readUrlProjectId(searchParams)
-      const resolved = resolveActiveProject({ urlId, persistedId: persisted, projects: list })
-      setProjects(list)
-      setActiveProjectId(resolved.id)
-      setIsResolved(true)
-      // A deep-link wins and updates persistence; a fallback also persists its pick.
-      if (resolved.id && (resolved.source === 'url' || resolved.id !== persisted)) persist(resolved.id)
-      // Standardize a legacy project_id deep-link onto the canonical projectId.
-      if (resolved.id && resolved.source === 'url' && fromLegacy) syncUrl(resolved.id)
-    })()
-    return () => { cancelled = true }
+    const signal = { cancelled: false }
+    void loadProjects(signal)
+    return () => { signal.cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -143,7 +170,7 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
   }, [persist, syncUrl])
 
   return (
-    <ActiveProjectContext.Provider value={{ activeProjectId, projects, isResolved, setActiveProject }}>
+    <ActiveProjectContext.Provider value={{ activeProjectId, projects, isResolved, projectsError, reloadProjects, setActiveProject }}>
       {children}
     </ActiveProjectContext.Provider>
   )
@@ -153,5 +180,5 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
 export function useActiveProject(): ActiveProjectContextValue {
   const ctx = useContext(ActiveProjectContext)
   if (ctx) return ctx
-  return { activeProjectId: null, projects: [], isResolved: true, setActiveProject: () => {} }
+  return { activeProjectId: null, projects: [], isResolved: true, projectsError: false, reloadProjects: () => {}, setActiveProject: () => {} }
 }

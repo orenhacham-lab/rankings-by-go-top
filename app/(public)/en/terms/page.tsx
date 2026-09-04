@@ -68,12 +68,31 @@ export default function EnglishTermsPage() {
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">5. Subscriptions and Payments</h2>
               <p>
-                The Service operates on a monthly subscription model. Payments are processed through a
-                third-party payment provider (PayPal). As long as the subscription remains active, billing
-                renews automatically each month according to the selected plan. Prices, plans and limits
-                may change from time to time and updates will be reflected in the Service and on the
-                pricing page.
+                The Service operates on a monthly subscription model. As long as the subscription remains
+                active, billing renews automatically each month according to the selected plan. Prices,
+                plans and limits may change from time to time and updates will be reflected in the Service
+                and on the pricing page.
               </p>
+              <p className="mt-3">
+                <strong>How you are billed depends on how your account was opened:</strong>
+              </p>
+              <ul className="list-disc ml-6 mt-2 space-y-2">
+                <li>
+                  <strong>Merchants who installed the app through Shopify</strong> (and any account whose
+                  billing authority is Shopify) are billed exclusively through Shopify App Pricing, as part
+                  of their Shopify invoice. These merchants are never directed to PayPal or to any other
+                  checkout outside Shopify, and we do not charge them through a second channel.
+                </li>
+                <li>
+                  <strong>Customers who signed up directly on our website</strong>, whose billing authority
+                  is not Shopify, pay through a third-party payment provider (PayPal).
+                </li>
+                <li>
+                  Connecting a Shopify store in order to publish content, by a customer who is already
+                  billed through the website, does not create double billing: an account is billed through
+                  one channel only at any given time.
+                </li>
+              </ul>
             </section>
 
             <section>
@@ -122,7 +141,8 @@ export default function EnglishTermsPage() {
               <p>
                 The Service relies, or may rely, on data and services provided by third parties, including:
                 Google, Google Ads API, Google Maps, various search providers, AI providers (ChatGPT, Gemini,
-                Perplexity and others), payment providers (PayPal), and infrastructure and hosting providers
+                Perplexity and others), payment providers (Shopify for accounts billed through Shopify,
+                PayPal for customers billed through the website), and infrastructure and hosting providers
                 (Supabase and others). Data obtained from third parties may be partial, estimated, delayed
                 or unavailable, and its accuracy and availability are not within the Company&rsquo;s control.
               </p>

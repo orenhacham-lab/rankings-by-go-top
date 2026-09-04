@@ -42,7 +42,11 @@ export default function EnglishPrivacyPage() {
                 <li><strong>Profile information:</strong> plan details and subscription information</li>
                 <li><strong>Business information:</strong> company name, domain, keywords, ranking data</li>
                 <li><strong>Technical information:</strong> IP address, browser type, referring page</li>
-                <li><strong>Payment information:</strong> credit card data (processed through PayPal only)</li>
+                <li><strong>Payment information:</strong> we do not store your payment instrument. For
+                accounts whose billing authority is Shopify — including merchants who installed the app
+                through Shopify — payment is processed by Shopify under Shopify App Pricing, and we never
+                direct them to PayPal. For customers who signed up directly on our website, whose billing
+                authority is not Shopify, payment is processed through PayPal</li>
               </ul>
             </section>
 
@@ -63,7 +67,8 @@ export default function EnglishPrivacyPage() {
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Information Sharing</h2>
               <p>We do not share your personal information with third parties, except:</p>
               <ul className="list-disc list-inside space-y-2">
-                <li><strong>PayPal:</strong> for payment processing only</li>
+                <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
+                <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
                 <li><strong>Supabase:</strong> for secure data storage</li>
                 <li><strong>Serper:</strong> for Google search queries</li>
                 <li><strong>Vercel:</strong> for site hosting</li>

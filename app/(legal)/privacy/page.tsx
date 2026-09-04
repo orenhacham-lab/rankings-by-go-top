@@ -37,7 +37,10 @@ export default function PrivacyPage() {
               <li><strong>מידע פרופיל:</strong> מידע על התוכנית שלך, הנוי שלך</li>
               <li><strong>מידע עסקי:</strong> שם חברה, דומיין, מילות מפתח, נתוני דירוג</li>
               <li><strong>מידע טכני:</strong> כתובת IP, סוג דפדפן, דף שנכנסת ממנו</li>
-              <li><strong>מידע תשלום:</strong> מידע כרטיס אשראי (מעובד דרך PayPal בלבד)</li>
+              <li><strong>מידע תשלום:</strong> פרטי אמצעי התשלום אינם נשמרים אצלנו. עבור חשבונות שסמכות
+              החיוב שלהם היא Shopify — לרבות סוחרים שהתקינו את האפליקציה דרך Shopify — התשלום מעובד
+              על ידי Shopify במסגרת Shopify App Pricing, ואיננו מפנים אותם ל-PayPal. עבור לקוחות
+              שנרשמו ישירות באתר, שסמכות החיוב שלהם אינה Shopify, התשלום מעובד דרך PayPal</li>
             </ul>
           </section>
 
@@ -62,7 +65,8 @@ export default function PrivacyPage() {
               אנו לא משתפים את המידע האישי שלך עם צדדים שלישיים, מלבד:
             </p>
             <ul className="list-disc list-inside space-y-2">
-              <li><strong>PayPal:</strong> לעיבוד תשלומים בלבד</li>
+              <li><strong>Shopify:</strong> לעיבוד תשלומים עבור חשבונות המחויבים דרך Shopify App Pricing, ולפרסום תוכן לחנות המחוברת</li>
+              <li><strong>PayPal:</strong> לעיבוד תשלומים עבור לקוחות המחויבים דרך האתר בלבד</li>
               <li><strong>Supabase:</strong> לאחסון נתונים מאובטח</li>
               <li><strong>Serper:</strong> לביצוע חיפושים בגוגל</li>
               <li><strong>Vercel:</strong> להנעת האתר</li>

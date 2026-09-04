@@ -24,6 +24,9 @@ export const dashboardHe = {
     selectProjectPlaceholder: 'בחר פרויקט…',
     selectProjectMessage: 'בחרו פרויקט כדי לראות ולנהל את התוכן שלו.',
     noProjectsTitle: 'כדי להשתמש בכלי הזה, יש ליצור פרויקט ראשון',
+    projectsLoadError: 'לא הצלחנו לטעון כרגע את הפרויקטים שלכם. זו תקלה זמנית.',
+    projectsLoadRetry: 'נסו שוב',
+    projectsLoading: 'טוענים את הפרויקטים שלכם…',
     noProjectsCta: 'צור פרויקט',
     // K5 — missing-connections onboarding. Platform card = publishing setup; Search
     // Console card = OPTIONAL evidence (never claimed required; publishing never
@@ -364,6 +367,7 @@ export const dashboardHe = {
       scheduledAt: 'מתוזמן ל',
       publishedAt: 'פורסם',
       wordpressUrl: 'WordPress',
+      publication: 'פרסום',
       actions: 'פעולות',
       emptyTitle: 'אין עדיין מאמרים לפרויקט הזה',
       emptyHint: 'יצירת מאמרי SEO/GEO תתווסף בשלב הבא. בינתיים אפשר לחבר את אתר ה-WordPress.',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react'
+import { DocumentLocaleEffect } from '@/components/DocumentLocaleEffect'
 import type { Locale } from '../locales'
 import { normalizeLocale, resolveDashboardLocale } from './locale'
 
@@ -48,6 +49,11 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
 
   return (
     <DashboardLanguageContext.Provider value={{ language, setDashboardLanguage, isLoaded }}>
+      {/* The DOCUMENT's own lang/dir follow the switcher. Without this the page
+          rendered English text inside a document still declaring lang="he"
+          dir="rtl" — a scoped wrapper div cannot change what the document
+          declares. */}
+      <DocumentLocaleEffect locale={language} />
       {children}
     </DashboardLanguageContext.Provider>
   )
