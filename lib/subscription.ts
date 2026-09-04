@@ -1,6 +1,6 @@
 import type { SubscriptionPlan } from '@/lib/supabase/types'
 import { isKnownPlanCode } from '@/lib/paypal/client'
-import { resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive } from '@/lib/shopify/entitlement-resolver'
+import { resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive, type ShopifyRouteAccessReason, type TimestampFacts } from '@/lib/shopify/entitlement-resolver'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 
 /**
@@ -284,32 +284,88 @@ export async function getUserEntitlement(
  * Lightweight check used in middleware — only reads profile + subscription status.
  * Returns true if the user has access (admin, active trial, or active subscription).
  */
-export async function hasAccess(
+/** Why the route guard allowed or denied. Non-secret codes only. */
+export type AccessReason =
+  | 'admin'
+  | ShopifyRouteAccessReason
+  | 'website_no_subscription'
+  | 'website_trial_active' | 'website_trial_expired'
+  | 'website_active' | 'website_period_expired'
+  | 'website_cancelled_in_period' | 'website_cancelled_expired'
+  | 'website_unknown_status'
+
+/**
+ * The full, non-secret explanation of a route-access decision. Everything here
+ * is safe to log: identifiers and enum-like state, never a cookie, token,
+ * secret, HMAC or session payload, and never a raw timestamp value.
+ */
+export interface AccessDiagnostics {
+  allowed: boolean
+  reason: AccessReason
+  authority: 'shopify' | 'website' | 'unreadable' | 'admin'
+  /**
+   * Whether a billing_governance row was readable at all. Kept even when the
+   * website branch decides the outcome: 'missing' and 'unreadable' look the
+   * same from the website path but mean completely different things, and
+   * 'unreadable' is the signature of the RLS incident.
+   */
+  governanceRow?: 'present' | 'missing' | 'unreadable'
+  connectionFound?: boolean
+  connectionStatus?: string | null
+  subscriptionStatus?: string | null
+  planHandle?: string | null
+  planHandleSupported?: boolean
+  trialEndsAt?: TimestampFacts
+  periodEndsAt?: TimestampFacts
+  verifiedAt?: TimestampFacts
+}
+
+/**
+ * The route guard, with its reasoning. Used by the middleware.
+ *
+ * `admin` MUST be a SERVICE-ROLE client. It reads billing_governance, which is
+ * RLS-enabled with no policies and REVOKEd from anon/authenticated — an
+ * RLS-scoped client cannot read it at all and every Shopify-governed merchant
+ * would be denied. See isShopifyGovernedAndActive and proxy.ts.
+ */
+export async function explainAccess(
   userId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  // Injectable clock — same convention as getUserEntitlement above. Every
-  // real caller uses the default; production behavior is unchanged.
+  admin: any,
   nowFn: () => Date = () => new Date(),
-): Promise<boolean> {
-  // Check role
-  const { data: profile } = await supabase
+): Promise<AccessDiagnostics> {
+  const { data: profile } = await admin
     .from('profiles')
     .select('role')
     .eq('id', userId)
     .maybeSingle()
 
-  if (profile?.role === 'admin') return true
+  if (profile?.role === 'admin') return { allowed: true, reason: 'admin', authority: 'admin' }
 
   // Phase 2 (blocker fix) — Shopify governance is authoritative and checked
   // before the subscriptions table (cache-only — see
   // lib/shopify/entitlement-resolver.ts's isShopifyGovernedAndActive for why
   // this never makes a live network call on the middleware hot path).
-  const shopify = await isShopifyGovernedAndActive(supabase, userId)
-  if (shopify.governed) return shopify.active
+  const shopify = await isShopifyGovernedAndActive(admin, userId, nowFn)
+  if (shopify.governed) {
+    return {
+      allowed: shopify.active,
+      reason: shopify.reason,
+      authority: shopify.authority,
+      governanceRow: shopify.reason === 'governance_unreadable' ? 'unreadable' : 'present',
+      connectionFound: shopify.connectionStatus !== undefined,
+      connectionStatus: shopify.connectionStatus ?? null,
+      subscriptionStatus: shopify.subscriptionStatus ?? null,
+      planHandle: shopify.planHandle ?? null,
+      planHandleSupported: shopify.planHandleSupported ?? false,
+      trialEndsAt: shopify.trialEndsAt,
+      periodEndsAt: shopify.periodEndsAt,
+      verifiedAt: shopify.verifiedAt,
+    }
+  }
 
   // Check subscription. 'cancelled' status grants access until current_period_end.
-  const { data: sub } = await supabase
+  const { data: sub } = await admin
     .from('subscriptions')
     .select('status, trial_ends_at, current_period_end')
     .eq('user_id', userId)
@@ -318,20 +374,43 @@ export async function hasAccess(
     .limit(1)
     .maybeSingle()
 
-  if (!sub) return false
+  const base = {
+    authority: 'website' as const,
+    governanceRow: (shopify.reason === 'governance_missing' ? 'missing' : 'present') as 'present' | 'missing',
+  }
+  if (!sub) return { allowed: false, reason: 'website_no_subscription', ...base }
   const now = nowFn()
 
   if (sub.status === 'trial') {
-    return sub.trial_ends_at ? new Date(sub.trial_ends_at) > now : false
+    const ok = sub.trial_ends_at ? new Date(sub.trial_ends_at) > now : false
+    return { allowed: ok, reason: ok ? 'website_trial_active' : 'website_trial_expired', ...base }
   }
 
   if (sub.status === 'active') {
-    return !sub.current_period_end || new Date(sub.current_period_end) > now
+    const ok = !sub.current_period_end || new Date(sub.current_period_end) > now
+    return { allowed: ok, reason: ok ? 'website_active' : 'website_period_expired', ...base }
   }
 
   if (sub.status === 'cancelled') {
-    return !!sub.current_period_end && new Date(sub.current_period_end) > now
+    const ok = !!sub.current_period_end && new Date(sub.current_period_end) > now
+    return { allowed: ok, reason: ok ? 'website_cancelled_in_period' : 'website_cancelled_expired', ...base }
   }
 
-  return false
+  return { allowed: false, reason: 'website_unknown_status', ...base }
+}
+
+/**
+ * Lightweight check used in middleware — only reads profile + subscription status.
+ * Returns true if the user has access (admin, active trial, or active subscription).
+ * Thin wrapper over explainAccess, which carries the reasoning.
+ */
+export async function hasAccess(
+  userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  // Injectable clock — same convention as getUserEntitlement above. Every
+  // real caller uses the default; production behavior is unchanged.
+  nowFn: () => Date = () => new Date(),
+): Promise<boolean> {
+  return (await explainAccess(userId, supabase, nowFn)).allowed
 }

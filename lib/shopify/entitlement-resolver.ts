@@ -287,31 +287,100 @@ export async function isShopifyGovernedAndActive(
   admin: Admin,
   userId: string,
   nowFn: () => Date = () => new Date(),
-): Promise<{ governed: boolean; active: boolean; unavailable?: true; reason?: ShopifyRouteAccessReason }> {
+): Promise<ShopifyGovernanceCheck> {
   // Same authority rule as resolveShopifyGovernedEntitlement — a connection row
   // never decides governance on its own — and the same fail-closed rule: an
   // unreadable governance record reports `unavailable`, never
   // `{ governed: false }`, which would grant website access on a DB outage.
+  //
+  // `admin` MUST be a SERVICE-ROLE client. billing_governance is RLS-enabled
+  // with NO policies and REVOKEd from anon/authenticated (see
+  // supabase/migrations/20260901000000_billing_governance.sql:85-87), so an
+  // RLS-scoped client cannot read it at all: the read errors, this returns
+  // `governance_unreadable`, and every Shopify-governed merchant is denied
+  // regardless of what their billing actually says. That was the production
+  // incident — the middleware was passing its anon-key session client. See
+  // proxy.ts, which now builds a service-role client for this decision.
   const authority = await resolveBillingAuthority(admin, userId)
-  if (!authority.ok) return { governed: true, active: false, unavailable: true }
-  if (authority.authority !== 'shopify') return { governed: false, active: false }
+  if (!authority.ok) {
+    return { governed: true, active: false, unavailable: true, reason: 'governance_unreadable', authority: 'unreadable' }
+  }
+  if (authority.authority !== 'shopify') {
+    return {
+      governed: false, active: false, authority: authority.authority,
+      // An ABSENT governance row also resolves to website authority, but the
+      // two are different operational facts and must not be reported alike.
+      reason: authority.governance ? 'authority_not_shopify' : 'governance_missing',
+    }
+  }
 
+  // The connected-only filter moved from SQL into code so that "this account
+  // has no store row at all" and "its store is disconnected/archived" are
+  // DISTINGUISHABLE in the diagnostics. The verdict is unchanged: the newest
+  // live connected row decides, exactly as before.
   const { data, error } = await admin
     .from('shopify_connections')
-    .select('shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_end, shopify_billing_verified_at')
+    .select('connection_status, shopify_subscription_status, shopify_plan_handle, shopify_trial_ends_at, shopify_current_period_end, shopify_billing_verified_at')
     .eq('user_id', userId)
-    .eq('connection_status', 'connected')
     .is('archived_at', null)
     .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  // A Shopify-governed account is STILL governed when its connection is
-  // missing, failed or unreadable — it is simply not active. Reporting
-  // `governed: false` here would send it back to website access.
-  if (error) return { governed: true, active: false, unavailable: true, reason: 'connection_unreadable' }
-  if (!data) return { governed: true, active: false, reason: 'no_connection' }
-  const decision = decideShopifyRouteAccess(data as ShopifyRouteAccessRow, nowFn())
-  return { governed: true, active: decision.allowed, reason: decision.reason }
+    .limit(5)
+  if (error) return { governed: true, active: false, unavailable: true, reason: 'connection_unreadable', authority: 'shopify' }
+
+  const rows = (data ?? []) as (ShopifyRouteAccessRow & { connection_status: string | null })[]
+  if (rows.length === 0) return { governed: true, active: false, reason: 'connection_missing', authority: 'shopify' }
+  const connected = rows.find((r) => r.connection_status === 'connected')
+  if (!connected) {
+    return { governed: true, active: false, reason: 'connection_not_connected', authority: 'shopify', connectionStatus: rows[0]!.connection_status }
+  }
+
+  const handle = normalizePlanHandle(connected.shopify_plan_handle)
+  const decision = decideShopifyRouteAccess(connected, nowFn())
+  return {
+    governed: true, active: decision.allowed, reason: decision.reason, authority: 'shopify',
+    connectionStatus: connected.connection_status,
+    subscriptionStatus: connected.shopify_subscription_status,
+    planHandle: handle,
+    planHandleSupported: isSupportedShopifyPlanHandle(handle),
+    trialEndsAt: describeTimestamp(connected.shopify_trial_ends_at, nowFn()),
+    periodEndsAt: describeTimestamp(connected.shopify_current_period_end, nowFn()),
+    verifiedAt: describeTimestamp(connected.shopify_billing_verified_at, nowFn()),
+  }
+}
+
+/**
+ * What a timestamp column actually contained — present? parseable? still in the
+ * future? Structured so a denial can be explained without printing raw values.
+ */
+export interface TimestampFacts { present: boolean; valid: boolean; future: boolean }
+
+export function describeTimestamp(iso: string | null | undefined, now: Date): TimestampFacts {
+  if (!iso) return { present: false, valid: false, future: false }
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return { present: true, valid: false, future: false }
+  return { present: true, valid: true, future: t > now.getTime() }
+}
+
+/** Trim and lower-case a stored handle before matching. Never invents a value. */
+export function normalizePlanHandle(handle: string | null | undefined): string | null {
+  const h = (handle ?? '').trim().toLowerCase()
+  return h || null
+}
+
+/** The full, non-secret result of the middleware's entitlement decision. */
+export interface ShopifyGovernanceCheck {
+  governed: boolean
+  active: boolean
+  unavailable?: true
+  reason: ShopifyRouteAccessReason
+  authority: 'shopify' | 'website' | 'unreadable'
+  connectionStatus?: string | null
+  subscriptionStatus?: string | null
+  planHandle?: string | null
+  planHandleSupported?: boolean
+  trialEndsAt?: TimestampFacts
+  periodEndsAt?: TimestampFacts
+  verifiedAt?: TimestampFacts
 }
 
 /** The cached billing columns the route-access decision reads. Nothing else. */
@@ -325,13 +394,21 @@ export interface ShopifyRouteAccessRow {
 
 /** WHY access was granted or denied — for tests, logs and honest diagnostics. */
 export type ShopifyRouteAccessReason =
-  | 'recently_verified'
-  | 'shopify_trial_window'
-  | 'shopify_paid_cycle'
-  | 'not_active'
+  // allowed
+  | 'allowed_by_freshness'
+  | 'allowed_by_trial'
+  | 'allowed_by_period'
+  // denied — billing verdicts
+  | 'inactive_subscription'
+  | 'missing_plan_handle'
   | 'unsupported_plan_handle'
-  | 'stale_unverified'
-  | 'no_connection'
+  | 'stale_without_open_window'
+  // denied — the account is not in a state this decision applies to
+  | 'governance_missing'
+  | 'governance_unreadable'
+  | 'authority_not_shopify'
+  | 'connection_missing'
+  | 'connection_not_connected'
   | 'connection_unreadable'
 
 /** A timestamp strictly in the future, or false for null/blank/invalid input. */
@@ -368,15 +445,19 @@ export function decideShopifyRouteAccess(
   row: ShopifyRouteAccessRow,
   now: Date,
 ): { allowed: boolean; reason: ShopifyRouteAccessReason } {
-  if (row.shopify_subscription_status !== 'active') return { allowed: false, reason: 'not_active' }
-  if (!isSupportedShopifyPlanHandle(row.shopify_plan_handle)) return { allowed: false, reason: 'unsupported_plan_handle' }
+  if (row.shopify_subscription_status !== 'active') return { allowed: false, reason: 'inactive_subscription' }
+  const handle = normalizePlanHandle(row.shopify_plan_handle)
+  // Absent and unrecognised are different operational facts: one means nothing
+  // was ever cached, the other means Shopify named a plan we do not sell.
+  if (!handle) return { allowed: false, reason: 'missing_plan_handle' }
+  if (!isSupportedShopifyPlanHandle(handle)) return { allowed: false, reason: 'unsupported_plan_handle' }
 
   const verifiedAt = row.shopify_billing_verified_at ? new Date(row.shopify_billing_verified_at).getTime() : NaN
   if (Number.isFinite(verifiedAt) && now.getTime() - verifiedAt < CACHE_FRESHNESS_MS) {
-    return { allowed: true, reason: 'recently_verified' }
+    return { allowed: true, reason: 'allowed_by_freshness' }
   }
   // Past the recheck window: stand on a date Shopify itself stated, or deny.
-  if (isFuture(row.shopify_trial_ends_at, now)) return { allowed: true, reason: 'shopify_trial_window' }
-  if (isFuture(row.shopify_current_period_end, now)) return { allowed: true, reason: 'shopify_paid_cycle' }
-  return { allowed: false, reason: 'stale_unverified' }
+  if (isFuture(row.shopify_trial_ends_at, now)) return { allowed: true, reason: 'allowed_by_trial' }
+  if (isFuture(row.shopify_current_period_end, now)) return { allowed: true, reason: 'allowed_by_period' }
+  return { allowed: false, reason: 'stale_without_open_window' }
 }
