@@ -32,7 +32,7 @@
  */
 const Module: any = require('module')
 const origLoad = Module._load
-const INTERCEPT = ['@supabase/ssr']
+const INTERCEPT = ['@supabase/ssr', '@supabase/supabase-js']
 const overrides = new Map<string, Record<string, unknown>>()
 Module._load = function (request: string, parent: any, isMain: boolean) {
   const real = origLoad.call(this, request, parent, isMain)
@@ -51,6 +51,7 @@ Module._load = function (request: string, parent: any, isMain: boolean) {
 // proxy.ts refuses to run at all unless Supabase looks configured.
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://qa.supabase.co'
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'qa-anon-key'
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'qa-service-role-key'
 
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { decideShopifyRouteAccess } from '../entitlement-resolver'
@@ -116,17 +117,47 @@ function world(opts: {
   }, hooks)
 }
 
-/** Wrap a FakeAdmin as the SSR client proxy() expects (auth + from). */
+/**
+ * The SSR client proxy() builds from the ANON key.
+ *
+ * THE BOUNDARY THAT BROKE PRODUCTION. billing_governance is RLS-enabled with
+ * NO policies and REVOKEd from anon/authenticated (migration
+ * 20260901000000_billing_governance.sql:85-87), so PostgREST answers an
+ * `authenticated` read with 42501 permission denied. The previous version of
+ * this suite handed the middleware a client that COULD read that table, which
+ * is why it passed while production 307'd. This fake now denies it exactly as
+ * the database does, so anything reaching for governance through the session
+ * client fails here too.
+ */
 function asSsrClient(admin: FakeAdmin, user: { id: string } | null) {
   return {
     auth: { getUser: async () => ({ data: { user }, error: null }) },
-    from: (t: string) => admin.from(t),
+    from: (t: string) => {
+      if (t === 'billing_governance') return rlsDeniedTable()
+      return admin.from(t)
+    },
   }
+}
+
+/** A PostgREST table handle that answers every read with 42501, like RLS does. */
+function rlsDeniedTable() {
+  const denied = { data: null, error: { code: '42501', message: 'permission denied for table billing_governance' } }
+  const chain: any = new Proxy({}, {
+    get: (_t, k) => {
+      if (k === 'then') return undefined
+      if (k === 'maybeSingle' || k === 'single') return async () => denied
+      return () => chain
+    },
+  })
+  return chain
 }
 
 /** Run the REAL middleware for one pathname. Returns status + Location. */
 async function runProxy(admin: FakeAdmin, pathname: string, now: Date, user: { id: string } | null = { id: USER }) {
   overrides.set('@supabase/ssr', { createServerClient: () => asSsrClient(admin, user) })
+  // The SERVICE-ROLE client proxy() builds for the entitlement decision. This
+  // one CAN read billing_governance — that is the whole point of the fix.
+  overrides.set('@supabase/supabase-js', { createClient: () => admin })
   const realNow = Date.now
   // proxy() -> hasAccess() -> isShopifyGovernedAndActive() all default their
   // clock to `new Date()`; freeze it so the test is not governed by wall time.
@@ -197,9 +228,9 @@ async function main() {
     const r = await runProxy(admin, '/dashboard', NOW_IN_TRIAL)
     check('4a: NULL period start/end is not a denial', allowed(r) && !redirectedToBilling(r), `status=${r.status} location=${r.location}`)
     check('4b: and the reason is the Shopify-declared trial window',
-      decideShopifyRouteAccess(productionConnection() as any, NOW_IN_TRIAL).reason === 'shopify_trial_window')
+      decideShopifyRouteAccess(productionConnection() as any, NOW_IN_TRIAL).reason === 'allowed_by_trial')
     check('4c: within 5 minutes of verification it is the freshness window instead',
-      decideShopifyRouteAccess(productionConnection() as any, new Date('2026-09-04T09:33:00.000Z')).reason === 'recently_verified')
+      decideShopifyRouteAccess(productionConnection() as any, new Date('2026-09-04T09:33:00.000Z')).reason === 'allowed_by_freshness')
   }
 
   console.log('\n5) ENDED trial with no active billing cycle is DENIED')
@@ -207,13 +238,13 @@ async function main() {
     const admin = world()
     const r = await runProxy(admin, '/dashboard', NOW_AFTER_TRIAL)
     check('5a: redirected to /billing', redirectedToBilling(r), `status=${r.status} location=${r.location}`)
-    check('5b: for the honest reason', decideShopifyRouteAccess(productionConnection() as any, NOW_AFTER_TRIAL).reason === 'stale_unverified')
+    check('5b: for the honest reason', decideShopifyRouteAccess(productionConnection() as any, NOW_AFTER_TRIAL).reason === 'stale_without_open_window')
     // A trial that ended but converted to a real paid cycle IS still allowed.
     const paid = world({ connection: { shopify_trial_ends_at: TRIAL_ENDS, shopify_current_period_end: '2026-10-08T23:28:48Z' } })
     const r2 = await runProxy(paid, '/dashboard', NOW_AFTER_TRIAL)
     check('5c: but an ended trial WITH a live paid cycle is allowed', allowed(r2) && !redirectedToBilling(r2), `status=${r2.status} location=${r2.location}`)
     check('5d: for the paid-cycle reason',
-      decideShopifyRouteAccess(productionConnection({ shopify_current_period_end: '2026-10-08T23:28:48Z' }) as any, NOW_AFTER_TRIAL).reason === 'shopify_paid_cycle')
+      decideShopifyRouteAccess(productionConnection({ shopify_current_period_end: '2026-10-08T23:28:48Z' }) as any, NOW_AFTER_TRIAL).reason === 'allowed_by_period')
   }
 
   console.log('\n6) subscription_status = none is DENIED')
@@ -229,13 +260,17 @@ async function main() {
 
   console.log('\n7) Unsupported or missing plan handle is DENIED (this was NOT checked before)')
   {
-    for (const handle of [null, '', 'enterprise', 'free', 'Advanced', 'large_agency']) {
+    for (const handle of [null, '', '   ', 'enterprise', 'free', 'large_agency']) {
       const admin = world({ connection: { shopify_plan_handle: handle } })
       const r = await runProxy(admin, '/dashboard', NOW_IN_TRIAL)
       check(`7: handle=${JSON.stringify(handle)} is redirected to /billing`, redirectedToBilling(r), `status=${r.status} location=${r.location}`)
     }
-    // The four handles we actually sell are allowed.
-    for (const handle of ['regular', 'advanced', 'premium', 'large-agency']) {
+    check('7z: a missing handle and an UNRECOGNISED one are reported differently',
+      decideShopifyRouteAccess(productionConnection({ shopify_plan_handle: null }) as any, NOW_IN_TRIAL).reason === 'missing_plan_handle'
+      && decideShopifyRouteAccess(productionConnection({ shopify_plan_handle: 'enterprise' }) as any, NOW_IN_TRIAL).reason === 'unsupported_plan_handle')
+    // The four handles we actually sell are allowed — and casing/whitespace in
+    // the cached value is normalized rather than denying a paying merchant.
+    for (const handle of ['regular', 'advanced', 'premium', 'large-agency', 'Advanced', '  premium  ']) {
       const admin = world({ connection: { shopify_plan_handle: handle } })
       const r = await runProxy(admin, '/dashboard', NOW_IN_TRIAL)
       check(`7: supported handle ${handle} is allowed`, allowed(r) && !redirectedToBilling(r), `status=${r.status} location=${r.location}`)
@@ -349,7 +384,7 @@ async function main() {
       countCallers('decideShopifyRouteAccess', ['lib/shopify/entitlement-resolver.ts']) === 1)
     check('11f: isShopifyGovernedAndActive is called only by hasAccess',
       countCallers('isShopifyGovernedAndActive', ['lib/subscription.ts']) === 1)
-    check('11g: hasAccess is called only by the middleware', countCallers('hasAccess', ['proxy.ts']) === 1)
+    check('11g: the middleware calls the explained guard', countCallers('explainAccess', ['proxy.ts']) === 1)
     for (const f of ['lib/content/entitlement-guard.ts', 'lib/billing/usage-period.ts', 'lib/shopify/billing-guard.ts', 'lib/quota.ts']) {
       const src = readFileSync(join(ROOT, f), 'utf8')
       // A CALL, not a mention: usage-period.ts names isShopifyGovernedAndActive
@@ -357,6 +392,124 @@ async function main() {
       check(`11h: ${f} never CALLS the route-access predicate`,
         !/\bdecideShopifyRouteAccess\s*\(/.test(src) && !/\bisShopifyGovernedAndActive\s*\(/.test(src))
     }
+  }
+
+  console.log('\n12) THE ACTUAL INCIDENT — the RLS boundary PR #53 did not cross')
+  {
+    // PR #53 fixed decideShopifyRouteAccess and shipped, and Production still
+    // 307'd. The reason: proxy.ts evaluated entitlement with the client it
+    // built from the ANON key, so every billing_governance read ran as
+    // `authenticated` against a table that is RLS-enabled with NO policies and
+    // REVOKEd from anon/authenticated. The read fails, the Shopify branch
+    // collapses to "denied", and decideShopifyRouteAccess is never reached.
+    //
+    // These assertions pin the boundary itself, not the pure helper.
+
+    // 12a — the guard, given ONLY a session-scoped client, must deny. This is
+    // what production was doing, and it is the fixture bug in PR #53's suite.
+    const { explainAccess } = require('../../subscription')
+    const sessionOnly = { from: (t: string) => (t === 'billing_governance' ? rlsDeniedTable() : world().from(t)) }
+    const denied = await explainAccess(USER, sessionOnly, () => NOW_IN_TRIAL)
+    check('12a: an RLS-scoped client CANNOT decide entitlement — it denies', denied.allowed === false)
+    check('12b: and says exactly why, without a billing verdict', denied.reason === 'governance_unreadable', denied.reason)
+    check('12c: authority is reported unreadable, never silently "website"', denied.authority === 'unreadable')
+
+    // 12d — the same user, same row, through a SERVICE-ROLE client: allowed.
+    const allowedD = await explainAccess(USER, world(), () => NOW_IN_TRIAL)
+    check('12d: a service-role client reaches the real decision and ALLOWS', allowedD.allowed === true, JSON.stringify(allowedD))
+    check('12e: with an explicit allow reason', allowedD.reason === 'allowed_by_trial', allowedD.reason)
+
+    // 12f — end to end through the REAL middleware, with the session client
+    // denied exactly as PostgREST denies it. This is the production request.
+    const r = await runProxy(world(), '/dashboard', NOW_IN_TRIAL)
+    check('12f: the real middleware allows /dashboard across the RLS boundary', allowed(r) && !redirectedToBilling(r), `status=${r.status} location=${r.location}`)
+
+    // 12g — NEGATIVE MUTATION: hand the guard the session client, as the
+    // pre-fix middleware did, and the incident reproduces exactly.
+    check('12g: MUTATION — using the session client reproduces the 307', denied.allowed === false)
+
+    // 12h — the fix must not depend on the service key being present silently.
+    const savedKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY
+    const noKey = await runProxy(world(), '/dashboard', NOW_IN_TRIAL)
+    check('12h: with no service-role key it fails CLOSED (never open)', redirectedToBilling(noKey), `status=${noKey.status} location=${noKey.location}`)
+    process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey
+
+    // 12i — diagnostics must be safe to log: no secrets, no raw timestamps.
+    const keys = Object.keys(allowedD).join(',')
+    check('12i: diagnostics carry no cookie/token/secret/hmac field',
+      !/cookie|token|secret|hmac|session|key|password/i.test(keys), keys)
+    check('12j: date fields are reduced to present/valid/future facts, not raw values',
+      JSON.stringify(allowedD.trialEndsAt) === JSON.stringify({ present: true, valid: true, future: true })
+      && JSON.stringify(allowedD.periodEndsAt) === JSON.stringify({ present: false, valid: false, future: false })
+      && JSON.stringify(allowedD.verifiedAt) === JSON.stringify({ present: true, valid: true, future: false }),
+      JSON.stringify({ t: allowedD.trialEndsAt, p: allowedD.periodEndsAt, v: allowedD.verifiedAt }))
+    check('12k: the diagnostic identifies authority, connection, status and handle',
+      allowedD.authority === 'shopify' && allowedD.connectionFound === true
+      && allowedD.connectionStatus === 'connected' && allowedD.subscriptionStatus === 'active'
+      && allowedD.planHandle === 'advanced' && allowedD.planHandleSupported === true,
+      JSON.stringify(allowedD))
+
+    // 12l — a disconnected store is now distinguishable from no store at all.
+    const missing = await explainAccess(USER, world({ connection: null }), () => NOW_IN_TRIAL)
+    const notConnected = await explainAccess(USER, world({ connection: { connection_status: 'failed' } }), () => NOW_IN_TRIAL)
+    check('12l: no store row → connection_missing', missing.reason === 'connection_missing', missing.reason)
+    check('12m: a store that is not connected → connection_not_connected', notConnected.reason === 'connection_not_connected', notConnected.reason)
+    check('12n: both still DENY', missing.allowed === false && notConnected.allowed === false)
+
+    // 12o — an ABSENT governance row is not the same as a website verdict.
+    const noGov = new FakeAdmin({
+      profiles: [{ id: USER, role: 'user' }], billing_governance: [],
+      shopify_connections: [productionConnection()], subscriptions: [],
+    })
+    const govMissing = await explainAccess(USER, noGov, () => NOW_IN_TRIAL)
+    // The final REASON is the website verdict (correct — the account has no
+    // Shopify authority, so the website path decided it), but the governance
+    // fact is preserved so 'missing' is never confused with 'unreadable'.
+    check('12o: a missing governance row is recorded as missing, not unreadable',
+      govMissing.governanceRow === 'missing' && govMissing.authority === 'website', JSON.stringify(govMissing))
+    check('12p: …and still denies (no Shopify authority was ever established)', govMissing.allowed === false)
+    check('12q: while the RLS failure is recorded as UNREADABLE — the incident signature',
+      denied.governanceRow === 'unreadable', JSON.stringify(denied))
+  }
+
+  console.log('\n13) SOURCE GUARD — who reads billing_governance, and with which client')
+  {
+    // billing_governance is service-role-only. Any caller that reaches it with
+    // an RLS-scoped client gets 42501 and fails closed. The middleware was one
+    // such caller (fixed above); getUserEntitlement has others. This guard is a
+    // SOURCE check — it proves nothing about runtime behaviour, it only stops a
+    // NEW RLS-scoped caller being added without anyone noticing.
+    const { readFileSync } = require('fs')
+    const { join } = require('path')
+    const ROOT = join(__dirname, '..', '..', '..')
+    const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
+
+    check('13a: the middleware builds a SERVICE-ROLE client for the decision',
+      /SUPABASE_SERVICE_ROLE_KEY/.test(read('proxy.ts')) && /createEntitlementClient\(\)/.test(read('proxy.ts')))
+    check('13b: and no longer hands the anon session client to the guard',
+      !/explainAccess\(user\.id, supabase\)/.test(read('proxy.ts')))
+    check('13c: the privileged-client requirement is documented where it is relied on',
+      /SERVICE-ROLE client/.test(read('lib/shopify/entitlement-resolver.ts'))
+      && /SERVICE-ROLE client/.test(read('lib/subscription.ts')))
+
+    // The KNOWN remaining RLS-scoped callers of getUserEntitlement. Same root
+    // cause, different blast radius (all-zero limits rather than a redirect).
+    // Listed explicitly so the count cannot grow unnoticed; see the PR body.
+    const KNOWN_RLS_ENTITLEMENT_CALLERS = [
+      'app/actions/tracking-targets.ts', 'app/actions/projects.ts',
+      'app/api/projects/create/route.ts', 'app/api/clients/create/route.ts',
+      'app/api/scan/route.ts', 'app/api/ai-visibility/runs/route.ts',
+      'app/api/keyword-research/add-to-project/route.ts',
+      'app/(dashboard)/billing/page.tsx', 'lib/clients/ensure-default-client.ts',
+    ]
+    for (const f of KNOWN_RLS_ENTITLEMENT_CALLERS) {
+      check(`13d: ${f} is a known getUserEntitlement caller (tracked, not fixed here)`,
+        /getUserEntitlement\(/.test(read(f)))
+    }
+    // These two already pass a service-role client and must keep doing so.
+    check('13e: article-generation passes an admin client', /getUserEntitlement\(userId, admin/.test(read('lib/content/article-generation.ts')))
+    check('13f: the scan scheduler passes an admin client', /getUserEntitlement\(project\.user_id, admin\)/.test(read('lib/scan-scheduler/process-scheduled-scan.ts')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
