@@ -211,6 +211,13 @@ async function main() {
       overrides.set('lib/shopify/billing-guard.ts', { checkShopifyPublishEntitlement: async () => ({ ok: true }) })
       overrides.set('lib/shopify/token-resolver.ts', { resolveShopifyAccessToken: async () => ({ ok: true, accessToken: 'shpat' }) })
     }
+    // The exact counting the overview route does (status → tally).
+    const EMPTY = { total: 0, draft: 0, ready: 0, scheduled: 0, published: 0, failed: 0 } as Record<string, number>
+    const countOf = (rows: any[]): Record<string, number> => {
+      const c: Record<string, number> = { ...EMPTY, total: rows.length }
+      for (const r of rows) if (r.status in c) c[r.status] += 1
+      return c
+    }
     const { publishArticleToShopify } = require('../../shopify/publish-article')
     const conn = (a: FakeAdmin) => (a.tables.shopify_connections as any[])[0]
 
@@ -227,12 +234,6 @@ async function main() {
     check('3f: exactly one Shopify article was created', creates === 1)
 
     // ── The counter and filter the hub reads must now agree too. ──
-    const EMPTY = { total: 0, draft: 0, ready: 0, scheduled: 0, published: 0, failed: 0 } as Record<string, number>
-    const countOf = (rows: any[]): Record<string, number> => {
-      const c: Record<string, number> = { ...EMPTY, total: rows.length }
-      for (const r of rows) if (r.status in c) c[r.status] += 1
-      return c
-    }
     const counts = countOf(a1.tables.generated_articles as any[])
     check('3g: the Published counter is 1, not 0', counts.published === 1, JSON.stringify(counts))
     check('3h: and it is no longer counted as Ready', counts.ready === 0)
@@ -262,6 +263,23 @@ async function main() {
     check('3p: but does NOT mark the article published', art(a2).status === 'ready')
     check('3q: and leaves published_at empty', art(a2).published_at === null)
     check('3r: while the shopify mirror truthfully says draft', art(a2).shopify_status === 'draft')
+    // The COUNTER and the FILTER must agree that a draft is not public.
+    const draftCounts = countOf(a2.tables.generated_articles as any[])
+    check('3r2: a Draft export does NOT increment the Published counter',
+      draftCounts.published === 0 && draftCounts.ready === 1, JSON.stringify(draftCounts))
+    check('3r3: and the row does not match the "published" filter',
+      (a2.tables.generated_articles as any[]).filter((r) => r.status === 'published').length === 0)
+    check('3r4: the row still carries a Shopify article id (it WAS exported, just not public)',
+      art(a2).shopify_article_id === 'gid://shopify/Article/1')
+
+    // Draft → Visible on a later attempt promotes it, still without duplicating.
+    installEdge(true)
+    creates = 0
+    const promote = await publishArticleToShopify(a2 as never, conn(a2) as never, {} as never, art(a2) as never, { published: true, authorName: null })
+    check('3r5: publishing the same draft as Visible succeeds', promote.ok === true, JSON.stringify(promote))
+    check('3r6: it now counts as published, with Shopify’s date', art(a2).status === 'published' && art(a2).published_at === SHOPIFY_PUBLISHED_AT)
+    check('3r7: and created no second Shopify article', creates === 0)
+    check('3r8: still one article row', (a2.tables.generated_articles as any[]).length === 1)
 
     // ── A draft export over an ALREADY published article must not downgrade it. ──
     const a3 = world({ status: 'published', published_at: SHOPIFY_PUBLISHED_AT, shopify_article_id: 'gid://shopify/Article/1' })

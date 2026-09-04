@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { resolveDashboardLocale, normalizeLocale, DASHBOARD_LANGUAGE_STORAGE_KEY } from '../useDashboardLanguage'
+import { resolveRequestLocale } from '../../request-locale'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -61,9 +62,20 @@ function main() {
   // callback preserves a validated lang on the redirect.
   check('callback reads + validates lang and sets it on the redirect',
     /searchParams\.get\('lang'\)/.test(callback) && /lang === 'en' \|\| lang === 'he'/.test(callback) && /dest\.searchParams\.set\('lang', lang\)/.test(callback))
-  // 3 — layout seeds the provider from auth metadata (empty-storage default only).
-  check('layout passes initialLocale from normalized user metadata locale',
-    /normalizeLocale\(user\.user_metadata\?\.locale\)/.test(layout) && /initialLocale=\{initialLocale\}/.test(layout))
+  const rootLayout = read('app/layout.tsx')
+  // 3 — the layout still seeds from auth metadata, now THROUGH the server locale
+  // resolver (cookie first, metadata as the fresh-device seed). The shape changed
+  // with the server language contract; the guarantee did not.
+  check('dashboard layout seeds the provider from the server-resolved locale',
+    /getServerLocale\(user\.user_metadata\?\.locale/.test(layout))
+  check('and the root document applies the SAME seed, so the two agree',
+    /getServerLocale\(localeSeed\)/.test(rootLayout) && /user\?\.user_metadata\?\.locale/.test(rootLayout))
+  {
+    check('a signup-EN seed still wins on a device with no cookie',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')
+    check('but an explicit cookie still outranks the seed',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
