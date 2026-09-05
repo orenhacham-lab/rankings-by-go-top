@@ -263,6 +263,31 @@ async function persistSuccess(
 ): Promise<ShopifyPublishResult> {
   const url = node.handle ? buildCanonicalUrl(host, 'article', node.handle, node.blogHandle) : null
   const status: 'draft' | 'published' = node.isPublished ? 'published' : 'draft'
+
+  // PRODUCTION INCIDENT — the row disagreed with itself. This function wrote
+  // only the shopify_* mirror, so a successfully published Shopify article kept
+  // `status = 'ready'` and `published_at = NULL` while `shopify_status` said
+  // 'published'. The Content Hub read those different columns for different
+  // things, and the same article showed status "Ready", published date "—",
+  // a Published counter of 0, and a green "Published on Shopify" badge, all at
+  // once. The WordPress route has always written both (see
+  // app/api/content/articles/[id]/wordpress/route.ts); the Shopify manual route
+  // never did, and the automation queue wrote them separately afterwards.
+  //
+  // The publishing SERVICE now owns the article's publish state, so every
+  // Shopify path — manual route, automation queue, retry — produces the same
+  // row. Driven by what Shopify ACTUALLY reports (`node.isPublished`), not by
+  // what was requested, and stamped with Shopify's own `publishedAt`, which is
+  // stable across re-publishes and therefore idempotent: reconciling an already
+  // published article rewrites the same value rather than moving the date.
+  //
+  // A draft export deliberately leaves `status`/`published_at` ALONE rather
+  // than downgrading them: this write is a publication result, never a reason
+  // to erase a publication that already happened.
+  const publishState = node.isPublished
+    ? { status: 'published' as const, published_at: node.publishedAt ?? nowIso() }
+    : {}
+
   await admin.from('generated_articles').update({
     shopify_article_id: node.id,
     shopify_article_url: url,
@@ -271,6 +296,7 @@ async function persistSuccess(
     shopify_published_at: node.publishedAt,
     shopify_last_error: null,
     shopify_last_synced_at: nowIso(),
+    ...publishState,
     updated_at: nowIso(),
   }).eq('id', articleId)
   return { ok: true, articleId: node.id, url, handle: node.handle, status, publishedAt: node.publishedAt, imageWarnings, updated }

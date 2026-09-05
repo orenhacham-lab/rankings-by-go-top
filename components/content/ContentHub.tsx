@@ -82,7 +82,11 @@ const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | '
 export default function ContentHub({ proFirst = false }: { proFirst?: boolean }) {
   // Area D — the project comes from the GLOBAL active-project state, so Content Hub
   // stays in sync with keywords / reports / other sections, across tabs and refresh.
-  const { activeProjectId, setActiveProject } = useActiveProject()
+  const {
+    activeProjectId, setActiveProject,
+    projects: accessibleProjects, isResolved: projectsResolved,
+    projectsError, reloadProjects,
+  } = useActiveProject()
   const projectId = activeProjectId ?? ''
   // Area M — router/searchParams are used ONLY for the ideas `?section` sub-tab; the
   // active PROJECT still comes from the provider above (Areas D + M compose: M copies
@@ -443,7 +447,41 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
     setActiveProject(e.target.value)
   }
 
-  const projects = data?.projects ?? []
+  /**
+   * A row is already exported on the ACTIVE platform (skip it in batch, and do
+   * not offer its checkbox). A hoisted function declaration, not a const arrow:
+   * the article table computes selectability further up the render than this
+   * sits, and a `const` would be in its temporal dead zone there.
+   */
+  function alreadyExported(a: ArticleRow): boolean {
+    return activePlatform === 'shopify'
+      ? !!a.shopify_article_id || a.status === 'published'
+      : !!a.wp_post_id || a.status === 'published'
+  }
+
+  /**
+   * THE SELECTOR'S OPTIONS AND THE SELECTION MUST COME FROM THE SAME LIST.
+   *
+   * The dropdown used to render `data.projects` (from /api/content/overview)
+   * while `setActiveProject` validated against the provider's list (from
+   * /api/projects/active). Any divergence between the two — including the
+   * provider's list simply failing to load — produced exactly the reported
+   * symptom: options visible in the dropdown, and picking one silently doing
+   * nothing, because the provider rejected an id it had never seen.
+   *
+   * The provider's list is now authoritative for WHICH projects exist (it is
+   * the owned + active list that also gates selection, so a stale, inactive or
+   * unowned project can never be offered). The overview response is used only
+   * to ENRICH a row that is already accepted — never to add one.
+   */
+  const overviewProjects = data?.projects ?? []
+  const projects: ProjectOption[] = useMemo(() => {
+    const enriched = new Map(overviewProjects.map((p) => [p.id, p]))
+    return accessibleProjects.map((p) => enriched.get(p.id) ?? {
+      id: p.id, name: p.name ?? '—', business_name: null, target_domain: null, language: null,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessibleProjects, data])
   const counts = data?.counts
   const selectedProject = projects.find((p) => p.id === projectId) || null
 
@@ -466,8 +504,11 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   const selectableTopics = useMemo(() => topics.filter((tp) => !articleByTopic[tp.id]), [topics, articleByTopic])
   const allSelectableSelected = selectableTopics.length > 0 && selectableTopics.every((tp) => selected.has(tp.id))
 
-  // Articles eligible for batch WordPress export = not yet sent + not published.
-  const selectableArticles = filteredArticles.filter((a) => !a.wp_post_id && a.status !== 'published')
+  // Articles eligible for batch export = not yet sent ON THE ACTIVE PLATFORM +
+  // not published. `alreadyExported` is the one predicate that knows about both
+  // platforms; using `wp_post_id` here left a Shopify-published article selected
+  // for a batch that would immediately reject it.
+  const selectableArticles = filteredArticles.filter((a) => !alreadyExported(a))
   const allArticlesSelected = selectableArticles.length > 0 && selectableArticles.every((a) => selectedArticles.has(a.id))
   function toggleArticleSelectAll() {
     setSelectedArticles(() => (allArticlesSelected ? new Set() : new Set(selectableArticles.map((a) => a.id))))
@@ -621,8 +662,6 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
       clearTimeout(timer)
     }
   }
-  // A row is already exported on the active platform (skip it in batch).
-  const alreadyExported = (a: ArticleRow): boolean => activePlatform === 'shopify' ? !!a.shopify_article_id || a.status === 'published' : !!a.wp_post_id || a.status === 'published'
 
   async function runArticleBatch(mode: 'publish' | 'draft') {
     if (articleBatchRef.current || articleBatchRunning) return // synchronous lock first
@@ -701,8 +740,20 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
         {t.comingSoonBanner}
       </div>
 
-      {/* No projects → empty state */}
-      {!loading && projects.length === 0 ? (
+      {/* The accessible-project list FAILED to load — never rendered as "you have
+          no projects", which is a different fact and offers no way forward. */}
+      {projectsResolved && projectsError ? (
+        <Card className="p-10 text-center">
+          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.projectsLoadError}</p>
+          <Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>
+        </Card>
+      ) : !projectsResolved ? (
+        /* Still resolving — do NOT flash an empty state at a user who has projects. */
+        <Card className="p-10 text-center">
+          <p className="text-sm text-slate-400 dark:text-slate-500">{t.projectsLoading}</p>
+        </Card>
+      ) : /* No projects → empty state */
+      !loading && projects.length === 0 ? (
         <Card className="p-10 text-center">
           <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.noProjectsTitle}</p>
           <Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>
@@ -915,7 +966,12 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                       <Th>{t.table.updated}</Th>
                       <Th>{t.table.scheduledAt}</Th>
                       <Th>{t.table.publishedAt}</Th>
-                      <Th>{t.table.wordpressUrl}</Th>
+                      {/* The column carries the row's PUBLICATION state, which is
+                          WordPress or Shopify depending on the active platform.
+                          Labelling it "WordPress" for a Shopify project was simply
+                          wrong; a neutral heading is used whenever the row is not
+                          WordPress. */}
+                      <Th>{isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
                       <Th>{t.table.actions}</Th>
                     </tr>
                   </TableHead>
@@ -924,7 +980,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                       <EmptyRow colSpan={10} message={t.table.emptyTitle} />
                     ) : (
                       (articlesExpanded ? filteredArticles : filteredArticles.slice(0, 3)).map((a) => {
-                        const selectableArticle = !a.wp_post_id && a.status !== 'published'
+                        const selectableArticle = !alreadyExported(a)
                         return (
                         <TableRow key={a.id}>
                           <Td>

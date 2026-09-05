@@ -1,4 +1,4 @@
-import { EnglishLocaleEffect } from '@/components/EnglishLocaleEffect'
+import { DocumentLocaleEffect } from '@/components/DocumentLocaleEffect'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
@@ -23,7 +23,8 @@ export default function EnLayout({
 }) {
   return (
     <div dir="ltr" lang="en" className="ltr-scope">
-      <EnglishLocaleEffect />
+      {/* The SAME component the dashboard uses, so the two cannot disagree. */}
+      <DocumentLocaleEffect locale="en" restoreOnUnmount />
       {children}
     </div>
   )

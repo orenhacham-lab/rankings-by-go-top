@@ -1,0 +1,236 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+/**
+ * THE LANGUAGE CONTRACT, proved at the SERVER boundary.
+ *
+ * A previous pass called this PASS on the strength of a useEffect that set
+ * document.documentElement after hydration. That is not the contract: the
+ * INITIAL server response is what a crawler, a screen reader and the first
+ * paint actually get, and it was hard-coded to lang="he" dir="rtl" for every
+ * route, English ones included.
+ *
+ * Sections 1-3 start a REAL production server and read the RAW HTML off the
+ * wire — no browser, no JavaScript executed, so anything asserted there is true
+ * before the client boots. Sections 4-6 exercise the pure precedence and
+ * migration rules that the middleware, the server layouts and the client
+ * provider all share.
+ *
+ * Requires a production build (`npx next build`). Without .next/ the server
+ * sections report BLOCKED rather than passing vacuously.
+ *
+ * Run: npx tsx lib/i18n/__qa__/server-language-contract.qa.ts
+ */
+
+import { existsSync } from 'fs'
+import { join } from 'path'
+import { spawn, type ChildProcess } from 'child_process'
+import {
+  resolveRequestLocale, migrateLocalePreference, languageCookieString, readCookie,
+  isEnglishPath, LANGUAGE_COOKIE, LOCALE_HEADER, DEFAULT_LOCALE,
+} from '../request-locale'
+import { documentLocaleAttributes } from '../document-locale'
+import { resolveDashboardLocale } from '../dashboard/locale'
+
+let pass = 0, fail = 0, blocked = 0
+function check(name: string, cond: boolean, detail?: string) {
+  if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
+}
+function block(name: string, why: string) { blocked++; console.log(`  ⊘ BLOCKED ${name} — ${why}`) }
+
+const ROOT = join(__dirname, '..', '..', '..')
+const PORT = 3997
+const BASE = `http://127.0.0.1:${PORT}`
+
+/** The <html …> tag exactly as the server wrote it. */
+async function htmlTag(path: string, cookie?: string): Promise<string> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: cookie ? { cookie } : undefined,
+    redirect: 'manual',
+  })
+  const body = await res.text()
+  return (body.match(/<html[^>]*>/) || [''])[0]
+}
+
+async function waitForServer(proc: ChildProcess, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    if (proc.exitCode !== null) return false
+    try {
+      const r = await fetch(BASE, { redirect: 'manual' })
+      if (r.status > 0) return true
+    } catch { /* not up yet */ }
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  return false
+}
+
+async function main() {
+  console.log('Server language contract\n')
+
+  let server: ChildProcess | null = null
+  const built = existsSync(join(ROOT, '.next', 'BUILD_ID'))
+  if (!built) {
+    block('1-3: server-rendered HTML', 'no production build present — run `npx next build` first')
+  } else {
+    server = spawn('npx', ['next', 'start', '-p', String(PORT)], {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: 'https://qa.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'qa-anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'qa-svc',
+      },
+      stdio: 'ignore',
+    })
+    if (!(await waitForServer(server, 60_000))) {
+      block('1-3: server-rendered HTML', 'the production server did not start in time')
+      try { server.kill('SIGKILL') } catch { /* ignore */ }
+      server = null
+    }
+  }
+
+  if (server) {
+    try {
+      console.log('1) THE INITIAL SERVER RESPONSE — raw HTML, no JavaScript executed')
+      {
+        const heDefault = await htmlTag('/')
+        check('1a: no preference at all → lang="he" dir="rtl"',
+          /lang="he"/.test(heDefault) && /dir="rtl"/.test(heDefault), heDefault)
+
+        const enCookie = await htmlTag('/', `${LANGUAGE_COOKIE}=en`)
+        check('1b: an EN preference → lang="en" dir="ltr" IN THE FIRST RESPONSE',
+          /lang="en"/.test(enCookie) && /dir="ltr"/.test(enCookie), enCookie)
+        check('1c: and it carries no Hebrew/RTL at all', !/lang="he"/.test(enCookie) && !/dir="rtl"/.test(enCookie), enCookie)
+
+        const heCookie = await htmlTag('/terms', `${LANGUAGE_COOKIE}=he`)
+        check('1d: an explicit HE preference → lang="he" dir="rtl"',
+          /lang="he"/.test(heCookie) && /dir="rtl"/.test(heCookie), heCookie)
+      }
+
+      console.log('\n2) PUBLIC /en ROUTES — English on the initial response, whatever the cookie says')
+      {
+        const noCookie = await htmlTag('/en')
+        check('2a: /en with no cookie → lang="en" dir="ltr"',
+          /lang="en"/.test(noCookie) && /dir="ltr"/.test(noCookie), noCookie)
+        const heCookieOnEn = await htmlTag('/en', `${LANGUAGE_COOKIE}=he`)
+        check('2b: /en with an HE cookie → still English (the URL is the route)',
+          /lang="en"/.test(heCookieOnEn) && /dir="ltr"/.test(heCookieOnEn), heCookieOnEn)
+      }
+
+      console.log('\n3) APP ROUTES — the preference survives the request, and garbage does not')
+      {
+        const appEn = await htmlTag('/login', `${LANGUAGE_COOKIE}=en`)
+        check('3a: an authenticated-app route carrying the EN preference renders EN/LTR initially',
+          /lang="en"/.test(appEn) && /dir="ltr"/.test(appEn), appEn)
+        const appHe = await htmlTag('/login', `${LANGUAGE_COOKIE}=he`)
+        check('3b: …and HE/RTL for the HE preference', /lang="he"/.test(appHe) && /dir="rtl"/.test(appHe), appHe)
+        const junk = await htmlTag('/', `${LANGUAGE_COOKIE}=zz`)
+        check('3c: an unrecognised cookie falls back to Hebrew, never to a broken value',
+          /lang="he"/.test(junk) && /dir="rtl"/.test(junk), junk)
+        const other = await htmlTag('/', 'some-other-cookie=en')
+        check('3d: an unrelated cookie is ignored', /lang="he"/.test(other), other)
+      }
+    } finally {
+      try { server.kill('SIGKILL') } catch { /* ignore */ }
+    }
+  }
+
+  console.log('\n4) PRECEDENCE — one rule, shared by middleware, server layouts and client')
+  {
+    check('4a: an /en path wins over an HE cookie',
+      resolveRequestLocale({ pathname: '/en/pricing', cookieValue: 'he' }) === 'en')
+    check('4b: the cookie decides a non-/en path',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'en' }) === 'en')
+    check('4c: the seed is used only when there is no cookie',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en'
+      && resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
+    check('4d: the default is Hebrew', resolveRequestLocale({}) === DEFAULT_LOCALE && DEFAULT_LOCALE === 'he')
+    check('4e: /english is NOT an English route (prefix must be a segment)', isEnglishPath('/english') === false)
+    check('4f: /en and /en/… are', isEnglishPath('/en') && isEnglishPath('/en/terms'))
+
+    check('4g: EN maps to lang=en dir=ltr', JSON.stringify(documentLocaleAttributes('en')) === JSON.stringify({ lang: 'en', dir: 'ltr' }))
+    check('4h: HE maps to lang=he dir=rtl', JSON.stringify(documentLocaleAttributes('he')) === JSON.stringify({ lang: 'he', dir: 'rtl' }))
+  }
+
+  console.log('\n5) NO SERVER/CLIENT DISAGREEMENT')
+  {
+    // The server renders <html> from resolveRequestLocale; the provider's FIRST
+    // render comes from resolveDashboardLocale(null, initialLocale), and
+    // initialLocale is that same server value. Same input, same answer, so the
+    // first client render cannot differ from the server's.
+    for (const cookieValue of ['en', 'he', null, 'zz']) {
+      const serverLocale = resolveRequestLocale({ pathname: '/dashboard', cookieValue })
+      const clientFirstRender = resolveDashboardLocale(null, serverLocale)
+      check(`5a: cookie=${JSON.stringify(cookieValue)} — client's first render matches the server (${serverLocale})`,
+        clientFirstRender === serverLocale)
+    }
+    check('5b: and the same locale yields the same document attributes on both sides',
+      JSON.stringify(documentLocaleAttributes(resolveRequestLocale({ cookieValue: 'en' })))
+      === JSON.stringify(documentLocaleAttributes(resolveDashboardLocale(null, 'en'))))
+
+    const proxySrc = require('fs').readFileSync(join(ROOT, 'proxy.ts'), 'utf8')
+    check('5c: SOURCE — the proxy hands the locale forward on a request header, and ONLY when this request decides it',
+      proxySrc.includes('LOCALE_HEADER')
+      && /if \(explicitLocale\) requestHeaders\.set\(LOCALE_HEADER, explicitLocale\)/.test(proxySrc))
+    const rootLayout = require('fs').readFileSync(join(ROOT, 'app', 'layout.tsx'), 'utf8')
+    check('5d: SOURCE — the root layout renders that locale, not a hard-coded one',
+      /<html lang=\{lang\} dir=\{dir\}/.test(rootLayout) && !/<html lang="he" dir="rtl"/.test(rootLayout))
+    check('5e: SOURCE — the root layout resolves the locale server-side, seed included',
+      /getServerLocale\(localeSeed\)/.test(rootLayout))
+    check('5g: the SEED survives — an English signup on a cookie-less device still gets English',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')
+    check('5h: …while an explicit cookie still outranks it',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
+    const dashLayout = require('fs').readFileSync(join(ROOT, 'app', '(dashboard)', 'layout.tsx'), 'utf8')
+    check('5f: SOURCE — the dashboard seeds the provider from the SAME server locale',
+      /getServerLocale\(/.test(dashLayout))
+  }
+
+  console.log('\n6) SWITCHING AND MIGRATION — deterministic, cookie-first')
+  {
+    // The switcher must make the preference SERVER-READABLE, not just visible.
+    const provider = require('fs').readFileSync(join(ROOT, 'lib', 'i18n', 'dashboard', 'useDashboardLanguage.tsx'), 'utf8')
+    check('6a: SOURCE — setDashboardLanguage writes the cookie AND localStorage',
+      /const setDashboardLanguage[\s\S]{0,400}writeLanguageCookie\(lang\)[\s\S]{0,200}localStorage\.setItem\(STORAGE_KEY, lang\)/.test(provider))
+
+    const cookie = languageCookieString('en', true)
+    check('6b: the cookie is path-wide', /Path=\//.test(cookie))
+    check('6c: SameSite=Lax, so a normal navigation carries it', /SameSite=Lax/.test(cookie))
+    check('6d: persistent, not a session cookie', /Max-Age=\d{6,}/.test(cookie))
+    check('6e: Secure on https', /Secure/.test(cookie) && !/Secure/.test(languageCookieString('en', false)))
+    check('6f: readCookie round-trips the value it wrote',
+      readCookie(`a=1; ${LANGUAGE_COOKIE}=en; b=2`, LANGUAGE_COOKIE) === 'en')
+    check('6g: readCookie does not match a similarly-named cookie',
+      readCookie('not-dashboard-language=en', LANGUAGE_COOKIE) === null)
+
+    // MIGRATION — the same inputs must always give the same answer.
+    const m1 = migrateLocalePreference({ cookieValue: 'he', storedValue: 'en', serverLocale: 'he' })
+    check('6h: an explicit cookie WINS over a stale localStorage value', m1.locale === 'he' && m1.reason === 'cookie')
+    check('6i: …and localStorage is corrected to match it', m1.writeStorage === true)
+
+    const m2 = migrateLocalePreference({ cookieValue: null, storedValue: 'en', serverLocale: 'he' })
+    check('6j: with no cookie, a real stored choice is adopted', m2.locale === 'en' && m2.reason === 'migrated_from_storage')
+    check('6k: …and written to the cookie so the NEXT request is decided server-side', m2.writeCookie === true)
+
+    const m3 = migrateLocalePreference({ cookieValue: null, storedValue: null, serverLocale: 'en' })
+    check('6l: with neither, the server\'s locale is kept and persisted', m3.locale === 'en' && m3.reason === 'server_default' && m3.writeCookie === true)
+
+    const m4 = migrateLocalePreference({ cookieValue: 'zz', storedValue: 'nonsense', serverLocale: 'he' })
+    check('6m: unrecognised values are ignored, never adopted', m4.locale === 'he' && m4.reason === 'server_default')
+
+    for (let i = 0; i < 3; i++) {
+      check(`6n[${i}]: migration is deterministic — identical inputs, identical result`,
+        JSON.stringify(migrateLocalePreference({ cookieValue: null, storedValue: 'en', serverLocale: 'he' })) === JSON.stringify(m2))
+    }
+    // Idempotent: re-running after the cookie exists must not flip anything back.
+    const after = migrateLocalePreference({ cookieValue: m2.locale, storedValue: 'en', serverLocale: 'he' })
+    check('6o: re-running after migration is stable (no flip-flop, no reload loop)',
+      after.locale === m2.locale && after.reason === 'cookie')
+
+    check('6p: the header name is not a cookie name (no collision)', String(LOCALE_HEADER) !== String(LANGUAGE_COOKIE))
+  }
+
+  console.log(`\n${pass} passed, ${fail} failed${blocked ? `, ${blocked} blocked` : ''}`)
+  if (fail > 0) process.exitCode = 1
+}
+
+main().catch((e) => { console.error(e); process.exitCode = 1 })

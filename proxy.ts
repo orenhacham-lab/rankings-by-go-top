@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
+import { LANGUAGE_COOKIE, LOCALE_HEADER, explicitRequestLocale } from '@/lib/i18n/request-locale'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -30,8 +31,27 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(setupUrl)
   }
 
+  // ── Locale, resolved BEFORE anything renders ────────────────────
+  // The root layout is a server component and cannot see the pathname or read
+  // the cookie store as cheaply as this does, so the resolved locale is handed
+  // forward on a request header. Without it the server emitted lang="he"
+  // dir="rtl" for every response — including English ones — and only a client
+  // effect corrected it after hydration.
+  //
+  // Set ONLY when this request decides the locale on its own — an /en route, or
+  // an explicit cookie. With neither, the header is omitted so a server layout
+  // can still apply its seed (the signup language in auth metadata), which the
+  // proxy cannot see. Sending a default here would silently outrank that seed
+  // and give an English signup a Hebrew first page on a fresh device.
+  const explicitLocale = explicitRequestLocale({
+    pathname,
+    cookieValue: request.cookies.get(LANGUAGE_COOKIE)?.value ?? null,
+  })
+  const requestHeaders = new Headers(request.headers)
+  if (explicitLocale) requestHeaders.set(LOCALE_HEADER, explicitLocale)
+
   // ── Normal auth flow ────────────────────────────────────────────
-  let supabaseResponse = NextResponse.next({ request })
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -42,7 +62,7 @@ export async function proxy(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value)
         )
-        supabaseResponse = NextResponse.next({ request })
+        supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
         )

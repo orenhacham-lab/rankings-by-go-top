@@ -4,6 +4,8 @@ import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
 import { createClient } from '@/lib/supabase/server'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { getServerLocale } from '@/lib/i18n/server-locale'
+import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 
 export const metadata: Metadata = {
   title: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top',
@@ -45,16 +47,32 @@ export default async function RootLayout({
   // logged-in user (no client-side flash). A transient auth failure defaults to the
   // safe public behavior and never breaks the whole app.
   let isAuthenticated = false
+  // The signup language lives in auth metadata and is the seed for a device that
+  // has no cookie yet. Read from the SAME call, so the document's language and
+  // the dashboard provider's first render come from one source.
+  let localeSeed: string | null = null
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     isAuthenticated = !!user
+    const seed = user?.user_metadata?.locale
+    localeSeed = typeof seed === 'string' ? seed : null
   } catch {
     isAuthenticated = false
   }
 
+  // THE INITIAL RESPONSE carries the real language. Previously hard-coded to
+  // Hebrew/RTL, so an English page shipped the wrong lang and dir to every
+  // crawler, screen reader and first paint, and a client effect only patched it
+  // up after hydration.
+  // The seed (signup language in auth metadata) is applied HERE too, so the
+  // <html> the server writes matches what the dashboard provider will start
+  // from. Without it a fresh device after an English signup would render a
+  // Hebrew document and then flip.
+  const { lang, dir } = documentLocaleAttributes(await getServerLocale(localeSeed))
+
   return (
-    <html lang="he" dir="rtl" className="h-full" suppressHydrationWarning>
+    <html lang={lang} dir={dir} className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />

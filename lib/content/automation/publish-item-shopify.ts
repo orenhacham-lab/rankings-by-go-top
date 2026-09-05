@@ -127,7 +127,11 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     })
     if (!result.ok) return await failAttempt(result.reason as string, result.detail)
 
-    await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', articleId)
+    // `status` and `published_at` are written by publishArticleToShopify itself
+    // (see persistSuccess) so the manual route and this queue can never produce
+    // different rows for the same outcome. Re-stamping published_at here would
+    // overwrite Shopify's own timestamp with a local one on every retry.
+    await admin.from('generated_articles').update({ last_error: null, updated_at: nowIso() }).eq('id', articleId)
     await admin.from('article_pool_items').update({ status: 'published', published_at: nowIso(), last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', item.id)
     await resolvePublishAlerts(admin, item.id)
     return { itemId: item.id, status: 'published', articleId, wpPostUrl: result.url }

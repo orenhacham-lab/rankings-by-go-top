@@ -2,6 +2,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
 import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getServerLocale } from '@/lib/i18n/server-locale'
 // normalizeLocale comes from the PURE (non-'use client') module: this layout is a server
 // component, and calling a function exported by a client module throws at runtime.
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
@@ -41,7 +42,10 @@ export default async function DashboardLayout({
   // Area G — seed the dashboard language from the signup-origin locale saved in auth
   // metadata, so a fresh device's first login (empty localStorage) opens in the
   // signup language. The switcher / a prior stored choice still overrides client-side.
-  const initialLocale = normalizeLocale(user.user_metadata?.locale)
+  // The SERVER-resolved locale (cookie first, auth metadata as the first-visit
+  // seed) — the same value the root layout rendered <html lang/dir> from, so the
+  // provider's first client render cannot disagree with the server's.
+  const initialLocale = await getServerLocale(user.user_metadata?.locale as string | null | undefined)
 
   // Area G — the language provider is seeded from the signup-origin locale.
   return (

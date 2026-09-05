@@ -26,6 +26,9 @@ export const dashboardEn = {
     selectProjectPlaceholder: 'Select a project…',
     selectProjectMessage: 'Select a project to view and manage its content.',
     noProjectsTitle: 'Create your first project to use this tool',
+    projectsLoadError: 'We couldn’t load your projects just now. This is temporary.',
+    projectsLoadRetry: 'Try again',
+    projectsLoading: 'Loading your projects…',
     noProjectsCta: 'Create project',
     // K5 — missing-connections onboarding. Platform card = publishing setup; Search
     // Console card = OPTIONAL evidence (never claimed required; publishing never
@@ -364,6 +367,7 @@ export const dashboardEn = {
       scheduledAt: 'Scheduled for',
       publishedAt: 'Published',
       wordpressUrl: 'WordPress',
+      publication: 'Publication',
       actions: 'Actions',
       emptyTitle: 'No articles yet for this project',
       emptyHint: 'Article creation arrives in the next phase. For now you can connect your WordPress site.',
