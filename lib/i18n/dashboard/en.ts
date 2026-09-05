@@ -177,6 +177,7 @@ export const dashboardEn = {
       tryOther: 'No ideas found. Try another source or a broader keyword.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
       funnelLine: 'Run breakdown: {g} ideas generated · {e} did not pass quality/relevance checks · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
+      funnelDiagnosticsLine: 'Also set aside: {p} could not be read from the generator · {b} repeated another idea in the same batch · {u} were removed by an internal problem we could not identify',
       // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
       kwMatchTitle: 'Diagnostics: what exactly blocked each idea ({n} examples)',
       kwMatchKeyword: 'Keyword',

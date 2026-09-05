@@ -17,11 +17,12 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
+import { applyDispositions, type DroppedCandidate } from './candidate-dispositions'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
-import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunities, parseOpportunitiesDetailed, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
+import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunitiesDetailed, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
 import { buildValidatorPrompt, parseValidatorResponse, validatorBatches, applyValidatorVerdicts, type ValidatorMetrics, type ValidatorVerdict } from './plan-validator'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
@@ -285,15 +286,18 @@ export async function generateOpportunities(
   /** suggestion object → its stable candidate id. Identity, not keyword. */
   const candidateIdBySuggestion = new Map<TopicSuggestion, string>()
   const ledgerById = new Map<string, CandidateLedgerEntry>()
-  /** Record a removal AT the boundary that performs it. Never inferred later. */
-  const removeCandidate = (s: TopicSuggestion, disposition: 'duplicate' | 'rejected', reason: string, duplicateOf: string | null = null) => {
-    const id = candidateIdBySuggestion.get(s)
-    const entry = id ? ledgerById.get(id) : undefined
+  /**
+   * Record a removal AT the boundary that performed it, by stable id. Fed by the
+   * ONE shared dedupe implementation from both the family and recovery paths, so
+   * nothing has to be inferred from a candidate's later absence.
+   */
+  const recordDrop = (d: DroppedCandidate<TopicSuggestion>) => {
+    const entry = ledgerById.get(d.candidateId)
     if (!entry || entry.disposition !== 'accepted') return
-    entry.disposition = disposition
-    entry.reason = reason
-    entry.duplicateOf = duplicateOf
-    if (disposition === 'duplicate') duplicates_by_reason[reason] = (duplicates_by_reason[reason] ?? 0) + 1
+    entry.disposition = 'duplicate'
+    entry.reason = d.reason
+    entry.duplicateOf = d.duplicateOfKey
+    duplicates_by_reason[d.reason] = (duplicates_by_reason[d.reason] ?? 0) + 1
   }
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
   let secondaryKeywordsFiltered = 0
@@ -465,7 +469,7 @@ export async function generateOpportunities(
     const familyClusters = selectClustersWithinBudget(rankClusters(clusters), input.maxClusters)
     const poolTarget = input.poolTarget ?? input.targetCount * 2
     const pool: TopicSuggestion[] = []
-    const seen = new Set<string>()
+    const seen = new Map<string, string>()
     const familiesRun: RecoveryTier[] = []
     for (const family of input.families) {
       if (pool.length >= poolTarget || familyClusters.length === 0) break
@@ -480,11 +484,14 @@ export async function generateOpportunities(
       // DEDUPE is not a rejection — it is a different disposition, tracked in
       // its own bucket so the two can never double-count. Each candidate's
       // ledger entry is reclassified in place, so it still has exactly one.
-      for (const s of produced) {
-        const k = normalizeText(s.primaryKeyword)
-        if (!k) { removeCandidate(s, 'duplicate', 'empty_primary_keyword'); continue }
-        if (seen.has(k)) { removeCandidate(s, 'duplicate', 'cross_family_duplicate', k); continue }
-        seen.add(k)
+      // THE SAME shared implementation the recovery path uses.
+      const disp = applyDispositions(produced, {
+        keyOf: (x) => normalizeText(x.primaryKeyword),
+        idOf: (x) => candidateIdBySuggestion.get(x),
+        seen,
+      })
+      for (const d of disp.dropped) recordDrop(d)
+      for (const s of disp.retained) {
         const carried = { ...s, opportunityFamily: family }
         // The identity travels with the copy, so later boundaries still find it.
         const id = candidateIdBySuggestion.get(s)
@@ -526,7 +533,8 @@ export async function generateOpportunities(
       keyKey: (s) => normalizeText(s.primaryKeyword),
       runTier,
       // Attribute at THIS boundary too, so nothing has to be inferred later.
-      onDropped: (s, reason, duplicateOf) => removeCandidate(s, 'duplicate', reason, duplicateOf),
+      idOf: (x) => candidateIdBySuggestion.get(x),
+      onDropped: (d) => recordDrop(d),
     })
   }
 
@@ -578,7 +586,8 @@ export async function generateOpportunities(
   }
 
   // THE TWO INVARIANTS, computed from the ledger itself.
-  const finalAccepted = candidateLedger.filter((e) => e.disposition === 'accepted').length
+  // ACCEPTED IS WHAT CAME OUT — outcome.suggestions, not deterministic survivors.
+  const finalAccepted = outcome.suggestions.length
   const duplicatesCount = candidateLedger.filter((e) => e.disposition === 'duplicate').length
   const rejectedCount = candidateLedger.filter((e) => e.disposition === 'rejected').length
   const parsedCandidates = candidateLedger.length

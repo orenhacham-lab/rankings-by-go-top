@@ -14,6 +14,7 @@ import { generateOpportunities } from '@/lib/content/recommendations/generate-op
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
 import { buildFinalCandidateOutcomes, applyFinalOutcomesToGscDetails } from '@/lib/content/recommendations/final-outcomes'
 import { buildScanSources, buildGscRunSummary } from '@/lib/content/recommendations/customer-run-summary'
+import { buildFunnelDiagnostics } from '@/lib/content/recommendations/funnel-summary'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -365,7 +366,7 @@ export async function POST(request: Request) {
           source, projectId: auth.project.id, generationRunId, clientRequestId,
           persisted: false, dryRun: true, newlyAddedCount: 0, wouldPersistCount: fresh.length,
           ...pathContract,
-          funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+          funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0, ...buildFunnelDiagnostics(opportunityDiagnostics) },
           isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, gscInput: gscInputEnriched, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
         },
       })
@@ -463,7 +464,7 @@ export async function POST(request: Request) {
       return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, ...pathContract, projectId: auth.project.id, generationRunId, clientRequestId, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
-        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0, ...buildFunnelDiagnostics(opportunityDiagnostics) },
         isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, productionProvenance: proFirstProvenance ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }

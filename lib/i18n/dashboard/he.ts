@@ -175,6 +175,7 @@ export const dashboardHe = {
       tryOther: 'לא נמצאו רעיונות. נסו מקור אחר או מילת מפתח רחבה יותר.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
       funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {e} לא עברו בדיקות איכות ורלוונטיות · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
+      funnelDiagnosticsLine: 'הוסרו בנוסף: {p} לא ניתנו לקריאה מהמחולל · {b} חזרו על רעיון אחר באותה מנה · {u} הוסרו בשל תקלה פנימית שלא הצלחנו לזהות',
       // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
       kwMatchTitle: 'אבחון: מה בדיוק חסם כל רעיון ({n} דוגמאות)',
       kwMatchKeyword: 'מילת מפתח',

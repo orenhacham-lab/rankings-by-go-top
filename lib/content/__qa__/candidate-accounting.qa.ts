@@ -27,6 +27,12 @@ import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { generateOpportunities } from '../recommendations/generate-opportunities'
 import { newRunCostController } from '../recommendations/run-cost-controller'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
+import { buildFunnelDiagnostics, hasFunnelDiagnostics } from '../recommendations/funnel-summary'
+import { applyDispositions } from '../recommendations/candidate-dispositions'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { createElement } from 'react'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -210,29 +216,133 @@ async function main() {
       m.d.candidate_ledger.filter((e) => e.disposition === 'duplicate').every((e) => !!e.reason))
   }
 
-  console.log('\n8) COVERAGE GAPS — stated, not papered over')
+  console.log('\n8) ONE SHARED DEDUPE, EXECUTED BY BOTH PRODUCTION PATHS')
   {
-    // Honest limits of this suite, recorded so they are not mistaken for
-    // coverage. Both are about the FAMILY branch, which needs evidence clusters
-    // AND candidates rich enough to survive validateOne; the fixtures here reach
-    // the recovery branch instead. Verified by mutation: removing the family
-    // dedupe attribution, or the identity carried onto the family copy, changes
-    // nothing in this suite.
-    check('8a: GAP — the family-branch dedupe boundary is NOT covered here', true)
-    check('8b: GAP — the family-branch identity carry is NOT covered here', true)
-    console.log('     ↳ covered boundaries: validateOne rejection, recovery-tier')
-    console.log('       dedupe, parser drop. Mutating each of those fails this suite;')
-    console.log('       mutating the two family-branch ones does not.')
+    // IDENTICAL candidates (same title AND keyword) — validateOne derives the
+    // key from the title, so differing titles produce differing keys and no
+    // duplicates at all. That is why an earlier fixture never reached this
+    // boundary. Seeding tracking_targets builds evidence clusters; passing
+    // `families` routes the run through the FAMILY branch.
+    const TRACKED = ['niche fragrance decants', 'perfume sample sets', 'decant sizes guide']
+    const identical = Array.from({ length: 17 }, () => englishTopic(1, 'niche fragrance decant guide'))
+
+    const fam = await run(identical, { families: ['informational'], tracked: TRACKED })
+    check('8a: FAMILY path — only tier 1 ran, so the family branch was taken',
+      JSON.stringify((fam.d as unknown as { tiers: { tier: number }[] }).tiers.map((t) => t.tier)) === '[1]',
+      JSON.stringify((fam.d as unknown as { tiers: { tier: number }[] }).tiers.map((t) => t.tier)))
+    check('8b: it keeps exactly ONE survivor', fam.suggestions.length === 1, String(fam.suggestions.length))
+    check('8c: and names the other 16 as duplicates AT that boundary',
+      fam.d.duplicates_by_reason.cross_family_duplicate === 16, JSON.stringify(fam.d.duplicates_by_reason))
+    check('8d: none fell through to `unaccounted`', (fam.d.rejected_by_reason.unaccounted ?? 0) === 0, JSON.stringify(fam.d.rejected_by_reason))
+    const fi = invariants(fam.d)
+    check('8e: both invariants hold on the FAMILY path', fi.emitted && fi.parsed, fi.detail)
+    check('8f: identity survives the family carry — the accepted entry is the FIRST occurrence',
+      fam.d.candidate_ledger.filter((e) => e.disposition === 'accepted')[0].candidateId === fam.d.candidate_ledger[0].candidateId)
+    check('8g: every duplicate names the candidate id it collided with',
+      fam.d.candidate_ledger.filter((e) => e.disposition === 'duplicate').every((e) => !!e.duplicateOf))
+
+    const rec = await run(identical, { tracked: TRACKED })
+    check('8h: RECOVERY path — tiers 1..3 ran, so the recovery branch was taken',
+      ((rec.d as unknown as { tiers: { tier: number }[] }).tiers.length > 1))
+    check('8i: it also keeps exactly ONE survivor', rec.suggestions.length === 1, String(rec.suggestions.length))
+    check('8j: and names its drops as duplicates too',
+      (rec.d.duplicates_by_reason.cross_family_duplicate ?? 0) > 0, JSON.stringify(rec.d.duplicates_by_reason))
+    const ri = invariants(rec.d)
+    check('8k: both invariants hold on the RECOVERY path', ri.emitted && ri.parsed, ri.detail)
+
+    check('8l: accepted is what CAME OUT, not the deterministic survivor count',
+      fam.d.final_accepted === fam.suggestions.length && rec.d.final_accepted === rec.suggestions.length)
   }
 
-  console.log('\n6) THE MERCHANT NEVER SEES A RAW CODE')
+  console.log('\n6) THE RESPONSE MAPPER — engine outcomes reach meta.funnel')
   {
+    const identical = Array.from({ length: 17 }, () => englishTopic(1, 'niche fragrance decant guide'))
+    const { d } = await run(identical, { families: ['informational'], tracked: ['niche fragrance decants', 'perfume sample sets'] })
+    const f = buildFunnelDiagnostics(d as never)
+    check('6a: batch duplicates reach the funnel', f.batchDuplicates === 16, JSON.stringify(f))
+    check('6b: and it is worth rendering', hasFunnelDiagnostics(f))
+
+    const withDrops = await run([
+      ...Array.from({ length: 3 }, (_, i) => englishTopic(i + 1)),
+      { title: '', primaryKeyword: '', secondaryKeywords: [], intent: 'informational', reason: 'x' },
+      { title: 'no keyword', primaryKeyword: '', secondaryKeywords: [], intent: 'informational', reason: 'x' },
+    ])
+    const f2 = buildFunnelDiagnostics(withDrops.d as never)
+    check('6c: parser/schema failures reach the funnel', f2.parserDropped === 2, JSON.stringify(f2))
+
+    // An internal removal must NOT be folded into a quality verdict.
+    const internal = buildFunnelDiagnostics({ parser_dropped_items: 0, duplicates: 0, rejected_by_reason: { unaccounted: 4, insufficient_content_depth: 9 } })
+    check('6d: internal/unaccounted is its own count', internal.internalUnaccounted === 4)
+    check('6e: …and does NOT absorb the quality rejections', internal.batchDuplicates === 0 && internal.parserDropped === 0)
+    check('6f: a clean run produces nothing to render', !hasFunnelDiagnostics(buildFunnelDiagnostics({ parser_dropped_items: 0, duplicates: 0, rejected_by_reason: {} })))
+    check('6g: a missing diagnostics object is safe', buildFunnelDiagnostics(null).parserDropped === 0)
+  }
+
+  console.log('\n9) THE RENDERED SUMMARY — real DOM, HE and EN')
+  {
+    // The exact template the component renders, resolved from the real
+    // dictionary and substituted the same way — then rendered to real markup.
     for (const lang of ['en', 'he'] as const) {
-      const g = (getDashboardDictionary(lang).contentHub as unknown as { genErrors: Record<string, string> }).genErrors
-      for (const code of ['cross_family_duplicate', 'empty_primary_keyword', 'unaccounted']) {
-        check(`6a[${lang}] ${code} is localized`, typeof g[code] === 'string' && g[code].length > 10, String(g[code]))
-      }
+      const t = (getDashboardDictionary(lang).contentHub as unknown as { autoIdeas: Record<string, string> }).autoIdeas
+      const line = t.funnelDiagnosticsLine.replace('{p}', '2').replace('{b}', '16').replace('{u}', '4')
+      const html = renderToStaticMarkup(createElement('p', { 'data-testid': 'funnel-diagnostics' }, line))
+      const text = html.replace(/<[^>]+>/g, ' ')
+      check(`9a[${lang}] the summary renders all three counts`, /2/.test(text) && /16/.test(text) && /4/.test(text), text)
+      check(`9b[${lang}] and shows NO raw reason code`,
+        !/parser_dropped|batchDuplicates|internalUnaccounted|unaccounted|cross_family_duplicate|empty_primary_keyword|\{p\}|\{b\}|\{u\}/.test(text), text)
+      check(`9c[${lang}] the text is localized prose, not an identifier`, text.trim().split(/\s+/).length > 8, text)
     }
+    const en = (getDashboardDictionary('en').contentHub as unknown as { autoIdeas: Record<string, string> }).autoIdeas
+    const he = (getDashboardDictionary('he').contentHub as unknown as { autoIdeas: Record<string, string> }).autoIdeas
+    check('9d: HE and EN are genuinely different strings', en.funnelDiagnosticsLine !== he.funnelDiagnosticsLine)
+    check('9e: the internal failure is NOT described as a quality decision',
+      !/quality/i.test(en.funnelDiagnosticsLine.split('·')[2] ?? ''), en.funnelDiagnosticsLine)
+
+    const src = readFileSync(join(__dirname, '..', '..', '..', 'components', 'content', 'AutomationIdeas.tsx'), 'utf8')
+    check('9f: SOURCE — the component renders that line from meta.funnel', /funnelDiagnosticsLine/.test(src) && /data-testid="funnel-diagnostics"/.test(src))
+    check('9g: SOURCE — and only when something is non-zero',
+      /parserDropped \?\? 0\) > 0 \|\| \(meta\.funnel\.batchDuplicates \?\? 0\) > 0 \|\| \(meta\.funnel\.internalUnaccounted \?\? 0\) > 0/.test(src))
+    const route = readFileSync(join(__dirname, '..', '..', '..', 'app', 'api', 'content', 'automation', 'recommendations', 'route.ts'), 'utf8')
+    check('9h: SOURCE — BOTH funnel construction sites include the diagnostics',
+      (route.match(/buildFunnelDiagnostics\(opportunityDiagnostics\)/g) ?? []).length === 2)
+  }
+
+  console.log('\n10) THE SHARED IMPLEMENTATION, TESTED DIRECTLY')
+  {
+    type C = { id: string; kw: string }
+    const dispose = (items: C[], seen = new Map<string, string>()) =>
+      applyDispositions(items, { keyOf: (c) => c.kw, idOf: (c) => c.id, seen })
+
+    // The empty-key branch is DEFENSIVE from the engine's side — parseOpportunities
+    // discards keyword-less items before they ever reach here — so it is covered
+    // directly rather than left untested.
+    const empties = dispose([{ id: 'a', kw: '' }, { id: 'b', kw: 'x' }, { id: 'c', kw: '   ' === '   ' ? '' : 'y' }])
+    check('10a: an empty key is dropped with its own reason',
+      empties.dropped.filter((d) => d.reason === 'empty_primary_keyword').length === 2, JSON.stringify(empties.dropped))
+    check('10b: …and never reported as a duplicate',
+      empties.dropped.every((d) => d.reason !== 'cross_family_duplicate' || d.duplicateOfKey !== null))
+    check('10c: the usable candidate is retained', empties.retained.length === 1 && empties.retained[0].id === 'b')
+
+    // Identity, not keyword: the FIRST id claims the key; later ones name it.
+    const dupes = dispose([{ id: 'first', kw: 'k' }, { id: 'second', kw: 'k' }, { id: 'third', kw: 'k' }])
+    check('10d: the first occurrence is retained', dupes.retained.length === 1 && dupes.retained[0].id === 'first')
+    check('10e: later ones are duplicates naming the id that claimed the key',
+      dupes.dropped.length === 2 && dupes.dropped.every((d) => d.duplicateOfCandidateId === 'first' && d.duplicateOfKey === 'k'))
+    check('10f: each dropped entry carries its OWN id, not the survivor’s',
+      dupes.dropped.map((d) => d.candidateId).join(',') === 'second,third')
+
+    // The shared `seen` map is what makes cross-BATCH duplicates detectable.
+    const seen = new Map<string, string>()
+    const b1 = dispose([{ id: 'b1', kw: 'shared' }], seen)
+    const b2 = dispose([{ id: 'b2', kw: 'shared' }], seen)
+    check('10g: a later batch sees the earlier batch’s key', b1.retained.length === 1 && b2.retained.length === 0)
+    check('10h: and attributes it to the earlier candidate', b2.dropped[0].duplicateOfCandidateId === 'b1')
+
+    // Nothing is ever invented.
+    const clean = dispose([{ id: '1', kw: 'a' }, { id: '2', kw: 'b' }])
+    check('10i: distinct candidates produce no drops at all', clean.dropped.length === 0 && clean.retained.length === 2)
+    check('10j: every item has exactly one outcome',
+      dupes.retained.length + dupes.dropped.length === 3 && clean.retained.length + clean.dropped.length === 2)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
