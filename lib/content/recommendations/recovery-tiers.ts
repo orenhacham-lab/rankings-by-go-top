@@ -57,6 +57,14 @@ export async function runRecoveryTiers(deps: {
   keyKey: (s: TopicSuggestion) => string
   runTier: (plan: TierPlan) => Promise<TopicSuggestion[]>
   plans?: readonly TierPlan[]
+  /**
+   * Called for each candidate this function DROPS, at the moment it drops it.
+   * Dedupe happens here as well as in the family loop, and a caller that only
+   * instruments the other one is left inferring what happened — which is how a
+   * removal ends up reported as a guess. Optional: existing callers are
+   * unaffected.
+   */
+  onDropped?: (s: TopicSuggestion, reason: 'empty_primary_keyword' | 'cross_family_duplicate', duplicateOf: string | null) => void
 }): Promise<RecoveryOutcome> {
   const plans = deps.plans ?? TIER_PLANS
   const acc: TopicSuggestion[] = []
@@ -68,7 +76,8 @@ export async function runRecoveryTiers(deps: {
     const produced = await deps.runTier(plan)
     for (const s of produced) {
       const k = deps.keyKey(s)
-      if (!k || seen.has(k)) continue
+      if (!k) { deps.onDropped?.(s, 'empty_primary_keyword', null); continue }
+      if (seen.has(k)) { deps.onDropped?.(s, 'cross_family_duplicate', k); continue }
       seen.add(k)
       acc.push(s)
     }

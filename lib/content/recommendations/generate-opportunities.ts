@@ -56,6 +56,13 @@ export interface TierDiagnostics {
 
 /** What became of one generated candidate. No title, no body. */
 export interface CandidateLedgerEntry {
+  /**
+   * A STABLE identity for this candidate, assigned at parse time and carried
+   * through validation, dedupe and the final output. Reconciling by normalized
+   * keyword could not tell two candidates with the SAME key apart, so on a
+   * second duplicate it could reclassify the surviving original.
+   */
+  candidateId: string
   /** Normalized primary keyword, or null when it normalizes to nothing. */
   key: string | null
   hasPrimaryKeyword: boolean
@@ -119,6 +126,16 @@ export interface OpportunityDiagnostics {
   duplicates_by_reason: Record<string, number>
   /** Items the PARSER discarded before they were ever counted as candidates. */
   parser_dropped_items: number
+  /** Items the model emitted, BEFORE the parser discarded any. */
+  model_emitted_items: number
+  /** Items that survived parsing — the population the ledger accounts for. */
+  parsed_candidates: number
+  /** Candidates present in the FINAL returned set. */
+  final_accepted: number
+  /** Candidates removed by a dedupe boundary. */
+  duplicates: number
+  /** Candidates removed by a validation/gate boundary. */
+  rejected: number
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
   generated_opportunities: number
@@ -263,6 +280,21 @@ export async function generateOpportunities(
   const candidateLedger: CandidateLedgerEntry[] = []
   const duplicates_by_reason: Record<string, number> = {}
   let parserDroppedItems = 0
+  let modelEmittedItems = 0
+  let candidateSeq = 0
+  /** suggestion object → its stable candidate id. Identity, not keyword. */
+  const candidateIdBySuggestion = new Map<TopicSuggestion, string>()
+  const ledgerById = new Map<string, CandidateLedgerEntry>()
+  /** Record a removal AT the boundary that performs it. Never inferred later. */
+  const removeCandidate = (s: TopicSuggestion, disposition: 'duplicate' | 'rejected', reason: string, duplicateOf: string | null = null) => {
+    const id = candidateIdBySuggestion.get(s)
+    const entry = id ? ledgerById.get(id) : undefined
+    if (!entry || entry.disposition !== 'accepted') return
+    entry.disposition = disposition
+    entry.reason = reason
+    entry.duplicateOf = duplicateOf
+    if (disposition === 'duplicate') duplicates_by_reason[reason] = (duplicates_by_reason[reason] ?? 0) + 1
+  }
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
   let secondaryKeywordsFiltered = 0
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
@@ -368,20 +400,29 @@ export async function generateOpportunities(
     const parsed = res.ok ? parseOpportunitiesDetailed(res.text) : { items: [], droppedItems: 0, parseFailed: true, emitted: 0 }
     const opportunities: SynthOpportunity[] = parsed.items
     parserDroppedItems += parsed.droppedItems
+    modelEmittedItems += parsed.emitted
     td.parse_ok = res.ok
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
+      // STABLE IDENTITY, assigned once and carried onto the suggestion, so every
+      // later boundary can name the exact candidate it removed — even when two
+      // candidates normalize to the same keyword.
+      const candidateId = `cand_${candidateSeq++}`
       const r = validateOne({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: o.intent, reason: o.reason }, { confidenceLevel: plan.confidenceLevel, discovery: plan.discovery })
       const key = normalizeText(o.primaryKeyword) || null
+      const base = { candidateId, key, hasPrimaryKeyword: !!o.primaryKeyword.trim(), family: plan.discovery ? 'discovery' : 'synthesis', language }
       if (r.suggestion) {
+        candidateIdBySuggestion.set(r.suggestion, candidateId)
         out.push(r.suggestion)
-        // Provisionally accepted; the dedupe step below may reclassify it.
-        candidateLedger.push({ key, hasPrimaryKeyword: !!o.primaryKeyword.trim(), family: plan.discovery ? 'discovery' : 'synthesis', language, disposition: 'accepted', reason: null, duplicateOf: null })
+        // No disposition yet: it is set by whichever boundary decides its fate.
+        const e: CandidateLedgerEntry = { ...base, disposition: 'accepted', reason: null, duplicateOf: null }
+        candidateLedger.push(e); ledgerById.set(candidateId, e)
       } else {
         const reason = r.rejectionReason || 'insufficient_independent_need'
         bump(td, reason)
-        candidateLedger.push({ key, hasPrimaryKeyword: !!o.primaryKeyword.trim(), family: plan.discovery ? 'discovery' : 'synthesis', language, disposition: 'rejected', reason, duplicateOf: null })
+        const e: CandidateLedgerEntry = { ...base, disposition: 'rejected', reason, duplicateOf: null }
+        candidateLedger.push(e); ledgerById.set(candidateId, e)
       }
     }
     td.mapped_opportunities += out.length
@@ -441,20 +482,14 @@ export async function generateOpportunities(
       // ledger entry is reclassified in place, so it still has exactly one.
       for (const s of produced) {
         const k = normalizeText(s.primaryKeyword)
-        const entry = candidateLedger.find((e) => e.disposition === 'accepted' && e.key === (k || null) && e.duplicateOf === null)
-        if (!k) {
-          duplicates_by_reason.empty_primary_keyword = (duplicates_by_reason.empty_primary_keyword ?? 0) + 1
-          if (entry) { entry.disposition = 'duplicate'; entry.reason = 'empty_primary_keyword' }
-          continue
-        }
-        if (seen.has(k)) {
-          duplicates_by_reason.cross_family_duplicate = (duplicates_by_reason.cross_family_duplicate ?? 0) + 1
-          if (entry) { entry.disposition = 'duplicate'; entry.reason = 'cross_family_duplicate'; entry.duplicateOf = k }
-          continue
-        }
+        if (!k) { removeCandidate(s, 'duplicate', 'empty_primary_keyword'); continue }
+        if (seen.has(k)) { removeCandidate(s, 'duplicate', 'cross_family_duplicate', k); continue }
         seen.add(k)
-        if (entry) entry.family = family
-        pool.push({ ...s, opportunityFamily: family })
+        const carried = { ...s, opportunityFamily: family }
+        // The identity travels with the copy, so later boundaries still find it.
+        const id = candidateIdBySuggestion.get(s)
+        if (id) candidateIdBySuggestion.set(carried, id)
+        pool.push(carried)
       }
       familiesRun.push(1)
     }
@@ -486,7 +521,13 @@ export async function generateOpportunities(
     planStageIds.validator_survivor_ids = finalPool.map((s) => s.id)
     outcome = { suggestions: finalPool, tiersRun: familiesRun, recoveryTierUsed: familiesRun.length ? 1 : null, discoveryUsed: false, fallbackReason: finalPool.length === 0 ? 'no_safe_opportunities' : null }
   } else {
-    outcome = await runRecoveryTiers({ targetFloor: TARGET_FLOOR, keyKey: (s) => normalizeText(s.primaryKeyword), runTier })
+    outcome = await runRecoveryTiers({
+      targetFloor: TARGET_FLOOR,
+      keyKey: (s) => normalizeText(s.primaryKeyword),
+      runTier,
+      // Attribute at THIS boundary too, so nothing has to be inferred later.
+      onDropped: (s, reason, duplicateOf) => removeCandidate(s, 'duplicate', reason, duplicateOf),
+    })
   }
 
   // 3) Assemble diagnostics.
@@ -496,28 +537,8 @@ export async function generateOpportunities(
   // `generated_candidates: 0` no matter how many candidates it actually
   // produced — and the reconciliation below then had nothing to reconcile.
   planStageIds.generated_candidates = tierDiags.reduce((a, t) => a + t.raw_candidates, 0)
-
-  // RECONCILE THE LEDGER AGAINST THE AUTHORITATIVE OUTCOME.
-  //
-  // Dedupe happens in more than one place — the family loop above and, on the
-  // recovery path, inside runRecoveryTiers — so instrumenting each site by hand
-  // leaves whichever one is added next silently unaccounted. Instead, anything
-  // still marked 'accepted' that is NOT in the final set is reclassified here
-  // from what actually came out. That is path-independent and cannot be
-  // outrun by a new removal site.
-  {
-    const survivingKeys = new Set(outcome.suggestions.map((x: TopicSuggestion) => normalizeText(x.primaryKeyword)))
-    const keptOnce = new Set<string>()
-    for (const entry of candidateLedger) {
-      if (entry.disposition !== 'accepted') continue
-      const k = entry.key ?? ''
-      if (k && survivingKeys.has(k) && !keptOnce.has(k)) { keptOnce.add(k); continue }
-      entry.disposition = 'duplicate'
-      entry.reason = k ? 'cross_family_duplicate' : 'empty_primary_keyword'
-      entry.duplicateOf = k || null
-      duplicates_by_reason[entry.reason] = (duplicates_by_reason[entry.reason] ?? 0) + 1
-    }
-  }
+  // The recovery path never assigned these, so the funnel had no survivor set to
+  // reconcile against on that branch. Filled from what actually came out.
   if (planStageIds.deterministic_survivor_ids.length === 0 && outcome.suggestions.length > 0) {
     planStageIds.deterministic_survivor_ids = outcome.suggestions.map((x: TopicSuggestion) => x.id)
   }
@@ -535,10 +556,32 @@ export async function generateOpportunities(
   // reports "17 generated, 0 accepted, nothing rejected" is describing a bug,
   // and it must say so on the spot instead of looking like a quiet zero.
   // This never removes or adds a candidate; it only makes the numbers add up.
-  const namedRejections = Object.values(rejected_by_reason).reduce((a, b) => a + b, 0)
-  const namedDuplicates = Object.values(duplicates_by_reason).reduce((a, b) => a + b, 0)
-  const unaccounted = planStageIds.generated_candidates - planStageIds.deterministic_survivor_ids.length - namedRejections - namedDuplicates
-  if (unaccounted > 0) rejected_by_reason.unaccounted = (rejected_by_reason.unaccounted ?? 0) + unaccounted
+  // FINAL DISPOSITION, from what actually came out — and NOTHING is guessed.
+  //
+  // A candidate that is provisionally accepted but absent from the final set was
+  // removed by SOME boundary. If that boundary recorded a reason, the entry
+  // already carries it. If it did not, the honest answer is `unaccounted` — NOT
+  // 'duplicate'. Inferring a duplicate from absence was wrong: a candidate can
+  // also disappear via validator rejection, a failed repair, a later
+  // deterministic gate, recovery-tier selection, or a filter added tomorrow.
+  {
+    const survivingIds = new Set(
+      outcome.suggestions.map((x: TopicSuggestion) => candidateIdBySuggestion.get(x)).filter((v): v is string => !!v),
+    )
+    for (const entry of candidateLedger) {
+      if (entry.disposition !== 'accepted') continue
+      if (survivingIds.has(entry.candidateId)) continue
+      entry.disposition = 'rejected'
+      entry.reason = 'unaccounted'
+      rejected_by_reason.unaccounted = (rejected_by_reason.unaccounted ?? 0) + 1
+    }
+  }
+
+  // THE TWO INVARIANTS, computed from the ledger itself.
+  const finalAccepted = candidateLedger.filter((e) => e.disposition === 'accepted').length
+  const duplicatesCount = candidateLedger.filter((e) => e.disposition === 'duplicate').length
+  const rejectedCount = candidateLedger.filter((e) => e.disposition === 'rejected').length
+  const parsedCandidates = candidateLedger.length
   const persisted_by_confidence: Record<string, number> = {}
   for (const s of outcome.suggestions) { const c = s.confidenceLevel ?? 'high_confidence'; persisted_by_confidence[c] = (persisted_by_confidence[c] ?? 0) + 1 }
   const persisted_by_page_type: Record<string, number> = {}
@@ -584,6 +627,11 @@ export async function generateOpportunities(
     candidate_ledger: candidateLedger,
     duplicates_by_reason,
     parser_dropped_items: parserDroppedItems,
+    model_emitted_items: modelEmittedItems,
+    parsed_candidates: parsedCandidates,
+    final_accepted: finalAccepted,
+    duplicates: duplicatesCount,
+    rejected: rejectedCount,
     model_calls: cs.totalCalls,
     generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
     persisted: outcome.suggestions.length,

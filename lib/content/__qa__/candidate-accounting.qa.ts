@@ -54,10 +54,14 @@ const englishTopic = (i: number, keyword?: string): Topic => ({
 })
 
 /** Run the REAL production module against a deterministic batch. */
-async function run(topics: unknown[]) {
+async function run(topics: unknown[], opts: { families?: string[]; tracked?: string[] } = {}) {
   const admin = world()
+  // Seeding tracked keywords builds evidence clusters, which — together with
+  // `families` — routes the run through the FAMILY branch rather than the
+  // recovery tiers. Both paths dedupe, and both must attribute.
+  if (opts.tracked) (admin.tables.tracking_targets = opts.tracked.map((keyword, i) => ({ id: `t${i}`, project_id: PROJECT, keyword })))
   const controller = newRunCostController('standard', 'run-1', 10, { maxModelCallsPerRun: 20, maxEstimatedCostUsd: 5 })
-  const res = await generateOpportunities(admin as never, { projectId: PROJECT, targetCount: 17, maxClusters: 14 }, controller, {
+  const res = await generateOpportunities(admin as never, { projectId: PROJECT, targetCount: 17, maxClusters: 14, ...(opts.families ? { families: opts.families as never } : {}) }, controller, {
     generateJson: (async () => ({ ok: true, text: JSON.stringify({ topics }) })) as never,
   })
   const d = res.diagnostics as unknown as {
@@ -65,11 +69,25 @@ async function run(topics: unknown[]) {
     rejected_by_reason: Record<string, number>
     duplicates_by_reason: Record<string, number>
     parser_dropped_items: number
-    candidate_ledger: { key: string | null; disposition: string; reason: string | null; duplicateOf: string | null; language: string }[]
+    model_emitted_items: number
+    parsed_candidates: number
+    final_accepted: number
+    duplicates: number
+    rejected: number
+    candidate_ledger: { candidateId: string; key: string | null; disposition: string; reason: string | null; duplicateOf: string | null; language: string }[]
   }
   return { suggestions: res.suggestions, d }
 }
 const sum = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0)
+
+/** THE TWO REQUIRED INVARIANTS, checked on every batch this suite runs. */
+function invariants(d: { model_emitted_items: number; parser_dropped_items: number; parsed_candidates: number; final_accepted: number; duplicates: number; rejected: number }) {
+  return {
+    emitted: d.model_emitted_items === d.parser_dropped_items + d.final_accepted + d.duplicates + d.rejected,
+    parsed: d.parsed_candidates === d.final_accepted + d.duplicates + d.rejected,
+    detail: `emitted=${d.model_emitted_items} dropped=${d.parser_dropped_items} parsed=${d.parsed_candidates} accepted=${d.final_accepted} dup=${d.duplicates} rej=${d.rejected}`,
+  }
+}
 
 async function main() {
   console.log('Topic-candidate funnel — real production module\n')
@@ -158,6 +176,53 @@ async function main() {
     console.log('       so neither explains 17 generated → 0 accepted. Reproducing')
     console.log('       the real incident needs the actual candidate batch, which')
     console.log('       this environment has no database or log access to obtain.')
+  }
+
+  console.log('\n7) CANDIDATE IDENTITY, AND THE TWO EXACT INVARIANTS')
+  {
+    // Repeated keys: identity must survive, and the SURVIVOR must be the one
+    // actually kept — reconciling by keyword could reclassify the original.
+    const { suggestions, d } = await run(Array.from({ length: 17 }, (_, i) => englishTopic(i + 1, 'niche fragrance decant guide')))
+    const ids = d.candidate_ledger.map((e) => e.candidateId)
+    check('7a: every candidate has a stable, unique id', new Set(ids).size === 17 && ids.every((x) => !!x))
+    const accepted = d.candidate_ledger.filter((e) => e.disposition === 'accepted')
+    check('7b: exactly one entry is accepted', accepted.length === 1)
+    check('7c: and it is the FIRST occurrence, not a later one reclassified onto',
+      accepted[0].candidateId === ids[0], `${accepted[0].candidateId} vs ${ids[0]}`)
+    check('7d: the accepted entry corresponds to the returned suggestion', suggestions.length === 1)
+
+    const inv = invariants(d)
+    check('7e: INVARIANT model_emitted = dropped + accepted + duplicates + rejected', inv.emitted, inv.detail)
+    check('7f: INVARIANT parsed = accepted + duplicates + rejected', inv.parsed, inv.detail)
+
+    // …and on a mixed batch that exercises the parser drop as well.
+    const mixed = [
+      ...Array.from({ length: 4 }, (_, i) => englishTopic(i + 1)),
+      ...Array.from({ length: 3 }, () => englishTopic(99, 'shared decant keyword')),
+      { title: '', primaryKeyword: '', secondaryKeywords: [], intent: 'informational', reason: 'x' },
+    ]
+    const m = await run(mixed)
+    const mi = invariants(m.d)
+    check('7g: both invariants hold on a mixed batch (drops + duplicates + accepts)', mi.emitted && mi.parsed, mi.detail)
+    check('7h: no entry is left without a disposition',
+      m.d.candidate_ledger.every((e) => ['accepted', 'duplicate', 'rejected'].includes(e.disposition)))
+    check('7i: a removal is NEVER labelled duplicate without a boundary saying so',
+      m.d.candidate_ledger.filter((e) => e.disposition === 'duplicate').every((e) => !!e.reason))
+  }
+
+  console.log('\n8) COVERAGE GAPS — stated, not papered over')
+  {
+    // Honest limits of this suite, recorded so they are not mistaken for
+    // coverage. Both are about the FAMILY branch, which needs evidence clusters
+    // AND candidates rich enough to survive validateOne; the fixtures here reach
+    // the recovery branch instead. Verified by mutation: removing the family
+    // dedupe attribution, or the identity carried onto the family copy, changes
+    // nothing in this suite.
+    check('8a: GAP — the family-branch dedupe boundary is NOT covered here', true)
+    check('8b: GAP — the family-branch identity carry is NOT covered here', true)
+    console.log('     ↳ covered boundaries: validateOne rejection, recovery-tier')
+    console.log('       dedupe, parser drop. Mutating each of those fails this suite;')
+    console.log('       mutating the two family-branch ones does not.')
   }
 
   console.log('\n6) THE MERCHANT NEVER SEES A RAW CODE')
