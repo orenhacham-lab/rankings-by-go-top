@@ -21,7 +21,7 @@ import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-conten
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
-import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
+import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunities, parseOpportunitiesDetailed, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
 import { buildValidatorPrompt, parseValidatorResponse, validatorBatches, applyValidatorVerdicts, type ValidatorMetrics, type ValidatorVerdict } from './plan-validator'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
@@ -52,6 +52,19 @@ export interface TierDiagnostics {
   mapped_opportunities: number
   rejected_by_reason: Record<string, number>
   persisted: number
+}
+
+/** What became of one generated candidate. No title, no body. */
+export interface CandidateLedgerEntry {
+  /** Normalized primary keyword, or null when it normalizes to nothing. */
+  key: string | null
+  hasPrimaryKeyword: boolean
+  family: string
+  language: 'he' | 'en'
+  disposition: 'accepted' | 'rejected' | 'duplicate'
+  reason: string | null
+  /** For a duplicate: the earlier key that already occupied the slot. */
+  duplicateOf: string | null
 }
 
 export interface OpportunityDiagnostics {
@@ -96,6 +109,16 @@ export interface OpportunityDiagnostics {
   // B — per-stage candidate IDs (Preview-only trace; empty outside plan mode). Makes it
   // impossible for N>0 candidates to vanish without a typed reason at some stage.
   plan_stage_ids: { generated_candidates: number; deterministic_survivor_ids: string[]; validator_survivor_ids: string[] }
+  /**
+   * One entry per generated candidate, with EXACTLY ONE final disposition, so
+   * `accepted + duplicate + rejected === generated` always holds. Carries no
+   * title or body — only the normalized key and structural facts.
+   */
+  candidate_ledger: CandidateLedgerEntry[]
+  /** Dedupe removals, kept SEPARATE from rejections so neither double-counts. */
+  duplicates_by_reason: Record<string, number>
+  /** Items the PARSER discarded before they were ever counted as candidates. */
+  parser_dropped_items: number
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
   generated_opportunities: number
@@ -115,11 +138,23 @@ const PAGE_TYPE = (t: string | null | undefined): EntityPageType => {
 
 /** Run the production opportunity path with recovery tiers. Returns [] with full
  *  diagnostics only when NO safe opportunity exists after all tiers. */
+/**
+ * The ONE external dependency this module has. Injectable so the whole
+ * downstream pipeline — parse, validate, dedupe, validator, diversity — can be
+ * exercised against a deterministic batch without calling a model. Production
+ * passes nothing and gets the real client.
+ */
+export interface OpportunityGenerationDeps {
+  generateJson?: typeof generateRecommendationJSON
+}
+
 export async function generateOpportunities(
   admin: Admin,
   input: { projectId: string; targetCount: number; maxClusters: number; families?: OpportunityFamily[]; poolTarget?: number; validatorCalls?: number },
   controller: RunCostController,
+  deps: OpportunityGenerationDeps = {},
 ): Promise<{ suggestions: TopicSuggestion[]; diagnostics: OpportunityDiagnostics }> {
+  const generateJson = deps.generateJson ?? generateRecommendationJSON
   // 1) Load evidence.
   const { data: proj } = await admin.from('projects').select('business_name, target_domain, language, country').eq('id', input.projectId).maybeSingle()
   const p = (proj as { business_name: string | null; target_domain: string | null; language: string | null } | null) ?? { business_name: null, target_domain: null, language: null }
@@ -224,6 +259,10 @@ export async function generateOpportunities(
   const GATE_LOCAL_SERVICE_AREA = process.env.RECO_GATE_LOCAL_SERVICE_AREA === '1'
   const GATE_BUSINESS_RELEVANCE = process.env.RECO_GATE_BUSINESS_RELEVANCE === '1'
   const shadow_rejected_by_reason: Record<string, number> = {}
+  // ONE entry per generated candidate, exactly one disposition each.
+  const candidateLedger: CandidateLedgerEntry[] = []
+  const duplicates_by_reason: Record<string, number> = {}
+  let parserDroppedItems = 0
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
   let secondaryKeywordsFiltered = 0
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
@@ -321,16 +360,29 @@ export async function generateOpportunities(
   // Synthesize a batch of candidates then run each through validateOne (same gates for
   // every tier — only the prompt + confidence label differ).
   const synthAndValidate = async (prompt: string, plan: TierPlan, td: TierDiagnostics): Promise<TopicSuggestion[]> => {
-    const res = await generateRecommendationJSON(prompt, { temperature: plan.discovery ? 0.95 : 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: plan.tier === 1 ? 'primary' : 'salvage', requestedIdeaCount: input.targetCount })
+    const res = await generateJson(prompt, { temperature: plan.discovery ? 0.95 : 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: plan.tier === 1 ? 'primary' : 'salvage', requestedIdeaCount: input.targetCount })
     td.model_calls += 1
-    const opportunities: SynthOpportunity[] = res.ok ? parseOpportunities(res.text) : []
+    // parseOpportunitiesDetailed reports what the PARSER discarded (an item with
+    // no title or no primaryKeyword). Those never reach raw_candidates, so the
+    // loss used to be invisible; it is surfaced now.
+    const parsed = res.ok ? parseOpportunitiesDetailed(res.text) : { items: [], droppedItems: 0, parseFailed: true, emitted: 0 }
+    const opportunities: SynthOpportunity[] = parsed.items
+    parserDroppedItems += parsed.droppedItems
     td.parse_ok = res.ok
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
       const r = validateOne({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: o.intent, reason: o.reason }, { confidenceLevel: plan.confidenceLevel, discovery: plan.discovery })
-      if (r.suggestion) out.push(r.suggestion)
-      else bump(td, r.rejectionReason || 'insufficient_independent_need')
+      const key = normalizeText(o.primaryKeyword) || null
+      if (r.suggestion) {
+        out.push(r.suggestion)
+        // Provisionally accepted; the dedupe step below may reclassify it.
+        candidateLedger.push({ key, hasPrimaryKeyword: !!o.primaryKeyword.trim(), family: plan.discovery ? 'discovery' : 'synthesis', language, disposition: 'accepted', reason: null, duplicateOf: null })
+      } else {
+        const reason = r.rejectionReason || 'insufficient_independent_need'
+        bump(td, reason)
+        candidateLedger.push({ key, hasPrimaryKeyword: !!o.primaryKeyword.trim(), family: plan.discovery ? 'discovery' : 'synthesis', language, disposition: 'rejected', reason, duplicateOf: null })
+      }
     }
     td.mapped_opportunities += out.length
     td.persisted += out.length
@@ -384,18 +436,30 @@ export async function generateOpportunities(
       // counted them — so a run could report N candidates generated, zero
       // accepted, and an empty rejected_by_reason: the ledger said nothing had
       // been rejected while everything had been. Both causes are now named.
+      // DEDUPE is not a rejection — it is a different disposition, tracked in
+      // its own bucket so the two can never double-count. Each candidate's
+      // ledger entry is reclassified in place, so it still has exactly one.
       for (const s of produced) {
         const k = normalizeText(s.primaryKeyword)
-        if (!k) { bump(td, 'empty_primary_keyword'); continue }
-        if (seen.has(k)) { bump(td, 'cross_family_duplicate'); continue }
+        const entry = candidateLedger.find((e) => e.disposition === 'accepted' && e.key === (k || null) && e.duplicateOf === null)
+        if (!k) {
+          duplicates_by_reason.empty_primary_keyword = (duplicates_by_reason.empty_primary_keyword ?? 0) + 1
+          if (entry) { entry.disposition = 'duplicate'; entry.reason = 'empty_primary_keyword' }
+          continue
+        }
+        if (seen.has(k)) {
+          duplicates_by_reason.cross_family_duplicate = (duplicates_by_reason.cross_family_duplicate ?? 0) + 1
+          if (entry) { entry.disposition = 'duplicate'; entry.reason = 'cross_family_duplicate'; entry.duplicateOf = k }
+          continue
+        }
         seen.add(k)
+        if (entry) entry.family = family
         pool.push({ ...s, opportunityFamily: family })
       }
       familiesRun.push(1)
     }
 
     planStageIds.deterministic_survivor_ids = pool.map((s) => s.id)
-    planStageIds.generated_candidates = tierDiags.reduce((s, t) => s + t.raw_candidates, 0)
 
     // A — the ACTUAL batched validator over the deterministic survivors, strictly
     // ADDITIVE: it may only remove a candidate via an explicit reject (repairs re-run
@@ -408,7 +472,7 @@ export async function generateOpportunities(
       const unvalidated = pool.filter((s) => !batchedIds.has(s.id))
       const verdictsPerBatch: Map<string, ValidatorVerdict>[] = []
       for (const batch of batches) {
-        const vres = await generateRecommendationJSON(buildValidatorPrompt(batch, langLabel), { temperature: 0.2, maxOutputTokens: outputBudgetFor(batch.length) }, controller, { source: 'plan_validator', callPurpose: 'validate', requestedIdeaCount: batch.length })
+        const vres = await generateJson(buildValidatorPrompt(batch, langLabel), { temperature: 0.2, maxOutputTokens: outputBudgetFor(batch.length) }, controller, { source: 'plan_validator', callPurpose: 'validate', requestedIdeaCount: batch.length })
         verdictsPerBatch.push(vres.ok ? parseValidatorResponse(vres.text) : new Map())
       }
       // Repairs re-run EVERY deterministic gate via validateOne; a failed repair → reject.
@@ -427,6 +491,40 @@ export async function generateOpportunities(
 
   // 3) Assemble diagnostics.
   const ranked = rankClusters(clusters)
+  // FUNNEL COUNTERS, on every path. These were assigned only inside the family
+  // branch, so a run that fell through to the tier-2/3 recovery path reported
+  // `generated_candidates: 0` no matter how many candidates it actually
+  // produced — and the reconciliation below then had nothing to reconcile.
+  planStageIds.generated_candidates = tierDiags.reduce((a, t) => a + t.raw_candidates, 0)
+
+  // RECONCILE THE LEDGER AGAINST THE AUTHORITATIVE OUTCOME.
+  //
+  // Dedupe happens in more than one place — the family loop above and, on the
+  // recovery path, inside runRecoveryTiers — so instrumenting each site by hand
+  // leaves whichever one is added next silently unaccounted. Instead, anything
+  // still marked 'accepted' that is NOT in the final set is reclassified here
+  // from what actually came out. That is path-independent and cannot be
+  // outrun by a new removal site.
+  {
+    const survivingKeys = new Set(outcome.suggestions.map((x: TopicSuggestion) => normalizeText(x.primaryKeyword)))
+    const keptOnce = new Set<string>()
+    for (const entry of candidateLedger) {
+      if (entry.disposition !== 'accepted') continue
+      const k = entry.key ?? ''
+      if (k && survivingKeys.has(k) && !keptOnce.has(k)) { keptOnce.add(k); continue }
+      entry.disposition = 'duplicate'
+      entry.reason = k ? 'cross_family_duplicate' : 'empty_primary_keyword'
+      entry.duplicateOf = k || null
+      duplicates_by_reason[entry.reason] = (duplicates_by_reason[entry.reason] ?? 0) + 1
+    }
+  }
+  if (planStageIds.deterministic_survivor_ids.length === 0 && outcome.suggestions.length > 0) {
+    planStageIds.deterministic_survivor_ids = outcome.suggestions.map((x: TopicSuggestion) => x.id)
+  }
+  if (planStageIds.validator_survivor_ids.length === 0 && outcome.suggestions.length > 0) {
+    planStageIds.validator_survivor_ids = outcome.suggestions.map((x: TopicSuggestion) => x.id)
+  }
+
   const rejected_by_reason: Record<string, number> = {}
   for (const td of tierDiags) for (const [r, n] of Object.entries(td.rejected_by_reason)) rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + n
 
@@ -438,7 +536,8 @@ export async function generateOpportunities(
   // and it must say so on the spot instead of looking like a quiet zero.
   // This never removes or adds a candidate; it only makes the numbers add up.
   const namedRejections = Object.values(rejected_by_reason).reduce((a, b) => a + b, 0)
-  const unaccounted = planStageIds.generated_candidates - planStageIds.deterministic_survivor_ids.length - namedRejections
+  const namedDuplicates = Object.values(duplicates_by_reason).reduce((a, b) => a + b, 0)
+  const unaccounted = planStageIds.generated_candidates - planStageIds.deterministic_survivor_ids.length - namedRejections - namedDuplicates
   if (unaccounted > 0) rejected_by_reason.unaccounted = (rejected_by_reason.unaccounted ?? 0) + unaccounted
   const persisted_by_confidence: Record<string, number> = {}
   for (const s of outcome.suggestions) { const c = s.confidenceLevel ?? 'high_confidence'; persisted_by_confidence[c] = (persisted_by_confidence[c] ?? 0) + 1 }
@@ -482,6 +581,9 @@ export async function generateOpportunities(
     target_role_mappings,
     validator: validatorMetrics,
     plan_stage_ids: planStageIds,
+    candidate_ledger: candidateLedger,
+    duplicates_by_reason,
+    parser_dropped_items: parserDroppedItems,
     model_calls: cs.totalCalls,
     generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
     persisted: outcome.suggestions.length,

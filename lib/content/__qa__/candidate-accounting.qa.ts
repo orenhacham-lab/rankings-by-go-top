@@ -1,161 +1,173 @@
 /**
- * DEFECT — the topic funnel could report "N candidates generated, 0 accepted,
- * nothing rejected".
+ * Topic-candidate funnel — ACCOUNTING AND OBSERVABILITY.
  *
- * Observed on a real run: 17 candidates generated, all 17 gone, and every
- * displayed rejection-reason counter zero. The failure is AFTER candidate
- * generation, so the input data is not in question.
+ * SCOPE, stated up front: this exercises the REAL exported
+ * generateOpportunities with a narrow injected candidate source (no model
+ * call). It proves the funnel reports every candidate's fate truthfully. It
+ * does NOT claim to explain the production 17→0 incident — see the note at the
+ * end of section 5 for exactly what is and is not established.
  *
- * The cause is a single unattributed exit in the pool-assembly loop
- * (generate-opportunities.ts). `td.raw_candidates` counted the candidates, then
- * the loop dropped them with a bare `continue` — no `bump()`, so nothing
- * reached `rejected_by_reason`:
+ * The reported symptom was "N candidates generated, 0 accepted, every
+ * rejection counter zero". Two real reporting defects are covered here:
  *
- *     for (const s of produced) {
- *       const k = normalizeText(s.primaryKeyword)
- *       if (!k || seen.has(k)) continue      // ← counted in, never counted out
- *       ...
- *     }
+ *   1. plan_stage_ids.generated_candidates was assigned ONLY inside the
+ *      family-cluster branch, so a run that fell through to the tier-2/3
+ *      recovery path reported 0 candidates generated no matter what it did —
+ *      and the reconciliation then had nothing to reconcile.
+ *   2. The cross-family dedupe loop discarded candidates with a bare
+ *      `continue` after they had been counted, so the loss reached no ledger.
  *
- * Every other exit in the funnel is typed: synthAndValidate bumps a reason for
- * each rejected candidate, and the batched validator FAILS OPEN (a missing or
- * unparsable verdict KEEPS the candidate — plan-validator.ts:138), so neither
- * can produce a silent zero.
- *
- * These tests reproduce the invariant violation on the OLD loop, show it named
- * under the new one, and pin the ledger invariant itself.
+ * Every candidate now carries EXACTLY ONE disposition, and dedupe removals are
+ * kept in their own bucket so they cannot double-count against rejections.
  *
  * Run: npx tsx lib/content/__qa__/candidate-accounting.qa.ts
  */
 
-import { readFileSync } from 'fs'
-import { join } from 'path'
-import { normalizeText } from '../recommendations/topic-idea-store'
+import { FakeAdmin } from '../../__qa__/_fake-admin'
+import { generateOpportunities } from '../recommendations/generate-opportunities'
+import { newRunCostController } from '../recommendations/run-cost-controller'
+import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
-type Cand = { primaryKeyword: string }
-type Ledger = Record<string, number>
+const PROJECT = 'afrodite'
 
-/** The pool-assembly loop as it was — the defect, preserved for the control. */
-function assembleOld(produced: Cand[]): { pool: Cand[]; rejected: Ledger } {
-  const pool: Cand[] = []
-  const seen = new Set<string>()
-  const rejected: Ledger = {}
-  for (const s of produced) {
-    const k = normalizeText(s.primaryKeyword)
-    if (!k || seen.has(k)) continue
-    seen.add(k)
-    pool.push(s)
+/** An ENGLISH project, like the one in the incident. No Hebrew anywhere. */
+function world() {
+  return new FakeAdmin({
+    projects: [{ id: PROJECT, user_id: 'u1', business_name: 'Afrodite Decants', target_domain: 'afroditedecants.com', language: 'en', country: 'IL', is_active: true }],
+    article_topics: [], generated_articles: [], gsc_query_page_metrics: [], gsc_sync_runs: [],
+  })
+}
+
+/** Candidates shaped exactly like the model's JSON output. */
+type Topic = { title: string; primaryKeyword: string; secondaryKeywords: string[]; intent: string; reason: string }
+const englishTopic = (i: number, keyword?: string): Topic => ({
+  title: `How to choose a niche fragrance decant ${i}`,
+  primaryKeyword: keyword ?? `niche fragrance decant guide ${i}`,
+  secondaryKeywords: ['perfume samples', 'decant sizes'],
+  intent: 'informational',
+  reason: 'Buyers compare decant sizes before committing to a full bottle.',
+})
+
+/** Run the REAL production module against a deterministic batch. */
+async function run(topics: unknown[]) {
+  const admin = world()
+  const controller = newRunCostController('standard', 'run-1', 10, { maxModelCallsPerRun: 20, maxEstimatedCostUsd: 5 })
+  const res = await generateOpportunities(admin as never, { projectId: PROJECT, targetCount: 17, maxClusters: 14 }, controller, {
+    generateJson: (async () => ({ ok: true, text: JSON.stringify({ topics }) })) as never,
+  })
+  const d = res.diagnostics as unknown as {
+    plan_stage_ids: { generated_candidates: number; deterministic_survivor_ids: string[] }
+    rejected_by_reason: Record<string, number>
+    duplicates_by_reason: Record<string, number>
+    parser_dropped_items: number
+    candidate_ledger: { key: string | null; disposition: string; reason: string | null; duplicateOf: string | null; language: string }[]
   }
-  return { pool, rejected }
+  return { suggestions: res.suggestions, d }
 }
-
-/** The corrected loop — every exit typed and counted. Mirrors the shipped code. */
-function assembleNew(produced: Cand[]): { pool: Cand[]; rejected: Ledger } {
-  const pool: Cand[] = []
-  const seen = new Set<string>()
-  const rejected: Ledger = {}
-  const bump = (r: string) => { rejected[r] = (rejected[r] ?? 0) + 1 }
-  for (const s of produced) {
-    const k = normalizeText(s.primaryKeyword)
-    if (!k) { bump('empty_primary_keyword'); continue }
-    if (seen.has(k)) { bump('cross_family_duplicate'); continue }
-    seen.add(k)
-    pool.push(s)
-  }
-  return { pool, rejected }
-}
-
-/** The shipped ledger invariant: residual losses are surfaced, never dropped. */
-function sealLedger(generated: number, poolSize: number, rejected: Ledger): Ledger {
-  const out = { ...rejected }
-  const named = Object.values(out).reduce((a, b) => a + b, 0)
-  const unaccounted = generated - poolSize - named
-  if (unaccounted > 0) out.unaccounted = (out.unaccounted ?? 0) + unaccounted
-  return out
-}
-const sum = (l: Ledger) => Object.values(l).reduce((a, b) => a + b, 0)
+const sum = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0)
 
 async function main() {
-  console.log('Topic-candidate funnel accounting\n')
+  console.log('Topic-candidate funnel — real production module\n')
 
-  // The production shape: 17 candidates that all collapse to one normalized key.
-  const SEVENTEEN: Cand[] = Array.from({ length: 17 }, (_, i) =>
-    ({ primaryKeyword: i === 0 ? 'בשמים נישה' : `  בשמים נישה${i === 1 ? '' : ''}  ` }))
-
-  console.log('1) REPRODUCTION — 17 generated, 0 accepted, every counter zero')
+  console.log('1) A LEGITIMATE ENGLISH BATCH YIELDS USABLE IDEAS')
   {
-    const old = assembleOld(SEVENTEEN)
-    check('1a: all 17 candidates leave the funnel', old.pool.length + sum(old.rejected) !== 17 || old.pool.length < 17)
-    check('1b: only 1 survives into the pool', old.pool.length === 1, String(old.pool.length))
-    check('1c: and the rejection ledger is EMPTY — the reported symptom', sum(old.rejected) === 0, JSON.stringify(old.rejected))
-    check('1d: THE INVARIANT IS VIOLATED: generated ≠ pool + rejected',
-      17 !== old.pool.length + sum(old.rejected), `17 vs ${old.pool.length} + ${sum(old.rejected)}`)
-
-    // The exact reported case: nothing survives at all.
-    const allEmpty: Cand[] = Array.from({ length: 17 }, () => ({ primaryKeyword: '   ' }))
-    const oldEmpty = assembleOld(allEmpty)
-    check('1e: with unusable keywords, 17 in / 0 out / 0 rejected — exactly what was seen',
-      oldEmpty.pool.length === 0 && sum(oldEmpty.rejected) === 0)
+    const { suggestions, d } = await run(Array.from({ length: 17 }, (_, i) => englishTopic(i + 1)))
+    check('1a: 17 distinct English candidates produce 17 usable ideas', suggestions.length === 17, String(suggestions.length))
+    check('1b: generated_candidates reports 17, not 0', d.plan_stage_ids.generated_candidates === 17, String(d.plan_stage_ids.generated_candidates))
+    check('1c: nothing was rejected', sum(d.rejected_by_reason) === 0, JSON.stringify(d.rejected_by_reason))
+    check('1d: the ledger holds one entry per candidate', d.candidate_ledger.length === 17)
+    check('1e: every entry says English — no Hebrew rules were applied',
+      d.candidate_ledger.every((e) => e.language === 'en'))
+    check('1f: the invariant holds: accepted + duplicate + rejected === generated',
+      d.candidate_ledger.filter((e) => e.disposition === 'accepted').length
+      + d.candidate_ledger.filter((e) => e.disposition === 'duplicate').length
+      + d.candidate_ledger.filter((e) => e.disposition === 'rejected').length === 17)
   }
 
-  console.log('\n2) THE FIX — every exit is named, and the numbers add up')
+  console.log('\n2) THE RECOVERY-PATH REPORTING DEFECT')
   {
-    const next = assembleNew(SEVENTEEN)
-    check('2a: the same 17 candidates produce the same pool (no behaviour change)',
-      next.pool.length === 1)
-    check('2b: but the 16 losses are now NAMED', sum(next.rejected) === 16, JSON.stringify(next.rejected))
-    check('2c: as cross-family duplicates', next.rejected.cross_family_duplicate === 16)
-    check('2d: THE INVARIANT HOLDS: generated === pool + rejected',
-      17 === next.pool.length + sum(next.rejected))
-
-    const allEmpty: Cand[] = Array.from({ length: 17 }, () => ({ primaryKeyword: '   ' }))
-    const nextEmpty = assembleNew(allEmpty)
-    check('2e: unusable keywords are named too, not silently dropped',
-      nextEmpty.rejected.empty_primary_keyword === 17 && nextEmpty.pool.length === 0)
-    check('2f: and that run also reconciles', 17 === nextEmpty.pool.length + sum(nextEmpty.rejected))
-
-    // Thresholds are NOT touched: a clean batch still yields the same pool.
-    const distinct: Cand[] = ['בושם ורד', 'בושם עץ אלגום', 'מארז דוגמיות'].map((primaryKeyword) => ({ primaryKeyword }))
-    const clean = assembleNew(distinct)
-    check('2g: a batch with distinct keywords is unaffected — nothing was made stricter',
-      clean.pool.length === 3 && sum(clean.rejected) === 0)
+    // This batch reaches the tier-2/3 recovery path (no clusters exist), which
+    // is exactly where generated_candidates used to report 0.
+    const { d } = await run(Array.from({ length: 17 }, (_, i) => englishTopic(i + 1)))
+    check('2a: the recovery path reports the real candidate count', d.plan_stage_ids.generated_candidates === 17)
+    check('2b: and its survivors, so the funnel is reconcilable at all',
+      d.plan_stage_ids.deterministic_survivor_ids.length === 17)
   }
 
-  console.log('\n3) THE SEALED LEDGER — a future silent drop cannot hide')
+  console.log('\n3) EVERY CANDIDATE HAS EXACTLY ONE DISPOSITION')
   {
-    // Simulate some yet-unknown drop that forgets to bump: 17 in, 5 pooled,
-    // 2 named. The ledger must surface the missing 10 rather than under-report.
-    const sealed = sealLedger(17, 5, { covered_by_existing_content: 2 })
-    check('3a: an unnamed residual is surfaced as `unaccounted`', sealed.unaccounted === 10, JSON.stringify(sealed))
-    check('3b: and the ledger then reconciles', 17 === 5 + sum(sealed))
-    check('3c: a fully-accounted run gains no phantom entry',
-      sealLedger(17, 1, { cross_family_duplicate: 16 }).unaccounted === undefined)
-    check('3d: it never invents a negative or zero entry',
-      sealLedger(3, 3, {}).unaccounted === undefined && sealLedger(3, 5, {}).unaccounted === undefined)
-    check('3e: the reported total always covers every candidate that left',
-      (() => { const l = sealLedger(17, 0, {}); return sum(l) === 17 })())
+    // All 17 collapse to ONE key: 1 survives, 16 are duplicates. This is the
+    // shape that shows duplicates alone CANNOT produce 17→0.
+    const { suggestions, d } = await run(Array.from({ length: 17 }, (_, i) => englishTopic(i + 1, 'niche fragrance decant guide')))
+    check('3a: duplicates leave exactly ONE survivor — never zero', suggestions.length === 1, String(suggestions.length))
+    check('3b: the other 16 are typed as duplicates, not rejections',
+      d.duplicates_by_reason.cross_family_duplicate === 16, JSON.stringify(d.duplicates_by_reason))
+    check('3c: duplicates are NOT counted as rejections (no double counting)',
+      (d.rejected_by_reason.cross_family_duplicate ?? 0) === 0)
+    check('3d: each duplicate names the key that displaced it',
+      d.candidate_ledger.filter((e) => e.disposition === 'duplicate').every((e) => !!e.duplicateOf))
+    check('3e: the ledger still reconciles', d.candidate_ledger.length === 17
+      && d.candidate_ledger.filter((e) => e.disposition === 'accepted').length === 1
+      && d.candidate_ledger.filter((e) => e.disposition === 'duplicate').length === 16)
+    check('3f: and generated === accepted + duplicate + rejected',
+      d.plan_stage_ids.generated_candidates === 17)
   }
 
-  console.log('\n4) SOURCE — the shipped funnel matches what is tested here')
+  console.log('\n4) THE PARSER’S OWN DROPS ARE VISIBLE')
   {
-    const src = readFileSync(join(__dirname, '..', 'recommendations', 'generate-opportunities.ts'), 'utf8')
-    check('4a: the bare `continue` drop is gone',
-      !/if \(!k \|\| seen\.has\(k\)\) continue/.test(src))
-    check('4b: both causes are bumped by name',
-      /bump\(td, 'empty_primary_keyword'\)/.test(src) && /bump\(td, 'cross_family_duplicate'\)/.test(src))
-    check('4c: the ledger is sealed against unnamed residuals',
-      /rejected_by_reason\.unaccounted/.test(src) && /const unaccounted =/.test(src))
-    check('4d: no quality threshold was altered in this change',
-      !/SERVING_POSITION_MAX\s*=\s*(?!20)/.test(src))
-    // The validator still fails OPEN — it is not the silent dropper and must not become one.
-    const validator = readFileSync(join(__dirname, '..', 'recommendations', 'plan-validator.ts'), 'utf8')
-    check('4e: a missing validator verdict still KEEPS the candidate',
-      /validator_missing_verdict_count \+= 1; keep\(s\); continue/.test(validator))
+    // An item with no primaryKeyword never reaches raw_candidates — the parser
+    // discards it first. That loss used to be entirely invisible.
+    const mixed = [
+      ...Array.from({ length: 5 }, (_, i) => englishTopic(i + 1)),
+      { title: 'No keyword here', primaryKeyword: '', secondaryKeywords: [], intent: 'informational', reason: 'x' },
+      { title: '', primaryKeyword: 'orphan keyword', secondaryKeywords: [], intent: 'informational', reason: 'x' },
+    ]
+    const { suggestions, d } = await run(mixed)
+    check('4a: the well-formed candidates still come through', suggestions.length === 5, String(suggestions.length))
+    check('4b: the two malformed items are reported as parser drops', d.parser_dropped_items === 2, String(d.parser_dropped_items))
+    check('4c: they are NOT silently absent from every count', d.parser_dropped_items > 0)
+  }
+
+  console.log('\n5) WHAT WOULD ACTUALLY PRODUCE 17 → 0')
+  {
+    // Every candidate rejected by the real validator: the counters must say so.
+    const junk = Array.from({ length: 17 }, (_, i) => ({
+      title: 'a', primaryKeyword: 'a', secondaryKeywords: [], intent: 'informational', reason: `${i}`,
+    }))
+    const { suggestions, d } = await run(junk)
+    const rejected = sum(d.rejected_by_reason)
+    const duplicates = sum(d.duplicates_by_reason)
+    check('5a: a batch that genuinely fails validation yields zero ideas', suggestions.length === 0, String(suggestions.length))
+    check('5b: and the run EXPLAINS the zero rather than reporting empty counters',
+      rejected + duplicates === d.plan_stage_ids.generated_candidates && rejected + duplicates > 0,
+      `generated=${d.plan_stage_ids.generated_candidates} rejected=${rejected} duplicates=${duplicates} ${JSON.stringify(d.rejected_by_reason)}`)
+    check('5c: every candidate still carries exactly one disposition',
+      d.candidate_ledger.length === d.plan_stage_ids.generated_candidates)
+    check('5d: and none is left as "accepted" when nothing was accepted',
+      d.candidate_ledger.filter((e) => e.disposition === 'accepted').length === suggestions.length)
+
+    // NOT ESTABLISHED — stated so it cannot be mistaken for a conclusion.
+    check('5e: SCOPE — the production 17→0 cause is NOT claimed here', true)
+    console.log('     ↳ duplicates alone leave one survivor (3a), and the parser')
+    console.log('       discards keyword-less items before they are counted (4b),')
+    console.log('       so neither explains 17 generated → 0 accepted. Reproducing')
+    console.log('       the real incident needs the actual candidate batch, which')
+    console.log('       this environment has no database or log access to obtain.')
+  }
+
+  console.log('\n6) THE MERCHANT NEVER SEES A RAW CODE')
+  {
+    for (const lang of ['en', 'he'] as const) {
+      const g = (getDashboardDictionary(lang).contentHub as unknown as { genErrors: Record<string, string> }).genErrors
+      for (const code of ['cross_family_duplicate', 'empty_primary_keyword', 'unaccounted']) {
+        check(`6a[${lang}] ${code} is localized`, typeof g[code] === 'string' && g[code].length > 10, String(g[code]))
+      }
+    }
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
