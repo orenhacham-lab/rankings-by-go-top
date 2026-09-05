@@ -276,6 +276,89 @@ async function main() {
       wr.ok === true && sr.ok === false)
   }
 
+  console.log('\n8) THE RECONCILIATION — identity-checked, and impossible to run empty')
+  {
+    const { parseArgs, verifyRow, reconcileProvenance } = require('../../../scripts/reconcile-shopify-provenance')
+    const ID = '11111111-2222-3333-4444-555555555555'
+    const PID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const UID = '99999999-8888-7777-6666-555555555555'
+    const SHOP = 'oligarch.myshopify.com'
+    const argv = ['--connection-id', ID, '--project-id', PID, '--shop-domain', SHOP, '--user-id', UID]
+
+    // THE FAILURE MODE THIS COMMAND EXISTS TO PREVENT.
+    const placeholder = parseArgs(['--connection-id', '00000000-0000-0000-0000-000000000000', '--project-id', PID, '--shop-domain', SHOP, '--user-id', UID])
+    check('8a: the PLACEHOLDER uuid is rejected outright', placeholder.ok === false && /placeholder/.test(placeholder.error))
+    for (const missing of ['--connection-id', '--project-id', '--shop-domain', '--user-id']) {
+      const without = argv.filter((a, i) => a !== missing && argv[i - 1] !== missing)
+      check(`8b: ${missing} is required`, parseArgs(without).ok === false)
+    }
+    check('8c: a non-uuid id is rejected', parseArgs(['--connection-id', 'not-a-uuid', '--project-id', PID, '--shop-domain', SHOP, '--user-id', UID]).ok === false)
+    check('8d: a non-myshopify domain is rejected', parseArgs(['--connection-id', ID, '--project-id', PID, '--shop-domain', 'evil.com', '--user-id', UID]).ok === false)
+    const good = parseArgs(argv)
+    check('8e: a complete, real identity parses, and is a DRY RUN by default', good.ok === true && good.args.apply === false)
+    check('8f: --apply is explicit', parseArgs([...argv, '--apply']).args.apply === true)
+
+    const eligible = () => ({
+      id: ID, project_id: PID, user_id: UID, shop_domain: SHOP,
+      connection_status: 'connected', archived_at: null,
+      access_token_encrypted: 'enc', refresh_token_encrypted: null,
+      access_token_expires_at: null, oauth_app_edition: null, connection_provenance: null,
+    })
+    const args = { connectionId: ID, projectId: PID, shopDomain: SHOP, userId: UID, apply: true }
+    check('8g: the eligible row passes every check', verifyRow(eligible(), args).every((c: { ok: boolean }) => c.ok))
+    check('8h: all eleven conditions are actually evaluated', verifyRow(eligible(), args).length === 11)
+
+    // Each condition, individually, must abort.
+    const mismatches: [string, Record<string, unknown>][] = [
+      ['wrong project', { project_id: 'other' }],
+      ['wrong owner', { user_id: 'other' }],
+      ['wrong shop domain', { shop_domain: 'someone-else.myshopify.com' }],
+      ['not connected', { connection_status: 'failed' }],
+      ['archived', { archived_at: '2026-01-01T00:00:00Z' }],
+      ['no credential', { access_token_encrypted: '' }],
+      ['has a refresh token', { refresh_token_encrypted: 'r' }],
+      ['has an expiry', { access_token_expires_at: '2026-01-01T00:00:00Z' }],
+      ['is a public-app grant', { oauth_app_edition: 'public' }],
+      ['already marked', { connection_provenance: 'direct_legacy_preapproval' }],
+    ]
+    for (const [label, over] of mismatches) {
+      check(`8i: ${label} → verification fails`, verifyRow({ ...eligible(), ...over }, args).some((c: { ok: boolean }) => !c.ok))
+    }
+
+    // ZERO and MULTIPLE matches abort rather than succeed.
+    const empty = new FakeAdmin({ shopify_connections: [] })
+    const zero = await reconcileProvenance(empty as never, args)
+    check('8j: zero matching rows ABORTS', zero.ok === false && zero.abortReason === 'no_matching_connection')
+    const dupes = new FakeAdmin({ shopify_connections: [eligible(), { ...eligible() }] })
+    const many = await reconcileProvenance(dupes as never, args)
+    check('8k: more than one match ABORTS', many.ok === false && many.abortReason === 'multiple_matching_connections', JSON.stringify(many))
+
+    // Dry run verifies but writes nothing.
+    const dry = new FakeAdmin({ shopify_connections: [eligible()] })
+    const dryRes = await reconcileProvenance(dry as never, { ...args, apply: false })
+    check('8l: a dry run passes verification', dryRes.ok === true && dryRes.applied === false)
+    check('8m: …and writes NOTHING', (dry.tables.shopify_connections as any[])[0].connection_provenance === null)
+
+    // Apply marks exactly one row.
+    const live = new FakeAdmin({ shopify_connections: [eligible()] })
+    const applied = await reconcileProvenance(live as never, args)
+    check('8n: --apply marks the row', applied.ok === true && applied.applied === true, JSON.stringify(applied))
+    check('8o: with the exact provenance value',
+      (live.tables.shopify_connections as any[])[0].connection_provenance === DIRECT_LEGACY_PROVENANCE)
+
+    // AND THE POINT OF ALL OF IT: the marked row now publishes.
+    const marked = world({ connection_provenance: null })
+    check('8p: BEFORE the reconciliation the connection is refused',
+      classifyStoredCredential({ ...HISTORICAL, connection_provenance: null } as any) === 'unusable')
+    void marked
+    check('8q: AFTER it, the same row is admitted',
+      classifyStoredCredential({ ...HISTORICAL, connection_provenance: DIRECT_LEGACY_PROVENANCE } as any) === 'legacy')
+
+    // Re-running is a no-op, not a second write.
+    const again = await reconcileProvenance(live as never, args)
+    check('8r: re-running after success ABORTS (already marked)', again.ok === false, JSON.stringify(again))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
