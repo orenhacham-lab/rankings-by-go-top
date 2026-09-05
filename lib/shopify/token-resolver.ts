@@ -81,9 +81,24 @@ export interface ResolvableConnection {
   access_token_expires_at?: string | null
   refresh_token_expires_at?: string | null
   oauth_app_edition?: string | null
+  /**
+   * WHY this connection is permitted to hold a non-expiring credential. Set
+   * explicitly by a reviewed reconciliation; never inferred, and never written
+   * by an OAuth flow. NULL means unknown, which is refused.
+   */
+  connection_provenance?: string | null
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * The ONLY provenance value that admits a non-expiring credential without an
+ * explicit legacy edition. Set exclusively by the reviewed reconciliation in
+ * supabase/migrations/20260905000000_shopify_direct_connection_provenance.sql,
+ * for connections positively identified as the permitted pre-approval direct
+ * connector. No runtime path ever writes it.
+ */
+export const DIRECT_LEGACY_PROVENANCE = 'direct_legacy_preapproval'
 
 /** True when this expiry is far enough away to use the token it belongs to. PURE. */
 export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, now: number = Date.now()): boolean {
@@ -101,45 +116,44 @@ export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, n
  *                   be rotated and its access token may already be dead, so it
  *                   must never be sent to the Admin API on the strength of
  *                   having once had an expiry.
- *   'legacy'        no expiry and no refresh material, and NOT issued by the
- *                   public app — either explicitly 'legacy', or a pre-column
- *                   NULL edition, which can only be a credential issued before
- *                   the public app existed (see the note in the body). Legacy
- *                   custom-app tokens are non-expiring by design.
- *   'unusable'      no expiry and no refresh material, issued by the PUBLIC app.
- *                   A non-expiring public token is exactly the deprecated kind
- *                   the Admin API now refuses, so it is never sent.
+ *   'legacy'        no expiry and no refresh material, and POSITIVELY known not
+ *                   to be a public-app grant: either oauth_app_edition='legacy',
+ *                   or connection_provenance explicitly marks it as the
+ *                   permitted historical direct connector. Such tokens are
+ *                   non-expiring by design.
+ *   'unusable'      no expiry and no refresh material, and provenance is either
+ *                   the PUBLIC app (a non-expiring public token is the
+ *                   deprecated kind the Admin API refuses) or UNKNOWN. Unknown
+ *                   is never promoted to trusted — absence of a value is not
+ *                   evidence of legitimacy.
  */
 export function classifyStoredCredential(c: ResolvableConnection): 'expiring' | 'incomplete' | 'legacy' | 'unusable' {
   const hasRefresh = !!c.refresh_token_encrypted
   const hasExpiry = !!c.access_token_expires_at
   if (hasRefresh) return 'expiring'
   if (hasExpiry) return 'incomplete'
+  // PUBLIC FIRST, and unconditionally. A non-expiring public-app token is the
+  // deprecated kind the Admin API refuses, and NO provenance marking may launder
+  // it — checking the marking first would let a mislabelled row hand out a dead
+  // public credential.
+  if (c.oauth_app_edition === 'public') return 'unusable'
+
   if (c.oauth_app_edition === 'legacy') return 'legacy'
 
-  // PRODUCTION REGRESSION (historical direct connections).
+  // POSITIVELY MARKED historical direct connector. This is the ONE permitted
+  // pre-approval direct connection, and it is admitted because a reviewed
+  // reconciliation SAID SO — never because a column happens to be NULL.
   //
-  // A non-expiring credential with NO recorded edition is a row written BEFORE
-  // oauth_app_edition existed — the column was added by migration
-  // 20260901010000 with no backfill, and every writer since records it: the
-  // OAuth callback always passes `config.edition` (never null, see
-  // lib/shopify/oauth.ts's ShopifyAppEdition) and the App Store link copies the
-  // edition off the pending install. So NULL cannot be produced by any current
-  // path — it can only mean "issued before the public app existed", which is
-  // precisely the legacy custom app.
-  //
-  // Treating that as 'unusable' stranded every intentional pre-approval direct
-  // connection: the resolver refused a perfectly good token, loadShopifyConnection
-  // returned 409, and the automation queue reported "this project has no
-  // connected Shopify store" before it ever contacted Shopify.
-  //
-  // THE PUBLIC-APP GUARD IS UNCHANGED. An edition of 'public' with no expiry and
-  // no refresh material still falls through to 'unusable' below: a non-expiring
-  // PUBLIC token is the deprecated kind the Admin API refuses, and it is still
-  // refused here. Only the pre-column NULL is admitted, and only when there is
-  // no expiry and no refresh material to rotate with.
-  if (c.oauth_app_edition === null || c.oauth_app_edition === undefined) return 'legacy'
+  // A NULL edition means UNKNOWN provenance and stays refused below. Inferring
+  // "no edition recorded, therefore legacy" would convert every historical,
+  // manually-imported or corrupt row into a trusted credential on the strength
+  // of an absence; proving that today's writers populate the column does not
+  // prove anything about rows this code has never seen. See
+  // supabase/migrations/20260905000000_shopify_direct_connection_provenance.sql
+  // for the scoped, positively-identified marking.
+  if (c.connection_provenance === DIRECT_LEGACY_PROVENANCE) return 'legacy'
 
+  // UNKNOWN provenance — including a NULL edition — is refused. Fail closed.
   return 'unusable'
 }
 

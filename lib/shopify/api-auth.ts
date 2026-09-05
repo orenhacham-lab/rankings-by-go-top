@@ -26,6 +26,11 @@ export type ShopifyConnectionRow = {
   // WHICH Shopify app issued this credential. Refresh must use that app's
   // client id + secret; NULL means it was never recorded and is never guessed.
   oauth_app_edition: 'public' | 'legacy' | null
+  /** Reviewed, explicit provenance for a permitted non-expiring credential.
+   *  Optional on the row type: the column is added by a later migration, so a
+   *  not-yet-migrated database simply has no value — which reads as unknown,
+   *  and unknown is refused. */
+  connection_provenance?: string | null
   api_version: string
   connection_status: 'untested' | 'connected' | 'failed'
   last_tested_at: string | null
