@@ -156,6 +156,19 @@ export function hasNamedExternalBusiness(text: string, bs: BrandSafety): { hit: 
 const LATIN_TOKEN_RE = /^[a-z][a-z0-9'.-]*$/
 
 /**
+ * The script the PROJECT'S OWN content is written in. The unknown-latin-token rule
+ * below is only meaningful when latin is FOREIGN to that content, so every caller
+ * must say which case it is in; nothing about this is inferable from the text alone.
+ */
+export type ContentScript = 'hebrew' | 'latin'
+
+/** Map a project's language code to the script its content is written in. Mirrors
+ *  the engine's own `language` derivation (anything starting 'en' is English). */
+export function scriptOfContentLanguage(language: string | null | undefined): ContentScript {
+  return String(language || '').toLowerCase().startsWith('en') ? 'latin' : 'hebrew'
+}
+
+/**
  * UNKNOWN-LATIN-TOKEN detection for model-authored output — the STRUCTURAL form of
  * the per-brief prompt rule "NEVER mention a business, brand or product name that is
  * not in that brief's entities". Prose can be ignored; this cannot.
@@ -173,10 +186,30 @@ const LATIN_TOKEN_RE = /^[a-z][a-z0-9'.-]*$/
  * may itself surface a competitor's name; letting a research-derived query authorise
  * a latin token would re-open exactly that hole.
  *
+ * CONTENT SCRIPT — THE RULE'S PRECONDITION, NOT A DETAIL. Everything above holds
+ * because latin is FOREIGN to the prose: on a Hebrew-language project a latin token
+ * stands out, so "unknown to the project" is real evidence that the model introduced
+ * a name. On a LATIN-SCRIPT project (an English-language store) nothing stands out —
+ * every ordinary word of every legitimate title is a latin token, and "unknown to the
+ * project" only means the word is absent from a vocabulary built from the business
+ * name, entity titles and existing coverage. A polished English headline adds ordinary
+ * English words by design, so the rule flags them and the project's ENTIRE output is
+ * rejected. That is not a theoretical risk: it is the measured Afrodite failure —
+ * 17 candidates generated, 17 rejected as `title_unknown_latin_token`, 0 ideas left,
+ * with no other gate involved (lib/content/__qa__/reco-english-project.qa.ts).
+ * The rule therefore applies ONLY when contentScript is 'hebrew'; on a latin-script
+ * project it has NO SIGNAL and returns nothing. Callers must pass the project's own
+ * script — the default stays 'hebrew' so every existing caller is byte-identical.
+ *
  * LIMITATION — DELIBERATE AND UNCLOSED. This detects the LATIN-SCRIPT case only. A
  * foreign brand written in HEBREW letters, with no legal suffix (BUSINESS_SUFFIX_RE)
  * and no single-edit relationship to an owned name, is NOT detected here and is
  * REJECTED BY NOTHING in this pipeline. "בשמים מתוקים לנשים בהשראת שאנל" is accepted.
+ * On a LATIN-SCRIPT project the SAME already-accepted limitation applies to a latin
+ * brand: containment there rests on hasNamedExternalBusiness (legal suffix / owned-name
+ * mutation), which stays fully active. Widening it would need a name gazetteer or a
+ * model call — the same cost that left the Hebrew case open — and rejecting every
+ * unknown English word is not a substitute for it: it rejects the language, not a brand.
  *
  * It may still be OBSERVED, inconsistently: the broad classifier
  * (classifyKeywordEntity / scanSuggestionBrandSafety) flags such a title WHEN the
@@ -191,8 +224,17 @@ const LATIN_TOKEN_RE = /^[a-z][a-z0-9'.-]*$/
  * cost more than the defect. Containment is therefore PARTIAL: do not read a passing
  * title as proof that no external brand is present.
  */
-export function unknownLatinTokens(text: string, bs: BrandSafety, allowed?: Iterable<string>): string[] {
+export function unknownLatinTokens(
+  text: string,
+  bs: BrandSafety,
+  allowed?: Iterable<string>,
+  contentScript: ContentScript = 'hebrew',
+): string[] {
   if (!text) return []
+  // PRECONDITION (see above): a latin token only carries a foreign-name signal when
+  // the surrounding content is NOT latin. On a latin-script project it is ordinary
+  // prose, so the rule is inert — never "relaxed", simply inapplicable.
+  if (contentScript === 'latin') return []
   const allow = new Set(allowed ?? [])
   return unknownTokens(toks(text), bs).filter((t) => LATIN_TOKEN_RE.test(t) && !allow.has(t))
 }

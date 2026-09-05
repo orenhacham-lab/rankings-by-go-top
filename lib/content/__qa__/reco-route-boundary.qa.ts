@@ -132,7 +132,12 @@ async function main() {
   console.log('E/G) truthful funnel + no customer cost/call/up-to-30 text')
   {
     const route = read('app/api/content/automation/recommendations/route.ts')
-    check('E. the customer funnel always carries engineFiltered (raw − engine-accepted)', /engineFiltered = Math\.max\(0, rawGeneratedCount - engineAcceptedCount\)/.test(route) && /funnel: \{ generated:[^}]*engineFiltered/.test(route))
+    // The three funnel literals are now ONE builder (the persisted response used to be
+    // the odd one out), so this asserts the definition plus that every response uses it.
+    check('E. the customer funnel always carries engineFiltered (raw − engine-accepted)',
+      /engineFiltered = Math\.max\(0, rawGeneratedCount - engineAcceptedCount\)/.test(route)
+      && /const funnelFor = \(generated: number, hiddenOnLoad: number\) => \(\{[\s\S]*?engineFiltered,/.test(route)
+      && (route.match(/funnel: funnelFor\(/g) ?? []).length === 3)
     check('E. newlyAddedCount is the truthful inserted count, not pre-insert fresh', /newlyAddedCount: persistOutcome \? persistOutcome\.inserted : fresh\.length/.test(route))
     const ui = read('components/content/AutomationIdeas.tsx')
     const i18nHe = read('lib/i18n/dashboard/he.ts')

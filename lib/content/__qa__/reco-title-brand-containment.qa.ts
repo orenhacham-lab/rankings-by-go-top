@@ -29,7 +29,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import {
-  buildBrandSafety, unknownLatinTokens, hasNamedExternalBusiness,
+  buildBrandSafety, unknownLatinTokens, hasNamedExternalBusiness, scriptOfContentLanguage,
   containsExternalBusiness, scanSuggestionBrandSafety, detectUnsafeNamedEntityMutation,
   type BrandSafety,
 } from '../recommendations/brand-safety'
@@ -217,6 +217,41 @@ function main() {
       /do not\s*\n?\s*\*?\s*read a passing title as proof that no external brand is present/.test(raw.replace(/\s+/g, ' ')) || /proof that no external brand is present/.test(raw))
   }
 
+  // ── F2) the CONTENT-SCRIPT precondition ─────────────────────────────────────
+  console.log('\nF2) the rule is script-relative — inapplicable, not relaxed, on a latin project')
+  {
+    // An ENGLISH-language project: every ordinary word of every legitimate title is a
+    // latin token, so "unknown to this project" stops being evidence of a name. Applying
+    // the Hebrew-calibrated rule there rejected an entire project's output
+    // (lib/content/__qa__/reco-english-project.qa.ts drives that end to end).
+    const EN_SHOP = buildBrandSafety({
+      businessName: 'Afrodite Decants',
+      entityNames: ['Perfume Decant 5ml', 'Travel Atomizer Set', 'Womens Fragrance Decants'],
+      ownEvidence: [],
+    })
+    const enAllow = allowFor('perfume decant sizes explained')
+    const enTitle = 'perfume decant sizes explained: A Practical Walkthrough'
+    check('F2a. hebrew script (the default, i.e. the old behavior) flags plain English words',
+      unknownLatinTokens(enTitle, EN_SHOP, enAllow).length > 0,
+      JSON.stringify(unknownLatinTokens(enTitle, EN_SHOP, enAllow)))
+    check('F2b. latin script → the rule is inapplicable and flags nothing',
+      unknownLatinTokens(enTitle, EN_SHOP, enAllow, 'latin').length === 0)
+    check('F2c. the default is hebrew, so every pre-existing caller is byte-identical',
+      JSON.stringify(unknownLatinTokens(enTitle, EN_SHOP, enAllow))
+      === JSON.stringify(unknownLatinTokens(enTitle, EN_SHOP, enAllow, 'hebrew')))
+    check('F2d. project language → script', scriptOfContentLanguage('en') === 'latin'
+      && scriptOfContentLanguage('he') === 'hebrew' && scriptOfContentLanguage(null) === 'hebrew')
+    // The protection the Hebrew case relies on is untouched by any of this.
+    check('F2e. a Hebrew title with a foreign brand is still rejected',
+      titleRejected('בשמים מתוקים לנשים מבית Tom Ford', PERFUME, allowFor('בשמים מתוקים לנשים')))
+    // And on a latin project the STRICT named-business detector still carries the load.
+    check('F2f. a legal-suffix business in an English title is still a hard rejection',
+      hasNamedExternalBusiness('perfume decants reviewed by Acme Fragrances Ltd', EN_SHOP).hit)
+    check('F2g. the limitation is stated for BOTH scripts in the code',
+      /On a LATIN-SCRIPT project the SAME already-accepted limitation applies/
+        .test(read('lib/content/recommendations/brand-safety.ts')))
+  }
+
   // ── G) FROZEN ───────────────────────────────────────────────────────────────
   console.log('\nG) FROZEN — no engine, cost, prompt or persistence change')
   {
@@ -236,8 +271,17 @@ function main() {
       !/title_unknown_latin_token|title_named_external_business/.test(read('lib/content/recommendations/topic-idea-store.ts')))
     check('G5. the low-yield fallback seed exclusion (21464c9) is intact',
       /if \(hasNamedExternalBusiness\(phrase, params\.brandSafety\)\.hit\)/.test(read('lib/content/recommendations/low-yield-fallback.ts')))
-    check('G6. the reasons are engine reasons only — no customer-facing i18n string added',
-      !/title_unknown_latin_token/.test(read('lib/i18n/dashboard/he.ts')))
+    // G6 was "no customer-facing i18n string added" — a SCOPE freeze for the increment
+    // that introduced these gates, not a product invariant. It has been superseded on
+    // purpose: an English-language project had all 17 of its candidates removed by (3c)
+    // and the card could only say "17 did not pass quality/relevance checks", because
+    // the engine's reason had no localized sentence to be rendered as. The reason is now
+    // shown — as PROSE in both dictionaries. The invariant that actually matters is that
+    // the CODE itself never reaches a merchant, and that is what is pinned here.
+    check('G6. the engine reason is rendered as localized prose, never as the raw code',
+      /title_unknown_latin_token: '/.test(read('lib/i18n/dashboard/he.ts'))
+      && /title_unknown_latin_token: '/.test(read('lib/i18n/dashboard/en.ts'))
+      && !/title_unknown_latin_token/.test(read('components/content/AutomationIdeas.tsx')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

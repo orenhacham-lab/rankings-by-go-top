@@ -303,8 +303,13 @@ async function main() {
     check('9g: SOURCE — and only when something is non-zero',
       /parserDropped \?\? 0\) > 0 \|\| \(meta\.funnel\.batchDuplicates \?\? 0\) > 0 \|\| \(meta\.funnel\.internalUnaccounted \?\? 0\) > 0/.test(src))
     const route = readFileSync(join(__dirname, '..', '..', '..', 'app', 'api', 'content', 'automation', 'recommendations', 'route.ts'), 'utf8')
-    check('9h: SOURCE — BOTH funnel construction sites include the diagnostics',
-      (route.match(/buildFunnelDiagnostics\(opportunityDiagnostics\)/g) ?? []).length === 2)
+    // Was: "BOTH funnel construction sites include the diagnostics" — two of the three
+    // did, and the third (the persisted path, the one a merchant actually sees) did not.
+    // The three literals are now one builder, so a site cannot be forgotten again.
+    check('9h: SOURCE — ONE builder carries the diagnostics into ALL THREE funnel responses',
+      (route.match(/buildFunnelDiagnostics\(opportunityDiagnostics\)/g) ?? []).length === 1
+      && (route.match(/const funnelFor = /g) ?? []).length === 1
+      && (route.match(/funnel: funnelFor\(/g) ?? []).length === 3)
   }
 
   console.log('\n10) THE SHARED IMPLEMENTATION, TESTED DIRECTLY')

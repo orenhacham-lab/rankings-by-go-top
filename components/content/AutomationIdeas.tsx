@@ -15,6 +15,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
+import { buildEngineRejectionLines } from '@/lib/content/recommendations/engine-rejection-line'
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
@@ -175,7 +176,7 @@ export default function AutomationIdeas({
   const PAGE_STEP = 5
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number; parserDropped?: number; batchDuplicates?: number; internalUnaccounted?: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number; parserDropped?: number; batchDuplicates?: number; internalUnaccounted?: number; engineRejections?: { reason: string; count: number }[]; engineNotProcessed?: number; engineDropped?: number; engineUnexplained?: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -1012,6 +1013,17 @@ export default function AutomationIdeas({
             .replace('{b}', String(meta.funnel.batchDuplicates ?? 0))
             .replace('{u}', String(meta.funnel.internalUnaccounted ?? 0))}
         </p>
+      )}
+      {/* The engine's OWN reasons for the "did not pass quality/relevance checks"
+          count above. That number is a subtraction; on its own it tells a merchant
+          that everything vanished and nothing about why — the run that motivated
+          this line reported 17 generated, 17 filtered and 0 in every named bucket.
+          Reason CODES never reach the screen: each one is looked up in the
+          dictionary, and anything unmapped falls back to a localized sentence. */}
+      {meta?.funnel && !loading && buildEngineRejectionLines(meta.funnel, t).length > 0 && (
+        <div className="mb-2 text-[11px] text-slate-500 dark:text-slate-400" data-testid="engine-rejections">
+          {buildEngineRejectionLines(meta.funnel, t).map((line, i) => (<p key={i}>{line}</p>))}
+        </div>
       )}
       {/* Phase 3I.6 — EXACT match evidence for a zero-new run blocked on existing
           keywords: which existing row (source/status/keyword) killed each idea.
