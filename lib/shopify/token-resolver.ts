@@ -101,19 +101,46 @@ export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, n
  *                   be rotated and its access token may already be dead, so it
  *                   must never be sent to the Admin API on the strength of
  *                   having once had an expiry.
- *   'legacy'        no expiry and no refresh material, issued by the LEGACY
- *                   custom app, whose tokens are non-expiring by design.
- *   'unusable'      no expiry and no refresh material, but issued by the public
- *                   app or by an unrecorded app. A public non-expiring token is
- *                   exactly the deprecated kind the Admin API now refuses, and
- *                   an unknown issuer is never guessed at.
+ *   'legacy'        no expiry and no refresh material, and NOT issued by the
+ *                   public app — either explicitly 'legacy', or a pre-column
+ *                   NULL edition, which can only be a credential issued before
+ *                   the public app existed (see the note in the body). Legacy
+ *                   custom-app tokens are non-expiring by design.
+ *   'unusable'      no expiry and no refresh material, issued by the PUBLIC app.
+ *                   A non-expiring public token is exactly the deprecated kind
+ *                   the Admin API now refuses, so it is never sent.
  */
 export function classifyStoredCredential(c: ResolvableConnection): 'expiring' | 'incomplete' | 'legacy' | 'unusable' {
   const hasRefresh = !!c.refresh_token_encrypted
   const hasExpiry = !!c.access_token_expires_at
   if (hasRefresh) return 'expiring'
   if (hasExpiry) return 'incomplete'
-  return c.oauth_app_edition === 'legacy' ? 'legacy' : 'unusable'
+  if (c.oauth_app_edition === 'legacy') return 'legacy'
+
+  // PRODUCTION REGRESSION (historical direct connections).
+  //
+  // A non-expiring credential with NO recorded edition is a row written BEFORE
+  // oauth_app_edition existed — the column was added by migration
+  // 20260901010000 with no backfill, and every writer since records it: the
+  // OAuth callback always passes `config.edition` (never null, see
+  // lib/shopify/oauth.ts's ShopifyAppEdition) and the App Store link copies the
+  // edition off the pending install. So NULL cannot be produced by any current
+  // path — it can only mean "issued before the public app existed", which is
+  // precisely the legacy custom app.
+  //
+  // Treating that as 'unusable' stranded every intentional pre-approval direct
+  // connection: the resolver refused a perfectly good token, loadShopifyConnection
+  // returned 409, and the automation queue reported "this project has no
+  // connected Shopify store" before it ever contacted Shopify.
+  //
+  // THE PUBLIC-APP GUARD IS UNCHANGED. An edition of 'public' with no expiry and
+  // no refresh material still falls through to 'unusable' below: a non-expiring
+  // PUBLIC token is the deprecated kind the Admin API refuses, and it is still
+  // refused here. Only the pre-column NULL is admitted, and only when there is
+  // no expiry and no refresh material to rotate with.
+  if (c.oauth_app_edition === null || c.oauth_app_edition === undefined) return 'legacy'
+
+  return 'unusable'
 }
 
 function decrypt(value: string): string | null {

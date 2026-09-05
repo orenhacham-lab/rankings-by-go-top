@@ -480,14 +480,19 @@ async function main() {
       check('6b4: a PUBLIC-app non-expiring token is never sent to the Admin API',
         publicLegacyShape.ok === false && publicLegacyShape.reason === 'reauthorization_required')
 
-      // An UNRECORDED issuing app is never guessed at.
+      // An UNRECORDED edition is a PRE-COLUMN row — it can only have been issued
+      // before the public app existed (no writer since the column was added can
+      // produce NULL), so it is the legacy custom app and its non-expiring token
+      // is used. This is the historical direct-connection regression: refusing
+      // it stranded intentional pre-approval connections behind a false
+      // "no connected store".
       const unknownEdition = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
         id: 'c-unknown', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
         refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
         oauth_app_edition: null,
       })
-      check('6b5: an unrecorded issuing app is not guessed — reauthorization is required',
-        unknownEdition.ok === false && unknownEdition.reason === 'reauthorization_required')
+      check('6b5: a PRE-COLUMN (null-edition) non-expiring credential is USED, not refused',
+        unknownEdition.ok === true, JSON.stringify(unknownEdition))
       check('6b6: none of these contacted Shopify', calls === 0)
 
       check('6b7: the shape classifier names each case exactly', (() => {
@@ -495,8 +500,15 @@ async function main() {
         return classifyStoredCredential({ ...base, refresh_token_encrypted: 'r', access_token_expires_at: 'now' }) === 'expiring'
           && classifyStoredCredential({ ...base, access_token_expires_at: 'now' }) === 'incomplete'
           && classifyStoredCredential({ ...base, oauth_app_edition: 'legacy' }) === 'legacy'
+          // The public-app guard is UNCHANGED — this is the case that must stay refused.
           && classifyStoredCredential({ ...base, oauth_app_edition: 'public' }) === 'unusable'
-          && classifyStoredCredential({ ...base }) === 'unusable'
+          // A pre-column NULL edition is legacy by construction, not unusable.
+          && classifyStoredCredential({ ...base }) === 'legacy'
+          && classifyStoredCredential({ ...base, oauth_app_edition: null }) === 'legacy'
+          // …but only when there is nothing to rotate with: an expiry or refresh
+          // material still classifies first, regardless of the null edition.
+          && classifyStoredCredential({ ...base, access_token_expires_at: 'now' }) === 'incomplete'
+          && classifyStoredCredential({ ...base, refresh_token_encrypted: 'r' }) === 'expiring'
       })())
     } finally { globalThis.fetch = originalFetch }
   }
