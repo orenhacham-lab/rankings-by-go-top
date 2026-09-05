@@ -379,7 +379,18 @@ export async function generateOpportunities(
       const td: TierDiagnostics = { tier: 1, confidence_level: 'high_confidence', clusters_available: familyClusters.length, clusters_sent_to_model: familyClusters.length, model_calls: 0, raw_candidates: 0, parse_ok: false, mapped_opportunities: 0, rejected_by_reason: {}, persisted: 0 }
       tierDiags.push(td)
       const produced = await synthAndValidate(buildFamilyPrompt(familyClusters, ctx, langLabel, year, input.targetCount, family), { tier: 1, confidenceLevel: 'high_confidence', discovery: false }, td)
-      for (const s of produced) { const k = normalizeText(s.primaryKeyword); if (!k || seen.has(k)) continue; seen.add(k); pool.push({ ...s, opportunityFamily: family }) }
+      // EVERY exit from the funnel is TYPED AND COUNTED. This loop used to drop
+      // candidates with a bare `continue` — after td.raw_candidates had already
+      // counted them — so a run could report N candidates generated, zero
+      // accepted, and an empty rejected_by_reason: the ledger said nothing had
+      // been rejected while everything had been. Both causes are now named.
+      for (const s of produced) {
+        const k = normalizeText(s.primaryKeyword)
+        if (!k) { bump(td, 'empty_primary_keyword'); continue }
+        if (seen.has(k)) { bump(td, 'cross_family_duplicate'); continue }
+        seen.add(k)
+        pool.push({ ...s, opportunityFamily: family })
+      }
       familiesRun.push(1)
     }
 
@@ -418,6 +429,17 @@ export async function generateOpportunities(
   const ranked = rankClusters(clusters)
   const rejected_by_reason: Record<string, number> = {}
   for (const td of tierDiags) for (const [r, n] of Object.entries(td.rejected_by_reason)) rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + n
+
+  // SELF-ACCOUNTING LEDGER. Generated candidates either survive into the
+  // deterministic pool or leave it for a named reason — there is no third
+  // outcome. Any residual is a drop this code failed to name, and it is
+  // surfaced as `unaccounted` rather than silently vanishing: a funnel that
+  // reports "17 generated, 0 accepted, nothing rejected" is describing a bug,
+  // and it must say so on the spot instead of looking like a quiet zero.
+  // This never removes or adds a candidate; it only makes the numbers add up.
+  const namedRejections = Object.values(rejected_by_reason).reduce((a, b) => a + b, 0)
+  const unaccounted = planStageIds.generated_candidates - planStageIds.deterministic_survivor_ids.length - namedRejections
+  if (unaccounted > 0) rejected_by_reason.unaccounted = (rejected_by_reason.unaccounted ?? 0) + unaccounted
   const persisted_by_confidence: Record<string, number> = {}
   for (const s of outcome.suggestions) { const c = s.confidenceLevel ?? 'high_confidence'; persisted_by_confidence[c] = (persisted_by_confidence[c] ?? 0) + 1 }
   const persisted_by_page_type: Record<string, number> = {}
