@@ -913,6 +913,7 @@ export const dashboardEn = {
       shopify_credentials_unavailable: 'We couldn’t refresh your Shopify credentials just now. This is temporary — publishing will be retried.',
       shopify_credential_unreadable: 'Your stored Shopify credentials could not be read. Reconnect the store to continue publishing.',
       shopify_connection_unreadable: 'We couldn’t read your Shopify connection just now. This is temporary — publishing will be retried.',
+      shopify_connection_inactive: 'Your Shopify store connection is not active. Reconnect the store to continue publishing.',
       no_shopify_connection: 'This project has no connected Shopify store.',
       entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
       usage_period_unavailable: 'We couldn’t verify your billing period just now. Please try again shortly.',

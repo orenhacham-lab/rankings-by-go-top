@@ -915,6 +915,7 @@ export const dashboardHe = {
       shopify_credentials_unavailable: 'לא הצלחנו לרענן כרגע את פרטי ההתחברות ל-Shopify. זו תקלה זמנית — הפרסום ינוסה שוב.',
       shopify_credential_unreadable: 'לא ניתן לקרוא את פרטי ההתחברות השמורים ל-Shopify. חברו מחדש את החנות כדי להמשיך לפרסם.',
       shopify_connection_unreadable: 'לא הצלחנו לקרוא כרגע את חיבור ה-Shopify. זו תקלה זמנית — הפרסום ינוסה שוב.',
+      shopify_connection_inactive: 'חיבור חנות ה-Shopify אינו פעיל. חברו מחדש את החנות כדי להמשיך לפרסם.',
       no_shopify_connection: 'לפרויקט הזה אין חנות Shopify מחוברת.',
       entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
       usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב. נסו שוב בעוד רגע.',

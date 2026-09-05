@@ -42,6 +42,8 @@ Module._load = function (request: string, parent: any, isMain: boolean) {
 // real thing is the stronger test anyway.
 process.env.CONTENT_CREDENTIALS_ENCRYPTION_KEY = '0'.repeat(64)
 
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { encryptCredential } from '../../security/credentials-crypto'
 import { classifyStoredCredential, DIRECT_LEGACY_PROVENANCE } from '../token-resolver'
@@ -189,14 +191,31 @@ async function main() {
     const res2 = await publishShopifyPoolItem(none as never, { ...item(none) })
     check('4e: a genuinely missing store still reports no_shopify_connection', res2.reason === 'no_shopify_connection', String(res2.reason))
 
+    // EXHAUSTIVE, read from the union itself. A hand-written list is how a member
+    // gets forgotten: this suite previously enumerated five codes and omitted
+    // `shopify_connection_inactive`, which the queue can persist and the alert
+    // renderer would then have printed verbatim (see 4h). The list is derived from
+    // api-auth.ts so a new failure reason cannot ship without a sentence.
+    const unionSrc = readFileSync(join(__dirname, '..', 'api-auth.ts'), 'utf8')
+    const unionBlock = unionSrc.split('export type ShopifyConnectionFailureReason =')[1]?.split('\n\n')[0] ?? ''
+    const ALL_REASONS = Array.from(new Set((unionBlock.match(/'([a-z_]+)'/g) ?? []).map((m) => m.slice(1, -1))))
+    check('4f0: the union was parsed (7 reasons)', ALL_REASONS.length === 7, JSON.stringify(ALL_REASONS))
     for (const lang of ['en', 'he'] as const) {
       const g = (getDashboardDictionary(lang).contentHub as any).genErrors
-      for (const code of ['shopify_reauthorization_required', 'shopify_app_not_configured', 'shopify_credentials_unavailable', 'shopify_credential_unreadable', 'shopify_connection_unreadable']) {
-        check(`4f[${lang}] ${code} is localized, never shown raw`, typeof g[code] === 'string' && g[code].length > 10)
+      for (const code of ALL_REASONS) {
+        check(`4f[${lang}] ${code} is localized, never shown raw`,
+          typeof g[code] === 'string' && g[code].length > 10 && g[code] !== code, JSON.stringify(g[code]))
       }
       check(`4g[${lang}] the reconnect message does NOT claim the store is missing`,
         !/no Shopify store|אין חנות/.test(g.shopify_reauthorization_required), g.shopify_reauthorization_required)
     }
+    // Why 4f matters: the alert renderer falls back to the CODE. A missing sentence
+    // is not a blank line, it is `shopify_connection_inactive` shown to a merchant.
+    const schedule = readFileSync(join(__dirname, '..', '..', '..', 'components', 'content', 'AutomationSchedule.tsx'), 'utf8')
+    check('4h: the renderer falls back to the raw code, so every reason MUST be mapped',
+      /const label = genErrors\[base\] \?\? base/.test(schedule))
+    check('4i: …and it renders that label on the blocked-publish alert',
+      /reasonLabel\(a\.error\)/.test(schedule))
   }
 
   console.log('\n5) AN INVALID LEGACY TOKEN REACHES SHOPIFY AND IS REJECTED TRUTHFULLY')
