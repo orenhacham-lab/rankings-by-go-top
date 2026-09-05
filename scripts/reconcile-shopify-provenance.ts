@@ -150,6 +150,14 @@ export async function reconcileProvenance(
     .is('access_token_expires_at', null)
     .is('oauth_app_edition', null)
     .is('connection_provenance', null)
+    // The credential must STILL be present at write time. Verifying it on the
+    // read and omitting it here left a window in which the token could be
+    // removed or emptied between the two, and the row would be marked
+    // direct_legacy_preapproval anyway — permitting a credential that no longer
+    // exists. Both halves are required: `neq('')` alone does not exclude NULL in
+    // SQL (NULL != '' is unknown), and a NOT NULL test alone does not exclude ''.
+    .not('access_token_encrypted', 'is', null)
+    .neq('access_token_encrypted', '')
     .select('id')
 
   if (updateError) return { ok: false, checks, matched: 1, applied: false, abortReason: 'update_failed' }

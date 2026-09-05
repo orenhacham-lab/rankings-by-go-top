@@ -359,6 +359,85 @@ async function main() {
     check('8r: re-running after success ABORTS (already marked)', again.ok === false, JSON.stringify(again))
   }
 
+  console.log('\n9) THE WRITE MUST RE-ASSERT EVERY VERIFIED PREDICATE')
+  {
+    const { reconcileProvenance, verifyRow } = require('../../../scripts/reconcile-shopify-provenance')
+    const ID = '11111111-2222-3333-4444-555555555555'
+    const PID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const UID = '99999999-8888-7777-6666-555555555555'
+    const SHOP = 'oligarch.myshopify.com'
+    const args = { connectionId: ID, projectId: PID, shopDomain: SHOP, userId: UID, apply: true }
+    const eligible = () => ({
+      id: ID, project_id: PID, user_id: UID, shop_domain: SHOP,
+      connection_status: 'connected', archived_at: null,
+      access_token_encrypted: 'enc', refresh_token_encrypted: null,
+      access_token_expires_at: null, oauth_app_edition: null, connection_provenance: null,
+    })
+
+    /**
+     * Mutate the row BETWEEN the verification read and the update.
+     * reconcileProvenance touches the table exactly twice: call 1 is the SELECT,
+     * call 2 is the UPDATE. Mutating at the start of call 2 means verification
+     * saw a good row and only the WRITE can catch the change — which is what
+     * makes these assertions about the write predicate rather than the read.
+     */
+    function racingAdmin(mutation: Record<string, unknown>) {
+      const admin = new FakeAdmin({ shopify_connections: [eligible()] })
+      const original = admin.from.bind(admin)
+      let call = 0
+      ;(admin as unknown as { from: (t: string) => unknown }).from = (t: string) => {
+        if (t === 'shopify_connections') {
+          call += 1
+          if (call === 2) Object.assign((admin.tables.shopify_connections as any[])[0], mutation)
+        }
+        return original(t)
+      }
+      return admin
+    }
+
+    // ── THE CREDENTIAL RACE, the one that was unguarded.
+    for (const [label, gone] of [['removed (NULL)', null], ['emptied ("")', '']] as const) {
+      const racing = racingAdmin({ access_token_encrypted: gone })
+      const res = await reconcileProvenance(racing as never, args)
+      check(`9a: credential ${label} between read and write → the UPDATE matches nothing`,
+        res.ok === false && res.abortReason === 'affected_rows_not_exactly_one', JSON.stringify({ ok: res.ok, reason: res.abortReason }))
+      check(`9b: …and provenance is left NULL for ${label}`,
+        (racing.tables.shopify_connections as any[])[0].connection_provenance === null)
+    }
+
+    // ── EVERY read predicate re-asserted on the write, one field at a time.
+    const perField: [string, Record<string, unknown>][] = [
+      ['project_id', { project_id: 'moved' }],
+      ['user_id', { user_id: 'moved' }],
+      ['shop_domain', { shop_domain: 'other.myshopify.com' }],
+      ['connection_status', { connection_status: 'failed' }],
+      ['archived_at', { archived_at: '2026-09-01T00:00:00Z' }],
+      ['access_token_encrypted', { access_token_encrypted: null }],
+      ['refresh_token_encrypted', { refresh_token_encrypted: 'r' }],
+      ['access_token_expires_at', { access_token_expires_at: '2027-01-01T00:00:00Z' }],
+      ['oauth_app_edition', { oauth_app_edition: 'public' }],
+      ['connection_provenance', { connection_provenance: 'direct_legacy_preapproval' }],
+    ]
+    for (const [field, mutation] of perField) {
+      const admin = racingAdmin(mutation)
+      const res = await reconcileProvenance(admin as never, args)
+      check(`9c: the WRITE re-asserts ${field} (changed after verification → 0 rows)`,
+        res.ok === false && res.abortReason === 'affected_rows_not_exactly_one',
+        `${field}: ${JSON.stringify({ ok: res.ok, reason: res.abortReason })}`)
+      check(`9c2: …and ${field} left provenance untouched`,
+        (admin.tables.shopify_connections as any[])[0].connection_provenance !== 'direct_legacy_preapproval'
+        || field === 'connection_provenance')
+    }
+    check('9d: the read checks the ten mutable predicates above, plus the id itself',
+      verifyRow(eligible(), args).length === perField.length + 1)
+
+    // Control: nothing changes between read and write → it still applies.
+    const clean = new FakeAdmin({ shopify_connections: [eligible()] })
+    const okRes = await reconcileProvenance(clean as never, args)
+    check('9e: CONTROL — an unchanged row still applies (the guards are not blanket)',
+      okRes.ok === true && okRes.applied === true, JSON.stringify(okRes))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }

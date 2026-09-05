@@ -9,7 +9,7 @@ type Row = Record<string, unknown>
 /** Shared counter for auto-assigned ids on plain inserts (mirrors a real
  *  Postgres `DEFAULT gen_random_uuid()` id column). */
 let fakeRowIdCounter = 0
-interface Filter { kind: 'eq' | 'neq' | 'is' | 'gt' | 'lt' | 'in'; col: string; val: unknown }
+interface Filter { kind: 'eq' | 'neq' | 'is' | 'gt' | 'lt' | 'in' | 'not_is'; col: string; val: unknown }
 /** Per-op DB-error injectors, keyed by mutation kind, to exercise fail-closed handling. */
 export interface ErrorHooks { insert?: () => { code: string } | null; update?: () => { code?: string; message?: string } | null; upsert?: () => { code?: string; message?: string } | null; select?: () => { code?: string; message?: string } | null; delete?: () => { code?: string; message?: string } | null }
 
@@ -36,6 +36,13 @@ class FakeQuery {
   neq(col: string, val: unknown) { this.filters.push({ kind: 'neq', col, val }); return this }
   in(col: string, vals: unknown[]) { this.filters.push({ kind: 'in', col, val: vals }); return this }
   is(col: string, val: unknown) { this.filters.push({ kind: 'is', col, val }); return this }
+  /** PostgREST .not(col, op, val). Only the `is` operator is modelled — the one
+   *  callers use for NOT NULL. Distinct from `neq`, which follows JS `!==` and
+   *  therefore would NOT exclude a NULL the way SQL does. */
+  not(col: string, op: string, val: unknown) {
+    if (op !== 'is') throw new Error(`FakeAdmin.not: unsupported operator '${op}'`)
+    this.filters.push({ kind: 'not_is', col, val }); return this
+  }
   gt(col: string, val: unknown) { this.filters.push({ kind: 'gt', col, val }); return this }
   lt(col: string, val: unknown) { this.filters.push({ kind: 'lt', col, val }); return this }
   order(col: string, opts?: { ascending?: boolean }) { this.orderSpec.push({ col, ascending: opts?.ascending !== false }); return this }
@@ -58,6 +65,7 @@ class FakeQuery {
   private matchOne(r: Row, f: Filter): boolean {
     return f.kind === 'eq' ? r[f.col] === f.val
       : f.kind === 'neq' ? r[f.col] !== f.val
+        : f.kind === 'not_is' ? (f.val === null ? r[f.col] != null : r[f.col] !== f.val)
         : f.kind === 'in' ? (f.val as unknown[]).includes(r[f.col])
           : f.kind === 'is' ? (f.val === null ? r[f.col] == null : r[f.col] === f.val)
             : f.kind === 'gt' ? (r[f.col] as string | number) > (f.val as string | number)
