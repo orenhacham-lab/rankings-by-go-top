@@ -38,7 +38,7 @@ async function blockShopifyItem(admin: Admin, item: PoolItem, reason: string, ar
   await finalizeItem(admin, item.id, 'paused', reason)
   await recordPublishBlockedAlert(admin, {
     projectId: item.project_id, poolItemId: item.id, articleId: item.article_id, topicId: item.topic_id,
-    title: articleTitle, error: reason, attempts: item.attempts ?? 0,
+    title: articleTitle, error: reason, attempts: item.attempts ?? 0, channel: 'shopify',
   })
 }
 
@@ -94,7 +94,7 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
       if (((item.attempts ?? 0) + 1) < AUTOMATION_MAX_ATTEMPTS) return
       await recordPublishFinalFailureAlert(admin, {
         projectId: item.project_id, poolItemId: item.id, articleId, topicId: item.topic_id,
-        title: articleTitle, error: reason, attempts: (item.attempts ?? 0) + 1,
+        title: articleTitle, error: reason, attempts: (item.attempts ?? 0) + 1, channel: 'shopify',
       })
     }
 
@@ -140,7 +140,7 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     // overwrite Shopify's own timestamp with a local one on every retry.
     await admin.from('generated_articles').update({ last_error: null, updated_at: nowIso() }).eq('id', articleId)
     await admin.from('article_pool_items').update({ status: 'published', published_at: nowIso(), last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', item.id)
-    await resolvePublishAlerts(admin, item.id)
+    await resolvePublishAlerts(admin, item.id, { articleId, channel: 'shopify' })
     return { itemId: item.id, status: 'published', articleId, wpPostUrl: result.url }
   } catch (e) {
     // Area E — this path previously had NO try/catch: an unexpected throw here

@@ -342,7 +342,13 @@ export const dashboardEn = {
       alertOverdue: 'Queue is overdue — the due item has not published yet',
       alertHint: 'Run one manual pass, or open the queue item and retry (generate/publish). After a few attempts an item is marked failed and waits for a human.',
       // Phase 4B.1 — persisted final-failure alerts.
-      alertPublishFailedTitle: 'WordPress publish failed',
+      // Derived from the alert's own channel — never a constant. The generic
+      // heading is for legacy rows that predate the channel column: naming a
+      // platform the record does not name is what this replaces.
+      alertPublishFailedShopify: 'Shopify publish failed',
+      alertPublishFailedWordPress: 'WordPress publish failed',
+      alertPublishFailedGeneric: 'Publishing failed',
+      alertReasonOther: 'the publishing service reported an error',
       // Area E — action-required block (paused): the owner must fix the cause, then retry.
       alertBlockedTitle: 'Publishing blocked — action required',
       alertAttempts: 'after {n} attempts',
@@ -947,6 +953,23 @@ export const dashboardEn = {
       shopify_connection_unreadable: 'We couldn’t read your Shopify connection just now. This is temporary — publishing will be retried.',
       shopify_connection_inactive: 'Your Shopify store connection is not active. Reconnect the store to continue publishing.',
       no_shopify_connection: 'This project has no connected Shopify store.',
+      // Publish-path reasons that can reach an ALERT. Both the bare code and the
+      // `shopify_`-prefixed form are listed, because the queue persists the bare
+      // code for a deterministic blocker and the prefixed one for a failed attempt.
+      no_active_publishing_platform: 'This project has no connected publishing platform yet. Connect Shopify or WordPress, then retry.',
+      platform_conflict: 'Both Shopify and WordPress are connected for this project. Disconnect one so we know where to publish.',
+      publish_quality_gate_failed: 'The article did not pass the publish-time quality check, so it was not published.',
+      shopify_publish_quality_gate_failed: 'The article did not pass the publish-time quality check, so it was not published.',
+      token_invalid: 'Shopify rejected the stored authorization. Reconnect the store to continue publishing.',
+      shopify_token_invalid: 'Shopify rejected the stored authorization. Reconnect the store to continue publishing.',
+      permission_error: 'The store did not grant permission for this action. Reconnect the store to grant it.',
+      shopify_permission_error: 'The store did not grant permission for this action. Reconnect the store to grant it.',
+      remote_article_missing: 'The article no longer exists on the store, so it could not be updated.',
+      shopify_remote_article_missing: 'The article no longer exists on the store, so it could not be updated.',
+      graphql_user_error: 'The store rejected the article. Please try again, and contact support if it repeats.',
+      shopify_graphql_user_error: 'The store rejected the article. Please try again, and contact support if it repeats.',
+      billing_not_entitled: 'Publishing is not included in the current plan state. Check your billing and try again.',
+      shopify_billing_not_entitled: 'Publishing is not included in the current plan state. Check your billing and try again.',
       entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
       usage_period_unavailable: 'We couldn’t verify your billing period just now. Please try again shortly.',
       gemini_quota_exceeded: 'Gemini quota / rate limit exceeded. Please try again later.',

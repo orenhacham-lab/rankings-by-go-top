@@ -25,10 +25,14 @@ import { join } from 'path'
 import { spawn, type ChildProcess } from 'child_process'
 import {
   resolveRequestLocale, migrateLocalePreference, languageCookieString, readCookie,
-  isEnglishPath, LANGUAGE_COOKIE, LOCALE_HEADER, DEFAULT_LOCALE,
+  isEnglishPath, LANGUAGE_COOKIE, LOCALE_HEADER, REQUEST_FALLBACK_LOCALE,
+  routeContentLocale, publicMarketingSegments,
 } from '../request-locale'
 import { documentLocaleAttributes } from '../document-locale'
 import { resolveDashboardLocale } from '../dashboard/locale'
+import { parseAcceptLanguage, localeFromAcceptLanguage } from '../accept-language'
+import { getSiteMetadata } from '../site-metadata'
+import { readdirSync } from 'fs'
 
 let pass = 0, fail = 0, blocked = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -40,14 +44,27 @@ const ROOT = join(__dirname, '..', '..', '..')
 const PORT = 3997
 const BASE = `http://127.0.0.1:${PORT}`
 
+/** The raw server response body — no browser, no JavaScript executed. */
+async function rawBody(path: string, opts: { cookie?: string; acceptLanguage?: string } = {}): Promise<string> {
+  const headers: Record<string, string> = {}
+  if (opts.cookie) headers.cookie = opts.cookie
+  // Node's fetch sends NO Accept-Language of its own, so omitting this is a
+  // faithful "missing header" case rather than an accidental default.
+  if (opts.acceptLanguage !== undefined) headers['accept-language'] = opts.acceptLanguage
+  const res = await fetch(`${BASE}${path}`, { headers, redirect: 'manual' })
+  return await res.text()
+}
+
 /** The <html …> tag exactly as the server wrote it. */
-async function htmlTag(path: string, cookie?: string): Promise<string> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: cookie ? { cookie } : undefined,
-    redirect: 'manual',
-  })
-  const body = await res.text()
+async function htmlTag(path: string, cookie?: string, acceptLanguage?: string): Promise<string> {
+  const body = await rawBody(path, { cookie, acceptLanguage })
   return (body.match(/<html[^>]*>/) || [''])[0]
+}
+
+/** The <title> exactly as the server wrote it. */
+async function titleTag(path: string, opts: { cookie?: string; acceptLanguage?: string } = {}): Promise<string> {
+  const body = await rawBody(path, opts)
+  return (body.match(/<title[^>]*>([\s\S]*?)<\/title>/) || ['', ''])[1].trim()
 }
 
 async function waitForServer(proc: ChildProcess, ms: number): Promise<boolean> {
@@ -93,7 +110,7 @@ async function main() {
       console.log('1) THE INITIAL SERVER RESPONSE — raw HTML, no JavaScript executed')
       {
         const heDefault = await htmlTag('/')
-        check('1a: no preference at all → lang="he" dir="rtl"',
+        check('1a: the Hebrew marketing root with no preference → lang="he" dir="rtl"',
           /lang="he"/.test(heDefault) && /dir="rtl"/.test(heDefault), heDefault)
 
         const enCookie = await htmlTag('/', `${LANGUAGE_COOKIE}=en`)
@@ -124,11 +141,82 @@ async function main() {
         const appHe = await htmlTag('/login', `${LANGUAGE_COOKIE}=he`)
         check('3b: …and HE/RTL for the HE preference', /lang="he"/.test(appHe) && /dir="rtl"/.test(appHe), appHe)
         const junk = await htmlTag('/', `${LANGUAGE_COOKIE}=zz`)
-        check('3c: an unrecognised cookie falls back to Hebrew, never to a broken value',
+        check('3c: an unrecognised cookie never yields a broken value — the route decides',
           /lang="he"/.test(junk) && /dir="rtl"/.test(junk), junk)
         const other = await htmlTag('/', 'some-other-cookie=en')
         check('3d: an unrelated cookie is ignored', /lang="he"/.test(other), other)
       }
+      console.log('\n3B) FIRST VISIT, RAW SERVER RESPONSE — no cookie, no stored preference')
+      {
+        // The reported defect: a reviewer with an English browser and nothing
+        // stored opened the full dashboard in Hebrew RTL. /login is the app
+        // surface an unauthenticated reviewer actually lands on, and it is
+        // bilingual, so the browser's own header decides.
+        const enBrowser = await htmlTag('/login', undefined, 'en-US,en;q=0.9')
+        check('3B-a: no cookie + Accept-Language en-US,en;q=0.9 → lang="en" dir="ltr"',
+          /lang="en"/.test(enBrowser) && /dir="ltr"/.test(enBrowser), enBrowser)
+        check('3B-b: …and the response carries no Hebrew/RTL at all',
+          !/lang="he"/.test(enBrowser) && !/dir="rtl"/.test(enBrowser), enBrowser)
+
+        const heBrowser = await htmlTag('/login', undefined, 'he-IL,he;q=0.9,en;q=0.8')
+        check('3B-c: no cookie + Accept-Language he-IL,he;q=0.9,en;q=0.8 → lang="he" dir="rtl"',
+          /lang="he"/.test(heBrowser) && /dir="rtl"/.test(heBrowser), heBrowser)
+
+        const noHeader = await htmlTag('/login')
+        check('3B-d: a MISSING Accept-Language → lang="en" dir="ltr"',
+          /lang="en"/.test(noHeader) && /dir="ltr"/.test(noHeader), noHeader)
+        const junkHeader = await htmlTag('/login', undefined, ';;;q=abc,,,')
+        check('3B-e: an INVALID Accept-Language → lang="en" dir="ltr"',
+          /lang="en"/.test(junkHeader) && /dir="ltr"/.test(junkHeader), junkHeader)
+
+        // A q-weighted header that a substring test would get wrong.
+        const weighted = await htmlTag('/login', undefined, 'he;q=0.1,en;q=0.9')
+        check('3B-f: q-values are honoured on the wire (he;q=0.1,en;q=0.9 → English)',
+          /lang="en"/.test(weighted), weighted)
+
+        // Cookies still win over the browser, in both directions.
+        const enCookieHeBrowser = await htmlTag('/login', `${LANGUAGE_COOKIE}=en`, 'he-IL,he;q=0.9')
+        check('3B-g: an EN cookie overrides a Hebrew browser',
+          /lang="en"/.test(enCookieHeBrowser) && /dir="ltr"/.test(enCookieHeBrowser), enCookieHeBrowser)
+        const heCookieEnBrowser = await htmlTag('/login', `${LANGUAGE_COOKIE}=he`, 'en-US,en;q=0.9')
+        check('3B-h: an HE cookie overrides an English browser',
+          /lang="he"/.test(heCookieEnBrowser) && /dir="rtl"/.test(heCookieEnBrowser), heCookieEnBrowser)
+
+        // /en still wins over everything, and the Hebrew marketing tree is never
+        // relabelled by a browser header.
+        const enPathHeBrowser = await htmlTag('/en', `${LANGUAGE_COOKIE}=he`, 'he-IL,he;q=0.9')
+        check('3B-i: /en outranks both an HE cookie and a Hebrew browser',
+          /lang="en"/.test(enPathHeBrowser) && /dir="ltr"/.test(enPathHeBrowser), enPathHeBrowser)
+        const heMarketingEnBrowser = await htmlTag('/', undefined, 'en-US,en;q=0.9')
+        check('3B-j: the Hebrew marketing root is NOT relabelled English by an English browser',
+          /lang="he"/.test(heMarketingEnBrowser) && /dir="rtl"/.test(heMarketingEnBrowser), heMarketingEnBrowser)
+
+        // The Shopify embedded entry point shares the resolver.
+        const shopifyEn = await htmlTag('/shopify/app', undefined, 'en-US,en;q=0.9')
+        check('3B-k: the Shopify embedded entry point uses the SAME resolver (English browser → en/ltr)',
+          /lang="en"/.test(shopifyEn) && /dir="ltr"/.test(shopifyEn), shopifyEn)
+        const shopifyHe = await htmlTag('/shopify/app', `${LANGUAGE_COOKIE}=he`)
+        check('3B-l: …and an HE cookie moves it too',
+          /lang="he"/.test(shopifyHe) && /dir="rtl"/.test(shopifyHe), shopifyHe)
+      }
+
+      console.log('\n3C) METADATA FOLLOWS THE DOCUMENT — raw <title> off the wire')
+      {
+        const enTitle = await titleTag('/login', { acceptLanguage: 'en-US,en;q=0.9' })
+        const heTitle = await titleTag('/login', { acceptLanguage: 'he-IL,he;q=0.9' })
+        check('3C-a: an English document has a non-Hebrew <title>',
+          enTitle.length > 0 && !/[\u0590-\u05FF]/.test(enTitle), enTitle)
+        check('3C-b: a Hebrew document keeps its Hebrew <title>',
+          /[\u0590-\u05FF]/.test(heTitle), heTitle)
+        check('3C-c: the two are genuinely different', enTitle !== heTitle, `${enTitle} / ${heTitle}`)
+        const enCookieTitle = await titleTag('/login', { cookie: `${LANGUAGE_COOKIE}=en` })
+        check('3C-d: the cookie moves the title as well as the document',
+          !/[\u0590-\u05FF]/.test(enCookieTitle), enCookieTitle)
+        const enBody = await rawBody('/login', { acceptLanguage: 'en-US,en;q=0.9' })
+        check('3C-e: og:locale on an English document is en_US, not he_IL',
+          enBody.includes('en_US') && !enBody.includes('he_IL'))
+      }
+
     } finally {
       try { server.kill('SIGKILL') } catch { /* ignore */ }
     }
@@ -143,7 +231,15 @@ async function main() {
     check('4c: the seed is used only when there is no cookie',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en'
       && resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
-    check('4d: the default is Hebrew', resolveRequestLocale({}) === DEFAULT_LOCALE && DEFAULT_LOCALE === 'he')
+    check('4d: with NO signal of any kind the fallback is English, not Hebrew',
+      resolveRequestLocale({}) === REQUEST_FALLBACK_LOCALE && REQUEST_FALLBACK_LOCALE === 'en')
+    check('4d2: the route content language outranks the browser but not the cookie',
+      resolveRequestLocale({ pathname: '/', acceptLanguage: 'en-US,en;q=0.9' }) === 'he'
+      && resolveRequestLocale({ pathname: '/pricing', acceptLanguage: 'en-US' }) === 'he'
+      && resolveRequestLocale({ pathname: '/', cookieValue: 'en' }) === 'en')
+    check('4d3: a bilingual app route falls through to the browser',
+      resolveRequestLocale({ pathname: '/dashboard', acceptLanguage: 'en-US,en;q=0.9' }) === 'en'
+      && resolveRequestLocale({ pathname: '/dashboard', acceptLanguage: 'he-IL,he;q=0.9,en;q=0.8' }) === 'he')
     check('4e: /english is NOT an English route (prefix must be a segment)', isEnglishPath('/english') === false)
     check('4f: /en and /en/… are', isEnglishPath('/en') && isEnglishPath('/en/terms'))
 
@@ -174,8 +270,13 @@ async function main() {
     const rootLayout = require('fs').readFileSync(join(ROOT, 'app', 'layout.tsx'), 'utf8')
     check('5d: SOURCE — the root layout renders that locale, not a hard-coded one',
       /<html lang=\{lang\} dir=\{dir\}/.test(rootLayout) && !/<html lang="he" dir="rtl"/.test(rootLayout))
+    // The seed read moved into the request-cached context so generateMetadata and
+    // the render share ONE resolution; the seed itself is unchanged.
+    const rootReqSrc = require('fs').readFileSync(join(ROOT, 'lib', 'i18n', 'root-request.ts'), 'utf8')
     check('5e: SOURCE — the root layout resolves the locale server-side, seed included',
-      /getServerLocale\(localeSeed\)/.test(rootLayout))
+      /const \{ isAuthenticated, locale \} = await getRootRequestContext\(\)/.test(rootLayout)
+      && /user\?\.user_metadata\?\.locale/.test(rootReqSrc)
+      && /getServerLocale\(seed\)/.test(rootReqSrc))
     check('5g: the SEED survives — an English signup on a cookie-less device still gets English',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')
     check('5h: …while an explicit cookie still outranks it',
@@ -183,6 +284,87 @@ async function main() {
     const dashLayout = require('fs').readFileSync(join(ROOT, 'app', '(dashboard)', 'layout.tsx'), 'utf8')
     check('5f: SOURCE — the dashboard seeds the provider from the SAME server locale',
       /getServerLocale\(/.test(dashLayout))
+  }
+
+  console.log('\n7) ACCEPT-LANGUAGE — parsed, with q-values; never a substring test')
+  {
+    check('7a: q-values decide, not order — he;q=0.1,en;q=0.9 is ENGLISH',
+      localeFromAcceptLanguage('he;q=0.1,en;q=0.9') === 'en')
+    check('7b: …and en;q=0.1,he;q=0.9 is HEBREW',
+      localeFromAcceptLanguage('en;q=0.1,he;q=0.9') === 'he')
+    check('7c: equal q keeps the sender\'s own order',
+      localeFromAcceptLanguage('he,en') === 'he' && localeFromAcceptLanguage('en,he') === 'en')
+    check('7d: an absent q means 1 and outranks an explicit lower one',
+      localeFromAcceptLanguage('en,he;q=0.9') === 'en')
+    check('7e: q=0 means NOT acceptable and is skipped',
+      localeFromAcceptLanguage('he;q=0,en;q=0.5') === 'en')
+    check('7f: region subtags are matched on the primary subtag',
+      localeFromAcceptLanguage('en-GB') === 'en' && localeFromAcceptLanguage('he-IL') === 'he'
+      && localeFromAcceptLanguage('EN-us') === 'en')
+    check('7g: the legacy Hebrew code iw is recognised', localeFromAcceptLanguage('iw-IL') === 'he')
+    // The exact failure a substring test produces: "he" inside another tag.
+    check('7h: NOT a substring test — zh-Hant contains "he" and is not Hebrew',
+      localeFromAcceptLanguage('zh-Hant,zh;q=0.9') === null)
+    check('7i: unsupported languages yield null so the caller\'s own fallback applies',
+      localeFromAcceptLanguage('fr-FR,de;q=0.8') === null)
+    check('7j: the wildcard is not a preference for either language',
+      localeFromAcceptLanguage('*') === null)
+    check('7k: missing / empty / junk headers never throw and yield null',
+      localeFromAcceptLanguage(null) === null && localeFromAcceptLanguage('') === null
+      && localeFromAcceptLanguage(';;;,,,') === null && localeFromAcceptLanguage('   ') === null)
+    check('7l: a malformed q drops that entry rather than promoting it',
+      localeFromAcceptLanguage('he;q=abc,en;q=0.4') === 'en'
+      && localeFromAcceptLanguage('he;q=7,en') === 'en')
+    check('7m: the parser reports the ordered entries it used',
+      JSON.stringify(parseAcceptLanguage('en;q=0.8,he;q=0.9')) === JSON.stringify([{ tag: 'he', q: 0.9 }, { tag: 'en', q: 0.8 }]))
+    check('7n: whitespace around parameters is tolerated',
+      localeFromAcceptLanguage(' he-IL ; q=0.2 , en-US ; q=0.7 ') === 'en')
+  }
+
+  console.log('\n8) THE ROUTE\'S OWN LANGUAGE — a fixed-content page is never mislabelled')
+  {
+    check('8a: the Hebrew marketing tree states Hebrew',
+      routeContentLocale('/') === 'he' && routeContentLocale('/pricing') === 'he'
+      && routeContentLocale('/about') === 'he' && routeContentLocale('/articles/x') === 'he')
+    check('8b: the English tree states English', routeContentLocale('/en') === 'en' && routeContentLocale('/en/pricing') === 'en')
+    check('8c: bilingual surfaces state nothing and defer to the user',
+      routeContentLocale('/dashboard') === null && routeContentLocale('/login') === null
+      && routeContentLocale('/shopify/app') === null && routeContentLocale('/content') === null)
+    check('8d: /english is not the English tree', routeContentLocale('/english') === null)
+    // DRIFT GUARD: a new marketing section that is not in the list would be
+    // labelled by the browser header instead of by its own Hebrew content.
+    const publicDirs = readdirSync(join(ROOT, 'app', '(public)'), { withFileTypes: true })
+      .filter((d) => d.isDirectory() && d.name !== 'en')
+      .map((d) => d.name)
+    const missing = publicDirs.filter((d) => routeContentLocale(`/${d}`) !== 'he')
+    check('8e: every directory in app/(public) is covered by the marketing list',
+      missing.length === 0, `missing: ${JSON.stringify(missing)} — known: ${JSON.stringify(publicMarketingSegments())}`)
+  }
+
+  console.log('\n9) LOCALIZED DOCUMENT METADATA')
+  {
+    const he = getSiteMetadata('he')
+    const en = getSiteMetadata('en')
+    check('9a: the two locales have genuinely different titles', he.title !== en.title)
+    check('9b: the English title carries no Hebrew characters', !/[\u0590-\u05FF]/.test(en.title), en.title)
+    check('9c: the Hebrew title is unchanged from the previous constant',
+      he.title === 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top')
+    check('9d: og:locale follows the document locale', he.ogLocale === 'he_IL' && en.ogLocale === 'en_US')
+    check('9e: description and keywords are localized too',
+      he.description !== en.description && he.keywords !== en.keywords
+      && !/[\u0590-\u05FF]/.test(en.description) && !/[\u0590-\u05FF]/.test(en.keywords))
+    const rootLayout = require('fs').readFileSync(join(ROOT, 'app', 'layout.tsx'), 'utf8')
+    check('9f: SOURCE — metadata is generated per request from the resolved locale',
+      /export async function generateMetadata\(\)/.test(rootLayout)
+      && /getSiteMetadata\(locale\)/.test(rootLayout))
+    check('9g: SOURCE — no hard-coded Hebrew title object survives in the layout',
+      !/^\s*export const metadata: Metadata = \{/m.test(rootLayout))
+    check('9h: SOURCE — metadata and <html> share ONE request-cached resolution',
+      /getRootRequestContext\(\)/.test(rootLayout)
+      && (rootLayout.match(/getRootRequestContext\(\)/g) ?? []).length === 2)
+    const rootReq = require('fs').readFileSync(join(ROOT, 'lib', 'i18n', 'root-request.ts'), 'utf8')
+    check('9i: SOURCE — that resolution is React-cached, so it runs once per request',
+      /cache\(async \(\)/.test(rootReq) && /from 'react'/.test(rootReq))
   }
 
   console.log('\n6) SWITCHING AND MIGRATION — deterministic, cookie-first')

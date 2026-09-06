@@ -15,6 +15,8 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { presentAlert } from '@/lib/content/automation/alert-presentation'
+import { alertReasonCode, type ActiveAlert } from '@/lib/content/automation/alert-read-model'
 
 type Cadence = 'daily' | 'weekly' | 'monthly' | 'custom'
 type Preset = 'weekly1' | 'weekly2' | 'custom'
@@ -60,24 +62,46 @@ export default function AutomationSchedule({
 }) {
   const t = getDashboardDictionary(language).contentHub.autoSchedule
   const locale = language === 'he' ? 'he-IL' : 'en-US'
-  // Phase 3G.2 — map a raw failure code (e.g. gemini_quota_exceeded) to a friendly,
-  // short reason; unknown codes fall back to the raw string.
+  // Phase 3G.2 — map a stored failure code (e.g. gemini_quota_exceeded) to short,
+  // localized prose. See reasonLabel below for why the stored string's TAIL is
+  // never rendered.
   const genErrors = getDashboardDictionary(language).contentHub.genErrors as Record<string, string>
+  // ONE dictionary slice for the alert composer, so the card and its test read
+  // the same strings through the same function.
+  const alertDict = {
+    alertBlockedTitle: t.alertBlockedTitle,
+    alertPublishFailedShopify: t.alertPublishFailedShopify,
+    alertPublishFailedWordPress: t.alertPublishFailedWordPress,
+    alertPublishFailedGeneric: t.alertPublishFailedGeneric,
+    alertAttempts: t.alertAttempts,
+    alertReasonOther: t.alertReasonOther,
+    genErrors,
+  }
+  /**
+   * It used to append the stored string's tail — `label — <tail>` — "so it is
+   * debuggable". That tail is the PROVIDER's own text: for a Shopify failure it
+   * is the GraphQL userError, verbatim, on the merchant's screen. Debuggability
+   * belongs in the row and the server log, both of which still hold the full
+   * string; the panel shows the CODE's sentence and nothing else. An
+   * unrecognised code degrades to a localized sentence rather than printing
+   * itself, so the identifier never leaks either. alertReasonCode is the shared
+   * extractor, so this panel and the alert read model agree on what a code is.
+   */
   const reasonLabel = (code: string | null | undefined): string => {
     if (!code) return ''
-    const idx = code.indexOf(':')
-    const base = (idx >= 0 ? code.slice(0, idx) : code).trim()
-    const tail = idx >= 0 ? code.slice(idx + 1).trim() : ''
-    const label = genErrors[base] ?? base
-    // Keep the sanitized raw preview for unknown provider errors so it is debuggable.
-    return tail ? `${label} — ${tail}` : label
+    const base = alertReasonCode(code)
+    if (!base) return t.alertReasonOther
+    return genErrors[base] ?? t.alertReasonOther
   }
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [items, setItems] = useState<QueueItem[]>([])
   const [health, setHealth] = useState<{ needsAttention: boolean; overdue: boolean; failedCount: number; stuckCount: number; latestError: string | null } | null>(null)
   // Phase 4B.1 — persisted final-failure alerts (one per item, owner-scoped).
-  const [alerts, setAlerts] = useState<{ id: string; pool_item_id: string | null; article_id: string | null; kind: string | null; title: string | null; error: string | null; attempts: number; created_at: string }[]>([])
+  // The API now returns the shared read model: a channel, a derived heading and a
+  // typed reason CODE. The raw `error` string is deliberately absent from the
+  // payload — it can carry provider/GraphQL text and belongs in server logs.
+  const [alerts, setAlerts] = useState<ActiveAlert[]>([])
   // Safety A — surface a clear config error when the alerts migration is missing
   // (never silently hide that failures aren't being recorded).
   const [alertsMigrationMissing, setAlertsMigrationMissing] = useState(false)
@@ -465,19 +489,19 @@ export default function AutomationSchedule({
             {alerts.map((a) => (
               <div key={a.id} className="rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/20 px-3 py-2">
                 <p className="text-xs font-semibold text-red-800 dark:text-red-300">
-                  {(a.kind === 'publish_blocked' ? t.alertBlockedTitle : t.alertPublishFailedTitle)}{a.title ? ` — ${a.title}` : ''}
+                  {presentAlert(a, alertDict).heading}
                 </p>
                 <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-400 break-words">
-                  {t.alertAttempts.replace('{n}', String(a.attempts))}{a.error ? ` · ${reasonLabel(a.error)}` : ''}
+                  {presentAlert(a, alertDict).detail}
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  {a.article_id && (
-                    <Link href={`/content/articles/${a.article_id}`} className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                  {a.articleId && (
+                    <Link href={`/content/articles/${a.articleId}`} className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                       {t.alertViewArticle}
                     </Link>
                   )}
-                  {a.pool_item_id && (
-                    <button type="button" onClick={() => retryFromAlert(a.pool_item_id!)} disabled={busyItem === a.pool_item_id}
+                  {a.poolItemId && (
+                    <button type="button" onClick={() => retryFromAlert(a.poolItemId!)} disabled={busyItem === a.poolItemId}
                       className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline disabled:opacity-50">
                       {t.alertRetryNow}
                     </button>

@@ -209,13 +209,17 @@ async function main() {
       check(`4g[${lang}] the reconnect message does NOT claim the store is missing`,
         !/no Shopify store|אין חנות/.test(g.shopify_reauthorization_required), g.shopify_reauthorization_required)
     }
-    // Why 4f matters: the alert renderer falls back to the CODE. A missing sentence
-    // is not a blank line, it is `shopify_connection_inactive` shown to a merchant.
+    // Why 4f still matters after the alert read-model change. The renderer no
+    // longer prints an unmapped code — that leak was closed — but it now falls
+    // back to a VAGUE sentence, so a missing string turns a specific, actionable
+    // reason ("reconnect the store") into "the publishing service reported an
+    // error". Losing the truth quietly is the failure mode 4f prevents.
     const schedule = readFileSync(join(__dirname, '..', '..', '..', 'components', 'content', 'AutomationSchedule.tsx'), 'utf8')
-    check('4h: the renderer falls back to the raw code, so every reason MUST be mapped',
-      /const label = genErrors\[base\] \?\? base/.test(schedule))
-    check('4i: …and it renders that label on the blocked-publish alert',
-      /reasonLabel\(a\.error\)/.test(schedule))
+    check('4h: an unmapped reason degrades to localized prose, never to the raw code',
+      /return genErrors\[base\] \?\? t\.alertReasonOther/.test(schedule)
+      && !/const label = genErrors\[base\] \?\? base/.test(schedule))
+    check('4i: …and the blocked-publish alert renders through the shared composer',
+      /presentAlert\(a, alertDict\)/.test(schedule) && !/reasonLabel\(a\.error\)/.test(schedule))
   }
 
   console.log('\n5) AN INVALID LEGACY TOKEN REACHES SHOPIFY AND IS REJECTED TRUTHFULLY')

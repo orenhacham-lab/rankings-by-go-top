@@ -342,7 +342,13 @@ export const dashboardHe = {
       alertOverdue: 'התור באיחור — טרם פורסם הפריט שהגיע זמנו',
       alertHint: 'אפשר להריץ הרצה ידנית אחת, או לפתוח את פריט התור ולנסות שוב (יצירה/פרסום). לאחר מספר ניסיונות הפריט יסומן כנכשל וימתין לטיפול.',
       // Phase 4B.1 — persisted final-failure alerts.
-      alertPublishFailedTitle: 'פרסום ל-WordPress נכשל',
+      // Derived from the alert's own channel — never a constant. The generic
+      // heading is for legacy rows that predate the channel column: naming a
+      // platform the record does not name is what this replaces.
+      alertPublishFailedShopify: 'הפרסום ל-Shopify נכשל',
+      alertPublishFailedWordPress: 'הפרסום ל-WordPress נכשל',
+      alertPublishFailedGeneric: 'הפרסום נכשל',
+      alertReasonOther: 'שירות הפרסום דיווח על שגיאה',
       // Area E — חסימה הדורשת טיפול (מושהה): יש לתקן את הסיבה ואז לנסות שוב.
       alertBlockedTitle: 'הפרסום חסום — נדרש טיפול',
       alertAttempts: 'לאחר {n} ניסיונות',
@@ -949,6 +955,23 @@ export const dashboardHe = {
       shopify_connection_unreadable: 'לא הצלחנו לקרוא כרגע את חיבור ה-Shopify. זו תקלה זמנית — הפרסום ינוסה שוב.',
       shopify_connection_inactive: 'חיבור חנות ה-Shopify אינו פעיל. חברו מחדש את החנות כדי להמשיך לפרסם.',
       no_shopify_connection: 'לפרויקט הזה אין חנות Shopify מחוברת.',
+      // Publish-path reasons that can reach an ALERT. Both the bare code and the
+      // `shopify_`-prefixed form are listed, because the queue persists the bare
+      // code for a deterministic blocker and the prefixed one for a failed attempt.
+      no_active_publishing_platform: 'לפרויקט הזה עדיין אין פלטפורמת פרסום מחוברת. חברו Shopify או WordPress ונסו שוב.',
+      platform_conflict: 'גם Shopify וגם WordPress מחוברים לפרויקט הזה. נתקו אחד מהם כדי שנדע לאן לפרסם.',
+      publish_quality_gate_failed: 'המאמר לא עבר את בדיקת האיכות שלפני הפרסום ולכן לא פורסם.',
+      shopify_publish_quality_gate_failed: 'המאמר לא עבר את בדיקת האיכות שלפני הפרסום ולכן לא פורסם.',
+      token_invalid: 'Shopify דחתה את ההרשאה השמורה. חברו מחדש את החנות כדי להמשיך לפרסם.',
+      shopify_token_invalid: 'Shopify דחתה את ההרשאה השמורה. חברו מחדש את החנות כדי להמשיך לפרסם.',
+      permission_error: 'החנות לא העניקה הרשאה לפעולה הזו. חברו מחדש את החנות כדי להעניק אותה.',
+      shopify_permission_error: 'החנות לא העניקה הרשאה לפעולה הזו. חברו מחדש את החנות כדי להעניק אותה.',
+      remote_article_missing: 'המאמר כבר לא קיים בחנות ולכן לא ניתן היה לעדכן אותו.',
+      shopify_remote_article_missing: 'המאמר כבר לא קיים בחנות ולכן לא ניתן היה לעדכן אותו.',
+      graphql_user_error: 'החנות דחתה את המאמר. נסו שוב, ואם זה חוזר פנו לתמיכה.',
+      shopify_graphql_user_error: 'החנות דחתה את המאמר. נסו שוב, ואם זה חוזר פנו לתמיכה.',
+      billing_not_entitled: 'הפרסום אינו כלול במצב התוכנית הנוכחי. בדקו את החיוב ונסו שוב.',
+      shopify_billing_not_entitled: 'הפרסום אינו כלול במצב התוכנית הנוכחי. בדקו את החיוב ונסו שוב.',
       entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
       usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב. נסו שוב בעוד רגע.',
       gemini_quota_exceeded: 'חריגה ממכסת Gemini / הגבלת קצב. נסו שוב מאוחר יותר.',

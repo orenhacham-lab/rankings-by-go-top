@@ -1,11 +1,21 @@
 /**
  * Content automation — GET /api/content/automation/alerts?projectId=…
  *
- * Phase 4B.1 — list the project's OPEN failure alerts (persisted, owner-scoped).
+ * Phase 4B.1 — list the project's ACTIVE failure alerts (persisted, owner-scoped).
  * Read-only. Gated by ENABLE_CONTENT_AUTOMATION + project ownership.
+ *
+ * The decision lives in lib/content/automation/load-active-alerts, shared with
+ * /api/content/overview, so the two endpoints cannot disagree about whether a
+ * project has an open problem — they did, and the Content Hub and the automation
+ * panel showed different answers for the same project at the same moment.
+ *
+ * The response carries a typed `reasonCode`, never the stored `error` string:
+ * that column may hold a raw provider/GraphQL detail, which belongs in server
+ * logs, not in a public API response or on a merchant's screen.
  */
 
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
+import { loadActiveAlerts } from '@/lib/content/automation/load-active-alerts'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,28 +27,15 @@ export async function GET(request: Request) {
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  try {
-    const { data, error } = await auth.admin
-      .from('content_automation_alerts')
-      .select('id, pool_item_id, article_id, topic_id, kind, title, error, attempts, status, created_at, updated_at')
-      .eq('project_id', auth.project.id)
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(50)
-    if (error) {
-      // Safety A — the migration is a REQUIRED dependency. If the table is
-      // missing we must NOT pretend the feature is healthy with an empty list;
-      // surface a clear configuration error (503) so a silent final-failure is
-      // never hidden just because the alert store isn't there.
-      if ((error as { code?: string }).code === '42P01') {
-        return Response.json({ error: 'automation_alerts_migration_required', migrationRequired: true }, { status: 503 })
-      }
-      console.error('[automation-alerts] list failed', { message: error.message })
-      return Response.json({ error: 'Failed to load alerts' }, { status: 500 })
+  const result = await loadActiveAlerts(auth.admin as never, auth.project.id)
+  if (!result.ok) {
+    // Safety A — the migration is a REQUIRED dependency. If the table is missing
+    // we must NOT pretend the feature is healthy with an empty list; surface a
+    // clear configuration error (503) so a silent final-failure is never hidden.
+    if (result.reason === 'migration_required') {
+      return Response.json({ error: 'automation_alerts_migration_required', migrationRequired: true }, { status: 503 })
     }
-    return Response.json({ alerts: data ?? [] })
-  } catch (e) {
-    console.error('[automation-alerts] list threw', { message: e instanceof Error ? e.message : String(e) })
     return Response.json({ error: 'alerts_unavailable' }, { status: 500 })
   }
+  return Response.json({ alerts: result.alerts })
 }

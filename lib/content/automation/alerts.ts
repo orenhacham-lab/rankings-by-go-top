@@ -13,6 +13,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
+import type { AlertChannel } from './alert-read-model'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -43,6 +44,15 @@ export interface RecordPublishFailureInput {
   title: string | null
   error: string
   attempts: number
+  /**
+   * WHERE the attempt was going. Required for every publish-path caller so the
+   * Content Hub can name the platform instead of assuming one — the alert used
+   * to render under a hard-coded "WordPress publish failed" heading whatever the
+   * project actually publishes to. Omitted ONLY for a genuinely platform-neutral
+   * blocker (no connected platform, or two conflicting ones), where the honest
+   * answer is that no channel was chosen; the read model renders those neutrally.
+   */
+  channel?: AlertChannel | null
 }
 
 /**
@@ -63,6 +73,7 @@ async function upsertAlert(admin: Admin, input: RecordPublishFailureInput, kind:
       article_id: input.articleId,
       topic_id: input.topicId,
       kind,
+      channel: input.channel ?? null,
       dedupe_key: dedupeKey,
       title: input.title,
       error: input.error.slice(0, 500),
@@ -95,16 +106,42 @@ export async function recordPublishBlockedAlert(admin: Admin, input: RecordPubli
 }
 
 /**
- * Mark any OPEN alert for this item as resolved (recovered) — called after a
- * successful publish / reconcile. No-throw.
+ * Mark OPEN alerts as resolved after a successful publish / reconcile. No-throw.
+ *
+ * BY ITEM (unchanged) — the queue item that just succeeded.
+ *
+ * BY ARTICLE (added) — the same article on the same channel, plus legacy rows
+ * that carry NO channel. A failure is about an attempt; once the article is
+ * published, an older attempt's alert is history. Resolving only by pool item
+ * left exactly that behind: an article re-queued as a NEW item published
+ * successfully while the previous item's alert stayed open forever, which is how
+ * a long-closed Shopify failure was still being shown. Scoped to the SAME
+ * article, so an unrelated project or article is never touched, and to the same
+ * channel (or an unknown one), so a WordPress success cannot clear a Shopify
+ * failure. Two statements rather than one `.or(…)`: each predicate is explicit
+ * and independently verifiable.
  */
-export async function resolvePublishAlerts(admin: Admin, poolItemId: string): Promise<void> {
+export async function resolvePublishAlerts(
+  admin: Admin,
+  poolItemId: string,
+  opts?: { articleId?: string | null; channel?: AlertChannel | null },
+): Promise<void> {
+  const patch = { status: 'resolved', resolved_at: nowIso(), updated_at: nowIso() }
   try {
-    await admin.from(ALERTS)
-      .update({ status: 'resolved', resolved_at: nowIso(), updated_at: nowIso() })
-      .eq('pool_item_id', poolItemId)
-      .eq('status', 'open')
+    await admin.from(ALERTS).update(patch).eq('pool_item_id', poolItemId).eq('status', 'open')
   } catch (e) {
     console.warn('[content-alerts] resolve failed (non-fatal)', { poolItemId, message: e instanceof Error ? e.message : String(e) })
+  }
+  const articleId = opts?.articleId
+  if (!articleId) return
+  try {
+    if (opts?.channel) {
+      await admin.from(ALERTS).update(patch).eq('article_id', articleId).eq('status', 'open').eq('channel', opts.channel)
+    }
+    // Legacy rows predate the column; an unknown channel cannot be used to argue
+    // this publication was unrelated, so a success for the article clears them.
+    await admin.from(ALERTS).update(patch).eq('article_id', articleId).eq('status', 'open').is('channel', null)
+  } catch (e) {
+    console.warn('[content-alerts] resolve-by-article failed (non-fatal)', { articleId, message: e instanceof Error ? e.message : String(e) })
   }
 }

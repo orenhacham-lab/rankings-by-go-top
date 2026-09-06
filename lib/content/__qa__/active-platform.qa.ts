@@ -55,7 +55,10 @@ async function main() {
     check('publishPoolItem dispatches via loadActivePlatform (not row existence)', /loadActivePlatform\(/.test(publishItem) && /active\.platform === 'conflict'/.test(publishItem) && /active\.platform === 'shopify'/.test(publishItem) && /active\.platform === 'none'/.test(publishItem) && !/select\('id'\)\.eq\('project_id', item\.project_id\)/.test(publishItem))
 
     const overview = read('../../../app/api/content/overview/route.ts')
-    check('overview returns shopify + resolved platform + shopify article fields', /resolveActivePlatform\(/.test(overview) && /shopify,\s*platform\s*}\)/.test(overview) && /shopify_article_id/.test(overview))
+    // The response gained `alerts` (the shared read model), so the payload is
+    // matched on its members rather than on the exact closing shape.
+    check('overview returns shopify + resolved platform + shopify article fields', /resolveActivePlatform\(/.test(overview) && /shopify,\s*platform,/.test(overview) && /shopify_article_id/.test(overview))
+    check('overview also returns the shared active-alert decision', /alerts,\s*alertsUnavailable\s*}\)/.test(overview) && /loadActiveAlerts\(/.test(overview))
 
     const hub = read('../../../components/content/ContentHub.tsx')
     check('ContentHub routes row + batch by activePlatform to the Shopify route', /activePlatform: ActivePlatform = data\?\.platform\?\.platform/.test(hub) && /articles\/\$\{a\.id\}\/shopify/.test(hub) && /articles\/\$\{id\}\/shopify/.test(hub) && /if \(activePlatform === 'shopify'\) \{ await exportRowShopify/.test(hub))
