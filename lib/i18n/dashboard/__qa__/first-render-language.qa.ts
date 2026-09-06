@@ -237,12 +237,19 @@ async function main() {
   console.log('\nG) a missing provider is a reported bug, not a Hebrew page')
   {
     const provider = read('lib/i18n/dashboard/useDashboardLanguage.tsx')
+    const code = provider.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
     check('G1: the fallback no longer returns a hard-coded Hebrew locale',
-      !/return \{ language: 'he', setDashboardLanguage/.test(provider))
-    check('G2: it reads the lang the server already wrote on <html>',
-      /document\.documentElement\.lang/.test(provider))
-    check('G3: …and it reports the wiring bug instead of hiding it',
-      /console\.error\(\'\[dashboard-language\]/.test(provider))
+      !/return \{ language: 'he', setDashboardLanguage/.test(code))
+    // DETERMINISM. An earlier revision read document.documentElement.lang, which
+    // does not exist during SSR — so the server and the first client render could
+    // answer differently and hydrate over a mismatch, reintroducing the very flip
+    // this branch removes. The value must be identical on both sides.
+    check('G2: it does NOT read the document — that would differ between SSR and the client',
+      !/document\.documentElement\.lang/.test(code))
+    check('G3: development THROWS, so a wiring bug cannot be walked past',
+      /if \(process\.env\.NODE_ENV !== 'production'\) throw new Error\(message\)/.test(code))
+    check('G4: production reports it and returns ONE constant, the same on server and client',
+      /console\.error\(message\)/.test(code) && /return REQUEST_FALLBACK_LOCALE/.test(code))
   }
 
   // ── H) the locale precedence from PR #58 is untouched ─────────────────────

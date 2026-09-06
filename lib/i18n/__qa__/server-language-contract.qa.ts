@@ -287,6 +287,51 @@ async function main() {
         }
       }
 
+      console.log('\n3F) /login — the BODY, not just the attributes')
+      {
+        // The previous acceptance pass called /login English on the strength of
+        // <html lang="en"> and the <title>. The visible form was Hebrew. This
+        // reads the body copy off the wire, which is what a reviewer sees.
+        const enBody = await rawBody('/login', { acceptLanguage: 'en-US,en;q=0.9' })
+        const visible = (html: string) => html
+          .replace(/<script[\s\S]*?<\/script>/g, '')
+          .replace(/<style[\s\S]*?<\/style>/g, '')
+          .replace(/<head[\s\S]*?<\/head>/g, '')
+        const enVisible = visible(enBody)
+        check('3F-a: the English sign-in form is in the BODY',
+          enVisible.includes('Sign in') && enVisible.includes('Email address') && enVisible.includes('Password'),
+          enVisible.slice(0, 200))
+        check('3F-b: and NOT ONE Hebrew character is in the visible body',
+          !/[\u0590-\u05FF]/.test(enVisible),
+          (enVisible.match(/[\u0590-\u05FF][^<]{0,30}/g) ?? []).slice(0, 5).join(' | '))
+        check('3F-c: the page direction is ltr', /<main[^>]*\sdir="ltr"/.test(enBody))
+
+        const heBody = visible(await rawBody('/login', { acceptLanguage: 'he-IL,he;q=0.9' }))
+        check('3F-d: a Hebrew request gets the Hebrew form',
+          /[\u0590-\u05FF]/.test(heBody) && !heBody.includes('Email address'), heBody.slice(0, 200))
+        check('3F-e: …and the two bodies genuinely differ', enVisible !== heBody)
+
+        const cookieBody = visible(await rawBody('/login', { cookie: `${LANGUAGE_COOKIE}=en`, acceptLanguage: 'he-IL,he;q=0.9' }))
+        check('3F-f: an EN cookie moves the form too, over a Hebrew browser',
+          cookieBody.includes('Sign in') && !/[\u0590-\u05FF]/.test(cookieBody))
+
+        // The English route and the ?lang the OAuth callback carries.
+        const enRoute = visible(await rawBody('/en/login', { cookie: `${LANGUAGE_COOKIE}=he` }))
+        check('3F-g: /en/login is English even under an HE cookie',
+          enRoute.includes('Sign in') && !/[\u0590-\u05FF]/.test(enRoute))
+        const langQuery = visible(await rawBody('/login?lang=en', { acceptLanguage: 'he-IL,he;q=0.9' }))
+        check('3F-h: ?lang=en still overrides a Hebrew browser', langQuery.includes('Sign in'))
+
+        // /signup, the other reachable auth surface.
+        const signupEn = visible(await rawBody('/signup', { acceptLanguage: 'en-US,en;q=0.9' }))
+        check('3F-i: /signup is English for an English request',
+          signupEn.includes('Create your account') && !/[\u0590-\u05FF]/.test(signupEn),
+          (signupEn.match(/[\u0590-\u05FF][^<]{0,30}/g) ?? []).slice(0, 4).join(' | '))
+        const signupHe = visible(await rawBody('/signup', { acceptLanguage: 'he-IL,he;q=0.9' }))
+        check('3F-j: …and Hebrew for a Hebrew request',
+          /[\u0590-\u05FF]/.test(signupHe) && !signupHe.includes('Create your account'))
+      }
+
       console.log('\n3C) METADATA FOLLOWS THE DOCUMENT — raw <title> off the wire')
       {
         const enTitle = await titleTag('/login', { acceptLanguage: 'en-US,en;q=0.9' })

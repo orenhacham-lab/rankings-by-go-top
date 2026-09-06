@@ -4,9 +4,10 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from '
 import { DocumentLocaleEffect } from '@/components/DocumentLocaleEffect'
 import {
   LANGUAGE_COOKIE, languageCookieString, readCookie, migrateLocalePreference,
+  REQUEST_FALLBACK_LOCALE,
 } from '@/lib/i18n/request-locale'
 import type { Locale } from '../locales'
-import { normalizeLocale as normalize, resolveDashboardLocale } from './locale'
+import { resolveDashboardLocale } from './locale'
 
 /** The single, existing dashboard-language store key (localStorage). Exported so the
  *  signup flow can seed it without a second competing key. */
@@ -89,35 +90,34 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
 }
 
 /**
- * The locale to use when a consumer is rendered OUTSIDE the provider.
+ * A consumer rendered OUTSIDE the provider is a WIRING BUG, and this decides how
+ * loudly it fails.
  *
- * That is a wiring bug, and the old fallback answered it with a hard-coded
- * 'he' — so a missing provider on an English request produced a silently Hebrew
- * subtree that looked like a translation gap rather than the mistake it is.
+ * Two earlier answers were both wrong. A hard-coded 'he' was SILENT — a missing
+ * provider on an English request produced a Hebrew subtree that read as a
+ * translation gap rather than the mistake it is. Reading
+ * `document.documentElement.lang` fixed the silence but broke DETERMINISM: there
+ * is no document during SSR, so the server and the first client render could
+ * answer differently and React would hydrate over a mismatch — reintroducing, in
+ * a new place, exactly the flip this branch exists to remove.
  *
- * There is no context to read, so this uses the one authoritative value that is
- * still in reach: the `lang` the server already wrote on <html> from the request
- * contract. That element is rendered by the root layout on every response, so on
- * the client it is always present and always correct. During SSR there is no
- * document and genuinely no signal at all — the constant there is a guess, which
- * is why the console error below exists rather than a quiet default.
+ * So: development THROWS, because a wiring bug should be impossible to walk past
+ * and every consumer is proven to be inside a provider (see
+ * lib/i18n/dashboard/__qa__/first-render-language.qa.ts). Production reports it
+ * and returns ONE CONSTANT — the same value on the server and on the client, in
+ * every render, so nothing can diverge. It is the same constant the request
+ * contract ends at, so the codebase has exactly one answer to "no signal at all".
  */
-function fallbackLocaleOutsideProvider(): Locale {
-  try {
-    const lang = typeof document !== 'undefined' ? document.documentElement.lang : null
-    const normalized = normalize(lang)
-    if (normalized) return normalized
-  } catch { /* no DOM — fall through */ }
-  return 'he'
+function assertProviderPresent(): Locale {
+  const message = '[dashboard-language] useDashboardLanguage() was called outside DashboardLanguageProvider. '
+    + 'The subtree cannot follow the language contract — wrap it in the provider.'
+  if (process.env.NODE_ENV !== 'production') throw new Error(message)
+  console.error(message)
+  return REQUEST_FALLBACK_LOCALE
 }
 
 export function useDashboardLanguage(): DashboardLanguageContextValue {
   const ctx = useContext(DashboardLanguageContext)
   if (ctx) return ctx
-  // NOT silent. A consumer outside the provider cannot follow the language
-  // switch and cannot be trusted to match the document, so it is reported.
-  if (process.env.NODE_ENV !== 'production') {
-    console.error('[dashboard-language] useDashboardLanguage() called outside DashboardLanguageProvider — the subtree cannot follow the language contract.')
-  }
-  return { language: fallbackLocaleOutsideProvider(), setDashboardLanguage: () => {}, isLoaded: true }
+  return { language: assertProviderPresent(), setDashboardLanguage: () => {}, isLoaded: true }
 }
