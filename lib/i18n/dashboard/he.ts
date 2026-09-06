@@ -175,7 +175,6 @@ export const dashboardHe = {
       tryOther: 'לא נמצאו רעיונות. נסו מקור אחר או מילת מפתח רחבה יותר.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
       funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {e} לא עברו בדיקות איכות ורלוונטיות · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
-      funnelDiagnosticsLine: 'הוסרו בנוסף: {p} לא ניתנו לקריאה מהמחולל · {b} חזרו על רעיון אחר באותה מנה · {u} הוסרו בשל תקלה פנימית שלא הצלחנו לזהות',
       // The engine's OWN ledger for the "did not pass quality/relevance checks" count.
       // Without it that number is a subtraction with no explanation behind it.
       engineRejectionsLine: 'למה הם הוסרו: {list}',
@@ -943,9 +942,6 @@ export const dashboardHe = {
       shopify_blog_lookup_failed: 'לא הצלחנו לקרוא כרגע את הבלוגים שלכם ב-Shopify. זו תקלה זמנית — הפרסום ינוסה שוב.',
       missing_write_content_scope: 'לאפליקציה חסרה הרשאה לפרסם מאמרים בחנות. חברו מחדש את החנות כדי להעניק אותה.',
       shopify_missing_write_content_scope: 'לאפליקציה חסרה הרשאה לפרסם מאמרים בחנות. חברו מחדש את החנות כדי להעניק אותה.',
-      cross_family_duplicate: 'הרעיון הזה חזר על רעיון קיים, ולכן אוחד במקום להופיע פעמיים.',
-      empty_primary_keyword: 'הרעיון הגיע בלי מילת מפתח שמישה, ולכן לא ניתן היה להפוך אותו לנושא.',
-      unaccounted: 'חלק מהרעיונות הוסרו מסיבה שלא הצלחנו לזהות. נסו שוב, ועדכנו אותנו אם זה חוזר.',
       no_shopify_connection: 'לפרויקט הזה אין חנות Shopify מחוברת.',
       entitlement_unavailable: 'לא הצלחנו לאמת כרגע את התוכנית שלכם. זו תקלה זמנית — נסו שוב בעוד רגע.',
       usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב. נסו שוב בעוד רגע.',

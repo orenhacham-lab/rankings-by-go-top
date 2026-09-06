@@ -15,7 +15,6 @@
  */
 
 import type { TopicSuggestion } from './types'
-import { applyDispositions, type DroppedCandidate } from './candidate-dispositions'
 
 export type RecoveryTier = 1 | 2 | 3
 export type ConfidenceLevel = 'high_confidence' | 'medium_confidence' | 'discovery'
@@ -58,33 +57,21 @@ export async function runRecoveryTiers(deps: {
   keyKey: (s: TopicSuggestion) => string
   runTier: (plan: TierPlan) => Promise<TopicSuggestion[]>
   plans?: readonly TierPlan[]
-  /**
-   * Called for each candidate this function DROPS, at the moment it drops it.
-   * Dedupe happens here as well as in the family loop, and a caller that only
-   * instruments the other one is left inferring what happened — which is how a
-   * removal ends up reported as a guess. Optional: existing callers are
-   * unaffected.
-   */
-  idOf?: (s: TopicSuggestion) => string | undefined
-  onDropped?: (d: DroppedCandidate<TopicSuggestion>) => void
 }): Promise<RecoveryOutcome> {
   const plans = deps.plans ?? TIER_PLANS
   const acc: TopicSuggestion[] = []
-  // ONE shared dedupe implementation — see candidate-dispositions.ts. The family
-  // path in generate-opportunities uses the same function on the same rules.
-  const seen = new Map<string, string>()
+  const seen = new Set<string>()
   const tiersRun: RecoveryTier[] = []
 
   for (const plan of plans) {
     tiersRun.push(plan.tier)
     const produced = await deps.runTier(plan)
-    const { retained, dropped } = applyDispositions(produced, {
-      keyOf: deps.keyKey,
-      idOf: deps.idOf ?? (() => undefined),
-      seen,
-    })
-    for (const d of dropped) deps.onDropped?.(d)
-    acc.push(...retained)
+    for (const s of produced) {
+      const k = deps.keyKey(s)
+      if (!k || seen.has(k)) continue
+      seen.add(k)
+      acc.push(s)
+    }
     if (acc.length >= deps.targetFloor) break
   }
 

@@ -176,7 +176,7 @@ export default function AutomationIdeas({
   const PAGE_STEP = 5
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number; parserDropped?: number; batchDuplicates?: number; internalUnaccounted?: number; engineRejections?: { reason: string; count: number }[]; engineNotProcessed?: number; engineDropped?: number; engineUnexplained?: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number; engineRejections?: { reason: string; count: number }[]; engineNotProcessed?: number; engineDropped?: number; engineUnexplained?: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -999,19 +999,6 @@ export default function AutomationIdeas({
             .replace('{q}', String(meta.funnel.qualityFiltered))
             .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))
             .replace('{c}', String(meta.funnel.coveredByExisting))}
-        </p>
-      )}
-      {/* The engine's OWN outcomes, kept off the quality line on purpose: a
-          schema failure and an internal removal are not judgements about the
-          idea, and folding them into "quality filtered" would present a bug as
-          a decision. Rendered only when non-zero. */}
-      {meta?.funnel && !loading
-        && ((meta.funnel.parserDropped ?? 0) > 0 || (meta.funnel.batchDuplicates ?? 0) > 0 || (meta.funnel.internalUnaccounted ?? 0) > 0) && (
-        <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400" data-testid="funnel-diagnostics">
-          {t.funnelDiagnosticsLine
-            .replace('{p}', String(meta.funnel.parserDropped ?? 0))
-            .replace('{b}', String(meta.funnel.batchDuplicates ?? 0))
-            .replace('{u}', String(meta.funnel.internalUnaccounted ?? 0))}
         </p>
       )}
       {/* The engine's OWN reasons for the "did not pass quality/relevance checks"

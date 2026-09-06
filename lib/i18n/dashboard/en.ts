@@ -177,7 +177,6 @@ export const dashboardEn = {
       tryOther: 'No ideas found. Try another source or a broader keyword.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
       funnelLine: 'Run breakdown: {g} ideas generated · {e} did not pass quality/relevance checks · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
-      funnelDiagnosticsLine: 'Also set aside: {p} could not be read from the generator · {b} repeated another idea in the same batch · {u} were removed by an internal problem we could not identify',
       // The engine's OWN ledger for the "did not pass quality/relevance checks" count.
       // Without it that number is a subtraction with no explanation behind it.
       engineRejectionsLine: 'Why they were removed: {list}',
@@ -941,9 +940,6 @@ export const dashboardEn = {
       shopify_blog_lookup_failed: 'We couldn’t read your Shopify blogs just now. This is temporary — publishing will be retried.',
       missing_write_content_scope: 'The app is missing permission to publish articles to your store. Reconnect the store to grant it.',
       shopify_missing_write_content_scope: 'The app is missing permission to publish articles to your store. Reconnect the store to grant it.',
-      cross_family_duplicate: 'This idea repeated one we already had, so it was merged rather than suggested twice.',
-      empty_primary_keyword: 'This idea arrived without a usable keyword, so it could not be turned into a topic.',
-      unaccounted: 'Some ideas were set aside for a reason we could not name. Please try again, and tell us if it repeats.',
       no_shopify_connection: 'This project has no connected Shopify store.',
       entitlement_unavailable: 'We couldn’t verify your plan just now. This is temporary — please try again shortly.',
       usage_period_unavailable: 'We couldn’t verify your billing period just now. Please try again shortly.',

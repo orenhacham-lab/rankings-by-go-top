@@ -17,12 +17,11 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { applyDispositions, type DroppedCandidate } from './candidate-dispositions'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
-import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunitiesDetailed, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
+import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
 import { buildValidatorPrompt, parseValidatorResponse, validatorBatches, applyValidatorVerdicts, type ValidatorMetrics, type ValidatorVerdict } from './plan-validator'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
@@ -53,26 +52,6 @@ export interface TierDiagnostics {
   mapped_opportunities: number
   rejected_by_reason: Record<string, number>
   persisted: number
-}
-
-/** What became of one generated candidate. No title, no body. */
-export interface CandidateLedgerEntry {
-  /**
-   * A STABLE identity for this candidate, assigned at parse time and carried
-   * through validation, dedupe and the final output. Reconciling by normalized
-   * keyword could not tell two candidates with the SAME key apart, so on a
-   * second duplicate it could reclassify the surviving original.
-   */
-  candidateId: string
-  /** Normalized primary keyword, or null when it normalizes to nothing. */
-  key: string | null
-  hasPrimaryKeyword: boolean
-  family: string
-  language: 'he' | 'en'
-  disposition: 'accepted' | 'rejected' | 'duplicate'
-  reason: string | null
-  /** For a duplicate: the earlier key that already occupied the slot. */
-  duplicateOf: string | null
 }
 
 export interface OpportunityDiagnostics {
@@ -117,26 +96,6 @@ export interface OpportunityDiagnostics {
   // B — per-stage candidate IDs (Preview-only trace; empty outside plan mode). Makes it
   // impossible for N>0 candidates to vanish without a typed reason at some stage.
   plan_stage_ids: { generated_candidates: number; deterministic_survivor_ids: string[]; validator_survivor_ids: string[] }
-  /**
-   * One entry per generated candidate, with EXACTLY ONE final disposition, so
-   * `accepted + duplicate + rejected === generated` always holds. Carries no
-   * title or body — only the normalized key and structural facts.
-   */
-  candidate_ledger: CandidateLedgerEntry[]
-  /** Dedupe removals, kept SEPARATE from rejections so neither double-counts. */
-  duplicates_by_reason: Record<string, number>
-  /** Items the PARSER discarded before they were ever counted as candidates. */
-  parser_dropped_items: number
-  /** Items the model emitted, BEFORE the parser discarded any. */
-  model_emitted_items: number
-  /** Items that survived parsing — the population the ledger accounts for. */
-  parsed_candidates: number
-  /** Candidates present in the FINAL returned set. */
-  final_accepted: number
-  /** Candidates removed by a dedupe boundary. */
-  duplicates: number
-  /** Candidates removed by a validation/gate boundary. */
-  rejected: number
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
   generated_opportunities: number
@@ -156,23 +115,11 @@ const PAGE_TYPE = (t: string | null | undefined): EntityPageType => {
 
 /** Run the production opportunity path with recovery tiers. Returns [] with full
  *  diagnostics only when NO safe opportunity exists after all tiers. */
-/**
- * The ONE external dependency this module has. Injectable so the whole
- * downstream pipeline — parse, validate, dedupe, validator, diversity — can be
- * exercised against a deterministic batch without calling a model. Production
- * passes nothing and gets the real client.
- */
-export interface OpportunityGenerationDeps {
-  generateJson?: typeof generateRecommendationJSON
-}
-
 export async function generateOpportunities(
   admin: Admin,
   input: { projectId: string; targetCount: number; maxClusters: number; families?: OpportunityFamily[]; poolTarget?: number; validatorCalls?: number },
   controller: RunCostController,
-  deps: OpportunityGenerationDeps = {},
 ): Promise<{ suggestions: TopicSuggestion[]; diagnostics: OpportunityDiagnostics }> {
-  const generateJson = deps.generateJson ?? generateRecommendationJSON
   // 1) Load evidence.
   const { data: proj } = await admin.from('projects').select('business_name, target_domain, language, country').eq('id', input.projectId).maybeSingle()
   const p = (proj as { business_name: string | null; target_domain: string | null; language: string | null } | null) ?? { business_name: null, target_domain: null, language: null }
@@ -277,28 +224,6 @@ export async function generateOpportunities(
   const GATE_LOCAL_SERVICE_AREA = process.env.RECO_GATE_LOCAL_SERVICE_AREA === '1'
   const GATE_BUSINESS_RELEVANCE = process.env.RECO_GATE_BUSINESS_RELEVANCE === '1'
   const shadow_rejected_by_reason: Record<string, number> = {}
-  // ONE entry per generated candidate, exactly one disposition each.
-  const candidateLedger: CandidateLedgerEntry[] = []
-  const duplicates_by_reason: Record<string, number> = {}
-  let parserDroppedItems = 0
-  let modelEmittedItems = 0
-  let candidateSeq = 0
-  /** suggestion object → its stable candidate id. Identity, not keyword. */
-  const candidateIdBySuggestion = new Map<TopicSuggestion, string>()
-  const ledgerById = new Map<string, CandidateLedgerEntry>()
-  /**
-   * Record a removal AT the boundary that performed it, by stable id. Fed by the
-   * ONE shared dedupe implementation from both the family and recovery paths, so
-   * nothing has to be inferred from a candidate's later absence.
-   */
-  const recordDrop = (d: DroppedCandidate<TopicSuggestion>) => {
-    const entry = ledgerById.get(d.candidateId)
-    if (!entry || entry.disposition !== 'accepted') return
-    entry.disposition = 'duplicate'
-    entry.reason = d.reason
-    entry.duplicateOf = d.duplicateOfKey
-    duplicates_by_reason[d.reason] = (duplicates_by_reason[d.reason] ?? 0) + 1
-  }
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
   let secondaryKeywordsFiltered = 0
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
@@ -396,38 +321,16 @@ export async function generateOpportunities(
   // Synthesize a batch of candidates then run each through validateOne (same gates for
   // every tier — only the prompt + confidence label differ).
   const synthAndValidate = async (prompt: string, plan: TierPlan, td: TierDiagnostics): Promise<TopicSuggestion[]> => {
-    const res = await generateJson(prompt, { temperature: plan.discovery ? 0.95 : 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: plan.tier === 1 ? 'primary' : 'salvage', requestedIdeaCount: input.targetCount })
+    const res = await generateRecommendationJSON(prompt, { temperature: plan.discovery ? 0.95 : 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: plan.tier === 1 ? 'primary' : 'salvage', requestedIdeaCount: input.targetCount })
     td.model_calls += 1
-    // parseOpportunitiesDetailed reports what the PARSER discarded (an item with
-    // no title or no primaryKeyword). Those never reach raw_candidates, so the
-    // loss used to be invisible; it is surfaced now.
-    const parsed = res.ok ? parseOpportunitiesDetailed(res.text) : { items: [], droppedItems: 0, parseFailed: true, emitted: 0 }
-    const opportunities: SynthOpportunity[] = parsed.items
-    parserDroppedItems += parsed.droppedItems
-    modelEmittedItems += parsed.emitted
+    const opportunities: SynthOpportunity[] = res.ok ? parseOpportunities(res.text) : []
     td.parse_ok = res.ok
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
-      // STABLE IDENTITY, assigned once and carried onto the suggestion, so every
-      // later boundary can name the exact candidate it removed — even when two
-      // candidates normalize to the same keyword.
-      const candidateId = `cand_${candidateSeq++}`
       const r = validateOne({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: o.intent, reason: o.reason }, { confidenceLevel: plan.confidenceLevel, discovery: plan.discovery })
-      const key = normalizeText(o.primaryKeyword) || null
-      const base = { candidateId, key, hasPrimaryKeyword: !!o.primaryKeyword.trim(), family: plan.discovery ? 'discovery' : 'synthesis', language }
-      if (r.suggestion) {
-        candidateIdBySuggestion.set(r.suggestion, candidateId)
-        out.push(r.suggestion)
-        // No disposition yet: it is set by whichever boundary decides its fate.
-        const e: CandidateLedgerEntry = { ...base, disposition: 'accepted', reason: null, duplicateOf: null }
-        candidateLedger.push(e); ledgerById.set(candidateId, e)
-      } else {
-        const reason = r.rejectionReason || 'insufficient_independent_need'
-        bump(td, reason)
-        const e: CandidateLedgerEntry = { ...base, disposition: 'rejected', reason, duplicateOf: null }
-        candidateLedger.push(e); ledgerById.set(candidateId, e)
-      }
+      if (r.suggestion) out.push(r.suggestion)
+      else bump(td, r.rejectionReason || 'insufficient_independent_need')
     }
     td.mapped_opportunities += out.length
     td.persisted += out.length
@@ -469,39 +372,19 @@ export async function generateOpportunities(
     const familyClusters = selectClustersWithinBudget(rankClusters(clusters), input.maxClusters)
     const poolTarget = input.poolTarget ?? input.targetCount * 2
     const pool: TopicSuggestion[] = []
-    const seen = new Map<string, string>()
+    const seen = new Set<string>()
     const familiesRun: RecoveryTier[] = []
     for (const family of input.families) {
       if (pool.length >= poolTarget || familyClusters.length === 0) break
       const td: TierDiagnostics = { tier: 1, confidence_level: 'high_confidence', clusters_available: familyClusters.length, clusters_sent_to_model: familyClusters.length, model_calls: 0, raw_candidates: 0, parse_ok: false, mapped_opportunities: 0, rejected_by_reason: {}, persisted: 0 }
       tierDiags.push(td)
       const produced = await synthAndValidate(buildFamilyPrompt(familyClusters, ctx, langLabel, year, input.targetCount, family), { tier: 1, confidenceLevel: 'high_confidence', discovery: false }, td)
-      // EVERY exit from the funnel is TYPED AND COUNTED. This loop used to drop
-      // candidates with a bare `continue` — after td.raw_candidates had already
-      // counted them — so a run could report N candidates generated, zero
-      // accepted, and an empty rejected_by_reason: the ledger said nothing had
-      // been rejected while everything had been. Both causes are now named.
-      // DEDUPE is not a rejection — it is a different disposition, tracked in
-      // its own bucket so the two can never double-count. Each candidate's
-      // ledger entry is reclassified in place, so it still has exactly one.
-      // THE SAME shared implementation the recovery path uses.
-      const disp = applyDispositions(produced, {
-        keyOf: (x) => normalizeText(x.primaryKeyword),
-        idOf: (x) => candidateIdBySuggestion.get(x),
-        seen,
-      })
-      for (const d of disp.dropped) recordDrop(d)
-      for (const s of disp.retained) {
-        const carried = { ...s, opportunityFamily: family }
-        // The identity travels with the copy, so later boundaries still find it.
-        const id = candidateIdBySuggestion.get(s)
-        if (id) candidateIdBySuggestion.set(carried, id)
-        pool.push(carried)
-      }
+      for (const s of produced) { const k = normalizeText(s.primaryKeyword); if (!k || seen.has(k)) continue; seen.add(k); pool.push({ ...s, opportunityFamily: family }) }
       familiesRun.push(1)
     }
 
     planStageIds.deterministic_survivor_ids = pool.map((s) => s.id)
+    planStageIds.generated_candidates = tierDiags.reduce((s, t) => s + t.raw_candidates, 0)
 
     // A — the ACTUAL batched validator over the deterministic survivors, strictly
     // ADDITIVE: it may only remove a candidate via an explicit reject (repairs re-run
@@ -514,7 +397,7 @@ export async function generateOpportunities(
       const unvalidated = pool.filter((s) => !batchedIds.has(s.id))
       const verdictsPerBatch: Map<string, ValidatorVerdict>[] = []
       for (const batch of batches) {
-        const vres = await generateJson(buildValidatorPrompt(batch, langLabel), { temperature: 0.2, maxOutputTokens: outputBudgetFor(batch.length) }, controller, { source: 'plan_validator', callPurpose: 'validate', requestedIdeaCount: batch.length })
+        const vres = await generateRecommendationJSON(buildValidatorPrompt(batch, langLabel), { temperature: 0.2, maxOutputTokens: outputBudgetFor(batch.length) }, controller, { source: 'plan_validator', callPurpose: 'validate', requestedIdeaCount: batch.length })
         verdictsPerBatch.push(vres.ok ? parseValidatorResponse(vres.text) : new Map())
       }
       // Repairs re-run EVERY deterministic gate via validateOne; a failed repair → reject.
@@ -528,69 +411,13 @@ export async function generateOpportunities(
     planStageIds.validator_survivor_ids = finalPool.map((s) => s.id)
     outcome = { suggestions: finalPool, tiersRun: familiesRun, recoveryTierUsed: familiesRun.length ? 1 : null, discoveryUsed: false, fallbackReason: finalPool.length === 0 ? 'no_safe_opportunities' : null }
   } else {
-    outcome = await runRecoveryTiers({
-      targetFloor: TARGET_FLOOR,
-      keyKey: (s) => normalizeText(s.primaryKeyword),
-      runTier,
-      // Attribute at THIS boundary too, so nothing has to be inferred later.
-      idOf: (x) => candidateIdBySuggestion.get(x),
-      onDropped: (d) => recordDrop(d),
-    })
+    outcome = await runRecoveryTiers({ targetFloor: TARGET_FLOOR, keyKey: (s) => normalizeText(s.primaryKeyword), runTier })
   }
 
   // 3) Assemble diagnostics.
   const ranked = rankClusters(clusters)
-  // FUNNEL COUNTERS, on every path. These were assigned only inside the family
-  // branch, so a run that fell through to the tier-2/3 recovery path reported
-  // `generated_candidates: 0` no matter how many candidates it actually
-  // produced — and the reconciliation below then had nothing to reconcile.
-  planStageIds.generated_candidates = tierDiags.reduce((a, t) => a + t.raw_candidates, 0)
-  // The recovery path never assigned these, so the funnel had no survivor set to
-  // reconcile against on that branch. Filled from what actually came out.
-  if (planStageIds.deterministic_survivor_ids.length === 0 && outcome.suggestions.length > 0) {
-    planStageIds.deterministic_survivor_ids = outcome.suggestions.map((x: TopicSuggestion) => x.id)
-  }
-  if (planStageIds.validator_survivor_ids.length === 0 && outcome.suggestions.length > 0) {
-    planStageIds.validator_survivor_ids = outcome.suggestions.map((x: TopicSuggestion) => x.id)
-  }
-
   const rejected_by_reason: Record<string, number> = {}
   for (const td of tierDiags) for (const [r, n] of Object.entries(td.rejected_by_reason)) rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + n
-
-  // SELF-ACCOUNTING LEDGER. Generated candidates either survive into the
-  // deterministic pool or leave it for a named reason — there is no third
-  // outcome. Any residual is a drop this code failed to name, and it is
-  // surfaced as `unaccounted` rather than silently vanishing: a funnel that
-  // reports "17 generated, 0 accepted, nothing rejected" is describing a bug,
-  // and it must say so on the spot instead of looking like a quiet zero.
-  // This never removes or adds a candidate; it only makes the numbers add up.
-  // FINAL DISPOSITION, from what actually came out — and NOTHING is guessed.
-  //
-  // A candidate that is provisionally accepted but absent from the final set was
-  // removed by SOME boundary. If that boundary recorded a reason, the entry
-  // already carries it. If it did not, the honest answer is `unaccounted` — NOT
-  // 'duplicate'. Inferring a duplicate from absence was wrong: a candidate can
-  // also disappear via validator rejection, a failed repair, a later
-  // deterministic gate, recovery-tier selection, or a filter added tomorrow.
-  {
-    const survivingIds = new Set(
-      outcome.suggestions.map((x: TopicSuggestion) => candidateIdBySuggestion.get(x)).filter((v): v is string => !!v),
-    )
-    for (const entry of candidateLedger) {
-      if (entry.disposition !== 'accepted') continue
-      if (survivingIds.has(entry.candidateId)) continue
-      entry.disposition = 'rejected'
-      entry.reason = 'unaccounted'
-      rejected_by_reason.unaccounted = (rejected_by_reason.unaccounted ?? 0) + 1
-    }
-  }
-
-  // THE TWO INVARIANTS, computed from the ledger itself.
-  // ACCEPTED IS WHAT CAME OUT — outcome.suggestions, not deterministic survivors.
-  const finalAccepted = outcome.suggestions.length
-  const duplicatesCount = candidateLedger.filter((e) => e.disposition === 'duplicate').length
-  const rejectedCount = candidateLedger.filter((e) => e.disposition === 'rejected').length
-  const parsedCandidates = candidateLedger.length
   const persisted_by_confidence: Record<string, number> = {}
   for (const s of outcome.suggestions) { const c = s.confidenceLevel ?? 'high_confidence'; persisted_by_confidence[c] = (persisted_by_confidence[c] ?? 0) + 1 }
   const persisted_by_page_type: Record<string, number> = {}
@@ -633,14 +460,6 @@ export async function generateOpportunities(
     target_role_mappings,
     validator: validatorMetrics,
     plan_stage_ids: planStageIds,
-    candidate_ledger: candidateLedger,
-    duplicates_by_reason,
-    parser_dropped_items: parserDroppedItems,
-    model_emitted_items: modelEmittedItems,
-    parsed_candidates: parsedCandidates,
-    final_accepted: finalAccepted,
-    duplicates: duplicatesCount,
-    rejected: rejectedCount,
     model_calls: cs.totalCalls,
     generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
     persisted: outcome.suggestions.length,

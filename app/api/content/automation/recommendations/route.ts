@@ -14,7 +14,7 @@ import { generateOpportunities } from '@/lib/content/recommendations/generate-op
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
 import { buildFinalCandidateOutcomes, applyFinalOutcomesToGscDetails } from '@/lib/content/recommendations/final-outcomes'
 import { buildScanSources, buildGscRunSummary } from '@/lib/content/recommendations/customer-run-summary'
-import { buildFunnelDiagnostics, buildEngineRejectionSummary } from '@/lib/content/recommendations/funnel-summary'
+import { buildEngineRejectionSummary } from '@/lib/content/recommendations/funnel-summary'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -352,7 +352,6 @@ export async function POST(request: Request) {
       titleExists: filteredTitleExists,
       coveredByExisting: filteredCoveredByContent,
       hiddenOnLoad,
-      ...buildFunnelDiagnostics(opportunityDiagnostics),
       engineRejections: engineRejectionSummary.reasons,
       engineNotProcessed: engineRejectionSummary.notProcessed,
       engineDropped: engineRejectionSummary.dropped,
