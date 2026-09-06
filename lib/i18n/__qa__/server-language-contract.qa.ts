@@ -263,6 +263,30 @@ async function main() {
         }
       }
 
+      console.log('\n3E) THE DASHBOARD ROUTES — the document served for them is English')
+      {
+        // /dashboard and /content are behind the session guard, so an
+        // unauthenticated fetch is redirected and the document that actually
+        // reaches the browser is the auth page. That document must already be
+        // English for an English reader — and it is the same root layout and the
+        // same resolver the dashboard uses. The AUTHENTICATED chrome (sidebar,
+        // Content Hub, tables) cannot be fetched from here without a real
+        // Supabase session; it is proven instead by rendering the real
+        // components through the real provider with no effects run — see
+        // lib/i18n/dashboard/__qa__/first-render-language.qa.ts.
+        for (const path of ['/dashboard', '/content']) {
+          const en = await htmlTag(path, undefined, 'en-US,en;q=0.9', true)
+          check(`3E-a: ${path} on an English browser serves lang="en" dir="ltr"`,
+            /lang="en"/.test(en) && /dir="ltr"/.test(en), en)
+          const he = await htmlTag(path, undefined, 'he-IL,he;q=0.9', true)
+          check(`3E-b: ${path} on a Hebrew browser serves lang="he" dir="rtl"`,
+            /lang="he"/.test(he) && /dir="rtl"/.test(he), he)
+          const enCookie = await htmlTag(path, `${LANGUAGE_COOKIE}=en`, 'he-IL,he;q=0.9', true)
+          check(`3E-c: ${path} follows an EN cookie over a Hebrew browser`,
+            /lang="en"/.test(enCookie) && /dir="ltr"/.test(enCookie), enCookie)
+        }
+      }
+
       console.log('\n3C) METADATA FOLLOWS THE DOCUMENT — raw <title> off the wire')
       {
         const enTitle = await titleTag('/login', { acceptLanguage: 'en-US,en;q=0.9' })

@@ -23,8 +23,8 @@ interface ProjectsTableProps {
 }
 
 export default function ProjectsTable({ projects, clients, showClient = true, onProjectsChange }: ProjectsTableProps) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
 
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)

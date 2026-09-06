@@ -1488,6 +1488,7 @@ export const dashboardHe = {
     loading: 'טוען לוח בקרה...',
   },
   common: {
+    close: 'סגור',
     logout: 'יציאה',
     loading: 'טוען...',
     save: 'שמור',

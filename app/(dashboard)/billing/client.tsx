@@ -24,8 +24,8 @@ interface PayPalWindow extends Window {
 }
 
 export default function BillingClient({ market }: { market: BillingMarket }) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.billing.paypal
   const paypalLocale = language === 'en' ? 'en_US' : 'he_IL'
 

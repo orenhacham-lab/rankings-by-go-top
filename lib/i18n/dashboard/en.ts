@@ -1486,6 +1486,7 @@ export const dashboardEn = {
     loading: 'Loading dashboard...',
   },
   common: {
+    close: 'Close',
     logout: 'Log out',
     loading: 'Loading...',
     save: 'Save',

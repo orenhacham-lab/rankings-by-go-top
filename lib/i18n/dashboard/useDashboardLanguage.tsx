@@ -6,7 +6,7 @@ import {
   LANGUAGE_COOKIE, languageCookieString, readCookie, migrateLocalePreference,
 } from '@/lib/i18n/request-locale'
 import type { Locale } from '../locales'
-import { resolveDashboardLocale } from './locale'
+import { normalizeLocale as normalize, resolveDashboardLocale } from './locale'
 
 /** The single, existing dashboard-language store key (localStorage). Exported so the
  *  signup flow can seed it without a second competing key. */
@@ -88,10 +88,36 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
   )
 }
 
+/**
+ * The locale to use when a consumer is rendered OUTSIDE the provider.
+ *
+ * That is a wiring bug, and the old fallback answered it with a hard-coded
+ * 'he' — so a missing provider on an English request produced a silently Hebrew
+ * subtree that looked like a translation gap rather than the mistake it is.
+ *
+ * There is no context to read, so this uses the one authoritative value that is
+ * still in reach: the `lang` the server already wrote on <html> from the request
+ * contract. That element is rendered by the root layout on every response, so on
+ * the client it is always present and always correct. During SSR there is no
+ * document and genuinely no signal at all — the constant there is a guess, which
+ * is why the console error below exists rather than a quiet default.
+ */
+function fallbackLocaleOutsideProvider(): Locale {
+  try {
+    const lang = typeof document !== 'undefined' ? document.documentElement.lang : null
+    const normalized = normalize(lang)
+    if (normalized) return normalized
+  } catch { /* no DOM — fall through */ }
+  return 'he'
+}
+
 export function useDashboardLanguage(): DashboardLanguageContextValue {
   const ctx = useContext(DashboardLanguageContext)
   if (ctx) return ctx
-  // Safe fallback for any consumer rendered outside the provider.
-  // Keeps Hebrew default so the dashboard never appears broken.
-  return { language: 'he', setDashboardLanguage: () => {}, isLoaded: true }
+  // NOT silent. A consumer outside the provider cannot follow the language
+  // switch and cannot be trusted to match the document, so it is reported.
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('[dashboard-language] useDashboardLanguage() called outside DashboardLanguageProvider — the subtree cannot follow the language contract.')
+  }
+  return { language: fallbackLocaleOutsideProvider(), setDashboardLanguage: () => {}, isLoaded: true }
 }

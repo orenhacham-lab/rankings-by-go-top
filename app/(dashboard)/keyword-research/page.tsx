@@ -117,8 +117,8 @@ function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): O
 }
 
 export default function KeywordResearchPage() {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.keywordResearch
   const isRTL = language === 'he'
 

@@ -35,8 +35,8 @@ export default function TrackingTargetForm({
   onSuccess,
   onCancel,
 }: TrackingTargetFormProps) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.trackingTargetForm
   const isEnglish = language === 'en'
 

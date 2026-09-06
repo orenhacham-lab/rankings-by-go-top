@@ -16,8 +16,8 @@ interface ClientFormProps {
 }
 
 export default function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const f = dict.clients.form
 
   const [loading, setLoading] = useState(false)

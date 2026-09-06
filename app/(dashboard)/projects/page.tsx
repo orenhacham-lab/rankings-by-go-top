@@ -17,8 +17,8 @@ export default function ProjectsPage() {
   const defaultClientId = searchParams.get('client_id') || ''
   const shouldOpenCreate = searchParams.get('create') === '1'
 
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
 
   const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
   const [clients, setClients] = useState<Client[]>([])

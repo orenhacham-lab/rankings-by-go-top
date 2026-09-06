@@ -55,8 +55,8 @@ export function DashboardOnboardingTour({
   totalProjects,
   shouldShowTour = false,
 }: DashboardOnboardingTourProps) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.onboarding
 
   const [isVisible, setIsVisible] = useState(false)
