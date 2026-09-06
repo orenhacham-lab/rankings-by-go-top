@@ -57,7 +57,9 @@ function main() {
   for (const reason of ['platform_conflict', 'no_active_publishing_platform', 'article_missing', 'duplicate_topic_published', 'no_wordpress_connection', 'wordpress_media_upload_failed']) {
     check(`WordPress blocker '${reason}' → blockItem(...paused + alert)`, new RegExp(`blockItem\\(admin, itemId, [^\\n]*${reason}`).test(wp) || new RegExp(`blockItem\\(admin, itemId, \\w+, ctx\\)`).test(wp) && wp.includes(reason))
   }
-  check('WordPress publish quality-gate failure → blockItem (paused)', /publish_quality_gate_failed/.test(wp) && /blockItem\(admin, itemId, reason, ctx\)/.test(wp))
+  // blockItem now takes the CHANNEL explicitly, so a WordPress blocker is recorded
+  // as WordPress and the two platform-neutral blockers are recorded as neither.
+  check('WordPress publish quality-gate failure → blockItem (paused)', /publish_quality_gate_failed/.test(wp) && /blockItem\(admin, itemId, reason, ctx, 'wordpress'\)/.test(wp))
   check('blockItem finalizes to paused + records blocked alert', /finalizeItem\(admin, itemId, 'paused', reason\)/.test(wp) && /recordPublishBlockedAlert/.test(wp))
   // media only pauses when deterministic; transient stays a retryable failure.
   check("media pause is gated on classifyMediaFailure === 'deterministic'", /classifyMediaFailure\(created\)\s*===\s*'deterministic'/.test(wp))

@@ -14,6 +14,7 @@ import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
+import type { AlertChannel } from '@/lib/content/automation/alert-read-model'
 import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 import type { WpCreateError } from '@/lib/content/wordpress-publish'
@@ -30,11 +31,17 @@ interface PublishAlertContext { projectId: string; articleId: string | null; top
  * not re-picked by the runner) and an immediate deduped alert is raised so the
  * owner can act. Best-effort alert; never throws.
  */
-async function blockItem(admin: Admin, itemId: string, reason: string, ctx: PublishAlertContext): Promise<void> {
+/**
+ * `channel` is explicit rather than defaulted: the two blockers raised BEFORE a
+ * platform is chosen (no connected platform, or two conflicting ones) genuinely
+ * have no channel, and recording 'wordpress' for them is the same false claim
+ * this change removes. They pass null and render under the neutral heading.
+ */
+async function blockItem(admin: Admin, itemId: string, reason: string, ctx: PublishAlertContext, channel: AlertChannel | null): Promise<void> {
   await finalizeItem(admin, itemId, 'paused', reason)
   await recordPublishBlockedAlert(admin, {
     projectId: ctx.projectId, poolItemId: itemId, articleId: ctx.articleId, topicId: ctx.topicId,
-    title: ctx.title, error: reason, attempts: ctx.attempts,
+    title: ctx.title, error: reason, attempts: ctx.attempts, channel,
   })
 }
 
@@ -115,11 +122,11 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     const active = await loadActivePlatform(admin, item.project_id)
     // Area E — deterministic, action-required config blockers → paused + immediate alert.
     if (active.platform === 'conflict') {
-      await blockItem(admin, itemId, 'platform_conflict', ctx)
+      await blockItem(admin, itemId, 'platform_conflict', ctx, null)
       return { itemId, status: 'paused', articleId: item.article_id, reason: 'platform_conflict' }
     }
     if (active.platform === 'none') {
-      await blockItem(admin, itemId, 'no_active_publishing_platform', ctx)
+      await blockItem(admin, itemId, 'no_active_publishing_platform', ctx, null)
       return { itemId, status: 'paused', articleId: item.article_id, reason: 'no_active_publishing_platform' }
     }
     if (active.platform === 'shopify') {
@@ -128,7 +135,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
 
     const { data: artData } = await admin.from('generated_articles').select(ARTICLE_SELECT).eq('id', item.article_id).maybeSingle()
     const article = artData as ArticleRow | null
-    if (!article) { await blockItem(admin, itemId, 'article_missing', ctx); return { itemId, status: 'paused', articleId: item.article_id, reason: 'article_missing' } }
+    if (!article) { await blockItem(admin, itemId, 'article_missing', ctx, 'wordpress'); return { itemId, status: 'paused', articleId: item.article_id, reason: 'article_missing' } }
     ctx.title = article.title
 
     // (C/D) Recovery + already-published: the article already has a WP post →
@@ -142,7 +149,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       // Idempotent (deduped), so the already_published path is a cheap no-op too.
       await ensureProjectKeywordFromPublishedArticle(admin, article.id)
       // Phase 4B.1 — a recovered/reconciled publish resolves any open failure alert.
-      await resolvePublishAlerts(admin, itemId)
+      await resolvePublishAlerts(admin, itemId, { articleId: article.id, channel: 'wordpress' })
       return { itemId, status: 'published', articleId: article.id, wpPostUrl: article.wp_post_url, noop: item.status === 'published' ? 'already_published' : 'reconciled' }
     }
     if (item.status === 'published') return { itemId, status: 'published', articleId: article.id, noop: 'already_published' }
@@ -154,7 +161,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       if (((item.attempts ?? 0) + 1) < AUTOMATION_MAX_ATTEMPTS) return
       await recordPublishFinalFailureAlert(admin, {
         projectId: item.project_id, poolItemId: itemId, articleId: article.id, topicId: item.topic_id,
-        title: article.title, error: reason, attempts: (item.attempts ?? 0) + 1,
+        title: article.title, error: reason, attempts: (item.attempts ?? 0) + 1, channel: 'wordpress',
       })
     }
 
@@ -162,7 +169,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     const gate = runQualityGate(article)
     if (!gate.ok) {
       const reason = `publish_quality_gate_failed: ${gate.failures.join(', ')}`
-      await blockItem(admin, itemId, reason, ctx)
+      await blockItem(admin, itemId, reason, ctx, 'wordpress')
       return { itemId, status: 'paused', articleId: article.id, reason }
     }
 
@@ -176,13 +183,13 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
         .neq('id', article.id)
         .limit(1)
         .maybeSingle()
-      if (dup) { await blockItem(admin, itemId, 'duplicate_topic_published', ctx); return { itemId, status: 'paused', articleId: article.id, reason: 'duplicate_topic_published' } }
+      if (dup) { await blockItem(admin, itemId, 'duplicate_topic_published', ctx, 'wordpress'); return { itemId, status: 'paused', articleId: article.id, reason: 'duplicate_topic_published' } }
     }
 
     // (E) WordPress credentials must be present/valid. Deterministic → pause + alert.
     const loaded = await loadWordPressCredentials(admin, item.project_id)
     if ('error' in loaded) {
-      await blockItem(admin, itemId, 'no_wordpress_connection', ctx)
+      await blockItem(admin, itemId, 'no_wordpress_connection', ctx, 'wordpress')
       return { itemId, status: 'paused', articleId: article.id, reason: 'no_wordpress_connection' }
     }
 
@@ -218,7 +225,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
         // invalid media / WP 4xx) pauses + alerts; a transient timeout/429/5xx
         // stays a bounded, retryable failure (final-failure alert at the cap).
         if (classifyMediaFailure(created) === 'deterministic') {
-          await blockItem(admin, itemId, 'wordpress_media_upload_failed', ctx)
+          await blockItem(admin, itemId, 'wordpress_media_upload_failed', ctx, 'wordpress')
           return { itemId, status: 'paused', articleId: article.id, reason: 'wordpress_media_upload_failed' }
         }
         const mediaReason = created.detail ? `wordpress_media_upload_failed: ${created.detail.slice(0, 120)}` : 'wordpress_media_upload_failed'
@@ -273,8 +280,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // keywords. Best-effort + idempotent; never affects the publish outcome.
     await ensureProjectKeywordFromPublishedArticle(admin, article.id)
 
-    // Phase 4B.1 — a successful publish resolves any open failure alert.
-    await resolvePublishAlerts(admin, itemId)
+    // Phase 4B.1 — a successful publish resolves any open failure alert, for this
+    // item AND for this article's older attempts on the same (or unknown) channel.
+    await resolvePublishAlerts(admin, itemId, { articleId: article.id, channel: 'wordpress' })
 
     return { itemId, status: 'published', articleId: article.id, wpPostUrl: created.wpPostUrl }
   } catch (e) {
@@ -286,7 +294,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     if (ctx.projectId) {
       await recordPublishFinalFailureAlert(admin, {
         projectId: ctx.projectId, poolItemId: itemId, articleId: ctx.articleId, topicId: ctx.topicId,
-        title: ctx.title, error: `unexpected: ${msg}`, attempts: ctx.attempts,
+        // An unexpected throw in THIS function is on the WordPress branch: the
+        // Shopify path returned above and handles its own failures.
+        title: ctx.title, error: `unexpected: ${msg}`, attempts: ctx.attempts, channel: 'wordpress',
       })
     }
     return { itemId, status: 'failed', articleId: ctx.articleId, reason: 'unexpected_error' }

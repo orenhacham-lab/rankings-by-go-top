@@ -17,6 +17,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { resolveActivePlatform } from '@/lib/content/platform/active-platform'
+import { loadActiveAlerts } from '@/lib/content/automation/load-active-alerts'
+import type { ActiveAlert } from '@/lib/content/automation/alert-read-model'
 
 const EMPTY_COUNTS = {
   total: 0,
@@ -198,5 +200,20 @@ export async function GET(request: Request) {
     shopify: { present: !!shData, connectionStatus: shopify.status, canPublish: shopify.canPublish },
   })
 
-  return Response.json({ projects, selected: projectId, counts, articles, wordpress, shopify, platform })
+  // ACTIVE ALERTS — the same decision /api/content/automation/alerts returns,
+  // through the same loader. This endpoint previously returned no alerts field at
+  // all, so the Content Hub showed a healthy project while the automation panel
+  // showed an open failure for it. Read through the caller's own RLS-scoped
+  // client, so it can still only ever see their own rows.
+  //
+  // A loader failure is NOT reported as "no alerts": that would restore exactly
+  // the silence being fixed. It is surfaced as a typed, non-fatal flag alongside
+  // an empty list, so the client can say the alert store is unavailable.
+  let alerts: ActiveAlert[] = []
+  let alertsUnavailable: 'migration_required' | 'unavailable' | null = null
+  const alertResult = await loadActiveAlerts(supabase as never, projectId)
+  if (alertResult.ok) alerts = alertResult.alerts
+  else alertsUnavailable = alertResult.reason
+
+  return Response.json({ projects, selected: projectId, counts, articles, wordpress, shopify, platform, alerts, alertsUnavailable })
 }
