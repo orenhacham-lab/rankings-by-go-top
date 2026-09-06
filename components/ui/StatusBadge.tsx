@@ -5,8 +5,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export function ActiveBadge({ active }: { active: boolean }) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   return (
     <Badge variant={active ? 'success' : 'neutral'}>
       {active ? dict.common.active : dict.common.inactive}
@@ -15,8 +15,8 @@ export function ActiveBadge({ active }: { active: boolean }) {
 }
 
 export function ScanStatusBadge({ status }: { status: string }) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
 
   const map: Record<string, { variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label: string }> = {
     completed: { variant: 'success', label: dict.scans.status.completed },
@@ -29,8 +29,8 @@ export function ScanStatusBadge({ status }: { status: string }) {
 }
 
 export function EngineBadge({ engine, device }: { engine: string; device?: string | null }) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
 
   if (engine === 'google_search') {
     let label: string

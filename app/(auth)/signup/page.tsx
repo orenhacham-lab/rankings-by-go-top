@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
+import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
 const SIGNUP_UI = {
@@ -102,9 +104,13 @@ export function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const serverLocale = useAuthServerLocale()
   const langParam = searchParams.get('lang')
-  const lang: 'he' | 'en' =
-    langParam === 'en' || pathname?.startsWith('/en/') ? 'en' : 'he'
+  // The route, then an explicit ?lang, then the locale the SERVER resolved for
+  // this request. That last step is the fix: without it every request without an
+  // /en URL or a ?lang rendered Hebrew, including one the server had already
+  // resolved to English and labelled lang="en" dir="ltr".
+  const lang: 'he' | 'en' = resolveAuthLocale({ pathname, langParam, serverLocale })
   const isEn = lang === 'en'
   const t = SIGNUP_UI[lang]
 

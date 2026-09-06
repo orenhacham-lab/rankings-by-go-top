@@ -58,8 +58,8 @@ export default function BillingView({
   planPricesILS,
   planPricesUSD,
 }: BillingViewProps) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.billing
   const dateLocale = language === 'en' ? 'en-US' : 'he-IL'
   const planPrices = market === 'USD' ? planPricesUSD : planPricesILS

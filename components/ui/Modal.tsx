@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 interface ModalProps {
   open: boolean
@@ -12,6 +14,12 @@ interface ModalProps {
 }
 
 export default function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  // The close control's accessible name was the hard-coded Hebrew "סגור", so an
+  // English dashboard announced a Hebrew word to a screen reader — the same
+  // defect as a Hebrew label, just only audible. Every Modal call site is inside
+  // the dashboard provider, so the resolved language is available here.
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
           type="button"
           onClick={onClose}
           className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm leading-none"
-          aria-label="סגור"
+          aria-label={dict.common.close}
         >
           ✕
         </button>

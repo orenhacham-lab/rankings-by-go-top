@@ -24,8 +24,8 @@ export default function ProjectForm({
   onSuccess,
   onCancel,
 }: ProjectFormProps) {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const f = dict.projects.form
 
   const [loading, setLoading] = useState(false)

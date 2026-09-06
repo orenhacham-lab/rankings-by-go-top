@@ -40,8 +40,8 @@ interface RankingChange {
 }
 
 export default function DashboardPage() {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
 
   const [stats, setStats] = useState<DashboardStats>({ totalClients: 0, totalProjects: 0, totalKeywords: 0, totalScans: 0 })
   const [latestScans, setLatestScans] = useState<LatestScan[]>([])

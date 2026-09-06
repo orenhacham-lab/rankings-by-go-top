@@ -3,10 +3,17 @@
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { cn } from '@/lib/utils'
 
+/**
+ * The switch renders from the FIRST render, in the server-resolved language.
+ *
+ * It used to return null until `isLoaded` — i.e. until a client effect had run —
+ * so the one control that changes the language was missing for the whole of the
+ * initial load, exactly when a reader who landed in the wrong language wants it.
+ * Nothing here needs hydration: `language` is authoritative from the first
+ * render, and the handlers only run on click, which cannot happen earlier.
+ */
 export function DashboardLanguageSwitcher() {
-  const { language, setDashboardLanguage, isLoaded } = useDashboardLanguage()
-
-  if (!isLoaded) return null
+  const { language, setDashboardLanguage } = useDashboardLanguage()
 
   return (
     <div className="flex gap-1 px-3 py-2">

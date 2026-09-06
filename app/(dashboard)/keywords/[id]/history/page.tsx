@@ -16,8 +16,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 
 export default function KeywordHistoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.keywordsPage.history
   const common = dict.common
   const [target, setTarget] = useState<TrackingTarget & { projects?: { name: string; id: string } } | null>(null)

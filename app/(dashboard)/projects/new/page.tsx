@@ -15,8 +15,8 @@ export default function NewProjectPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultClientId = searchParams.get('client_id') || ''
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.projects
   const common = dict.common
 

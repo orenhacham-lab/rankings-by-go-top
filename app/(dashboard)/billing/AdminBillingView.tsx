@@ -19,8 +19,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
  * Shopify" — admins have full product access and no billing concept at all.
  */
 export default function AdminBillingView() {
-  const { language, isLoaded } = useDashboardLanguage()
-  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   const t = dict.billing.admin
 
   return (

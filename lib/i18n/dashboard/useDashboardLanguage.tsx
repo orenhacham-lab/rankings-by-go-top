@@ -4,6 +4,7 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from '
 import { DocumentLocaleEffect } from '@/components/DocumentLocaleEffect'
 import {
   LANGUAGE_COOKIE, languageCookieString, readCookie, migrateLocalePreference,
+  REQUEST_FALLBACK_LOCALE,
 } from '@/lib/i18n/request-locale'
 import type { Locale } from '../locales'
 import { resolveDashboardLocale } from './locale'
@@ -88,10 +89,35 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
   )
 }
 
+/**
+ * A consumer rendered OUTSIDE the provider is a WIRING BUG, and this decides how
+ * loudly it fails.
+ *
+ * Two earlier answers were both wrong. A hard-coded 'he' was SILENT — a missing
+ * provider on an English request produced a Hebrew subtree that read as a
+ * translation gap rather than the mistake it is. Reading
+ * `document.documentElement.lang` fixed the silence but broke DETERMINISM: there
+ * is no document during SSR, so the server and the first client render could
+ * answer differently and React would hydrate over a mismatch — reintroducing, in
+ * a new place, exactly the flip this branch exists to remove.
+ *
+ * So: development THROWS, because a wiring bug should be impossible to walk past
+ * and every consumer is proven to be inside a provider (see
+ * lib/i18n/dashboard/__qa__/first-render-language.qa.ts). Production reports it
+ * and returns ONE CONSTANT — the same value on the server and on the client, in
+ * every render, so nothing can diverge. It is the same constant the request
+ * contract ends at, so the codebase has exactly one answer to "no signal at all".
+ */
+function assertProviderPresent(): Locale {
+  const message = '[dashboard-language] useDashboardLanguage() was called outside DashboardLanguageProvider. '
+    + 'The subtree cannot follow the language contract — wrap it in the provider.'
+  if (process.env.NODE_ENV !== 'production') throw new Error(message)
+  console.error(message)
+  return REQUEST_FALLBACK_LOCALE
+}
+
 export function useDashboardLanguage(): DashboardLanguageContextValue {
   const ctx = useContext(DashboardLanguageContext)
   if (ctx) return ctx
-  // Safe fallback for any consumer rendered outside the provider.
-  // Keeps Hebrew default so the dashboard never appears broken.
-  return { language: 'he', setDashboardLanguage: () => {}, isLoaded: true }
+  return { language: assertProviderPresent(), setDashboardLanguage: () => {}, isLoaded: true }
 }
