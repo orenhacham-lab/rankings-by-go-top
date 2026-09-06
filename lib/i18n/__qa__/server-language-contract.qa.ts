@@ -45,19 +45,21 @@ const PORT = 3997
 const BASE = `http://127.0.0.1:${PORT}`
 
 /** The raw server response body — no browser, no JavaScript executed. */
-async function rawBody(path: string, opts: { cookie?: string; acceptLanguage?: string } = {}): Promise<string> {
+async function rawBody(path: string, opts: { cookie?: string; acceptLanguage?: string; follow?: boolean } = {}): Promise<string> {
   const headers: Record<string, string> = {}
   if (opts.cookie) headers.cookie = opts.cookie
   // Node's fetch sends NO Accept-Language of its own, so omitting this is a
   // faithful "missing header" case rather than an accidental default.
   if (opts.acceptLanguage !== undefined) headers['accept-language'] = opts.acceptLanguage
-  const res = await fetch(`${BASE}${path}`, { headers, redirect: 'manual' })
+  // `follow` is for a protected route: unauthenticated /dashboard 302s to
+  // /login, and the document we want to inspect is the one actually served.
+  const res = await fetch(`${BASE}${path}`, { headers, redirect: opts.follow ? 'follow' : 'manual' })
   return await res.text()
 }
 
 /** The <html …> tag exactly as the server wrote it. */
-async function htmlTag(path: string, cookie?: string, acceptLanguage?: string): Promise<string> {
-  const body = await rawBody(path, { cookie, acceptLanguage })
+async function htmlTag(path: string, cookie?: string, acceptLanguage?: string, follow?: boolean): Promise<string> {
+  const body = await rawBody(path, { cookie, acceptLanguage, follow })
   return (body.match(/<html[^>]*>/) || [''])[0]
 }
 
@@ -85,11 +87,26 @@ async function main() {
 
   let server: ChildProcess | null = null
   const built = existsSync(join(ROOT, '.next', 'BUILD_ID'))
-  if (!built) {
+  // A SERVER THIS SUITE DID NOT START IS NOT EVIDENCE. A `next start` left over
+  // from an earlier run keeps the port, so the spawn below silently loses the
+  // bind, waitForServer succeeds against the STRANGER, and every assertion is
+  // measured against whatever build that process is holding — which is how a
+  // corrected contract can report as still broken (or, far worse, a broken one
+  // report as green). Refuse to run rather than measure the wrong process.
+  const portBusy = await (async () => {
+    try { const r = await fetch(BASE, { redirect: 'manual' }); return r.status > 0 } catch { return false }
+  })()
+  if (portBusy) {
+    block('1-3: server-rendered HTML',
+      `port ${PORT} is already serving — a stray next start would be measured instead of this build. Kill it and re-run.`)
+  } else if (!built) {
     block('1-3: server-rendered HTML', 'no production build present — run `npx next build` first')
   } else {
     server = spawn('npx', ['next', 'start', '-p', String(PORT)], {
       cwd: ROOT,
+      // Own process group, so the kill below takes next-server with it instead
+      // of orphaning the listener for the next run to trip over.
+      detached: true,
       env: {
         ...process.env,
         NEXT_PUBLIC_SUPABASE_URL: 'https://qa.supabase.co',
@@ -100,7 +117,7 @@ async function main() {
     })
     if (!(await waitForServer(server, 60_000))) {
       block('1-3: server-rendered HTML', 'the production server did not start in time')
-      try { server.kill('SIGKILL') } catch { /* ignore */ }
+      try { if (server.pid) process.kill(-server.pid, 'SIGKILL') } catch { try { server.kill('SIGKILL') } catch { /* ignore */ } }
       server = null
     }
   }
@@ -113,12 +130,14 @@ async function main() {
         check('1a: the Hebrew marketing root with no preference → lang="he" dir="rtl"',
           /lang="he"/.test(heDefault) && /dir="rtl"/.test(heDefault), heDefault)
 
-        const enCookie = await htmlTag('/', `${LANGUAGE_COOKIE}=en`)
-        check('1b: an EN preference → lang="en" dir="ltr" IN THE FIRST RESPONSE',
+        // The preference decides on a BILINGUAL surface. (It used to decide on
+        // the Hebrew marketing tree too, which labelled Hebrew copy lang="en".)
+        const enCookie = await htmlTag('/login', `${LANGUAGE_COOKIE}=en`)
+        check('1b: an EN preference on a bilingual route → lang="en" dir="ltr" IN THE FIRST RESPONSE',
           /lang="en"/.test(enCookie) && /dir="ltr"/.test(enCookie), enCookie)
         check('1c: and it carries no Hebrew/RTL at all', !/lang="he"/.test(enCookie) && !/dir="rtl"/.test(enCookie), enCookie)
 
-        const heCookie = await htmlTag('/terms', `${LANGUAGE_COOKIE}=he`)
+        const heCookie = await htmlTag('/login', `${LANGUAGE_COOKIE}=he`)
         check('1d: an explicit HE preference → lang="he" dir="rtl"',
           /lang="he"/.test(heCookie) && /dir="rtl"/.test(heCookie), heCookie)
       }
@@ -140,9 +159,9 @@ async function main() {
           /lang="en"/.test(appEn) && /dir="ltr"/.test(appEn), appEn)
         const appHe = await htmlTag('/login', `${LANGUAGE_COOKIE}=he`)
         check('3b: …and HE/RTL for the HE preference', /lang="he"/.test(appHe) && /dir="rtl"/.test(appHe), appHe)
-        const junk = await htmlTag('/', `${LANGUAGE_COOKIE}=zz`)
-        check('3c: an unrecognised cookie never yields a broken value — the route decides',
-          /lang="he"/.test(junk) && /dir="rtl"/.test(junk), junk)
+        const junk = await htmlTag('/login', `${LANGUAGE_COOKIE}=zz`)
+        check('3c: an unrecognised cookie never yields a broken value',
+          /lang="en"/.test(junk) || /lang="he"/.test(junk), junk)
         const other = await htmlTag('/', 'some-other-cookie=en')
         check('3d: an unrelated cookie is ignored', /lang="he"/.test(other), other)
       }
@@ -200,6 +219,50 @@ async function main() {
           /lang="he"/.test(shopifyHe) && /dir="rtl"/.test(shopifyHe), shopifyHe)
       }
 
+      console.log('\n3D) FIXED-LANGUAGE PUBLIC ROUTES — no preference may relabel their copy')
+      {
+        // The defect this replaces: the cookie was consulted BEFORE the route, so
+        // a reviewer who switched the dashboard to English then received every
+        // Hebrew legal and marketing page labelled lang="en".
+        const privacyEn = await htmlTag('/privacy', `${LANGUAGE_COOKIE}=en`, 'en-US,en;q=0.9')
+        check('3D-a: /privacy + EN cookie + English browser → lang="he" dir="rtl"',
+          /lang="he"/.test(privacyEn) && /dir="rtl"/.test(privacyEn), privacyEn)
+        // The legal pages carry their OWN metadata export, so this asserts the
+        // pairing that matters: the Hebrew URL yields Hebrew metadata and the
+        // English URL yields English metadata (3D-e), whatever the cookie says.
+        const privacyTitle = await titleTag('/privacy', { cookie: `${LANGUAGE_COOKIE}=en`, acceptLanguage: 'en-US,en;q=0.9' })
+        check('3D-b: …and an EN cookie does not give the Hebrew page English metadata',
+          /[\u0590-\u05FF]/.test(privacyTitle), privacyTitle)
+
+        const termsEn = await htmlTag('/terms', `${LANGUAGE_COOKIE}=en`)
+        check('3D-c: /terms + EN cookie → lang="he" dir="rtl"',
+          /lang="he"/.test(termsEn) && /dir="rtl"/.test(termsEn), termsEn)
+
+        const enPrivacyHe = await htmlTag('/en/privacy', `${LANGUAGE_COOKIE}=he`, 'he-IL,he;q=0.9')
+        check('3D-d: /en/privacy + HE cookie → lang="en" dir="ltr"',
+          /lang="en"/.test(enPrivacyHe) && /dir="ltr"/.test(enPrivacyHe), enPrivacyHe)
+        const enPrivacyTitle = await titleTag('/en/privacy', { cookie: `${LANGUAGE_COOKIE}=he` })
+        check('3D-e: …and its metadata is English',
+          enPrivacyTitle.length > 0 && !/[\u0590-\u05FF]/.test(enPrivacyTitle), enPrivacyTitle)
+
+        // The bilingual surfaces still follow the reader, in both directions.
+        // Unauthenticated /dashboard 302s to /login; follow it, because the
+        // document the reviewer actually receives is the one that must be right.
+        const dashEn = await htmlTag('/dashboard', `${LANGUAGE_COOKIE}=en`, undefined, true)
+        check('3D-f: /dashboard + EN cookie → lang="en" dir="ltr"',
+          /lang="en"/.test(dashEn) && /dir="ltr"/.test(dashEn), dashEn)
+        const dashHe = await htmlTag('/dashboard', `${LANGUAGE_COOKIE}=he`, undefined, true)
+        check('3D-g: /dashboard + HE cookie → lang="he" dir="rtl"',
+          /lang="he"/.test(dashHe) && /dir="rtl"/.test(dashHe), dashHe)
+
+        // Other Hebrew public routes, same rule.
+        for (const path of ['/pricing', '/about', '/accessibility']) {
+          const html = await htmlTag(path, `${LANGUAGE_COOKIE}=en`, 'en-US,en;q=0.9')
+          check(`3D-h: ${path} + EN cookie + English browser stays Hebrew`,
+            /lang="he"/.test(html) && /dir="rtl"/.test(html), html)
+        }
+      }
+
       console.log('\n3C) METADATA FOLLOWS THE DOCUMENT — raw <title> off the wire')
       {
         const enTitle = await titleTag('/login', { acceptLanguage: 'en-US,en;q=0.9' })
@@ -218,7 +281,7 @@ async function main() {
       }
 
     } finally {
-      try { server.kill('SIGKILL') } catch { /* ignore */ }
+      try { if (server.pid) process.kill(-server.pid, 'SIGKILL') } catch { try { server.kill('SIGKILL') } catch { /* ignore */ } }
     }
   }
 
@@ -226,17 +289,24 @@ async function main() {
   {
     check('4a: an /en path wins over an HE cookie',
       resolveRequestLocale({ pathname: '/en/pricing', cookieValue: 'he' }) === 'en')
-    check('4b: the cookie decides a non-/en path',
-      resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'en' }) === 'en')
+    check('4b: the cookie decides a BILINGUAL path',
+      resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'en' }) === 'en'
+      && resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he' }) === 'he')
     check('4c: the seed is used only when there is no cookie',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en'
       && resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
     check('4d: with NO signal of any kind the fallback is English, not Hebrew',
       resolveRequestLocale({}) === REQUEST_FALLBACK_LOCALE && REQUEST_FALLBACK_LOCALE === 'en')
-    check('4d2: the route content language outranks the browser but not the cookie',
-      resolveRequestLocale({ pathname: '/', acceptLanguage: 'en-US,en;q=0.9' }) === 'he'
-      && resolveRequestLocale({ pathname: '/pricing', acceptLanguage: 'en-US' }) === 'he'
-      && resolveRequestLocale({ pathname: '/', cookieValue: 'en' }) === 'en')
+    // THE CORRECTED PRECEDENCE: the route outranks EVERY preference, not just
+    // the browser. A cookie, an auth seed and a header are all preferences about
+    // which language to READ; none of them changes which language a page is
+    // WRITTEN in.
+    check('4d2: a fixed-language route outranks the cookie, the seed AND the browser',
+      resolveRequestLocale({ pathname: '/privacy', cookieValue: 'en', seed: 'en', acceptLanguage: 'en-US,en;q=0.9' }) === 'he'
+      && resolveRequestLocale({ pathname: '/terms', cookieValue: 'en' }) === 'he'
+      && resolveRequestLocale({ pathname: '/pricing', cookieValue: 'en', acceptLanguage: 'en-US' }) === 'he'
+      && resolveRequestLocale({ pathname: '/', cookieValue: 'en', seed: 'en' }) === 'he'
+      && resolveRequestLocale({ pathname: '/en/privacy', cookieValue: 'he', seed: 'he', acceptLanguage: 'he-IL' }) === 'en')
     check('4d3: a bilingual app route falls through to the browser',
       resolveRequestLocale({ pathname: '/dashboard', acceptLanguage: 'en-US,en;q=0.9' }) === 'en'
       && resolveRequestLocale({ pathname: '/dashboard', acceptLanguage: 'he-IL,he;q=0.9,en;q=0.8' }) === 'he')
@@ -330,15 +400,30 @@ async function main() {
     check('8c: bilingual surfaces state nothing and defer to the user',
       routeContentLocale('/dashboard') === null && routeContentLocale('/login') === null
       && routeContentLocale('/shopify/app') === null && routeContentLocale('/content') === null)
+    check('8c2: the legal pages are fixed-language too',
+      routeContentLocale('/privacy') === 'he' && routeContentLocale('/terms') === 'he'
+      && routeContentLocale('/accessibility') === 'he'
+      && routeContentLocale('/en/privacy') === 'en' && routeContentLocale('/en/accessibility') === 'en')
     check('8d: /english is not the English tree', routeContentLocale('/english') === null)
     // DRIFT GUARD: a new marketing section that is not in the list would be
     // labelled by the browser header instead of by its own Hebrew content.
-    const publicDirs = readdirSync(join(ROOT, 'app', '(public)'), { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== 'en')
-      .map((d) => d.name)
+    // BOTH Hebrew public groups — /privacy and /accessibility live in (legal),
+    // which an earlier version of this guard did not scan at all.
+    const publicDirs = ['(public)', '(legal)'].flatMap((group) =>
+      readdirSync(join(ROOT, 'app', group), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && d.name !== 'en')
+        .map((d) => d.name))
     const missing = publicDirs.filter((d) => routeContentLocale(`/${d}`) !== 'he')
-    check('8e: every directory in app/(public) is covered by the marketing list',
-      missing.length === 0, `missing: ${JSON.stringify(missing)} — known: ${JSON.stringify(publicMarketingSegments())}`)
+    check('8e: every directory in app/(public) AND app/(legal) is covered',
+      publicDirs.length >= 8 && missing.length === 0,
+      `scanned: ${JSON.stringify(publicDirs)} missing: ${JSON.stringify(missing)} — known: ${JSON.stringify(publicMarketingSegments())}`)
+    // The switch on a fixed-language page must NAVIGATE, not relabel.
+    const switcher = require('fs').readFileSync(join(ROOT, 'components', 'LanguageSwitcher.tsx'), 'utf8')
+    check('8f: the public language switch links to the counterpart URL',
+      /getCounterpartPath\(pathname, locale\)/.test(switcher) && /<Link/.test(switcher)
+      && /return `\/en\$\{pathname\.startsWith\('\/'\) \? pathname : `\/\$\{pathname\}`\}`/.test(switcher))
+    check('8g: …and it does not write the language cookie (that would relabel, not navigate)',
+      !/languageCookieString|document\.cookie/.test(switcher))
   }
 
   console.log('\n9) LOCALIZED DOCUMENT METADATA')

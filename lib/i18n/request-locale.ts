@@ -9,12 +9,15 @@
  * before it renders anything.
  *
  * Precedence, deliberately in this order:
- *   1. an /en URL prefix — the route IS English, whatever the cookie says;
+ *   1. the ROUTE's own content language, where the route HAS one — `/en/…` is
+ *      English, `/` and the Hebrew public tree are Hebrew. Nothing overrides it;
  *   2. the `dashboard-language` cookie — the user's explicit choice;
- *   3. the ROUTE's own content language, where the route has one;
- *   4. a seed (auth metadata) for a first visit on a fresh device;
- *   5. the browser's own Accept-Language, parsed with q-values;
- *   6. English.
+ *   3. a seed (auth metadata) for a first visit on a fresh device;
+ *   4. the browser's own Accept-Language, parsed with q-values;
+ *   5. English.
+ *
+ * Steps 2-5 apply ONLY to the genuinely bilingual surfaces: the dashboard, auth
+ * and the Shopify entry points, whose text follows the reader.
  *
  * WHY STEPS 5 AND 6 EXIST. The chain used to end at Hebrew, so a visitor with no
  * /en URL, no cookie and no stored preference — every first-time reviewer
@@ -26,14 +29,20 @@
  * carries no signal at all — a missing or unparseable header — where English is
  * the safer answer for an unknown audience than an RTL document.
  *
- * WHY STEP 3 SITS ABOVE THEM. The public marketing pages are not bilingual: `/`
- * and its siblings render Hebrew copy, `/en/…` renders English copy, and which
- * one you get is decided by the URL. Letting a browser header pick the LABEL for
- * a page whose CONTENT is fixed would announce Hebrew prose as `lang="en"` to
- * every English browser — worse for a crawler and a screen reader than the bug
- * being fixed. So those routes state their own language, and only the genuinely
- * bilingual surfaces (the dashboard, auth, the Shopify entry points) fall
- * through to the seed and the browser.
+ * WHY STEP 1 IS FIRST, ABOVE THE COOKIE. The public pages are not bilingual:
+ * `/privacy` renders Hebrew copy and `/en/privacy` renders English copy, and
+ * which one you get is decided by the URL. A LABEL that disagrees with the COPY
+ * is a lie to a crawler and a screen reader whatever put it there — a browser
+ * header, an auth seed, or a cookie the reader set while using the dashboard in
+ * English. An earlier revision of this contract ranked the cookie above the
+ * route, which meant a reviewer who switched the dashboard to English then
+ * served every Hebrew legal and marketing page as `lang="en"`. The route's own
+ * language is therefore not one signal among several: on those URLs it is the
+ * only fact, and the preference chain does not run at all.
+ *
+ * Switching language on such a page is a NAVIGATION, not a relabel — the public
+ * switcher links to the counterpart URL (components/LanguageSwitcher.tsx), which
+ * is what actually changes the copy.
  *
  * PURE — no React, no DOM, no Next imports — so the middleware, the server
  * layouts and the client provider all decide identically and cannot drift.
@@ -66,14 +75,15 @@ export function isEnglishPath(pathname: string | null | undefined): boolean {
 }
 
 /**
- * First path segments of the HEBREW public marketing tree — the `app/(public)`
- * route group plus the root. These pages contain Hebrew copy written into the
- * components; there is no dictionary lookup and no English variant except the
- * separate /en tree, so their content language is a property of the URL.
+ * First path segments of the HEBREW public tree — the `app/(public)` and
+ * `app/(legal)` route groups plus the root. These pages contain Hebrew copy
+ * written into the components; there is no dictionary lookup and no English
+ * variant except the separate /en tree, so their content language is a property
+ * of the URL.
  *
- * A closed list is the point: it is short, it changes only when a marketing
- * section is added, and the language QA fails if a directory in
- * `app/(public)` is missing from it, so it cannot drift silently.
+ * A closed list is the point: it is short, it changes only when a public section
+ * is added, and the language QA fails if a directory in EITHER group is missing
+ * from it, so it cannot drift silently.
  */
 const PUBLIC_MARKETING_SEGMENTS = new Set([
   'about', 'accessibility', 'articles', 'features', 'pricing', 'privacy', 'sitemap', 'terms',
@@ -104,23 +114,25 @@ export function resolveRequestLocale(input: {
   /** The raw Accept-Language header, parsed with q-values (never substring-matched). */
   acceptLanguage?: string | null
 }): Locale {
-  if (isEnglishPath(input.pathname)) return 'en'
+  // The route decides FIRST and alone where it has a language of its own; no
+  // cookie, seed or header may relabel content it did not write.
+  const fixed = routeContentLocale(input.pathname)
+  if (fixed) return fixed
   return normalizeLocale(input.cookieValue)
-    ?? routeContentLocale(input.pathname)
     ?? normalizeLocale(input.seed)
     ?? localeFromAcceptLanguage(input.acceptLanguage)
     ?? REQUEST_FALLBACK_LOCALE
 }
 
 /**
- * The locale THIS REQUEST decides on its own — an /en route, an explicit cookie,
- * or a route that serves one fixed language — or null when it does not decide
- * and the seed / the browser's header should still apply. Separate from
- * resolveRequestLocale, which always answers with a default.
+ * The locale THIS REQUEST decides on its own — a route that serves one fixed
+ * language, or an explicit cookie on a bilingual route — or null when it does
+ * not decide and the seed / the browser's header should still apply. Same
+ * precedence as resolveRequestLocale: the route first, then the cookie.
+ * Separate from resolveRequestLocale, which always answers with a default.
  */
 export function explicitRequestLocale(input: { pathname?: string | null; cookieValue?: string | null }): Locale | null {
-  if (isEnglishPath(input.pathname)) return 'en'
-  return normalizeLocale(input.cookieValue) ?? routeContentLocale(input.pathname)
+  return routeContentLocale(input.pathname) ?? normalizeLocale(input.cookieValue)
 }
 
 /**

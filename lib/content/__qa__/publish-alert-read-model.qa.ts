@@ -50,7 +50,7 @@ import {
   type AlertRow, type PublicationFact, type ActiveAlert,
 } from '../automation/alert-read-model'
 import { presentAlert } from '../automation/alert-presentation'
-import { publicationFactsFrom, loadActiveAlerts } from '../automation/load-active-alerts'
+import { publicationFactsFrom, loadActiveAlerts, isMissingSchemaError } from '../automation/load-active-alerts'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -213,15 +213,88 @@ async function main() {
       [later])
     check('C8: the stale one disappears and the UNRELATED one stays',
       mixed.length === 1 && mixed[0].id === 'keep', JSON.stringify(mixed.map((m) => m.id)))
-    check('C9: publication facts are derived from the persisted remote id, per channel',
-      JSON.stringify(publicationFactsFrom([
-        { id: 'art-1', status: 'published', published_at: '2026-09-03T09:00:00Z', shopify_article_id: 'gid://shopify/Article/1', shopify_published_at: '2026-09-03T10:00:00Z', wp_post_id: null },
-        { id: 'art-2', status: 'published', published_at: '2026-09-02T09:00:00Z', shopify_article_id: null, shopify_published_at: null, wp_post_id: 55 },
-        { id: 'art-3', status: 'draft', published_at: null, shopify_article_id: null, shopify_published_at: null, wp_post_id: null },
-      ])) === JSON.stringify([
-        { articleId: 'art-1', channel: 'shopify', publishedAt: '2026-09-03T10:00:00Z' },
-        { articleId: 'art-2', channel: 'wordpress', publishedAt: '2026-09-02T09:00:00Z' },
-      ]))
+  }
+
+  // ── C2) the EVIDENCE contract — a remote id is not a publication ───────────
+  console.log('\nC2) publication evidence: a remote id proves nothing on its own')
+  {
+    type Art = Parameters<typeof publicationFactsFrom>[0][number]
+    const art = (over: Partial<Art> = {}): Art => ({
+      id: 'art-1', status: 'draft', published_at: null,
+      shopify_status: null, shopify_published_at: null, wp_post_id: null, ...over,
+    })
+    const facts = (a: Art) => publicationFactsFrom([a])
+
+    // SHOPIFY — needs its OWN published status AND its OWN timestamp.
+    check('C2-a: a real Shopify publication is a fact',
+      JSON.stringify(facts(art({ shopify_status: 'published', shopify_published_at: '2026-09-03T10:00:00Z', status: 'published', published_at: '2026-09-03T10:00:00Z' })))
+      === JSON.stringify([{ articleId: 'art-1', channel: 'shopify', publishedAt: '2026-09-03T10:00:00Z' }]))
+    // The exact production shape: published to WordPress, later DRAFT-exported to
+    // Shopify. The old code read the Shopify id + the WordPress date as a Shopify
+    // publication that never happened.
+    const draftExport = art({ shopify_status: 'draft', shopify_published_at: null, wp_post_id: 42, status: 'published', published_at: '2026-09-03T09:00:00Z' })
+    check('C2-b: a Shopify DRAFT export is NOT a Shopify publication',
+      !facts(draftExport).some((f) => f.channel === 'shopify'), JSON.stringify(facts(draftExport)))
+    check('C2-c: …and the generic published_at is never borrowed for Shopify',
+      !facts(art({ shopify_status: 'draft', published_at: '2026-09-03T09:00:00Z', status: 'published' })).some((f) => f.channel === 'shopify'))
+    check('C2-d: a published Shopify status with NO Shopify timestamp is not a fact',
+      facts(art({ shopify_status: 'published', shopify_published_at: null, status: 'published', published_at: '2026-09-03T09:00:00Z' })).length === 0)
+    check('C2-e: an unparseable Shopify timestamp is not a fact',
+      facts(art({ shopify_status: 'published', shopify_published_at: 'not-a-date' })).length === 0)
+    check('C2-f: shopify_status remote_missing is not a publication',
+      facts(art({ shopify_status: 'remote_missing', shopify_published_at: '2026-09-03T10:00:00Z' })).length === 0)
+
+    // WORDPRESS — needs a post id AND a generic published state AND a date.
+    check('C2-g: a real WordPress publication is a fact',
+      JSON.stringify(facts(art({ wp_post_id: 55, status: 'published', published_at: '2026-09-02T09:00:00Z' })))
+      === JSON.stringify([{ articleId: 'art-1', channel: 'wordpress', publishedAt: '2026-09-02T09:00:00Z' }]))
+    check('C2-h: a WordPress DRAFT export (post id, still unpublished) is NOT a fact',
+      facts(art({ wp_post_id: 55, status: 'ready', published_at: null })).length === 0)
+    check('C2-i: a post id with a published status but no date is not a fact',
+      facts(art({ wp_post_id: 55, status: 'published', published_at: null })).length === 0)
+    // AMBIGUITY: Shopify owns the generic pair when it says published, so the
+    // WordPress fact is withheld rather than invented.
+    const both = art({ wp_post_id: 55, status: 'published', published_at: '2026-09-03T10:00:00Z', shopify_status: 'published', shopify_published_at: '2026-09-03T10:00:00Z' })
+    check('C2-j: when Shopify claims the generic publish state, no WordPress fact is invented',
+      JSON.stringify(facts(both)) === JSON.stringify([{ articleId: 'art-1', channel: 'shopify', publishedAt: '2026-09-03T10:00:00Z' }]),
+      JSON.stringify(facts(both)))
+    check('C2-k: an article with no publication evidence yields nothing',
+      facts(art()).length === 0 && facts(art({ status: 'published', published_at: '2026-09-03T09:00:00Z' })).length === 0)
+
+    // …and the SUPPRESSION consequences the contract exists for.
+    const shopFailure = row({ channel: 'shopify' })
+    const wpFailure = row({ channel: 'wordpress', error: 'wordpress_media_upload_failed' })
+    const legacyFailure = row({ channel: null })
+    const draftFacts = facts(draftExport)
+    check('C2-l: a Shopify DRAFT does not suppress a Shopify failure',
+      selectActiveAlerts([shopFailure], draftFacts).length === 1)
+    // A Shopify draft ALONE — no other channel published — must leave the legacy
+    // row visible. (draftExport above also carries a genuine WordPress
+    // publication, which legitimately does supersede it; see C2-r.)
+    const shopifyDraftOnly = facts(art({ shopify_status: 'draft', shopify_published_at: null }))
+    check('C2-m: …nor a LEGACY channel-less failure',
+      shopifyDraftOnly.length === 0 && selectActiveAlerts([legacyFailure], shopifyDraftOnly).length === 1)
+    const wpOnly = facts(art({ wp_post_id: 55, status: 'published', published_at: '2026-09-05T09:00:00Z' }))
+    check('C2-n: a WordPress success does not suppress a Shopify failure',
+      selectActiveAlerts([shopFailure], wpOnly).length === 1)
+    const shopOnly = facts(art({ shopify_status: 'published', shopify_published_at: '2026-09-05T09:00:00Z' }))
+    check('C2-o: a Shopify success does not suppress a WordPress failure',
+      selectActiveAlerts([wpFailure], shopOnly).length === 1)
+    check('C2-p: a later genuine publication on the SAME channel does suppress it',
+      selectActiveAlerts([shopFailure], shopOnly).length === 0
+      && selectActiveAlerts([wpFailure], wpOnly).length === 0)
+    const earlier = facts(art({ shopify_status: 'published', shopify_published_at: '2026-08-01T09:00:00Z' }))
+    check('C2-q: an EARLIER publication does not suppress a later failure',
+      selectActiveAlerts([shopFailure], earlier).length === 1)
+    check('C2-r: a genuine publication DOES supersede the legacy channel-less failure',
+      selectActiveAlerts([legacyFailure], shopOnly).length === 0)
+
+    // SOURCE: the loader must actually select the columns this contract needs.
+    const loaderSrc = strip(read('lib/content/automation/load-active-alerts.ts'))
+    check('C2-s: the loader selects the status columns the contract depends on',
+      /shopify_status/.test(loaderSrc) && /shopify_published_at/.test(loaderSrc) && /\bstatus,/.test(loaderSrc))
+    check('C2-t: …and never falls back to the generic date for Shopify',
+      !/shopify_published_at \?\? a\.published_at/.test(loaderSrc))
   }
 
   // ── D) both REAL endpoints agree ───────────────────────────────────────────
@@ -232,8 +305,10 @@ async function main() {
       { ...row({ id: 'live-wp', article_id: 'art-2', channel: 'wordpress', error: 'wordpress_media_upload_failed' }), project_id: 'p1' },
     ]
     const articles = [
-      { id: 'art-1', project_id: 'p1', status: 'published', published_at: '2026-09-03T09:00:00Z', shopify_article_id: 'gid://shopify/Article/9', shopify_published_at: '2026-09-03T09:00:00Z', wp_post_id: null },
-      { id: 'art-2', project_id: 'p1', status: 'failed', published_at: null, shopify_article_id: null, shopify_published_at: null, wp_post_id: null },
+      // art-1 genuinely published to Shopify AFTER its failure was recorded.
+      { id: 'art-1', project_id: 'p1', status: 'published', published_at: '2026-09-03T09:00:00Z', shopify_status: 'published', shopify_published_at: '2026-09-03T09:00:00Z', wp_post_id: null },
+      // art-2 never published anywhere — its WordPress failure is still live.
+      { id: 'art-2', project_id: 'p1', status: 'failed', published_at: null, shopify_status: null, shopify_published_at: null, wp_post_id: null },
     ]
     const client = fakeClient({
       // The overview endpoint checks ownership against the caller's own project list.
@@ -279,6 +354,95 @@ async function main() {
       `${JSON.stringify(overviewJson.alerts)} vs ${JSON.stringify(alertsJson.alerts)}`)
     check('D6: …and the overview payload leaks no provider text either',
       !JSON.stringify(overviewJson).includes('ArticleCreateInput'))
+  }
+
+  // ── D2) the migration has not been applied ─────────────────────────────────
+  console.log('\nD2) a missing COLUMN is a migration, not an outage')
+  {
+    // The query selects `channel`. Between deploying this code and running the
+    // migration the TABLE exists and the COLUMN does not, and Postgres answers
+    // 42703 / PostgREST answers PGRST204 — never 42P01, the only code the first
+    // revision handled. It would have reported a generic 500 "alerts
+    // unavailable" and sent an operator hunting an outage that isn't there.
+    check('D2-a: undefined_table is a migration', isMissingSchemaError({ code: '42P01' }))
+    check('D2-b: undefined_COLUMN is a migration', isMissingSchemaError({ code: '42703' }))
+    check('D2-c: the PostgREST schema-cache codes are migrations',
+      isMissingSchemaError({ code: 'PGRST204' }) && isMissingSchemaError({ code: 'PGRST202' }))
+    check('D2-d: …and the schema-cache MESSAGE form is too',
+      isMissingSchemaError({ message: "Could not find the 'channel' column of 'content_automation_alerts' in the schema cache" })
+      && isMissingSchemaError({ message: 'column content_automation_alerts.channel does not exist' }))
+    check('D2-e: an UNRELATED database failure stays an outage',
+      !isMissingSchemaError({ code: '57014', message: 'canceling statement due to statement timeout' })
+      && !isMissingSchemaError({ code: '42501', message: 'permission denied for table' })
+      && !isMissingSchemaError({}) && !isMissingSchemaError(null))
+
+    /** A client whose alerts SELECT fails exactly as a missing column does. */
+    const failingClient = (error: Record<string, unknown>) => {
+      const base = fakeClient({
+        projects: [{ id: 'p1', user_id: 'u1', is_active: true, name: 'P', business_name: 'P', target_domain: 'x', language: 'en' }] as never,
+        generated_articles: [] as never, wordpress_connections: [] as never, shopify_connections: [] as never, article_pool_items: [] as never,
+      }) as never as { from: (t: string) => Record<string, unknown> }
+      return {
+        auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
+        from(table: string) {
+          if (table !== 'content_automation_alerts') return base.from(table)
+          const q: Record<string, unknown> = {}
+          Object.assign(q, {
+            select: () => q, eq: () => q, is: () => q, in: () => q, order: () => q, limit: () => q,
+            maybeSingle: () => q, single: () => q,
+            then: (res: (v: unknown) => unknown) => Promise.resolve({ data: null, error }).then(res),
+          })
+          return q
+        },
+      } as never
+    }
+
+    for (const [label, error] of [
+      ['42703 undefined_column', { code: '42703', message: 'column content_automation_alerts.channel does not exist' }],
+      ['PGRST204 schema cache', { code: 'PGRST204', message: "Could not find the 'channel' column in the schema cache" }],
+    ] as const) {
+      const client = failingClient(error as never)
+      const direct = await loadActiveAlerts(client, 'p1')
+      check(`D2-f[${label}]: the loader reports migration_required`,
+        !direct.ok && direct.reason === 'migration_required', JSON.stringify(direct))
+
+      overrides.set('@/lib/content/api-auth', {
+        authContentProject: async () => ({ user: { id: 'u1' }, admin: client, project: { id: 'p1', user_id: 'u1' } }),
+        isContentAutomationEnabled: () => true,
+      })
+      const { GET: aGET } = await import('../../../app/api/content/automation/alerts/route')
+      const aRes = await aGET(new Request('http://localhost/api/content/automation/alerts?projectId=p1') as never) as Response
+      const aJson = await aRes.json() as { error?: string; migrationRequired?: boolean }
+      check(`D2-g[${label}]: /automation/alerts returns the typed 503 migration error`,
+        aRes.status === 503 && aJson.error === 'automation_alerts_migration_required' && aJson.migrationRequired === true,
+        `${aRes.status} ${JSON.stringify(aJson)}`)
+
+      overrides.set('@/lib/supabase/server', { createClient: async () => client })
+      const { GET: oGET } = await import('../../../app/api/content/overview/route')
+      const oRes = await oGET(new Request('http://localhost/api/content/overview?projectId=p1') as never) as Response
+      const oJson = await oRes.json() as { alerts?: unknown[]; alertsUnavailable?: string }
+      check(`D2-h[${label}]: /overview reports it too, and never as a healthy empty list`,
+        oJson.alertsUnavailable === 'migration_required' && Array.isArray(oJson.alerts) && oJson.alerts.length === 0,
+        JSON.stringify(oJson).slice(0, 200))
+    }
+
+    // NEGATIVE CONTROL: an unrelated failure must NOT be reported as a migration.
+    const outage = failingClient({ code: '57014', message: 'canceling statement due to statement timeout' } as never)
+    const outageResult = await loadActiveAlerts(outage, 'p1')
+    check('D2-i: an unrelated DB failure stays `unavailable`, not `migration_required`',
+      !outageResult.ok && outageResult.reason === 'unavailable', JSON.stringify(outageResult))
+    overrides.set('@/lib/content/api-auth', {
+      authContentProject: async () => ({ user: { id: 'u1' }, admin: outage, project: { id: 'p1', user_id: 'u1' } }),
+      isContentAutomationEnabled: () => true,
+    })
+    const { GET: aGET2 } = await import('../../../app/api/content/automation/alerts/route')
+    const aRes2 = await aGET2(new Request('http://localhost/api/content/automation/alerts?projectId=p1') as never) as Response
+    check('D2-j: …and the endpoint answers 500, not the migration 503', aRes2.status === 500)
+    // The first revision's predicate: 42P01 only. It must FAIL the column case,
+    // so D2-b/f are not vacuous.
+    const oldPredicate = (e: { code?: string }) => e.code === '42P01'
+    check('D2-k: the OLD predicate misses a missing column (control)',
+      !oldPredicate({ code: '42703' }) && !oldPredicate({ code: 'PGRST204' }))
   }
 
   // ── E) the write path ──────────────────────────────────────────────────────
