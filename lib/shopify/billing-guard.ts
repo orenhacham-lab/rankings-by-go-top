@@ -24,6 +24,8 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShopifyConnectionRow } from './api-auth'
 import { getActiveShopifySubscription } from './partner-client'
 import { getActiveMigrationResult } from './paypal-migration'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { getUserEntitlement } from '@/lib/subscription'
 import { recordShopifyBillingCache } from './billing-cache'
 import type { ShopifyPlanHandle } from './constants'
 
@@ -31,6 +33,10 @@ type Admin = ReturnType<typeof createAdminClient>
 
 export type ShopifyPublishDenyReason =
   | 'shop_identity_unverified'
+  /** Billing authority itself could not be read — an outage, not a verdict. */
+  | 'billing_authority_unavailable'
+  /** Website-governed account whose WEBSITE plan is not active. */
+  | 'no_active_website_plan'
   | 'paypal_migration_incomplete'
   /** The migration state itself could not be read — an outage, not a verdict. */
   | 'migration_state_unavailable'
@@ -38,7 +44,10 @@ export type ShopifyPublishDenyReason =
   | 'no_active_shopify_plan'
 
 export type ShopifyPublishEntitlementResult =
-  | { ok: true; planHandle: ShopifyPlanHandle }
+  /** Shopify bills this account: a verified Shopify App Pricing plan. */
+  | { ok: true; governedBy: 'shopify'; planHandle: ShopifyPlanHandle }
+  /** The WEBSITE bills this account: its own entitlement was verified instead. */
+  | { ok: true; governedBy: 'website' }
   | { ok: false; reason: ShopifyPublishDenyReason; detail?: string }
 
 const recordBillingCache = recordShopifyBillingCache
@@ -53,9 +62,40 @@ export async function checkShopifyPublishEntitlement(
   connection: ShopifyConnectionRow,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ShopifyPublishEntitlementResult> {
+  // 0) WHO BILLS THIS ACCOUNT decides which entitlement applies.
+  //
+  //    This guard used to run Shopify App Pricing verification for EVERY
+  //    Shopify publish, including accounts the WEBSITE bills. A website
+  //    customer who connects a store purely as a publishing destination has no
+  //    Shopify plan and — for an older direct connection — no shop_gid, so step
+  //    1 below refused them unconditionally with 'shop_identity_unverified'.
+  //    Their entitlement lives on the website side; demanding a Shopify plan of
+  //    them asks the wrong question.
+  //
+  //    Authority is READ here, never changed. A governance read failure fails
+  //    closed, and a website-governed account is still checked — against its
+  //    real website entitlement, not waved through.
+  const authority = await resolveBillingAuthority(admin, connection.user_id)
+  if (!authority.ok) {
+    return { ok: false, reason: 'billing_authority_unavailable', detail: authority.reason }
+  }
+  if (authority.authority !== 'shopify') {
+    const entitlement = await getUserEntitlement(connection.user_id, admin)
+    if (entitlement.plan === 'entitlement_unavailable') {
+      return { ok: false, reason: 'billing_verification_unavailable', detail: 'website entitlement unavailable' }
+    }
+    const websiteActive = entitlement.isAdmin || entitlement.hasActiveSubscription || entitlement.trialActive
+    if (!websiteActive) {
+      return { ok: false, reason: 'no_active_website_plan', detail: entitlement.plan }
+    }
+    return { ok: true, governedBy: 'website' }
+  }
+
   // 1) A connection with no verified Shop GID cannot be checked against the
   //    Partner API at all (activeSubscription requires a real shopId). This
   //    also covers pre-Phase-2 connections that haven't re-verified yet.
+  //    Reached ONLY for Shopify-billed accounts, where a Partner-API check is
+  //    genuinely required.
   if (!connection.shop_gid) {
     return { ok: false, reason: 'shop_identity_unverified', detail: 'no shop_gid on this connection; reconnect required' }
   }
@@ -117,5 +157,5 @@ export async function checkShopifyPublishEntitlement(
     shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
     shopify_billing_last_error: null,
   })
-  return { ok: true, planHandle: result.planHandle }
+  return { ok: true, governedBy: 'shopify', planHandle: result.planHandle }
 }

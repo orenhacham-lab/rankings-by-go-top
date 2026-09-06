@@ -26,6 +26,11 @@ export type ShopifyConnectionRow = {
   // WHICH Shopify app issued this credential. Refresh must use that app's
   // client id + secret; NULL means it was never recorded and is never guessed.
   oauth_app_edition: 'public' | 'legacy' | null
+  /** Reviewed, explicit provenance for a permitted non-expiring credential.
+   *  Optional on the row type: the column is added by a later migration, so a
+   *  not-yet-migrated database simply has no value — which reads as unknown,
+   *  and unknown is refused. */
+  connection_provenance?: string | null
   api_version: string
   connection_status: 'untested' | 'connected' | 'failed'
   last_tested_at: string | null
@@ -70,12 +75,25 @@ type Admin = ReturnType<typeof createAdminClient>
  * `{ allowInactive: true }` — it is the path responsible for testing/recovering an
  * untested/failed connection. Ownership is unchanged (enforced by the caller).
  */
+/** Why a Shopify connection could not be used. Non-secret, stable, localizable. */
+export type ShopifyConnectionFailureReason =
+  | 'no_shopify_connection'
+  | 'shopify_connection_inactive'
+  | 'shopify_connection_unreadable'
+  | 'shopify_reauthorization_required'
+  | 'shopify_app_not_configured'
+  | 'shopify_credentials_unavailable'
+  | 'shopify_credential_unreadable'
+
 export async function loadShopifyConnection(
   admin: Admin,
   projectId: string,
   opts?: { allowInactive?: boolean },
 ): Promise<
-  | { error: string; status: 404 | 409 | 500 | 503 }
+  // `reason` is a STABLE, non-secret code. It exists because the automation queue
+  // used to collapse every one of these into 'no_shopify_connection', telling a
+  // merchant with a perfectly good connected store that they had no store at all.
+  | { error: string; status: 404 | 409 | 500 | 503; reason: ShopifyConnectionFailureReason }
   | { connection: ShopifyConnectionRow; creds: ShopifyCredentials }
 > {
   const { data, error } = await admin
@@ -87,13 +105,13 @@ export async function loadShopifyConnection(
 
   if (error) {
     console.error('[Shopify] Failed to load connection:', error.message)
-    return { error: 'Failed to load Shopify connection', status: 500 }
+    return { error: 'Failed to load Shopify connection', status: 500, reason: 'shopify_connection_unreadable' }
   }
-  if (!data) return { error: 'No Shopify connection for this project', status: 404 }
+  if (!data) return { error: 'No Shopify connection for this project', status: 404, reason: 'no_shopify_connection' }
 
   const connection = data as ShopifyConnectionRow
   if (connection.connection_status !== 'connected' && !opts?.allowInactive) {
-    return { error: 'Shopify connection is not active', status: 409 }
+    return { error: 'Shopify connection is not active', status: 409, reason: 'shopify_connection_inactive' }
   }
   // THE credential resolution point. Every Admin API caller in the app reaches
   // Shopify through this one function, so refreshing an expiring offline grant
@@ -108,17 +126,17 @@ export async function loadShopifyConnection(
     if (resolved.reason === 'reauthorization_required') {
       // TERMINAL: Shopify refused the refresh token. The connection is already
       // marked so the UI can offer a reconnect. Billing authority is untouched.
-      return { error: 'Shopify authorization expired — reconnect the store', status: 409 }
+      return { error: 'Shopify authorization expired — reconnect the store', status: 409, reason: 'shopify_reauthorization_required' }
     }
     if (resolved.reason === 'not_configured') {
-      return { error: 'Shopify app credentials are not configured for this connection', status: 500 }
+      return { error: 'Shopify app credentials are not configured for this connection', status: 500, reason: 'shopify_app_not_configured' }
     }
     if (resolved.reason === 'token_refresh_failed') {
       // TRANSIENT: Shopify was unreachable or briefly failing. Retry later;
       // nothing about the connection or its billing has changed.
-      return { error: 'Shopify credentials could not be refreshed, try again', status: 503 }
+      return { error: 'Shopify credentials could not be refreshed, try again', status: 503, reason: 'shopify_credentials_unavailable' }
     }
-    return { error: 'Stored Shopify credentials could not be decrypted', status: 500 }
+    return { error: 'Stored Shopify credentials could not be decrypted', status: 500, reason: 'shopify_credential_unreadable' }
   }
 
   return {

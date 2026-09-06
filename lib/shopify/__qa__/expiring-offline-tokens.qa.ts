@@ -480,14 +480,33 @@ async function main() {
       check('6b4: a PUBLIC-app non-expiring token is never sent to the Admin API',
         publicLegacyShape.ok === false && publicLegacyShape.reason === 'reauthorization_required')
 
-      // An UNRECORDED issuing app is never guessed at.
+      // An UNRECORDED edition is UNKNOWN provenance and stays refused. Absence
+      // of a value is not evidence of legitimacy: NULL also covers manually
+      // imported, partially written and corrupt rows. A permitted historical
+      // direct connector is admitted only by an explicit, reviewed marking
+      // (see 6b8).
       const unknownEdition = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
         id: 'c-unknown', shop_domain: SHOP, access_token_encrypted: encryptCredential(ACCESS),
         refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
         oauth_app_edition: null,
       })
-      check('6b5: an unrecorded issuing app is not guessed — reauthorization is required',
+      check('6b5: an unrecorded edition is UNKNOWN and stays refused (fail closed)',
         unknownEdition.ok === false && unknownEdition.reason === 'reauthorization_required')
+
+      // 6b8 — the ONLY way a non-expiring credential without a legacy edition is
+      // admitted: an explicit, human-asserted provenance marking.
+      const marked = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
+        id: 'c-marked', shop_domain: SHOP, access_token_encrypted: encryptCredential('shpat_direct'),
+        refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+        oauth_app_edition: null, connection_provenance: 'direct_legacy_preapproval',
+      })
+      check('6b8: a POSITIVELY MARKED historical direct connector is admitted', marked.ok === true, JSON.stringify(marked))
+      const bogusMark = await resolveShopifyAccessToken(new FakeAdmin({ shopify_connections: [] }) as never, {
+        id: 'c-bogus', shop_domain: SHOP, access_token_encrypted: 'e',
+        refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+        oauth_app_edition: 'public', connection_provenance: 'direct_legacy_preapproval',
+      })
+      check('6b9: the marking can NEVER launder a public-app grant', bogusMark.ok === false)
       check('6b6: none of these contacted Shopify', calls === 0)
 
       check('6b7: the shape classifier names each case exactly', (() => {
@@ -495,8 +514,19 @@ async function main() {
         return classifyStoredCredential({ ...base, refresh_token_encrypted: 'r', access_token_expires_at: 'now' }) === 'expiring'
           && classifyStoredCredential({ ...base, access_token_expires_at: 'now' }) === 'incomplete'
           && classifyStoredCredential({ ...base, oauth_app_edition: 'legacy' }) === 'legacy'
+          // The public-app guard is UNCHANGED — this is the case that must stay refused.
           && classifyStoredCredential({ ...base, oauth_app_edition: 'public' }) === 'unusable'
+          // UNKNOWN provenance is refused — never promoted to trusted.
           && classifyStoredCredential({ ...base }) === 'unusable'
+          && classifyStoredCredential({ ...base, oauth_app_edition: null }) === 'unusable'
+          // …only an explicit marking admits it, and only when not public-app.
+          && classifyStoredCredential({ ...base, connection_provenance: 'direct_legacy_preapproval' }) === 'legacy'
+          && classifyStoredCredential({ ...base, oauth_app_edition: 'public', connection_provenance: 'direct_legacy_preapproval' }) === 'unusable'
+          && classifyStoredCredential({ ...base, connection_provenance: 'something_else' }) === 'unusable'
+          // …but only when there is nothing to rotate with: an expiry or refresh
+          // material still classifies first, regardless of the null edition.
+          && classifyStoredCredential({ ...base, access_token_expires_at: 'now' }) === 'incomplete'
+          && classifyStoredCredential({ ...base, refresh_token_encrypted: 'r' }) === 'expiring'
       })())
     } finally { globalThis.fetch = originalFetch }
   }

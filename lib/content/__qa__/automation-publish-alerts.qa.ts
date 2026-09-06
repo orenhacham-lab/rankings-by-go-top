@@ -64,9 +64,17 @@ function main() {
   check('transient media failure stays retryable (failed) + final-failure alert', /finalizeItem\(admin, itemId, 'failed', mediaReason\)/.test(wp) && /alertOnFinalFailure\(mediaReason\)/.test(wp))
 
   // 4 — Shopify blockers route to paused + alert (local blockShopifyItem).
-  for (const reason of ['article_missing', 'no_shopify_connection', 'missing_write_content_scope']) {
+  for (const reason of ['article_missing', 'missing_write_content_scope']) {
     check(`Shopify blocker '${reason}' → blockShopifyItem (paused + alert)`, new RegExp(`blockShopifyItem\\(admin, item, '${reason}'`).test(shop))
   }
+  // A CONNECTION failure no longer hard-codes 'no_shopify_connection': the queue
+  // forwards loadShopifyConnection's own reason, so a merchant whose store IS
+  // connected but whose credential needs reauthorization is told that, instead
+  // of being told they have no store. The reason is still routed to the same
+  // paused + alert path.
+  check('Shopify connection failure → blockShopifyItem with the REAL reason (not a hard-coded one)',
+    /blockShopifyItem\(admin, item, loaded\.reason, articleTitle\)/.test(shop)
+    && !/blockShopifyItem\(admin, item, 'no_shopify_connection'/.test(shop))
   check('blockShopifyItem finalizes paused + records blocked alert', /finalizeItem\(admin, item\.id, 'paused', reason\)/.test(shop) && /recordPublishBlockedAlert/.test(shop))
 
   // 5 — terminal catch alert in BOTH backends (retained context, deduped).

@@ -58,7 +58,14 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     articleTitle = article.title
 
     const loaded = await loadShopifyConnection(admin, item.project_id)
-    if ('error' in loaded) { await blockShopifyItem(admin, item, 'no_shopify_connection', articleTitle); return { itemId: item.id, status: 'paused', articleId, reason: 'no_shopify_connection' } }
+    if ('error' in loaded) {
+      // TRUTHFULLY, not 'no_shopify_connection' for everything. Collapsing all
+      // five failures into that one code told merchants whose store IS connected
+      // that no store was connected — and sent them to reconnect a healthy
+      // integration instead of showing the real problem.
+      await blockShopifyItem(admin, item, loaded.reason, articleTitle)
+      return { itemId: item.id, status: 'paused', articleId, reason: loaded.reason }
+    }
 
     // Publishing prerequisite — a config gate that won't change on retry.
     if (!hasWriteContent(loaded.connection.granted_scopes)) { await blockShopifyItem(admin, item, 'missing_write_content_scope', articleTitle); return { itemId: item.id, status: 'paused', articleId, reason: 'missing_write_content_scope' } }

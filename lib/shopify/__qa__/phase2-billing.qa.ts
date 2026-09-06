@@ -68,6 +68,11 @@ const activeSubBody = (handle: string, shopId = DEFAULT_SHOP_GID, myshopifyDomai
 })
 const noSubBody = { data: { activeSubscription: null } }
 
+/** The guard now reads billing authority first, so these fixtures must SAY that
+ *  Shopify bills this account. A missing governance row means website authority
+ *  — a different code path with a different (website) entitlement check. */
+const SHOPIFY_GOVERNANCE = [{ user_id: 'user-1', signup_origin: 'shopify_app_store', billing_authority: 'shopify', authority_reason: 'verified_app_store_install' }]
+
 function baseConnection(overrides: Partial<ShopifyConnectionRow> = {}): ShopifyConnectionRow {
   return {
     id: 'conn-1', user_id: 'user-1', project_id: 'project-1', shop_domain: 'test-shop.myshopify.com',
@@ -225,7 +230,7 @@ async function main() {
   // ── Central publish entitlement guard ──
   console.log('\n16) checkShopifyPublishEntitlement — no shop_gid fails closed')
   {
-    const admin = new FakeAdmin({ shopify_connections: [], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: SHOPIFY_GOVERNANCE, shopify_connections: [], shopify_billing_migrations: [] })
     const conn = baseConnection({ shop_gid: null })
     const r = await checkShopifyPublishEntitlement(admin as unknown as Admin, conn)
     check('ok:false, reason shop_identity_unverified', r.ok === false && r.reason === 'shop_identity_unverified')
@@ -234,6 +239,7 @@ async function main() {
   console.log('\n17) checkShopifyPublishEntitlement — in-progress PayPal migration blocks publish')
   {
     const admin = new FakeAdmin({
+      billing_governance: SHOPIFY_GOVERNANCE,
       shopify_connections: [],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'user-1', project_id: 'project-1', status: 'pending', paypal_cancel_attempts: 0 }],
     })
@@ -243,6 +249,7 @@ async function main() {
   console.log('\n17b) checkShopifyPublishEntitlement — a FAILED PayPal-cancel migration also blocks publish (never leaves it silently unlocked)')
   {
     const admin = new FakeAdmin({
+      billing_governance: SHOPIFY_GOVERNANCE,
       shopify_connections: [],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'user-1', project_id: 'project-1', status: 'paypal_cancel_failed', paypal_cancel_attempts: 2 }],
     })
@@ -254,7 +261,7 @@ async function main() {
   {
     const saved = process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN
     delete process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN
-    const admin = new FakeAdmin({ shopify_connections: [{ ...baseConnection() }], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: SHOPIFY_GOVERNANCE, shopify_connections: [{ ...baseConnection() }], shopify_billing_migrations: [] })
     const r = await checkShopifyPublishEntitlement(admin as unknown as Admin, baseConnection())
     check('ok:false, reason billing_verification_unavailable', r.ok === false && r.reason === 'billing_verification_unavailable')
     process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN = saved
@@ -262,10 +269,10 @@ async function main() {
 
   console.log('\n19) checkShopifyPublishEntitlement — live active plan grants entitlement AND updates the cache/audit columns')
   {
-    const admin = new FakeAdmin({ shopify_connections: [{ ...baseConnection() }], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: SHOPIFY_GOVERNANCE, shopify_connections: [{ ...baseConnection() }], shopify_billing_migrations: [] })
     const f = fakePartnerFetch(() => ({ status: 200, body: activeSubBody('premium') }))
     const r = await checkShopifyPublishEntitlement(admin as unknown as Admin, baseConnection(), f)
-    check('ok:true, planHandle=premium', r.ok === true && r.planHandle === 'premium')
+    check('ok:true, governed by shopify, planHandle=premium', r.ok === true && r.governedBy === 'shopify' && r.planHandle === 'premium')
     const row = admin.tables.shopify_connections[0] as Record<string, unknown>
     check('cache column shopify_plan_handle updated to premium', row.shopify_plan_handle === 'premium')
     check('cache column shopify_subscription_status updated to active', row.shopify_subscription_status === 'active')
@@ -274,7 +281,7 @@ async function main() {
   console.log('\n20) checkShopifyPublishEntitlement — STALE cache saying "active" is IGNORED when the LIVE check now says inactive')
   {
     const staleConn = baseConnection({ shopify_subscription_status: 'active', shopify_plan_handle: 'premium' })
-    const admin = new FakeAdmin({ shopify_connections: [{ ...staleConn }], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: SHOPIFY_GOVERNANCE, shopify_connections: [{ ...staleConn }], shopify_billing_migrations: [] })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
     const r = await checkShopifyPublishEntitlement(admin as unknown as Admin, staleConn, f)
     check('ok:false despite a stale "active" cache — the guard never trusts the cache for the decision', r.ok === false && r.reason === 'no_active_shopify_plan')
@@ -290,6 +297,10 @@ async function main() {
     // that shop. No code path here references the reviewer's email; this
     // proves the guard denies based purely on the live Partner API answer.
     const admin = new FakeAdmin({
+      // Governance says SHOPIFY bills this account — which is what an App Store
+      // install establishes. The manually-granted subscriptions row must not
+      // override that, and the live Partner API answer decides.
+      billing_governance: SHOPIFY_GOVERNANCE,
       subscriptions: [{ id: 'sub-1', user_id: 'user-1', plan_code: 'large_agency', status: 'active', paypal_subscription_id: null }],
       shopify_connections: [{ ...baseConnection() }],
       shopify_billing_migrations: [],
@@ -297,6 +308,42 @@ async function main() {
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
     const r = await checkShopifyPublishEntitlement(admin as unknown as Admin, baseConnection(), f)
     check('ok:false — manually granted PayPal-less entitlement does not unlock Shopify publishing', r.ok === false && r.reason === 'no_active_shopify_plan')
+
+    // THE SEPARATION, stated as its own case. A WEBSITE-governed account is not
+    // asked for a Shopify plan at all — its entitlement is the website's, and
+    // Shopify is only a publishing destination. Authority is read, never changed.
+    let partnerCalls = 0
+    const countingFetch = fakePartnerFetch(() => { partnerCalls++; return { status: 200, body: noSubBody } })
+    const websiteAdmin = new FakeAdmin({
+      billing_governance: [{ user_id: 'user-1', signup_origin: 'website', billing_authority: 'website', authority_reason: 'website_signup' }],
+      subscriptions: [{ id: 'sub-1', user_id: 'user-1', plan_code: 'advanced', status: 'active', paypal_subscription_id: 'I-PP', current_period_end: '2099-01-01T00:00:00Z' }],
+      shopify_connections: [{ ...baseConnection() }],
+      shopify_billing_migrations: [],
+    })
+    const wr = await checkShopifyPublishEntitlement(websiteAdmin as unknown as Admin, baseConnection(), countingFetch)
+    check('website-governed + active website plan → allowed, governedBy website',
+      wr.ok === true && wr.governedBy === 'website', JSON.stringify(wr))
+    check('…and the Shopify Partner API was never called for it', partnerCalls === 0)
+
+    // …but a website account whose WEBSITE plan is not active is still refused.
+    const lapsedAdmin = new FakeAdmin({
+      billing_governance: [{ user_id: 'user-1', signup_origin: 'website', billing_authority: 'website', authority_reason: 'website_signup' }],
+      subscriptions: [{ id: 'sub-1', user_id: 'user-1', plan_code: 'advanced', status: 'active', paypal_subscription_id: 'I-PP', current_period_end: '2020-01-01T00:00:00Z' }],
+      shopify_connections: [{ ...baseConnection() }],
+      shopify_billing_migrations: [],
+    })
+    const lr = await checkShopifyPublishEntitlement(lapsedAdmin as unknown as Admin, baseConnection())
+    check('website-governed with a LAPSED website plan → refused (not waved through)',
+      lr.ok === false && lr.reason === 'no_active_website_plan', JSON.stringify(lr))
+
+    // A governance READ FAILURE fails closed — never silently "website".
+    const brokenGov = new FakeAdmin(
+      { shopify_connections: [{ ...baseConnection() }], shopify_billing_migrations: [] },
+      { billing_governance: { select: () => ({ code: '42501', message: 'permission denied' }) } },
+    )
+    const br = await checkShopifyPublishEntitlement(brokenGov as unknown as Admin, baseConnection())
+    check('unreadable billing authority → refused, with its own reason',
+      br.ok === false && br.reason === 'billing_authority_unavailable', JSON.stringify(br))
   }
 
   // ── PayPal-checkout blocking ──

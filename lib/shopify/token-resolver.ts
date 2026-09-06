@@ -81,9 +81,24 @@ export interface ResolvableConnection {
   access_token_expires_at?: string | null
   refresh_token_expires_at?: string | null
   oauth_app_edition?: string | null
+  /**
+   * WHY this connection is permitted to hold a non-expiring credential. Set
+   * explicitly by a reviewed reconciliation; never inferred, and never written
+   * by an OAuth flow. NULL means unknown, which is refused.
+   */
+  connection_provenance?: string | null
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * The ONLY provenance value that admits a non-expiring credential without an
+ * explicit legacy edition. Set exclusively by the reviewed reconciliation in
+ * supabase/migrations/20260905000000_shopify_direct_connection_provenance.sql,
+ * for connections positively identified as the permitted pre-approval direct
+ * connector. No runtime path ever writes it.
+ */
+export const DIRECT_LEGACY_PROVENANCE = 'direct_legacy_preapproval'
 
 /** True when this expiry is far enough away to use the token it belongs to. PURE. */
 export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, now: number = Date.now()): boolean {
@@ -101,19 +116,45 @@ export function isAccessTokenSafelyValid(expiresAt: string | null | undefined, n
  *                   be rotated and its access token may already be dead, so it
  *                   must never be sent to the Admin API on the strength of
  *                   having once had an expiry.
- *   'legacy'        no expiry and no refresh material, issued by the LEGACY
- *                   custom app, whose tokens are non-expiring by design.
- *   'unusable'      no expiry and no refresh material, but issued by the public
- *                   app or by an unrecorded app. A public non-expiring token is
- *                   exactly the deprecated kind the Admin API now refuses, and
- *                   an unknown issuer is never guessed at.
+ *   'legacy'        no expiry and no refresh material, and POSITIVELY known not
+ *                   to be a public-app grant: either oauth_app_edition='legacy',
+ *                   or connection_provenance explicitly marks it as the
+ *                   permitted historical direct connector. Such tokens are
+ *                   non-expiring by design.
+ *   'unusable'      no expiry and no refresh material, and provenance is either
+ *                   the PUBLIC app (a non-expiring public token is the
+ *                   deprecated kind the Admin API refuses) or UNKNOWN. Unknown
+ *                   is never promoted to trusted — absence of a value is not
+ *                   evidence of legitimacy.
  */
 export function classifyStoredCredential(c: ResolvableConnection): 'expiring' | 'incomplete' | 'legacy' | 'unusable' {
   const hasRefresh = !!c.refresh_token_encrypted
   const hasExpiry = !!c.access_token_expires_at
   if (hasRefresh) return 'expiring'
   if (hasExpiry) return 'incomplete'
-  return c.oauth_app_edition === 'legacy' ? 'legacy' : 'unusable'
+  // PUBLIC FIRST, and unconditionally. A non-expiring public-app token is the
+  // deprecated kind the Admin API refuses, and NO provenance marking may launder
+  // it — checking the marking first would let a mislabelled row hand out a dead
+  // public credential.
+  if (c.oauth_app_edition === 'public') return 'unusable'
+
+  if (c.oauth_app_edition === 'legacy') return 'legacy'
+
+  // POSITIVELY MARKED historical direct connector. This is the ONE permitted
+  // pre-approval direct connection, and it is admitted because a reviewed
+  // reconciliation SAID SO — never because a column happens to be NULL.
+  //
+  // A NULL edition means UNKNOWN provenance and stays refused below. Inferring
+  // "no edition recorded, therefore legacy" would convert every historical,
+  // manually-imported or corrupt row into a trusted credential on the strength
+  // of an absence; proving that today's writers populate the column does not
+  // prove anything about rows this code has never seen. See
+  // supabase/migrations/20260905000000_shopify_direct_connection_provenance.sql
+  // for the scoped, positively-identified marking.
+  if (c.connection_provenance === DIRECT_LEGACY_PROVENANCE) return 'legacy'
+
+  // UNKNOWN provenance — including a NULL edition — is refused. Fail closed.
+  return 'unusable'
 }
 
 function decrypt(value: string): string | null {
