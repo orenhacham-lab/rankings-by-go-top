@@ -14,6 +14,7 @@ import { generateOpportunities } from '@/lib/content/recommendations/generate-op
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
 import { buildFinalCandidateOutcomes, applyFinalOutcomesToGscDetails } from '@/lib/content/recommendations/final-outcomes'
 import { buildScanSources, buildGscRunSummary } from '@/lib/content/recommendations/customer-run-summary'
+import { buildEngineRejectionSummary } from '@/lib/content/recommendations/funnel-summary'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -335,6 +336,28 @@ export async function POST(request: Request) {
     // acceptance; this traces each generated candidate through route finalization + the
     // blog gate to the exact `fresh` set that WOULD persist. Separate from (never replaces)
     // the engine view. Computed for both the dry-run and normal responses.
+    // TRUTHFUL FUNNEL. `engineFiltered` above is a subtraction and explains nothing;
+    // the engine recorded a typed reason for every candidate it removed and that ledger
+    // never reached the response, so a run could report "17 generated / 17 filtered" with
+    // every named bucket at 0. ONE builder feeds all three funnel responses (dry-run,
+    // early-return and the persisted path) so the customer, Preview and diagnostics views
+    // can never disagree about the same run. Reason CODES only — the UI localizes them.
+    const engineRejectionSummary = buildEngineRejectionSummary(briefDiagnostics)
+    const funnelFor = (generated: number, hiddenOnLoad: number) => ({
+      generated,
+      corpusDuplicates: result.meta.skippedDuplicates,
+      qualityFiltered: result.meta.qualityFilteredCount ?? 0,
+      engineFiltered,
+      keywordExists: filteredPrimaryKeywordExists,
+      titleExists: filteredTitleExists,
+      coveredByExisting: filteredCoveredByContent,
+      hiddenOnLoad,
+      engineRejections: engineRejectionSummary.reasons,
+      engineNotProcessed: engineRejectionSummary.notProcessed,
+      engineDropped: engineRejectionSummary.dropped,
+      engineUnexplained: engineRejectionSummary.unexplained,
+    })
+
     const engineCandidateOutcomes = briefDiagnostics?.candidateOutcomes ?? []
     const { finalCandidateOutcomes, finalCandidateAccounting } = buildFinalCandidateOutcomes({ engineOutcomes: engineCandidateOutcomes, engineFresh, fresh, blogRejectedByTitle })
     // Stage E3A FIX 4 — resolve the route/blog stages of finalOutcome for engine-accepted GSC
@@ -365,7 +388,7 @@ export async function POST(request: Request) {
           source, projectId: auth.project.id, generationRunId, clientRequestId,
           persisted: false, dryRun: true, newlyAddedCount: 0, wouldPersistCount: fresh.length,
           ...pathContract,
-          funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+          funnel: funnelFor(rawGeneratedCount, 0),
           isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, gscInput: gscInputEnriched, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
         },
       })
@@ -463,7 +486,7 @@ export async function POST(request: Request) {
       return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, ...pathContract, projectId: auth.project.id, generationRunId, clientRequestId, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
-        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+        funnel: funnelFor(result.meta.generated ?? 0, 0),
         isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, productionProvenance: proFirstProvenance ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
@@ -634,7 +657,7 @@ export async function POST(request: Request) {
         reason,
         // E — customer funnel ALWAYS carries engineFiltered so "generated N / 0
         // rejections" is impossible when the engine removed candidates in-generator.
-        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: conflictIds.length },
+        funnel: funnelFor(result.meta.generated ?? 0, conflictIds.length),
         debug: buildDebug({ revalidatedHidden: conflictIds.length }),
       },
     })

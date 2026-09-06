@@ -45,7 +45,7 @@ import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type
 import { filterLinkPlan, sharesSubjectHead } from './link-relevance'
 import { assessNeedCannibalization, isSameNeedDuplicate, isTitleKeywordAligned, hasIncompatibleSubtype, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
-import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, unknownLatinTokens, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
+import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, unknownLatinTokens, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, scriptOfContentLanguage, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
 import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -862,6 +862,11 @@ export async function synthesizeFromSnapshot(
   // when still null — a FRESH per-attempt holder so attempts never share the field.
   const modelConfigHolder: { value: BriefRunDiagnostics['modelConfig'] } = { value: snapshot.modelConfig }
 
+  // The script this project's own content is written in. Read ONCE per attempt from the
+  // snapshot's already-resolved language; the title brand gate at (3c) is only meaningful
+  // relative to it (see brand-safety.unknownLatinTokens).
+  const contentScript = scriptOfContentLanguage(language)
+
   const shadow_rejected_by_reason: Record<string, number> = {}
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
 
@@ -1072,9 +1077,15 @@ export async function synthesizeFromSnapshot(
     // own subject and related entity names. NOT the aligned demand query: ownVocab
     // excludes keyword research by design, and research can surface a competitor name.
     // See unknownLatinTokens for the documented Hebrew-script blind spot.
+    //
+    // SCRIPT-RELATIVE. The rule reads a latin token as a name only because latin is
+    // FOREIGN to the prose. This run's own content script decides that: on a Hebrew
+    // project the gate is exactly what it always was; on an ENGLISH project every
+    // ordinary word is latin, so the rule has no signal and is inapplicable — applying
+    // it there rejected every candidate of an English project (the Afrodite failure).
     const briefOwnTokens = new Set<string>(contentTokens(brief.subject))
     for (const e of brief.relatedEntities) for (const tok of contentTokens(e.name)) briefOwnTokens.add(tok)
-    const foreignLatin = unknownLatinTokens(t.title, brandSafety, briefOwnTokens)
+    const foreignLatin = unknownLatinTokens(t.title, brandSafety, briefOwnTokens, contentScript)
     if (foreignLatin.length > 0) {
       return rej('title_unknown_latin_token', 'brand_safety_title_unknown_token', { blocker: { blockingSource: null, blockingRecordStatus: null, blockingTitle: t.title, blockingPrimaryKeyword: foreignLatin.slice(0, 4).join(' '), blockingUrl: null, matchType: 'unknown_latin_token' } })
     }
