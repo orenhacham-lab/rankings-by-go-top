@@ -3,15 +3,19 @@ import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
-import { planLimitLines, plansForAudience, AUDIENCE_HEADING } from '@/lib/plans/features'
+import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
-const PLAN_UI: Record<PlanCode, { name: string; description: string }> = {
-  regular: { name: 'בייסיק', description: 'פרויקט אחד, בסיס מושלם להתחלה' },
-  advanced: { name: 'מתקדם', description: 'לעסקים בצמיחה עם כמה אתרים' },
-  premium: { name: 'פרימיום', description: 'לעסקים ולסוכנויות עם צרכים מתקדמים' },
-  large_agency: { name: 'סוכנות', description: 'לסוכנויות עם הרבה לקוחות' },
+/** Card display NAMES. The audience label and description live in
+ *  lib/plans/features.ts so they cannot drift from the catalog again —
+ *  Advanced was still sold here as a multi-site plan after it became a
+ *  one-project plan. */
+const PLAN_NAME: Record<PlanCode, string> = {
+  regular: 'בייסיק',
+  advanced: 'מתקדם',
+  premium: 'פרימיום',
+  large_agency: 'סוכנות',
 }
 
 /** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
@@ -119,16 +123,14 @@ export default async function PricingPage() {
       {/* Pricing Cards */}
       <section className="pb-12 lg:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Two STATIC audience sections. Deliberately not a toggle: the split is
-              editorial and identical for every visitor, so interactive state, a URL
-              parameter or a cookie would be persistence bought for nothing. */}
-          {(['single_site', 'multi_site'] as const).map((audience) => (
-            <div key={audience} className="mb-10 last:mb-0">
-              <h2 className="text-lg lg:text-xl font-bold text-slate-900 mb-4">{AUDIENCE_HEADING[audience]['he']}</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {plansForAudience(audience, PLAN_ORDER).map((code) => {
+          {/* ONE row of four cards on a large screen, two columns on a tablet, one
+              on a phone. The audience distinction is carried by a small label on
+              each card rather than by full-width stacked sections, which pushed
+              Premium and Agency below the fold. Static text — no toggle, no URL
+              parameter, no cookie, no client state. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {PLAN_ORDER.map((code) => {
               const plan = PLAN_CATALOG[code]
-              const ui = PLAN_UI[code]
               const highlighted = code === HIGHLIGHTED_PLAN
 
               // The five LIMIT lines come from the shared builder, so this card and
@@ -158,11 +160,14 @@ export default async function PricingPage() {
                   )}
 
                   <div className="mb-5">
+                    <p className={`text-xs font-semibold mb-1.5 ${highlighted ? 'text-blue-100' : 'text-slate-400'}`}>
+                      {PLAN_AUDIENCE_LABEL[code]['he']}
+                    </p>
                     <h3 className={`text-xl font-bold mb-1 ${highlighted ? 'text-white' : 'text-slate-900'}`}>
-                      {ui.name}
+                      {PLAN_NAME[code]}
                     </h3>
                     <p className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                      {ui.description}
+                      {PLAN_AUDIENCE_DESCRIPTION[code]['he']}
                     </p>
                   </div>
 
@@ -214,10 +219,8 @@ export default async function PricingPage() {
                   </Link>
                 </div>
               )
-                })}
-              </div>
-            </div>
-          ))}
+            })}
+          </div>
 
           {/* Usage clarification */}
           <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">

@@ -27,7 +27,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { PLAN_CATALOG, PLAN_CODES, TRIAL_CATALOG, type PlanCode } from '../catalog'
-import { planLimitLines, PLAN_AUDIENCE, AUDIENCE_HEADING, plansForAudience } from '../features'
+import { planLimitLines, planArticleLine, planArticleLineIndex, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
 import { PLAN_LIMITS, PLAN_FEATURES } from '../../subscription'
 import { reserveUsage } from '../../billing/usage-reservations'
 import { decideShopifyRouteAccess, normalizePlanHandle } from '../../shopify/entitlement-resolver'
@@ -210,38 +210,44 @@ async function main() {
     // period" while the Shopify plan descriptions said "per month" — one quota,
     // two phrasings, which is the shape a customer dispute takes. Every plan is
     // monthly, so every surface says so in the same words.
+    //
+    // THE ACCOUNT-WIDE CLAUSE IS CONDITIONAL. "Shared across your account"
+    // answers "shared with what?", a question a one-project plan does not
+    // raise — on Basic and Advanced it read as a hint that other projects
+    // exist, contradicting the one-website positioning. It is stated only on
+    // the multi-project plans, where the sharing is real.
     const MONTHLY_EN: Record<PlanCode, string> = {
-      regular: '4 articles per monthly billing period, shared across your account',
-      advanced: '12 articles per monthly billing period, shared across your account',
+      regular: '4 articles per monthly billing period',
+      advanced: '12 articles per monthly billing period',
       premium: '50 articles per monthly billing period, shared across your account',
       large_agency: '200 articles per monthly billing period, shared across your account',
     }
     const MONTHLY_HE: Record<PlanCode, string> = {
-      regular: '4 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
-      advanced: '12 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+      regular: '4 מאמרים בכל מחזור חיוב חודשי',
+      advanced: '12 מאמרים בכל מחזור חיוב חודשי',
       premium: '50 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
       large_agency: '200 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
     }
     for (const code of PLAN_CODES) {
       check(`E6-en-${code}: the article line is the exact agreed English wording`,
-        planLimitLines(code, 'en')[4] === MONTHLY_EN[code], planLimitLines(code, 'en')[4])
+        planArticleLine(code, 'en') === MONTHLY_EN[code], planArticleLine(code, 'en'))
       check(`E6-he-${code}: the article line is the exact agreed Hebrew wording`,
-        planLimitLines(code, 'he')[4] === MONTHLY_HE[code], planLimitLines(code, 'he')[4])
+        planArticleLine(code, 'he') === MONTHLY_HE[code], planArticleLine(code, 'he'))
       // …and the dictionaries the billing card reads carry that same sentence.
       for (const [locale, expected] of [['en', MONTHLY_EN], ['he', MONTHLY_HE]] as const) {
         const dict = (getDashboardDictionary(locale) as never as { billing: { features: Record<string, string[]> } }).billing.features
         check(`E7-${locale}-${code}: the billing card shows it too`,
-          dict[code][4] === expected[code], dict[code][4])
+          dict[code][planArticleLineIndex(code)] === expected[code], JSON.stringify(dict[code]))
       }
     }
     check('E8: no surface still says the ambiguous "per billing period" for articles',
       PLAN_CODES.every((c) => (['en', 'he'] as const).every((l) =>
-        !/^\d+ articles per billing period/.test(planLimitLines(c, l)[4])
-        && !/^\d+ מאמרים בכל מחזור חיוב,/.test(planLimitLines(c, l)[4]))))
+        !/^\d+ articles per billing period/.test(planArticleLine(c, l))
+        && !/^\d+ מאמרים בכל מחזור חיוב,/.test(planArticleLine(c, l)))))
     // The wording is a SENTENCE change only: the quota period resolver and the
     // numbers behind it are untouched.
     check('E9: the article NUMBERS are unchanged by the rewording',
-      PLAN_CODES.every((c) => planLimitLines(c, 'en')[4].startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
+      PLAN_CODES.every((c) => planArticleLine(c, 'en').startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
 
     check('E3: the server-side Hebrew feature list is derived from the same builder',
       JSON.stringify(PLAN_FEATURES.advanced) === JSON.stringify(planLimitLines('advanced', 'he'))
@@ -256,26 +262,39 @@ async function main() {
     }
   }
 
-  // ── F) audience grouping ──────────────────────────────────────────────────
-  console.log('\nF) the two static audience sections')
+  // ── F) the audience label and the four-card grid ──────────────────────────
+  console.log('\nF) the per-card audience label and the restored four-card grid')
   {
-    check('F1: Basic and Advanced are the one-website section',
-      JSON.stringify(plansForAudience('single_site', PLAN_CODES)) === JSON.stringify(['regular', 'advanced']))
-    check('F2: Premium and Agency are the multiple-websites section',
-      JSON.stringify(plansForAudience('multi_site', PLAN_CODES)) === JSON.stringify(['premium', 'large_agency']))
-    check('F3: the headings are the approved wording, both languages',
-      AUDIENCE_HEADING.single_site.en === 'For one website' && AUDIENCE_HEADING.single_site.he === 'לאתר אחד'
-      && AUDIENCE_HEADING.multi_site.en === 'For multiple websites and agencies'
-      && AUDIENCE_HEADING.multi_site.he === 'למספר אתרים וסוכנויות')
-    check('F4: every plan belongs to exactly one section',
-      PLAN_CODES.every((c) => PLAN_AUDIENCE[c] === 'single_site' || PLAN_AUDIENCE[c] === 'multi_site')
-      && plansForAudience('single_site', PLAN_CODES).length + plansForAudience('multi_site', PLAN_CODES).length === 4)
+    check('F1: the audience labels are the approved wording, both languages',
+      PLAN_AUDIENCE_LABEL.regular.en === 'One website' && PLAN_AUDIENCE_LABEL.regular.he === 'לאתר אחד'
+      && PLAN_AUDIENCE_LABEL.advanced.en === 'One website' && PLAN_AUDIENCE_LABEL.advanced.he === 'לאתר אחד'
+      && PLAN_AUDIENCE_LABEL.premium.en === 'Multiple websites' && PLAN_AUDIENCE_LABEL.premium.he === 'למספר אתרים'
+      && PLAN_AUDIENCE_LABEL.large_agency.en === 'Agencies' && PLAN_AUDIENCE_LABEL.large_agency.he === 'לסוכנויות')
+    check('F2: the label matches the catalog — one project is labelled one website',
+      PLAN_CODES.every((c) => (PLAN_CATALOG[c].maxProjects === 1)
+        === (PLAN_AUDIENCE_LABEL[c].en === 'One website')))
+    check('F3: Advanced is described as a ONE-website plan, both languages',
+      PLAN_AUDIENCE_DESCRIPTION.advanced.en === 'For one website with higher content and tracking needs'
+      && PLAN_AUDIENCE_DESCRIPTION.advanced.he === 'לאתר אחד עם צרכי תוכן ומעקב מתקדמים')
+    check('F4: every plan has a label and a description in both languages',
+      PLAN_CODES.every((c) => (['en', 'he'] as const).every((l) =>
+        PLAN_AUDIENCE_LABEL[c][l].length > 0 && PLAN_AUDIENCE_DESCRIPTION[c][l].length > 0)))
     for (const rel of ['app/(public)/pricing/page.tsx', 'app/(public)/en/pricing/page.tsx']) {
       const src = read(rel)
-      check(`F5: ${rel} renders both sections from the shared grouping`,
-        /plansForAudience\(audience, PLAN_ORDER\)/.test(src) && /AUDIENCE_HEADING\[audience\]/.test(src))
-      check(`F6: ${rel} adds NO state, URL parameter, cookie or persistence for it`,
+      // ONE grid over all four plans: four columns on a large screen, two on a
+      // tablet, one on a phone — the layout PR #60 replaced with two stacked
+      // half-width sections that pushed Premium and Agency below the fold.
+      check(`F5: ${rel} renders ONE four-card grid over all four plans`,
+        /grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6/.test(src)
+        && /\{PLAN_ORDER\.map\(\(code\) => \{/.test(src))
+      check(`F6: ${rel} no longer renders the stacked audience sections`,
+        !/plansForAudience|AUDIENCE_HEADING/.test(src))
+      check(`F7: ${rel} reads the label and description from the shared module`,
+        /PLAN_AUDIENCE_LABEL\[code\]/.test(src) && /PLAN_AUDIENCE_DESCRIPTION\[code\]/.test(src))
+      check(`F8: ${rel} adds NO state, URL parameter, cookie or persistence for it`,
         !/useState|searchParams|document\.cookie|localStorage/.test(src))
+      check(`F9: ${rel} keeps the "most popular" treatment pinned to Advanced`,
+        /const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(src))
     }
   }
 
