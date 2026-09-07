@@ -1,6 +1,7 @@
 /**
- * The five LIMIT lines a plan card shows, in both languages, derived from
- * PLAN_CATALOG — never written by hand.
+ * The five LIMIT lines a plan card shows, its audience LABEL and its audience
+ * DESCRIPTION, in both languages, derived from PLAN_CATALOG — never written by
+ * hand on a page.
  *
  * WHY THIS EXISTS. The same five numbers were being retyped in four places: the
  * Hebrew list in lib/subscription.ts, the Hebrew and English lists in the
@@ -9,6 +10,14 @@
  * dictionaries still promised "Up to 10 projects" and "20 articles" for
  * Advanced. A card that promises more than the server grants is not a display
  * bug; it is a commitment the product does not keep.
+ *
+ * THE AUDIENCE COPY LIVES HERE FOR THE SAME REASON. Each pricing page used to
+ * carry its own hand-written PLAN_UI description. When Advanced dropped from 10
+ * projects to 1, both of those sentences kept selling it as a multi-site plan —
+ * "לעסקים בצמיחה עם כמה אתרים" / "For growing businesses with multiple sites" —
+ * because nothing tied them to the catalog. Copy that contradicts the
+ * entitlement is the same class of defect as a wrong number, so it is derived
+ * from one place and guarded by a test.
  *
  * Numbers come from the catalog. Only the sentence FRAMES live here.
  *
@@ -49,7 +58,13 @@ export function planLimitLines(code: PlanCode, locale: Locale): string[] {
       single
         ? `Up to ${c.maxAIChecksPerPeriodPerProject} AI checks per billing period`
         : `Up to ${c.maxAIChecksPerPeriodPerProject} AI checks per billing period per project`,
-      `${c.maxArticlesPerPeriodAccountWide} articles per monthly billing period, shared across your account`,
+      // "Shared across your account" answers "shared with WHAT?" — a question a
+      // one-project plan does not raise. On Basic and Advanced the clause reads
+      // as a hint that other projects exist, which is the opposite of the
+      // positioning, so it is stated only where sharing is real.
+      single
+        ? `${c.maxArticlesPerPeriodAccountWide} articles per monthly billing period`
+        : `${c.maxArticlesPerPeriodAccountWide} articles per monthly billing period, shared across your account`,
     ]
   }
   return [
@@ -61,36 +76,54 @@ export function planLimitLines(code: PlanCode, locale: Locale): string[] {
     single
       ? `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב`
       : `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב לפרויקט`,
-    `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון`,
+    single
+      ? `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב חודשי`
+      : `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון`,
   ]
 }
 
 /**
- * THE AUDIENCE GROUPING for the website-controlled pricing surfaces.
+ * THE AUDIENCE LABEL — a short, understated line above each plan name saying
+ * who the plan is for.
  *
- * Two static sections, not a toggle: adding interactive state, a URL parameter
- * or a cookie for what is a fixed editorial split would be new persistence for
- * no benefit, and the split never changes per visitor.
+ * This replaced two stacked, full-width audience SECTIONS. The sections carried
+ * the same information but doubled the height of the pricing block, which
+ * pushed Premium and Agency below the fold on a laptop: a visitor saw two plans
+ * and had to discover the other two by scrolling. A per-card label keeps the
+ * distinction and gives the four cards back their single row.
  *
- * Shopify's hosted pricing page shows all four plans in one list and cannot
- * render sections — which is exactly why each plan's Shopify DESCRIPTION has to
- * carry its own audience sentence. See the PR body's configuration table.
+ * Static text, no toggle: the split is editorial and identical for every
+ * visitor, so interactive state, a URL parameter or a cookie would be
+ * persistence bought for nothing.
  */
-export type PlanAudience = 'single_site' | 'multi_site'
-
-export const PLAN_AUDIENCE: Record<PlanCode, PlanAudience> = {
-  regular: 'single_site',
-  advanced: 'single_site',
-  premium: 'multi_site',
-  large_agency: 'multi_site',
+export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<Locale, string>> = {
+  regular: { en: 'One website', he: 'לאתר אחד' },
+  advanced: { en: 'One website', he: 'לאתר אחד' },
+  premium: { en: 'Multiple websites', he: 'למספר אתרים' },
+  large_agency: { en: 'Agencies', he: 'לסוכנויות' },
 }
 
-export const AUDIENCE_HEADING: Record<PlanAudience, Record<Locale, string>> = {
-  single_site: { en: 'For one website', he: 'לאתר אחד' },
-  multi_site: { en: 'For multiple websites and agencies', he: 'למספר אתרים וסוכנויות' },
-}
-
-/** The plan codes in each section, in catalog order. */
-export function plansForAudience(audience: PlanAudience, order: readonly PlanCode[]): PlanCode[] {
-  return order.filter((code) => PLAN_AUDIENCE[code] === audience)
+/**
+ * THE AUDIENCE DESCRIPTION — the sentence under the plan name.
+ *
+ * Advanced is a ONE-WEBSITE plan. Every phrasing implying several sites is
+ * gone, and `pricing-copy-and-layout.qa.ts` fails if one returns anywhere in the tree.
+ */
+export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<Locale, string>> = {
+  regular: {
+    en: 'One project, a perfect starting point',
+    he: 'פרויקט אחד, בסיס מושלם להתחלה',
+  },
+  advanced: {
+    en: 'For one website with higher content and tracking needs',
+    he: 'לאתר אחד עם צרכי תוכן ומעקב מתקדמים',
+  },
+  premium: {
+    en: 'For businesses and agencies with advanced needs',
+    he: 'לעסקים ולסוכנויות עם צרכים מתקדמים',
+  },
+  large_agency: {
+    en: 'For agencies with many clients',
+    he: 'לסוכנויות עם הרבה לקוחות',
+  },
 }
