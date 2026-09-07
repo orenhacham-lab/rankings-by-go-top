@@ -27,7 +27,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { PLAN_CATALOG, PLAN_CODES, TRIAL_CATALOG, type PlanCode } from '../catalog'
-import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
+import { planLimitLines, planArticleLine, planArticleLineIndex, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
 import { PLAN_LIMITS, PLAN_FEATURES } from '../../subscription'
 import { reserveUsage } from '../../billing/usage-reservations'
 import { decideShopifyRouteAccess, normalizePlanHandle } from '../../shopify/entitlement-resolver'
@@ -230,24 +230,24 @@ async function main() {
     }
     for (const code of PLAN_CODES) {
       check(`E6-en-${code}: the article line is the exact agreed English wording`,
-        planLimitLines(code, 'en')[4] === MONTHLY_EN[code], planLimitLines(code, 'en')[4])
+        planArticleLine(code, 'en') === MONTHLY_EN[code], planArticleLine(code, 'en'))
       check(`E6-he-${code}: the article line is the exact agreed Hebrew wording`,
-        planLimitLines(code, 'he')[4] === MONTHLY_HE[code], planLimitLines(code, 'he')[4])
+        planArticleLine(code, 'he') === MONTHLY_HE[code], planArticleLine(code, 'he'))
       // …and the dictionaries the billing card reads carry that same sentence.
       for (const [locale, expected] of [['en', MONTHLY_EN], ['he', MONTHLY_HE]] as const) {
         const dict = (getDashboardDictionary(locale) as never as { billing: { features: Record<string, string[]> } }).billing.features
         check(`E7-${locale}-${code}: the billing card shows it too`,
-          dict[code][4] === expected[code], dict[code][4])
+          dict[code][planArticleLineIndex(code)] === expected[code], JSON.stringify(dict[code]))
       }
     }
     check('E8: no surface still says the ambiguous "per billing period" for articles',
       PLAN_CODES.every((c) => (['en', 'he'] as const).every((l) =>
-        !/^\d+ articles per billing period/.test(planLimitLines(c, l)[4])
-        && !/^\d+ מאמרים בכל מחזור חיוב,/.test(planLimitLines(c, l)[4]))))
+        !/^\d+ articles per billing period/.test(planArticleLine(c, l))
+        && !/^\d+ מאמרים בכל מחזור חיוב,/.test(planArticleLine(c, l)))))
     // The wording is a SENTENCE change only: the quota period resolver and the
     // numbers behind it are untouched.
     check('E9: the article NUMBERS are unchanged by the rewording',
-      PLAN_CODES.every((c) => planLimitLines(c, 'en')[4].startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
+      PLAN_CODES.every((c) => planArticleLine(c, 'en').startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
 
     check('E3: the server-side Hebrew feature list is derived from the same builder',
       JSON.stringify(PLAN_FEATURES.advanced) === JSON.stringify(planLimitLines('advanced', 'he'))

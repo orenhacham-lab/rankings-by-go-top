@@ -13,7 +13,10 @@
  *   2. THE ACCOUNT-WIDE CLAUSE IS CONDITIONAL. "Shared across your account"
  *      answers "shared with what?" — a question a one-project plan does not
  *      raise. Basic and Advanced state the monthly quota plainly; Premium and
- *      Agency, where the sharing is real, keep the clarification.
+ *      Agency, where the sharing is real, keep the clarification. The article
+ *      line is also READ SECOND on those plans, immediately after the project
+ *      line: 4 vs 12 articles is what separates Basic from Advanced, and it was
+ *      buried under three check-quota lines.
  *
  *   3. THE FOUR CARDS ARE ONE ROW AGAIN. Two stacked half-width audience
  *      sections doubled the height of the pricing block and pushed Premium and
@@ -32,7 +35,7 @@
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
 import { PLAN_CATALOG, PLAN_CODES, TRIAL_CATALOG, type PlanCode } from '../catalog'
-import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
+import { planLimitLines, planArticleLine, planArticleLineIndex, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
 import { PLAN_LIMITS, PLAN_FEATURES } from '../../subscription'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 
@@ -156,14 +159,14 @@ function main() {
     }
     for (const code of PLAN_CODES) {
       check(`B1-en-${code}: the exact agreed English article line`,
-        planLimitLines(code, 'en')[4] === EXPECT_EN[code], planLimitLines(code, 'en')[4])
+        planArticleLine(code, 'en') === EXPECT_EN[code], planArticleLine(code, 'en'))
       check(`B1-he-${code}: the exact agreed Hebrew article line`,
-        planLimitLines(code, 'he')[4] === EXPECT_HE[code], planLimitLines(code, 'he')[4])
+        planArticleLine(code, 'he') === EXPECT_HE[code], planArticleLine(code, 'he'))
       // The dashboard billing card reads the same builder, so it cannot diverge.
       for (const [locale, expected] of [['en', EXPECT_EN], ['he', EXPECT_HE]] as const) {
         const dict = (getDashboardDictionary(locale) as never as { billing: { features: Record<string, string[]> } }).billing.features
         check(`B2-${locale}-${code}: the dashboard billing card shows it too`,
-          dict[code][4] === expected[code], dict[code][4])
+          dict[code][planArticleLineIndex(code)] === expected[code], JSON.stringify(dict[code]))
       }
     }
     check('B3: the server-side Hebrew feature list is the same builder output',
@@ -171,18 +174,105 @@ function main() {
     // THE CONDITION, stated as a rule rather than as four literals.
     check('B4: the account-wide clause appears exactly on the multi-project plans',
       PLAN_CODES.every((c) => {
-        const shared = planLimitLines(c, 'en')[4].includes('shared across your account')
-          && planLimitLines(c, 'he')[4].includes('משותפים לכל החשבון')
-        const plain = !planLimitLines(c, 'en')[4].includes('shared across')
-          && !planLimitLines(c, 'he')[4].includes('משותפים')
+        const shared = planArticleLine(c, 'en').includes('shared across your account')
+          && planArticleLine(c, 'he').includes('משותפים לכל החשבון')
+        const plain = !planArticleLine(c, 'en').includes('shared across')
+          && !planArticleLine(c, 'he').includes('משותפים')
         return PLAN_CATALOG[c].maxProjects > 1 ? shared : plain
       }))
     check('B5: every plan still states the MONTHLY period explicitly',
-      PLAN_CODES.every((c) => planLimitLines(c, 'en')[4].includes('per monthly billing period')
-        && planLimitLines(c, 'he')[4].includes('בכל מחזור חיוב חודשי')))
+      PLAN_CODES.every((c) => planArticleLine(c, 'en').includes('per monthly billing period')
+        && planArticleLine(c, 'he').includes('בכל מחזור חיוב חודשי')))
     check('B6: the article NUMBERS are untouched by the rewording',
-      PLAN_CODES.every((c) => planLimitLines(c, 'en')[4].startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)
-        && planLimitLines(c, 'he')[4].startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
+      PLAN_CODES.every((c) => planArticleLine(c, 'en').startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)
+        && planArticleLine(c, 'he').startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
+  }
+
+  // ── B7-B12) THE ORDER OF THE LIMIT LINES ──────────────────────────────────
+  console.log('\nB-order) the article allowance is read second on a one-website plan')
+  {
+    // The full ordered list, written out independently of the builder so a
+    // reordering in either place fails.
+    const ORDER_EN: Record<PlanCode, string[]> = {
+      regular: ['1 project', '4 articles per monthly billing period', 'Up to 50 keywords',
+        'Up to 50 Google checks per billing period', 'Up to 10 AI checks per billing period'],
+      advanced: ['1 project', '12 articles per monthly billing period', 'Up to 100 keywords',
+        'Up to 100 Google checks per billing period', 'Up to 20 AI checks per billing period'],
+      premium: ['Up to 10 projects', 'Up to 100 keywords per project',
+        'Up to 200 Google checks per billing period per project',
+        'Up to 20 AI checks per billing period per project',
+        '50 articles per monthly billing period, shared across your account'],
+      large_agency: ['Up to 100 projects', 'Up to 200 keywords per project',
+        'Up to 400 Google checks per billing period per project',
+        'Up to 50 AI checks per billing period per project',
+        '200 articles per monthly billing period, shared across your account'],
+    }
+    const ORDER_HE: Record<PlanCode, string[]> = {
+      regular: ['פרויקט אחד', '4 מאמרים בכל מחזור חיוב חודשי', 'עד 50 מילות מפתח',
+        'עד 50 בדיקות גוגל בכל מחזור חיוב', 'עד 10 בדיקות AI בכל מחזור חיוב'],
+      advanced: ['פרויקט אחד', '12 מאמרים בכל מחזור חיוב חודשי', 'עד 100 מילות מפתח',
+        'עד 100 בדיקות גוגל בכל מחזור חיוב', 'עד 20 בדיקות AI בכל מחזור חיוב'],
+      premium: ['עד 10 פרויקטים', 'עד 100 מילות מפתח לפרויקט',
+        'עד 200 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 20 בדיקות AI בכל מחזור חיוב לפרויקט',
+        '50 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון'],
+      large_agency: ['עד 100 פרויקטים', 'עד 200 מילות מפתח לפרויקט',
+        'עד 400 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 50 בדיקות AI בכל מחזור חיוב לפרויקט',
+        '200 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון'],
+    }
+    for (const code of PLAN_CODES) {
+      check(`B7-en-${code}: the five lines are the exact agreed English list, in order`,
+        JSON.stringify(planLimitLines(code, 'en')) === JSON.stringify(ORDER_EN[code]),
+        JSON.stringify(planLimitLines(code, 'en')))
+      check(`B7-he-${code}: the five lines are the exact agreed Hebrew list, in order`,
+        JSON.stringify(planLimitLines(code, 'he')) === JSON.stringify(ORDER_HE[code]),
+        JSON.stringify(planLimitLines(code, 'he')))
+    }
+
+    // THE RULE, stated as a rule: on a one-project plan the article line comes
+    // IMMEDIATELY after the project line; on a multi-project plan it comes last.
+    for (const code of PLAN_CODES) {
+      const single = PLAN_CATALOG[code].maxProjects === 1
+      for (const locale of ['en', 'he'] as const) {
+        const lines = planLimitLines(code, locale)
+        const at = lines.indexOf(planArticleLine(code, locale))
+        check(`B8-${locale}-${code}: the article line sits at index ${single ? 1 : 4}`,
+          at === planArticleLineIndex(code) && at === (single ? 1 : 4), `index ${at}`)
+        if (single) {
+          check(`B9-${locale}-${code}: it is immediately after the project line`,
+            at === 1 && /^(1 project|פרויקט אחד)$/.test(lines[0]), `${lines[0]} → ${lines[1]}`)
+          check(`B10-${locale}-${code}: the keyword, Google and AI lines follow it, in that order`,
+            /keywords|מילות מפתח/.test(lines[2]) && /Google checks|בדיקות גוגל/.test(lines[3])
+            && /AI checks|בדיקות AI/.test(lines[4]), JSON.stringify(lines.slice(2)))
+        } else {
+          check(`B9-${locale}-${code}: the multi-project order is unchanged — articles last`,
+            at === 4 && /projects|פרויקטים/.test(lines[0]) && /keywords|מילות מפתח/.test(lines[1]),
+            JSON.stringify(lines))
+        }
+      }
+    }
+
+    // THE ORDER PROPAGATES. Every derived surface is the same array, so none of
+    // them can order it differently.
+    for (const code of PLAN_CODES) {
+      for (const locale of ['en', 'he'] as const) {
+        const dict = (getDashboardDictionary(locale) as never as { billing: { features: Record<string, string[]> } }).billing.features
+        check(`B11-${locale}-${code}: the dashboard billing card uses the same ordered list`,
+          JSON.stringify(dict[code]) === JSON.stringify(planLimitLines(code, locale)), JSON.stringify(dict[code]))
+      }
+      check(`B12-${code}: the server-side Hebrew list uses the same ordered list`,
+        JSON.stringify(PLAN_FEATURES[code]) === JSON.stringify(planLimitLines(code, 'he')),
+        JSON.stringify(PLAN_FEATURES[code]))
+    }
+
+    // NO PAGE RE-SORTS IT. A page that reordered the array itself would be the
+    // drift this module exists to prevent.
+    for (const rel of PAGES) {
+      const src = read(rel)
+      const spread = src.slice(src.indexOf('const features = ['), src.indexOf('const features = [') + 400)
+      check(`B13: ${rel} spreads the builder's array without reordering it`,
+        /\.\.\.planLimitLines\(code, '(he|en)'\),/.test(spread)
+        && !/\.sort\(|\.reverse\(|planLimitLines\([^)]*\)\[/.test(spread), spread.slice(0, 120))
+    }
   }
 
   // ── C) the restored four-card grid ────────────────────────────────────────

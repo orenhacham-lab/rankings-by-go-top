@@ -22,7 +22,7 @@ import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { spawn, type ChildProcess } from 'child_process'
 import { PLAN_CATALOG, PLAN_CODES } from '../catalog'
-import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
+import { planLimitLines, planArticleLine, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '../features'
 
 let pass = 0, fail = 0, blocked = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -47,7 +47,7 @@ const PAGES = [
 ] as const
 
 /** Geometry of every plan card, read from the live layout. */
-type CardBox = { name: string; top: number; left: number; width: number; height: number;
+type CardBox = { name: string; features: string[]; text: string; top: number; left: number; width: number; height: number;
   clippedX: boolean; clippedY: boolean; ctaVisible: boolean; badge: { top: number; left: number; width: number; height: number } | null }
 
 async function waitForServer(proc: ChildProcess, ms: number): Promise<boolean> {
@@ -174,6 +174,12 @@ async function main() {
             const b = badgeEl?.getBoundingClientRect()
             return {
               name: h3?.textContent?.trim() ?? '',
+              // THE RENDERED ORDER, straight off the list items — not the source
+              // array and not the flattened page text, either of which could
+              // agree while the DOM shows something else.
+              features: Array.from(card.querySelectorAll('ul li')).map(
+                (li) => (li.textContent ?? '').replace(/\s+/g, ' ').trim()),
+              text: (card.innerText ?? '').replace(/\s+/g, ' '),
               top: Math.round(r.top + window.scrollY), left: Math.round(r.left),
               width: Math.round(r.width), height: Math.round(r.height),
               // A card is CLIPPED when its own content is larger than its box.
@@ -235,6 +241,36 @@ async function main() {
             overlapping.length === 0, JSON.stringify(overlapping.map((c) => c.name)))
         }
 
+        // ── THE RENDERED FEATURE ORDER, per card ────────────────────────────
+        //
+        // The cards are matched to plans by POSITION in the grid, which follows
+        // PLAN_ORDER on both pages; the assertion then compares the first five
+        // rendered list items to the builder's ordered output, item by item. A
+        // page that re-sorted the list, or a builder that changed the order,
+        // fails here even if every individual sentence is still present.
+        for (let i = 0; i < Math.min(cards.length, PLAN_CODES.length); i++) {
+          const code = PLAN_CODES[i]
+          // The positional mapping is PROVEN, not assumed: the card at this
+          // index must carry this plan's price, which is unique per plan.
+          const ownPrice = page.lang === 'en' ? `$${PLAN_CATALOG[code].priceUSD}` : `₪${PLAN_CATALOG[code].priceILS}`
+          check(`${id}: grid position ${i} is the ${code} card`,
+            cards[i].text.replace(/,/g, '').includes(ownPrice), `${ownPrice} in ${cards[i].name}`)
+          const rendered = cards[i].features.slice(0, 5)
+          const expected = planLimitLines(code, page.lang)
+          check(`${id}: ${code}'s five limit lines render in the approved ORDER`,
+            JSON.stringify(rendered) === JSON.stringify(expected),
+            `rendered=${JSON.stringify(rendered)} expected=${JSON.stringify(expected)}`)
+          if (PLAN_CATALOG[code].maxProjects === 1) {
+            check(`${id}: ${code} shows the article allowance SECOND, right after the project line`,
+              rendered[1] === planArticleLine(code, page.lang)
+              && /^(1 project|פרויקט אחד)$/.test(rendered[0]),
+              `${rendered[0]} → ${rendered[1]}`)
+          } else {
+            check(`${id}: ${code} keeps the account-wide article line LAST`,
+              rendered[4] === planArticleLine(code, page.lang), rendered[4])
+          }
+        }
+
         // ── copy: label, description and limit lines, per plan ──────────────
         for (const code of PLAN_CODES) {
           check(`${id}: ${code} shows its audience label`,
@@ -254,12 +290,12 @@ async function main() {
         // The account-wide clause appears only where sharing is real.
         const SHARED = page.lang === 'en' ? 'shared across your account' : 'משותפים לכל החשבון'
         check(`${id}: Basic and Advanced do NOT claim an account-wide article pool`,
-          !planLimitLines('regular', page.lang)[4].includes(SHARED)
-          && !planLimitLines('advanced', page.lang)[4].includes(SHARED))
+          !planArticleLine('regular', page.lang).includes(SHARED)
+          && !planArticleLine('advanced', page.lang).includes(SHARED))
         check(`${id}: Premium and Agency DO keep the account-wide clarification`,
-          text.includes(planLimitLines('premium', page.lang)[4])
-          && planLimitLines('premium', page.lang)[4].includes(SHARED)
-          && planLimitLines('large_agency', page.lang)[4].includes(SHARED))
+          text.includes(planArticleLine('premium', page.lang))
+          && planArticleLine('premium', page.lang).includes(SHARED)
+          && planArticleLine('large_agency', page.lang).includes(SHARED))
 
         // Prices unchanged, all four present.
         // The page groups thousands (₪1,999), so digits are compared with the
