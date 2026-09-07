@@ -32,11 +32,14 @@ async function main() {
   console.log('\n2) Advanced')
   {
     const c = PLAN_CATALOG.advanced
-    check('10 projects', c.maxProjects === 10)
-    check('50 keywords/project', c.maxKeywordsPerProject === 50)
-    check('100 Google checks/period/project', c.maxGoogleChecksPerPeriodPerProject === 100)
-    check('10 AI checks/period/project', c.maxAIChecksPerPeriodPerProject === 10)
-    check('20 articles/period, account-wide', c.maxArticlesPerPeriodAccountWide === 20)
+    // FINAL POSITIONING — Advanced is "one website, higher usage", not a small
+    // agency plan. These four assertions changed with that decision; the handle
+    // and the price deliberately did not.
+    check('1 project', c.maxProjects === 1)
+    check('100 keywords (single-project plan)', c.maxKeywordsPerProject === 100)
+    check('100 Google checks/period', c.maxGoogleChecksPerPeriodPerProject === 100)
+    check('20 AI checks/period', c.maxAIChecksPerPeriodPerProject === 20)
+    check('12 articles/period, account-wide', c.maxArticlesPerPeriodAccountWide === 12)
     check('₪549/month', c.priceILS === 549)
     check('$179/month', c.priceUSD === 179)
     check('Shopify handle "advanced"', c.shopifyHandle === 'advanced')
@@ -45,7 +48,8 @@ async function main() {
   console.log('\n3) Premium')
   {
     const c = PLAN_CATALOG.premium
-    check('25 projects', c.maxProjects === 25)
+    // Premium is now the ENTRY tier for multiple websites: 10, not 25.
+    check('10 projects', c.maxProjects === 10)
     check('100 keywords/project', c.maxKeywordsPerProject === 100)
     check('200 Google checks/period/project', c.maxGoogleChecksPerPeriodPerProject === 200)
     check('20 AI checks/period/project', c.maxAIChecksPerPeriodPerProject === 20)

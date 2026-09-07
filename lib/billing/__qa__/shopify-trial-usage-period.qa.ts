@@ -108,8 +108,8 @@ async function main() {
       && /PLAN_CATALOG\[SHOPIFY_HANDLE_TO_PLAN_CODE\[handle\]\]\.trialDays/.test(strip(read('lib/billing/usage-period.ts'))))
     check('A1-f: "now" falls inside the resolved period',
       !!r && r.start.getTime() <= NOW.getTime() && NOW.getTime() < r.end.getTime())
-    check('A1-g: the Advanced allowance the reservation is bounded by is 20 articles',
-      PLAN_CATALOG.advanced.maxArticlesPerPeriodAccountWide === 20)
+    check('A1-g: the Advanced allowance the reservation is bounded by is 12 articles',
+      PLAN_CATALOG.advanced.maxArticlesPerPeriodAccountWide === 12)
 
     for (const handle of ['regular', 'premium', 'large-agency'] as const) {
       const code = handle === 'large-agency' ? 'large_agency' : handle
@@ -221,7 +221,7 @@ async function main() {
         r.ok === false && r.kind === 'quota_exceeded', JSON.stringify(r))
       check('A1B-4b: and Gemini is NEVER invoked', g.calls.generate === 0)
       check('A1B-4c: no article row was written', (admin.tables.generated_articles as unknown[]).length === 0)
-      check('A1B-4d: so the fix did not turn a real limit into an unlimited allowance', ADVANCED_LIMIT === 20)
+      check('A1B-4d: so the fix did not turn a real limit into an unlimited allowance', ADVANCED_LIMIT === 12)
     }
 
     // 5) an UNRESOLVED period returns usage_period_unavailable and never invokes Gemini.

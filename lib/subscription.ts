@@ -2,6 +2,7 @@ import type { SubscriptionPlan } from '@/lib/supabase/types'
 import { isKnownPlanCode } from '@/lib/paypal/client'
 import { resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive, type ShopifyRouteAccessReason, type TimestampFacts } from '@/lib/shopify/entitlement-resolver'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { planLimitLines } from '@/lib/plans/features'
 
 /**
  * Phase 2 (blocker fix) — 'shopify_billing_required' is a DISTINCT state
@@ -117,14 +118,20 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
   large_agency: planLimitsFromCatalog('large_agency'),
 }
 
+/**
+ * Hebrew feature lines, DERIVED from the catalog. They used to be typed out
+ * here and had already drifted: this list still promised Advanced "10 projects"
+ * and "20 articles" after the catalog said otherwise. Deriving them makes that
+ * class of drift impossible rather than merely fixed once.
+ */
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
   trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות גוגל בתקופת הניסיון', 'עד 3 בדיקות AI בתקופת הניסיון', 'מאמר AI אחד בתקופת הניסיון', '7 ימי ניסיון'],
   shopify_billing_required: ['יש לבחור תוכנית ב-Shopify App Pricing כדי להשתמש במערכת'],
   entitlement_unavailable: ['לא ניתן לאמת כרגע את ההרשאות. נסו שוב בעוד רגע.'],
-  regular: ['פרויקט אחד', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 10 בדיקות AI בכל מחזור חיוב לפרויקט', '4 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
-  advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 10 בדיקות AI בכל מחזור חיוב לפרויקט', '20 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
-  premium: ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 20 בדיקות AI בכל מחזור חיוב לפרויקט', '50 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
-  large_agency: ['עד 100 פרויקטים', 'עד 200 מילות מפתח לפרויקט', 'עד 400 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 50 בדיקות AI בכל מחזור חיוב לפרויקט', '200 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
+  regular: planLimitLines('regular', 'he'),
+  advanced: planLimitLines('advanced', 'he'),
+  premium: planLimitLines('premium', 'he'),
+  large_agency: planLimitLines('large_agency', 'he'),
 }
 
 export interface UserEntitlement {
@@ -165,9 +172,18 @@ export async function getUserEntitlement(
   const isAdmin = profile?.role === 'admin'
 
   if (isAdmin) {
+    // GRANDFATHERED ADMIN ACCESS. This used to hand the admin `premium`, which
+    // was the largest plan at 25 projects. Premium is now the 10-project entry
+    // tier for multiple websites, so keeping this mapping would have SHRUNK an
+    // existing admin account's project allowance from 25 to 10 — silently
+    // blocking creation for an account that already runs more than ten. The
+    // admin is mapped to the largest entitlement instead, which is what the
+    // branch always meant: no ceiling the product itself imposes. Existing
+    // projects are never touched by either value — the limit is read only when
+    // something new is created.
     return {
-      plan: 'premium',
-      limits: PLAN_LIMITS.premium,
+      plan: 'large_agency',
+      limits: PLAN_LIMITS.large_agency,
       isAdmin: true,
       trialActive: false,
       trialEndsAt: null,

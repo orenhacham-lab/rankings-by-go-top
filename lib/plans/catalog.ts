@@ -10,6 +10,18 @@
  * Internal plan codes are UNCHANGED from the pre-existing schema (regular /
  * advanced / premium / large_agency) — no migration was needed for them, only
  * for their display names, prices, and limits.
+ *
+ * THE NAMES BUSINESS USES AND THE CODES THE DATABASE STORES ARE NOT THE SAME
+ * STRINGS, and conflating them would mean a subscription migration nobody
+ * asked for:
+ *
+ *   Basic     → code `regular`,      Shopify handle `regular`
+ *   Advanced  → code `advanced`,     Shopify handle `advanced`
+ *   Premium   → code `premium`,      Shopify handle `premium`
+ *   Agency    → code `large_agency`, Shopify handle `large-agency`
+ *
+ * `displayNameKey` is the bridge. Every persisted row, every Shopify plan
+ * handle and every PayPal plan id keeps the code it already has.
  */
 
 export type PlanCode = 'regular' | 'advanced' | 'premium' | 'large_agency'
@@ -51,16 +63,26 @@ export const PLAN_CATALOG: Record<PlanCode, PlanCatalogEntry> = {
     maxArticlesPerPeriodAccountWide: 4,
     priceILS: 249, priceUSD: 79, trialDays: 7,
   },
+  // FINAL POSITIONING — Advanced is "one website, higher usage", not a small
+  // agency plan. It drops from 10 projects to 1 and from 20 articles to 12, and
+  // gains the higher per-project keyword and AI-check allowances. The handle is
+  // deliberately UNCHANGED so every existing subscription — including the
+  // Shopify reviewer's active `advanced` plan — keeps resolving without a
+  // migration; only the numbers behind it move.
   advanced: {
     code: 'advanced', shopifyHandle: 'advanced', displayNameKey: 'advanced',
-    maxProjects: 10, maxKeywordsPerProject: 50,
-    maxGoogleChecksPerPeriodPerProject: 100, maxAIChecksPerPeriodPerProject: 10,
-    maxArticlesPerPeriodAccountWide: 20,
+    maxProjects: 1, maxKeywordsPerProject: 100,
+    maxGoogleChecksPerPeriodPerProject: 100, maxAIChecksPerPeriodPerProject: 20,
+    maxArticlesPerPeriodAccountWide: 12,
     priceILS: 549, priceUSD: 179, trialDays: 7,
   },
+  // Premium becomes the entry plan for MULTIPLE websites: 25 projects was more
+  // than the tier's usage allowances could realistically serve, so it drops to
+  // 10. Everything else — keywords, checks, articles, price, handle — is
+  // unchanged.
   premium: {
     code: 'premium', shopifyHandle: 'premium', displayNameKey: 'premium',
-    maxProjects: 25, maxKeywordsPerProject: 100,
+    maxProjects: 10, maxKeywordsPerProject: 100,
     maxGoogleChecksPerPeriodPerProject: 200, maxAIChecksPerPeriodPerProject: 20,
     maxArticlesPerPeriodAccountWide: 50,
     priceILS: 999, priceUSD: 329, trialDays: 7,

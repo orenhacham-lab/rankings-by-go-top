@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { planLimitLines, plansForAudience, AUDIENCE_HEADING } from '@/lib/plans/features'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -118,18 +119,22 @@ export default async function EnglishPricingPage() {
       {/* Pricing Cards */}
       <section className="pb-12 lg:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {PLAN_ORDER.map((code) => {
+          {/* Two STATIC audience sections. Deliberately not a toggle: the split is
+              editorial and identical for every visitor, so interactive state, a URL
+              parameter or a cookie would be persistence bought for nothing. */}
+          {(['single_site', 'multi_site'] as const).map((audience) => (
+            <div key={audience} className="mb-10 last:mb-0">
+              <h2 className="text-lg lg:text-xl font-bold text-slate-900 mb-4">{AUDIENCE_HEADING[audience]['en']}</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {plansForAudience(audience, PLAN_ORDER).map((code) => {
               const plan = PLAN_CATALOG[code]
               const ui = PLAN_UI[code]
               const highlighted = code === HIGHLIGHTED_PLAN
 
+              // The five LIMIT lines come from the shared builder, so this card and
+              // the dashboard's billing card cannot disagree with the server.
               const features = [
-                `Up to ${plan.maxProjects} project${plan.maxProjects === 1 ? '' : 's'}`,
-                `Up to ${plan.maxKeywordsPerProject} keywords per project`,
-                `Up to ${plan.maxGoogleChecksPerPeriodPerProject} Google checks per billing period per project`,
-                `Up to ${plan.maxAIChecksPerPeriodPerProject} AI checks per billing period per project`,
-                `${plan.maxArticlesPerPeriodAccountWide} articles per billing period, shared across all projects in your account`,
+                ...planLimitLines(code, 'en'),
                 'Google Organic and Google Maps tracking',
                 'AI visibility tracking',
                 'Article creation, scheduling and publishing to WordPress and Shopify',
@@ -209,8 +214,10 @@ export default async function EnglishPricingPage() {
                   </Link>
                 </div>
               )
-            })}
-          </div>
+                })}
+              </div>
+            </div>
+          ))}
 
           {/* Usage clarification */}
           <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">
