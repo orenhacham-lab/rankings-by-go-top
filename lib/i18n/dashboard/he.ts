@@ -1,3 +1,4 @@
+import { planLimitLines } from '@/lib/plans/features'
 export const dashboardHe = {
   sidebar: {
     dashboard: 'לוח בקרה',
@@ -2590,12 +2591,15 @@ export const dashboardHe = {
       premium: 'פרימיום',
       large_agency: 'סוכנות',
     },
+    // The four paid plans' limit lines are DERIVED from PLAN_CATALOG so a card
+    // can never promise more than the server grants. These were hand-written and
+    // had already drifted — Advanced still said 10 projects and 20 articles.
     features: {
       trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות גוגל בתקופת הניסיון', 'עד 3 בדיקות AI בתקופת הניסיון', 'מאמר AI אחד בתקופת הניסיון', '7 ימי ניסיון'],
-      regular: ['פרויקט אחד', 'עד 50 מילות מפתח', 'עד 50 בדיקות גוגל בכל מחזור חיוב', 'עד 10 בדיקות AI בכל מחזור חיוב', '4 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
-      advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 10 בדיקות AI בכל מחזור חיוב לפרויקט', '20 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
-      premium: ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 20 בדיקות AI בכל מחזור חיוב לפרויקט', '50 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
-      large_agency: ['עד 100 פרויקטים', 'עד 200 מילות מפתח לפרויקט', 'עד 400 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 50 בדיקות AI בכל מחזור חיוב לפרויקט', '200 מאמרים בכל מחזור חיוב, משותפים לכל החשבון'],
+      regular: planLimitLines('regular', 'he'),
+      advanced: planLimitLines('advanced', 'he'),
+      premium: planLimitLines('premium', 'he'),
+      large_agency: planLimitLines('large_agency', 'he'),
     },
     keywordCheckNote: 'בדיקת גוגל = בדיקה של מילת מפתח אחת ביעד גוגל אחד (אורגני או מפות). בדיקת AI = הרצת שאילתה אחת במנוע AI אחד. מכסת המאמרים משותפת לכל הפרויקטים בחשבון ומתחדשת בכל מחזור חיוב — יתרה שלא נוצלה אינה עוברת הלאה.',
     trialNoChargeNotice: 'אתם בתקופת ניסיון. לא הוזן אמצעי תשלום ולא יתבצע חיוב אוטומטי.',

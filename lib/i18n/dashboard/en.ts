@@ -1,3 +1,4 @@
+import { planLimitLines } from '@/lib/plans/features'
 import type { DashboardDictionary } from './he'
 
 export const dashboardEn = {
@@ -2585,12 +2586,15 @@ export const dashboardEn = {
       premium: 'Premium',
       large_agency: 'Agency',
     },
+    // The four paid plans' limit lines are DERIVED from PLAN_CATALOG so a card
+    // can never promise more than the server grants. These were hand-written and
+    // had already drifted — Advanced still said 10 projects and 20 articles.
     features: {
       trial: ['1 project', 'Up to 30 keywords', 'Up to 30 Google checks during the trial', 'Up to 3 AI checks during the trial', 'One AI-generated article during the trial', '7-day trial'],
-      regular: ['1 project', 'Up to 50 keywords', 'Up to 50 Google checks per billing period', 'Up to 10 AI checks per billing period', '4 articles per billing period, shared across your account'],
-      advanced: ['Up to 10 projects', 'Up to 50 keywords per project', 'Up to 100 Google checks per billing period per project', 'Up to 10 AI checks per billing period per project', '20 articles per billing period, shared across your account'],
-      premium: ['Up to 25 projects', 'Up to 100 keywords per project', 'Up to 200 Google checks per billing period per project', 'Up to 20 AI checks per billing period per project', '50 articles per billing period, shared across your account'],
-      large_agency: ['Up to 100 projects', 'Up to 200 keywords per project', 'Up to 400 Google checks per billing period per project', 'Up to 50 AI checks per billing period per project', '200 articles per billing period, shared across your account'],
+      regular: planLimitLines('regular', 'en'),
+      advanced: planLimitLines('advanced', 'en'),
+      premium: planLimitLines('premium', 'en'),
+      large_agency: planLimitLines('large_agency', 'en'),
     },
     keywordCheckNote: 'A Google check means checking one keyword in one Google destination (Organic or Maps). An AI check means running one query in one AI engine. Article allowances are shared across all projects in your account and reset each billing cycle — unused allowances do not roll over.',
     trialNoChargeNotice: 'You are on a free trial. No payment method was added and you will not be charged automatically.',
