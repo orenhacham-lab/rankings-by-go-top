@@ -10,8 +10,14 @@
  * Advanced. A card that promises more than the server grants is not a display
  * bug; it is a commitment the product does not keep.
  *
- * Numbers come from the catalog. Only the sentence FRAMES live here, and they
- * are the frames already in use, so nothing else about the copy changes.
+ * Numbers come from the catalog. Only the sentence FRAMES live here.
+ *
+ * THE ARTICLE LINE SAYS "MONTHLY" EXPLICITLY. The cards used to read "per
+ * billing period" while the Shopify plan descriptions read "per month" — two
+ * phrasings for one quota, which is the shape a customer dispute takes. Every
+ * plan is monthly and annual billing is out of scope, so the period is stated
+ * rather than implied, in the same words on every surface. The underlying
+ * period RESOLVER is untouched; this is what the sentence calls it.
  *
  * PURE — no React, no database, no server-only import — so the public pricing
  * pages, the dashboard billing view and the server-side entitlement module can
@@ -43,7 +49,7 @@ export function planLimitLines(code: PlanCode, locale: Locale): string[] {
       single
         ? `Up to ${c.maxAIChecksPerPeriodPerProject} AI checks per billing period`
         : `Up to ${c.maxAIChecksPerPeriodPerProject} AI checks per billing period per project`,
-      `${c.maxArticlesPerPeriodAccountWide} articles per billing period, shared across your account`,
+      `${c.maxArticlesPerPeriodAccountWide} articles per monthly billing period, shared across your account`,
     ]
   }
   return [
@@ -55,7 +61,7 @@ export function planLimitLines(code: PlanCode, locale: Locale): string[] {
     single
       ? `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב`
       : `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב לפרויקט`,
-    `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב, משותפים לכל החשבון`,
+    `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון`,
   ]
 }
 

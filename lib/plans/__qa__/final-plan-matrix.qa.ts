@@ -138,8 +138,11 @@ async function main() {
     const period = read('lib/billing/usage-period.ts')
     check('B6: the usage-period module is untouched by this change',
       !/PLAN_CATALOG\[[^\]]*\]\.max/.test(period) || /resolveUsagePeriod/.test(period))
+    // Comments are stripped: features.ts documents that annual billing is out of
+    // scope, and the guard is about the CODE, not about naming what was excluded.
+    const stripComments = (v: string) => v.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
     check('B7: no annual billing or interval toggle was introduced',
-      !/annual|yearly|per year|לשנה/i.test(read('lib/plans/catalog.ts') + read('lib/plans/features.ts')))
+      !/annual|yearly|per year|לשנה/i.test(stripComments(read('lib/plans/catalog.ts')) + stripComments(read('lib/plans/features.ts'))))
   }
 
   // ── C) project limits, server-side ────────────────────────────────────────
@@ -203,6 +206,43 @@ async function main() {
           `${JSON.stringify(lines[0])} ${JSON.stringify(numbers)}`)
       }
     }
+    // THE ARTICLE PERIOD IS STATED, NOT IMPLIED. The cards said "per billing
+    // period" while the Shopify plan descriptions said "per month" — one quota,
+    // two phrasings, which is the shape a customer dispute takes. Every plan is
+    // monthly, so every surface says so in the same words.
+    const MONTHLY_EN: Record<PlanCode, string> = {
+      regular: '4 articles per monthly billing period, shared across your account',
+      advanced: '12 articles per monthly billing period, shared across your account',
+      premium: '50 articles per monthly billing period, shared across your account',
+      large_agency: '200 articles per monthly billing period, shared across your account',
+    }
+    const MONTHLY_HE: Record<PlanCode, string> = {
+      regular: '4 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+      advanced: '12 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+      premium: '50 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+      large_agency: '200 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+    }
+    for (const code of PLAN_CODES) {
+      check(`E6-en-${code}: the article line is the exact agreed English wording`,
+        planLimitLines(code, 'en')[4] === MONTHLY_EN[code], planLimitLines(code, 'en')[4])
+      check(`E6-he-${code}: the article line is the exact agreed Hebrew wording`,
+        planLimitLines(code, 'he')[4] === MONTHLY_HE[code], planLimitLines(code, 'he')[4])
+      // …and the dictionaries the billing card reads carry that same sentence.
+      for (const [locale, expected] of [['en', MONTHLY_EN], ['he', MONTHLY_HE]] as const) {
+        const dict = (getDashboardDictionary(locale) as never as { billing: { features: Record<string, string[]> } }).billing.features
+        check(`E7-${locale}-${code}: the billing card shows it too`,
+          dict[code][4] === expected[code], dict[code][4])
+      }
+    }
+    check('E8: no surface still says the ambiguous "per billing period" for articles',
+      PLAN_CODES.every((c) => (['en', 'he'] as const).every((l) =>
+        !/^\d+ articles per billing period/.test(planLimitLines(c, l)[4])
+        && !/^\d+ מאמרים בכל מחזור חיוב,/.test(planLimitLines(c, l)[4]))))
+    // The wording is a SENTENCE change only: the quota period resolver and the
+    // numbers behind it are untouched.
+    check('E9: the article NUMBERS are unchanged by the rewording',
+      PLAN_CODES.every((c) => planLimitLines(c, 'en')[4].startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
+
     check('E3: the server-side Hebrew feature list is derived from the same builder',
       JSON.stringify(PLAN_FEATURES.advanced) === JSON.stringify(planLimitLines('advanced', 'he'))
       && JSON.stringify(PLAN_FEATURES.premium) === JSON.stringify(planLimitLines('premium', 'he')))
