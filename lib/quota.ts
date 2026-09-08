@@ -187,6 +187,47 @@ const EN_PLAN_LABEL: Record<PlanType, string> = {
   large_agency: 'Agency',
 }
 
+/**
+ * "WE CANNOT VERIFY YOUR ENTITLEMENT" IS NOT "YOU HAVE USED IT UP".
+ *
+ * `entitlement_unavailable` means a governance/connection/migration read
+ * failed, so the system does not currently know what this account is entitled
+ * to. Its PLAN_LIMITS are all zero — correctly, because nothing may be spent
+ * against an unknown allowance — but zero limits then flowed straight into
+ * buildQuotaError, and a merchant with an active Advanced plan and nothing
+ * consumed was told "you have reached the limit of 0 AI scans on the
+ * Entitlement temporarily unavailable plan. Upgrade your plan."
+ *
+ * That message is wrong in every part: no limit was reached, there is nothing
+ * to upgrade to, and the condition is transient. lib/shopify/entitlement-
+ * resolver.ts already documents that callers "surface it as a retryable
+ * 503-shaped state"; this is the payload that finally makes that true.
+ *
+ * `shopify_billing_required` is deliberately NOT folded in here: that account
+ * genuinely has no plan, and "choose a plan in Shopify" is the right answer.
+ */
+export const ENTITLEMENT_UNAVAILABLE_CODE = 'ENTITLEMENT_UNAVAILABLE' as const
+
+export function isEntitlementUnknown(plan: PlanType): boolean {
+  return plan === 'entitlement_unavailable'
+}
+
+export interface EntitlementUnavailablePayload {
+  error: string
+  errorEn: string
+  code: typeof ENTITLEMENT_UNAVAILABLE_CODE
+  retryable: true
+}
+
+export function buildEntitlementUnavailableError(): EntitlementUnavailablePayload {
+  return {
+    error: 'לא ניתן לאמת כרגע את ההרשאות של החשבון. זו תקלה זמנית — נסו שוב בעוד רגע. לא בוצע חיוב ולא נוצלה מכסה.',
+    errorEn: 'Your account entitlement could not be verified right now. This is temporary — please try again in a moment. Nothing was charged and no allowance was used.',
+    code: ENTITLEMENT_UNAVAILABLE_CODE,
+    retryable: true,
+  }
+}
+
 export function buildQuotaError(
   code: QuotaCode,
   plan: PlanType,

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { runScan } from '@/lib/scanner'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
+  buildEntitlementUnavailableError,
+  isEntitlementUnknown,
   buildQuotaError,
   buildTrialTargetAlreadyScannedError,
   countActiveTargets,
@@ -56,7 +58,17 @@ export async function POST(request: Request) {
     // never a plain count-then-proceed — so no external provider call is
     // ever made unless the reservation actually succeeded, and concurrent
     // scan requests can never together exceed the plan's allowance.
-    const entitlement = await getUserEntitlement(user.id, supabase)
+    // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
+    // billing_governance, which is REVOKEd from `authenticated` and errors
+    // (42501) rather than returning an empty set — collapsing the whole
+    // entitlement to zero limits. See lib/supabase/admin.ts.
+    const entitlement = await getUserEntitlement(user.id, admin)
+    // A read failure is not an exhausted quota: answering "you have reached
+    // your limit of 0 — upgrade your plan" is what the reviewer saw. This is
+    // transient and retryable, and nothing was spent.
+    if (isEntitlementUnknown(entitlement.plan)) {
+      return Response.json(buildEntitlementUnavailableError(), { status: 503 })
+    }
     const checksThisScan = targetId
       ? 1
       : await countActiveTargets(projectId, admin)
@@ -235,7 +247,7 @@ export async function POST(request: Request) {
       await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'resized_for_resume' })
       reservationId = null
       reservationToken = null
-      const entitlementForResume = await getUserEntitlement(user.id, supabase)
+      const entitlementForResume = await getUserEntitlement(user.id, admin)
       if (!entitlementForResume.isAdmin && entitlementForResume.plan !== 'trial' && targetsToRun.length > 0) {
         const period = await resolveCurrentUsagePeriod(admin, user.id)
         if (period) {

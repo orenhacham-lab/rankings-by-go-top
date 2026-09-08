@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getUserEntitlement } from '@/lib/subscription'
+import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 
 interface KeywordToAdd {
   keyword: string
@@ -163,7 +165,17 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Check quota
-    const entitlement = await getUserEntitlement(user.id, supabase)
+    // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
+    // billing_governance, which is REVOKEd from `authenticated` and errors
+    // (42501) rather than returning an empty set — collapsing the whole
+    // entitlement to zero limits. See lib/supabase/admin.ts.
+    const entitlement = await getUserEntitlement(user.id, createAdminClient())
+    // A read failure is not an exhausted quota: answering "you have reached
+    // your limit of 0 — upgrade your plan" is what the reviewer saw. This is
+    // transient and retryable, and nothing was spent.
+    if (isEntitlementUnknown(entitlement.plan)) {
+      return Response.json(buildEntitlementUnavailableError(), { status: 503 })
+    }
     if (!entitlement.isAdmin) {
       const { count: currentCount } = await supabase
         .from('tracking_targets')

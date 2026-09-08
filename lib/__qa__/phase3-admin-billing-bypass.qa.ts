@@ -85,7 +85,7 @@ async function main() {
       [{ id: 's1', user_id: 'u1', status: 'trial', plan_code: null, trial_ends_at: '2026-06-01T00:00:00Z' }], // expired trial, per production evidence
       [{ id: 'c1', user_id: 'u1', connection_status: 'connected', shopify_plan_handle: null, shopify_subscription_status: null, shopify_current_period_end: null, shopify_current_period_start: null, shopify_billing_verified_at: null }],
     )
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin as never)
     check('1: isAdmin is true', ent.isAdmin === true)
     check('1: plan is the internal stand-in only (never surfaced as a real plan by the UI after this fix)', ent.plan === 'premium')
     check('1: hasActiveSubscription true (full product access)', ent.hasActiveSubscription === true)
@@ -94,7 +94,7 @@ async function main() {
   console.log('\n2) Admin with connected Shopify but NO Shopify subscription at all — still isAdmin bypass')
   {
     const admin = adminFake('admin', [], [{ id: 'c2', user_id: 'u1', connection_status: 'connected', shopify_plan_handle: null, shopify_subscription_status: 'none', shopify_current_period_end: null, shopify_current_period_start: null, shopify_billing_verified_at: null }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin as never)
     check('2: isAdmin is true regardless of Shopify subscription state', ent.isAdmin === true)
   }
 
@@ -103,7 +103,7 @@ async function main() {
     const admin = adminFake('admin', [],
       [{ id: 'c3', user_id: 'u1', connection_status: 'connected', shopify_plan_handle: 'premium-plan', shopify_subscription_status: 'active', shopify_current_period_end: '2099-01-01T00:00:00Z', shopify_current_period_start: '2098-12-01T00:00:00Z', shopify_billing_verified_at: '2098-12-01T00:00:00Z' }],
     )
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin as never)
     check('3: isAdmin is true — an active-looking Shopify cache never overrides admin status', ent.isAdmin === true)
     check('3: plan is still the internal stand-in, not the Shopify-cached plan', ent.plan === 'premium')
   }
@@ -146,15 +146,15 @@ async function main() {
   console.log('\n7) Ordinary PayPal / trial / manual users are UNCHANGED by this fix')
   {
     const paypalAdmin = adminFake('user', [{ id: 's-pp', user_id: 'u1', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_end: '2099-01-01T00:00:00Z' }])
-    const paypalEnt = await getUserEntitlement('u1', paypalAdmin)
+    const paypalEnt = await getUserEntitlement('u1', paypalAdmin as never)
     check('7a: a real PayPal/active subscriber still resolves their real plan, isAdmin=false', paypalEnt.isAdmin === false && paypalEnt.plan === 'premium' && paypalEnt.hasActiveSubscription === true)
 
     const trialAdmin = adminFake('user', [{ id: 's-tr', user_id: 'u1', status: 'trial', plan_code: null, trial_ends_at: '2099-01-01T00:00:00Z' }])
-    const trialEnt = await getUserEntitlement('u1', trialAdmin)
+    const trialEnt = await getUserEntitlement('u1', trialAdmin as never)
     check('7b: a real trial user still resolves as trial, isAdmin=false', trialEnt.isAdmin === false && trialEnt.plan === 'trial' && trialEnt.trialActive === true)
 
     const manualAdmin = adminFake('user', [{ id: 's-man', user_id: 'u1', status: 'active', plan_code: 'regular', trial_ends_at: null, current_period_end: null }])
-    const manualEnt = await getUserEntitlement('u1', manualAdmin)
+    const manualEnt = await getUserEntitlement('u1', manualAdmin as never)
     check('7c: a legacy/manual active subscriber (no PayPal id concept at THIS entitlement layer) still resolves their real plan, isAdmin=false', manualEnt.isAdmin === false && manualEnt.plan === 'regular')
   }
 

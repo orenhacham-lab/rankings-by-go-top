@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
 import { LANGUAGE_COOKIE, LOCALE_HEADER, explicitRequestLocale } from '@/lib/i18n/request-locale'
@@ -166,11 +167,11 @@ function redirectToBilling(request: NextRequest) {
  * If it ever stopped holding, the guard degrades to `governanceRow: "missing"`
  * in the log below rather than failing silently.
  */
-function createEntitlementClient() {
+function createEntitlementClient(): ServiceRoleClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceKey) return null
-  return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } }) as ServiceRoleClient
 }
 
 /**

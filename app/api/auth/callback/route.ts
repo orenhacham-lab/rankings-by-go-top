@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 
 export async function GET(request: NextRequest) {
@@ -286,7 +287,7 @@ export async function GET(request: NextRequest) {
         // metadata now that the session exists. Server-authoritative + best-effort; the
         // `supabase` client above carries the just-established session (runs under RLS).
         // Runs BEFORE the redirect below so the client exists by the time the dashboard loads.
-        try { await ensureDefaultClient(supabase) } catch { /* non-blocking */ }
+        try { await ensureDefaultClient(supabase, createAdminClient()) } catch { /* non-blocking */ }
 
         // Area G — preserve the signup-origin language through the email-confirmation
         // hop. The durable source is auth metadata (seeds the dashboard provider); this

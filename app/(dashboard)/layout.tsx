@@ -8,6 +8,7 @@ import { getServerLocale } from '@/lib/i18n/server-locale'
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
@@ -28,7 +29,7 @@ export default async function DashboardLayout({
   // a path that didn't run the signup/callback hooks, e.g. Google OAuth) get their default
   // client here on first dashboard load. Idempotent + quota-aware + best-effort (a cheap
   // head-count no-ops once any client exists; a failure never blocks the dashboard).
-  try { await ensureDefaultClient(supabase) } catch { /* non-blocking */ }
+  try { await ensureDefaultClient(supabase, createAdminClient()) } catch { /* non-blocking */ }
 
   // Fetch profile to determine admin status
   const { data: profile } = await supabase

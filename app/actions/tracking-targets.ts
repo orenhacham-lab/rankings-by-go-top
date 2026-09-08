@@ -1,8 +1,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { getUserEntitlement } from '@/lib/subscription'
+import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
 import type { ExactPointResolutionSource } from '@/lib/supabase/types'
 
@@ -102,7 +104,16 @@ export async function createTrackingTargetAction(formData: FormData) {
   const projectId = formData.get('project_id') as string
 
   // Enforce keyword limit per project
-  const entitlement = await getUserEntitlement(user.id, supabase)
+  // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
+  // billing_governance, which is REVOKEd from `authenticated` and errors
+  // (42501) rather than returning an empty set — collapsing the whole
+  // entitlement to zero limits. See lib/supabase/admin.ts.
+  const entitlement = await getUserEntitlement(user.id, createAdminClient())
+  // A read failure is not an exhausted quota. Throwing a quota message here is
+  // what surfaced to the reviewer as a generic server error on "Add keyword".
+  if (isEntitlementUnknown(entitlement.plan)) {
+    throw new Error(buildEntitlementUnavailableError().error)
+  }
   if (!entitlement.isAdmin) {
     const { count } = await supabase
       .from('tracking_targets')
@@ -314,7 +325,16 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   }
 
   // Enforce keyword limit per project
-  const entitlement = await getUserEntitlement(user.id, supabase)
+  // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
+  // billing_governance, which is REVOKEd from `authenticated` and errors
+  // (42501) rather than returning an empty set — collapsing the whole
+  // entitlement to zero limits. See lib/supabase/admin.ts.
+  const entitlement = await getUserEntitlement(user.id, createAdminClient())
+  // A read failure is not an exhausted quota. Throwing a quota message here is
+  // what surfaced to the reviewer as a generic server error on "Add keyword".
+  if (isEntitlementUnknown(entitlement.plan)) {
+    throw new Error(buildEntitlementUnavailableError().error)
+  }
   if (!entitlement.isAdmin) {
     const currentCount = existingSet.size
     const limit = entitlement.limits.maxKeywordsPerProject

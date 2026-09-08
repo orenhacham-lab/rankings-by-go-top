@@ -74,7 +74,7 @@ async function main() {
   // ── zero-client → created; fields derived ONLY from auth user + metadata.
   {
     const ctx: Ctx = { user: baseUser, clientCount: 0, profile: null, subscription: null, inserted: [] }
-    const r = await ensureDefaultClient(fakeSupabase(ctx))
+    const r = await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('zero-client user → created', r.status === 'created')
     const row = ctx.inserted[0] ?? {}
     check('name = company_name (trimmed)', row.name === 'Acme Ltd')
@@ -88,14 +88,14 @@ async function main() {
   // ── idempotent: any existing client → no-op, NO insert.
   {
     const ctx: Ctx = { user: baseUser, clientCount: 1, profile: null, subscription: null, inserted: [] }
-    const r = await ensureDefaultClient(fakeSupabase(ctx))
+    const r = await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('existing client → exists (idempotent), no insert', r.status === 'exists' && ctx.inserted.length === 0)
   }
 
   // ── no authenticated user → skipped(no_user).
   {
     const ctx: Ctx = { user: null, clientCount: 0, inserted: [] }
-    const r = await ensureDefaultClient(fakeSupabase(ctx))
+    const r = await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('no user → skipped(no_user), no insert', r.status === 'skipped' && r.reason === 'no_user' && ctx.inserted.length === 0)
   }
 
@@ -105,7 +105,7 @@ async function main() {
       user: baseUser, clientCount: 0, profile: null, subscription: null, inserted: [],
       insertBehavior: () => ({ data: null, error: { code: '23505' } }),
     }
-    const r = await ensureDefaultClient(fakeSupabase(ctx))
+    const r = await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('23505 on is_default insert → exists (race backstop)', r.status === 'exists')
     check('23505 does NOT trigger a second insert', ctx.inserted.length === 1)
   }
@@ -117,7 +117,7 @@ async function main() {
       insertBehavior: (row, attempt) =>
         attempt === 0 ? { data: null, error: { code: '42703' } } : { data: { id: 'c-fallback' }, error: null },
     }
-    const r = await ensureDefaultClient(fakeSupabase(ctx))
+    const r = await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('missing column → still created (best-effort)', r.status === 'created')
     check('first attempt carried is_default; fallback did NOT', ctx.inserted[0]?.is_default === true && !('is_default' in (ctx.inserted[1] ?? {})))
   }
@@ -125,18 +125,25 @@ async function main() {
   // ── field fallbacks: no company_name → name = full_name; neither → email local part.
   {
     const ctx: Ctx = { user: { id: 'u-2', email: 'solo@x.io', user_metadata: { full_name: 'Solo Dev' } }, clientCount: 0, profile: null, subscription: null, inserted: [] }
-    await ensureDefaultClient(fakeSupabase(ctx))
+    await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('no company_name → name = full_name', ctx.inserted[0]?.name === 'Solo Dev')
   }
   {
     const ctx: Ctx = { user: { id: 'u-3', email: 'nameless@x.io', user_metadata: {} }, clientCount: 0, profile: null, subscription: null, inserted: [] }
-    await ensureDefaultClient(fakeSupabase(ctx))
+    await ensureDefaultClient(fakeSupabase(ctx), fakeSupabase(ctx) as never)
     check('no company/full name → name = email local part', ctx.inserted[0]?.name === 'nameless')
   }
 
-  console.log('WIRING) helper takes only the supabase client (no caller input) + 3 lifecycle points')
+  console.log('WIRING) helper takes the request client + an injected service-role client, and no caller input')
   const helper = strip(read('lib/clients/ensure-default-client.ts'))
-  check('helper signature takes ONLY the supabase client', /export async function ensureDefaultClient\(supabase: SupabaseClient\)/.test(helper))
+  // The service-role client is INJECTED, not constructed here: getUserEntitlement
+  // reads billing_governance, which the request-scoped client may not read at
+  // all (42501) — that made this helper silently skip every zero-client account
+  // with reason 'quota' against a limit of 0. Injecting keeps it testable and
+  // reuses the caller's client. Still no caller-supplied DATA of any kind.
+  check('helper signature takes the request client plus an injected service-role client',
+    /export async function ensureDefaultClient\(\s*supabase: SupabaseClient,\s*admin: ServiceRoleClient,\s*\)/.test(helper))
+  check('helper never constructs its own admin client', !/createAdminClient\(\)/.test(helper))
   check('helper derives fields from auth user + metadata only', /supabase\.auth\.getUser\(\)/.test(helper) && /user\.user_metadata/.test(helper) && /company_name/.test(helper))
   check('helper is quota-aware via entitlement.limits.maxClients', /entitlement\.limits\.maxClients/.test(helper))
   check('helper creates NO project', !/from\(['"]projects['"]\)/.test(helper))
@@ -145,11 +152,11 @@ async function main() {
   const signup = strip(read('app/(auth)/signup/page.tsx'))
   check('signup (immediate session) calls the ensure-default endpoint', /fetch\('\/api\/clients\/ensure-default',\s*\{\s*method:\s*'POST'\s*\}\)/.test(signup))
   const callback = strip(read('app/api/auth/callback/route.ts'))
-  check('auth callback (email-confirmation) calls ensureDefaultClient(supabase)', /ensureDefaultClient\(supabase\)/.test(callback))
+  check('auth callback (email-confirmation) passes both clients', /ensureDefaultClient\(supabase, createAdminClient\(\)\)/.test(callback))
   const layout = strip(read('app/(dashboard)/layout.tsx'))
-  check('dashboard layout catch-all calls ensureDefaultClient(supabase)', /ensureDefaultClient\(supabase\)/.test(layout))
+  check('dashboard layout catch-all passes both clients', /ensureDefaultClient\(supabase, createAdminClient\(\)\)/.test(layout))
   const route = strip(read('app/api/clients/ensure-default/route.ts'))
-  check('API route ignores the body (POST() takes no request)', /export async function POST\(\)/.test(route) && /ensureDefaultClient\(supabase\)/.test(route))
+  check('API route ignores the body (POST() takes no request)', /export async function POST\(\)/.test(route) && /ensureDefaultClient\(supabase, createAdminClient\(\)\)/.test(route))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

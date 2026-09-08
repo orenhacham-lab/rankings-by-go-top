@@ -19,7 +19,11 @@ export default async function BillingPage() {
     redirect('/login')
   }
 
-  const entitlement = await getUserEntitlement(user.id, supabase)
+  // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
+  // billing_governance, which is REVOKEd from `authenticated` and errors
+  // (42501) rather than returning an empty set — collapsing the whole
+  // entitlement to zero limits. See lib/supabase/admin.ts.
+  const entitlement = await getUserEntitlement(user.id, createAdminClient())
 
   // Hotfix — admin users bypass ALL billing-provider governance and
   // presentation. Checked FIRST, before any Shopify connection / migration /
