@@ -19,6 +19,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getUserEntitlement } from '@/lib/subscription'
+import type { ServiceRoleClient } from '@/lib/supabase/admin'
 
 export type EnsureDefaultClientResult =
   | { status: 'created'; clientId: string | null }
@@ -36,7 +37,16 @@ const MISSING_COLUMN = new Set(['42703', 'PGRST204'])
  * Ensure the authenticated user has exactly one default client. Never throws
  * (best-effort; a failure never blocks signup / navigation).
  */
-export async function ensureDefaultClient(supabase: SupabaseClient): Promise<EnsureDefaultClientResult> {
+/**
+ * `admin` is INJECTED rather than constructed here so this stays testable and
+ * so the caller — which already has one — does not build a second client per
+ * request. It must be the SERVICE-ROLE client: getUserEntitlement reads
+ * billing_governance, which `authenticated` may not read at all.
+ */
+export async function ensureDefaultClient(
+  supabase: SupabaseClient,
+  admin: ServiceRoleClient,
+): Promise<EnsureDefaultClientResult> {
   try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { status: 'skipped', reason: 'no_user' }
@@ -52,7 +62,14 @@ export async function ensureDefaultClient(supabase: SupabaseClient): Promise<Ens
     if ((count ?? 0) >= 1) return { status: 'exists' }
 
     // Quota-aware: the auto client counts toward maxClients (never overshoot the plan).
-    const entitlement = await getUserEntitlement(user.id, supabase)
+    //
+    // SERVICE-ROLE, not the caller's request-scoped client. getUserEntitlement
+    // reads billing_governance, which `authenticated` may not read at all
+    // (42501) — with the request client this resolved to zero limits for every
+    // user, so `count >= maxClients` was `0 >= 0` and no zero-client account
+    // ever got its default client. The user id is the one just verified from
+    // the session above. See lib/supabase/admin.ts.
+    const entitlement = await getUserEntitlement(user.id, admin)
     if ((count ?? 0) >= entitlement.limits.maxClients) return { status: 'skipped', reason: 'quota' }
 
     // Fields derived ONLY from the authenticated user + signup metadata.

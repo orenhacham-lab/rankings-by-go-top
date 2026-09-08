@@ -2,6 +2,11 @@ import type { SubscriptionPlan } from '@/lib/supabase/types'
 import { isKnownPlanCode } from '@/lib/paypal/client'
 import { resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive, type ShopifyRouteAccessReason, type TimestampFacts } from '@/lib/shopify/entitlement-resolver'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+// TYPE-ONLY. lib/subscription.ts is imported by a client component
+// (app/(dashboard)/billing/BillingView.tsx), so this must never pull the
+// service-role factory — or its key — into a browser bundle. `import type`
+// is erased at compile time and does neither.
+import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { planLimitLines } from '@/lib/plans/features'
 
 /**
@@ -149,10 +154,32 @@ export interface UserEntitlement {
  * Resolve effective plan from profile + subscription data.
  * Call this from server actions and API routes (not middleware) since it needs the admin client.
  */
+/**
+ * `admin` MUST be a SERVICE-ROLE client — this is not a stylistic preference.
+ *
+ * This function resolves Shopify governance FIRST, which reads
+ * `public.billing_governance`: RLS-enabled, no policies, REVOKEd from
+ * `anon, authenticated`. A request-scoped (anon-key) client does not read that
+ * table as an empty set — it gets SQLSTATE 42501, an ERROR, which
+ * resolveBillingAuthority correctly refuses to interpret. The whole resolution
+ * then collapses to `entitlement_unavailable`, whose limits are all zero, and
+ * every quota check downstream reports "you have reached the limit of 0" to a
+ * merchant with a fully active plan and nothing consumed.
+ *
+ * That is not hypothetical. It is the production incident this signature now
+ * prevents: ten call sites — every mutating one — passed the request-scoped
+ * client, so keyword creation, project creation, client creation, ranking
+ * scans and AI-visibility runs all reported a zero allowance, while page reads
+ * (which never call this) stayed healthy. proxy.ts had the identical defect
+ * and was fixed in isolation; its comment then asserted that "every other
+ * caller already passes a service-role client", which was not true.
+ *
+ * `userId` is always an id the server has already verified from the session,
+ * never a request value, so reading as service_role widens no access.
+ */
 export async function getUserEntitlement(
   userId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  admin: ServiceRoleClient,
   // Injectable clock (repo convention — see
   // lib/content/recommendations/smart-run-harness.ts's `now: () => number`)
   // so trial/period-expiry tests are deterministic regardless of wall-clock
@@ -163,7 +190,7 @@ export async function getUserEntitlement(
   const now = nowFn()
 
   // Fetch profile — role only
-  const { data: profile } = await supabase
+  const { data: profile } = await admin
     .from('profiles')
     .select('role')
     .eq('id', userId)
@@ -198,7 +225,7 @@ export async function getUserEntitlement(
   // manually-granted row, or PayPal history is never read for entitlement —
   // see lib/shopify/entitlement-resolver.ts's header for why (this is
   // exactly what closes the shopify@gotop.co.il reviewer-bypass gap).
-  const resolution = await resolveShopifyGovernedEntitlement(supabase, userId, nowFn)
+  const resolution = await resolveShopifyGovernedEntitlement(admin, userId, nowFn)
 
   // FAIL CLOSED on an infrastructure failure. Falling through to the
   // subscriptions table here would hand a Shopify-governed merchant the website
@@ -245,7 +272,7 @@ export async function getUserEntitlement(
   // back to trial-tier limits regardless of actual status).
   // 'cancelled' status means the renewal was cancelled in PayPal but access
   // remains valid until current_period_end.
-  const { data: sub, error } = await supabase
+  const { data: sub, error } = await admin
     .from('subscriptions')
     .select('id, plan_code, status, trial_ends_at, current_period_end')
     .eq('user_id', userId)
@@ -346,8 +373,7 @@ export interface AccessDiagnostics {
  */
 export async function explainAccess(
   userId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: any,
+  admin: ServiceRoleClient,
   nowFn: () => Date = () => new Date(),
 ): Promise<AccessDiagnostics> {
   const { data: profile } = await admin
@@ -422,11 +448,10 @@ export async function explainAccess(
  */
 export async function hasAccess(
   userId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  admin: ServiceRoleClient,
   // Injectable clock — same convention as getUserEntitlement above. Every
   // real caller uses the default; production behavior is unchanged.
   nowFn: () => Date = () => new Date(),
 ): Promise<boolean> {
-  return (await explainAccess(userId, supabase, nowFn)).allowed
+  return (await explainAccess(userId, admin, nowFn)).allowed
 }

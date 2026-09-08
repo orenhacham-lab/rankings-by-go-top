@@ -30,6 +30,8 @@ import {
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
+  buildEntitlementUnavailableError,
+  isEntitlementUnknown,
   countAIScansTrialLifetime,
 } from '@/lib/quota'
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
@@ -88,7 +90,14 @@ export async function POST(request: Request) {
   // checks total, plain count — no concurrent-job race risk for a single
   // trial user). Paid: an ATOMIC reservation against the user's actual
   // billing-period boundary (never a plain count-then-proceed).
-  const entitlement = await getUserEntitlement(user.id, supabase)
+  // SERVICE-ROLE, not the request client: getUserEntitlement reads
+  // billing_governance, which `authenticated` may not read at all.
+  const entitlement = await getUserEntitlement(user.id, admin)
+  // A read failure is not an exhausted quota. Answering with a 403 "you have
+  // reached your limit of 0 — upgrade" here is what the reviewer saw.
+  if (isEntitlementUnknown(entitlement.plan)) {
+    return Response.json(buildEntitlementUnavailableError(), { status: 503 })
+  }
   let reservationId: string | null = null
   let reservationToken: string | null = null
   if (!entitlement.isAdmin) {

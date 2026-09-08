@@ -7,13 +7,14 @@
  * signup flow calls this but never blocks on its outcome.
  */
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 
 export async function POST() {
   const supabase = await createClient()
-  const result = await ensureDefaultClient(supabase)
+  const result = await ensureDefaultClient(supabase, createAdminClient())
   if (result.status === 'skipped' && result.reason === 'no_user') {
     return NextResponse.json(result, { status: 401 })
   }

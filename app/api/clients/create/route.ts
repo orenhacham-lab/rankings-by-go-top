@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
+import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 
 // API Route for creating new clients
 // Replaces deprecated Server Action approach to avoid production crashes
@@ -29,7 +31,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Check user's plan and quotas
-    const entitlement = await getUserEntitlement(user.id, supabase)
+    // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
+    // billing_governance, which is REVOKEd from `authenticated` and errors
+    // (42501) rather than returning an empty set — collapsing the whole
+    // entitlement to zero limits. See lib/supabase/admin.ts.
+    const entitlement = await getUserEntitlement(user.id, createAdminClient())
+    // A read failure is not an exhausted quota: answering "you have reached
+    // your limit of 0 — upgrade your plan" is what the reviewer saw. This is
+    // transient and retryable, and nothing was spent.
+    if (isEntitlementUnknown(entitlement.plan)) {
+      return NextResponse.json(buildEntitlementUnavailableError(), { status: 503 })
+    }
     const planLimits = PLAN_LIMITS[entitlement.plan]
 
     // Count existing clients for this user
