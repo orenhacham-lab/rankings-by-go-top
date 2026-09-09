@@ -32,6 +32,12 @@ interface TrackingTargetsTableProps {
    *  says so explicitly rather than showing a dash indistinguishable from
    *  "this keyword has no search volume". */
   volumeUnavailable?: boolean
+  /** The keyword list is still loading, or could not be read. Reported HERE,
+   *  on the thing that is missing, rather than by holding the whole page —
+   *  the header, the tabs and the actions do not depend on it. */
+  targetsLoading?: boolean
+  targetsError?: boolean
+  onRetryTargets?: () => void
   /** Lets the merchant retry a volume that came back empty or unavailable,
    *  without hunting for the toolbar button. */
   onRetryVolumes?: () => void
@@ -52,6 +58,9 @@ export default function TrackingTargetsTable({
   volumePending = false,
   volumeUnavailable = false,
   onRetryVolumes,
+  targetsLoading = false,
+  targetsError = false,
+  onRetryTargets,
   projectDevice,
   onActionComplete,
 }: TrackingTargetsTableProps) {
@@ -164,7 +173,30 @@ export default function TrackingTargetsTable({
           </tr>
         </TableHead>
         <TableBody>
-          {targets.length === 0 && (
+          {/* THREE DISTINCT ANSWERS, never one. "Still loading", "could not be
+              read — try again" and "there are none yet" mean different things
+              to a merchant, and collapsing them into an empty table is how a
+              failure reads as an empty project. */}
+          {targets.length === 0 && targetsLoading && (
+            <EmptyRow colSpan={9} message={k.keywordsLoading} />
+          )}
+          {targets.length === 0 && !targetsLoading && targetsError && (
+            <tr>
+              <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                {k.keywordsLoadFailed}
+                {onRetryTargets && (
+                  <button
+                    type="button"
+                    onClick={onRetryTargets}
+                    className="ms-2 underline decoration-dotted underline-offset-2 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    {k.volumeRetry}
+                  </button>
+                )}
+              </td>
+            </tr>
+          )}
+          {targets.length === 0 && !targetsLoading && !targetsError && (
             <EmptyRow colSpan={9} message={k.emptyState} />
           )}
           {sortedTargets.map((target) => {
