@@ -1,3 +1,5 @@
+import { routeContentLocale } from '@/lib/i18n/request-locale'
+import { authUrlWithLocale } from '@/lib/shopify/handoff-url'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -28,6 +30,8 @@ export default async function ShopifyLinkPage() {
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  // From the shared contract, not decided here.
+  const surfaceLocale = routeContentLocale('/shopify/link') ?? 'en'
 
   if (!user) {
     return (
@@ -37,8 +41,12 @@ export default async function ShopifyLinkPage() {
           Log in or create a Rankings by Go Top account to finish connecting this store. You&apos;ll come right back here afterward.
         </p>
         <div style={{ display: 'flex', gap: 12 }}>
-          <a href="/login?next=%2Fshopify%2Flink" style={linkButtonStyle}>Log in</a>
-          <a href="/signup?next=%2Fshopify%2Flink" style={{ ...linkButtonStyle, background: '#fff', color: '#008060', border: '1px solid #008060' }}>Sign up</a>
+          {/* The surface's language travels with the handoff — the same rule
+              as the connector home's "Open full dashboard". A hand-written
+              `/login?next=…` here is exactly how the original defect survived
+              in more than one place. */}
+          <a href={authUrlWithLocale('/login', '/shopify/link', surfaceLocale)} style={linkButtonStyle}>Log in</a>
+          <a href={authUrlWithLocale('/signup', '/shopify/link', surfaceLocale)} style={{ ...linkButtonStyle, background: '#fff', color: '#008060', border: '1px solid #008060' }}>Sign up</a>
         </div>
       </Shell>
     )

@@ -90,6 +90,23 @@ const PUBLIC_MARKETING_SEGMENTS = new Set([
 ])
 
 /**
+ * Sections whose copy is ENGLISH-ONLY, for the same reason the list above is
+ * Hebrew-only: the language is written into the components, not looked up.
+ *
+ * The embedded Shopify surface (`/shopify/app`, `/shopify/link`) contains zero
+ * Hebrew characters — it is an English page displayed inside Shopify Admin. So
+ * its language is a property of the URL, exactly like `/en/*`, and saying so
+ * here is what lets the rest of the contract carry that fact outward instead of
+ * inventing a second mechanism for it.
+ */
+const ENGLISH_ONLY_SEGMENTS = new Set(['shopify'])
+
+/** Exposed so the QA can prove the list matches the real route tree. */
+export function englishOnlySegments(): string[] {
+  return Array.from(ENGLISH_ONLY_SEGMENTS).sort()
+}
+
+/**
  * The language THE ROUTE ITSELF serves, or null when the route is bilingual and
  * the user's preference decides.
  */
@@ -98,6 +115,7 @@ export function routeContentLocale(pathname: string | null | undefined): Locale 
   if (isEnglishPath(p)) return 'en'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
+  if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'
   return PUBLIC_MARKETING_SEGMENTS.has(segment) ? 'he' : null
 }
 
@@ -108,6 +126,19 @@ export function publicMarketingSegments(): string[] {
 
 export function resolveRequestLocale(input: {
   pathname?: string | null
+  /**
+   * An explicit `?lang=` on THIS request.
+   *
+   * It ranks above the cookie because it is a deliberate act by whatever
+   * initiated the navigation, and the cookie is a remembered default. That
+   * distinction is what the Shopify journey needed: the embedded English app
+   * hands off to the external dashboard, and a `dashboard-language` cookie left
+   * behind by an earlier visit must not relabel the journey the merchant is
+   * standing in. The proxy persists it, so it survives the login redirect, the
+   * `next` destination and a refresh — after which it IS the remembered
+   * default, and the switcher can change it like any other.
+   */
+  langParam?: string | null
   cookieValue?: string | null
   /** Seed for a first visit (e.g. signup language in auth metadata). */
   seed?: string | null
@@ -115,10 +146,11 @@ export function resolveRequestLocale(input: {
   acceptLanguage?: string | null
 }): Locale {
   // The route decides FIRST and alone where it has a language of its own; no
-  // cookie, seed or header may relabel content it did not write.
+  // cookie, seed, parameter or header may relabel content it did not write.
   const fixed = routeContentLocale(input.pathname)
   if (fixed) return fixed
-  return normalizeLocale(input.cookieValue)
+  return normalizeLocale(input.langParam)
+    ?? normalizeLocale(input.cookieValue)
     ?? normalizeLocale(input.seed)
     ?? localeFromAcceptLanguage(input.acceptLanguage)
     ?? REQUEST_FALLBACK_LOCALE
@@ -131,8 +163,38 @@ export function resolveRequestLocale(input: {
  * precedence as resolveRequestLocale: the route first, then the cookie.
  * Separate from resolveRequestLocale, which always answers with a default.
  */
-export function explicitRequestLocale(input: { pathname?: string | null; cookieValue?: string | null }): Locale | null {
-  return routeContentLocale(input.pathname) ?? normalizeLocale(input.cookieValue)
+export function explicitRequestLocale(input: {
+  pathname?: string | null
+  langParam?: string | null
+  cookieValue?: string | null
+}): Locale | null {
+  return routeContentLocale(input.pathname)
+    ?? normalizeLocale(input.langParam)
+    ?? normalizeLocale(input.cookieValue)
+}
+
+/** The query parameter that carries an explicit locale across a navigation. */
+export const LANGUAGE_PARAM = 'lang'
+
+/**
+ * A `next` destination that is safe to send a browser to after authentication.
+ *
+ * ONLY a same-origin path. `//evil.com` and `/\evil.com` are protocol-relative
+ * URLs that browsers resolve to another origin, and `https://evil.com` needs no
+ * explanation; all three are rejected rather than sanitised into something
+ * adjacent. Anything unusable becomes the caller's default, so a hostile value
+ * degrades to a safe internal page rather than to an error.
+ */
+export function sanitizeNextPath(raw: string | null | undefined, fallback = '/dashboard'): string {
+  if (typeof raw !== 'string' || raw.length === 0) return fallback
+  let value = raw
+  // A double-encoded value is still an attempt at the same thing.
+  try { value = decodeURIComponent(raw) } catch { /* keep the raw form */ }
+  if (!value.startsWith('/')) return fallback
+  if (value.startsWith('//') || value.startsWith('/\\')) return fallback
+  // A control character can smuggle a scheme past a naive prefix check.
+  if (/[\u0000-\u001f\u007f]/.test(value)) return fallback
+  return value
 }
 
 /**

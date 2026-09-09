@@ -59,3 +59,27 @@ The ~60-second waits do not reproduce here, because this container's egress
 proxy refuses both providers immediately rather than accepting the connection
 and going silent. That timing was measured directly at the module boundary
 instead — see `lib/ops/__qa__/keyword-scan-and-volume.qa.ts`.
+
+## The language journey
+
+`shopify-language-journey.js` drives the handoff the Shopify reviewer takes:
+embedded app → Open dashboard → login → project page, with
+`dashboard-language=he` already on the browser (the production condition) and an
+`en-US` Accept-Language. It reads the RAW server responses as well as the settled
+DOM, so nothing can pass because hydration corrected it.
+
+    node lib/__qa__/reviewer-journey/supabase-stub.js &
+    NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:5555 … npx next build
+    QA_SCREENSHOT_DIR=/tmp/lang node lib/__qa__/reviewer-journey/shopify-language-journey.js
+
+Measured at the time of commit, same stub, fresh database each run:
+
+| | on `origin/main` | with this change |
+|---|---|---|
+| raw `/login` response | `lang="he" dir="rtl"` | `lang="en" dir="ltr"` |
+| `?lang=he` on an English browser | ignored — stayed English | Hebrew, as asked |
+| destination after sign-in | `lang="he" dir="rtl"`, Hebrew sidebar | `lang="en" dir="ltr"`, English |
+| reload of the destination | Hebrew | English |
+| `next=https://evil.com` / `//evil.com` / `/\evil.com` | followed | replaced with a safe internal page |
+| cookie persisted through the redirect | no | yes |
+| **totals** | **12 passed, 10 failed** | **22 passed, 0 failed** |

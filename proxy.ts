@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
-import { LANGUAGE_COOKIE, LOCALE_HEADER, explicitRequestLocale } from '@/lib/i18n/request-locale'
+import {
+  LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
+  explicitRequestLocale, languageCookieString, sanitizeNextPath,
+} from '@/lib/i18n/request-locale'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -44,12 +47,36 @@ export async function proxy(request: NextRequest) {
   // can still apply its seed (the signup language in auth metadata), which the
   // proxy cannot see. Sending a default here would silently outrank that seed
   // and give an English signup a Hebrew first page on a fresh device.
+  //
+  // `?lang=` is read HERE, not only in the auth client component. It used to be
+  // honoured by resolveAuthLocale alone, so `/login?lang=en` returned English
+  // COPY inside a document still declaring `lang="he" dir="rtl"` — measured on
+  // the real build before this change. The server has to decide it, or the raw
+  // response is wrong however right the client is.
+  const langParam = request.nextUrl.searchParams.get(LANGUAGE_PARAM)
   const explicitLocale = explicitRequestLocale({
     pathname,
+    langParam,
     cookieValue: request.cookies.get(LANGUAGE_COOKIE)?.value ?? null,
   })
   const requestHeaders = new Headers(request.headers)
   if (explicitLocale) requestHeaders.set(LOCALE_HEADER, explicitLocale)
+
+  /**
+   * A `?lang=` the request CHOSE is persisted, so it survives the login
+   * redirect, the `next` destination and a refresh — which is what "the
+   * selected locale must survive authentication" means in practice. Only a
+   * value the parameter actually resolved is written; a route-fixed locale
+   * (`/en/*`, `/privacy`, the Shopify surface) is a property of that URL and
+   * must never be remembered as the account's preference.
+   */
+  const localeToPersist = normalizedLangParam(langParam)
+  const persistLocale = (res: NextResponse): NextResponse => {
+    if (localeToPersist) {
+      res.headers.append('set-cookie', languageCookieString(localeToPersist, request.nextUrl.protocol === 'https:'))
+    }
+    return res
+  }
 
   // ── Normal auth flow ────────────────────────────────────────────
   let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
@@ -92,8 +119,14 @@ export async function proxy(request: NextRequest) {
     }))
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
-    loginUrl.searchParams.set('next', pathname)
-    return NextResponse.redirect(loginUrl)
+    loginUrl.search = ''
+    // The destination is built from the REQUEST'S OWN pathname, never from a
+    // parameter, so it cannot be pointed at another origin.
+    loginUrl.searchParams.set('next', sanitizeNextPath(pathname))
+    // …and the language the request decided travels with it, so the sign-in
+    // page is rendered in it on the server rather than corrected afterwards.
+    if (localeToPersist) loginUrl.searchParams.set(LANGUAGE_PARAM, localeToPersist)
+    return persistLocale(NextResponse.redirect(loginUrl))
   }
 
   if (user && pathname === '/login') {
@@ -142,7 +175,14 @@ export async function proxy(request: NextRequest) {
     if (!decision.allowed) return redirectToBilling(request)
   }
 
-  return supabaseResponse
+  return persistLocale(supabaseResponse)
+}
+
+/** The `?lang=` value, normalised, or null. Kept beside the proxy so the cookie
+ *  and the header can never be written from different readings of it. */
+function normalizedLangParam(raw: string | null): 'he' | 'en' | null {
+  const v = (raw ?? '').trim().toLowerCase()
+  return v === 'he' || v === 'en' ? v : null
 }
 
 function redirectToBilling(request: NextRequest) {

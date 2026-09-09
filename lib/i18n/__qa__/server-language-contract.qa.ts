@@ -214,9 +214,16 @@ async function main() {
         const shopifyEn = await htmlTag('/shopify/app', undefined, 'en-US,en;q=0.9')
         check('3B-k: the Shopify embedded entry point uses the SAME resolver (English browser → en/ltr)',
           /lang="en"/.test(shopifyEn) && /dir="ltr"/.test(shopifyEn), shopifyEn)
+        // CONTRACT CHANGE, deliberate. The embedded Shopify pages contain zero
+        // Hebrew characters, so following a Hebrew cookie there produced
+        // `lang="he" dir="rtl"` wrapped around English copy — exactly the
+        // mislabelling section 8 of this suite exists to prevent, and exactly
+        // what sent the Shopify reviewer's whole journey into Hebrew. The
+        // surface is now declared English by the ROUTE, like /en/*, so a cookie
+        // cannot relabel copy it did not write.
         const shopifyHe = await htmlTag('/shopify/app', `${LANGUAGE_COOKIE}=he`)
-        check('3B-l: …and an HE cookie moves it too',
-          /lang="he"/.test(shopifyHe) && /dir="rtl"/.test(shopifyHe), shopifyHe)
+        check('3B-l: …and an HE cookie CANNOT move it — the surface owns its language',
+          /lang="en"/.test(shopifyHe) && /dir="ltr"/.test(shopifyHe), shopifyHe)
       }
 
       console.log('\n3D) FIXED-LANGUAGE PUBLIC ROUTES — no preference may relabel their copy')
@@ -468,7 +475,9 @@ async function main() {
     check('8b: the English tree states English', routeContentLocale('/en') === 'en' && routeContentLocale('/en/pricing') === 'en')
     check('8c: bilingual surfaces state nothing and defer to the user',
       routeContentLocale('/dashboard') === null && routeContentLocale('/login') === null
-      && routeContentLocale('/shopify/app') === null && routeContentLocale('/content') === null)
+      && routeContentLocale('/content') === null)
+    check('8c1: the embedded Shopify surface states ENGLISH — its copy is English-only',
+      routeContentLocale('/shopify/app') === 'en' && routeContentLocale('/shopify/link') === 'en')
     check('8c2: the legal pages are fixed-language too',
       routeContentLocale('/privacy') === 'he' && routeContentLocale('/terms') === 'he'
       && routeContentLocale('/accessibility') === 'he'

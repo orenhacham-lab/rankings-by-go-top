@@ -17,6 +17,9 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { routeContentLocale } from '@/lib/i18n/request-locale'
+import { getServerLocale } from '@/lib/i18n/server-locale'
+import { externalUrlWithLocale } from '@/lib/shopify/handoff-url'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { getActiveShopifySubscription, describeInactiveSubscription } from '@/lib/shopify/partner-client'
@@ -185,6 +188,11 @@ export async function GET(request: Request) {
     }
   }
 
+  // The language THIS SURFACE renders in, from the shared contract — the
+  // embedded Shopify pages are declared English there because their copy is
+  // English-only (they contain no Hebrew at all).
+  const surfaceLocale = routeContentLocale('/shopify/app') ?? await getServerLocale()
+
   return Response.json({
     connected: true,
     shopDomain,
@@ -193,7 +201,19 @@ export async function GET(request: Request) {
     configOk: hasWriteContent(connection.granted_scopes) && connection.connection_status === 'connected',
     connectionLastError: connection.last_error,
     project: project ? { businessName: project.business_name, targetDomain: project.target_domain } : null,
-    dashboardUrl: `${config.appUrl}/projects/${encodeURIComponent(connection.project_id)}`,
+    // THE LOCALE TRAVELS WITH THE HANDOFF.
+    //
+    // This URL used to be the bare project path, so the moment the merchant
+    // left the embedded app the journey was decided by whatever
+    // `dashboard-language` cookie happened to be on the browser — which for an
+    // account created through the Hebrew signup is `he`, written durably by the
+    // dashboard provider on its first mount. An English app then handed off to
+    // a Hebrew login and a Hebrew dashboard.
+    //
+    // The locale is RESOLVED, not hard-coded: the embedded surface is a
+    // fixed-English route in the same contract that makes `/en/*` English and
+    // `/privacy` Hebrew, so this asks the contract and carries its answer.
+    dashboardUrl: externalUrlWithLocale(config.appUrl, `/projects/${encodeURIComponent(connection.project_id)}`, surfaceLocale),
     // Hotfix — admin billing bypass: isAdmin: true means the client must
     // render NO Billing card / plan-selection control at all (billing is
     // always null in that case too, above).

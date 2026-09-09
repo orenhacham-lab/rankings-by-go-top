@@ -235,8 +235,17 @@ async function main() {
   console.log('\n13) /shopify/link/page.tsx — UNCHANGED: unauthenticated continuation via a hardcoded, server-resolved `next` (no open redirect), authenticated continuation via the project picker')
   {
     const linkSrc = read('app/shopify/link/page.tsx')
-    check('13a: the unauthenticated branch links to a HARDCODED /login?next=%2Fshopify%2Flink (never derived from any request input)', /href="\/login\?next=%2Fshopify%2Flink"/.test(linkSrc))
-    check('13a: the unauthenticated branch ALSO offers signup with the same hardcoded continuation', /href="\/signup\?next=%2Fshopify%2Flink"/.test(linkSrc))
+    // The literal `/login?next=%2Fshopify%2Flink` became a call to the shared
+    // handoff builder so the surface's LANGUAGE travels with it (the Shopify
+    // reviewer's journey lost its English at exactly this boundary). What this
+    // assertion is about — a continuation the SERVER fixes, never one derived
+    // from request input — is unchanged and now checked directly.
+    check('13a: the unauthenticated branch builds its continuation from a literal internal path (never from request input)',
+      /authUrlWithLocale\('\/login', '\/shopify\/link'/.test(linkSrc))
+    check('13a: the unauthenticated branch ALSO offers signup with the same fixed continuation',
+      /authUrlWithLocale\('\/signup', '\/shopify\/link'/.test(linkSrc))
+    check('13a-guard: no continuation on this page comes from a query parameter',
+      !/searchParams/.test(linkSrc))
     check('13b: the authenticated branch renders ShopifyLinkClient (project picker), not a login prompt', /<ShopifyLinkClient/.test(linkSrc))
     check('13c: the pending install is identified ONLY via the signed httpOnly cookie, never a URL/query parameter', /PENDING_LINK_COOKIE/.test(linkSrc) && !/searchParams/.test(linkSrc))
   }

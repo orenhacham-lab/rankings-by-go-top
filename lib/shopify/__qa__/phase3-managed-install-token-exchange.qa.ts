@@ -226,8 +226,12 @@ async function main() {
   {
     const link = read('app/shopify/link/page.tsx')
     check('7a: the pending install is still identified ONLY by the signed httpOnly cookie', /PENDING_LINK_COOKIE/.test(link) && !/searchParams/.test(link))
-    check('7b: unauthenticated merchants still get the hardcoded, server-resolved continuation (no open redirect)',
-      /href="\/login\?next=%2Fshopify%2Flink"/.test(link))
+    // Now built by the shared handoff builder so the surface's language travels
+    // with it. The property under test — a server-fixed continuation, never one
+    // taken from request input — is unchanged.
+    check('7b: unauthenticated merchants still get a server-fixed continuation (no open redirect)',
+      /authUrlWithLocale\('\/login', '\/shopify\/link'/.test(link)
+      && !/searchParams/.test(link))
     check('7c: authenticated merchants still get the project picker', /<ShopifyLinkClient/.test(link))
     const complete = read('app/api/shopify/link/complete/route.ts')
     check('7d: completion still re-validates the pending install server-side', /loadValidPendingInstall|consumePendingInstall/.test(complete))
