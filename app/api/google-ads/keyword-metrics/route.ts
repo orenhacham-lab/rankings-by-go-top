@@ -4,6 +4,8 @@ import {
   Deadline, fetchProvider, logOperation, newRequestId,
   type ProviderOutcome,
 } from '@/lib/ops/deadline'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { claimOperation, releaseOperationClaim, searchVolumeScope } from '@/lib/ops/single-flight'
 
 /**
  * The platform ceiling this handler must ALWAYS answer inside.
@@ -24,6 +26,9 @@ const OPERATION_BUDGET_MS = 45_000
  *  open until the platform killed it. */
 const OAUTH_TIMEOUT_MS = 10_000
 const METRICS_TIMEOUT_MS = 20_000
+/** Outlives the operation budget by a margin; short enough that a claim left by
+ *  a killed function recovers on its own. */
+const CLAIM_TTL_SECONDS = 90
 
 interface TokenResponse {
   access_token?: string
@@ -117,7 +122,13 @@ export async function POST(request: Request) {
     stage: string; outcome: string; userId?: string; projectId?: string
     targetCount?: number; providerStatus?: number | null; providerOutcome?: ProviderOutcome | null
     persisted?: number | null; persistenceOutcome?: string | null
+    claimOutcome?: string | null; claimRelease?: string | null
   } = { stage: 'start', outcome: 'unknown' }
+  // Set once the claim is taken, so the finally can release exactly this
+  // request's own claim and nobody else's.
+  let claimHeld = false
+  let claimUserId: string | null = null
+  let claimScope: string | null = null
 
   try {
     const supabase = await createClient()
@@ -158,6 +169,45 @@ export async function POST(request: Request) {
         { status: 403 }
       )
     }
+
+    // SINGLE FLIGHT, per project, taken only AFTER ownership is verified — a
+    // caller must never be able to claim (or discover) an operation on a
+    // project they do not own.
+    //
+    // The automatic refresh that follows keyword creation and the manual
+    // "Update search volumes" button are the SAME operation here, so they can
+    // never both reach the provider: whichever arrives second is told the truth
+    // and does no provider work. Two tabs, a reload mid-flight and two direct
+    // POSTs all resolve the same way, which a React ref could not do.
+    const admin = createAdminClient()
+    const scope = searchVolumeScope(projectId)
+    const claim = await claimOperation(admin, {
+      userId: user.id, operation: 'search_volume', scope, requestId, ttlSeconds: CLAIM_TTL_SECONDS,
+    })
+    diag.claimOutcome = claim.outcome
+    if (claim.outcome === 'in_progress') {
+      diag.stage = 'claim'
+      diag.outcome = 'in_progress'
+      return Response.json({
+        success: false, errorCode: 'VOLUME_IN_PROGRESS',
+        error: 'עדכון נפחי חיפוש כבר רץ עבור הפרויקט הזה.',
+        errorEn: 'A search-volume update is already running for this project.',
+        retryable: true, inProgressRequestId: claim.holderRequestId, requestId,
+      }, { status: 409 })
+    }
+    if (claim.outcome === 'unavailable') {
+      diag.stage = 'claim'
+      diag.outcome = 'claim_unavailable'
+      return Response.json({
+        success: false, errorCode: 'PROVIDER_UNAVAILABLE',
+        error: 'לא ניתן לעדכן כרגע. נסו שוב בעוד רגע.',
+        errorEn: 'The update could not start. Please try again in a moment.',
+        retryable: true, requestId,
+      }, { status: 503 })
+    }
+    claimHeld = claim.outcome === 'claimed'
+    claimUserId = user.id
+    claimScope = scope
 
     const country = typeof project.country === 'string' ? project.country : ''
     const language = typeof project.language === 'string' ? project.language : ''
@@ -415,6 +465,13 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   } finally {
+    // Released on success, on a classified failure and on a timeout alike, so a
+    // legitimate later refresh is never blocked by a finished one.
+    if (claimHeld && claimUserId && claimScope) {
+      diag.claimRelease = await releaseOperationClaim(createAdminClient(), {
+        userId: claimUserId, operation: 'search_volume', scope: claimScope, requestId,
+      })
+    }
     logOperation({
       operation: 'search_volume',
       stage: diag.stage,
@@ -428,6 +485,8 @@ export async function POST(request: Request) {
       providerOutcome: diag.providerOutcome ?? null,
       persisted: diag.persisted ?? null,
       persistenceOutcome: diag.persistenceOutcome ?? null,
+      claimOutcome: diag.claimOutcome ?? null,
+      claimRelease: diag.claimRelease ?? null,
     })
   }
 }

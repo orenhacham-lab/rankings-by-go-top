@@ -2234,6 +2234,7 @@ export const dashboardHe = {
       // distinct from "no data" and from a configuration fault, which the UI
       // used to collapse into one message.
       volumesUnavailable: 'ספק נפחי החיפוש לא הגיב. נסו שוב בעוד רגע.',
+      volumesInProgress: 'עדכון נפחי חיפוש כבר רץ עבור הפרויקט הזה.',
       volumesFailedToSave: 'הנתונים התקבלו אך לא נשמרו. נסו שוב בעוד רגע.',
       volumesPending: 'מאתר נפח חיפוש…',
       volumesRetry: 'נסו שוב',
@@ -2255,6 +2256,7 @@ export const dashboardHe = {
       notChecked: 'לא נבדק',
       volumePending: 'מאתר נפח חיפוש…',
       volumeRetry: 'לחצו לניסיון חוזר',
+      volumeUnavailable: 'נפח לא זמין',
       unavailable: 'לא זמין',
       scan: 'סרוק',
       details: 'פרטים',
@@ -2279,6 +2281,7 @@ export const dashboardHe = {
       scanNetworkError: 'שגיאת רשת בסריקה',
       scanSuccess: 'סריקה הושלמה בהצלחה',
       scanNetworkErrorTarget: 'שגיאת רשת',
+      scanInProgress: 'בדיקה כבר רצה עבור הבחירה הזו. המתינו לסיומה.',
       scanTimeout: 'הבדיקה לקחה יותר מדי זמן ולא הושלמה. נסו שוב בעוד רגע.',
       scanRetryable: 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
     },

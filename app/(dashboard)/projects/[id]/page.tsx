@@ -58,9 +58,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // merchant found the manual button. This tracks the automatic refresh so the
   // row can say "fetching" rather than showing an empty cell that looks broken.
   const [volumePending, setVolumePending] = useState(false)
+  // A SILENT catch left the merchant looking at a dash with no way to tell a
+  // keyword that has no volume from one whose lookup failed. The automatic
+  // refresh now records that it did not succeed, so the row can offer a retry —
+  // without ever suggesting the keyword itself failed to save.
+  const [volumeUnavailable, setVolumeUnavailable] = useState(false)
   // IN-FLIGHT GUARD, in a ref rather than state: two clicks in the same tick
   // must not both start work, and a ref is read synchronously.
   const volumeRequestInFlight = useRef(false)
+  // The same synchronous guard for both scan entry points. UX protection only —
+  // it stops a second click in THIS component and nothing else. The server's
+  // single-flight claim is what actually prevents duplicate work, and remains
+  // mandatory: two tabs, a reload mid-flight and two direct POSTs never reach
+  // this ref at all.
+  const scanAllInFlight = useRef(false)
+  const targetScansInFlight = useRef<Set<string>>(new Set())
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -130,6 +142,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
    * language regardless of the merchant's.
    */
   function scanFailureMessage(data: { errorCode?: string; error?: string }): string {
+    if (data?.errorCode === 'SCAN_IN_PROGRESS') return k.messages.scanInProgress
     if (data?.errorCode === 'SCAN_TIMEOUT') return k.messages.scanTimeout
     if (data?.errorCode === 'SCAN_FAILED') return k.messages.scanRetryable
     if (data?.errorCode === 'ENTITLEMENT_UNAVAILABLE') return k.messages.scanRetryable
@@ -164,11 +177,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         body: JSON.stringify({ projectId: id }),
       })
       const data = await response.json().catch(() => null)
-      if (response.ok && data?.updated > 0) await loadData()
+      if (response.ok && data?.updated > 0) {
+        setVolumeUnavailable(false)
+        await loadData()
+      } else if (response.ok && (data?.updated === 0 && data?.noData === 0)) {
+        // Nothing needed fetching — the volumes are current, not unavailable.
+        setVolumeUnavailable(false)
+      } else {
+        // NOT an error toast: the keyword was created and saved. The row says
+        // its volume is unavailable and offers a retry, which is the truth.
+        setVolumeUnavailable(true)
+      }
     } catch {
-      // Deliberately silent: this is an automatic follow-up to a keyword the
-      // merchant has already successfully created. Surfacing a provider error
-      // here would report a failure for an action that succeeded.
+      setVolumeUnavailable(true)
     } finally {
       volumeRequestInFlight.current = false
       setVolumePending(false)
@@ -190,6 +211,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         keywordsSection.classList.remove('ring-2', 'ring-indigo-400')
       }, 1500)
     }
+    if (scanAllInFlight.current) return
+    scanAllInFlight.current = true
     setScanning(true)
     setScanMessage('')
     try {
@@ -208,6 +231,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     } catch {
       showScanResult(k.messages.scanNetworkError, true)
     } finally {
+      scanAllInFlight.current = false
       setScanning(false)
     }
   }
@@ -250,6 +274,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         showScanResult(k.keywordsSection.volumesNotConfigured, true)
       } else if (data?.errorCode === 'RATE_LIMITED' || response.status === 429) {
         showScanResult(k.keywordsSection.volumesQuota, true)
+      } else if (data?.errorCode === 'VOLUME_IN_PROGRESS') {
+        showScanResult(k.keywordsSection.volumesInProgress, false)
       } else if (data?.errorCode === 'PROVIDER_UNAVAILABLE') {
         // TRANSIENT and retryable — distinct from "not configured", which no
         // amount of retrying fixes. Both used to be the same 503.
@@ -268,6 +294,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleScanTarget(targetId: string) {
+    if (targetScansInFlight.current.has(targetId)) return
+    targetScansInFlight.current.add(targetId)
     setScanningTargets((prev) => new Set([...prev, targetId]))
     setScanMessage('')
     try {
@@ -286,6 +314,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     } catch {
       showScanResult(k.messages.scanNetworkErrorTarget, true)
     } finally {
+      targetScansInFlight.current.delete(targetId)
       setScanningTargets((prev) => {
         const next = new Set(prev)
         next.delete(targetId)
@@ -561,6 +590,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         onScanTarget={handleScanTarget}
         scanningTargets={scanningTargets}
         volumePending={volumePending}
+        volumeUnavailable={volumeUnavailable}
         onRetryVolumes={handleUpdateVolumes}
         projectDevice={project.device_type}
         onActionComplete={loadData}

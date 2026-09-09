@@ -170,6 +170,11 @@ export interface OperationDiagnostics {
   reservationOutcome?: string | null
   persisted?: number | null
   persistenceOutcome?: string | null
+  /** Whether this request owned the single-flight claim, joined one, or found
+   *  the mechanism undeployed — the first thing to look at when two operations
+   *  are suspected of racing. */
+  claimOutcome?: string | null
+  claimRelease?: string | null
 }
 
 export function logOperation(d: OperationDiagnostics): void {

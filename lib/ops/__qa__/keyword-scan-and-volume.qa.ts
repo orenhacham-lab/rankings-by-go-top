@@ -380,6 +380,23 @@ async function main() {
       /LIVE_VERIFICATION_BUDGET_MS = 8_000/.test(readFileSync(join(ROOT, 'lib/shopify/entitlement-resolver.ts'), 'utf8')))
     // Nothing secret may appear in an operation line.
     const ops = readFileSync(join(ROOT, 'lib/ops/deadline.ts'), 'utf8')
+    // SANITIZED LOGS. The scan route used to log `errorMsg` and full stacks —
+    // strings that come from the provider client, from PostgREST and from this
+    // route's own thrown messages, and can carry a query, a URL with a key in
+    // it, a database hint or a shop identifier.
+    check('E8: the scan route logs a CATEGORY, never a raw exception message or a stack',
+      /function classifyFailure\(/.test(scan)
+      && !/console\.error\([^)]*errorMsg/.test(scan)
+      && !/console\.error\([^)]*\.stack/.test(scan)
+      && !/details: \(resultError/.test(scan) && !/hint: \(resultError/.test(scan))
+    check('E9: and the response body carries a category too, not the provider’s sentence',
+      /error: scanOutput\.error \? classifyFailure/.test(scan) && /error: classifyFailure\(targetError\)/.test(scan))
+    check('E10: both routes take a server-side single-flight claim before any work',
+      /claimOperation\(admin, \{/.test(scan) && /claimOperation\(admin, \{/.test(vol)
+      && /releaseOperationClaim/.test(scan) && /releaseOperationClaim/.test(vol))
+    check('E11: the reservation key is the OPERATION’s identity, never the request id',
+      /idempotencyKey: `manual:\$\{projectId\}:\$\{scope\}:\$\{operationKey\}`/.test(scan)
+      && !/idempotencyKey: `manual:[^`]*\$\{requestId\}`/.test(scan))
     check('E7: the diagnostics type carries no credential, token or provider payload field',
       !/token|secret|credential|apiKey|password|payload:/i.test(ops.slice(ops.indexOf('export interface OperationDiagnostics'), ops.indexOf('export function logOperation'))))
   }
