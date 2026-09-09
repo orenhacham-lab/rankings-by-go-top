@@ -1,5 +1,6 @@
 'use client'
 
+import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { useState, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -60,7 +61,12 @@ export function AuthForm() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const serverLocale = useAuthServerLocale()
-  const nextPath = searchParams.get('next') || '/dashboard'
+  // OPEN-REDIRECT PROTECTION. This was `searchParams.get('next') || '/dashboard'`
+  // handed straight to `router.replace`, so `?next=https://evil.com` sent the
+  // merchant off-origin immediately after they typed their password. Only a
+  // same-origin path survives sanitizeNextPath; anything else becomes the
+  // default, so a hostile value degrades to a safe page rather than an error.
+  const nextPath = sanitizeNextPath(searchParams.get('next'), '/dashboard')
   const langParam = searchParams.get('lang')
   // The route, then an explicit ?lang, then the locale the SERVER resolved for
   // this request. That last step is the fix: without it every request without an
