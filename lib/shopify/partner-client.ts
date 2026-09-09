@@ -32,9 +32,26 @@
  */
 
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from './constants'
+import { Deadline } from '@/lib/ops/deadline'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_TRANSIENT_RETRIES = 2
+
+/**
+ * A PER-ATTEMPT TIMEOUT IS NOT A DEADLINE.
+ *
+ * Three attempts of 15 seconds is a 46-second operation, and that is not a
+ * hypothesis: with an unresponsive Partner API this module was measured at
+ * 46,238 ms, and the manual ranking-scan route inherited the wait exactly
+ * (46,291 ms) before answering with nothing persisted. On a merchant-facing
+ * request that is indistinguishable from the product being broken.
+ *
+ * The retry budget is now spent from ONE clock. A request path passes its own
+ * remaining budget; anything that does not (a webhook, a cron, a background
+ * reconciliation) keeps the previous generous behaviour by default, because
+ * there is no one waiting on it.
+ */
+const DEFAULT_TOTAL_BUDGET_MS = 3 * REQUEST_TIMEOUT_MS + 2_000
 
 export type PartnerApiErrorKind =
   | 'missing_config'
@@ -110,13 +127,20 @@ async function partnerGraphql<T>(
   query: string,
   variables: Record<string, unknown>,
   fetchImpl: typeof fetch = fetch,
+  deadline: Deadline = new Deadline(DEFAULT_TOTAL_BUDGET_MS),
 ): Promise<T> {
   let lastErr: PartnerApiError | null = null
   for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
-    if (attempt > 0) await sleep(backoffMs(attempt - 1))
+    // Never START an attempt the budget cannot pay for, and never sleep past it.
+    if (deadline.expired()) break
+    if (attempt > 0) {
+      await sleep(Math.min(backoffMs(attempt - 1), deadline.remaining()))
+      if (deadline.expired()) break
+    }
     let res: Response
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    // The attempt gets what is LEFT, capped by its own per-attempt limit.
+    const timer = setTimeout(() => controller.abort(), deadline.sliceFor(REQUEST_TIMEOUT_MS))
     try {
       res = await fetchImpl(endpoint(config), {
         method: 'POST',
@@ -246,6 +270,9 @@ export async function getActiveShopifySubscription(
   shopGid: string,
   fetchImpl: typeof fetch = fetch,
   expectedMyshopifyDomain?: string,
+  /** A request path passes its own remaining budget so the retries cannot
+   *  outlive the merchant's request. Background callers omit it. */
+  deadline?: Deadline,
 ): Promise<ActiveSubscriptionResult> {
   const config = loadPartnerApiConfig()
   if (!config) return { ok: false, reason: 'missing_config' }
@@ -256,7 +283,7 @@ export async function getActiveShopifySubscription(
     data = await partnerGraphql<ActiveSubscriptionData>(config, ACTIVE_SUBSCRIPTION_QUERY, {
       appId: config.appGid,
       shopId: shopGid,
-    }, fetchImpl)
+    }, fetchImpl, deadline)
   } catch (err) {
     const kind = err instanceof PartnerApiError ? err.kind : 'api_error'
     return { ok: false, reason: kind }

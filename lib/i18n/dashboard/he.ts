@@ -2230,6 +2230,13 @@ export const dashboardHe = {
       volumesError: 'שגיאה בעדכון נפחי חיפוש.',
       volumesQuota: 'הגעת למגבלת הקריאות של Google Ads API. נסה שוב מאוחר יותר.',
       volumesUpToDate: 'כל הביטויים מעודכנים.',
+      // A provider that did not answer in time is TRANSIENT and retryable —
+      // distinct from "no data" and from a configuration fault, which the UI
+      // used to collapse into one message.
+      volumesUnavailable: 'ספק נפחי החיפוש לא הגיב. נסו שוב בעוד רגע.',
+      volumesFailedToSave: 'הנתונים התקבלו אך לא נשמרו. נסו שוב בעוד רגע.',
+      volumesPending: 'מאתר נפח חיפוש…',
+      volumesRetry: 'נסו שוב',
     },
     table: {
       keyword: 'מילת מפתח',
@@ -2246,6 +2253,8 @@ export const dashboardHe = {
       yesFound: 'כן',
       noNotFound: 'לא',
       notChecked: 'לא נבדק',
+      volumePending: 'מאתר נפח חיפוש…',
+      volumeRetry: 'לחצו לניסיון חוזר',
       unavailable: 'לא זמין',
       scan: 'סרוק',
       details: 'פרטים',
@@ -2270,6 +2279,8 @@ export const dashboardHe = {
       scanNetworkError: 'שגיאת רשת בסריקה',
       scanSuccess: 'סריקה הושלמה בהצלחה',
       scanNetworkErrorTarget: 'שגיאת רשת',
+      scanTimeout: 'הבדיקה לקחה יותר מדי זמן ולא הושלמה. נסו שוב בעוד רגע.',
+      scanRetryable: 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
     },
   },
   trackingTargetForm: {

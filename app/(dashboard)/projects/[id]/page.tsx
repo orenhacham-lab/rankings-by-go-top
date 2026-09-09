@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback, useRef, use } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
@@ -52,6 +52,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [scanMessage, setScanMessage] = useState('')
   const [scanError, setScanError] = useState(false)
   const [updatingVolumes, setUpdatingVolumes] = useState(false)
+  // A NEW KEYWORD HAS NO SEARCH VOLUME UNTIL SOMETHING FETCHES ONE. The direct
+  // "+ Add keyword" path never scheduled that (only the keyword-research path
+  // carried metrics through), so a keyword added here stayed blank until the
+  // merchant found the manual button. This tracks the automatic refresh so the
+  // row can say "fetching" rather than showing an empty cell that looks broken.
+  const [volumePending, setVolumePending] = useState(false)
+  // IN-FLIGHT GUARD, in a ref rather than state: two clicks in the same tick
+  // must not both start work, and a ref is read synchronously.
+  const volumeRequestInFlight = useRef(false)
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -114,6 +123,58 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     })
   }, [loading, searchParams])
 
+  /**
+   * A LOCALIZED message from the route's stable CODE — never the route's own
+   * error text. `scanError(data.error)` used to print whatever the server sent,
+   * which after a fatal error was a raw provider or database string, and in one
+   * language regardless of the merchant's.
+   */
+  function scanFailureMessage(data: { errorCode?: string; error?: string }): string {
+    if (data?.errorCode === 'SCAN_TIMEOUT') return k.messages.scanTimeout
+    if (data?.errorCode === 'SCAN_FAILED') return k.messages.scanRetryable
+    if (data?.errorCode === 'ENTITLEMENT_UNAVAILABLE') return k.messages.scanRetryable
+    // A quota refusal is a real, specific answer and already localized by the
+    // server's bilingual quota payload; anything else degrades to the safe
+    // retryable line rather than echoing server text.
+    if (data?.errorCode === 'QUOTA_KEYWORD_CHECKS' && data.error) return data.error
+    return k.messages.scanRetryable
+  }
+
+  /**
+   * The automatic search-volume refresh.
+   *
+   * It asks for the PROJECT, not for a list of keywords: the route's default
+   * already selects exactly the targets with no metrics (or metrics older than
+   * thirty days) and batches them through one deduplicated provider request.
+   * So a single add schedules one refresh, a bulk add schedules one batch, and
+   * a repeat click while the previous one is still running does nothing.
+   *
+   * It NEVER blocks or fails keyword creation: the keyword is already saved
+   * before this runs, and every failure path here only leaves the volume blank
+   * with the manual button still available.
+   */
+  const refreshMissingVolumes = useCallback(async () => {
+    if (volumeRequestInFlight.current) return
+    volumeRequestInFlight.current = true
+    setVolumePending(true)
+    try {
+      const response = await fetch('/api/google-ads/keyword-metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id }),
+      })
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.updated > 0) await loadData()
+    } catch {
+      // Deliberately silent: this is an automatic follow-up to a keyword the
+      // merchant has already successfully created. Surfacing a provider error
+      // here would report a failure for an action that succeeded.
+    } finally {
+      volumeRequestInFlight.current = false
+      setVolumePending(false)
+    }
+  }, [id, loadData])
+
   function showScanResult(message: string, isError: boolean) {
     setScanMessage(message)
     setScanError(isError)
@@ -142,7 +203,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         await loadData()
         showScanResult(k.messages.scanComplete(data.completed, data.total), data.failed > 0 && data.completed === 0)
       } else {
-        showScanResult(k.messages.scanError(data.error), true)
+        showScanResult(scanFailureMessage(data), true)
       }
     } catch {
       showScanResult(k.messages.scanNetworkError, true)
@@ -152,6 +213,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleUpdateVolumes() {
+    // The automatic refresh and this button share one in-flight guard, so a
+    // repeated click cannot create duplicate provider work.
+    if (volumeRequestInFlight.current) return
+    volumeRequestInFlight.current = true
     setUpdatingVolumes(true)
     setScanMessage('')
     try {
@@ -175,16 +240,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           showScanResult(k.keywordsSection.volumesNoData, false)
         }
         await loadData()
-      } else if (response.status === 503) {
+      } else if (data?.errorCode === 'GOOGLE_ADS_NOT_CONFIGURED'
+        || data?.errorCode === 'GOOGLE_ADS_CLIENT_CREDENTIALS_INVALID'
+        || data?.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
+        // All three mean the same thing to a merchant: the search-volume
+        // connection is not usable and no amount of retrying will change that.
+        // They differ only in which operator action fixes them, which the
+        // structured operation line carries.
         showScanResult(k.keywordsSection.volumesNotConfigured, true)
-      } else if (response.status === 429) {
+      } else if (data?.errorCode === 'RATE_LIMITED' || response.status === 429) {
         showScanResult(k.keywordsSection.volumesQuota, true)
+      } else if (data?.errorCode === 'PROVIDER_UNAVAILABLE') {
+        // TRANSIENT and retryable — distinct from "not configured", which no
+        // amount of retrying fixes. Both used to be the same 503.
+        showScanResult(k.keywordsSection.volumesUnavailable, true)
+      } else if (data?.errorCode === 'PERSIST_FAILED') {
+        showScanResult(k.keywordsSection.volumesFailedToSave, true)
       } else {
         showScanResult(k.keywordsSection.volumesError, true)
       }
     } catch {
       showScanResult(k.keywordsSection.volumesError, true)
     } finally {
+      volumeRequestInFlight.current = false
       setUpdatingVolumes(false)
     }
   }
@@ -203,7 +281,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         await loadData()
         showScanResult(k.messages.scanSuccess, false)
       } else {
-        showScanResult(k.messages.scanError(data.error), true)
+        showScanResult(scanFailureMessage(data), true)
       }
     } catch {
       showScanResult(k.messages.scanNetworkErrorTarget, true)
@@ -482,6 +560,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         projectBusinessName={project.business_name || undefined}
         onScanTarget={handleScanTarget}
         scanningTargets={scanningTargets}
+        volumePending={volumePending}
+        onRetryVolumes={handleUpdateVolumes}
         projectDevice={project.device_type}
         onActionComplete={loadData}
       />
@@ -504,7 +584,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           projectCountry={project.country}
           defaultDomain={project.target_domain}
           defaultBusinessName={project.business_name || undefined}
-          onSuccess={() => { setShowAddTarget(false); loadData() }}
+          onSuccess={() => {
+            setShowAddTarget(false)
+            // The keyword is already saved. Show it, then fetch its volume in
+            // the background — one refresh for a single add, one deduplicated
+            // batch for a bulk add, and never anything the creation waits on.
+            void loadData().then(() => refreshMissingVolumes())
+          }}
           onCancel={() => setShowAddTarget(false)}
         />
       </Modal>

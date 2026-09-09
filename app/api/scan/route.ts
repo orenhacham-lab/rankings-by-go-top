@@ -15,8 +15,36 @@ import {
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeUsageReservation, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
+import {
+  Deadline, DeadlineExceededError, withDeadline, logOperation, newRequestId,
+} from '@/lib/ops/deadline'
+
+/**
+ * The platform ceiling this handler must ALWAYS answer inside.
+ *
+ * Declared explicitly. Inherited, it is a number nobody in this file knows, and
+ * a handler that is KILLED at the ceiling throws nothing, logs nothing and
+ * persists nothing — which is what a merchant experienced as "waited about a
+ * minute, then nothing happened".
+ */
+export const maxDuration = 60
+
+/** The whole operation's budget, comfortably inside `maxDuration` so this
+ *  handler — not the platform — decides how the request ends. */
+const OPERATION_BUDGET_MS = 45_000
+/** One target's provider call. The scanner has its own per-request timeouts;
+ *  this bounds the STEP, so a batch cannot spend the whole budget on target one. */
+const PROVIDER_STEP_MS = 20_000
 
 export async function POST(request: Request) {
+  const startedAt = Date.now()
+  const requestId = newRequestId()
+  const deadline = new Deadline(OPERATION_BUDGET_MS)
+  const diag: {
+    stage: string; outcome: string; userId?: string; projectId?: string; targetId?: string
+    targetCount?: number; reservationOutcome?: string | null; persisted?: number | null
+    persistenceOutcome?: string | null
+  } = { stage: 'start', outcome: 'unknown' }
   // Auth check
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,6 +66,9 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
+  diag.userId = user.id
+  diag.projectId = projectId
+  if (targetId) diag.targetId = targetId
   let scan: any = null
   // Phase 3 — set once a reservation is granted; the outer catch and every
   // early-return path below MUST finalize/release it so a request that
@@ -62,6 +93,7 @@ export async function POST(request: Request) {
     // billing_governance, which is REVOKEd from `authenticated` and errors
     // (42501) rather than returning an empty set — collapsing the whole
     // entitlement to zero limits. See lib/supabase/admin.ts.
+    diag.stage = 'entitlement'
     const entitlement = await getUserEntitlement(user.id, admin)
     // A read failure is not an exhausted quota: answering "you have reached
     // your limit of 0 — upgrade your plan" is what the reviewer saw. This is
@@ -101,9 +133,16 @@ export async function POST(request: Request) {
         const reservation = await reserveUsage(admin, {
           userId: user.id, projectId, usageType: 'google_check', amount: checksThisScan,
           periodStart: period.start, periodEnd: period.end, limit,
-          idempotencyKey: `manual:${projectId}:${targetId ?? 'all'}:${Date.now()}`,
+          // PER-REQUEST, not per-millisecond. `Date.now()` gave two clicks in
+          // the same millisecond the SAME key, so the second request found the
+          // first's reservation already consumed and was refused outright —
+          // two dispatches would also have shared one check. The request id is
+          // unique per invocation, so each dispatch reserves its own check and
+          // a genuine network-level retry of the SAME request still reuses one.
+          idempotencyKey: `manual:${projectId}:${targetId ?? 'all'}:${requestId}`,
         })
-        if (reservation.outcome === 'quota_exceeded') {
+        diag.reservationOutcome = reservation.outcome
+      if (reservation.outcome === 'quota_exceeded') {
           const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlement.plan, entitlement.limits, limit)
           return Response.json(payload, { status: 403 })
         }
@@ -173,6 +212,7 @@ export async function POST(request: Request) {
       targetsQuery = targetsQuery.eq('id', targetId)
     }
 
+    diag.stage = 'load_targets'
     const { data: targets, error: targetsError } = await targetsQuery
 
     if (targetsError) {
@@ -255,7 +295,7 @@ export async function POST(request: Request) {
             userId: user.id, projectId, usageType: 'google_check', amount: targetsToRun.length,
             periodStart: period.start, periodEnd: period.end,
             limit: entitlementForResume.limits.maxKeywordChecksPerPeriodPerProject,
-            idempotencyKey: `manual:${projectId}:resume:${scan.id}:${Date.now()}`,
+            idempotencyKey: `manual:${projectId}:resume:${scan.id}:${requestId}`,
           })
           if (resumeReservation.outcome === 'quota_exceeded') {
             const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlementForResume.plan, entitlementForResume.limits, entitlementForResume.limits.maxKeywordChecksPerPeriodPerProject)
@@ -275,6 +315,10 @@ export async function POST(request: Request) {
     // increments this — that check was never dispatched, so it must not be
     // consumed from the reservation (released back at finalize time below).
     const results = []
+    // A target whose provider call ran out of the operation's budget is a
+    // DIFFERENT outcome from one that failed: it is transient and worth
+    // retrying, and it must never be counted as a completed check.
+    let timedOutTargets = 0
 
     for (const target of targetsToRun) {
       try {
@@ -486,8 +530,14 @@ export async function POST(request: Request) {
         })
         console.log('[Scan:route] === END PAYLOAD SUMMARY ===')
 
+        // BUDGET BEFORE CHARGE. A target the operation can no longer afford to
+        // dispatch is not "consumed": the provider call never happens, so the
+        // check must not be counted against the reservation.
+        deadline.assertNotExpired('provider')
+        diag.stage = 'provider'
         dispatchedCount++ // the provider call is about to actually happen — this check is now "consumed" regardless of outcome (including a valid not-found result)
-        const scanOutput = await runScan(target.engine_type, scanPayload)
+        const scanOutput = await withDeadline(
+          runScan(target.engine_type, scanPayload), deadline.sliceFor(PROVIDER_STEP_MS), 'provider')
 
         // change_value: positive = improved (moved up), negative = dropped
         // Only compute when both scans found the keyword at a numeric position
@@ -588,6 +638,7 @@ export async function POST(request: Request) {
         })
       } catch (targetError) {
         const errorMsg = targetError instanceof Error ? targetError.message : String(targetError)
+        if (targetError instanceof DeadlineExceededError) timedOutTargets++
         console.error(`[Scan] Exception while scanning target ${target.id}:`, errorMsg)
         console.error((targetError as Error)?.stack)
         results.push({
@@ -653,6 +704,35 @@ export async function POST(request: Request) {
       .update({ last_scan_at: new Date().toISOString() })
       .eq('id', projectId)
 
+    diag.stage = 'complete'
+    diag.outcome = finalStatus
+    diag.targetCount = targets.length
+    diag.persisted = cumulativeCompleted
+    diag.persistenceOutcome = cumulativeFailed === 0 ? 'written' : cumulativeCompleted > 0 ? 'partial' : 'none'
+
+    // NO SILENT SUCCESS.
+    //
+    // A scan in which nothing was successfully checked used to answer 200 with
+    // `completed: 0`, which the UI reported as a finished scan. To a merchant
+    // that is the button doing nothing, announced as success. This is decided
+    // AFTER the bookkeeping above — the scan row is updated and the reservation
+    // finalized either way, so a truthful failure never leaks a held reservation.
+    if (targetsToRun.length > 0 && cumulativeCompleted === 0) {
+      const timedOut = timedOutTargets > 0
+      diag.outcome = timedOut ? 'timeout_no_result' : 'failed_no_result'
+      return Response.json({
+        errorCode: timedOut ? 'SCAN_TIMEOUT' : 'SCAN_FAILED',
+        error: timedOut
+          ? 'הבדיקה לקחה יותר מדי זמן ולא הושלמה. נסו שוב בעוד רגע.'
+          : 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
+        errorEn: timedOut
+          ? 'The check took too long and did not finish. Please try again in a moment.'
+          : 'The check failed. Please try again in a moment.',
+        retryable: true,
+        requestId,
+      }, { status: timedOut ? 504 : 500 })
+    }
+
     return Response.json({
       scanId: scan.id,
       status: finalStatus,
@@ -660,6 +740,7 @@ export async function POST(request: Request) {
       failed: cumulativeFailed,
       total: targets.length,
       results,
+      requestId,
     })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -710,9 +791,40 @@ export async function POST(request: Request) {
       }
     }
 
+    // NO RAW ERROR REACHES THE MERCHANT. `Scan execution failed: ${errorMsg}`
+    // forwarded provider and database text — including, on the deadline path,
+    // an internal stage name that means nothing to a person.
+    const timedOut = err instanceof DeadlineExceededError
+    diag.outcome = timedOut ? `deadline_exceeded:${err.stage}` : 'fatal_error'
+    diag.persisted = dispatchedCount
     return Response.json(
-      { error: `Scan execution failed: ${errorMsg}` },
-      { status: 500 }
+      {
+        errorCode: timedOut ? 'SCAN_TIMEOUT' : 'SCAN_FAILED',
+        error: timedOut
+          ? 'הבדיקה לקחה יותר מדי זמן ולא הושלמה. נסו שוב בעוד רגע.'
+          : 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
+        errorEn: timedOut
+          ? 'The check took too long and did not finish. Please try again in a moment.'
+          : 'The check failed. Please try again in a moment.',
+        retryable: true,
+        requestId,
+      },
+      { status: timedOut ? 504 : 500 }
     )
+  } finally {
+    logOperation({
+      operation: 'ranking_scan',
+      stage: diag.stage,
+      outcome: diag.outcome,
+      durationMs: Date.now() - startedAt,
+      requestId,
+      userId: diag.userId,
+      projectId: diag.projectId,
+      targetId: diag.targetId,
+      targetCount: diag.targetCount,
+      reservationOutcome: diag.reservationOutcome ?? null,
+      persisted: diag.persisted ?? null,
+      persistenceOutcome: diag.persistenceOutcome ?? null,
+    })
   }
 }

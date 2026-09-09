@@ -2225,6 +2225,10 @@ export const dashboardEn = {
       volumesError: 'Error updating search volumes.',
       volumesQuota: 'You have reached the Google Ads API request limit. Please try again later.',
       volumesUpToDate: 'All keywords are up to date.',
+      volumesUnavailable: 'The search-volume provider did not respond. Please try again in a moment.',
+      volumesFailedToSave: 'The data arrived but could not be saved. Please try again in a moment.',
+      volumesPending: 'Fetching search volume…',
+      volumesRetry: 'Try again',
     },
     table: {
       keyword: 'Keyword',
@@ -2241,6 +2245,8 @@ export const dashboardEn = {
       yesFound: 'Yes',
       noNotFound: 'No',
       notChecked: 'Not checked',
+      volumePending: 'Fetching…',
+      volumeRetry: 'Click to try again',
       unavailable: 'Unavailable',
       scan: 'Scan',
       details: 'Details',
@@ -2265,6 +2271,8 @@ export const dashboardEn = {
       scanNetworkError: 'Network error during scan',
       scanSuccess: 'Scan completed successfully',
       scanNetworkErrorTarget: 'Network error',
+      scanTimeout: 'The check took too long and did not finish. Please try again in a moment.',
+      scanRetryable: 'The check failed. Please try again in a moment.',
     },
   },
   trackingTargetForm: {
