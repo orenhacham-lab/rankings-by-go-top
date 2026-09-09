@@ -25,6 +25,16 @@ interface TrackingTargetsTableProps {
   projectBusinessName?: string
   onScanTarget?: (targetId: string) => void
   scanningTargets?: Set<string>
+  /** True while an automatic search-volume refresh is running for this project.
+   *  A blank volume cell looks like a broken feature; "fetching" is the truth. */
+  volumePending?: boolean
+  /** True when the last automatic refresh could not produce a volume. The cell
+   *  says so explicitly rather than showing a dash indistinguishable from
+   *  "this keyword has no search volume". */
+  volumeUnavailable?: boolean
+  /** Lets the merchant retry a volume that came back empty or unavailable,
+   *  without hunting for the toolbar button. */
+  onRetryVolumes?: () => void
   projectDevice?: string | null
   onActionComplete?: () => void
 }
@@ -39,6 +49,9 @@ export default function TrackingTargetsTable({
   projectBusinessName,
   onScanTarget,
   scanningTargets = new Set(),
+  volumePending = false,
+  volumeUnavailable = false,
+  onRetryVolumes,
   projectDevice,
   onActionComplete,
 }: TrackingTargetsTableProps) {
@@ -175,6 +188,31 @@ export default function TrackingTargetsTable({
                     <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
                       {target.avg_monthly_searches.toLocaleString()}
                     </span>
+                  ) : volumePending ? (
+                    // TRUTHFUL PENDING STATE. An em dash is indistinguishable
+                    // from "this feature does not work"; a new keyword whose
+                    // volume is on its way should say so.
+                    <span className="text-slate-400 dark:text-slate-500 text-sm animate-pulse">
+                      {k.volumePending}
+                    </span>
+                  ) : volumeUnavailable && onRetryVolumes ? (
+                    <button
+                      type="button"
+                      onClick={onRetryVolumes}
+                      className="text-amber-600 dark:text-amber-400 text-xs underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 text-start"
+                      title={k.volumeRetry}
+                    >
+                      {k.volumeUnavailable} · {k.volumeRetry}
+                    </button>
+                  ) : onRetryVolumes ? (
+                    <button
+                      type="button"
+                      onClick={onRetryVolumes}
+                      className="text-slate-400 dark:text-slate-500 text-sm underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300"
+                      title={k.volumeRetry}
+                    >
+                      —
+                    </button>
                   ) : (
                     <span
                       className="text-slate-400 dark:text-slate-500 text-sm"

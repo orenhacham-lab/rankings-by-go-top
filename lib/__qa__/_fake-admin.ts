@@ -242,6 +242,60 @@ export class FakeAdmin {
     const nowIso = () => new Date(this.now()).toISOString()
     const newToken = () => `fake-token-${++fakeRpcIdCounter}`
 
+    /**
+     * `claim_operation` / `release_operation_claim`, mirroring
+     * supabase/migrations/20260909000000_operation_claims.sql branch for branch.
+     *
+     * WHAT THIS DOES AND DOES NOT PROVE. It proves the CONTRACT — who wins, who
+     * is told in-progress, what an expired claim does, that a non-holder cannot
+     * release, and that a route joining an existing operation performs no work.
+     * It cannot prove true transactional atomicity: JS is single-threaded, so
+     * this is trivially atomic by construction. That guarantee comes from the
+     * single INSERT ... ON CONFLICT ... WHERE statement in the SQL, and was
+     * measured separately against a real PostgreSQL cluster — twenty parallel
+     * backends racing one scope returned exactly one `claimed`.
+     *
+     * It IS, however, the right shape for the failure that actually occurred:
+     * two Node requests interleaving at every `await`. `Promise.all` over two
+     * route invocations exercises that faithfully.
+     */
+    if (name === 'claim_operation') {
+      const claims = (this.tables.operation_claims ??= [])
+      const key = `${params.p_user_id}:${params.p_operation}:${params.p_scope}`
+      const nowMs = this.now()
+      const ttl = Number(params.p_ttl_seconds)
+      if (!Number.isFinite(ttl) || ttl <= 0 || ttl > 900) {
+        return { data: null, error: { message: 'claim_operation: ttl out of range' } }
+      }
+      const existing = claims.find((c) => c.claim_key === key)
+      const live = existing && new Date(existing.expires_at as string).getTime() > nowMs
+      if (live) {
+        // Cross-tenant discovery is impossible: the user id is part of the key.
+        return { data: [{ outcome: 'in_progress', holder_request_id: existing!.holder_request_id,
+          claimed_at: existing!.claimed_at, expires_at: existing!.expires_at }], error: null }
+      }
+      const row = {
+        claim_key: key, user_id: params.p_user_id, operation: params.p_operation, scope: params.p_scope,
+        holder_request_id: params.p_request_id,
+        claimed_at: new Date(nowMs).toISOString(),
+        expires_at: new Date(nowMs + ttl * 1000).toISOString(),
+      }
+      if (existing) Object.assign(existing, row); else claims.push(row)
+      return { data: [{ outcome: 'claimed', holder_request_id: row.holder_request_id,
+        claimed_at: row.claimed_at, expires_at: row.expires_at }], error: null }
+    }
+
+    if (name === 'release_operation_claim') {
+      const claims = (this.tables.operation_claims ??= [])
+      const key = `${params.p_user_id}:${params.p_operation}:${params.p_scope}`
+      const i = claims.findIndex((c) => c.claim_key === key
+        && c.user_id === params.p_user_id
+        && c.holder_request_id === params.p_request_id)
+      if (i < 0) return { data: [{ outcome: 'not_holder' }], error: null }
+      claims.splice(i, 1)
+      return { data: [{ outcome: 'released' }], error: null }
+    }
+
     if (name === 'reserve_usage') {
       const userId = params.p_user_id as string
       const projectId = (params.p_project_id ?? null) as string | null

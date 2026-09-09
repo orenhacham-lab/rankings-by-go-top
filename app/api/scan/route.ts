@@ -15,8 +15,62 @@ import {
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeUsageReservation, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
+import {
+  Deadline, DeadlineExceededError, withDeadline, logOperation, newRequestId,
+} from '@/lib/ops/deadline'
+import { claimOperation, releaseOperationClaim, rankingScanScope } from '@/lib/ops/single-flight'
+
+/**
+ * The platform ceiling this handler must ALWAYS answer inside.
+ *
+ * Declared explicitly. Inherited, it is a number nobody in this file knows, and
+ * a handler that is KILLED at the ceiling throws nothing, logs nothing and
+ * persists nothing — which is what a merchant experienced as "waited about a
+ * minute, then nothing happened".
+ */
+export const maxDuration = 60
+
+/** The whole operation's budget, comfortably inside `maxDuration` so this
+ *  handler — not the platform — decides how the request ends. */
+const OPERATION_BUDGET_MS = 45_000
+/** One target's provider call. The scanner has its own per-request timeouts;
+ *  this bounds the STEP, so a batch cannot spend the whole budget on target one. */
+const PROVIDER_STEP_MS = 20_000
+/** The single-flight claim outlives the operation budget by a margin, so a live
+ *  operation is never stolen, and expires soon enough that one abandoned by a
+ *  killed function recovers without anyone intervening. */
+const CLAIM_TTL_SECONDS = 90
+
+/**
+ * A stable, non-secret category for an exception — and NOTHING else.
+ *
+ * The scan route logged `errorMsg` and full stacks. Those strings come from the
+ * provider client, from PostgREST and from this route's own thrown messages,
+ * and can carry a query, a URL with a key in it, a database hint or a shop
+ * identifier. A platform log is not the place for any of that, and a category
+ * is what an operator actually needs.
+ */
+function classifyFailure(err: unknown): string {
+  if (err instanceof DeadlineExceededError) return `deadline_exceeded:${err.stage}`
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  if (/^scan_results_insert_failed:/.test(raw)) return 'persist_failed'
+  if (/exact_point|קואורדינטות/.test(raw)) return 'invalid_exact_point'
+  if (/Radius|ZIP/.test(raw)) return 'invalid_radius_config'
+  if (/timed out|timeout|abort/i.test(raw)) return 'provider_timeout'
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|network/i.test(raw)) return 'provider_network'
+  if (/Serper API error/i.test(raw)) return 'provider_error'
+  return 'unclassified'
+}
 
 export async function POST(request: Request) {
+  const startedAt = Date.now()
+  const requestId = newRequestId()
+  const deadline = new Deadline(OPERATION_BUDGET_MS)
+  const diag: {
+    stage: string; outcome: string; userId?: string; projectId?: string; targetId?: string
+    targetCount?: number; reservationOutcome?: string | null; persisted?: number | null
+    persistenceOutcome?: string | null; claimOutcome?: string | null; claimRelease?: string | null
+  } = { stage: 'start', outcome: 'unknown' }
   // Auth check
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,6 +92,63 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
+  diag.userId = user.id
+  diag.projectId = projectId
+  if (targetId) diag.targetId = targetId
+
+  // SINGLE FLIGHT, BEFORE ANY WORK.
+  //
+  // Taken before the entitlement read, the reservation and the provider call,
+  // so a second request for the SAME scope creates no scan, reserves nothing,
+  // calls nobody and consumes no check. "Scan all" and a single target are
+  // different scopes and never block each other. Applies to trial and paid
+  // accounts alike — the trial path's old assumption that a single user cannot
+  // race themselves is what this replaces.
+  const scope = rankingScanScope(projectId, targetId ?? null)
+  const claim = await claimOperation(admin, {
+    userId: user.id, operation: 'ranking_scan', scope, requestId, ttlSeconds: CLAIM_TTL_SECONDS,
+  })
+  diag.claimOutcome = claim.outcome
+  if (claim.outcome === 'in_progress') {
+    diag.stage = 'claim'
+    diag.outcome = 'in_progress'
+    logOperation({
+      operation: 'ranking_scan', stage: 'claim', outcome: 'in_progress',
+      durationMs: Date.now() - startedAt, requestId, userId: user.id, projectId,
+      targetId: targetId ?? undefined, claimOutcome: claim.outcome,
+    })
+    return Response.json({
+      errorCode: 'SCAN_IN_PROGRESS',
+      error: 'בדיקה כבר רצה עבור הבחירה הזו. המתינו לסיומה.',
+      errorEn: 'A check is already running for this selection. Please wait for it to finish.',
+      retryable: true,
+      // The holder's id, so a merchant report can be matched to the operation
+      // that is actually running. Never another tenant's — the claim key is
+      // scoped by user id and the function refuses to report across users.
+      inProgressRequestId: claim.holderRequestId,
+      requestId,
+    }, { status: 409 })
+  }
+  if (claim.outcome === 'unavailable') {
+    diag.stage = 'claim'
+    diag.outcome = 'claim_unavailable'
+    logOperation({
+      operation: 'ranking_scan', stage: 'claim', outcome: 'claim_unavailable',
+      durationMs: Date.now() - startedAt, requestId, userId: user.id, projectId, claimOutcome: claim.outcome,
+    })
+    return Response.json({
+      errorCode: 'SCAN_FAILED',
+      error: 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
+      errorEn: 'The check failed. Please try again in a moment.',
+      retryable: true, requestId,
+    }, { status: 503 })
+  }
+  // 'claimed', or 'not_deployed' — see lib/ops/single-flight.ts. Either way the
+  // work proceeds; only the former is protected, and the diagnostics say which.
+  const claimHeld = claim.outcome === 'claimed'
+  /** The OPERATION's identity — never this request's id. */
+  const operationKey = claim.operationKey ?? `unclaimed:${requestId}`
+
   let scan: any = null
   // Phase 3 — set once a reservation is granted; the outer catch and every
   // early-return path below MUST finalize/release it so a request that
@@ -62,6 +173,7 @@ export async function POST(request: Request) {
     // billing_governance, which is REVOKEd from `authenticated` and errors
     // (42501) rather than returning an empty set — collapsing the whole
     // entitlement to zero limits. See lib/supabase/admin.ts.
+    diag.stage = 'entitlement'
     const entitlement = await getUserEntitlement(user.id, admin)
     // A read failure is not an exhausted quota: answering "you have reached
     // your limit of 0 — upgrade your plan" is what the reviewer saw. This is
@@ -101,9 +213,19 @@ export async function POST(request: Request) {
         const reservation = await reserveUsage(admin, {
           userId: user.id, projectId, usageType: 'google_check', amount: checksThisScan,
           periodStart: period.start, periodEnd: period.end, limit,
-          idempotencyKey: `manual:${projectId}:${targetId ?? 'all'}:${Date.now()}`,
+          // PER-OPERATION, not per-request.
+          //
+          // `Date.now()` gave two clicks in the same millisecond one key; a
+          // per-request id gave them two. Neither is an idempotency key. This
+          // is the single-flight claim's own start instant: identical for every
+          // request that joins one operation, different for a later legitimate
+          // retry. Concurrent duplicates never reach this line at all — they
+          // are refused at the claim above — so this is the second line of
+          // defence, not the first.
+          idempotencyKey: `manual:${projectId}:${scope}:${operationKey}`,
         })
-        if (reservation.outcome === 'quota_exceeded') {
+        diag.reservationOutcome = reservation.outcome
+      if (reservation.outcome === 'quota_exceeded') {
           const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlement.plan, entitlement.limits, limit)
           return Response.json(payload, { status: 403 })
         }
@@ -173,6 +295,7 @@ export async function POST(request: Request) {
       targetsQuery = targetsQuery.eq('id', targetId)
     }
 
+    diag.stage = 'load_targets'
     const { data: targets, error: targetsError } = await targetsQuery
 
     if (targetsError) {
@@ -255,7 +378,7 @@ export async function POST(request: Request) {
             userId: user.id, projectId, usageType: 'google_check', amount: targetsToRun.length,
             periodStart: period.start, periodEnd: period.end,
             limit: entitlementForResume.limits.maxKeywordChecksPerPeriodPerProject,
-            idempotencyKey: `manual:${projectId}:resume:${scan.id}:${Date.now()}`,
+            idempotencyKey: `manual:${projectId}:resume:${scan.id}:${operationKey}`,
           })
           if (resumeReservation.outcome === 'quota_exceeded') {
             const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlementForResume.plan, entitlementForResume.limits, entitlementForResume.limits.maxKeywordChecksPerPeriodPerProject)
@@ -275,6 +398,10 @@ export async function POST(request: Request) {
     // increments this — that check was never dispatched, so it must not be
     // consumed from the reservation (released back at finalize time below).
     const results = []
+    // A target whose provider call ran out of the operation's budget is a
+    // DIFFERENT outcome from one that failed: it is transient and worth
+    // retrying, and it must never be counted as a completed check.
+    let timedOutTargets = 0
 
     for (const target of targetsToRun) {
       try {
@@ -486,8 +613,14 @@ export async function POST(request: Request) {
         })
         console.log('[Scan:route] === END PAYLOAD SUMMARY ===')
 
+        // BUDGET BEFORE CHARGE. A target the operation can no longer afford to
+        // dispatch is not "consumed": the provider call never happens, so the
+        // check must not be counted against the reservation.
+        deadline.assertNotExpired('provider')
+        diag.stage = 'provider'
         dispatchedCount++ // the provider call is about to actually happen — this check is now "consumed" regardless of outcome (including a valid not-found result)
-        const scanOutput = await runScan(target.engine_type, scanPayload)
+        const scanOutput = await withDeadline(
+          runScan(target.engine_type, scanPayload), deadline.sliceFor(PROVIDER_STEP_MS), 'provider')
 
         // change_value: positive = improved (moved up), negative = dropped
         // Only compute when both scans found the keyword at a numeric position
@@ -541,25 +674,18 @@ export async function POST(request: Request) {
         const { error: resultError } = await admin.from('scan_results').insert(resultData)
 
         if (resultError) {
-          console.error(`[Scan] Failed to save result for target ${target.id}:`, {
-            message: resultError.message,
-            code: (resultError as any).code,
-            details: (resultError as any).details,
-            hint: (resultError as any).hint,
+          // The SQLSTATE is actionable; `details` and `hint` quote row values
+          // and are not safe to log.
+          console.error('[Scan] result persist failed', {
+            requestId, targetId: target.id, code: (resultError as { code?: string }).code ?? null,
           })
-          console.error(`[Scan] scan_results insert payload:`, {
-            scan_id: resultData.scan_id,
-            tracking_target_id: resultData.tracking_target_id,
-            engine_type: resultData.engine_type,
-            keyword: resultData.keyword,
-            found: resultData.found,
-            position: resultData.position,
-            error_message: resultData.error_message,
-            audit_request_keys: resultData.audit_request ? Object.keys(resultData.audit_request) : null,
-            audit_response_keys: resultData.audit_response ? Object.keys(resultData.audit_response) : null,
-            audit_decision_keys: resultData.audit_decision ? Object.keys(resultData.audit_decision) : null,
-            audit_location_mode: resultData.audit_location_mode,
-            audit_resolved_location: resultData.audit_resolved_location,
+          // The former payload dump quoted the keyword, the audit request and
+          // response, and the provider's own error text. Only the shape is
+          // logged now — enough to tell a schema fault from a data fault.
+          console.error('[Scan] result payload shape', {
+            requestId,
+            hasAudit: resultData.audit_request != null,
+            locationMode: resultData.audit_location_mode ?? null,
           })
           // 2nd review correction — a scan_results insert failure is now
           // THROWN (caught by this SAME target's catch block below) rather
@@ -584,19 +710,24 @@ export async function POST(request: Request) {
           found: scanOutput.found,
           position: scanOutput.position,
           changeValue,
-          error: scanOutput.error,
+          // A CATEGORY in the response, never the provider's own sentence. The
+          // full text is still written to scan_results.error_message, which is
+          // the operator's audit trail, not something a browser receives.
+          error: scanOutput.error ? classifyFailure(new Error(scanOutput.error)) : null,
         })
       } catch (targetError) {
-        const errorMsg = targetError instanceof Error ? targetError.message : String(targetError)
-        console.error(`[Scan] Exception while scanning target ${target.id}:`, errorMsg)
-        console.error((targetError as Error)?.stack)
+        if (targetError instanceof DeadlineExceededError) timedOutTargets++
+        // A CATEGORY, never the message and never the stack.
+        console.error('[Scan] target failed', {
+          requestId, targetId: target.id, category: classifyFailure(targetError),
+        })
         results.push({
           targetId: target.id,
           keyword: target.keyword,
           found: false,
           position: null,
           changeValue: null,
-          error: errorMsg,
+          error: classifyFailure(targetError),
         })
       }
     }
@@ -653,6 +784,35 @@ export async function POST(request: Request) {
       .update({ last_scan_at: new Date().toISOString() })
       .eq('id', projectId)
 
+    diag.stage = 'complete'
+    diag.outcome = finalStatus
+    diag.targetCount = targets.length
+    diag.persisted = cumulativeCompleted
+    diag.persistenceOutcome = cumulativeFailed === 0 ? 'written' : cumulativeCompleted > 0 ? 'partial' : 'none'
+
+    // NO SILENT SUCCESS.
+    //
+    // A scan in which nothing was successfully checked used to answer 200 with
+    // `completed: 0`, which the UI reported as a finished scan. To a merchant
+    // that is the button doing nothing, announced as success. This is decided
+    // AFTER the bookkeeping above — the scan row is updated and the reservation
+    // finalized either way, so a truthful failure never leaks a held reservation.
+    if (targetsToRun.length > 0 && cumulativeCompleted === 0) {
+      const timedOut = timedOutTargets > 0
+      diag.outcome = timedOut ? 'timeout_no_result' : 'failed_no_result'
+      return Response.json({
+        errorCode: timedOut ? 'SCAN_TIMEOUT' : 'SCAN_FAILED',
+        error: timedOut
+          ? 'הבדיקה לקחה יותר מדי זמן ולא הושלמה. נסו שוב בעוד רגע.'
+          : 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
+        errorEn: timedOut
+          ? 'The check took too long and did not finish. Please try again in a moment.'
+          : 'The check failed. Please try again in a moment.',
+        retryable: true,
+        requestId,
+      }, { status: timedOut ? 504 : 500 })
+    }
+
     return Response.json({
       scanId: scan.id,
       status: finalStatus,
@@ -660,13 +820,11 @@ export async function POST(request: Request) {
       failed: cumulativeFailed,
       total: targets.length,
       results,
+      requestId,
     })
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err)
-    const errorStack = err instanceof Error ? err.stack : ''
-
-    console.error('[Scan] FATAL ERROR:', errorMsg)
-    console.error('[Scan] Stack:', errorStack)
+    const failureCategory = classifyFailure(err)
+    console.error('[Scan] fatal', { requestId, stage: diag.stage, category: failureCategory })
 
     // Correction (review blocker 1) — a fatal error must never leave a
     // reservation permanently held, AND must never blanket-release checks
@@ -678,7 +836,9 @@ export async function POST(request: Request) {
     if (reservationId && reservationToken) {
       await finalizeUsageReservation(admin, {
         reservationId, userId: user.id, reservationToken, consumed: dispatchedCount, relatedRef: scan?.id ?? null,
-        reason: dispatchedCount > 0 ? `partial_before_fatal_error:${errorMsg}` : 'fatal_error',
+        // The release reason is persisted, so it carries the category rather
+        // than the raw message it used to interpolate.
+        reason: dispatchedCount > 0 ? `partial_before_fatal_error:${failureCategory}` : 'fatal_error',
       })
     }
 
@@ -695,24 +855,65 @@ export async function POST(request: Request) {
             .from('scans')
             .update({
               status: 'failed',
-              error_message: errorMsg,
+              error_message: failureCategory,
               completed_at: new Date().toISOString(),
             })
             .eq('id', scan.id)
         } else {
           await admin
             .from('scans')
-            .update({ error_message: `resumable_after_error: ${errorMsg}` })
+            .update({ error_message: `resumable_after_error: ${failureCategory}` })
             .eq('id', scan.id)
         }
-      } catch (updateErr) {
-        console.error('[Scan] Failed to update scan with error:', updateErr)
+      } catch {
+        console.error('[Scan] could not record the failure on the scan row', { requestId })
       }
     }
 
+    // NO RAW ERROR REACHES THE MERCHANT. `Scan execution failed: ${errorMsg}`
+    // forwarded provider and database text — including, on the deadline path,
+    // an internal stage name that means nothing to a person.
+    const timedOut = err instanceof DeadlineExceededError
+    diag.outcome = failureCategory
+    diag.persisted = dispatchedCount
     return Response.json(
-      { error: `Scan execution failed: ${errorMsg}` },
-      { status: 500 }
+      {
+        errorCode: timedOut ? 'SCAN_TIMEOUT' : 'SCAN_FAILED',
+        error: timedOut
+          ? 'הבדיקה לקחה יותר מדי זמן ולא הושלמה. נסו שוב בעוד רגע.'
+          : 'הבדיקה נכשלה. נסו שוב בעוד רגע.',
+        errorEn: timedOut
+          ? 'The check took too long and did not finish. Please try again in a moment.'
+          : 'The check failed. Please try again in a moment.',
+        retryable: true,
+        requestId,
+      },
+      { status: timedOut ? 504 : 500 }
     )
+  } finally {
+    // RELEASED WHATEVER HAPPENED — success, classified failure, deadline or
+    // fatal error — so a legitimate later retry is never blocked by a finished
+    // operation. Only this request's own claim is released.
+    if (claimHeld) {
+      diag.claimRelease = await releaseOperationClaim(admin, {
+        userId: user.id, operation: 'ranking_scan', scope, requestId,
+      })
+    }
+    logOperation({
+      operation: 'ranking_scan',
+      stage: diag.stage,
+      outcome: diag.outcome,
+      durationMs: Date.now() - startedAt,
+      requestId,
+      userId: diag.userId,
+      projectId: diag.projectId,
+      targetId: diag.targetId,
+      targetCount: diag.targetCount,
+      reservationOutcome: diag.reservationOutcome ?? null,
+      persisted: diag.persisted ?? null,
+      persistenceOutcome: diag.persistenceOutcome ?? null,
+      claimOutcome: diag.claimOutcome ?? null,
+      claimRelease: diag.claimRelease ?? null,
+    })
   }
 }

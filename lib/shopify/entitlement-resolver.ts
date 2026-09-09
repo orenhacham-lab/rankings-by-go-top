@@ -33,6 +33,7 @@ import { recordShopifyBillingCache } from './billing-cache'
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from './constants'
 import { getActiveMigrationResult } from './paypal-migration'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { Deadline } from '@/lib/ops/deadline'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -132,6 +133,23 @@ function fromCache(c: ConnectionRow): ShopifyGovernedEntitlement {
  * or unverifiable billing returns `planCode: null` (floor tier), never a
  * silent fallback to PayPal data.
  */
+/**
+ * ENTITLEMENT RESOLUTION ON A REQUEST PATH IS BOUNDED.
+ *
+ * When the billing cache is older than CACHE_FRESHNESS_MS — the ordinary state
+ * after five minutes of browsing — this makes a LIVE Partner API call, and that
+ * call used to be allowed three 15-second attempts of its own. Measured against
+ * an unresponsive Partner API this function took 46,238 ms, and the manual
+ * ranking-scan route inherited it exactly. A merchant waiting on a button does
+ * not have 46 seconds to give.
+ *
+ * The budget below is what a person will wait for while still believing the
+ * product works. Exceeding it is not a billing verdict: the resolution ends as
+ * `unavailable`, which callers already surface as a retryable state — the same
+ * answer they would eventually have reached, reached sooner and truthfully.
+ */
+const LIVE_VERIFICATION_BUDGET_MS = 8_000
+
 export async function resolveShopifyGovernedEntitlement(
   admin: Admin,
   userId: string,
@@ -194,7 +212,8 @@ export async function resolveShopifyGovernedEntitlement(
     return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' } }
   }
 
-  const result = await getActiveShopifySubscription(connection.shop_gid, fetch, connection.shop_domain)
+  const result = await getActiveShopifySubscription(
+    connection.shop_gid, fetch, connection.shop_domain, new Deadline(LIVE_VERIFICATION_BUDGET_MS))
 
   if (!result.ok) {
     await recordShopifyBillingCache(admin, connection.id, {
