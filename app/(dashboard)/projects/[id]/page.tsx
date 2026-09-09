@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, use } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, use } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
@@ -52,6 +52,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [scanMessage, setScanMessage] = useState('')
   const [scanError, setScanError] = useState(false)
   const [updatingVolumes, setUpdatingVolumes] = useState(false)
+  /** The project row could not be read. A TERMINAL state, with a retry — not a
+   *  spinner that never ends. */
+  const [dataError, setDataError] = useState(false)
+  /** The keyword table's own data. Reported on the table, never by the page. */
+  const [secondaryLoading, setSecondaryLoading] = useState(true)
+  const [secondaryError, setSecondaryError] = useState(false)
   // A NEW KEYWORD HAS NO SEARCH VOLUME UNTIL SOMETHING FETCHES ONE. The direct
   // "+ Add keyword" path never scheduled that (only the keyword-research path
   // carried metrics through), so a keyword added here stayed blank until the
@@ -74,21 +80,79 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const scanAllInFlight = useRef(false)
   const targetScansInFlight = useRef<Set<string>>(new Set())
 
+  /**
+   * THE PAGE MUST REACH A TERMINAL STATE, AND THE HEADER MUST NOT WAIT FOR THE
+   * WHOLE BATCH.
+   *
+   * Measured on the previous version, in Chromium over a production build, by
+   * delaying ONE of the four calls at the network layer:
+   *
+   *   one call delayed 20s -> the sidebar appeared at 200ms and the project
+   *                           body stayed a bare spinner for 20,344ms;
+   *   one call FAILING     -> the body was a spinner FOREVER: no error, no
+   *                           retry, nothing to read (`usable: NEVER`);
+   *   nothing delayed      -> usable at 656ms.
+   *
+   * Neither branch had a timeout and `loadData` had no catch or finally, so
+   * `loading` could only ever be cleared by the success path. That is the shape
+   * of the reported ~190-second refresh: not a loop, not a duplicated request —
+   * one slow call holding a page that had nothing else to show.
+   *
+   * So: the PROJECT is fetched on its own and rendered as soon as it lands (the
+   * header, the tabs and the actions need only it), the rest loads beside it,
+   * every path is bounded, and a failure ends in a localized error with a retry
+   * instead of an unbounded spinner.
+   */
+  // A NEW ARRAY EVERY RENDER IS A NEW DEPENDENCY.
+  //
+  // This was `targets.map(...).filter(Boolean)` written inline in the JSX, so
+  // every render of this page handed AIVisibilitySection a fresh array
+  // identity — and that array is in the dependency list of an effect that calls
+  // the Gemini-backed `/api/ai-visibility/enriched-suggestions`. Measured after
+  // a hard refresh: that endpoint was called THREE times for one page load,
+  // along with two competitor-analysis calls. In production those are the
+  // slowest requests the page makes.
+  const projectKeywords = useMemo(
+    () => targets.map((t) => t.keyword).filter(Boolean),
+    [targets],
+  )
+
   const loadData = useCallback(async () => {
     const supabase = createClient()
-    const [
-      { data: projectData },
-      { data: targetsData },
-      { data: clientsData },
-    ] = await Promise.all([
-      supabase.from('projects').select('*, clients(*)').eq('id', id).single(),
-      supabase.from('tracking_targets').select('*').eq('project_id', id).order('created_at'),
-      supabase.from('clients').select('*').eq('is_active', true),
-    ])
+    setDataError(false)
+    // A ceiling for the whole load. Long enough that a healthy-but-busy request
+    // still succeeds, short enough that a person is told something is wrong
+    // instead of watching a spinner.
+    const deadline = <T,>(work: PromiseLike<T>, ms = 15000): Promise<T | null> =>
+      Promise.race([
+        Promise.resolve(work).catch(() => null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+      ])
 
-    setProject(projectData)
+    // THE HEADER'S OWN DATA, FIRST AND ALONE. One row, one round trip; the
+    // title, the project switcher, the tabs and the action bar need nothing
+    // else, so they must not queue behind the keyword table.
+    const projectRes = await deadline(
+      supabase.from('projects').select('*, clients(*)').eq('id', id).single())
+    if (!projectRes || projectRes.error || !projectRes.data) {
+      setDataError(true)
+      setLoading(false)
+      return
+    }
+    setProject(projectRes.data)
+    setLoading(false)
+
+    setSecondaryLoading(true)
+    const [targetsRes, clientsRes] = await Promise.all([
+      deadline(supabase.from('tracking_targets').select('*').eq('project_id', id).order('created_at')),
+      deadline(supabase.from('clients').select('*').eq('is_active', true)),
+    ])
+    const targetsData = targetsRes?.data ?? null
     setTargets(targetsData || [])
-    setClients(clientsData || [])
+    setClients(clientsRes?.data || [])
+    // A secondary list that could not be read is reported where it belongs —
+    // on the table — never by holding the whole page.
+    setSecondaryError(!targetsRes || !!targetsRes.error)
 
     // Load latest results for each target
     if (targetsData && targetsData.length > 0) {
@@ -109,11 +173,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setLatestResults(latest)
     }
 
-    setLoading(false)
+    setSecondaryLoading(false)
   }, [id])
 
   useEffect(() => {
-    loadData()
+    // `loadData` never rejects — every await inside it is already bounded and
+    // caught — but the guard stays so a future edit cannot reintroduce the
+    // permanent spinner this page had.
+    loadData().catch(() => { setDataError(true); setLoading(false); setSecondaryLoading(false) })
   }, [loadData])
 
   // Deep-link support: ?section=ai-visibility | rankings scrolls to that area.
@@ -323,6 +390,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // A TERMINAL, READABLE STATE — checked before the spinner, so a failure can
+  // never present as "still loading". Measured on the previous version: a
+  // single failing data call left this page a spinner forever, with no error
+  // and no way to retry.
+  if (dataError && !project) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-slate-500 dark:text-slate-400 mb-4">{k.messages.loadFailed}</p>
+        <Button
+          onClick={() => { setLoading(true); setDataError(false); void loadData() }}
+        >
+          {k.messages.retry}
+        </Button>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
@@ -512,7 +596,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             projectBrandAliases={project.brand_aliases}
             projectDomainAliases={project.domain_aliases}
             projectCity={project.city}
-            projectKeywords={targets.map((t) => t.keyword).filter(Boolean)}
+            projectKeywords={projectKeywords}
           />
         </div>
       )}
@@ -589,6 +673,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         projectBusinessName={project.business_name || undefined}
         onScanTarget={handleScanTarget}
         scanningTargets={scanningTargets}
+        targetsLoading={secondaryLoading}
+        targetsError={secondaryError}
+        onRetryTargets={() => { void loadData() }}
         volumePending={volumePending}
         volumeUnavailable={volumeUnavailable}
         onRetryVolumes={handleUpdateVolumes}

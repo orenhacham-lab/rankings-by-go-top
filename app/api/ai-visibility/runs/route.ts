@@ -36,6 +36,12 @@ import {
 } from '@/lib/quota'
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeUsageReservation, releaseUsageReservation } from '@/lib/billing/usage-reservations'
+import { claimOperation, releaseOperationClaim } from '@/lib/ops/single-flight'
+import { newRequestId } from '@/lib/ops/deadline'
+
+/** Outlives the 60s provider timeout by a margin; short enough that a claim left
+ *  by a killed function recovers on its own. */
+const CLAIM_TTL_SECONDS = 120
 
 const SCRAPELLM_TIMEOUT_MS = 60_000 // 60s — within Vercel/Next.js limits, avoids user-perceived stuck state
 
@@ -66,137 +72,245 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
+  const requestId = newRequestId()
 
-  // Verify user owns the project
-  const { data: project, error: projectError } = await admin
-    .from('projects')
-    .select('id, user_id, target_domain, business_name, country, language')
-    .eq('id', projectId)
-    .single()
-
-  if (projectError || !project) {
-    console.error('[AI Visibility Runs] Project lookup failed', {
-      projectId,
-      projectError: projectError?.message,
-    })
-    return Response.json({ error: 'Project not found' }, { status: 404 })
+  // SINGLE FLIGHT for this exact prompt+engine.
+  //
+  // The button is disabled while a check runs, but that is one component in one
+  // tab: it cannot see a second tab, a reload mid-flight or two direct POSTs.
+  // The reservation key used to include `Date.now()`, so two clicks a
+  // millisecond apart reserved twice and dispatched twice. The claim is the
+  // same database-enforced one the ranking scan uses.
+  //
+  // WHY THE OPERATION IS NAMED `ranking_scan` FOR AN AI CHECK. `operation_claims`
+  // carries a deployed CHECK constraint allowing exactly two names, and widening
+  // it would mean a second migration that, if it were ever missed, would make
+  // `claim_operation` raise and this route fail closed with a 503 — turning a
+  // label into an outage. The claim key is `<user>:<operation>:<scope>` and the
+  // scopes cannot collide: a ranking scan is `project:X:target:Y` or
+  // `project:X:all`, an AI check is `project:X:prompt:Y:engine:Z`. So this is a
+  // shared namespace, not a shared lock.
+  const scope = `project:${projectId}:prompt:${promptId}:engine:${engine}`
+  const claim = await claimOperation(admin, {
+    userId: user.id, operation: 'ranking_scan', scope, requestId, ttlSeconds: CLAIM_TTL_SECONDS,
+  })
+  if (claim.outcome === 'in_progress') {
+    return Response.json({
+      errorCode: 'AI_CHECK_IN_PROGRESS',
+      error: 'בדיקת AI כבר רצה עבור השאילתה והמנוע האלה.',
+      errorEn: 'An AI check is already running for this query and engine.',
+      retryable: true, inProgressRequestId: claim.holderRequestId, requestId,
+    }, { status: 409 })
   }
-  if ((project as { user_id?: string }).user_id !== user.id) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  if (claim.outcome === 'unavailable') {
+    return Response.json({
+      errorCode: 'AI_CHECK_FAILED',
+      error: 'לא ניתן להתחיל בדיקה כרגע. נסו שוב בעוד רגע.',
+      errorEn: 'The check could not start. Please try again in a moment.',
+      retryable: true, requestId,
+    }, { status: 503 })
   }
-
-  // Enforce AI-check quota BEFORE creating ai_scan_runs or calling AI
-  // providers. Trial: lifetime cap across all of the user's projects (3 AI
-  // checks total, plain count — no concurrent-job race risk for a single
-  // trial user). Paid: an ATOMIC reservation against the user's actual
-  // billing-period boundary (never a plain count-then-proceed).
-  // SERVICE-ROLE, not the request client: getUserEntitlement reads
-  // billing_governance, which `authenticated` may not read at all.
-  const entitlement = await getUserEntitlement(user.id, admin)
-  // A read failure is not an exhausted quota. Answering with a 403 "you have
-  // reached your limit of 0 — upgrade" here is what the reviewer saw.
-  if (isEntitlementUnknown(entitlement.plan)) {
-    return Response.json(buildEntitlementUnavailableError(), { status: 503 })
-  }
-  let reservationId: string | null = null
-  let reservationToken: string | null = null
-  if (!entitlement.isAdmin) {
-    const isTrial = entitlement.plan === 'trial'
-    if (isTrial) {
-      const used = await countAIScansTrialLifetime(user.id, admin)
-      if (used + 1 > entitlement.limits.maxAIScansTotal) {
-        const payload = buildQuotaError('QUOTA_AI_SCANS', entitlement.plan, entitlement.limits, entitlement.limits.maxAIScansTotal)
-        return Response.json(payload, { status: 403 })
-      }
-    } else {
-      const period = await resolveCurrentUsagePeriod(admin, user.id)
-      if (!period) return Response.json({ error: 'Unable to resolve billing period' }, { status: 500 })
-      const limit = entitlement.limits.maxAIScansPerPeriodPerProject
-      const reservation = await reserveUsage(admin, {
-        userId: user.id, projectId, usageType: 'ai_check', amount: 1,
-        periodStart: period.start, periodEnd: period.end, limit,
-        idempotencyKey: `manual:${projectId}:${promptId}:${engine}:${Date.now()}`,
-      })
-      if (reservation.outcome === 'quota_exceeded') {
-        const payload = buildQuotaError('QUOTA_AI_SCANS', entitlement.plan, entitlement.limits, limit)
-        return Response.json(payload, { status: 403 })
-      }
-      if (reservation.outcome !== 'reserved' && reservation.outcome !== 'already_reserved') {
-        return Response.json({ error: 'Failed to reserve AI-check allowance' }, { status: 500 })
-      }
-      reservationId = reservation.reservationId
-      reservationToken = reservation.reservationToken
+  const claimHeld = claim.outcome === 'claimed'
+  /** The OPERATION's identity — never this request's id. */
+  const operationKey = claim.operationKey ?? `unclaimed:${requestId}`
+  const releaseClaim = async () => {
+    if (claimHeld) {
+      await releaseOperationClaim(admin, { userId: user.id, operation: 'ranking_scan', scope, requestId })
     }
   }
+  // Hoisted above the try so the catch below can release exactly what the body
+  // reserved — a reservation the handler took must never outlive the request
+  // that took it.
+  let reservationId: string | null = null
+  let reservationToken: string | null = null
 
-  // Load prompt and verify it belongs to the same project
-  const { data: prompt, error: promptError } = await admin
-    .from('ai_prompts')
-    .select('*')
-    .eq('id', promptId)
-    .eq('project_id', projectId)
-    .single()
+  // EVERY EXIT PATH RELEASES THE CLAIM, and an exception can no longer escape.
+  //
+  // The provider call sat outside any try/catch behind the comment "provider
+  // catches errors and returns error result" — an assumption about the
+  // provider, not a guarantee. When runAIVisibilityScan THREW, the exception
+  // left this handler entirely: the merchant got an unclassified 500 and the
+  // reservation stayed `reserved`, holding one of the twenty checks against the
+  // allowance until its lease expired. Measured in the QA suite before this.
+  try {
+    // Verify user owns the project
+    const { data: project, error: projectError } = await admin
+      .from('projects')
+      .select('id, user_id, target_domain, business_name, country, language')
+      .eq('id', projectId)
+      .single()
 
-  if (promptError || !prompt) {
-    if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'prompt_not_found' })
-    return Response.json({ error: 'Prompt not found' }, { status: 404 })
-  }
+    if (projectError || !project) {
+      console.error('[AI Visibility Runs] Project lookup failed', {
+        projectId,
+        projectError: projectError?.message,
+      })
+      return Response.json({ error: 'Project not found' }, { status: 404 })
+    }
+    if ((project as { user_id?: string }).user_id !== user.id) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
-  // Create scan run row (status=running)
-  const startedAt = new Date().toISOString()
-  const { data: run, error: runError } = await admin
-    .from('ai_scan_runs')
-    .insert({
-      project_id: projectId,
-      user_id: user.id,
-      provider: 'scrapellm',
-      status: 'running',
-      triggered_by: 'manual',
-      total_prompts: 1,
-      total_engines: 1,
-      total_tasks: 1,
-      completed_tasks: 0,
-      failed_tasks: 0,
-      total_credits_used: 0,
-      started_at: startedAt,
+    // Enforce AI-check quota BEFORE creating ai_scan_runs or calling AI
+    // providers. Trial: lifetime cap across all of the user's projects (3 AI
+    // checks total, plain count — no concurrent-job race risk for a single
+    // trial user). Paid: an ATOMIC reservation against the user's actual
+    // billing-period boundary (never a plain count-then-proceed).
+    // SERVICE-ROLE, not the request client: getUserEntitlement reads
+    // billing_governance, which `authenticated` may not read at all.
+    const entitlement = await getUserEntitlement(user.id, admin)
+    // A read failure is not an exhausted quota. Answering with a 403 "you have
+    // reached your limit of 0 — upgrade" here is what the reviewer saw.
+    if (isEntitlementUnknown(entitlement.plan)) {
+      return Response.json(buildEntitlementUnavailableError(), { status: 503 })
+    }
+    reservationId = null
+    reservationToken = null
+    if (!entitlement.isAdmin) {
+      const isTrial = entitlement.plan === 'trial'
+      if (isTrial) {
+        const used = await countAIScansTrialLifetime(user.id, admin)
+        if (used + 1 > entitlement.limits.maxAIScansTotal) {
+          const payload = buildQuotaError('QUOTA_AI_SCANS', entitlement.plan, entitlement.limits, entitlement.limits.maxAIScansTotal)
+          return Response.json(payload, { status: 403 })
+        }
+      } else {
+        const period = await resolveCurrentUsagePeriod(admin, user.id)
+        if (!period) return Response.json({ error: 'Unable to resolve billing period' }, { status: 500 })
+        const limit = entitlement.limits.maxAIScansPerPeriodPerProject
+        const reservation = await reserveUsage(admin, {
+          userId: user.id, projectId, usageType: 'ai_check', amount: 1,
+          periodStart: period.start, periodEnd: period.end, limit,
+          // PER-OPERATION, not per-request and not per-millisecond: the claim's
+          // own start instant. Identical for anything that joins this operation,
+          // different for a legitimate later retry.
+          idempotencyKey: `manual:${projectId}:${promptId}:${engine}:${operationKey}`,
+        })
+        if (reservation.outcome === 'quota_exceeded') {
+          const payload = buildQuotaError('QUOTA_AI_SCANS', entitlement.plan, entitlement.limits, limit)
+          return Response.json(payload, { status: 403 })
+        }
+        if (reservation.outcome !== 'reserved' && reservation.outcome !== 'already_reserved') {
+          return Response.json({ error: 'Failed to reserve AI-check allowance' }, { status: 500 })
+        }
+        reservationId = reservation.reservationId
+        reservationToken = reservation.reservationToken
+      }
+    }
+
+    // Load prompt and verify it belongs to the same project
+    const { data: prompt, error: promptError } = await admin
+      .from('ai_prompts')
+      .select('*')
+      .eq('id', promptId)
+      .eq('project_id', projectId)
+      .single()
+
+    if (promptError || !prompt) {
+      if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'prompt_not_found' })
+      return Response.json({ error: 'Prompt not found' }, { status: 404 })
+    }
+
+    // Create scan run row (status=running)
+    const startedAt = new Date().toISOString()
+    const { data: run, error: runError } = await admin
+      .from('ai_scan_runs')
+      .insert({
+        project_id: projectId,
+        user_id: user.id,
+        provider: 'scrapellm',
+        status: 'running',
+        triggered_by: 'manual',
+        total_prompts: 1,
+        total_engines: 1,
+        total_tasks: 1,
+        completed_tasks: 0,
+        failed_tasks: 0,
+        total_credits_used: 0,
+        started_at: startedAt,
+      })
+      .select()
+      .single()
+
+    if (runError || !run) {
+      if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'run_create_failed' })
+      return Response.json(
+        { error: `Failed to create scan run: ${runError?.message}` },
+        { status: 500 }
+      )
+    }
+
+    const targetDomain = prompt.target_domain || project.target_domain || null
+    const targetBrand = prompt.target_brand_name || project.business_name || null
+    const country = prompt.country || project.country || null
+
+    // Execute ScrapeLLM synchronously (provider catches errors and returns error result)
+    const scanResult = await runAIVisibilityScan({
+      engine,
+      prompt: prompt.prompt,
+      country: country || undefined,
+      targetDomain: targetDomain,
+      targetBrandName: targetBrand,
+      timeout: SCRAPELLM_TIMEOUT_MS,
     })
-    .select()
-    .single()
 
-  if (runError || !run) {
-    if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'run_create_failed' })
-    return Response.json(
-      { error: `Failed to create scan run: ${runError?.message}` },
-      { status: 500 }
-    )
-  }
+    // Phase 3 — the provider call has now actually been dispatched: this
+    // check is consumed regardless of outcome (including a provider-side
+    // error result — the check still ran).
+    if (reservationId && reservationToken) {
+      await finalizeUsageReservation(admin, { reservationId, userId: user.id, reservationToken, consumed: 1, relatedRef: run.id, reason: null })
+    }
 
-  const targetDomain = prompt.target_domain || project.target_domain || null
-  const targetBrand = prompt.target_brand_name || project.business_name || null
-  const country = prompt.country || project.country || null
+    const scannedAt = new Date().toISOString()
 
-  // Execute ScrapeLLM synchronously (provider catches errors and returns error result)
-  const scanResult = await runAIVisibilityScan({
-    engine,
-    prompt: prompt.prompt,
-    country: country || undefined,
-    targetDomain: targetDomain,
-    targetBrandName: targetBrand,
-    timeout: SCRAPELLM_TIMEOUT_MS,
-  })
+    if (scanResult.error) {
+      // Persist error result
+      const { data: errorResult } = await admin
+        .from('ai_scan_results')
+        .insert({
+          run_id: run.id,
+          project_id: projectId,
+          prompt_id: promptId,
+          engine,
+          provider: 'scrapellm',
+          mentioned: false,
+          target_cited: false,
+          citation_count: 0,
+          source_count: 0,
+          credits_used: 0,
+          status: 'error',
+          error_message: scanResult.error,
+          scanned_at: scannedAt,
+        })
+        .select('id')
+        .single()
 
-  // Phase 3 — the provider call has now actually been dispatched: this
-  // check is consumed regardless of outcome (including a provider-side
-  // error result — the check still ran).
-  if (reservationId && reservationToken) {
-    await finalizeUsageReservation(admin, { reservationId, userId: user.id, reservationToken, consumed: 1, relatedRef: run.id, reason: null })
-  }
+      await admin
+        .from('ai_scan_runs')
+        .update({
+          status: 'failed',
+          completed_tasks: 0,
+          failed_tasks: 1,
+          completed_at: new Date().toISOString(),
+          error_message: scanResult.error,
+        })
+        .eq('id', run.id)
 
-  const scannedAt = new Date().toISOString()
+      return Response.json({
+        runId: run.id,
+        status: 'failed',
+        resultId: errorResult?.id ?? null,
+        mentioned: false,
+        targetCited: false,
+        citationCount: 0,
+        creditsUsed: 0,
+        error: scanResult.error,
+      })
+    }
 
-  if (scanResult.error) {
-    // Persist error result
-    const { data: errorResult } = await admin
+    // Persist successful scan result
+    const creditsUsed = typeof scanResult.creditsUsed === 'number' ? scanResult.creditsUsed : 0
+    const { data: resultRow, error: resultError } = await admin
       .from('ai_scan_results')
       .insert({
         run_id: run.id,
@@ -204,129 +318,107 @@ export async function POST(request: Request) {
         prompt_id: promptId,
         engine,
         provider: 'scrapellm',
-        mentioned: false,
-        target_cited: false,
-        citation_count: 0,
-        source_count: 0,
-        credits_used: 0,
-        status: 'error',
-        error_message: scanResult.error,
+        mentioned: scanResult.mentionedInText,
+        target_cited: scanResult.targetCitedInSources,
+        mention_positions: scanResult.mentionedPositions ?? null,
+        citation_count: scanResult.citationCount,
+        source_count: scanResult.sourceCount,
+        response_text: scanResult.responseText || null,
+        response_summary: scanResult.responseSummary || null,
+        raw_response: (scanResult.rawResponse as Record<string, unknown>) ?? null,
+        credits_used: creditsUsed,
+        status: 'success',
         scanned_at: scannedAt,
       })
       .select('id')
       .single()
 
+    if (resultError || !resultRow) {
+      await admin
+        .from('ai_scan_runs')
+        .update({
+          status: 'failed',
+          failed_tasks: 1,
+          completed_at: new Date().toISOString(),
+          error_message: `Failed to persist result: ${resultError?.message}`,
+        })
+        .eq('id', run.id)
+
+      return Response.json(
+        { error: `Failed to persist result: ${resultError?.message}` },
+        { status: 500 }
+      )
+    }
+
+    // Persist citations (best-effort batch insert)
+    if (scanResult.citations.length > 0) {
+      const citationRows = scanResult.citations.map((c) => ({
+        result_id: resultRow.id,
+        project_id: projectId,
+        prompt_id: promptId,
+        engine,
+        provider: 'scrapellm' as const,
+        url: c.url,
+        domain: c.domain,
+        title: c.title ?? null,
+        snippet: c.snippet ?? null,
+        citation_position: c.position ?? null,
+        is_target_domain: targetDomain ? isDomainMatch(c.url, targetDomain) : false,
+      }))
+
+      const { error: citationsError } = await admin
+        .from('ai_citations')
+        .insert(citationRows)
+
+      if (citationsError) {
+        console.error('[AIVisibility] Failed to insert citations:', citationsError.message)
+      }
+    }
+
+    // Mark run completed
     await admin
       .from('ai_scan_runs')
       .update({
-        status: 'failed',
-        completed_tasks: 0,
-        failed_tasks: 1,
+        status: 'completed',
+        completed_tasks: 1,
+        failed_tasks: 0,
+        total_credits_used: creditsUsed,
         completed_at: new Date().toISOString(),
-        error_message: scanResult.error,
       })
       .eq('id', run.id)
 
     return Response.json({
       runId: run.id,
-      status: 'failed',
-      resultId: errorResult?.id ?? null,
-      mentioned: false,
-      targetCited: false,
-      citationCount: 0,
-      creditsUsed: 0,
-      error: scanResult.error,
-    })
-  }
-
-  // Persist successful scan result
-  const creditsUsed = typeof scanResult.creditsUsed === 'number' ? scanResult.creditsUsed : 0
-  const { data: resultRow, error: resultError } = await admin
-    .from('ai_scan_results')
-    .insert({
-      run_id: run.id,
-      project_id: projectId,
-      prompt_id: promptId,
-      engine,
-      provider: 'scrapellm',
-      mentioned: scanResult.mentionedInText,
-      target_cited: scanResult.targetCitedInSources,
-      mention_positions: scanResult.mentionedPositions ?? null,
-      citation_count: scanResult.citationCount,
-      source_count: scanResult.sourceCount,
-      response_text: scanResult.responseText || null,
-      response_summary: scanResult.responseSummary || null,
-      raw_response: (scanResult.rawResponse as Record<string, unknown>) ?? null,
-      credits_used: creditsUsed,
-      status: 'success',
-      scanned_at: scannedAt,
-    })
-    .select('id')
-    .single()
-
-  if (resultError || !resultRow) {
-    await admin
-      .from('ai_scan_runs')
-      .update({
-        status: 'failed',
-        failed_tasks: 1,
-        completed_at: new Date().toISOString(),
-        error_message: `Failed to persist result: ${resultError?.message}`,
-      })
-      .eq('id', run.id)
-
-    return Response.json(
-      { error: `Failed to persist result: ${resultError?.message}` },
-      { status: 500 }
-    )
-  }
-
-  // Persist citations (best-effort batch insert)
-  if (scanResult.citations.length > 0) {
-    const citationRows = scanResult.citations.map((c) => ({
-      result_id: resultRow.id,
-      project_id: projectId,
-      prompt_id: promptId,
-      engine,
-      provider: 'scrapellm' as const,
-      url: c.url,
-      domain: c.domain,
-      title: c.title ?? null,
-      snippet: c.snippet ?? null,
-      citation_position: c.position ?? null,
-      is_target_domain: targetDomain ? isDomainMatch(c.url, targetDomain) : false,
-    }))
-
-    const { error: citationsError } = await admin
-      .from('ai_citations')
-      .insert(citationRows)
-
-    if (citationsError) {
-      console.error('[AIVisibility] Failed to insert citations:', citationsError.message)
-    }
-  }
-
-  // Mark run completed
-  await admin
-    .from('ai_scan_runs')
-    .update({
       status: 'completed',
-      completed_tasks: 1,
-      failed_tasks: 0,
-      total_credits_used: creditsUsed,
-      completed_at: new Date().toISOString(),
+      resultId: resultRow.id,
+      mentioned: scanResult.mentionedInText,
+      targetCited: scanResult.targetCitedInSources,
+      citationCount: scanResult.citationCount,
+      creditsUsed,
     })
-    .eq('id', run.id)
 
-  return Response.json({
-    runId: run.id,
-    status: 'completed',
-    resultId: resultRow.id,
-    mentioned: scanResult.mentionedInText,
-    targetCited: scanResult.targetCitedInSources,
-    citationCount: scanResult.citationCount,
-    creditsUsed,
-  })
+  } catch (err) {
+    // A THROW is not evidence that the provider ran. The scan route charges on
+    // dispatch because its provider returns rather than throws; here the
+    // documented contract was broken, so the check is RELEASED rather than
+    // billed. Nothing of the provider's own text escapes.
+    if (reservationId && reservationToken) {
+      await releaseUsageReservation(admin, {
+        reservationId, userId: user.id, reservationToken, reason: 'provider_threw',
+      })
+    }
+    console.error('[ai-visibility] dispatch failed', {
+      requestId, category: err instanceof Error && /timeout|abort/i.test(err.message) ? 'provider_timeout' : 'provider_error',
+    })
+    return Response.json({
+      errorCode: 'AI_CHECK_FAILED',
+      error: 'הבדיקה נכשלה ולא נוצלה מכסה. נסו שוב בעוד רגע.',
+      errorEn: 'The check failed and no allowance was used. Please try again in a moment.',
+      retryable: true, requestId,
+    }, { status: 502 })
+  } finally {
+    await releaseClaim()
+  }
 }
 
 /**

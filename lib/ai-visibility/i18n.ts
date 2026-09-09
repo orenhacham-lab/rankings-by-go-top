@@ -151,6 +151,23 @@ const STRINGS = {
   generating_more: { he: 'יוצר שאלות נוספות...', en: 'Generating more questions...' },
   rescan: { he: 'סריקה מחדש', en: 'Rescan' },
   scan_this_engine: { he: 'סרוק במנוע הזה', en: 'Scan this engine' },
+  // The engine chips ARE the run control, but they read as status badges — a
+  // reviewer looking for a "Run" action found only the delete icon. A visible
+  // instruction above them, and an accessible name that says what the click
+  // does, is what makes an existing control discoverable.
+  run_a_check_hint: {
+    he: 'לחצו על מנוע כדי להריץ בדיקת AI לשאילתה הזו',
+    en: 'Click an engine to run an AI check for this query',
+  },
+  run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
+  rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ' },
+  ai_allowance: { he: 'בדיקות AI במחזור הנוכחי', en: 'AI checks this billing period' },
+  ai_allowance_unknown: { he: 'לא ניתן לאמת כרגע את המכסה', en: 'The allowance could not be read right now' },
+  ai_allowance_unmetered: { he: 'ללא מגבלה', en: 'Unmetered' },
+  ai_allowance_exhausted: {
+    he: 'ניצלתם את כל בדיקות ה-AI במחזור החיוב הזה',
+    en: 'You have used every AI check in this billing period',
+  },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },

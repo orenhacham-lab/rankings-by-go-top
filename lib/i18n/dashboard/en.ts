@@ -2246,6 +2246,8 @@ export const dashboardEn = {
       yesFound: 'Yes',
       noNotFound: 'No',
       notChecked: 'Not checked',
+      keywordsLoading: 'Loading keywords…',
+      keywordsLoadFailed: 'We could not load the keywords.',
       volumePending: 'Fetching…',
       volumeRetry: 'Click to try again',
       volumeUnavailable: 'Volume unavailable',
@@ -2268,6 +2270,8 @@ export const dashboardEn = {
     messages: {
       loading: 'Loading...',
       projectNotFound: 'Project not found',
+      loadFailed: 'We could not load this project. Please try again.',
+      retry: 'Try again',
       scanComplete: (completed: number, total: number) => `Scan complete: ${completed} / ${total} succeeded`,
       scanError: (error: string) => `Error: ${error}`,
       scanNetworkError: 'Network error during scan',

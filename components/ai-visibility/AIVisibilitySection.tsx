@@ -226,6 +226,27 @@ export default function AIVisibilitySection({
   // Track previous server pool count to detect shrinkage across requests
   const [previousServerPoolCount, setPreviousServerPoolCount] = useState(0)
   const [scanningKey, setScanningKey] = useState<string | null>(null)
+  /**
+   * The AI-check allowance, from the ledger that enforces it. `null` means "not
+   * read yet"; the `unknown` state means the server could not read it and the UI
+   * must say so rather than imply zero.
+   */
+  const [allowance, setAllowance] = useState<
+    | { state: 'known'; limit: number; used: number; remaining: number }
+    | { state: 'unknown' } | { state: 'unmetered' } | null
+  >(null)
+  const loadAllowance = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai-visibility/allowance')
+      if (!res.ok) { setAllowance({ state: 'unknown' }); return }
+      const body = await res.json()
+      setAllowance(body?.state === 'known' || body?.state === 'unmetered' || body?.state === 'unknown'
+        ? body : { state: 'unknown' })
+    } catch {
+      setAllowance({ state: 'unknown' })
+    }
+  }, [])
+  useEffect(() => { void loadAllowance() }, [loadAllowance])
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
   const [showAllPrompts, setShowAllPrompts] = useState(false)
@@ -260,9 +281,13 @@ export default function AIVisibilitySection({
     [projectDomain]
   )
 
+  /** A stable key for the keyword LIST, so identity changes cannot re-trigger
+   *  work that only depends on the values. */
+  const projectKeywordsKey = (projectKeywords || []).join('\u0000')
   const isRichProject = useMemo(
     () => analyzeSmartQuestionContext(projectKeywords || []).isRichProject,
-    [projectKeywords]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectKeywordsKey]
   )
 
   // Load both scan results AND prompts in parallel
@@ -708,7 +733,13 @@ export default function AIVisibilitySection({
     return () => {
       cancelled = true
     }
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile, projectId])
+    // Keyed by the keywords' VALUE, not the array's identity. A caller that
+    // passes an inline `targets.map(...)` — as this page did — hands over a new
+    // array on every render, and an effect that calls a Gemini-backed endpoint
+    // must not re-run because a parent re-rendered. The parent now memoizes it
+    // too; this makes the component immune to the next caller that forgets.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywordsKey, manualProfile, projectId])
 
   useEffect(() => {
     loadAllResults()
@@ -920,6 +951,9 @@ export default function AIVisibilitySection({
         setError(e instanceof Error ? e.message : 'Scan failed')
         setScanStatus(null)
       } finally {
+        // The allowance moved (or did not) — re-read it either way, so what the
+        // merchant sees is the ledger's answer and not an optimistic guess.
+        void loadAllowance()
         setScanningKey(null)
         // Reset progress after fade
         setTimeout(() => {
@@ -929,7 +963,7 @@ export default function AIVisibilitySection({
         }, 500)
       }
     },
-    [projectId, loadAllResults, allResults, openResultDrawer, t]
+    [projectId, loadAllResults, allResults, openResultDrawer, t, loadAllowance]
   )
 
   // When allResults updates after a scan, if there's a highlighted id we haven't
@@ -1929,6 +1963,23 @@ export default function AIVisibilitySection({
 
           {allPrompts.length > 0 ? (
             <>
+              {/* THE CONTROL EXISTS — say so. The engine chips below dispatch a
+                  check; they looked like status badges next to a delete icon,
+                  which is why a reviewer could not find any way to start one.
+                  The allowance beside it comes from the usage ledger, so it can
+                  never disagree with what the dispatcher enforces. */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
+                <span className="text-slate-500 dark:text-slate-400">{t('run_a_check_hint')}</span>
+                <span className="text-slate-500 dark:text-slate-400 tabular-nums" data-testid="ai-allowance">
+                  {allowance == null ? null
+                    : allowance.state === 'unmetered' ? t('ai_allowance_unmetered')
+                    : allowance.state === 'unknown' ? t('ai_allowance_unknown')
+                    : `${t('ai_allowance')}: ${allowance.used}/${allowance.limit}`}
+                </span>
+              </div>
+              {allowance != null && allowance.state === 'known' && allowance.remaining === 0 && (
+                <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{t('ai_allowance_exhausted')}</p>
+              )}
               <div className="space-y-2">
                 {allPrompts.slice(0, showAllPrompts ? undefined : 3).map((p) => (
                   <div
@@ -1970,6 +2021,13 @@ export default function AIVisibilitySection({
                           : scanned
                           ? t('rescan')
                           : t('scan_this_engine')
+                        // The ACCESSIBLE NAME says what the click does and to
+                        // which engine. "ChatGPT ✓" named a status; "Run an AI
+                        // check on ChatGPT" names an action, which is what a
+                        // reviewer — and a screen reader — is looking for.
+                        const actionLabel = scanning
+                          ? t('scanning')
+                          : `${scanned ? t('rerun_check_on') : t('run_check_on')}${meta?.name || engine}`
                         return (
                           <div
                             key={engine}
@@ -1979,8 +2037,8 @@ export default function AIVisibilitySection({
                               <button
                                 onClick={() => !scanning && scanEngine(p.id, engine)}
                                 disabled={scanning}
-                                title={tooltip}
-                                aria-label={tooltip}
+                                title={actionLabel}
+                                aria-label={actionLabel}
                                 className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
                                   scanning
                                     ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'

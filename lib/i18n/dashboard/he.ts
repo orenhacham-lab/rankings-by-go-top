@@ -2254,6 +2254,8 @@ export const dashboardHe = {
       yesFound: 'כן',
       noNotFound: 'לא',
       notChecked: 'לא נבדק',
+      keywordsLoading: 'טוען מילות מפתח…',
+      keywordsLoadFailed: 'לא הצלחנו לטעון את מילות המפתח.',
       volumePending: 'מאתר נפח חיפוש…',
       volumeRetry: 'לחצו לניסיון חוזר',
       volumeUnavailable: 'נפח לא זמין',
@@ -2276,6 +2278,8 @@ export const dashboardHe = {
     messages: {
       loading: 'טוען...',
       projectNotFound: 'פרויקט לא נמצא',
+      loadFailed: 'לא הצלחנו לטעון את הפרויקט. נסו שוב.',
+      retry: 'נסו שוב',
       scanComplete: (completed: number, total: number) => `סריקה הושלמה: ${completed} / ${total} הצליחו`,
       scanError: (error: string) => `שגיאה: ${error}`,
       scanNetworkError: 'שגיאת רשת בסריקה',
