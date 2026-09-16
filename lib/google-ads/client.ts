@@ -9,7 +9,39 @@
  * per-user OAuth. Fully headless-safe.
  */
 
-export const GOOGLE_ADS_API_VERSION = 'v22'
+/**
+ * THE Google Ads API version — one declaration, for the whole app.
+ *
+ * Google sunsets each major version twelve months after release and simply
+ * stops answering: v22 was discontinued on 7 October 2026. When that happens
+ * keyword research, search volume and the keyword-seeded content
+ * recommendations all stop returning data at once, so this constant has a
+ * deadline attached to it and someone has to move it on time.
+ *
+ * WHY THIS IS THE ONLY PLACE IT MAY APPEAR. It used to be six places: this
+ * export, three routes that each declared a private `const
+ * GOOGLE_ADS_API_VERSION` of their own rather than importing this one, and two
+ * URLs in the debug route with the version written straight into the string.
+ * Bumping "the constant" would have moved one of six and left four routes
+ * talking to a version Google no longer answers — with nothing failing until
+ * the sunset date. `lib/google-ads/__qa__/api-version.qa.ts` fails the build if
+ * a second declaration or a literal version ever comes back.
+ *
+ * Current: v25 (released 22 July 2026, sunsets August 2027).
+ */
+export const GOOGLE_ADS_API_VERSION = 'v25'
+
+/**
+ * Build a Google Ads REST URL. Prefer this over interpolating the constant by
+ * hand — a caller that cannot write the host has no way to write the version
+ * either, which is what let four of the six copies drift in the first place.
+ *
+ * `path` is everything after the version, with no leading slash:
+ *   googleAdsUrl(`customers/${id}:generateKeywordIdeas`)
+ */
+export function googleAdsUrl(path: string): string {
+  return `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/${path.replace(/^\//, '')}`
+}
 
 export type GoogleAdsErrorCode =
   | 'not_configured'
