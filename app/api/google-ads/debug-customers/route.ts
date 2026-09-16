@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { googleAdsUrl } from '@/lib/google-ads/client'
 
 interface TokenResponse {
   access_token?: string
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
     }
 
     // List accessible customers
-    const listCustomersUrl = `https://googleads.googleapis.com/v22/customers:listAccessibleCustomers`
+    const listCustomersUrl = googleAdsUrl('customers:listAccessibleCustomers')
 
     const listResponse = await fetch(listCustomersUrl, {
       method: 'POST',
@@ -105,7 +106,15 @@ export async function POST(request: Request) {
     // Try to get details for configured customer
     let configuredCustomerDetails: Record<string, unknown> | null = null
     if (accessibleCustomerIds.includes(configuredCustomerId)) {
-      const getUrl = `https://googleads.googleapis.com/v22/customers/${configuredCustomerId}?fields=customer.id,customer.descriptive_name,customer.currency_code,customer.time_zone,customer.test_account`
+      // NOTE — PRE-EXISTING, NOT CAUSED BY THE VERSION BUMP. There is no
+      // `GET customers/{id}` in the Google Ads REST API, at any version:
+      // probed against v22 through v26 and every one answers with Google's
+      // plain 404 HTML page rather than an API error. Customer fields are read
+      // through GAQL (`customers/{id}/googleAds:search`) instead. The call is
+      // guarded by `if (getResponse.ok)`, so it has simply been leaving
+      // `configuredCustomerDetails` null all along. Left as-is here because
+      // this PR is the version migration; see the PR body for the fix.
+      const getUrl = googleAdsUrl(`customers/${configuredCustomerId}?fields=customer.id,customer.descriptive_name,customer.currency_code,customer.time_zone,customer.test_account`)
 
       const getResponse = await fetch(getUrl, {
         method: 'GET',

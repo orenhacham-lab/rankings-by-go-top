@@ -15,6 +15,7 @@
 
 import {
   GOOGLE_ADS_API_VERSION,
+  googleAdsUrl,
   GoogleAdsError,
   getGoogleAdsAccessToken,
   getGoogleAdsConfig,
@@ -158,7 +159,7 @@ export async function generateKeywordIdeas(input: KeywordIdeasInput): Promise<Ke
     pageSize: requestBody.pageSize,
   })
 
-  const apiUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${config.customerId}:generateKeywordIdeas`
+  const apiUrl = googleAdsUrl(`customers/${config.customerId}:generateKeywordIdeas`)
 
   const allRawResults: GoogleAdsKeywordIdea[] = []
   let nextPageToken: string | undefined = undefined

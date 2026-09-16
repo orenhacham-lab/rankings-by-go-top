@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { GOOGLE_ADS_API_VERSION, googleAdsUrl } from '@/lib/google-ads/client'
 
 // Google Ads API version — bumped periodically by Google.
-const GOOGLE_ADS_API_VERSION = 'v22'
 
 interface TokenResponse {
   access_token?: string
@@ -99,7 +99,7 @@ export async function GET() {
     //    customer permissions, so it isolates auth/config errors clearly.
     //    Note: login-customer-id is ignored for this endpoint, so we omit it.
     const listEndpoint = `customers:listAccessibleCustomers`
-    const listUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/${listEndpoint}`
+    const listUrl = googleAdsUrl(listEndpoint)
     const listResponse = await fetch(listUrl, {
       method: 'GET',
       headers: {

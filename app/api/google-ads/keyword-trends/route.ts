@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { COUNTRY_GEO_TARGETS, LANGUAGE_IDS, isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
+import { GOOGLE_ADS_API_VERSION, googleAdsUrl } from '@/lib/google-ads/client'
 
 interface TokenResponse {
   access_token?: string
@@ -39,7 +40,6 @@ interface MonthlySearch {
   searches: number
 }
 
-const GOOGLE_ADS_API_VERSION = 'v22'
 
 function toNumber(value: number | string | undefined | null): number | null {
   if (value === undefined || value === null || value === '') return null
@@ -258,7 +258,7 @@ export async function POST(request: Request) {
       keywordPresent: Boolean(keywordRaw),
     })
 
-    const apiUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}:generateKeywordHistoricalMetrics`
+    const apiUrl = googleAdsUrl(`customers/${customerId}:generateKeywordHistoricalMetrics`)
 
     const apiResponse = await fetch(apiUrl, {
       method: 'POST',

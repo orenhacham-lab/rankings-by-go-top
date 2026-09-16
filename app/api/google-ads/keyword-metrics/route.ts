@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { COUNTRY_GEO_TARGETS, LANGUAGE_IDS, isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
+import { googleAdsUrl } from '@/lib/google-ads/client'
 import {
   Deadline, fetchProvider, logOperation, newRequestId,
   type ProviderOutcome,
@@ -56,7 +57,6 @@ interface HistoricalMetricsResponse {
   }
 }
 
-const GOOGLE_ADS_API_VERSION = 'v22'
 const BATCH_SIZE = 50
 
 /**
@@ -323,7 +323,7 @@ export async function POST(request: Request) {
 
     const geoTargetId = COUNTRY_GEO_TARGETS[country]
     const languageId = LANGUAGE_IDS[language]
-    const apiUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}:generateKeywordHistoricalMetrics`
+    const apiUrl = googleAdsUrl(`customers/${customerId}:generateKeywordHistoricalMetrics`)
     const currency = currencyForCountry(country)
     const nowIso = new Date().toISOString()
 
