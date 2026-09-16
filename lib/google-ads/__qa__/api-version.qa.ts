@@ -194,8 +194,80 @@ async function main() {
       check(`D2-${label}: served on ${GOOGLE_ADS_API_VERSION}`, status === 401,
         `HTTP ${status} (404 would mean this version no longer offers it)`)
     }
+    // ── E) the schema contract ───────────────────────────────────────────
+    //
+    // The probe above proves the version SERVES our endpoints. It says nothing
+    // about whether the fields still exist. Google publishes a discovery
+    // document per version, so the real question — "does the version we ship
+    // still carry every field this code sends and reads?" — can be asked
+    // directly, and asked again at the NEXT bump instead of re-investigated.
+    //
+    // Names embed the version (GoogleAdsGoogleadsV25Common__X), so they are
+    // normalized before matching.
+    console.log('\nE) every field we send and read exists in the configured version')
+    const discovery = await (async () => {
+      try {
+        const res = await fetch(`https://googleads.googleapis.com/$discovery/rest?version=${GOOGLE_ADS_API_VERSION}`)
+        return res.ok ? await res.json() as { schemas?: Record<string, { properties?: Record<string, { type?: string; $ref?: string; enum?: string[] }> }> } : null
+      } catch { return null }
+    })()
+    check('E1: Google publishes a discovery document for this version', Boolean(discovery?.schemas))
+
+    if (discovery?.schemas) {
+      const schemas = discovery.schemas
+      const norm = (x: string) => x.replace(/V2[0-9]/g, 'V')
+      const find = (suffix: string) => {
+        const key = Object.keys(schemas).find((k) => norm(k).endsWith(norm(suffix)))
+        return key ? schemas[key] : null
+      }
+      /** message → the fields this codebase depends on, with their expected type. */
+      const CONTRACT: Array<[string, Array<[string, string]>]> = [
+        // sent — lib/google-ads/keyword-ideas.ts
+        ['Services__GenerateKeywordIdeasRequest', [
+          ['keywordSeed', '$ref'], ['urlSeed', '$ref'], ['keywordAndUrlSeed', '$ref'],
+          ['geoTargetConstants', 'array'], ['language', 'string'],
+          ['includeAdultKeywords', 'boolean'], ['keywordPlanNetwork', 'string'],
+          ['pageSize', 'integer'], ['pageToken', 'string'],
+        ]],
+        // sent — keyword-metrics/route.ts and keyword-trends/route.ts
+        ['Services__GenerateKeywordHistoricalMetricsRequest', [
+          ['keywords', 'array'], ['geoTargetConstants', 'array'],
+          ['language', 'string'], ['keywordPlanNetwork', 'string'],
+        ]],
+        // read
+        ['Services__GenerateKeywordIdeaResponse', [['results', 'array'], ['nextPageToken', 'string']]],
+        ['Services__GenerateKeywordIdeaResult', [['text', 'string'], ['keywordIdeaMetrics', '$ref']]],
+        ['Services__GenerateKeywordHistoricalMetricsResponse', [['results', 'array']]],
+        ['Services__GenerateKeywordHistoricalMetricsResult', [['text', 'string'], ['keywordMetrics', '$ref']]],
+        ['Common__KeywordPlanHistoricalMetrics', [
+          ['avgMonthlySearches', 'string'], ['competition', 'string'], ['competitionIndex', 'string'],
+        ]],
+      ]
+      let missing = 0
+      for (const [message, fields] of CONTRACT) {
+        const schema = find(message)
+        if (!schema?.properties) { missing++; console.log(`    ✗ message absent: ${message}`); continue }
+        for (const [field, expected] of fields) {
+          const prop = schema.properties[field]
+          const ok = Boolean(prop) && (expected === '$ref' ? Boolean(prop.$ref) : prop.type === expected)
+          if (!ok) { missing++; console.log(`    ✗ ${message}.${field}: expected ${expected}, got ${prop ? (prop.type ?? prop.$ref) : 'ABSENT'}`) }
+        }
+      }
+      const total = CONTRACT.reduce((n, [, f]) => n + f.length, 0)
+      check(`E2: all ${total} fields this code depends on are present, with the same types`,
+        missing === 0, `${missing} missing or retyped`)
+
+      // The two enums whose VALUES appear as literals in our code.
+      const metrics = find('Common__KeywordPlanHistoricalMetrics')
+      const competition = metrics?.properties?.competition?.enum ?? []
+      check('E3: the competition values our code matches on still exist',
+        ['LOW', 'MEDIUM', 'HIGH'].every((v) => competition.includes(v)), JSON.stringify(competition))
+      const network = find('Services__GenerateKeywordIdeasRequest')?.properties?.keywordPlanNetwork?.enum ?? []
+      check('E4: GOOGLE_SEARCH is still a valid keywordPlanNetwork',
+        network.includes('GOOGLE_SEARCH'), JSON.stringify(network))
+    }
   } else {
-    console.log('\nD) live probe skipped (set GOOGLE_ADS_LIVE_PROBE=1 to run it)')
+    console.log('\nD/E) live probe and schema contract skipped (set GOOGLE_ADS_LIVE_PROBE=1)')
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
