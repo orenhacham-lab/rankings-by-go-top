@@ -1154,6 +1154,8 @@ export const dashboardEn = {
           missing_scope: 'A required permission is missing.',
           network: 'Could not reach Shopify.',
           api_error: 'Shopify API error.',
+          billing_not_entitled: 'Publishing to Shopify needs an active plan for this store. Choose a plan in the app inside Shopify Admin.',
+          billing_unavailable: 'We couldn’t verify the plan just now. This is temporary — try publishing again shortly.',
           exact_failure: 'Publishing failed.',
         },
       },

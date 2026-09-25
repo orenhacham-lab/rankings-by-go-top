@@ -28,6 +28,7 @@ import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getUserEntitlement } from '@/lib/subscription'
 import { recordShopifyBillingCache } from './billing-cache'
 import type { ShopifyPlanHandle } from './constants'
+import { isAdminUser } from '@/lib/auth/admin-role'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -48,6 +49,8 @@ export type ShopifyPublishEntitlementResult =
   | { ok: true; governedBy: 'shopify'; planHandle: ShopifyPlanHandle }
   /** The WEBSITE bills this account: its own entitlement was verified instead. */
   | { ok: true; governedBy: 'website' }
+  /** A verified administrator (profiles.role, service-role read): no plan required. */
+  | { ok: true; governedBy: 'admin' }
   | { ok: false; reason: ShopifyPublishDenyReason; detail?: string }
 
 const recordBillingCache = recordShopifyBillingCache
@@ -75,6 +78,22 @@ export async function checkShopifyPublishEntitlement(
   //    Authority is READ here, never changed. A governance read failure fails
   //    closed, and a website-governed account is still checked — against its
   //    real website entitlement, not waved through.
+  // ADMINISTRATORS FIRST — the same rule every other entitlement gate applies
+  // (lib/subscription.ts getUserEntitlement/hasAccess, lib/content/
+  // entitlement-guard.ts since PR #62, /api/shopify/app-home, and
+  // start-intent, which keeps admins away from Shopify billing entirely).
+  // This gate was the one that skipped it: an administrator who installed the
+  // live app from the App Store has billing_authority='shopify' and no Shopify
+  // plan, so the connector home told them "Admin account — full access … does
+  // not require a billing plan" while every publish was refused with
+  // no_active_shopify_plan. The role is read server-side from profiles.role
+  // (lib/auth/admin-role.ts) and fails closed; the owner of this connection
+  // was already verified upstream. No Partner API call and no billing-cache
+  // write happen for an admin, exactly as in app-home.
+  if (await isAdminUser(admin, connection.user_id)) {
+    return { ok: true, governedBy: 'admin' }
+  }
+
   const authority = await resolveBillingAuthority(admin, connection.user_id)
   if (!authority.ok) {
     return { ok: false, reason: 'billing_authority_unavailable', detail: authority.reason }

@@ -1155,6 +1155,8 @@ export const dashboardHe = {
           missing_scope: 'חסרה הרשאה נדרשת.',
           network: 'לא ניתן להתחבר ל-Shopify.',
           api_error: 'שגיאת Shopify API.',
+          billing_not_entitled: 'פרסום ל-Shopify דורש תוכנית פעילה לחנות הזו. בחרו תוכנית באפליקציה בתוך Shopify Admin.',
+          billing_unavailable: 'לא הצלחנו לאמת את התוכנית כרגע. זה זמני — נסו לפרסם שוב בעוד רגע.',
           exact_failure: 'הפרסום נכשל.',
         },
       },

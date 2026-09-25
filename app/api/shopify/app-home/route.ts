@@ -30,6 +30,7 @@ import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
+import { embeddedPublishErrorMessage } from '@/lib/shopify/publish-error-display'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -228,7 +229,7 @@ export async function GET(request: Request) {
     // Shopify plan to a website-billed merchant.
     billingProvider: billingStateUnavailable ? 'unavailable' : (shopifyBills ? 'shopify' : 'website'),
     lastPublish: lastArticle
-      ? { status: lastArticle.shopify_status, lastError: lastArticle.shopify_last_error, lastSyncedAt: lastArticle.shopify_last_synced_at }
+      ? { status: lastArticle.shopify_status, lastError: embeddedPublishErrorMessage(lastArticle.shopify_last_error), lastSyncedAt: lastArticle.shopify_last_synced_at }
       : null,
   })
 }
