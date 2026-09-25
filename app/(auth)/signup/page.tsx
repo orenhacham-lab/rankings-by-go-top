@@ -48,6 +48,10 @@ const SIGNUP_UI = {
       emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר או לאפס סיסמה.',
       emailRateLimit: 'נשלחו יותר מדי בקשות הרשמה בזמן קצר. נסו שוב בעוד כמה דקות או השתמשו בכתובת אימייל אחרת.',
       signupFailed: 'אירעה שגיאה ביצירת החשבון. אנא נסו שוב.',
+      weakPasswordLength: (min: number) => `הסיסמה חייבת להכיל לפחות ${min} תווים`,
+      weakPasswordCharacters: 'הסיסמה חייבת לכלול אותיות קטנות וגדולות באנגלית, ספרות ותווים מיוחדים לפי דרישות האבטחה',
+      weakPasswordPwned: 'הסיסמה הזו הופיעה בדליפות מידע ידועות. בחרו סיסמה אחרת.',
+      weakPassword: 'הסיסמה אינה עומדת בדרישות האבטחה. בחרו סיסמה חזקה יותר.',
       createTrialFailed: 'אירעה שגיאה בהפעלת תקופת הניסיון. אנא נסו שוב.',
     },
     success: {
@@ -91,6 +95,10 @@ const SIGNUP_UI = {
       emailExists: 'This email is already registered. Please sign in or reset your password.',
       emailRateLimit: 'Too many signup requests were sent in a short time. Please try again in a few minutes or use a different email address.',
       signupFailed: 'An error occurred while creating your account. Please try again.',
+      weakPasswordLength: (min: number) => `Password must be at least ${min} characters`,
+      weakPasswordCharacters: 'Password must include lowercase and uppercase letters, digits and symbols as required',
+      weakPasswordPwned: 'This password has appeared in known data breaches. Please choose a different one.',
+      weakPassword: 'This password does not meet the security requirements. Please choose a stronger one.',
       createTrialFailed: 'An error occurred while activating your trial. Please try again.',
     },
     success: {
@@ -259,7 +267,19 @@ export function SignupForm() {
         console.error('Signup auth error:', authError)
         const msg = (authError.message || '').toLowerCase()
         const code = ((authError as { code?: string }).code || '').toLowerCase()
-        if (
+        // Supabase enforces the project's password policy (length / required
+        // characters / leaked passwords) and answers `weak_password` with the
+        // reasons. The client check below it only knows "8 characters", so a
+        // stricter policy used to surface as the generic "signup failed".
+        const reasons = ((authError as { reasons?: unknown }).reasons as string[] | undefined) ?? []
+        if (code === 'weak_password' || reasons.length > 0) {
+          const min = Number(/at least (\d+) characters/i.exec(authError.message || '')?.[1])
+          const parts: string[] = []
+          if (reasons.includes('length')) parts.push(t.err.weakPasswordLength(Number.isFinite(min) && min > 0 ? min : 8))
+          if (reasons.includes('characters')) parts.push(t.err.weakPasswordCharacters)
+          if (reasons.includes('pwned')) parts.push(t.err.weakPasswordPwned)
+          setError(parts.length > 0 ? parts.join(' · ') : t.err.weakPassword)
+        } else if (
           msg.includes('rate limit') ||
           msg.includes('too many') ||
           code.includes('rate_limit') ||

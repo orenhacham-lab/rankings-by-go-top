@@ -67,6 +67,16 @@ export async function POST(request: Request) {
     if ('error' in loaded) {
       return Response.json({ ok: false, error: loaded.error }, { status: loaded.status })
     }
+    // The stored password may only ever be sent to the site it was saved for.
+    // Otherwise any session on this project could point `siteUrl` at a host it
+    // controls and receive the decrypted application password as Basic auth.
+    if (!sameSiteOrigin(siteUrl, loaded.creds.siteUrl)) {
+      return Response.json({
+        ok: false,
+        user: null,
+        error: 'Enter the application password to test a different site address.',
+      }, { status: 400 })
+    }
     const result = await testConnection({
       siteUrl,
       username,
@@ -111,4 +121,18 @@ export async function POST(request: Request) {
     error: result.ok ? null : result.error,
     lastTestedAt: now,
   })
+}
+
+/** Same scheme + host + port, tolerating a missing scheme and a leading www. */
+function sameSiteOrigin(a: string, b: string): boolean {
+  const norm = (v: string) => {
+    try {
+      const u = new URL(/^https?:\/\//i.test(v.trim()) ? v.trim() : `https://${v.trim()}`)
+      return `${u.protocol}//${u.hostname.toLowerCase().replace(/^www\./, '')}:${u.port || (u.protocol === 'https:' ? '443' : '80')}`
+    } catch {
+      return null
+    }
+  }
+  const na = norm(a)
+  return na !== null && na === norm(b)
 }

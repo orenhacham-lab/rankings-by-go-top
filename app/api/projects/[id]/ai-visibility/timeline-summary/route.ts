@@ -127,7 +127,8 @@ export async function GET(
     return Response.json({ error: ERR.notFound }, { status: 404 })
   }
   const ownerId = (project as { user_id?: string | null }).user_id
-  if (ownerId && ownerId !== user.id) {
+  // Strict: a project with NO owner is not "anyone's" (was `ownerId && ...`).
+  if (ownerId !== user.id) {
     return Response.json({ error: ERR.forbidden }, { status: 403 })
   }
 

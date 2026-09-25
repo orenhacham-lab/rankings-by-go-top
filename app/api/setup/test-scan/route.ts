@@ -1,13 +1,21 @@
 /**
  * POST /api/setup/test-scan
  *
- * Public — no auth required. Used by the setup wizard to verify
+ * Administrators only (open only while Supabase is unconfigured). Used by the setup wizard to verify
  * the Serper API key works with a real query.
  */
 
 import { runScan } from '@/lib/scanner'
+import { requireAdminApi, isSupabaseUnconfigured } from '@/lib/auth/require-admin'
 
 export async function POST(request: Request) {
+  // Operator-only. Open solely while Supabase is unconfigured (first-run wizard);
+  // otherwise this spent the Serper key and exposed configuration to anyone.
+  if (!isSupabaseUnconfigured()) {
+    const gate = await requireAdminApi()
+    if (!gate.ok) return gate.response
+  }
+
   let body: {
     keyword?: string
     engine?: string

@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { googleAdsUrl } from '@/lib/google-ads/client'
+import { isAdminUser } from '@/lib/auth/admin-role'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 interface TokenResponse {
   access_token?: string
@@ -41,6 +43,11 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return Response.json({ error: 'Unauthorized', stage: 'auth' }, { status: 401 })
+    }
+    // Operator-only diagnostic: it returns the platform's own Google Ads
+    // customer ids (including the MCC). It used to answer any signed-in user.
+    if (!(await isAdminUser(createAdminClient(), user.id))) {
+      return Response.json({ error: 'Forbidden', stage: 'auth' }, { status: 403 })
     }
 
     // Check required env vars

@@ -13,6 +13,29 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Baseline hardening for every response (OWASP A02). None of these
+        // change what a page may load, so they cannot break GTM, PayPal or
+        // App Bridge; a full script CSP is intentionally NOT set here.
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        ],
+      },
+      {
+        // Anti-clickjacking for everything EXCEPT the Shopify surfaces, which
+        // Shopify Admin frames (the /shopify/app rule below scopes those to
+        // Shopify). Sending a second CSP there would be enforced alongside it
+        // and block the Admin iframe, hence the exclusion.
+        source: '/((?!shopify/|shopify$|api/shopify/).*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+        ],
+      },
+      {
         source: '/favicon.ico',
         headers: [
           {

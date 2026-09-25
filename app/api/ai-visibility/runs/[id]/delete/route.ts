@@ -61,7 +61,7 @@ export async function DELETE(
 
   if (deleteError) {
     return Response.json(
-      { error: `Failed to delete: ${deleteError.message}` },
+      { error: 'Failed to delete' },
       { status: 500 }
     )
   }

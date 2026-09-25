@@ -16,7 +16,6 @@ export async function GET() {
     ok: true,
     contentEnabled: isContentModuleEnabled(),
     automationEnabled: isContentAutomationEnabled(),
-    cronSecretConfigured: !!process.env.CRON_SECRET,
     commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
   })
 }

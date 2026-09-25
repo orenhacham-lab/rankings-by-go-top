@@ -55,7 +55,7 @@ export async function GET() {
     .eq('is_active', true)
 
   if (projectsError) {
-    return Response.json({ error: `Failed to load projects: ${projectsError.message}` }, { status: 500 })
+    return Response.json({ error: 'Failed to load projects' }, { status: 500 })
   }
 
   const projectIds = (projects ?? []).map((p) => p.id as string)

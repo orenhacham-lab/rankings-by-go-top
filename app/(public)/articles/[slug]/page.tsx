@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
+import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 // ============================================================
 // ARTICLE ACCESS CONTROL NOTE
@@ -112,11 +113,15 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   // Extract headings for TOC and add IDs
   let headings: Array<{ text: string; id: string; level: number }> = []
-  let contentWithIds = article.content
+  // Sanitized at render as well as on write (lib/content/public-article-html):
+  // this HTML is injected on the app's own origin.
+  const safeContent = sanitizePublicArticleHtml(article.content)
+  let contentWithIds = safeContent
 
   if (typeof document !== 'undefined') {
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = article.content
+    // DOMParser, not innerHTML on a detached element: an inert document never
+    // loads images or fires handlers while the headings are being read.
+    const tempDiv = new DOMParser().parseFromString(safeContent, 'text/html').body
 
     Array.from(tempDiv.querySelectorAll('h2, h3')).forEach((heading, index) => {
       const text = heading.textContent || ''

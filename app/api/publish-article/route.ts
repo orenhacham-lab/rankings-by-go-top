@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createHash, timingSafeEqual } from 'crypto'
+import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
+
+function constantTimeEquals(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a).digest()
+  const hb = createHash('sha256').update(b).digest()
+  return timingSafeEqual(ha, hb)
+}
 
 export async function POST(request: NextRequest) {
   try {
     // Verify this is an internal request with proper authorization
-    const authHeader = request.headers.get('authorization')
+    const authHeader = request.headers.get('authorization') ?? ''
     const token = process.env.INTERNAL_API_TOKEN
 
-    if (!token || authHeader !== `Bearer ${token}`) {
+    if (!token || !constantTimeEquals(authHeader, `Bearer ${token}`)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -29,7 +37,8 @@ export async function POST(request: NextRequest) {
         title: body.title,
         slug: body.slug,
         excerpt: body.excerpt || null,
-        content: body.content,
+        // Rendered as HTML on the public site — never stored as received.
+        content: sanitizePublicArticleHtml(body.content),
         meta_description: body.meta_description || null,
         featured_image_url: body.featured_image_url || null,
         featured_image_alt: body.featured_image_alt || null,

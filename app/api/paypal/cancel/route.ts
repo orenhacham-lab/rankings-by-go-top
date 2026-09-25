@@ -66,10 +66,9 @@ export async function POST() {
 
     return Response.json({ success: true })
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('[PayPal Cancel] Error:', error)
     return Response.json(
-      { error: `Cancellation failed: ${errorMsg}` },
+      { error: 'Cancellation failed' },
       { status: 500 }
     )
   }

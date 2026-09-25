@@ -82,7 +82,8 @@ async function authAndProject(projectId: string | null | undefined) {
   }
 
   const ownerId = (project as { user_id?: string | null }).user_id
-  if (ownerId && ownerId !== user.id) {
+  // Strict: a project with NO owner is not "anyone's" (was `ownerId && ...`).
+  if (ownerId !== user.id) {
     return { error: ERR_HEBREW.forbidden, status: 403 as const }
   }
 
@@ -188,7 +189,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return Response.json({ error: ERR_HEBREW.columnMissing, columnMissing: true }, { status: 500 })
     }
     return Response.json(
-      { error: `${ERR_HEBREW.saveFailed} (${error.message})` },
+      { error: ERR_HEBREW.saveFailed },
       { status: 500 },
     )
   }
@@ -217,7 +218,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       return Response.json({ ok: true, columnMissing: true })
     }
     return Response.json(
-      { error: `${ERR_HEBREW.resetFailed} (${error.message})` },
+      { error: ERR_HEBREW.resetFailed },
       { status: 500 },
     )
   }

@@ -2,12 +2,13 @@
  * GET /api/setup/logs
  *
  * Returns recent scan errors and failed scans.
- * Requires auth (inside the dashboard) — but gracefully handles
+ * Administrators only (requireAdminApi) — gracefully handles
  * the case where Supabase isn't configured yet.
  */
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireAdminApi } from '@/lib/auth/require-admin'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -20,6 +21,11 @@ export async function GET(request: Request) {
   ) {
     return Response.json({ logs: [], error: 'Supabase לא מוגדר' })
   }
+
+  // Operator-only: this reads EVERY tenant's failed scans and keyword errors
+  // with the service-role client. It previously had no auth check at all.
+  const gate = await requireAdminApi()
+  if (!gate.ok) return gate.response
 
   try {
     // Use admin client for logs (bypasses RLS)

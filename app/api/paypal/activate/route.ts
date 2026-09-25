@@ -85,11 +85,11 @@ export async function POST(request: Request) {
 
     if (result.kind === 'lookup_failed') {
       console.error('[paypal-activate] failed to look up existing subscription', { userId: user.id, message: result.message })
-      return Response.json({ error: `Failed to check existing subscription: ${result.message}` }, { status: 500 })
+      return Response.json({ error: 'Failed to check existing subscription' }, { status: 500 })
     }
     if (result.kind === 'write_failed') {
       console.error('[paypal-activate] failed to save subscription', { userId: user.id, message: result.message })
-      return Response.json({ error: `Failed to save subscription: ${result.message}` }, { status: 500 })
+      return Response.json({ error: 'Failed to save subscription' }, { status: 500 })
     }
     if (result.kind === 'multiple_current_entitlement_rows') {
       // Data-integrity violation that predates this request — never guess
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     console.error('Subscription activation error:', error)
     console.error('Error details:', errorMsg)
     return Response.json(
-      { error: `Subscription activation failed: ${errorMsg}` },
+      { error: 'Subscription activation failed' },
       { status: 500 }
     )
   }

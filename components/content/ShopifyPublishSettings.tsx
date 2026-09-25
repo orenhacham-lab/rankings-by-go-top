@@ -17,6 +17,7 @@ import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { publishErrorKey } from '@/lib/shopify/publish-error-display'
 
 type Blog = { id: string; title: string; handle: string }
 type Conn = { shop_domain: string; can_publish: boolean; granted_scopes: string[]; default_blog_id: string | null } | null
@@ -49,7 +50,10 @@ export default function ShopifyPublishSettings({
   const [busy, setBusy] = useState<'draft' | 'publish' | 'update' | null>(null)
   const [status, setStatus] = useState<string | null>(initialStatus)
   const [articleUrl, setArticleUrl] = useState<string | null>(initialArticleUrl)
-  const [lastError, setLastError] = useState<string | null>(initialLastError)
+  // The stored value is a diagnostic code; show its translation, never the raw text.
+  const [lastError, setLastError] = useState<string | null>(
+    initialLastError ? ((t.errors as Record<string, string>)[publishErrorKey(initialLastError) ?? ''] || t.errors.exact_failure) : null,
+  )
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   const canPublish = !!conn?.can_publish
@@ -124,9 +128,10 @@ export default function ShopifyPublishSettings({
         if (Array.isArray(data.imageWarnings) && data.imageWarnings.length) text = `${text} · ${t.imageWarn}`
         setMessage({ text, ok: true })
       } else {
-        const detail = typeof data.detail === 'string' && data.detail ? ` (${data.detail.slice(0, 160)})` : ''
-        setLastError(mapErr(data.reason || data.error) + detail)
-        setMessage({ text: mapErr(data.reason || data.error) + detail, ok: false })
+        // `detail` is a provider/diagnostic code (e.g. no_subscription) — not shown.
+        const text = mapErr(publishErrorKey(data.reason || data.error))
+        setLastError(text)
+        setMessage({ text, ok: false })
       }
     } catch { setMessage({ text: t.errors.exact_failure, ok: false }) } finally { setBusy(null) }
   }
