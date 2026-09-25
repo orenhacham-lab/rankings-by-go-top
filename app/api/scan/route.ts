@@ -19,6 +19,7 @@ import {
   Deadline, DeadlineExceededError, withDeadline, logOperation, newRequestId,
 } from '@/lib/ops/deadline'
 import { claimOperation, releaseOperationClaim, rankingScanScope } from '@/lib/ops/single-flight'
+import { isAdminUser } from '@/lib/auth/admin-role'
 
 /**
  * The platform ceiling this handler must ALWAYS answer inside.
@@ -85,13 +86,36 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { projectId, targetId, triggeredBy = 'manual' } = body
+  const { projectId, targetId } = body
+  // This route only ever runs a merchant's MANUAL scan (scheduled scans go
+  // through lib/scan-scheduler). The value used to be taken from the body and
+  // stored as-is, and it also selects which running scan is resumed.
+  const triggeredBy = 'manual'
 
   if (!projectId) {
     return Response.json({ error: 'projectId is required' }, { status: 400 })
   }
 
   const admin = createAdminClient()
+
+  // OWNERSHIP, BEFORE ANYTHING ELSE. Everything below runs on the service-role
+  // client, which bypasses RLS, and loads the project and its targets by the
+  // id from the request. Without this check any signed-in user could scan
+  // another tenant's project, read its keywords and positions in the response,
+  // and spend the platform's provider credit. An unknown and a foreign project
+  // answer identically, so the response does not reveal which ids exist.
+  // Administrators keep the access the RLS isolation policies give them.
+  {
+    const { data: owned } = await admin
+      .from('projects')
+      .select('id, user_id')
+      .eq('id', projectId)
+      .maybeSingle()
+    const ownerId = (owned as { user_id?: string | null } | null)?.user_id ?? null
+    if (!owned || (ownerId !== user.id && !(await isAdminUser(admin, user.id)))) {
+      return Response.json({ error: 'Project not found' }, { status: 404 })
+    }
+  }
   diag.userId = user.id
   diag.projectId = projectId
   if (targetId) diag.targetId = targetId
@@ -300,7 +324,8 @@ export async function POST(request: Request) {
 
     if (targetsError) {
       await releaseIfReserved('targets_load_failed')
-      return Response.json({ error: `Failed to load targets: ${targetsError.message}` }, { status: 500 })
+      console.error('[scan] targets load failed', { requestId, code: targetsError.code })
+      return Response.json({ error: 'Failed to load targets', requestId }, { status: 500 })
     }
     if (!targets || targets.length === 0) {
       await releaseIfReserved('no_active_targets')
@@ -345,7 +370,8 @@ export async function POST(request: Request) {
 
       if (scanError || !newScan) {
         await releaseIfReserved('scan_record_create_failed')
-        return Response.json({ error: `Failed to create scan record: ${scanError?.message}` }, { status: 500 })
+        console.error('[scan] scan record insert failed', { requestId, code: scanError?.code })
+        return Response.json({ error: 'Failed to create scan record', requestId }, { status: 500 })
       }
       scanData = newScan
     }

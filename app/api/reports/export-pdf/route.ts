@@ -153,7 +153,7 @@ export async function POST(req: Request) {
     console.log('[PDFShift Request]', {
       url: 'https://api.pdfshift.io/v3/convert/pdf',
       method: 'POST',
-      headers: requestHeaders,
+      // Never log requestHeaders: it carries the PDFShift API key.
       body: { source: `(${html.length} bytes)`, landscape: false },
     })
 

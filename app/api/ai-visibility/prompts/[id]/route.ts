@@ -59,7 +59,7 @@ export async function DELETE(
 
   if (deleteError) {
     return Response.json(
-      { error: `Failed to delete prompt: ${deleteError.message}` },
+      { error: 'Failed to delete prompt' },
       { status: 500 }
     )
   }

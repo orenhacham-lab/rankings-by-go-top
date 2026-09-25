@@ -1,11 +1,12 @@
 /**
  * GET /api/setup/status
  *
- * Public endpoint — no auth required (needed before auth is configured).
+ * Administrators only, except while Supabase is unconfigured (first-run wizard).
  * Tests each integration and returns live status.
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireAdminApi, isSupabaseUnconfigured } from '@/lib/auth/require-admin'
 
 interface ServiceStatus {
   ok: boolean
@@ -25,6 +26,13 @@ interface StatusResponse {
 }
 
 export async function GET(): Promise<Response> {
+  // Operator-only. Open solely while Supabase is unconfigured (first-run wizard);
+  // otherwise this spent the Serper key and exposed configuration to anyone.
+  if (!isSupabaseUnconfigured()) {
+    const gate = await requireAdminApi()
+    if (!gate.ok) return gate.response
+  }
+
   const envVars = {
     supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your_'),
     supabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('your_'),

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
         code: error.code,
       })
       return NextResponse.json(
-        { error: `שגיאה בהוספת לקוח: ${error.message}` },
+        { error: 'שגיאה בהוספת לקוח' },
         { status: 400 }
       )
     }

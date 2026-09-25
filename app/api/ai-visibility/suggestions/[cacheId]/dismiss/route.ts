@@ -70,7 +70,7 @@ export async function POST(
     .eq('project_id', projectId)
 
   if (error) {
-    return NextResponse.json({ error: `Failed to dismiss: ${error.message}` }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to dismiss' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })

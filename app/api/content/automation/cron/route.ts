@@ -11,6 +11,7 @@
 import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { runAutomation } from '@/lib/content/automation/runner'
+import { authorizeCronRequest } from '@/lib/auth/cron'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -20,13 +21,9 @@ export const dynamic = 'force-dynamic'
 async function handle(request: Request): Promise<Response> {
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
+  // Bearer CRON_SECRET, required — refuses when the secret is unset.
+  const denied = authorizeCronRequest(request, 'automation-cron')
+  if (denied) return denied
 
   const admin = createAdminClient()
   try {

@@ -22,17 +22,13 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { authorizeCronRequest } from '@/lib/auth/cron'
 import { processScheduledScanForProject } from '@/lib/scan-scheduler/process-scheduled-scan'
 
 export async function GET(request: Request) {
-  // Verify cron secret when configured
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
+  // Bearer CRON_SECRET, required — refuses when the secret is unset.
+  const denied = authorizeCronRequest(request, 'Schedule')
+  if (denied) return denied
 
   const admin = createAdminClient()
   const now = new Date()
@@ -52,7 +48,7 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error('[Schedule] Error loading projects:', error.message)
-    return Response.json({ error: error.message }, { status: 500 })
+    return Response.json({ error: 'load_failed' }, { status: 500 })
   }
 
   if (!projects || projects.length === 0) {

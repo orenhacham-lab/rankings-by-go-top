@@ -20,7 +20,7 @@ export async function GET() {
 
     if (error) {
       return Response.json(
-        { error: error.message },
+        { error: 'Request failed' },
         { status: 500 }
       )
     }

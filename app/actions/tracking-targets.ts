@@ -7,6 +7,7 @@ import { getUserEntitlement } from '@/lib/subscription'
 import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
 import type { ExactPointResolutionSource } from '@/lib/supabase/types'
+import { isAdminUser } from '@/lib/auth/admin-role'
 
 function safeStringFromFormData(formData: FormData, key: string): string | null {
   const value = formData.get(key)
@@ -95,6 +96,26 @@ async function fetchProjectCountry(
   return (data.country || 'IL').toString()
 }
 
+/**
+ * The project must belong to the caller. The insert runs on the session client,
+ * and tracking_targets' RLS WITH CHECK now enforces this too
+ * (20260925000000_security_owasp_hardening.sql); this check fails early with a
+ * clear message and does not depend on the policy alone. Under RLS a foreign
+ * project is simply invisible, so "not found" and "not yours" read the same.
+ */
+async function assertOwnedProject(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  projectId: string
+): Promise<void> {
+  if (!projectId) throw new Error('לא נמצא פרויקט')
+  const { data } = await supabase.from('projects').select('id, user_id').eq('id', projectId).maybeSingle()
+  const owner = (data as { user_id?: string | null } | null)?.user_id
+  if (!data || (owner !== userId && !(await isAdminUser(createAdminClient(), userId)))) {
+    throw new Error('לא נמצא פרויקט')
+  }
+}
+
 export async function createTrackingTargetAction(formData: FormData) {
   const supabase = await createClient()
 
@@ -102,6 +123,7 @@ export async function createTrackingTargetAction(formData: FormData) {
   if (!user) throw new Error('לא מחובר')
 
   const projectId = formData.get('project_id') as string
+  await assertOwnedProject(supabase, user.id, projectId)
 
   // Enforce keyword limit per project
   // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
@@ -248,6 +270,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   if (!user) throw new Error('לא מחובר')
 
   const projectId = formData.get('project_id') as string
+  await assertOwnedProject(supabase, user.id, projectId)
   const engineType = formData.get('engine_type') as string
   const targetDomain = (formData.get('target_domain') as string) || null
   const targetBusinessName = (formData.get('target_business_name') as string) || null

@@ -80,7 +80,7 @@ export async function PATCH(
 
   if (updateError) {
     return Response.json(
-      { error: `Failed to update result: ${updateError.message}` },
+      { error: 'Failed to update result' },
       { status: 500 }
     )
   }

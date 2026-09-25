@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
   if (error) {
     return NextResponse.json(
-      { error: `שגיאה בהעלאה: ${error.message}. ודא שה-bucket "${BUCKET}" קיים.` },
+      { error: 'שגיאה בהעלאה' },
       { status: 500 }
     )
   }

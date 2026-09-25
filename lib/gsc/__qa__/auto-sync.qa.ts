@@ -192,7 +192,12 @@ async function main() {
     const route = strip(read('app/api/gsc/sync/cron/route.ts'))
     check('reuses the existing executeManualSync engine', /executeManualSync\(\{/.test(route))
     check('reuses the shared store/client adapters', /makeSyncStore\(admin\)/.test(route) && /makeSyncClient\(accessToken/.test(route))
-    check('does NOT skip auth when the secret is absent', /if \(!cronSecret\)/.test(route) && !/if \(cronSecret\) \{/.test(route))
+    // The fail-closed check moved into the shared helper (lib/auth/cron.ts) that
+    // every cron route now uses; section C above exercises it end to end.
+    const cronHelper = strip(read('lib/auth/cron.ts'))
+    check('does NOT skip auth when the secret is absent',
+      !/if \(cronSecret\) \{/.test(route)
+      && (/if \(!cronSecret\)/.test(route) || (/authorizeCronRequest\(request/.test(route) && /if \(!secret\) \{[\s\S]{0,200}status: 503/.test(cronHelper))))
     check('never logs tokens', !/accessToken[^)]*console|console\.[a-z]+\([^)]*token/i.test(route))
 
     const store = strip(read('lib/gsc/auto-sync-store.ts'))

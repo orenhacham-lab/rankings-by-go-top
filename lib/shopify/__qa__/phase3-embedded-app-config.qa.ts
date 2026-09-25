@@ -189,10 +189,34 @@ async function main() {
     // comment (next.config.ts's own comment explains that the site sets no
     // X-Frame-Options — matching that text would be a false failure, the
     // mirror image of the comment trap guarded against for the TOML above).
-    check('8c: no X-Frame-Options header is emitted anywhere (it would override the CSP and block framing)',
-      !/key:\s*['"]X-Frame-Options['"]/i.test(cfg))
-    check('8c: the only CSP emitted is the frame-ancestors one for /shopify/app',
-      (cfg.match(/key:\s*['"]Content-Security-Policy['"]/gi) || []).length === 1)
+    // 8c is about what /shopify/app actually RECEIVES. Site-wide anti-framing
+    // headers (OWASP audit, 20260925) are allowed only on rules that do not
+    // match the Shopify surfaces, so the rules are evaluated with Next's own
+    // path matcher rather than grepped. The same property is asserted over
+    // HTTP in lib/__qa__/reviewer-journey/security-owasp.js.
+    type HeaderRule = { source: string; headers: Array<{ key: string; value: string }> }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getPathMatch } = require('next/dist/shared/lib/router/utils/path-match')
+    const headersFor = (rules: HeaderRule[], path: string) =>
+      rules.filter((r) => getPathMatch(r.source, { removeUnnamedParams: true, strict: false })(path) !== false)
+        .flatMap((r) => r.headers)
+    const framing = (rules: HeaderRule[], path: string) => {
+      const hs = headersFor(rules, path)
+      return {
+        xfo: hs.filter((h) => h.key.toLowerCase() === 'x-frame-options').length,
+        csp: hs.filter((h) => h.key.toLowerCase() === 'content-security-policy').map((h) => h.value),
+      }
+    }
+    const nextConfig = (await import(join(ROOT, 'next.config.ts'))).default
+    const rules: HeaderRule[] = await nextConfig.headers()
+    for (const path of ['/shopify/app', '/shopify/app/settings']) {
+      const f = framing(rules, path)
+      check(`8c: ${path} receives no X-Frame-Options (it would override the CSP and block framing)`, f.xfo === 0, JSON.stringify(f))
+      check(`8c: ${path} receives exactly one CSP, the Shopify frame-ancestors one`,
+        f.csp.length === 1 && /frame-ancestors https:\/\/admin\.shopify\.com/.test(f.csp[0]), JSON.stringify(f))
+    }
+    check('8c MUTATION CONTROL: a site-wide X-Frame-Options rule WOULD reach /shopify/app',
+      framing([...rules, { source: '/:path*', headers: [{ key: 'X-Frame-Options', value: 'DENY' }] }], '/shopify/app').xfo === 1)
   }
 
   console.log('\n9) EMBEDDED ENTRY FLOW — App Bridge initializes with SHOPIFY_PUBLIC_CLIENT_ID')

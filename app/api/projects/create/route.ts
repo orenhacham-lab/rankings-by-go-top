@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
         code: error.code,
       })
       return NextResponse.json(
-        { error: `שגיאה בהוספת פרויקט: ${error.message}` },
+        { error: 'שגיאה בהוספת פרויקט' },
         { status: 400 }
       )
     }

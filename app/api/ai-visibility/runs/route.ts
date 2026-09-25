@@ -235,7 +235,7 @@ export async function POST(request: Request) {
     if (runError || !run) {
       if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'run_create_failed' })
       return Response.json(
-        { error: `Failed to create scan run: ${runError?.message}` },
+        { error: 'Failed to create scan run' },
         { status: 500 }
       )
     }
@@ -345,7 +345,7 @@ export async function POST(request: Request) {
         .eq('id', run.id)
 
       return Response.json(
-        { error: `Failed to persist result: ${resultError?.message}` },
+        { error: 'Failed to persist result' },
         { status: 500 }
       )
     }
@@ -485,7 +485,7 @@ export async function GET(request: Request) {
     .limit(limit)
 
   if (runsError) {
-    return Response.json({ error: `Failed to load runs: ${runsError.message}` }, { status: 500 })
+    return Response.json({ error: 'Failed to load runs' }, { status: 500 })
   }
 
   const runIds = (runs ?? []).map((r) => r.id)

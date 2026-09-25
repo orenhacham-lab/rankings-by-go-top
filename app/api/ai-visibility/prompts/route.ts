@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    return Response.json({ error: `Failed to load prompts: ${error.message}` }, { status: 500 })
+    return Response.json({ error: 'Failed to load prompts' }, { status: 500 })
   }
 
   return Response.json({ prompts: prompts ?? [] })
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error || !row) {
-    return Response.json({ error: `Failed to create prompt: ${error?.message}` }, { status: 500 })
+    return Response.json({ error: 'Failed to create prompt' }, { status: 500 })
   }
 
   // If sourceSuggestionId provided, mark cache as accepted

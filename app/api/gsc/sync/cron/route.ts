@@ -26,23 +26,15 @@ import {
   type AutoSyncCandidate,
 } from '@/lib/gsc/auto-sync'
 import type { GscConnection } from '@/lib/supabase/types'
+import { authorizeCronRequest } from '@/lib/auth/cron'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-/** Bearer CRON_SECRET, required. Returns a Response to send, or null when authorized. */
+/** Bearer CRON_SECRET, required (lib/auth/cron.ts). Response to send, or null when authorized. */
 function authorizeCron(request: Request): Response | null {
-  const cronSecret = process.env.CRON_SECRET
-  // FAIL CLOSED: an unset secret must never mean "no authentication required".
-  if (!cronSecret) {
-    console.error('[gsc-auto-sync] refused: CRON_SECRET is not configured')
-    return Response.json({ ok: false, error: 'cron_not_configured' }, { status: 503 })
-  }
-  if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
-    return Response.json({ ok: false, error: 'unauthorized' }, { status: 401 })
-  }
-  return null
+  return authorizeCronRequest(request, 'gsc-auto-sync')
 }
 
 async function handle(request: Request): Promise<Response> {

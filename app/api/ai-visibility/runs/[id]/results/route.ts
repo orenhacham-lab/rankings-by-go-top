@@ -61,7 +61,7 @@ export async function GET(
 
   if (resultsError) {
     return Response.json(
-      { error: `Failed to load results: ${resultsError.message}` },
+      { error: 'Failed to load results' },
       { status: 500 }
     )
   }
@@ -78,7 +78,7 @@ export async function GET(
 
     if (citationsError) {
       return Response.json(
-        { error: `Failed to load citations: ${citationsError.message}` },
+        { error: 'Failed to load citations' },
         { status: 500 }
       )
     }

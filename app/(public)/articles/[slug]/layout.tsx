@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
 
 async function getArticleData(slug: string) {
   const supabase = await createClient()
@@ -174,19 +175,19 @@ export default async function ArticleLayout({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonForScriptTag(breadcrumbSchema) }}
       />
       {articleSchema && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+          dangerouslySetInnerHTML={{ __html: jsonForScriptTag(articleSchema) }}
         />
       )}
       {faqSchema.length > 0 && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: jsonForScriptTag({
               '@context': 'https://schema.org',
               '@type': 'FAQPage',
               mainEntity: faqSchema,

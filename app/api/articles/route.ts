@@ -38,7 +38,7 @@ export async function GET() {
     .select('id, slug, title, is_published, published_at, created_at, author')
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Request failed' }, { status: 500 })
   return NextResponse.json(data)
 }
 
@@ -72,6 +72,6 @@ export async function POST(req: Request) {
     meta_description: meta_description || null,
   }).select().single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Request failed' }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
 }
