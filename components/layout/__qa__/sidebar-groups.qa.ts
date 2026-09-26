@@ -24,9 +24,35 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 const ROOT = join(__dirname, '..', '..', '..')
 
 /** Next.js route groups under app/ — "(dashboard)", "(setup)", … */
-const routeGroups = readdirSync(join(ROOT, 'app'), { withFileTypes: true })
-  .filter((d) => d.isDirectory() && d.name.startsWith('(') && d.name.endsWith(')'))
-  .map((d) => d.name)
+/**
+ * Does this href have a page? A route group — a directory in (parentheses) — adds a
+ * layout without adding a URL segment, and may appear at ANY depth: /content lives at
+ * app/(dashboard)/content/(workspace)/page.tsx, because the content screens share a
+ * layout that the article editor beside them must not inherit. So resolution walks the
+ * href's real segments and is free to descend through any number of groups on the way.
+ */
+function routeExists(href: string): boolean {
+  const segments = href.split('/').filter(Boolean)
+  const groupsIn = (dir: string): string[] => {
+    try {
+      return readdirSync(dir, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && d.name.startsWith('(') && d.name.endsWith(')'))
+        .map((d) => d.name)
+    } catch { return [] }
+  }
+  const walk = (dir: string, rest: readonly string[]): boolean => {
+    if (rest.length === 0) {
+      // The page may sit directly here, or one or more route groups deeper.
+      if (existsSync(join(dir, 'page.tsx'))) return true
+      return groupsIn(dir).some((g) => walk(join(dir, g), rest))
+    }
+    const [head, ...tail] = rest
+    if (existsSync(join(dir, head)) && walk(join(dir, head), tail)) return true
+    return groupsIn(dir).some((g) => walk(join(dir, g), rest))
+  }
+  return walk(join(ROOT, 'app'), segments)
+}
+
 
 /** The groups, in the order the sidebar must render them. */
 const EXPECTED_GROUPS = ['groupMain', 'groupResearch', 'groupMonitoring', 'groupAccount'] as const
@@ -72,10 +98,7 @@ function main() {
   check('nav entries were found at all', entries.length >= 8, `found ${entries.length}`)
 
   for (const { href, labelKey } of entries) {
-    const seg = href.slice(1)
-    const routeExists = routeGroups.some((g) => existsSync(join(ROOT, 'app', g, seg, 'page.tsx')))
-      || existsSync(join(ROOT, 'app', seg, 'page.tsx'))
-    check(`"${href}" resolves to a real page`, routeExists)
+    check(`"${href}" resolves to a real page`, routeExists(href))
     check(`label "${labelKey}" exists in he.ts`, new RegExp(`\\b${labelKey}:\\s*'`).test(he))
     check(`label "${labelKey}" exists in en.ts`, new RegExp(`\\b${labelKey}:\\s*'`).test(en))
   }

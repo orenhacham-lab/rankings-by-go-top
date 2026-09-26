@@ -1,0 +1,114 @@
+'use client'
+
+/**
+ * The frame every content screen renders inside: the project selector, the
+ * missing-connection onboarding, the tab bar, the shared "new article topic"
+ * modal and the toast host.
+ *
+ * Everything here used to be inlined at the top of the one big ContentHub, which
+ * is why a screen could not exist without it. It is a layout now, so each screen
+ * is only its own subject.
+ */
+
+import Link from 'next/link'
+import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
+import Header from '@/components/layout/Header'
+import ArticleBriefModal from '@/components/content/ArticleBriefModal'
+import ContentHubSetup from '@/components/content/ContentHubSetup'
+import { ToastHost } from '@/components/content/Toast'
+import ContentNav from './ContentNav'
+import { useContentWorkspace } from './ContentWorkspaceProvider'
+import type { ReactNode } from 'react'
+
+export default function ContentWorkspaceShell({ children }: { children: ReactNode }) {
+  const {
+    t, isHebrew, toast, projectId, projects, data, loading,
+    projectsResolved, projectsError, reloadProjects, onSelectProject,
+    briefOpen, setBriefOpen, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
+  } = useContentWorkspace()
+
+  return (
+    <div dir={isHebrew ? 'rtl' : 'ltr'}>
+      <Header title={t.title} subtitle={t.subtitle} />
+
+      {/* Coming-soon context banner (this is an SEO/GEO content hub) */}
+      <div className="mb-4 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-900/10 px-3 py-2 text-xs text-indigo-700 dark:text-indigo-300">
+        {t.comingSoonBanner}
+      </div>
+
+      {/* The accessible-project list FAILED to load — never rendered as "you have
+          no projects", which is a different fact and offers no way forward. */}
+      {projectsResolved && projectsError ? (
+        <Card className="p-10 text-center">
+          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.projectsLoadError}</p>
+          <Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>
+        </Card>
+      ) : !projectsResolved ? (
+        /* Still resolving — do NOT flash an empty state at a user who has projects. */
+        <Card className="p-10 text-center">
+          <p className="text-sm text-slate-400 dark:text-slate-500">{t.projectsLoading}</p>
+        </Card>
+      ) : /* No projects → empty state */
+      !loading && projects.length === 0 ? (
+        <Card className="p-10 text-center">
+          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.noProjectsTitle}</p>
+          <Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>
+        </Card>
+      ) : (
+        <>
+          {/* Project selector */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <label className="text-sm text-slate-600 dark:text-slate-300">{t.selectProject}</label>
+            <select
+              value={projectId}
+              onChange={onSelectProject}
+              className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t.selectProjectPlaceholder}</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* K5 — missing-connections onboarding (two independent setup cards, each
+              hidden when its dimension is ready; whole block hidden when both are).
+              Its buttons now LINK to the screen that owns each connection. */}
+          {projectId && data && (
+            <ContentHubSetup
+              projectId={projectId}
+              platform={data.platform?.platform ?? 'none'}
+              platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed'}
+              shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
+            />
+          )}
+
+          <ContentNav />
+
+          {/* No project selected yet (multi-project) */}
+          {!projectId ? (
+            <Card className="p-10 text-center text-slate-500 dark:text-slate-400">
+              {t.selectProjectMessage}
+            </Card>
+          ) : (
+            children
+          )}
+        </>
+      )}
+
+      <ArticleBriefModal
+        open={briefOpen}
+        onClose={() => setBriefOpen(false)}
+        projects={projects}
+        defaultProjectId={projectId}
+        editing={editingTopic}
+        onSaved={loadTopics}
+        onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+        onTopicsCreated={(created) => { if (created.length) { setNewTopicsUnchecked({}); setNewTopicsSelected({}); setNewTopics(created) } }}
+      />
+
+      <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />
+    </div>
+  )
+}

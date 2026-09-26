@@ -374,6 +374,17 @@ export const dashboardEn = {
         failed: 'Failed', skipped: 'Skipped', paused: 'Paused',
       },
     },
+    // Each content concern is its own SCREEN with its own route. `tabs` below is the
+    // retired in-page tab bar, kept only for the surfaces that still read it.
+    // The content screens no longer carry connect forms; the project page owns them.
+    manageConnection: 'Publishing-platform connection management lives on the project page',
+    manageConnectionCta: 'Open connection settings',
+    screens: {
+      articles: 'Articles',
+      topics: 'Topics & strategy',
+      automation: 'Automation & schedule',
+      searchConsole: 'Search Console',
+    },
     tabs: {
       articles: 'Articles',
       gbpPosts: 'Google Maps Posts',

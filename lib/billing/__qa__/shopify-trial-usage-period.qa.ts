@@ -91,7 +91,7 @@ async function main() {
   const route = strip(read('app/api/content/articles/generate/route.ts'))
   const item = strip(read('lib/content/automation/generate-item.ts'))
   const appHome = strip(read('app/api/shopify/app-home/route.ts'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/AutomationScreen.tsx'))
 
   // ───────────────────────────────────────────────────────────────────────
   console.log('A1) THE INCIDENT — an active Advanced trial resolves a real period')
@@ -902,16 +902,18 @@ async function main() {
       (hub.match(/<AutomationSchedule/g) ?? []).length === 1)
     check('B-b: and exactly one import of it', (hub.match(/import AutomationSchedule from/g) ?? []).length === 1)
 
-    // It must sit AFTER the auto/manual conditional closes, and still inside
-    // the automationEnabled block.
-    const gate = hub.indexOf('{automationEnabled && (')
+    // It must sit AFTER the auto/manual conditional closes. The whole SCREEN is now
+    // gated by NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION on its own route, so the gate is
+    // checked on the route rather than as an inline conditional around the queue.
     const conditional = hub.indexOf("{ideasSection === 'manual' ? (")
-    const conditionalEnd = hub.indexOf('</>\n                  )}', conditional)
+    const conditionalEnd = hub.indexOf('</>\n      )}', conditional)
     const schedule = hub.indexOf('<AutomationSchedule')
+    const route = strip(read('app/(dashboard)/content/(workspace)/automation/page.tsx'))
     check('B-c: it is rendered OUTSIDE the auto/manual conditional',
       conditionalEnd !== -1 && schedule > conditionalEnd)
-    check('B-d: and still INSIDE automationEnabled', gate !== -1 && gate < schedule)
-    check('B-e: so section=manual renders the queue', schedule > conditionalEnd && gate < schedule)
+    check('B-d: and the screen itself is gated by the automation flag, on its route',
+      /NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION !== 'true'/.test(route))
+    check('B-e: so section=manual renders the queue', conditionalEnd !== -1 && schedule > conditionalEnd)
     check('B-f: and section=auto renders the same one', (hub.match(/<AutomationSchedule/g) ?? []).length === 1)
     check('B-g: the manual branch still offers manual topic creation',
       /t\.manualTopicTitle/.test(hub) && /t\.newTopicButton/.test(hub))
@@ -928,11 +930,16 @@ async function main() {
       (hub.match(/onGoToQueue=\{\(\) => scheduleSectionRef\.current\?\.scrollIntoView/g) ?? []).length >= 1)
     check('B-m: ONE component means one state — switching tabs cannot create a second queue',
       (hub.match(/<AutomationSchedule/g) ?? []).length === 1 && !/ideasSection === 'auto'[\s\S]{0,200}<AutomationSchedule/.test(hub))
-    check('B-n: nor can it lose the refreshed state — refreshKey lives in the parent',
-      /const \[automationRefresh, setAutomationRefresh\] = useState/.test(hub)
-      && hub.indexOf('const [automationRefresh') < gate)
+    // The refresh signal outlives a single screen: the queue is refreshed by an enqueue
+    // that can start on the topics screen, so it lives in the workspace provider and the
+    // automation screen only reads it. Switching sub-tabs cannot reset it.
+    const workspace = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
+    check('B-n: nor can it lose the refreshed state — refreshKey lives in the workspace, above the screen',
+      /const \[automationRefresh, setAutomationRefresh\] = useState/.test(workspace)
+      && !/const \[automationRefresh/.test(hub)
+      && /refreshKey=\{automationRefresh\}/.test(hub))
     check('B-o: queueing a manual topic still refreshes that queue',
-      /const handleScheduled = useCallback/.test(hub) && /setAutomationRefresh/.test(hub))
+      /const handleScheduled = useCallback/.test(workspace) && /setAutomationRefresh/.test(workspace))
     check('B-p: SCOPE — a source contract on placement; not a rendered-DOM test', true)
   }
 

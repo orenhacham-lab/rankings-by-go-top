@@ -374,6 +374,17 @@ export const dashboardHe = {
         failed: 'נכשל', skipped: 'דולג', paused: 'מושהה',
       },
     },
+    // Each content concern is its own SCREEN with its own route. `tabs` below is the
+    // retired in-page tab bar, kept only for the surfaces that still read it.
+    // The content screens no longer carry connect forms; the project page owns them.
+    manageConnection: 'ניהול החיבור לפלטפורמת הפרסום נמצא בעמוד הפרויקט',
+    manageConnectionCta: 'פתח את הגדרות החיבור',
+    screens: {
+      articles: 'מאמרים',
+      topics: 'נושאים ואסטרטגיה',
+      automation: 'אוטומציה ותזמון',
+      searchConsole: 'Search Console',
+    },
     tabs: {
       articles: 'מאמרים',
       gbpPosts: 'פוסטים בגוגל מפות',

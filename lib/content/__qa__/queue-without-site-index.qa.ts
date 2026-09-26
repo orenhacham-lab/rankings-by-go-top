@@ -96,7 +96,7 @@ function serverOutcome(o: Partial<TopicStageOutcomes>) {
 async function main() {
   console.log('Queueing a topic without a site index\n')
   const drawer = strip(read('components/content/TopicPlanDrawer.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
   const route = strip(read('app/api/content/automation/pools/[id]/approve-and-queue/route.ts'))
 
   // ───────────────────────────────────────────────────────────────────────

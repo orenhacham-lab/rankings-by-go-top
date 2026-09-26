@@ -7,23 +7,21 @@
  *     always labelled optional; topic generation works without it.
  * Each card hides when its dimension is ready; the whole block hides when both are.
  *
- * The buttons REUSE the existing K3 (WP/Shopify) and K4 (GscPanel) flows by
- * scrolling to those already-mounted panels — no duplicated OAuth/token logic here.
+ * The buttons REUSE the existing K3 (WP/Shopify) and K4 (GscPanel) flows by LINKING to
+ * the screen that owns each one — no duplicated OAuth/token logic here. They used to
+ * scroll to panels further down the same page, which stopped meaning anything once the
+ * content workspace became one screen per concern.
  */
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
-  selectSetupCards, PLATFORM_SETUP_ANCHOR, GSC_SETUP_ANCHOR,
+  selectSetupCards, platformSetupHref, gscSetupHref,
   type PlatformState, type GscState,
 } from '@/lib/content/content-hub-setup'
-
-function scrollToAnchor(id: string) {
-  if (typeof document === 'undefined') return
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 
 export default function ContentHubSetup({
   projectId, platform, platformFailed, shopifyNeedsScope,
@@ -74,11 +72,11 @@ export default function ContentHubSetup({
           <div className="mt-2 flex flex-wrap gap-2">
             {platformCard === 'none' ? (
               <>
-                <Button size="sm" onClick={() => scrollToAnchor(PLATFORM_SETUP_ANCHOR)}>{cs.connectWordPress}</Button>
-                <Button size="sm" variant="outline" onClick={() => scrollToAnchor(PLATFORM_SETUP_ANCHOR)}>{cs.connectShopify}</Button>
+                <Link href={platformSetupHref(projectId)}><Button size="sm">{cs.connectWordPress}</Button></Link>
+                <Link href={platformSetupHref(projectId)}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
               </>
             ) : (
-              <Button size="sm" onClick={() => scrollToAnchor(PLATFORM_SETUP_ANCHOR)}>{s.fixConnection}</Button>
+              <Link href={platformSetupHref(projectId)}><Button size="sm">{s.fixConnection}</Button></Link>
             )}
           </div>
         </Card>
@@ -93,9 +91,11 @@ export default function ContentHubSetup({
             {gscCard === 'no_property' ? s.gscNoPropertyBody : gscCard === 'reauth' ? s.gscReauthBody : s.gscNoneBody}
           </p>
           <div className="mt-2">
-            <Button size="sm" variant="outline" onClick={() => scrollToAnchor(GSC_SETUP_ANCHOR)}>
-              {gscCard === 'no_property' ? s.gscChooseProperty : gscCard === 'reauth' ? s.gscReconnect : s.gscConnect}
-            </Button>
+            <Link href={gscSetupHref()}>
+              <Button size="sm" variant="outline">
+                {gscCard === 'no_property' ? s.gscChooseProperty : gscCard === 'reauth' ? s.gscReconnect : s.gscConnect}
+              </Button>
+            </Link>
           </div>
         </Card>
       )}

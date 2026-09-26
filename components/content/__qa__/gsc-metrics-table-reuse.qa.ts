@@ -21,7 +21,7 @@ function main() {
 
   const table = strip(read('components/content/GscMetricsTable.tsx'))
   const panel = strip(read('components/content/GscPanel.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/SearchConsoleScreen.tsx'))
 
   // Shared component with the specified projectId API.
   check('GscMetricsTable is a projectId component', /export default function GscMetricsTable\(\{ projectId/.test(table))
@@ -52,9 +52,9 @@ function main() {
   check('GscPanel bumps refresh after sync / property change (no lost refresh)', /setDataRefresh\(\(k\) => k \+ 1\)/.test(panel))
 
   // Hub sub-tab: recommendations vs data; data → the shared table, NOT the internal browser.
-  check('hub has a recommendations/data sub-tab', /setGscView\(key\)/.test(hub) && /gscSubTabs\.recommendations/.test(hub) && /gscSubTabs\.data/.test(hub))
-  check("hub 'data' view renders the shared GscMetricsTable", /gscView === 'recommendations' \?[\s\S]*?<GscRecommendations[\s\S]*?\) : \([\s\S]*?<GscMetricsTable projectId=\{projectId\} \/>/.test(hub))
-  check('hub data sub-tab does NOT render the internal raw browser (GscOpportunities)',
+  check('the Search Console screen has a recommendations/data sub-tab', /setGscView\(key\)/.test(hub) && /gscSubTabs\.recommendations/.test(hub) && /gscSubTabs\.data/.test(hub))
+  check("its 'data' view renders the shared GscMetricsTable", /gscView === 'recommendations' \?[\s\S]*?<GscRecommendations[\s\S]*?\) : \([\s\S]*?<GscMetricsTable projectId=\{projectId\} \/>/.test(hub))
+  check('the data sub-tab does NOT render the internal raw browser (GscOpportunities)',
     !/gscView[\s\S]{0,400}<GscOpportunities/.test(hub))
 
   // i18n present both locales.

@@ -269,12 +269,19 @@ async function main() {
     check('F3(11) different cluster → different id', base !== diffCluster)
   }
 
-  // ── FIX 4: mounted inside ContentHub, not the project page; still read-only ─
+  // ── FIX 4: mounted on the Search Console screen, not the project page; still read-only ─
   {
-    const hub = read('components/content/ContentHub.tsx')
-    check('F4(12) GscOpportunities imported into ContentHub', /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(hub))
-    check('F4(12) rendered under the gscIdeas tab', /activeTab === 'gscIdeas'/.test(hub) && /<GscOpportunities\s[\s\S]{0,120}projectId=\{projectId\}/.test(hub))
-    check('F4(12) tab gated by the GSC client flag', /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'[\s\S]{0,400}setActiveTab\('gscIdeas'\)/.test(hub))
+    const hub = read('components/content/workspace/SearchConsoleScreen.tsx')
+    check('F4(12) GscOpportunities imported into the Search Console screen', /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(hub))
+    // It is a DIAGNOSTIC, so it stays behind its own development flag — never beside
+    // the merchant-facing recommendations by default.
+    check('F4(12) rendered only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED',
+      /NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' &&[\s\S]{0,400}<GscOpportunities\s[\s\S]{0,160}projectId=\{projectId\}/.test(hub))
+    // It used to be an in-page tab gated inline. The Search Console SCREEN carries the
+    // same client flag on its own route, so a build with GSC off has no route to reach.
+    const route = read('app/(dashboard)/content/(workspace)/search-console/page.tsx')
+    check('F4(12) the Search Console screen is gated by the GSC client flag',
+      /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED !== 'true'/.test(route))
     const projectPage = read('app/(dashboard)/projects/[id]/page.tsx')
     check('F4(13) NOT mounted on the project page anymore', !/GscOpportunities/.test(projectPage))
     check('F4(13) Stage E1 GscPanel is untouched on the project page', /<GscPanel projectId=\{id\}/.test(projectPage))

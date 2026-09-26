@@ -72,8 +72,8 @@ async function main() {
     const plugin = read('../../../wordpress-plugin/gotop-seo-bridge/gotop-seo-bridge.php')
     check('companion plugin: edit_post permission + SEO allowlist only + read-back verification (no arbitrary meta)',
       /current_user_can\('edit_post', \$post_id\)/.test(plugin) && /_yoast_wpseo_focuskw/.test(plugin) && /rank_math_focus_keyword/.test(plugin) && /in_array\(\$key, \$allowed, true\)/.test(plugin) && /get_post_meta\(\$post_id, \$key, true\)/.test(plugin))
-    const hub = read('../../../components/content/ContentHub.tsx')
-    check('ContentHub row + batch surface an SEO warning when the post succeeded but SEO did not',
+    const hub = read('../../../components/content/workspace/ArticlesScreen.tsx')
+    check('the articles row + batch surface an SEO warning when the post succeeded but SEO did not',
       /seoStatus !== 'verified' && seoStatus !== 'plugin_unavailable'/.test(hub) && /seoUnverified/.test(hub) && /t\.rowWp\.seoBridgeRequired/.test(hub))
     const he = read('../../../lib/i18n/dashboard/he.ts'); const en = read('../../../lib/i18n/dashboard/en.ts')
     check('SEO warning messages localized (he + en)', /seoBridgeRequired:/.test(he) && /seoNotVerified:/.test(he) && /seoBridgeRequired:/.test(en) && /seoNotVerified:/.test(en))

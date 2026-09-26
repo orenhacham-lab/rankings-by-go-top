@@ -26,7 +26,7 @@ function main() {
   const connect = strip(read('app/api/gsc/connect/route.ts'))
   const callback = strip(read('app/api/gsc/callback/route.ts'))
   const panel = strip(read('components/content/GscPanel.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/SearchConsoleScreen.tsx'))
   const oauth = strip(read('lib/gsc/oauth.ts'))
 
   // ── connect: sets the return cookie ONLY for a hub origin; still fully gated.
@@ -65,8 +65,8 @@ function main() {
   check('existing-connection-no-property path is preserved (property picker)', /openPicker|\/api\/gsc\/properties\?projectId=/.test(panel))
 
   // ── hub mounts the reused panel with the hub origin (no duplicated GSC logic in the hub).
-  check('hub mounts GscPanel with connectOrigin="hub"', /<GscPanel projectId=\{projectId\} connectOrigin="hub"/.test(hub))
-  check('hub adds no GSC OAuth/token logic of its own', !/oauth|refresh_token|access_token|storeConnection/i.test(hub))
+  check('the Search Console screen mounts GscPanel with connectOrigin="hub"', /<GscPanel projectId=\{projectId\} connectOrigin="hub"/.test(hub))
+  check('it adds no GSC OAuth/token logic of its own', !/oauth|refresh_token|access_token|storeConnection/i.test(hub))
 
   // ── the return cookie constant lives in the shared oauth module.
   check('GSC_RETURN_COOKIE is defined once in lib/gsc/oauth', /export const GSC_RETURN_COOKIE =/.test(oauth))

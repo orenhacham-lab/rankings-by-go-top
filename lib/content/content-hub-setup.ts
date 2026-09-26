@@ -8,10 +8,27 @@
  * so the six approved state combinations are unit-testable in isolation.
  */
 
-/** DOM anchors the setup cards scroll to — the EXISTING K3/K4 panels (reuse, not
- *  duplicate). The hub stamps these ids on the panel wrappers. */
-export const PLATFORM_SETUP_ANCHOR = 'hub-setup-platform'
+/** The DOM anchor the Search Console setup card LINKS to — the EXISTING K4 panel
+ *  (reuse, not duplicate). The Search Console screen stamps this id on its wrapper.
+ *  There is no platform equivalent: the platform connection lives on the project page,
+ *  under that page's own #content-section anchor. */
 export const GSC_SETUP_ANCHOR = 'hub-setup-gsc'
+
+/** The project page's own anchor for its connection section. */
+export const PROJECT_CONNECTION_ANCHOR = 'content-section'
+
+/**
+ * Where each setup card sends the merchant. The cards used to scroll to a panel further
+ * down the same 1,325-line page; the panels have their own screens now, so a scroll would
+ * land nowhere. The platform connection is project SETTINGS (the project page owns the
+ * connect form); Search Console is set up on the screen that shows its data.
+ */
+export function platformSetupHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}#${PROJECT_CONNECTION_ANCHOR}`
+}
+export function gscSetupHref(): string {
+  return `/content/search-console#${GSC_SETUP_ANCHOR}`
+}
 
 export type PlatformState = 'wordpress' | 'shopify' | 'conflict' | 'none'
 export type GscState = 'connected' | 'reauth_required' | 'revoked' | 'error' | 'none'

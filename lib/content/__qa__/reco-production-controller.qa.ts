@@ -300,8 +300,8 @@ async function main() {
     const uiSrc = read('../../../components/content/AutomationIdeas.tsx')
     const runSrc = read('../recommendations/production-run.ts')
     const ctrlSrc = read('../recommendations/production-controller.ts')
-    const pageSrc = read('../../../app/(dashboard)/content/page.tsx')
-    const hubSrc = read('../../../components/content/ContentHub.tsx')
+    const pageSrc = read('../../../app/(dashboard)/content/(workspace)/automation/page.tsx')
+    const hubSrc = read('../../../components/content/workspace/AutomationScreen.tsx')
     check('G1. flag helper: RECO_PRO_FIRST_CONTROLLER, missing/invalid → false', /RECO_PRO_FIRST_CONTROLLER === 'true'/.test(authSrc) && /isProFirstControllerEnabled/.test(authSrc))
     check('G2. route routes to the Pro-first controller when the flag is on', /const useProFirst = isProFirstControllerEnabled\(\)/.test(routeSrc) && /runProFirstProduction/.test(routeSrc))
     check('G3. flag on → client tier ignored (always premium; no Flash-first)', /qualityMode: 'premium'/.test(runSrc) && !/runProFirstProduction\([^)]*qualityMode/.test(routeSrc))
@@ -322,7 +322,7 @@ async function main() {
     check('G13. fallback reasons are pro_*_rescue (never flash_*_rescue)', /pro_provider_failure_rescue/.test(ctrlSrc) && !/flash_provider_failure_rescue|flash_synthesis_failure_rescue|flash_zero_marginal_yield_rescue/.test(ctrlSrc) && !/flash_.*_rescue/.test(runSrc))
     // Blocker 6 — ONE authoritative flag: server-derived prop, no NEXT_PUBLIC mirror.
     check('G14. UI reads the server prop, NOT NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER', /const PRO_FIRST = proFirst/.test(uiSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(uiSrc))
-    check('G15. the flag flows server→UI (page → ContentHub → AutomationIdeas), single source', /isProFirstControllerEnabled\(\)/.test(pageSrc) && /<ContentHub proFirst=\{proFirst\}/.test(pageSrc) && /proFirst=\{proFirst\}/.test(hubSrc))
+    check('G15. the flag flows server→UI (automation route → AutomationScreen → AutomationIdeas), single source', /isProFirstControllerEnabled\(\)/.test(pageSrc) && /<AutomationScreen proFirst=\{proFirst\}/.test(pageSrc) && /proFirst=\{proFirst\}/.test(hubSrc))
     check('G16. no residual NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER anywhere', !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(uiSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(pageSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(hubSrc))
     // Blocker 7/2b — EXACT-prompt budget: the same batch/prompt/output-budget the gate uses.
     check('G17. fallback budget uses the EXACT synthesis prompt (buildBriefSynthesisPrompt + prompt.length + synthesisOutputBudget)', /buildBriefSynthesisPrompt\(batch, snapshot\.langLabel, snapshot\.year\)/.test(runSrc) && /estimateNextCallUsd\(flashModel, prompt\.length, outputBudget\)/.test(runSrc) && /synthesisOutputBudget\(batch\.length\)/.test(runSrc) && !/2500 \+ estBatch \* 350/.test(runSrc) && /budgetStopped/.test(runSrc))

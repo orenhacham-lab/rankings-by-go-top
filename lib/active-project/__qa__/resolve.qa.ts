@@ -78,8 +78,8 @@ function main() {
   check('keywords section consumes the shared hook + derives its id (no private setter)',
     /useActiveProject\(/.test(keywords) && /const selectedProjectId = activeProjectId/.test(keywords) && !/setSelectedProjectId/.test(keywords))
   check('keywords project dropdown drives the SHARED state (setActiveProject)', /onChange=\{\(e\) => setActiveProject\(e\.target\.value\)\}/.test(keywords))
-  const content = strip(read('components/content/ContentHub.tsx'))
-  check('Content Hub consumes the shared hook (not a raw searchParams read)', /useActiveProject\(/.test(content))
+  const content = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
+  check('the content workspace consumes the shared hook (not a raw searchParams read)', /useActiveProject\(/.test(content))
 
   const reports = strip(read('app/(dashboard)/reports/page.tsx'))
   check('reports consumes the shared hook + derives its id (no private setter)',

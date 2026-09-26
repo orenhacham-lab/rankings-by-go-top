@@ -181,7 +181,7 @@ const serverOutcome = (o: Partial<TopicStageOutcomes>) => classifyTopicOutcome('
 async function main() {
   console.log('NewTopicsLinkPlanPanel — queueing without a site index\n')
   const panel = strip(read('components/content/NewTopicsLinkPlanPanel.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
 
   // ───────────────────────────────────────────────────────────────────────
   console.log('1) THE INCIDENT — confirmed missing index + zero links')
@@ -529,7 +529,7 @@ async function main() {
       && !/onEnqueue\(topicIdsToSave, false\)/.test(panel))
     check('6i: the plan-saving branch still enqueues with an explicit true',
       /onEnqueue\(r\.okIds, true\)/.test(panel))
-    check('6j: ContentHub still forwards whatever it is given',
+    check('6j: the workspace still forwards whatever it is given',
       /topics: topicIds\.map\(\(topicId\) => \(\{ topicId, expectsLinks \}\)\)/.test(hub))
     check('6k: no second copy of the policy — the panel defines no cacheState rule of its own',
       !/cacheState !== 'missing'/.test(panel) && !/expectsLinks: true/.test(panel))

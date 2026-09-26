@@ -139,7 +139,10 @@ async function main() {
   // ── C) representative pages across the product ─────────────────────────────
   console.log('\nC) representative dashboard surfaces, first render')
   {
-    const cases: { label: string; path: string; named?: string; props?: Record<string, unknown>; probe: (d: ReturnType<typeof getDashboardDictionary>) => string[] }[] = [
+    // `wrap` renders the component inside a provider it needs. The content workspace is
+    // the case: its screens read one shared context, so the surface a reviewer opens is
+    // provider + shell, not a screen on its own.
+    const cases: { label: string; path: string; named?: string; props?: Record<string, unknown>; wrap?: { path: string; named: string }; probe: (d: ReturnType<typeof getDashboardDictionary>) => string[] }[] = [
       { label: 'StatusBadge/ActiveBadge', path: 'components/ui/StatusBadge.tsx', named: 'ActiveBadge', props: { active: true },
         probe: (d) => [String((d.common as never as Record<string, string>).active)] },
       { label: 'StatusBadge/ScanStatusBadge', path: 'components/ui/StatusBadge.tsx', named: 'ScanStatusBadge', props: { status: 'completed' },
@@ -153,15 +156,24 @@ async function main() {
       // The two surfaces the reviewer actually opens.
       { label: 'DashboardPage', path: 'app/(dashboard)/dashboard/page.tsx', props: {},
         probe: (d) => [String((d.home as never as Record<string, string>).loading)] },
-      { label: 'ContentHub', path: 'components/content/ContentHub.tsx', props: {},
+      { label: 'ContentWorkspace', path: 'components/content/workspace/ContentWorkspaceShell.tsx', props: {},
+        wrap: { path: 'components/content/workspace/ContentWorkspaceProvider.tsx', named: 'ContentWorkspaceProvider' },
         probe: () => [] },
     ]
     for (const c of cases) {
       let Comp: unknown
       try { Comp = load(c.path, c.named) } catch { check(`C-${c.label}: module loads`, false, 'import failed'); continue }
       if (typeof Comp !== 'function') { check(`C-${c.label}: component resolved`, false, typeof Comp); continue }
+      let Wrap: unknown = null
+      if (c.wrap) {
+        try { Wrap = load(c.wrap.path, c.wrap.named) } catch { check(`C-${c.label}: wrapper loads`, false, 'import failed'); continue }
+        if (typeof Wrap !== 'function') { check(`C-${c.label}: wrapper resolved`, false, typeof Wrap); continue }
+      }
+      const element = () => (Wrap
+        ? createElement(Wrap as never, null, createElement(Comp as never, c.props as never))
+        : createElement(Comp as never, c.props as never))
       let enHtml = ''
-      try { enHtml = firstRender('en', createElement(Comp as never, c.props as never)) } catch (e) {
+      try { enHtml = firstRender('en', element()) } catch (e) {
         check(`C-${c.label}: renders`, false, (e as Error).message.slice(0, 120)); continue
       }
       const enWords = c.probe(getDashboardDictionary('en')).filter(Boolean)
@@ -169,7 +181,7 @@ async function main() {
       check(`C-${c.label}: English on the first render`,
         enWords.every((w) => enHtml.includes(w)) && !HEBREW.test(enBody),
         `${JSON.stringify(enWords)} :: ${(enBody.match(/[֐-׿][^<]*/g) ?? []).slice(0, 4).join(' | ') || enBody.slice(0, 160)}`)
-      const heHtml = firstRender('he', createElement(Comp as never, c.props as never))
+      const heHtml = firstRender('he', element())
       check(`C-${c.label}: Hebrew on the first render under he`,
         HEBREW.test(heHtml) && heHtml !== enHtml, heHtml.slice(0, 160))
     }
