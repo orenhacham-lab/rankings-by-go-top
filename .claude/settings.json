@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm audit)",
+      "Bash(npm audit --json)",
+      "Bash(npm audit --omit=dev)",
+      "Bash(npm audit --omit=dev --json)",
+      "Bash(npm ls *)",
+      "Bash(npm view *)",
+      "mcp__Vercel__get_runtime_logs",
+      "mcp__Supabase__query_logs",
+      "mcp__github__pull_request_read"
+    ]
+  }
+}
