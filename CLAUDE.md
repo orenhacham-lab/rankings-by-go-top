@@ -50,5 +50,5 @@ Keep this file short. It replaces the per-session "handoff" re-explanation.
 ## Environment gotchas (cloud sessions)
 - The SessionStart hook runs `npm install` (≈1 s warm). Never run `playwright install`, because Chromium is at `/opt/pw-browsers`. `playwright-core` is a devDependency.
 - The egress proxy blocks `*.vercel.app`, `gotopseo.com` and `api.cron-job.org`. Check production through the Vercel/Supabase MCP tools (see `/prod-health`).
-- Vercel runtime logs are large (the automation runner logs per pool). Always use `group_by` or `query` with `limit ≤ 5`.
+- Vercel runtime logs: always use `group_by`, or `query` with `limit ≤ 5`. The runner logs a pool only when it acts on it or the pool fails, and counts idle pools in one `[automation-runner] idle pools` line.
 - Commit trailer and PR attribution: follow the session's system reminder.
