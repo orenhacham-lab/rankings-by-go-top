@@ -69,6 +69,8 @@ const EXPECTED_GROUPS = ['groupMain', 'groupResearch', 'groupMonitoring', 'group
  * which is exactly how Next inlines the flag into the bundle.
  */
 process.env.NEXT_PUBLIC_ENABLE_CONTENT = 'true'
+// The same for AI visibility, whose entry is resolved at module load from its flag.
+process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY = 'true'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { navItemKeys, activeNavHref } = require('../Sidebar') as {
   navItemKeys: readonly { href: string }[]
@@ -110,12 +112,19 @@ function main() {
     .map((m) => m[1]).join('\n')
   check('the per-group items arrays were parsed', groupedSource.length > 0)
 
-  const entries = [...groupedSource.matchAll(/href: '(\/[a-z-]+)', labelKey: '([A-Za-z]+)'/g)]
+  const entryPattern = /href: '(\/[a-z-]+)', labelKey: '([A-Za-z]+)'/g
+  const entries = [...groupedSource.matchAll(entryPattern)]
     .map((m) => ({ href: m[1], labelKey: m[2] }))
+  // Entries behind a build-time flag are declared in a list of their own and spread
+  // into their group; they are entries all the same and get the same checks.
+  const aiListMatch = src.match(/const aiVisibilityNavItems[\s\S]*?\n\n/)
+  const aiList = aiListMatch ? aiListMatch[0] : ''
+  const flagged = [...aiList.matchAll(entryPattern)].map((m) => ({ href: m[1], labelKey: m[2] }))
+  const allEntries = [...entries, ...flagged]
 
-  check('nav entries were found at all', entries.length >= 8, `found ${entries.length}`)
+  check('nav entries were found at all', allEntries.length >= 8, `found ${allEntries.length}`)
 
-  for (const { href, labelKey } of entries) {
+  for (const { href, labelKey } of allEntries) {
     check(`"${href}" resolves to a real page`, routeExists(href))
     check(`label "${labelKey}" exists in he.ts`, new RegExp(`\\b${labelKey}:\\s*'`).test(he))
     check(`label "${labelKey}" exists in en.ts`, new RegExp(`\\b${labelKey}:\\s*'`).test(en))
@@ -162,6 +171,34 @@ function main() {
   // how the concept would creep back into a sidebar that no longer has one screen for it.
   check('the retired hub label is gone from both dictionaries',
     !/\n\s{4}content:\s*'/.test(he) && !/\n\s{4}content:\s*'/.test(en))
+
+  // ── Every screen is a tab of the current project ──────────────────────────
+  // The project is picked in the top bar's workspace switcher, so there is no
+  // Clients tab and no Projects tab to pick it from, and the project's own
+  // settings are a tab of their own.
+  const noProjectTabs = (hrefs: readonly string[]) => !hrefs.includes('/clients') && !hrefs.includes('/projects')
+  check('there is no Clients or Projects tab (declared)', noProjectTabs(allEntries.map((e) => e.href)),
+    allEntries.map((e) => e.href).join(', '))
+  check('…nor at runtime, in the list both surfaces render', noProjectTabs(navItemKeys.map((i) => i.href)))
+  check("the project's settings are a tab of the account group",
+    /groupKey: 'groupAccount',\s*items: \[\s*\{ href: '\/settings', labelKey: 'projectSettings'/.test(groupsRegion))
+  check('MUT: a nav that brings the Clients tab back fails that check',
+    !noProjectTabs([...allEntries.map((e) => e.href), '/clients']))
+
+  // AI visibility is the tool itself, behind the same flag as its page: with the
+  // flag off the page says it is not available, so no entry may lead there.
+  const aiGated = (sidebarSrc: string) =>
+    /const aiVisibilityNavItems[^=]*=\s*process\.env\.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'\s*\?\s*\[\{ href: '\/ai-visibility'/.test(sidebarSrc)
+    && !/items: \[[^\]]*href: '\/ai-visibility'/.test(sidebarSrc)
+  check('the AI visibility entry is gated by its build-time flag', aiGated(src))
+  check('…spread inside the monitoring group',
+    groupsRegion.indexOf('...aiVisibilityNavItems') > groupsRegion.indexOf(`groupKey: 'groupMonitoring'`)
+    && groupsRegion.indexOf('...aiVisibilityNavItems') < groupsRegion.indexOf(`groupKey: 'groupAccount'`))
+  check('…and its page checks the very same flag',
+    /process\.env\.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true'/.test(strip(readFileSync(join(ROOT, 'app/(dashboard)/ai-visibility/page.tsx'), 'utf8'))))
+  check('with the flag on, the entry is rendered', navItemKeys.some((i) => i.href === '/ai-visibility'))
+  check('MUT: an ungated entry fails the gate check',
+    !aiGated(src.replace(/process\.env\.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'\s*\?/, 'true ?')))
 
   // ── Exactly one entry is current, whichever content screen is open ────────
   // /content is a PREFIX of /content/topics, so a plain prefix test lit up two

@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
+import { useProjectRow } from '@/lib/active-project/useProjectRow'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
 
 interface KeywordIdeaResult {
@@ -17,13 +20,6 @@ interface KeywordIdeaResult {
   lowTopOfPageBid: number | null
   highTopOfPageBid: number | null
   currency: string
-}
-
-interface Project {
-  id: string
-  name: string
-  business_name: string | null
-  target_domain: string | null
 }
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
@@ -136,9 +132,13 @@ export default function KeywordResearchPage() {
   const [fewResultsWarning, setFewResultsWarning] = useState(false)
   const [filteredOutWarning, setFilteredOutWarning] = useState(false)
 
-  const [projects, setProjects] = useState<Project[]>([])
-  const [projectsLoading, setProjectsLoading] = useState(false)
-  const [selectedProject, setSelectedProject] = useState('')
+  // Research needs no project. What it finds is added to the project the top bar
+  // names, like every other screen's project; this page no longer picks its own.
+  const { activeProjectId, projects, isResolved: projectsResolved } = useActiveProject()
+  const { project: activeProject } = useProjectRow(activeProjectId)
+  const selectedProject = activeProjectId ?? ''
+  const projectsLoading = !projectsResolved
+  const activeProjectName = projects.find((p) => p.id === activeProjectId)?.name ?? ''
   const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
@@ -175,25 +175,6 @@ export default function KeywordResearchPage() {
   const [trendError, setTrendError] = useState('')
   const [trendCache, setTrendCache] = useState<Map<string, TrendData>>(new Map())
   const [trendData, setTrendData] = useState<TrendData | undefined>()
-
-  useEffect(() => {
-    fetchProjects()
-  }, [])
-
-  const fetchProjects = async () => {
-    setProjectsLoading(true)
-    try {
-      const response = await fetch('/api/projects')
-      if (response.ok) {
-        const data = await response.json()
-        setProjects(data.projects || [])
-      }
-    } catch (err) {
-      console.error('Error fetching projects:', err)
-    } finally {
-      setProjectsLoading(false)
-    }
-  }
 
   // Parse multiple keywords from comma/semicolon/newline separated input
   const parseKeywords = (input: string): string[] => {
@@ -541,7 +522,7 @@ export default function KeywordResearchPage() {
     }
 
     const keyword = Array.from(selectedKeywords)[0]
-    const project = projects.find((p) => p.id === selectedProject)
+    const project = activeProject
 
     if (!project) {
       setAIQuestionsError(t.addToProject.errorSelectProject)
@@ -999,7 +980,7 @@ export default function KeywordResearchPage() {
                   </button>
                   <button
                     onClick={handleGenerateAIQuestions}
-                    disabled={!selectedProject || generatingAIQuestions}
+                    disabled={!activeProject || generatingAIQuestions}
                     className="text-xs px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors flex items-center gap-1"
                     title={!selectedProject ? t.addToProject.errorSelectProject : ''}
                   >
@@ -1070,22 +1051,14 @@ export default function KeywordResearchPage() {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <label className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t.addToProject.projectLabel} *
-                      </label>
-                      <select
-                        value={selectedProject}
-                        onChange={(e) => setSelectedProject(e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                        disabled={addingToProject}
-                      >
-                        <option value="">{t.addToProject.projectPlaceholder}</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
+                      {/* The project is the one the top bar names; switching it
+                          there changes where these keywords go. */}
+                      <span className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                        {t.addToProject.projectLabel}
+                      </span>
+                      <p className="w-full truncate px-4 py-2 rounded-lg border border-line bg-sunk text-ink">
+                        {activeProjectName}
+                      </p>
                     </div>
 
                     <div>
@@ -1133,12 +1106,12 @@ export default function KeywordResearchPage() {
                     <span>{addToProjectMessage}</span>
                   </div>
                   {lastAddedProjectId && (
-                    <a
-                      href={`/projects/${lastAddedProjectId}`}
+                    <Link
+                      href={`/keywords?projectId=${encodeURIComponent(lastAddedProjectId)}`}
                       className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                     >
                       {t.addToProject.goToProject}
-                    </a>
+                    </Link>
                   )}
                 </div>
               )}

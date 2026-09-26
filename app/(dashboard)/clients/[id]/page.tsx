@@ -116,12 +116,18 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               {projects.map((project) => (
                 <Card key={project.id} className="flex items-center justify-between">
                   <div>
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="font-semibold text-blue-600 hover:underline"
-                    >
-                      {project.name}
-                    </Link>
+                    {/* Opens as the current project, on its dashboard; an inactive
+                        project has no workspace to open until it is reactivated. */}
+                    {project.is_active ? (
+                      <Link
+                        href={`/dashboard?projectId=${encodeURIComponent(project.id)}`}
+                        className="font-semibold text-blue-600 hover:underline"
+                      >
+                        {project.name}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-muted">{project.name}</span>
+                    )}
                     <p className="text-sm text-slate-500 mt-0.5">{project.target_domain}</p>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {project.city && `${project.city} · `}

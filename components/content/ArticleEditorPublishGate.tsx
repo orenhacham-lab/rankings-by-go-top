@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -71,7 +72,7 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
           <div>
             <div className="font-semibold text-amber-800 dark:text-amber-300">{t.conflictTitle}</div>
             <p className="text-sm text-amber-800/90 dark:text-amber-300/90">{t.conflictText}</p>
-            <Link href={`/projects/${projectId}`} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{t.projectPageLink}</Link>
+            {projectId && <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{t.projectPageLink}</Link>}
           </div>
         </div>
       </Card>
@@ -101,7 +102,7 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
     <Card className="hover:translate-y-0" >
       <div dir={dir}>
         <p className="text-sm text-slate-600 dark:text-slate-300">{t.neitherText}</p>
-        {projectId && <Link href={`/projects/${projectId}`} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{t.projectPageLink}</Link>}
+        {projectId && <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{t.projectPageLink}</Link>}
       </div>
     </Card>
   )

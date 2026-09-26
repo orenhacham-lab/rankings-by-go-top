@@ -9,7 +9,7 @@ interface AIQuestionsModalProps {
   onClose: () => void
   questions: GeneratedQuestion[]
   selectedProject: string
-  projects: Array<{ id: string; name: string }>
+  projects: Array<{ id: string; name?: string | null }>
   language: 'he' | 'en'
   isRTL: boolean
   onAddQuestions: (questions: GeneratedQuestion[]) => Promise<void>

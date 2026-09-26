@@ -9,22 +9,29 @@
  */
 
 /** The DOM anchor the Search Console setup card LINKS to — the EXISTING K4 panel
- *  (reuse, not duplicate). The Search Console screen stamps this id on its wrapper.
- *  There is no platform equivalent: the platform connection lives on the project page,
- *  under that page's own #content-section anchor. */
+ *  (reuse, not duplicate). The Search Console screen stamps this id on its wrapper. */
 export const GSC_SETUP_ANCHOR = 'hub-setup-gsc'
 
-/** The project page's own anchor for its connection section. */
-export const PROJECT_CONNECTION_ANCHOR = 'content-section'
+/** The settings screen's anchors for the project's two connections. The settings
+ *  screen stamps these ids on the sections, so a link and its target cannot drift. */
+export const PROJECT_CONNECTION_ANCHOR = 'platform'
+export const SETTINGS_GSC_ANCHOR = 'search-console'
 
 /**
  * Where each setup card sends the merchant. The cards used to scroll to a panel further
  * down the same 1,325-line page; the panels have their own screens now, so a scroll would
- * land nowhere. The platform connection is project SETTINGS (the project page owns the
- * connect form); Search Console is set up on the screen that shows its data.
+ * land nowhere. The platform connection is project SETTINGS, which owns the connect
+ * form; Search Console is set up on the screen that shows its data.
+ *
+ * The project rides along as `?projectId`, so the link opens the project it was
+ * made for even from another tab where a different project is current.
  */
 export function platformSetupHref(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}#${PROJECT_CONNECTION_ANCHOR}`
+  return `/settings?projectId=${encodeURIComponent(projectId)}#${PROJECT_CONNECTION_ANCHOR}`
+}
+/** The Search Console connection in the project's settings. */
+export function settingsGscHref(projectId: string): string {
+  return `/settings?projectId=${encodeURIComponent(projectId)}#${SETTINGS_GSC_ANCHOR}`
 }
 export function gscSetupHref(): string {
   return `/content/search-console#${GSC_SETUP_ANCHOR}`

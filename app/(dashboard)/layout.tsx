@@ -1,4 +1,5 @@
 import Sidebar from '@/components/layout/Sidebar'
+import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
 import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -55,11 +56,19 @@ export default async function DashboardLayout({
           Wrapped in Suspense because the provider reads the URL via useSearchParams. */}
       <Suspense fallback={null}>
         <ActiveProjectProvider userId={user.id}>
-          <div className="flex flex-col md:flex-row h-full min-h-screen dark:bg-slate-950">
+          <div className="flex flex-col md:flex-row h-full min-h-screen bg-canvas text-body">
             <DashboardLocaleEffect />
             <Sidebar isAdmin={isAdmin} />
-            <main className="flex-1 md:mr-64 p-4 md:p-8 overflow-auto min-h-screen dark:bg-slate-950 dark:text-slate-50">
-              <DashboardDirectionWrapper>{children}</DashboardDirectionWrapper>
+            <main className="flex-1 md:mr-64 overflow-auto min-h-screen">
+              <DashboardDirectionWrapper>
+                {/* The top bar. Every screen shows the SAME workspace control, because
+                    "which site am I looking at" is a question about the app, not about
+                    the screen — it used to be answered by a different widget per page. */}
+                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur md:px-8">
+                  <WorkspaceSwitcher />
+                </div>
+                <div className="p-4 md:p-8">{children}</div>
+              </DashboardDirectionWrapper>
             </main>
           </div>
         </ActiveProjectProvider>

@@ -39,7 +39,23 @@ function main() {
 
   // ── callback: return path is server-built from the VALIDATED project id, after verification.
   check('callback reads the return cookie as a fixed enum (=== hub)', /request\.cookies\.get\(GSC_RETURN_COOKIE\)\?\.value === 'hub'/.test(callback))
-  check('hub return path is /content?projectId built from the consumed projectId', /new URL\('\/content', origin\)[\s\S]{0,160}searchParams\.set\('projectId', projectId\)/.test(callback))
+  // The return lands on a screen that mounts the panel reading the result: the content
+  // Search Console screen for a hub connect, the project's settings for any other (the
+  // project page that used to hold the panel is a redirect now). Fixed paths only.
+  const returnsToPanels = (src: string) =>
+    /new URL\(returnHub \? '\/content\/search-console' : '\/settings', origin\)/.test(src)
+    && /if \(projectId\) url\.searchParams\.set\('projectId', projectId\)/.test(src)
+  check('the return path is a fixed screen that shows the result, with the consumed projectId as a param',
+    returnsToPanels(callback))
+  check('MUT: a return to the retired project page fails that check',
+    !returnsToPanels(callback.replace("'/settings'", '`/projects/${projectId}`')))
+  check('MUT: a hub return to the articles screen (no panel there) fails it too',
+    !returnsToPanels(callback.replace("'/content/search-console'", "'/content'")))
+  // Settings is a long screen: its return opens at the Search Console section.
+  const opensAtSection = (src: string) => /if \(projectId && !returnHub\) url\.hash = SETTINGS_GSC_ANCHOR/.test(src)
+  check('the settings return opens at the Search Console section', opensAtSection(callback))
+  check('MUT: without the anchor that check fails',
+    !opensAtSection(callback.replace('url.hash = SETTINGS_GSC_ANCHOR', 'void 0')))
   check('projectId comes ONLY from the validated one-time state (never client input)',
     /consumeOAuthState\(admin, \{ rawState, userId: user\.id \}\)/.test(callback) && /projectId = consumed\?\.projectId/.test(callback))
   check('every terminal redirect CLEARS the cookie (maxAge 0)', /res\.cookies\.set\(GSC_RETURN_COOKIE, '',[^\n]*maxAge: 0/.test(callback))
@@ -59,7 +75,9 @@ function main() {
 
   // ── panel reuse: connect origin + property assignment/reauth all preserved.
   check('GscPanel forwards origin (connectOrigin) in the connect body', /body: JSON\.stringify\(\{ projectId, origin: connectOrigin \}\)/.test(panel))
-  check('GscPanel default origin is project (project page unchanged)', /connectOrigin = 'project'/.test(panel))
+  check('GscPanel default origin is project (not the hub)', /connectOrigin = 'project'/.test(panel))
+  check("the project's settings mount GscPanel with the default origin, so they get the /settings return",
+    /<GscPanel projectId=\{project\.id\} \/>/.test(strip(read('app/(dashboard)/settings/page.tsx'))))
   check('per-project property assignment reused (POST /api/gsc/property)', /'\/api\/gsc\/property', \{ method: 'POST'/.test(panel))
   check('reauth_required is still handled in the panel', /reauth_required/.test(panel))
   check('existing-connection-no-property path is preserved (property picker)', /openPicker|\/api\/gsc\/properties\?projectId=/.test(panel))

@@ -60,6 +60,14 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
   const activeIdRef = useRef<string | null>(null)
   projectsRef.current = projects
   activeIdRef.current = activeProjectId
+  // The CURRENT url, for a list reload started after mount: loadProjects is
+  // created once, and reading the searchParams it closed over would resolve
+  // against the url of the first render.
+  const searchParamsRef = useRef(searchParams)
+  searchParamsRef.current = searchParams
+  // Url ids a reload has already been spent on, so an id that is simply not
+  // this user's cannot start a reload loop.
+  const reloadedForUrlIds = useRef<Set<string>>(new Set())
 
   const storageKey = activeProjectStorageKey(userId)
 
@@ -101,7 +109,7 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
     if (signal?.cancelled) return
     let persisted: string | null = null
     try { persisted = localStorage.getItem(storageKey) } catch { /* ignore */ }
-    const { id: urlId, fromLegacy } = readUrlProjectId(searchParams)
+    const { id: urlId, fromLegacy } = readUrlProjectId(searchParamsRef.current)
     const resolved = resolveActiveProject({ urlId, persistedId: persisted, projects: list })
     setProjects(list)
     setProjectsError(failed)
@@ -139,12 +147,23 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
   }, [userId])
 
   // ── Deep-link / Back-Forward: adopt a valid projectId that appears in the URL. ──
+  //
+  // An id the loaded list does not know may be a project created a moment ago
+  // (the list is loaded once, on mount), so the list is reloaded ONCE for it;
+  // the reload resolves with the url first and adopts it only if it validates.
   useEffect(() => {
     if (!isResolved) return
     const { id: urlId } = readUrlProjectId(searchParams)
-    if (urlId && isValidActiveId(urlId, projectsRef.current) && urlId !== activeIdRef.current) {
+    if (!urlId || urlId === activeIdRef.current) return
+    if (isValidActiveId(urlId, projectsRef.current)) {
       setActiveProjectId(urlId)
       persist(urlId)
+    } else if (!reloadedForUrlIds.current.has(urlId)) {
+      reloadedForUrlIds.current.add(urlId)
+      // Unresolved while the list reloads, so no screen shows the PREVIOUS
+      // project's data under a url that already names the new one.
+      setIsResolved(false)
+      void loadProjects()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, isResolved])

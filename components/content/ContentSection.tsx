@@ -1,7 +1,12 @@
 'use client'
 
 /**
- * Content & Articles section — project page module.
+ * The site-platform connection, as the project's settings screen shows it.
+ *
+ * It used to open the project page's "Content & Articles" block, under a title and
+ * four article counters. The counters were never wired to data (they always read
+ * 0), and article numbers belong to the content screens, so the settings screen
+ * keeps only the connection itself.
  *
  * Phase 4F.1 UX: a project uses ONE primary platform. This section derives the
  * active platform from the existing connection tables (no migration) and shows
@@ -12,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Newspaper, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import WordPressConnectionPanel from './WordPressConnectionPanel'
@@ -67,13 +72,6 @@ export default function ContentSection({ projectId }: { projectId: string }) {
     if (new URLSearchParams(window.location.search).has('shopify')) setChoice('shopify')
   }, [])
 
-  const stats = [
-    { label: t.statsDrafts, value: 0 },
-    { label: t.statsReady, value: 0 },
-    { label: t.statsScheduled, value: 0 },
-    { label: t.statsPublished, value: 0 },
-  ]
-
   const both = wpConnected && shopifyConnected
 
   // K2 — when a platform is connected, explain what the Content Hub offers and link
@@ -91,24 +89,7 @@ export default function ContentSection({ projectId }: { projectId: string }) {
   )
 
   return (
-    <section className="mb-6">
-      <div className="flex items-center gap-2 mb-1">
-        <Newspaper size={20} strokeWidth={2} className="text-indigo-600 dark:text-indigo-400" />
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.title}</h2>
-      </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.subtitle}</p>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        {stats.map((s) => (
-          <Card key={s.label} className="hover:translate-y-0" padding={false}>
-            <div className="p-4">
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{s.label}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{s.value}</div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
+    <section>
       {loading ? (
         <Card className="hover:translate-y-0">
           <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-3">

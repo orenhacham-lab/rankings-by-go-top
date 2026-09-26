@@ -13,6 +13,7 @@ import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { consumeOAuthState } from '@/lib/gsc/state-store'
 import { exchangeCodeForTokens, GscOAuthError, GSC_RETURN_COOKIE } from '@/lib/gsc/oauth'
 import { storeConnectionFromTokens, GscServiceError } from '@/lib/gsc/service'
+import { SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
 
 export const runtime = 'nodejs'
 
@@ -24,12 +25,17 @@ export async function GET(request: NextRequest) {
   // the VALIDATED state's project id below, never from any client-supplied URL. Every
   // terminal redirect clears this cookie so a stale value can't affect a later flow.
   const returnHub = request.cookies.get(GSC_RETURN_COOKIE)?.value === 'hub'
+  // Both destinations are the screens that mount the panel reading `gsc`/`gsc_error`:
+  // the content Search Console screen for a hub connect, the project's settings for
+  // any other (they replaced the project page, which held that panel before).
   const back = (projectId: string | null, params: Record<string, string>): NextResponse => {
-    const url = returnHub && projectId
-      ? new URL('/content', origin)
-      : new URL(projectId ? `/projects/${projectId}` : '/projects', origin)
-    if (returnHub && projectId) url.searchParams.set('projectId', projectId)
+    const url = projectId
+      ? new URL(returnHub ? '/content/search-console' : '/settings', origin)
+      : new URL('/projects', origin)
+    if (projectId) url.searchParams.set('projectId', projectId)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    // Settings is a long screen; the result shows in its Search Console section.
+    if (projectId && !returnHub) url.hash = SETTINGS_GSC_ANCHOR
     const res = NextResponse.redirect(url)
     res.cookies.set(GSC_RETURN_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 })
     return res

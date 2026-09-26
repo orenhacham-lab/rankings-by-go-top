@@ -1,16 +1,30 @@
 import { cn } from '@/lib/utils'
 
+/**
+ * A card is a flat surface with a real border.
+ *
+ * It used to carry two stacked shadows, a hover shadow and a hover lift, so a
+ * page of cards floated and nothing sat still while the cursor moved. Depth now
+ * comes from the border; the single soft shadow only lifts the card off the
+ * canvas. `tone` covers the two other surfaces a screen needs: `sunk` for an
+ * inset panel inside a card, and `ink` for the dark context card a screen can
+ * open with (one per screen — it stops meaning "read this first" if repeated).
+ */
 interface CardProps {
   children: React.ReactNode
   className?: string
   padding?: boolean
+  tone?: 'default' | 'sunk' | 'ink'
 }
 
-export function Card({ children, className, padding = true }: CardProps) {
+export function Card({ children, className, padding = true, tone = 'default' }: CardProps) {
   return (
     <div
       className={cn(
-        'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-[0_10px_30px_rgba(15,23,42,0.04)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_14px_36px_rgba(15,23,42,0.07)] dark:hover:shadow-[0_14px_36px_rgba(0,0,0,0.4)] transition-all duration-200 hover:-translate-y-0.5',
+        'rounded-card border transition-colors',
+        tone === 'default' && 'bg-surface border-line shadow-card',
+        tone === 'sunk' && 'bg-sunk border-line',
+        tone === 'ink' && 'bg-contrast text-contrast-ink border-transparent shadow-card',
         padding && 'p-6',
         className
       )}
@@ -22,7 +36,7 @@ export function Card({ children, className, padding = true }: CardProps) {
 
 export function CardHeader({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('flex items-center justify-between mb-4', className)}>
+    <div className={cn('flex items-center justify-between gap-3 mb-4', className)}>
       {children}
     </div>
   )
@@ -30,7 +44,7 @@ export function CardHeader({ children, className }: { children: React.ReactNode;
 
 export function CardTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <h2 className={cn('text-lg font-semibold text-slate-900 dark:text-slate-100', className)}>
+    <h2 className={cn('text-base font-semibold text-ink', className)}>
       {children}
     </h2>
   )

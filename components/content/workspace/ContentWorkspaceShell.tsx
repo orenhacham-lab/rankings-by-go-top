@@ -2,8 +2,8 @@
 
 /**
  * The frame every content screen renders inside: the screen's own heading, the
- * project selector, the missing-connection onboarding, the shared "new article
- * topic" modal and the toast host.
+ * missing-connection onboarding, the shared "new article topic" modal and the
+ * toast host. The project comes from the top bar's switcher, like every screen's.
  *
  * Everything here used to be inlined at the top of the one big ContentHub, which
  * is why a screen could not exist without it. It is a layout now, so each screen
@@ -29,7 +29,7 @@ import type { ReactNode } from 'react'
 export default function ContentWorkspaceShell({ children }: { children: ReactNode }) {
   const {
     t, isHebrew, toast, projectId, projects, data, loading,
-    projectsResolved, projectsError, reloadProjects, onSelectProject,
+    projectsResolved, projectsError, reloadProjects,
     briefOpen, setBriefOpen, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
   } = useContentWorkspace()
   const screen = activeContentScreen(usePathname() ?? '')
@@ -37,11 +37,6 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
       <Header title={t.screens[screen]} subtitle={t.screenSubtitles[screen]} />
-
-      {/* Coming-soon context banner (this is an SEO/GEO content hub) */}
-      <div className="mb-4 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-900/10 px-3 py-2 text-xs text-indigo-700 dark:text-indigo-300">
-        {t.comingSoonBanner}
-      </div>
 
       {/* The accessible-project list FAILED to load — never rendered as "you have
           no projects", which is a different fact and offers no way forward. */}
@@ -63,20 +58,8 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
         </Card>
       ) : (
         <>
-          {/* Project selector */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <label className="text-sm text-slate-600 dark:text-slate-300">{t.selectProject}</label>
-            <select
-              value={projectId}
-              onChange={onSelectProject}
-              className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">{t.selectProjectPlaceholder}</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* No project selector here: the top bar's switcher is the one control
+              that picks the project, on this screen as on every other. */}
 
           {/* K5 — missing-connections onboarding (two independent setup cards, each
               hidden when its dimension is ready; whole block hidden when both are).

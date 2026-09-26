@@ -404,11 +404,12 @@ async function main() {
     // The content screens carry NO connect form at all any more — connection management
     // belongs to the project. That makes the destination on this card the ONLY place a
     // connected merchant can see or fix where their articles publish, so 8c/8d below are
-    // the load-bearing checks. The project page still owns the connect form itself.
-    const projectPage = strip(read('app/(dashboard)/projects/[id]/page.tsx'))
-    check('8b: SOURCE — no connect form on the content screens; the project page owns it',
+    // the load-bearing checks. The project's settings own the connect form itself (the
+    // project page that used to hold it is a redirect to the project's tabs now).
+    const settingsPage = strip(read('app/(dashboard)/settings/page.tsx'))
+    check("8b: SOURCE — no connect form on the content screens; the project's settings own it",
       !/<ShopifyConnectionPanel/.test(hub) && !/<WordPressConnectionPanel/.test(hub)
-      && /<ContentSection projectId=\{id\}/.test(projectPage))
+      && /<ContentSection projectId=\{project\.id\}/.test(settingsPage))
     check('8c: SOURCE — the visible card renders the destination section', card.includes('<ShopifyDestinationSection'))
     check('8d: SOURCE — it passes the real connection fields, not constants',
       /canPublish=\{shopify\.can_publish\}/.test(card) && /defaultBlogId=\{shopify\.default_blog_id\}/.test(card))

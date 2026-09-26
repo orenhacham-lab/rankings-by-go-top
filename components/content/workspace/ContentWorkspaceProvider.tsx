@@ -50,7 +50,7 @@ function useWorkspaceValue() {
   // workspace stays in sync with keywords / reports / other sections, across tabs
   // and refresh.
   const {
-    activeProjectId, setActiveProject,
+    activeProjectId,
     projects: accessibleProjects, isResolved: projectsResolved,
     projectsError, reloadProjects,
   } = useActiveProject()
@@ -278,12 +278,6 @@ function useWorkspaceValue() {
     setData((d) => (d ? { ...d, articles: d.articles.map((x) => (x.id === id ? { ...x, ...patch } : x)) } : d))
   }, [])
 
-  function onSelectProject(e: React.ChangeEvent<HTMLSelectElement>) {
-    // ONE writer for the shared active project — the provider persists it and every
-    // other section follows. No local mirror of the selection lives here.
-    setActiveProject(e.target.value)
-  }
-
   // The selector's options come from the AUTHORITATIVE accessible-project list, not
   // from whatever the overview payload happened to return.
   const overviewProjects = data?.projects ?? []
@@ -310,7 +304,7 @@ function useWorkspaceValue() {
 
   return {
     // identity + i18n
-    projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects, onSelectProject,
+    projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects,
     language, t, isHebrew, toast,
     // overview
     data, loading, counts, activePlatform, isShopify, exportedIdOf, load, patchArticle, shopifyPublishError,

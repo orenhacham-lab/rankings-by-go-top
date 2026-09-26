@@ -16,6 +16,7 @@ import { matchExistingContent } from '../content-match'
 import { scoreOpportunity } from '../score'
 import { loadOpportunityInputs } from '../load'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
+import { settingsGscHref } from '../../../content/content-hub-setup'
 import type { GscMetricRow } from '../../summary'
 import type { ContentEvidence, OpportunityRunMeta } from '../types'
 
@@ -282,9 +283,10 @@ async function main() {
     const route = read('app/(dashboard)/content/(workspace)/search-console/page.tsx')
     check('F4(12) the Search Console screen is gated by the GSC client flag',
       /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED !== 'true'/.test(route))
-    const projectPage = read('app/(dashboard)/projects/[id]/page.tsx')
-    check('F4(13) NOT mounted on the project page anymore', !/GscOpportunities/.test(projectPage))
-    check('F4(13) Stage E1 GscPanel is untouched on the project page', /<GscPanel projectId=\{id\}/.test(projectPage))
+    // The project page became tabs; its connection panels live in the project's settings.
+    const settingsPage = read('app/(dashboard)/settings/page.tsx')
+    check("F4(13) NOT mounted in the project's settings (it is data, not a connection)", !/GscOpportunities/.test(settingsPage))
+    check("F4(13) Stage E1 GscPanel is mounted, unchanged, in the project's settings", /<GscPanel projectId=\{project\.id\}/.test(settingsPage))
     // (14) no Stage E2B actions / no writes in the UI. Strip comments first so descriptive
     // prose (e.g. "never creates/approves/publishes") doesn't trip the guard.
     const ui = read('components/content/GscOpportunities.tsx')
@@ -335,7 +337,11 @@ async function main() {
     check('LF2(9) not_connected shows a project-page CTA', /not_connected[\s\S]{0,120}ctaFor\('not_connected'\)/.test(ui) && /t\.ctaConnect/.test(ui))
     check('LF2(10) no_property shows a project-page CTA', /no_property[\s\S]{0,120}ctaFor\('no_property'\)/.test(ui) && /t\.ctaSelectProperty/.test(ui))
     check('LF2(11) never_synced shows a project-page CTA', /never_synced[\s\S]{0,120}ctaFor\('never_synced'\)/.test(ui) && /t\.ctaSync/.test(ui))
-    check('LF2 CTA links to the project GSC section preserving project', /\/projects\/\$\{projectId\}#gsc-section/.test(ui))
+    const ctaToSettings = (src: string) => /const gscHref = settingsGscHref\(projectId\)/.test(src)
+    check("LF2 CTA links to the Search Console section of the project's settings, preserving project",
+      ctaToSettings(ui) && settingsGscHref('p1') === '/settings?projectId=p1#search-console')
+    check('LF2 MUT: a CTA to the retired project page fails that check',
+      !ctaToSettings(ui.replace('settingsGscHref(projectId)', '`/projects/${projectId}#gsc-section`')))
     check('LF2(12) NO OAuth/connect implementation duplicated in Content Hub', !/api\/gsc\/connect|buildAuthUrl|oauth|access_type|listSites/i.test(ui) && !/api\/gsc\/property/.test(ui))
   }
 

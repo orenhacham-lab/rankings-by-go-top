@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { settingsGscHref } from '@/lib/content/content-hub-setup'
 import { Lightbulb, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -116,7 +117,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
   const allTypes: FilterValue[] = ['improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate', 'multi_page_signal']
   const scoreBadgeVariant = (s: number): 'success' | 'info' | 'neutral' => (s >= 66 ? 'success' : s >= 33 ? 'info' : 'neutral')
 
-  const gscHref = `/projects/${projectId}#gsc-section`
+  const gscHref = settingsGscHref(projectId)
   const ctaFor = (s: string): string | null => (s === 'not_connected' ? t.ctaConnect : s === 'no_property' ? t.ctaSelectProperty : s === 'never_synced' ? t.ctaSync : null)
   const renderStateCta = (message: string, ctaText: string) => (
     <div className="py-4">

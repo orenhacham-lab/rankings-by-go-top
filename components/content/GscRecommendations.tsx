@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { settingsGscHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -93,7 +94,7 @@ export default function GscRecommendations({ projectId, onToast }: {
   const state = data?.state
   const recommendations = data?.recommendations ?? []
   const filtered = categoryFilter ? recommendations.filter((r) => r.category === categoryFilter) : recommendations
-  const gscHref = `/projects/${projectId}#gsc-section`
+  const gscHref = settingsGscHref(projectId)
 
   const stateMessage = state === 'not_connected' ? t.stateNotConnected : state === 'no_property' ? t.stateNoProperty : state === 'never_synced' ? t.stateNeverSynced : null
   const stateCta = state === 'not_connected' ? t.ctaConnect : state === 'no_property' ? t.ctaSelectProperty : state === 'never_synced' ? t.ctaSync : null

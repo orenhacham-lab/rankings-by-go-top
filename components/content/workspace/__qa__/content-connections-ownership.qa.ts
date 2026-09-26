@@ -6,14 +6,16 @@
  * the article table, the automation queue and the pending topics — which is exactly what
  * made that page a catch-all nobody could read.
  *
- * The rule now: connection MANAGEMENT belongs to the project. The content screens show
- * WHERE articles publish (a Shopify queue can block on a missing default blog, so the
- * destination has to be visible with the articles) and link to the project for anything
- * that changes the connection. No content screen carries a connect form.
+ * The rule now: connection MANAGEMENT belongs to the project, in its settings screen
+ * (it was a section of the project page until that page became tabs). The content
+ * screens show WHERE articles publish (a Shopify queue can block on a missing default
+ * blog, so the destination has to be visible with the articles) and link to the
+ * project's settings for anything that changes the connection. No content screen
+ * carries a connect form.
  */
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { platformSetupHref, gscSetupHref } from '../../../../lib/content/content-hub-setup'
+import { platformSetupHref, gscSetupHref, settingsGscHref } from '../../../../lib/content/content-hub-setup'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -33,7 +35,7 @@ function main() {
   console.log('Connection ownership — the project, not the content screens')
 
   const workspaceSrc = workspaceFiles.map((p) => strip(read(p))).join('\n')
-  const projectPage = strip(read(join('app', '(dashboard)', 'projects', '[id]', 'page.tsx')))
+  const settingsPage = strip(read(join('app', '(dashboard)', 'settings', 'page.tsx')))
   const section = strip(read(join('components', 'content', 'ContentSection.tsx')))
   const articles = strip(read(join(WORKSPACE, 'ArticlesScreen.tsx')))
 
@@ -45,8 +47,8 @@ function main() {
   check('…and defines no credential / OAuth / token logic of its own',
     !/oauth\/start|exchangeCodeForToken|access_token|app_password/.test(workspaceSrc))
 
-  // ── 2. The project page owns it, through the section that already did. ──
-  check('the project page renders ContentSection', /<ContentSection projectId=\{id\}/.test(projectPage))
+  // ── 2. The project's settings own it, through the section that already did. ──
+  check("the project's settings render ContentSection", /<ContentSection projectId=\{project\.id\}/.test(settingsPage))
   check('ContentSection owns BOTH panels', /import WordPressConnectionPanel/.test(section) && /import ShopifyConnectionPanel/.test(section))
   check('and enforces platform exclusivity in the UI (one platform at a time)',
     /wpConnected/.test(section) && /shopifyConnected/.test(section))
@@ -64,13 +66,28 @@ function main() {
   // split exists to remove.
   check('…only when a platform is connected, so it never duplicates the setup card',
     /\{activePlatform !== 'none' && \([\s\S]{0,200}<ContentHubPlatformCard/.test(articles))
-  check('…and links to the project, where the connection is managed',
-    /href=\{`\/projects\/\$\{projectId\}#content-section`\}/.test(articles) && /t\.manageConnection/.test(articles))
-  check('the project page still carries that anchor', /id="content-section"/.test(projectPage))
-  // The onboarding card that asks a merchant to connect must reach the same place.
-  check('the setup card links to the project page, not to a panel that is no longer there',
-    platformSetupHref('p1') === '/projects/p1#content-section'
+  // The link and its target are both built from one constant, so they cannot drift.
+  const linksToSettings = (src: string) => /href=\{platformSetupHref\(projectId\)\}/.test(src) && /t\.manageConnection/.test(src)
+  const anchorsPlatform = (src: string) => /id=\{PROJECT_CONNECTION_ANCHOR\}[\s\S]{0,120}<ContentSection /.test(src)
+  const anchorsGsc = (src: string) => /id=\{SETTINGS_GSC_ANCHOR\}[\s\S]{0,120}<GscPanel /.test(src)
+  check("…and links to the project's settings, where the connection is managed", linksToSettings(articles))
+  check('the settings screen carries that anchor, around the connect section', anchorsPlatform(settingsPage))
+  check('…and the Search Console anchor, around the Search Console panel', anchorsGsc(settingsPage))
+  // The onboarding card that asks a merchant to connect must reach the same place,
+  // naming the project so the link opens it whichever project is current.
+  check("the setup card links to the project's settings, not to a panel that is no longer there",
+    platformSetupHref('p1') === '/settings?projectId=p1#platform'
     && !/scrollIntoView/.test(strip(read(join('components', 'content', 'ContentHubSetup.tsx')))))
+  check("the Search Console CTA links to the same settings screen's Search Console section",
+    settingsGscHref('p1') === '/settings?projectId=p1#search-console'
+    && platformSetupHref('a b') === '/settings?projectId=a%20b#platform')
+
+  // Mutation controls: the retired destinations must fail these checks.
+  check('MUT: an articles screen linking to the retired project page fails the link check',
+    !linksToSettings(articles.replace('href={platformSetupHref(projectId)}', 'href={`/projects/${projectId}#content-section`}')))
+  check('MUT: a settings screen with a hand-typed anchor fails the anchor check',
+    !anchorsPlatform(settingsPage.replace('id={PROJECT_CONNECTION_ANCHOR}', 'id="content-section"'))
+    && !anchorsGsc(settingsPage.replace('id={SETTINGS_GSC_ANCHOR}', 'id="gsc-section"')))
   check('and the Search Console setup card links to the screen that owns that panel',
     gscSetupHref() === '/content/search-console#hub-setup-gsc'
     && /id=\{GSC_SETUP_ANCHOR\}/.test(strip(read(join(WORKSPACE, 'SearchConsoleScreen.tsx')))))

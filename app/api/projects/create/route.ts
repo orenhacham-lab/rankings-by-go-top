@@ -139,7 +139,9 @@ export async function POST(request: NextRequest) {
     })
 
     // Insert into database
-    const { data: insertResult, error } = await supabase.from('projects').insert(data)
+    // The new row's id comes back so the app can open the project it just
+    // created. RLS returns only the caller's own row.
+    const { data: insertResult, error } = await supabase.from('projects').insert(data).select('id').single()
 
     if (error) {
       console.error('[API] Database error:', {

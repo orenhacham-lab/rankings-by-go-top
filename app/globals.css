@@ -3,6 +3,142 @@
 /* ── Tailwind v4 custom dark variant for class-based dark mode ───── */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ═══════════════════════════════════════════════════════════════════
+   Design tokens — the app's whole visual vocabulary, in one place.
+
+   Every screen used to spell its own look out of raw Tailwind: a card was
+   "bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 …" copied
+   by hand, so no two screens agreed and nothing could be changed centrally.
+   These tokens are the vocabulary instead. A component asks for `bg-surface`,
+   `border-line`, `text-muted`, `bg-action`, and dark mode is one override of the
+   same names — never a second set of classes.
+
+   The palette stays ours (indigo, slate). What is borrowed from the competitor
+   is the SYSTEM: flat surfaces with a real border instead of stacked shadows,
+   one accent colour, a second colour reserved for commitment, and a fixed set of
+   radii and shadows.
+
+   ── Two action colours, and only two ────────────────────────────────
+   `action`  — every ordinary action: save, generate, connect, publish.
+   `commit`  — the few that cost money or cannot be taken back: upgrade, buy.
+   A third filled colour would make neither of them mean anything, so warnings
+   and errors are SOFT (tinted background + dark text), never filled buttons.
+   ═══════════════════════════════════════════════════════════════════ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #f7f8fb;        /* the page behind everything */
+  --color-surface: #ffffff;       /* cards, panels, table rows */
+  --color-sunk: #f1f5f9;          /* table heads, insets, hover fills */
+  --color-line: #e2e8f0;          /* every default border */
+  --color-line-strong: #cbd5e1;   /* a border that has to be noticed */
+
+  /* Text */
+  --color-ink: #0f172a;           /* headings */
+  --color-body: #334155;          /* body copy */
+  --color-muted: #64748b;         /* labels, sub-labels, placeholders */
+
+  /* Actions — exactly two */
+  --color-action: #4f46e5;
+  --color-action-hover: #4338ca;
+  --color-action-ink: #ffffff;
+  --color-action-soft: #eef2ff;   /* selected rows, active chips */
+  --color-commit: #d97706;
+  --color-commit-hover: #b45309;
+  --color-commit-ink: #ffffff;
+  --color-commit-soft: #fffbeb;
+
+  /* States — soft pairs, never filled buttons */
+  --color-ok: #15803d;
+  --color-ok-soft: #f0fdf4;
+  --color-warn: #b45309;
+  --color-warn-soft: #fffbeb;
+  --color-bad: #b91c1c;
+  --color-bad-soft: #fef2f2;
+  --color-info: #1d4ed8;
+  --color-info-soft: #eff6ff;
+
+  /* The one dark surface: a screen's opening context card. Its own token,
+     because it must stay dark in dark mode instead of inverting. */
+  --color-contrast: #0f172a;
+  --color-contrast-ink: #f8fafc;
+
+  /* Radii — a card, a control, a pill. Nothing else. */
+  --radius-card: 1.25rem;
+  --radius-control: 0.5rem;
+  --radius-pill: 9999px;
+
+  /* Shadows — two. Depth comes from the border, not from stacked glows. */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -16px rgba(15, 23, 42, 0.18);
+  --shadow-pop: 0 12px 32px -8px rgba(15, 23, 42, 0.18);
+
+  /* Type rhythm — four steps, each with its own line height, and nothing between them:
+     screen title / section title / copy / caption. A screen that needs a fifth size is a
+     screen that needs a different layout. (Named so no step shares a name with a colour
+     token: `text-body` is the body COLOUR, and one utility must mean one thing.) */
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-section: 1rem;
+  --text-section--line-height: 1.5rem;
+  --text-copy: 0.875rem;
+  --text-copy--line-height: 1.5rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+
+  /* Motion — one entrance, short and slightly springy, for anything that appears on
+     demand (a dropdown, a popover). Nothing animates on its own. */
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Motion is a courtesy, never a requirement: honour the OS setting. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Dark mode redefines the SAME names, so no component carries a second palette. */
+.dark {
+  --color-canvas: #0b1120;
+  --color-surface: #111827;
+  --color-sunk: #1e293b;
+  --color-line: #1f2b3d;
+  --color-line-strong: #334155;
+
+  --color-ink: #f8fafc;
+  --color-body: #cbd5e1;
+  --color-muted: #94a3b8;
+
+  --color-action: #6366f1;
+  --color-action-hover: #818cf8;
+  --color-action-ink: #ffffff;
+  --color-action-soft: #1e1b4b;
+  --color-commit: #f59e0b;
+  --color-commit-hover: #fbbf24;
+  --color-commit-ink: #1c1917;
+  --color-commit-soft: #292014;
+
+  --color-ok: #4ade80;
+  --color-ok-soft: #052e1b;
+  --color-warn: #fbbf24;
+  --color-warn-soft: #2a2010;
+  --color-bad: #f87171;
+  --color-bad-soft: #2c1414;
+  --color-info: #93c5fd;
+  --color-info-soft: #0f2038;
+
+  --color-contrast: #1e293b;
+  --color-contrast-ink: #f8fafc;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+}
+
 /* ── Base RTL setup ────────────────────────────────────────────── */
 html {
   direction: rtl;
@@ -31,8 +167,8 @@ body {
   /* Rubik loaded from Google Fonts in layout.tsx */
   font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: linear-gradient(180deg, #f8fbff 0%, #f4f6fb 45%, #f8fafc 100%);
-  color: #0f172a;
+  background: var(--color-canvas);
+  color: var(--color-body);
   min-height: 100vh;
 }
 
@@ -61,14 +197,14 @@ select {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--color-sunk);
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-line-strong);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-muted);
 }
 
 /* ── Native dialog backdrop ────────────────────── */

@@ -13,7 +13,7 @@ const TOOLTIP_WIDTH = 380
 const GAP = 16
 const MOBILE_BP = 768
 
-type TourStep = 'createClient' | 'createProject' | 'keywordResearch' | 'generateReports'
+type TourStep = 'createProject' | 'keywordResearch' | 'generateReports'
 
 interface TourConfig {
   step: TourStep
@@ -21,8 +21,9 @@ interface TourConfig {
 }
 
 const tourSteps: TourConfig[] = [
-  { step: 'createClient', selector: '[data-onboarding="clients"]' },
-  { step: 'createProject', selector: '[data-onboarding="projects"]' },
+  // A workspace IS the project now, and it is created from the top-bar switcher —
+  // there is no Clients tab to send anyone to, and no separate "create a client" step.
+  { step: 'createProject', selector: '[data-onboarding="workspace"]' },
   { step: 'keywordResearch', selector: '[data-onboarding="keyword-research"]' },
   { step: 'generateReports', selector: '[data-onboarding="reports"]' },
 ]
@@ -34,7 +35,6 @@ interface TooltipPosition {
 }
 
 interface DashboardOnboardingTourProps {
-  totalClients: number
   totalProjects: number
   shouldShowTour?: boolean
 }
@@ -51,7 +51,6 @@ const debugWarn = (...args: unknown[]) => {
 }
 
 export function DashboardOnboardingTour({
-  totalClients,
   totalProjects,
   shouldShowTour = false,
 }: DashboardOnboardingTourProps) {
@@ -96,12 +95,9 @@ export function DashboardOnboardingTour({
   const getStorageKey = (userId: string | null) => userId ? `${STORAGE_KEY_BASE}_${userId}` : STORAGE_KEY_BASE
   const getCurrentStepKey = (userId: string | null) => userId ? `${CURRENT_STEP_KEY_BASE}_${userId}` : CURRENT_STEP_KEY_BASE
 
-  // Skip steps the user already finished
-  const getStartStep = useCallback(() => {
-    if (totalClients === 0) return 0
-    if (totalProjects === 0) return 1
-    return 2
-  }, [totalClients, totalProjects])
+  // Skip steps the user already finished. Step 0 is "create a project" (the
+  // switcher); an account that has one starts at keyword research.
+  const getStartStep = useCallback(() => (totalProjects === 0 ? 0 : 1), [totalProjects])
 
   // Decide whether to run the tour
   useEffect(() => {
@@ -113,13 +109,11 @@ export function DashboardOnboardingTour({
 
     const isCompleted = localStorage.getItem(storageKey) === 'true'
     const startStep = getStartStep()
-    const hasClients = totalClients > 0
     const hasProjects = totalProjects > 0
 
     debugLog('[onboarding] check conditions', {
       isCompleted,
       shouldShowTour,
-      hasClients,
       hasProjects,
       startStep,
     })
@@ -130,9 +124,9 @@ export function DashboardOnboardingTour({
       return
     }
 
-    // Don't show if established user (has clients and projects) and shouldn't force show
-    if (!shouldShowTour && hasClients && hasProjects) {
-      debugLog('[onboarding] user is established (has clients + projects), skipping')
+    // Don't show if established user (has a project) and shouldn't force show
+    if (!shouldShowTour && hasProjects) {
+      debugLog('[onboarding] user is established (has a project), skipping')
       return
     }
 
@@ -146,7 +140,7 @@ export function DashboardOnboardingTour({
     debugLog('[onboarding] showing tour, initialStep:', initialStep)
     setCurrentStepIndex(initialStep)
     setIsVisible(true)
-  }, [totalClients, totalProjects, shouldShowTour, getStartStep, userId])
+  }, [totalProjects, shouldShowTour, getStartStep, userId])
 
   // Locate the target for the current step
   const resolveTarget = useCallback((fromIndex: number): { el: HTMLElement; index: number } | null => {

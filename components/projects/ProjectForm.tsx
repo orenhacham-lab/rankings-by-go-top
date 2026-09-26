@@ -13,7 +13,8 @@ interface ProjectFormProps {
   project?: Project
   clients: Client[]
   defaultClientId?: string
-  onSuccess: () => void
+  /** On a create, receives the new project's id so the caller can open it. */
+  onSuccess: (createdId?: string) => void
   onCancel: () => void
 }
 
@@ -67,6 +68,7 @@ export default function ProjectForm({
     formData.set('auto_scan_enabled', autoScan ? 'true' : 'false')
 
     try {
+      let createdId: string | undefined
       if (project) {
         // Update existing project - use server action
         await updateProjectAction(project.id, formData)
@@ -82,9 +84,10 @@ export default function ProjectForm({
           throw new Error(errorData.error || f.errorCreate)
         }
 
-        await response.json()
+        const created = await response.json()
+        createdId = typeof created?.data?.id === 'string' ? created.data.id : undefined
       }
-      onSuccess()
+      onSuccess(createdId)
     } catch (err) {
       setError((err as Error).message || dict.common.saveError)
     } finally {

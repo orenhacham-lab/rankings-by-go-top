@@ -105,21 +105,21 @@ async function main() {
 
     const enHtml = firstRender('en', createElement(Sidebar as never, { isAdmin: false }))
     check('A1: initialLocale="en" → English nav labels are present on the FIRST render',
-      enHtml.includes(en.dashboard) && enHtml.includes(en.projects) && enHtml.includes(enScreens.articles) && enHtml.includes(en.billing),
+      enHtml.includes(en.dashboard) && enHtml.includes(en.projectSettings) && enHtml.includes(enScreens.articles) && enHtml.includes(en.billing),
       enHtml.slice(0, 300))
     const enBody = withoutSwitcherLabels(enHtml)
     check('A2: …and NOT ONE Hebrew character is rendered outside the language switch',
       !HEBREW.test(enBody),
       (enBody.match(/[֐-׿][^<]*/g) ?? []).slice(0, 6).join(' | '))
     check('A3: …specifically, the Hebrew labels are absent',
-      !enHtml.includes(he.dashboard) && !enHtml.includes(he.projects) && !enHtml.includes(heScreens.articles))
+      !enHtml.includes(he.dashboard) && !enHtml.includes(he.projectSettings) && !enHtml.includes(heScreens.articles))
 
     const heHtml = firstRender('he', createElement(Sidebar as never, { isAdmin: false }))
     check('A4: initialLocale="he" → Hebrew nav labels are present on the FIRST render',
-      heHtml.includes(he.dashboard) && heHtml.includes(he.projects) && heHtml.includes(heScreens.articles),
-      JSON.stringify({ dashboard: heHtml.includes(he.dashboard), projects: heHtml.includes(he.projects), articles: heHtml.includes(heScreens.articles) }))
+      heHtml.includes(he.dashboard) && heHtml.includes(he.projectSettings) && heHtml.includes(heScreens.articles),
+      JSON.stringify({ dashboard: heHtml.includes(he.dashboard), projectSettings: heHtml.includes(he.projectSettings), articles: heHtml.includes(heScreens.articles) }))
     check('A5: …and the English labels are absent',
-      !heHtml.includes(`>${en.dashboard}<`) && !heHtml.includes(`>${en.projects}<`))
+      !heHtml.includes(`>${en.dashboard}<`) && !heHtml.includes(`>${en.projectSettings}<`))
     check('A6: the two renders genuinely differ', enHtml !== heHtml)
 
     // The admin section too — it renders a second nav group from the same dict.
@@ -161,8 +161,14 @@ async function main() {
       { label: 'ProjectForm', path: 'components/projects/ProjectForm.tsx', props: { clients: [] },
         probe: (d) => [String((d.projects as never as { table: Record<string, string> }).table.projectName)] },
       // The two surfaces the reviewer actually opens.
+      // Rendered with no active project (no provider here), so the page is its own
+      // heading plus the workspace gate's "create your first project" state.
       { label: 'DashboardPage', path: 'app/(dashboard)/dashboard/page.tsx', props: {},
-        probe: (d) => [String((d.home as never as Record<string, string>).loading)] },
+        probe: (d) => [
+          String((d.home as never as Record<string, string>).title),
+          String((d.home as never as Record<string, string>).subtitle),
+          String((d.workspace as never as Record<string, string>).noProjectTitle),
+        ] },
       { label: 'ContentWorkspace', path: 'components/content/workspace/ContentWorkspaceShell.tsx', props: {},
         wrap: { path: 'components/content/workspace/ContentWorkspaceProvider.tsx', named: 'ContentWorkspaceProvider' },
         probe: () => [] },

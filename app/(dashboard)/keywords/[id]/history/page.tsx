@@ -76,8 +76,8 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         actions={
           <div className="flex gap-2">
             {target.projects && (
-              <Link href={`/projects/${target.projects.id}`}>
-                <Button variant="outline" size="sm">{t.backToProject}</Button>
+              <Link href={`/keywords?projectId=${encodeURIComponent(target.projects.id)}`}>
+                <Button variant="outline" size="sm">{t.backToKeywords}</Button>
               </Link>
             )}
           </div>

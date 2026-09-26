@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -320,7 +321,7 @@ export default function ArticlesScreen() {
           <ContentHubPlatformCard projectId={projectId}>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-slate-600 dark:text-slate-300">{t.manageConnection}</span>
-              <Link href={`/projects/${projectId}#content-section`} className="text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:underline">
+              <Link href={platformSetupHref(projectId)} className="text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:underline">
                 {t.manageConnectionCta}
               </Link>
             </div>

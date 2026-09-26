@@ -14,6 +14,7 @@ import { toggleProjectActiveAction, deleteProjectAction } from '@/app/actions/pr
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 
 interface ProjectsTableProps {
   projects: (Project & { clients?: Client })[]
@@ -25,6 +26,10 @@ interface ProjectsTableProps {
 export default function ProjectsTable({ projects, clients, showClient = true, onProjectsChange }: ProjectsTableProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
+  // The top bar's switcher lists the active projects. Every change made here
+  // (a rename, deactivating, reactivating, deleting) reloads that list, or the
+  // switcher would keep offering what this table just changed.
+  const { reloadProjects } = useActiveProject()
 
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
@@ -50,6 +55,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
     setTogglingId(project.id)
     try {
       await toggleProjectActiveAction(project.id, project.is_active)
+      reloadProjects()
     } finally {
       setTogglingId(null)
     }
@@ -86,12 +92,18 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
           {filtered.map((project) => (
             <TableRow key={project.id}>
               <Td>
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  {project.name}
-                </Link>
+                {/* A project opens as the current project, on its dashboard. An
+                    inactive one has no workspace to open until it is reactivated. */}
+                {project.is_active ? (
+                  <Link
+                    href={`/dashboard?projectId=${encodeURIComponent(project.id)}`}
+                    className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {project.name}
+                  </Link>
+                ) : (
+                  <span className="font-semibold text-muted">{project.name}</span>
+                )}
               </Td>
               {showClient && (
                 <Td>
@@ -154,7 +166,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
           <ProjectForm
             project={editingProject}
             clients={clients}
-            onSuccess={() => setEditingProject(null)}
+            onSuccess={() => { setEditingProject(null); reloadProjects() }}
             onCancel={() => setEditingProject(null)}
           />
         </Modal>
@@ -167,7 +179,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
           labels={dict.projects.deleteDialog}
           onConfirm={() => deleteProjectAction(deletingProject.id)}
           onClose={() => setDeletingProject(null)}
-          onDeleted={async () => { if (onProjectsChange) await onProjectsChange() }}
+          onDeleted={async () => { reloadProjects(); if (onProjectsChange) await onProjectsChange() }}
         />
       )}
     </>

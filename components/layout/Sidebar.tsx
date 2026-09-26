@@ -11,8 +11,6 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import type { LucideIcon } from 'lucide-react'
 import {
   BarChart3,
-  Users,
-  Folder,
   KeyRound,
   Sparkles,
   Search,
@@ -24,6 +22,7 @@ import {
   MessageCircle,
   Lightbulb,
   Newspaper,
+  Settings,
   Target,
   CalendarClock,
   LineChart,
@@ -89,6 +88,16 @@ const contentNavItems: readonly NavItem[] =
     : []
 
 /**
+ * AI visibility is the tool itself now, for the current project, behind the same
+ * build-time flag as its page. Without the flag the page has nothing to show, so
+ * there is no entry leading to it.
+ */
+const aiVisibilityNavItems: readonly NavItem[] =
+  process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'
+    ? [{ href: '/ai-visibility', labelKey: 'aiVisibility', icon: Sparkles }]
+    : []
+
+/**
  * The nav is declared as GROUPS, not as one flat list.
  *
  * Ten undifferentiated entries gave no clue which screen answers which
@@ -107,8 +116,6 @@ const navGroupKeys: readonly NavGroup[] = [
     groupKey: 'groupMain',
     items: [
       { href: '/dashboard', labelKey: 'dashboard', icon: BarChart3 },
-      { href: '/clients', labelKey: 'clients', icon: Users, onboarding: 'clients' },
-      { href: '/projects', labelKey: 'projects', icon: Folder, onboarding: 'projects' },
     ],
   },
   {
@@ -122,7 +129,7 @@ const navGroupKeys: readonly NavGroup[] = [
   {
     groupKey: 'groupMonitoring',
     items: [
-      { href: '/ai-visibility', labelKey: 'aiVisibility', icon: Sparkles },
+      ...aiVisibilityNavItems,
       { href: '/scans', labelKey: 'scans', icon: Search },
       { href: '/reports', labelKey: 'reports', icon: FileText, onboarding: 'reports' },
     ],
@@ -130,6 +137,7 @@ const navGroupKeys: readonly NavGroup[] = [
   {
     groupKey: 'groupAccount',
     items: [
+      { href: '/settings', labelKey: 'projectSettings', icon: Settings },
       { href: '/billing', labelKey: 'billing', icon: CreditCard },
     ],
   },

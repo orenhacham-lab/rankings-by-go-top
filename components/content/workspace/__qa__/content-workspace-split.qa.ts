@@ -75,9 +75,19 @@ function main() {
   // ── 1. The blob is gone, not renamed. ──
   check('components/content/ContentHub.tsx no longer exists',
     !existsSync(join(ROOT, 'components', 'content', 'ContentHub.tsx')))
+  // Every source file, not a list of the places it used to be: the project page
+  // that once mounted it is a redirect now, and a list would go stale again.
   check('and nothing imports it', (() => {
-    const all = [...workspaceFiles.map((f) => read(join(WS, f))), read(join('app', '(dashboard)', 'projects', '[id]', 'page.tsx'))].join('\n')
-    return !/from '@\/components\/content\/ContentHub'/.test(all)
+    const importers: string[] = []
+    const scan = (dir: string) => {
+      for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+        const rel = join(dir, e.name)
+        if (e.isDirectory()) { if (e.name !== '__qa__' && e.name !== 'node_modules') scan(rel); continue }
+        if (/\.tsx?$/.test(e.name) && /from '@\/components\/content\/ContentHub'/.test(strip(read(rel)))) importers.push(rel)
+      }
+    }
+    for (const top of ['app', 'components', 'lib']) scan(top)
+    return importers.length === 0
   })())
 
   // ── 2. Every declared screen is a real route. ──

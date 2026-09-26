@@ -68,16 +68,23 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
     )
   }
 
+  // Back to the list this page was opened from: one keyword's result comes from
+  // the keywords table, a whole scan from the scans list. Both are tabs of the
+  // scan's own project.
+  const fromKeyword = !!(resultId || targetId)
+  const backPath = fromKeyword ? '/keywords' : '/scans'
+  const backHref = projectId ? `${backPath}?projectId=${encodeURIComponent(projectId)}` : backPath
+  const backLabel = fromKeyword ? t.backToKeywords : t.backToScans
+
   if (results.length === 0) {
-    const emptyBackHref = projectId ? `/projects/${projectId}` : '/projects'
     return (
       <div>
         <Header
           title={t.title}
           subtitle={t.subtitle}
           actions={
-            <Link href={emptyBackHref}>
-              <Button variant="outline" size="sm">{t.backToProject}</Button>
+            <Link href={backHref}>
+              <Button variant="outline" size="sm">{backLabel}</Button>
             </Link>
           }
         />
@@ -88,8 +95,6 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
     )
   }
 
-  const backHref = projectId ? `/projects/${projectId}` : '/projects'
-
   return (
     <div>
       <Header
@@ -97,7 +102,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
         subtitle={t.subtitle}
         actions={
           <Link href={backHref}>
-            <Button variant="outline" size="sm">{t.backToProject}</Button>
+            <Button variant="outline" size="sm">{backLabel}</Button>
           </Link>
         }
       />

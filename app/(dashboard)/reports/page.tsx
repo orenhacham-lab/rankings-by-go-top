@@ -49,12 +49,10 @@ function ReportsContent() {
   const dict = getDashboardDictionary(language)
   const t = dict.reports
 
-  // Area D — the selected project is the GLOBAL active project (shared with keywords /
-  // Content Hub, across tabs + refresh). The local `projects` list is kept only for the
-  // dropdown labels/report data (it carries client names the shared list doesn't).
-  const { activeProjectId, setActiveProject } = useActiveProject()
+  // Area D — the selected project is the GLOBAL active project, picked in the top
+  // bar like on every screen. This page has no project dropdown of its own.
+  const { activeProjectId } = useActiveProject()
   const selectedProjectId = activeProjectId ?? ''
-  const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
   const [reportType, setReportType] = useState<ReportType>('google')
   
   // Google report data
@@ -88,33 +86,16 @@ function ReportsContent() {
   const [sortColumn, setSortColumn] = useState<'position' | null>('position')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
-  useEffect(() => {
-    async function loadProjects() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data } = await supabase
-        .from('projects')
-        .select('*, clients(*)')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('name')
-      setProjects(data || [])
-    }
-    loadProjects()
-  }, [])
-
   // Area D — load the current report type whenever the GLOBAL active project resolves
   // or changes (replaces the old ?project_id deep-link effect). The project switch is
   // handled centrally by ActiveProjectProvider; this section only reacts to it.
   useEffect(() => {
-    if (selectedProjectId && projects.length > 0) {
+    if (selectedProjectId) {
       if (reportType === 'google') loadGoogleReport(selectedProjectId)
       else loadAiReport(selectedProjectId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectId, projects.length])
+  }, [selectedProjectId])
 
   async function loadGoogleReport(projectId: string) {
     if (!projectId) return
@@ -380,23 +361,9 @@ function ReportsContent() {
         subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}
       />
 
-      {/* Project & Report Type Selector */}
+      {/* Report type. The project is the one the top bar names. */}
       <Card className="mb-6">
         <div className="flex gap-4 items-end flex-wrap">
-          <div className="flex-1 min-w-48">
-            <Select
-              label={t.selectProject}
-              value={selectedProjectId}
-              onChange={(e) => setActiveProject(e.target.value)}
-              options={[
-                { value: '', label: t.selectProjectPlaceholder },
-                ...projects.map((p) => ({
-                  value: p.id,
-                  label: `${p.clients?.name || ''} — ${p.name}`,
-                })),
-              ]}
-            />
-          </div>
           <div className="flex-1 min-w-48">
             <Select
               label={t.reportType}

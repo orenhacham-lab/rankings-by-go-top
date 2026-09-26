@@ -334,23 +334,15 @@ const STRINGS = {
   profile_save_failed: { he: 'שמירת הפרופיל נכשלה. נסה שוב.', en: 'Failed to save profile. Please try again.' },
   profile_reset_failed: { he: 'איפוס הפרופיל נכשל. נסה שוב.', en: 'Failed to reset profile. Please try again.' },
 
-  // Global AI Visibility page
+  // The AI visibility tab (one project: the one the top bar names)
   page_subtitle: {
-    he: 'ההופעות של האתר שלך בתוצאות AI לפי פרויקט',
-    en: 'How your site appears in AI results, per project',
+    he: 'איך מנועי ה-AI עונים על שאלות בתחום של העסק, והאם הם מזכירים ומצטטים את האתר',
+    en: 'How AI assistants answer questions in your field, and whether they mention and cite your site',
   },
-  no_projects_available: { he: 'אין פרויקטים זמינים', en: 'No projects available' },
-  add_project: { he: '+ הוסף פרויקט', en: '+ Add project' },
-  total_projects: { he: 'סה״כ פרויקטים', en: 'Total projects' },
-  total_queries: { he: 'סה״כ שאילתות', en: 'Total queries' },
-  total_scans: { he: 'סה״כ סריקות', en: 'Total scans' },
-  total_citations: { he: 'סה״כ ציטוטים', en: 'Total citations' },
-  avg_visibility: { he: 'ממוצע נראות', en: 'Avg. visibility' },
-  projects_heading: { he: 'פרויקטים', en: 'Projects' },
+  not_available: { he: 'נראות ב-AI לא זמינה בחשבון הזה.', en: 'AI visibility is not available on this account.' },
   no_data: { he: 'אין נתונים', en: 'No data' },
   queries: { he: 'שאילתות', en: 'Queries' },
   last_scan: { he: 'סריקה אחרונה', en: 'Last scan' },
-  open_ai_visibility: { he: 'פתח נראות ב-AI ←', en: 'Open AI Visibility →' },
   failed_to_load: { he: 'טעינה נכשלה', en: 'Failed to load' },
 
   // Category labels for the dropdown (BusinessCategory → display name)

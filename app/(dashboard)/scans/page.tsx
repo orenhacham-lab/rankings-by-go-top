@@ -1,125 +1,140 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+/**
+ * The scans of the current project.
+ *
+ * This list used to hold every scan in the account, with a project column and a
+ * client column to tell them apart. The top bar names the project now, so the
+ * list is that project's scans and those two columns went with the mixing.
+ */
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Scan } from '@/lib/supabase/types'
+import type { Project, Scan } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
+import WorkspaceGate from '@/components/layout/WorkspaceGate'
+import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
+import EmptyState from '@/components/ui/EmptyState'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ScanStatusBadge } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
+import { withDeadline } from '@/lib/active-project/useProjectRow'
 import { formatDateTime } from '@/lib/utils'
-import Link from 'next/link'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ScansPage() {
   const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
-  const t = dict.scans
-
-  const [scans, setScans] = useState<(Scan & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadData() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setLoading(false)
-        return
-      }
-
-      const { data } = await supabase
-        .from('scans')
-        .select('*, projects(id, name, clients(name))')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100)
-      setScans(data || [])
-      setLoading(false)
-    }
-    loadData()
-  }, [])
+  const t = getDashboardDictionary(language).scans
 
   return (
     <div>
       <Header title={t.title} subtitle={t.subtitle} />
-
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          {t.loading}
-        </div>
-      ) : (
-        <Table>
-          <TableHead>
-            <tr>
-              <Th>{t.table.project}</Th>
-              <Th>{t.table.client}</Th>
-              <Th>{t.table.status}</Th>
-              <Th>{t.table.trigger}</Th>
-              <Th>{t.table.results}</Th>
-              <Th>{t.table.started}</Th>
-              <Th>{t.table.finished}</Th>
-              <Th>{t.table.actions}</Th>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {scans.length === 0 && (
-              <EmptyRow colSpan={8} message={t.table.emptyState} />
-            )}
-            {scans.map((scan) => (
-              <TableRow key={scan.id}>
-                <Td>
-                  {scan.projects ? (
-                    <Link href={`/projects/${scan.projects.id}`} className="text-blue-600 hover:underline font-medium">
-                      {scan.projects.name}
-                    </Link>
-                  ) : '—'}
-                </Td>
-                <Td>
-                  <span className="text-slate-500 dark:text-slate-400 text-sm">
-                    {(scan.projects as { clients?: { name: string } })?.clients?.name || '—'}
-                  </span>
-                </Td>
-                <Td>
-                  <ScanStatusBadge status={scan.status} />
-                </Td>
-                <Td>
-                  <Badge variant={scan.triggered_by === 'scheduled' ? 'info' : 'neutral'}>
-                    {scan.triggered_by === 'scheduled' ? t.trigger.automatic : t.trigger.manual}
-                  </Badge>
-                </Td>
-                <Td>
-                  <span className="text-sm">
-                    <span className="text-green-600 font-medium">{scan.completed_targets}</span>
-                    {' / '}
-                    <span className="text-slate-600 dark:text-slate-300">{scan.total_targets}</span>
-                    {scan.failed_targets > 0 && (
-                      <span className="text-red-500 mr-1"> {t.table.failedSuffix(scan.failed_targets)}</span>
-                    )}
-                  </span>
-                </Td>
-                <Td>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {scan.started_at ? formatDateTime(scan.started_at) : '—'}
-                  </span>
-                </Td>
-                <Td>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {scan.completed_at ? formatDateTime(scan.completed_at) : '—'}
-                  </span>
-                </Td>
-                <Td>
-                  <Link href={`/scans/${scan.id}/details`} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                    {t.table.viewDetails}
-                  </Link>
-                </Td>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      <WorkspaceGate>
+        {(project) => <ProjectScans key={project.id} project={project} />}
+      </WorkspaceGate>
     </div>
+  )
+}
+
+function ProjectScans({ project }: { project: Project }) {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const t = dict.scans
+  const [scans, setScans] = useState<Scan[]>([])
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    void withDeadline(
+      createClient()
+        .from('scans')
+        .select('*')
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+    ).then((res) => {
+      if (cancelled) return
+      if (!res || res.error) { setStatus('error'); return }
+      setScans((res.data ?? []) as Scan[])
+      setStatus('ready')
+    })
+    return () => { cancelled = true }
+  }, [project.id, attempt])
+
+  if (status === 'error') {
+    return (
+      <Card>
+        <EmptyState
+          title={t.loadError}
+          action={<Button onClick={() => { setStatus('loading'); setAttempt((n) => n + 1) }}>{dict.workspace.retry}</Button>}
+        />
+      </Card>
+    )
+  }
+
+  if (status === 'loading') {
+    return (
+      <Card className="py-16 text-center">
+        <p className="text-sm text-muted">{t.loading}</p>
+      </Card>
+    )
+  }
+
+  return (
+    <Table>
+      <TableHead>
+        <tr>
+          <Th>{t.table.status}</Th>
+          <Th>{t.table.trigger}</Th>
+          <Th>{t.table.results}</Th>
+          <Th>{t.table.started}</Th>
+          <Th>{t.table.finished}</Th>
+          <Th>{t.table.actions}</Th>
+        </tr>
+      </TableHead>
+      <TableBody>
+        {scans.length === 0 && <EmptyRow colSpan={6} message={t.table.emptyState} />}
+        {scans.map((scan) => (
+          <TableRow key={scan.id}>
+            <Td>
+              <ScanStatusBadge status={scan.status} />
+            </Td>
+            <Td>
+              <Badge variant={scan.triggered_by === 'scheduled' ? 'info' : 'neutral'}>
+                {scan.triggered_by === 'scheduled' ? t.trigger.automatic : t.trigger.manual}
+              </Badge>
+            </Td>
+            <Td>
+              <span className="text-sm tabular-nums">
+                <span className="font-medium text-ok">{scan.completed_targets}</span>
+                {' / '}
+                <span className="text-body">{scan.total_targets}</span>
+                {scan.failed_targets > 0 && (
+                  <span className="ms-1 text-bad"> {t.table.failedSuffix(scan.failed_targets)}</span>
+                )}
+              </span>
+            </Td>
+            <Td>
+              <span className="text-xs text-muted tabular-nums">
+                {scan.started_at ? formatDateTime(scan.started_at) : t.table.notYet}
+              </span>
+            </Td>
+            <Td>
+              <span className="text-xs text-muted tabular-nums">
+                {scan.completed_at ? formatDateTime(scan.completed_at) : t.table.notYet}
+              </span>
+            </Td>
+            <Td>
+              <Link href={`/scans/${encodeURIComponent(scan.id)}/details`} className="text-sm font-medium text-action hover:underline">
+                {t.table.viewDetails}
+              </Link>
+            </Td>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }

@@ -102,6 +102,9 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // /settings and /ai-visibility hold what used to be sections of /projects/{id}
+  // (the project's details and connections, and the AI visibility tool), so they
+  // sit behind the same sign-in and subscription gate that page did.
   const isProtectedRoute =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/clients') ||
@@ -109,6 +112,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/keywords') ||
     pathname.startsWith('/scans') ||
     pathname.startsWith('/reports') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/ai-visibility') ||
     pathname.startsWith('/billing') ||
     pathname.startsWith('/admin')
 

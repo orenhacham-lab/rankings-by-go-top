@@ -8,7 +8,7 @@
  * is a single source of truth wired into the layout and consumed by the two
  * highest-risk sections.
  */
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
   activeProjectStorageKey, resolveActiveProject, isValidActiveId, mostRecentlyUpdated,
@@ -74,17 +74,40 @@ function main() {
   const layout = strip(read('app/(dashboard)/layout.tsx'))
   check('exactly one ActiveProjectProvider is mounted in the dashboard layout', (layout.match(/ActiveProjectProvider/g) || []).length >= 1 && /userId=\{/.test(layout))
 
+  // ONE control picks the project: the switcher in the top bar. The screens used to
+  // carry a project dropdown each (keywords, reports, research, content); each one
+  // drove the shared state, but four ways to answer one question is three too many.
+  const gate = strip(read('components/layout/WorkspaceGate.tsx'))
+  // …and only once the list is resolved, so the row it reads is for an id the
+  // provider has already validated against the user's own projects.
+  check('the workspace gate reads the shared state and loads that project\u2019s row once validated',
+    /useActiveProject\(/.test(gate) && /useProjectRow\(isResolved \? activeProjectId : null\)/.test(gate))
   const keywords = strip(read('app/(dashboard)/keywords/page.tsx'))
-  check('keywords section consumes the shared hook + derives its id (no private setter)',
-    /useActiveProject\(/.test(keywords) && /const selectedProjectId = activeProjectId/.test(keywords) && !/setSelectedProjectId/.test(keywords))
-  check('keywords project dropdown drives the SHARED state (setActiveProject)', /onChange=\{\(e\) => setActiveProject\(e\.target\.value\)\}/.test(keywords))
+  check('keywords renders inside the workspace gate, with no project state of its own',
+    /<WorkspaceGate>/.test(keywords) && !/useState|setSelectedProjectId/.test(keywords))
+  const switcher = strip(read('components/layout/WorkspaceSwitcher.tsx'))
+  check('the top bar switcher drives the SHARED state (setActiveProject)',
+    /onClick=\{\(\) => \{ setActiveProject\(p\.id\); setOpen\(false\) \}\}/.test(switcher))
+  const sourceFiles = (dir: string): string[] => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((d) => {
+    const rel = `${dir}/${d.name}`
+    if (d.isDirectory()) return d.name === '__qa__' || d.name === 'node_modules' ? [] : sourceFiles(rel)
+    return /\.tsx?$/.test(d.name) ? [rel] : []
+  })
+  const PROVIDER = 'lib/active-project/ActiveProjectProvider.tsx'
+  const setters = (files: { path: string; src: string }[]) =>
+    files.filter((f) => f.path !== PROVIDER && /\bsetActiveProject\(/.test(f.src)).map((f) => f.path)
+  const files = ['app', 'components', 'lib'].flatMap(sourceFiles).map((path) => ({ path, src: strip(read(path)) }))
+  const onlySwitcher = (found: string[]) => found.length === 1 && found[0] === 'components/layout/WorkspaceSwitcher.tsx'
+  check('the switcher is the ONLY control that changes the project', onlySwitcher(setters(files)), setters(files).join(', '))
+  check('MUT: a screen that brings back its own project dropdown fails that check',
+    !onlySwitcher(setters([...files, { path: 'app/(dashboard)/keywords/page.tsx', src: '<select onChange={(e) => setActiveProject(e.target.value)} />' }])))
   const content = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
   check('the content workspace consumes the shared hook (not a raw searchParams read)', /useActiveProject\(/.test(content))
 
   const reports = strip(read('app/(dashboard)/reports/page.tsx'))
   check('reports consumes the shared hook + derives its id (no private setter)',
     /useActiveProject\(/.test(reports) && /const selectedProjectId = activeProjectId/.test(reports) && !/setSelectedProjectId/.test(reports))
-  check('reports dropdown drives the SHARED state (setActiveProject)', /onChange=\{\(e\) => setActiveProject\(e\.target\.value\)\}/.test(reports))
+  check('reports carries no project dropdown of its own', !/setActiveProject|selectProject/.test(reports))
   check('reports retired the legacy project_id param (no searchParams project_id read)',
     !/searchParams\.get\('project_id'\)/.test(reports) && !/useSearchParams/.test(reports))
 

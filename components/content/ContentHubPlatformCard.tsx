@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { AlertTriangle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -123,7 +124,7 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
           <div>
             <div className="font-semibold text-amber-800 dark:text-amber-300">{cs.conflictTitle}</div>
             <p className="text-sm text-amber-800/90 dark:text-amber-300/90">{cs.conflictBody}</p>
-            <Link href={`/projects/${projectId}`} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+            <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
               {cs.title} →
             </Link>
           </div>
@@ -133,15 +134,15 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   }
   if (wpConnected) return <>{children}</>
   if (!shopify) {
-    // Neither connected → compact platform choice. Connection forms live on the
-    // project page (reuse), so these navigate there instead of duplicating them.
+    // Neither connected → compact platform choice. Connection forms live in the
+    // project's settings (reuse), so these navigate there instead of duplicating them.
     return (
       <Card className="hover:translate-y-0">
         <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">{cs.platformChoiceTitle}</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{cs.platformChoiceHint}</p>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/projects/${projectId}`}><Button size="sm">{cs.connectWordPress}</Button></Link>
-          <Link href={`/projects/${projectId}`}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
+          <Link href={platformSetupHref(projectId)}><Button size="sm">{cs.connectWordPress}</Button></Link>
+          <Link href={platformSetupHref(projectId)}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
         </div>
       </Card>
     )
