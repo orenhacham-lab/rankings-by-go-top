@@ -183,6 +183,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
   }
 
   let genBudget = MAX_GENERATIONS_PER_RUN
+  const idleByNote: Record<string, number> = {}
 
   for (const pool of poolRows) {
     // (Area E) Isolate every pool: an unexpected throw in this pool's own runner
@@ -270,10 +271,18 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
         }
       }
 
-      console.log('[automation-runner] pool', {
-        projectId: diag.projectId, poolId: diag.poolId, due: diag.due, queued: diag.queuedCount, generated: diag.generatedCount,
-        generateResult: diag.generateResult, publishResult: diag.publishResult, note: diag.note, error: diag.error,
-      })
+      // One line per pool only when this run acted on it or it failed. The cron
+      // fires every 15 minutes over every active pool; a line per idle pool per
+      // run buried the few that matter. Idle pools are counted once, below.
+      if (diag.generateAttempted || diag.publishAttempted || diag.error) {
+        console.log('[automation-runner] pool', {
+          projectId: diag.projectId, poolId: diag.poolId, due: diag.due, queued: diag.queuedCount, generated: diag.generatedCount,
+          generateResult: diag.generateResult, publishResult: diag.publishResult, note: diag.note, error: diag.error,
+        })
+      } else {
+        const key = diag.note ?? 'no_work'
+        idleByNote[key] = (idleByNote[key] ?? 0) + 1
+      }
       summary.diagnostics.push(diag)
     } catch (e) {
       // One pool's failure is isolated: record it and move on to the next pool.
@@ -290,6 +299,9 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
       })
     }
   }
+
+  const idleCount = Object.values(idleByNote).reduce((a, b) => a + b, 0)
+  if (idleCount > 0) console.log('[automation-runner] idle pools', { count: idleCount, byNote: idleByNote })
 
   summary.durationMs = Date.now() - started
   return summary
