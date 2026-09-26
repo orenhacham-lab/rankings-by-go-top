@@ -27,6 +27,12 @@ export async function GET() {
       priority: '1.0',
     },
     {
+      url: `${baseUrl}/free-check`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.9',
+    },
+    {
       url: `${baseUrl}/pricing`,
       lastmod: today,
       changefreq: 'monthly',
@@ -112,6 +118,12 @@ export async function GET() {
       lastmod: today,
       changefreq: 'weekly',
       priority: '0.9',
+    },
+    {
+      url: `${baseUrl}/en/free-check`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
     },
     {
       url: `${baseUrl}/en/pricing`,

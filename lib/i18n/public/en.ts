@@ -6,6 +6,7 @@ export const en = {
     pricing: 'Pricing',
     features: 'Features',
     articles: 'Articles',
+    freeCheck: 'Free check',
     about: 'About',
     login: 'Sign in',
     startFree: 'Start free',

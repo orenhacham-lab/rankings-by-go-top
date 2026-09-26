@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
+import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { getShopifyOAuthConfig, detectSignedShopifyLaunch } from '@/lib/shopify/oauth'
 
@@ -86,6 +87,11 @@ export default async function HomePage({
             ויצירת מאמרים, דרך תזמון ופרסום ישירות באתר, ועד מעקב אחרי המיקומים בגוגל, הנראות במפות
             והאזכורים ב-ChatGPT, Gemini ומנועי AI נוספים.
           </p>
+
+          {/* Free site check — the hero's primary action: one field, no signup. */}
+          <div className="mb-8">
+            <FreeCheckHeroForm locale="he" />
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
             <Link

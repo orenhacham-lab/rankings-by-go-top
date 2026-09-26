@@ -37,6 +37,7 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
   const links = [
     { href: `${prefix}/` === '/en/' ? '/en' : `${prefix}/`, label: dict.nav.home },
+    { href: `${prefix}/free-check`, label: dict.nav.freeCheck },
     { href: `${prefix}/pricing`, label: dict.nav.pricing },
     { href: `${prefix}/articles`, label: dict.nav.articles },
     { href: `${prefix}/about`, label: dict.nav.about },
