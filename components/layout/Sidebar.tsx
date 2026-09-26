@@ -8,6 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import type { LucideIcon } from 'lucide-react'
 import {
   BarChart3,
   Users,
@@ -25,29 +26,112 @@ import {
   Newspaper,
 } from 'lucide-react'
 
-const navItemKeys = [
-  { href: '/dashboard', labelKey: 'dashboard' as const, icon: BarChart3 },
-  { href: '/clients', labelKey: 'clients' as const, icon: Users, onboarding: 'clients' },
-  { href: '/projects', labelKey: 'projects' as const, icon: Folder, onboarding: 'projects' },
-  // Content Hub ("מרכז תוכן") sits immediately after Projects. Gated by the
-  // build-time content flag (same pattern as the content section in the project
-  // page); hidden entirely when off.
-  ...(process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
-    ? [{ href: '/content', labelKey: 'content' as const, icon: Newspaper }]
-    : []),
-  { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb, onboarding: 'keyword-research' },
-  { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
-  { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
-  { href: '/scans', labelKey: 'scans' as const, icon: Search },
-  { href: '/reports', labelKey: 'reports' as const, icon: FileText, onboarding: 'reports' },
-  { href: '/billing', labelKey: 'billing' as const, icon: CreditCard },
+type SidebarLabelKey = keyof ReturnType<typeof getDashboardDictionary>['sidebar']
+
+type NavItem = {
+  href: string
+  labelKey: SidebarLabelKey
+  icon: LucideIcon
+  onboarding?: string
+}
+
+type NavGroup = {
+  groupKey: SidebarLabelKey
+  items: readonly NavItem[]
+}
+
+/**
+ * The nav is declared as GROUPS, not as one flat list.
+ *
+ * Ten undifferentiated entries gave no clue which screen answers which
+ * question, so every group here is named for the question it answers:
+ * "what am I working on", "what should I write", "how is it doing",
+ * "what am I paying". A new screen joins the group that matches its
+ * question — it does not get appended to the end.
+ *
+ * Desktop renders the group headings. Mobile deliberately does not: the nav
+ * there is a two-column grid of tiles, where four headings would cost more
+ * vertical space than the tiles they label. The order is identical in both,
+ * so the grouping still governs what sits next to what.
+ */
+const navGroupKeys: readonly NavGroup[] = [
+  {
+    groupKey: 'groupMain',
+    items: [
+      { href: '/dashboard', labelKey: 'dashboard', icon: BarChart3 },
+      { href: '/clients', labelKey: 'clients', icon: Users, onboarding: 'clients' },
+      { href: '/projects', labelKey: 'projects', icon: Folder, onboarding: 'projects' },
+    ],
+  },
+  {
+    groupKey: 'groupResearch',
+    items: [
+      { href: '/keyword-research', labelKey: 'keywordResearch', icon: Lightbulb, onboarding: 'keyword-research' },
+      { href: '/keywords', labelKey: 'keywords', icon: KeyRound },
+      // Content Hub is gated by the build-time content flag (same pattern as the
+      // content section in the project page); hidden entirely when off.
+      ...(process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
+        ? ([{ href: '/content', labelKey: 'content', icon: Newspaper }] satisfies NavItem[])
+        : []),
+    ],
+  },
+  {
+    groupKey: 'groupMonitoring',
+    items: [
+      { href: '/ai-visibility', labelKey: 'aiVisibility', icon: Sparkles },
+      { href: '/scans', labelKey: 'scans', icon: Search },
+      { href: '/reports', labelKey: 'reports', icon: FileText, onboarding: 'reports' },
+    ],
+  },
+  {
+    groupKey: 'groupAccount',
+    items: [
+      { href: '/billing', labelKey: 'billing', icon: CreditCard },
+    ],
+  },
 ]
+
+/** Flattened in group order — what the mobile grid renders. */
+const navItemKeys = navGroupKeys.flatMap((g) => g.items)
 
 const adminItemKeys = [
   { href: '/admin/articles', labelKey: 'articleManagement' as const, icon: FileText },
   { href: '/setup', labelKey: 'connectionStatus' as const, icon: Plug },
   { href: '/admin/logs', labelKey: 'errorLogs' as const, icon: ClipboardList },
 ]
+
+/**
+ * One nav entry, shared by the mobile grid and the desktop groups so the two
+ * cannot drift apart. The tile shape (stacked icon over label) is the mobile
+ * presentation; `md:` restores the row shape used in the sidebar proper.
+ */
+function NavLink({ item, pathname, label }: { item: NavItem; pathname: string; label: string }) {
+  const IconComponent = item.icon
+  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+  return (
+    <Link
+      href={item.href}
+      data-onboarding={item.onboarding}
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
+        'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors duration-150 text-center md:text-start leading-tight break-words',
+        isActive
+          ? 'bg-indigo-600 dark:bg-indigo-600 text-white'
+          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
+      )}
+    >
+      <IconComponent
+        size={18}
+        className={cn(
+          'shrink-0 transition-colors',
+          isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+        )}
+        strokeWidth={2}
+      />
+      <span>{label}</span>
+    </Link>
+  )
+}
 
 interface SidebarProps {
   isAdmin?: boolean
@@ -104,37 +188,21 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
-        <ul className="grid grid-cols-2 gap-2 md:block md:space-y-1 w-full">
-          {navItemKeys.map((item) => {
-            const IconComponent = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            const label = dict.sidebar[item.labelKey]
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  data-onboarding={item.onboarding}
-                  className={cn(
-                    'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
-                    isActive
-                      ? 'bg-indigo-600 dark:bg-indigo-600 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
-                  )}
-                >
-                  <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
-                  <span>{label}</span>
-                </Link>
-              </li>
-            )
-          })}
+        {/* Mobile: one flat two-column grid of tiles, logout included. */}
+        <ul className="grid grid-cols-2 gap-2 w-full md:hidden">
+          {navItemKeys.map((item) => (
+            <li key={item.href}>
+              <NavLink item={item} pathname={pathname} label={dict.sidebar[item.labelKey]} />
+            </li>
+          ))}
 
-          {/* Mobile logout button - appears in grid next to Billing on mobile */}
-          <li className="md:hidden">
+          {/* Mobile logout button - appears in grid next to the last nav tile */}
+          <li>
             <form action="/api/auth/signout" method="post" className="w-full h-full">
               <button
                 type="submit"
                 className={cn(
-                  'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
+                  'group w-full min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-colors duration-150 text-center leading-tight break-words',
                   'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
                 )}
               >
@@ -144,6 +212,26 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             </form>
           </li>
         </ul>
+
+        {/* Desktop: the same order, split under its group headings. */}
+        <div className="hidden md:block space-y-3">
+          {navGroupKeys.map((group) => (
+            group.items.length === 0 ? null : (
+              <div key={group.groupKey}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 px-3 mb-1">
+                  {dict.sidebar[group.groupKey]}
+                </p>
+                <ul className="space-y-1">
+                  {group.items.map((item) => (
+                    <li key={item.href}>
+                      <NavLink item={item} pathname={pathname} label={dict.sidebar[item.labelKey]} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          ))}
+        </div>
       </nav>
 
       {/* Admin section — only shown to admins */}

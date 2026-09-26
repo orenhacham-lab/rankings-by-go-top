@@ -1,6 +1,10 @@
 import { planLimitLines } from '@/lib/plans/features'
 export const dashboardHe = {
   sidebar: {
+    groupMain: 'ראשי',
+    groupResearch: 'מחקר ותוכן',
+    groupMonitoring: 'ניטור ודוחות',
+    groupAccount: 'חשבון',
     dashboard: 'לוח בקרה',
     clients: 'לקוחות',
     projects: 'פרויקטים',

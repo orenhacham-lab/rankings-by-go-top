@@ -3,6 +3,10 @@ import type { DashboardDictionary } from './he'
 
 export const dashboardEn = {
   sidebar: {
+    groupMain: 'Main',
+    groupResearch: 'Research & content',
+    groupMonitoring: 'Monitoring & reports',
+    groupAccount: 'Account',
     dashboard: 'Dashboard',
     clients: 'Clients',
     projects: 'Projects',
