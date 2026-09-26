@@ -8,8 +8,10 @@
  * the one screen a merchant could not describe.
  *
  * This suite pins the shape that replaced it: four routes, one shared provider, one
- * shell, and screens that do not reach into each other. It is a SOURCE contract —
- * it checks structure, not rendered output; the journeys cover behaviour.
+ * shell, and screens that do not reach into each other. Each screen is also a sidebar
+ * entry of its own — the hub entry they used to hide behind is gone — so the workspace
+ * has no tab bar and every screen names itself. It is a SOURCE contract: it checks
+ * structure, not rendered output; the journeys cover behaviour.
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
@@ -106,20 +108,29 @@ function main() {
   check('no screen reads the accessible-project list directly',
     !/useActiveProject\(/.test(screensSrc) && /useActiveProject\(/.test(providerSrc))
 
-  // ── 5. A tab is a route, not a piece of state. ──
-  const navSrc = strip(read(join(WS, 'ContentNav.tsx')))
+  // ── 5. A screen is a route AND a sidebar entry — never a tab, never both. ──
   const allWorkspace = workspaceFiles.map((f) => strip(read(join(WS, f)))).join('\n')
+  const sidebarSrc = strip(read(join('components', 'layout', 'Sidebar.tsx')))
   check('nothing in the workspace keeps an activeTab state', !/setActiveTab|activeTab/.test(allWorkspace))
-  check('the nav renders Links', /<Link\s/.test(navSrc) && /href=\{s\.href\}/.test(navSrc))
-  check('and marks the current screen for assistive tech', /aria-current=/.test(navSrc))
-  // A tab a merchant cannot open teaches them nothing; the two disabled placeholders
-  // that used to sit in this bar are gone.
-  check('no disabled "coming soon" placeholder in the nav',
-    !/comingSoon|cursor-not-allowed/.test(navSrc))
+  // The workspace had a tab bar of its own while the four screens hid behind one
+  // "Content Hub" sidebar entry. The entry is gone, so the tab bar would now be the
+  // same navigation rendered twice.
+  check('the workspace has no tab bar of its own',
+    !existsSync(join(ROOT, WS, 'ContentNav.tsx')) && !/<ContentNav/.test(allWorkspace))
+  check('the sidebar carries the screens instead, derived from CONTENT_SCREENS',
+    /CONTENT_SCREENS/.test(sidebarSrc) && /\.\.\.contentNavItems/.test(sidebarSrc))
+  check('and marks the current entry for assistive tech', /aria-current=/.test(sidebarSrc))
+  // Without a tab bar, the heading is the only thing on the page that says which
+  // screen this is — so it must be the SCREEN's name, not one title for all four.
+  const shellHeading = strip(read(join(WS, 'ContentWorkspaceShell.tsx')))
+  check('each screen names itself in the heading, resolved from the pathname',
+    /activeContentScreen\(usePathname\(\)/.test(shellHeading)
+    && /title=\{t\.screens\[screen\]\}/.test(shellHeading)
+    && /subtitle=\{t\.screenSubtitles\[screen\]\}/.test(shellHeading))
 
   // ── 6. The frame is mounted once, by the shell. ──
   const shellSrc = strip(read(join(WS, 'ContentWorkspaceShell.tsx')))
-  for (const [what, needle] of [['the brief modal', '<ArticleBriefModal'], ['the toast host', '<ToastHost'], ['the setup cards', '<ContentHubSetup'], ['the nav', '<ContentNav']] as const) {
+  for (const [what, needle] of [['the brief modal', '<ArticleBriefModal'], ['the toast host', '<ToastHost'], ['the setup cards', '<ContentHubSetup']] as const) {
     check(`${what} is mounted exactly once, by the shell`,
       (shellSrc.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length === 1
       && !new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(screensSrc))
@@ -132,11 +143,18 @@ function main() {
   check('and it wraps provider + shell (a screen can never render bare)',
     /<ContentWorkspaceProvider>/.test(layoutSrc) && /<ContentWorkspaceShell>/.test(layoutSrc))
 
-  // ── 8. Both locales name every screen. ──
+  // ── 8. Both locales name every screen, and say what it is. ──
   for (const loc of ['he', 'en'] as const) {
-    const screens = (getDashboardDictionary(loc).contentHub as unknown as { screens?: Record<string, string> }).screens
+    const hub = getDashboardDictionary(loc).contentHub as unknown as {
+      screens?: Record<string, string>
+      screenSubtitles?: Record<string, string>
+    }
     check(`(${loc}) every screen has a label`,
-      !!screens && CONTENT_SCREENS.every((s) => typeof screens[s.key] === 'string' && screens[s.key].length > 0))
+      !!hub.screens && CONTENT_SCREENS.every((s) => typeof hub.screens![s.key] === 'string' && hub.screens![s.key].length > 0))
+    check(`(${loc}) every screen has its own one-line subtitle`,
+      !!hub.screenSubtitles
+      && CONTENT_SCREENS.every((s) => typeof hub.screenSubtitles![s.key] === 'string' && hub.screenSubtitles![s.key].length > 0)
+      && new Set(CONTENT_SCREENS.map((s) => hub.screenSubtitles![s.key])).size === CONTENT_SCREENS.length)
   }
 
   // ── 9. The pure nav helpers. ──

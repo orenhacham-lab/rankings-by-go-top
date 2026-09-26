@@ -92,25 +92,32 @@ async function main() {
   // ── A) the sidebar — the chrome the screencast shows first ─────────────────
   console.log('A) Sidebar, first render, no effects')
   {
+    // The content screens are sidebar entries of their own, gated by the build-time
+    // content flag and labelled from `contentHub.screens` (the same block their own
+    // headings read). Set the flag BEFORE the module loads, so the entries are part of
+    // this render and their labels are covered by the same first-render contract.
+    process.env.NEXT_PUBLIC_ENABLE_CONTENT = 'true'
     const Sidebar = load('components/layout/Sidebar.tsx')
     const en = getDashboardDictionary('en').sidebar
     const he = getDashboardDictionary('he').sidebar
+    const enScreens = getDashboardDictionary('en').contentHub.screens
+    const heScreens = getDashboardDictionary('he').contentHub.screens
 
     const enHtml = firstRender('en', createElement(Sidebar as never, { isAdmin: false }))
     check('A1: initialLocale="en" → English nav labels are present on the FIRST render',
-      enHtml.includes(en.dashboard) && enHtml.includes(en.projects) && enHtml.includes(en.content) && enHtml.includes(en.billing),
+      enHtml.includes(en.dashboard) && enHtml.includes(en.projects) && enHtml.includes(enScreens.articles) && enHtml.includes(en.billing),
       enHtml.slice(0, 300))
     const enBody = withoutSwitcherLabels(enHtml)
     check('A2: …and NOT ONE Hebrew character is rendered outside the language switch',
       !HEBREW.test(enBody),
       (enBody.match(/[֐-׿][^<]*/g) ?? []).slice(0, 6).join(' | '))
     check('A3: …specifically, the Hebrew labels are absent',
-      !enHtml.includes(he.dashboard) && !enHtml.includes(he.projects) && !enHtml.includes(he.content))
+      !enHtml.includes(he.dashboard) && !enHtml.includes(he.projects) && !enHtml.includes(heScreens.articles))
 
     const heHtml = firstRender('he', createElement(Sidebar as never, { isAdmin: false }))
     check('A4: initialLocale="he" → Hebrew nav labels are present on the FIRST render',
-      heHtml.includes(he.dashboard) && heHtml.includes(he.projects) && heHtml.includes(he.content),
-      JSON.stringify({ dashboard: heHtml.includes(he.dashboard), projects: heHtml.includes(he.projects), content: heHtml.includes(he.content) }))
+      heHtml.includes(he.dashboard) && heHtml.includes(he.projects) && heHtml.includes(heScreens.articles),
+      JSON.stringify({ dashboard: heHtml.includes(he.dashboard), projects: heHtml.includes(he.projects), articles: heHtml.includes(heScreens.articles) }))
     check('A5: …and the English labels are absent',
       !heHtml.includes(`>${en.dashboard}<`) && !heHtml.includes(`>${en.projects}<`))
     check('A6: the two renders genuinely differ', enHtml !== heHtml)

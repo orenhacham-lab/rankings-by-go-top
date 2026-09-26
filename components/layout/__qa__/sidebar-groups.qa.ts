@@ -7,12 +7,18 @@
  * which", but "every entry sits in a named group, every label exists in both
  * languages, and every href is a real route".
  *
- * This is a SOURCE guard — it reads Sidebar.tsx and the two dictionaries and
- * strips comments before matching, so prose in a comment can never satisfy a
- * check.
+ * Since the content workspace lost its hub entry, the sidebar also carries the four
+ * content SCREENS directly, derived from CONTENT_SCREENS rather than re-listed here.
+ * That is the second contract below: derived, not duplicated, and one active entry.
+ *
+ * Mostly a SOURCE guard — it reads Sidebar.tsx and the two dictionaries and strips
+ * comments before matching, so prose in a comment can never satisfy a check. The
+ * active-entry resolution is imported and tested as a function.
  */
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_TOPICS_PATH } from '../../../lib/content/content-workspace-nav'
+import { getDashboardDictionary } from '../../../lib/i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -56,6 +62,18 @@ function routeExists(href: string): boolean {
 
 /** The groups, in the order the sidebar must render them. */
 const EXPECTED_GROUPS = ['groupMain', 'groupResearch', 'groupMonitoring', 'groupAccount'] as const
+
+/**
+ * The nav itself, with the content flag ON so the derived content entries exist.
+ * Set before the module is required: `contentNavItems` is resolved at module load,
+ * which is exactly how Next inlines the flag into the bundle.
+ */
+process.env.NEXT_PUBLIC_ENABLE_CONTENT = 'true'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { navItemKeys, activeNavHref } = require('../Sidebar') as {
+  navItemKeys: readonly { href: string }[]
+  activeNavHref: (pathname: string, items: readonly { href: string }[]) => string | null
+}
 
 function main() {
   console.log('Sidebar — grouped navigation contract')
@@ -118,12 +136,51 @@ function main() {
   check('both surfaces render the shared NavLink component',
     (src.match(/<NavLink\b/g) ?? []).length >= 2)
 
-  // ── Content Hub now lives in the research group ───────────────────────────
+  // ── The content screens are entries of their own, derived from one list ───
   const iResearch = src.indexOf(`groupKey: 'groupResearch'`)
   const iMonitoring = src.indexOf(`groupKey: 'groupMonitoring'`)
-  const iContent = src.indexOf(`href: '/content'`)
-  check('Content Hub sits inside the research group',
+  const iContent = src.indexOf('...contentNavItems')
+  check('the content screens sit inside the research group',
     iContent > iResearch && iContent < iMonitoring)
+  check('…and they are DERIVED from CONTENT_SCREENS, never re-listed here',
+    /CONTENT_SCREENS\s*\n?\s*\.filter\(\(s\) => isContentScreenEnabled\(s, CONTENT_FLAGS\)\)/.test(src)
+    && /screenKey: s\.key/.test(src))
+  check('…gated by the build-time content flag, as the one hub entry was',
+    /NEXT_PUBLIC_ENABLE_CONTENT === 'true'/.test(src))
+  // A hard-coded content href is the regression: it would survive a screen being
+  // renamed, removed or flagged off, and point the merchant at a 404.
+  const hardCoded = CONTENT_SCREENS.filter((c) => src.includes(`href: '${c.href}'`)).map((c) => c.href)
+  check('no content href is hard-coded in the sidebar', hardCoded.length === 0, hardCoded.join(', '))
+  for (const c of CONTENT_SCREENS) {
+    check(`content screen "${c.key}" resolves to a real page`, routeExists(c.href))
+    for (const loc of ['he', 'en'] as const) {
+      const label = getDashboardDictionary(loc).contentHub.screens[c.key]
+      check(`(${loc}) content screen "${c.key}" is labelled`, typeof label === 'string' && label.length > 0)
+    }
+  }
+  // The retired hub label must not linger: a "Content Hub" entry in the dictionary is
+  // how the concept would creep back into a sidebar that no longer has one screen for it.
+  check('the retired hub label is gone from both dictionaries',
+    !/\n\s{4}content:\s*'/.test(he) && !/\n\s{4}content:\s*'/.test(en))
+
+  // ── Exactly one entry is current, whichever content screen is open ────────
+  // /content is a PREFIX of /content/topics, so a plain prefix test lit up two
+  // entries at once. The resolution keeps the longest match.
+  // The naive rule this replaced — "pathname starts with href" — matches BOTH the
+  // articles entry and the nested one. Asserting that it still would is what proves
+  // the resolution is doing work, not that the paths happen not to collide.
+  const naiveMatches = (pathname: string) =>
+    navItemKeys.filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`)).length
+  check('the articles entry is current on the workspace root',
+    activeNavHref(CONTENT_ROOT_PATH, navItemKeys) === CONTENT_ROOT_PATH)
+  check('a nested screen matches TWO entries by prefix, and only the nested one is current',
+    naiveMatches(CONTENT_TOPICS_PATH) === 2
+    && activeNavHref(CONTENT_TOPICS_PATH, navItemKeys) === CONTENT_TOPICS_PATH)
+  check('the article editor keeps the articles entry current',
+    activeNavHref(`${CONTENT_ROOT_PATH}/articles/abc-123`, navItemKeys) === CONTENT_ROOT_PATH)
+  check('an unrelated path lights nothing', activeNavHref('/nowhere', navItemKeys) === null)
+  check('a sibling prefix does not match (/keywords vs /keyword-research)',
+    activeNavHref('/keyword-research', navItemKeys) === '/keyword-research')
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

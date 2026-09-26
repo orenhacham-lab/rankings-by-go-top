@@ -1,23 +1,28 @@
 'use client'
 
 /**
- * The frame every content screen renders inside: the project selector, the
- * missing-connection onboarding, the tab bar, the shared "new article topic"
- * modal and the toast host.
+ * The frame every content screen renders inside: the screen's own heading, the
+ * project selector, the missing-connection onboarding, the shared "new article
+ * topic" modal and the toast host.
  *
  * Everything here used to be inlined at the top of the one big ContentHub, which
  * is why a screen could not exist without it. It is a layout now, so each screen
  * is only its own subject.
+ *
+ * There is no tab bar: every screen is its own sidebar entry, so a second row of
+ * tabs would be the same navigation twice. That is why the heading is per screen —
+ * without it nothing on the page would say which screen you are on.
  */
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Header from '@/components/layout/Header'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import ContentHubSetup from '@/components/content/ContentHubSetup'
 import { ToastHost } from '@/components/content/Toast'
-import ContentNav from './ContentNav'
+import { activeContentScreen } from '@/lib/content/content-workspace-nav'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import type { ReactNode } from 'react'
 
@@ -27,10 +32,11 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
     projectsResolved, projectsError, reloadProjects, onSelectProject,
     briefOpen, setBriefOpen, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
   } = useContentWorkspace()
+  const screen = activeContentScreen(usePathname() ?? '')
 
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
-      <Header title={t.title} subtitle={t.subtitle} />
+      <Header title={t.screens[screen]} subtitle={t.screenSubtitles[screen]} />
 
       {/* Coming-soon context banner (this is an SEO/GEO content hub) */}
       <div className="mb-4 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-900/10 px-3 py-2 text-xs text-indigo-700 dark:text-indigo-300">
@@ -83,8 +89,6 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
               shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
             />
           )}
-
-          <ContentNav />
 
           {/* No project selected yet (multi-project) */}
           {!projectId ? (

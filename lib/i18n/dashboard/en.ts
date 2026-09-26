@@ -13,7 +13,6 @@ export const dashboardEn = {
     keywords: 'Keywords',
     keywordResearch: 'Keyword Research',
     aiVisibility: 'AI Visibility',
-    content: 'Content Hub',
     scans: 'Scans',
     reports: 'Reports',
     billing: 'Billing',
@@ -25,8 +24,6 @@ export const dashboardEn = {
     logout: 'Log out',
   },
   contentHub: {
-    title: 'Content & Articles',
-    subtitle: 'Manage SEO/GEO articles, WordPress connections and content across all projects',
     selectProject: 'Select project / site',
     selectProjectPlaceholder: 'Select a project…',
     selectProjectMessage: 'Select a project to view and manage its content.',
@@ -384,6 +381,14 @@ export const dashboardEn = {
       topics: 'Topics & strategy',
       automation: 'Automation & schedule',
       searchConsole: 'Search Console',
+    },
+    // One line of context per screen, shown under its heading. Each screen is its
+    // own sidebar entry now, so it has to say what it is without a tab bar around it.
+    screenSubtitles: {
+      articles: 'Every article in this project, from draft to published',
+      topics: 'Topics awaiting approval and their internal-link plans',
+      automation: 'Automatic article ideas and the scheduled publishing queue',
+      searchConsole: 'What Google already sees on the site, and what it recommends',
     },
     tabs: {
       articles: 'Articles',

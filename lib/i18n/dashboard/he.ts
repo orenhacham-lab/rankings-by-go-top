@@ -11,7 +11,6 @@ export const dashboardHe = {
     keywords: 'מילות מפתח',
     keywordResearch: 'מחקר ביטויים',
     aiVisibility: 'נראות ב-AI',
-    content: 'מרכז תוכן',
     scans: 'סריקות',
     reports: 'דוחות',
     billing: 'מנוי ותשלום',
@@ -23,8 +22,6 @@ export const dashboardHe = {
     logout: 'יציאה',
   },
   contentHub: {
-    title: 'תוכן ומאמרים',
-    subtitle: 'ניהול מאמרי SEO/GEO, חיבורי WordPress ותוכן לכל הפרויקטים',
     selectProject: 'בחר פרויקט / אתר',
     selectProjectPlaceholder: 'בחר פרויקט…',
     selectProjectMessage: 'בחרו פרויקט כדי לראות ולנהל את התוכן שלו.',
@@ -384,6 +381,14 @@ export const dashboardHe = {
       topics: 'נושאים ואסטרטגיה',
       automation: 'אוטומציה ותזמון',
       searchConsole: 'Search Console',
+    },
+    // One line of context per screen, shown under its heading. Each screen is its
+    // own sidebar entry now, so it has to say what it is without a tab bar around it.
+    screenSubtitles: {
+      articles: 'כל המאמרים של הפרויקט, מהטיוטה ועד הפרסום',
+      topics: 'נושאים שמחכים לאישור ותוכניות הקישורים הפנימיים שלהם',
+      automation: 'רעיונות אוטומטיים למאמרים ותור הפרסום המתוזמן',
+      searchConsole: 'מה שגוגל כבר רואה באתר, וההמלצות שנגזרות מזה',
     },
     tabs: {
       articles: 'מאמרים',

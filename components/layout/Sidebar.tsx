@@ -24,21 +24,69 @@ import {
   MessageCircle,
   Lightbulb,
   Newspaper,
+  Target,
+  CalendarClock,
+  LineChart,
 } from 'lucide-react'
+import {
+  CONTENT_SCREENS,
+  isContentScreenEnabled,
+  type ContentScreenKey,
+} from '@/lib/content/content-workspace-nav'
 
 type SidebarLabelKey = keyof ReturnType<typeof getDashboardDictionary>['sidebar']
 
+/**
+ * A nav entry takes its label from ONE dictionary block: `sidebar` for its own
+ * label, or `contentHub.screens` for a content-workspace screen, which is the same
+ * block the screen's own heading reads. The union is deliberate: a content screen
+ * must not also get a label in `sidebar`, because two labels for one screen drift.
+ */
 type NavItem = {
   href: string
-  labelKey: SidebarLabelKey
   icon: LucideIcon
   onboarding?: string
-}
+} & (
+  | { labelKey: SidebarLabelKey; screenKey?: never }
+  | { screenKey: ContentScreenKey; labelKey?: never }
+)
 
 type NavGroup = {
   groupKey: SidebarLabelKey
   items: readonly NavItem[]
 }
+
+/** Read as literal member expressions, which is what lets Next inline them. */
+const CONTENT_FLAGS = {
+  NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION: process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION,
+  NEXT_PUBLIC_GSC_READ_ONLY_ENABLED: process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED,
+}
+
+const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
+  articles: Newspaper,
+  topics: Target,
+  automation: CalendarClock,
+  searchConsole: LineChart,
+}
+
+/**
+ * The content screens, each as its own sidebar entry.
+ *
+ * They were four tabs behind a single "Content Hub" entry, which is one level of
+ * nesting more than the work needs: a merchant looking for "articles" scanned the
+ * sidebar, found a hub, and had to open it to learn what was inside. The entries are
+ * DERIVED from the same CONTENT_SCREENS declaration the routes and the guards read,
+ * so the sidebar cannot list a screen that has no page, or miss one that does.
+ *
+ * Gated by the build-time content flag, exactly as the one hub entry was; each screen
+ * is additionally subject to its own flag, so a screen hidden on its route is hidden
+ * here from the same decision.
+ */
+const contentNavItems: readonly NavItem[] =
+  process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
+    ? CONTENT_SCREENS.filter((s) => isContentScreenEnabled(s, CONTENT_FLAGS))
+        .map((s) => ({ href: s.href, screenKey: s.key, icon: CONTENT_SCREEN_ICONS[s.key] }))
+    : []
 
 /**
  * The nav is declared as GROUPS, not as one flat list.
@@ -68,11 +116,7 @@ const navGroupKeys: readonly NavGroup[] = [
     items: [
       { href: '/keyword-research', labelKey: 'keywordResearch', icon: Lightbulb, onboarding: 'keyword-research' },
       { href: '/keywords', labelKey: 'keywords', icon: KeyRound },
-      // Content Hub is gated by the build-time content flag (same pattern as the
-      // content section in the project page); hidden entirely when off.
-      ...(process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
-        ? ([{ href: '/content', labelKey: 'content', icon: Newspaper }] satisfies NavItem[])
-        : []),
+      ...contentNavItems,
     ],
   },
   {
@@ -91,8 +135,9 @@ const navGroupKeys: readonly NavGroup[] = [
   },
 ]
 
-/** Flattened in group order — what the mobile grid renders. */
-const navItemKeys = navGroupKeys.flatMap((g) => g.items)
+/** Flattened in group order — what the mobile grid renders, and what a guard can
+ *  assert the active-entry resolution against. */
+export const navItemKeys = navGroupKeys.flatMap((g) => g.items)
 
 const adminItemKeys = [
   { href: '/admin/articles', labelKey: 'articleManagement' as const, icon: FileText },
@@ -101,20 +146,42 @@ const adminItemKeys = [
 ]
 
 /**
+ * The entry that owns a pathname: the LONGEST matching href wins.
+ *
+ * With the content screens promoted to entries of their own, /content is a prefix of
+ * /content/topics — a plain prefix test would light up two entries at once. The
+ * article editor at /content/articles/<id> has no entry, and correctly lights up the
+ * articles entry it was opened from.
+ */
+export function activeNavHref(pathname: string, items: readonly NavItem[]): string | null {
+  let best: string | null = null
+  for (const item of items) {
+    if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+      if (best === null || item.href.length > best.length) best = item.href
+    }
+  }
+  return best
+}
+
+function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem): string {
+  if (item.screenKey) return dict.contentHub.screens[item.screenKey]
+  return dict.sidebar[item.labelKey]
+}
+
+/**
  * One nav entry, shared by the mobile grid and the desktop groups so the two
  * cannot drift apart. The tile shape (stacked icon over label) is the mobile
  * presentation; `md:` restores the row shape used in the sidebar proper.
  */
-function NavLink({ item, pathname, label }: { item: NavItem; pathname: string; label: string }) {
+function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; label: string }) {
   const IconComponent = item.icon
-  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
   return (
     <Link
       href={item.href}
       data-onboarding={item.onboarding}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors duration-150 text-center md:text-start leading-tight break-words',
+        'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors duration-150 text-center md:text-start leading-tight break-words',
         isActive
           ? 'bg-indigo-600 dark:bg-indigo-600 text-white'
           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
@@ -141,13 +208,14 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
+  const activeHref = activeNavHref(pathname ?? '', navItemKeys)
 
   return (
     <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-3 md:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-col items-center md:items-center justify-center gap-2 md:gap-1.5">
-        {/* Mobile: logo on left of text */}
-        <div className="flex md:flex-col items-center justify-center gap-2 md:gap-1.5 w-full">
+      <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 md:gap-1.5">
+        {/* Logo beside the wordmark, on both surfaces. */}
+        <div className="flex items-center justify-center gap-2 w-full">
           <div className="flex items-center justify-center flex-shrink-0">
             <Image
               src="/gotop-primary.png"
@@ -192,7 +260,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         <ul className="grid grid-cols-2 gap-2 w-full md:hidden">
           {navItemKeys.map((item) => (
             <li key={item.href}>
-              <NavLink item={item} pathname={pathname} label={dict.sidebar[item.labelKey]} />
+              <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
             </li>
           ))}
 
@@ -214,7 +282,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         </ul>
 
         {/* Desktop: the same order, split under its group headings. */}
-        <div className="hidden md:block space-y-3">
+        <div className="hidden md:block space-y-2">
           {navGroupKeys.map((group) => (
             group.items.length === 0 ? null : (
               <div key={group.groupKey}>
@@ -224,7 +292,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                 <ul className="space-y-1">
                   {group.items.map((item) => (
                     <li key={item.href}>
-                      <NavLink item={item} pathname={pathname} label={dict.sidebar[item.labelKey]} />
+                      <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
                     </li>
                   ))}
                 </ul>
