@@ -43,3 +43,33 @@ create index if not exists free_site_checks_ai_used_idx
 alter table public.free_site_checks enable row level security;
 
 revoke all on public.free_site_checks from anon, authenticated;
+
+-- ── claim tokens ────────────────────────────────────────────────────────────
+--
+-- A visitor who scans a site and then opens an account should get THAT scan
+-- seeded into their first project. Looking the scan up by domain at signup
+-- would hand a stranger's account whatever scan happened to be cached for the
+-- domain they typed, so the handoff is a capability instead: each response
+-- carries a fresh random token, and this table is the one row that redeems it.
+--
+-- One row per RESPONSE, not per scan, because a cached scan is replayed to
+-- several visitors and each of them needs their own one-time claim. The token
+-- itself is never stored — only its SHA-256 — so a leaked table grants nothing.
+-- `consumed_at` makes redemption single-use; the 24h validity is enforced by
+-- the reader against `created_at`, matching the cache TTL above.
+
+create table if not exists public.free_site_check_claims (
+  token_hash text primary key,
+  check_id uuid not null references public.free_site_checks(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  consumed_at timestamptz
+);
+
+-- Redemption reads by token_hash (the primary key); this index serves the
+-- cascade and lets a scan's outstanding claims be found.
+create index if not exists free_site_check_claims_check_idx
+  on public.free_site_check_claims (check_id, created_at desc);
+
+alter table public.free_site_check_claims enable row level security;
+
+revoke all on public.free_site_check_claims from anon, authenticated;

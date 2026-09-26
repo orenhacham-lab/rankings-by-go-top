@@ -14,7 +14,7 @@
  */
 import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import type { SiteSignals } from './html-signals'
-import type { FreeCheckBusiness } from './types'
+import type { CommerceType, FreeCheckBusiness } from './types'
 import type { Locale } from '@/lib/i18n/locales'
 
 /** How much page text the prompt carries. Enough to characterise, cheap to send. */
@@ -39,11 +39,17 @@ function buildPrompt(signals: SiteSignals, locale: Locale): string {
   return [
     'You are an SEO strategist reading one page of a real website.',
     `Answer in ${language}. Return JSON only, matching this shape exactly:`,
-    '{"summary":string,"niche":string,"platform":string|null,"audiences":string[],"keywords":string[],"articles":string[],"competitors":string[]}',
+    '{"summary":string,"niche":string,"companyName":string|null,"commerceType":"product"|"service"|"content"|"other",'
+      + '"isLocal":boolean,"country":string|null,"platform":string|null,"audiences":string[],'
+      + '"keywords":string[],"articles":string[],"competitors":string[]}',
     '',
     'Rules:',
     `- "summary": 2-3 sentences on what the business sells and how, grounded ONLY in the page text below. If the text does not say, say what is visible and no more. Never invent brands, locations, certifications or claims.`,
     `- "niche": a short label, at most 6 words.`,
+    `- "companyName": the business's own name as the page presents it, without a tagline or a city. null if the page never states it.`,
+    `- "commerceType": "product" when it sells goods, "service" when it sells work or appointments, "content" when it publishes rather than sells, "other" when none fits.`,
+    `- "isLocal": true only when the business serves a specific place (a shop, a clinic, a tradesperson, a restaurant), false for a nationwide or online-only business.`,
+    `- "country": ISO-3166-1 alpha-2, from an address, a currency, a phone prefix or a domain suffix on the page. null when the page gives no evidence. Never infer it from the language alone.`,
     `- "platform": the CMS/e-commerce platform if the page reveals it (WordPress, Shopify, Wix...), else null.`,
     `- "audiences": up to ${MAX_AUDIENCES} concrete customer segments, one short line each.`,
     `- "keywords": exactly ${MAX_KEYWORDS} commercial search phrases this site should rank for, in the site's own language, buyer-intent first. No brand-only terms.`,
@@ -55,6 +61,8 @@ function buildPrompt(signals: SiteSignals, locale: Locale): string {
     `DESCRIPTION: ${signals.metaDescription ?? '(none)'}`,
     `HEADINGS: ${[...signals.h1, ...signals.h2].slice(0, 25).join(' | ')}`,
     `PAGE LANGUAGE: ${signals.htmlLang ?? 'unknown'}`,
+    `PLATFORM DETECTED FROM MARKUP: ${signals.platform ?? '(none)'}`,
+    `CONTACT IN STRUCTURED DATA: ${[signals.contact.address, signals.contact.phone].filter(Boolean).join(' · ') || '(none)'}`,
     `OUTBOUND DOMAINS: ${signals.externalDomains.slice(0, 10).join(', ') || '(none)'}`,
     '',
     'PAGE TEXT:',
@@ -72,6 +80,33 @@ function cleanList(value: unknown, max: number, maxLen = 160): string[] {
     if (out.length >= max) break
   }
   return out
+}
+
+const COMMERCE_TYPES = new Set<CommerceType>(['product', 'service', 'content', 'other'])
+
+/**
+ * Fold the model's answer together with what the page itself proved. The
+ * deterministic facts WIN on every field they cover: the platform read off the
+ * markup, the language from the `lang` attribute, the address and phone from
+ * JSON-LD. The model only fills what markup cannot state.
+ */
+function buildBusiness(parsed: Record<string, unknown>, summary: string, signals: SiteSignals): FreeCheckBusiness {
+  const commerce = typeof parsed.commerceType === 'string' ? parsed.commerceType.trim().toLowerCase() : ''
+  const country = typeof parsed.country === 'string' ? parsed.country.trim().toUpperCase() : ''
+  return {
+    summary,
+    audiences: cleanList(parsed.audiences, MAX_AUDIENCES),
+    niche: typeof parsed.niche === 'string' ? parsed.niche.trim().slice(0, 80) || null : null,
+    // Markup beats the model: a fingerprint is evidence, an answer is a guess.
+    platform: signals.platform ?? (typeof parsed.platform === 'string' ? parsed.platform.trim().slice(0, 40) || null : null),
+    companyName: typeof parsed.companyName === 'string' ? parsed.companyName.trim().slice(0, 120) || null : null,
+    commerceType: COMMERCE_TYPES.has(commerce as CommerceType) ? (commerce as CommerceType) : 'other',
+    isLocal: parsed.isLocal === true,
+    country: /^[A-Z]{2}$/.test(country) ? country : null,
+    language: signals.htmlLang,
+    address: signals.contact.address,
+    phone: signals.contact.phone,
+  }
 }
 
 /** Keep only plausible bare domains, and never the site's own. */
@@ -108,12 +143,7 @@ export async function fetchBusinessInsight(signals: SiteSignals, locale: Locale,
     return {
       ok: true,
       insight: {
-        business: {
-          summary,
-          audiences: cleanList(parsed.audiences, MAX_AUDIENCES),
-          niche: typeof parsed.niche === 'string' ? parsed.niche.trim().slice(0, 80) || null : null,
-          platform: typeof parsed.platform === 'string' ? parsed.platform.trim().slice(0, 40) || null : null,
-        },
+        business: buildBusiness(parsed, summary, signals),
         keywords: cleanList(parsed.keywords, MAX_KEYWORDS),
         articles: cleanList(parsed.articles, MAX_ARTICLES, 200),
         competitors: cleanDomains(parsed.competitors, selfDomain),

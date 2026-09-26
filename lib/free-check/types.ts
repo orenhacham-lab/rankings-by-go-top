@@ -15,6 +15,9 @@ export type FreeCheckFinding = {
 
 export type GeoSignal = { id: string; ok: boolean; title: string; detail: string }
 
+/** What the business sells, in the four shapes the product treats differently. */
+export type CommerceType = 'product' | 'service' | 'content' | 'other'
+
 export type FreeCheckBusiness = {
   summary: string
   audiences: string[]
@@ -22,6 +25,18 @@ export type FreeCheckBusiness = {
   niche: string | null
   /** Detected CMS/platform when the page gives it away, else null. */
   platform: string | null
+  /** The business's own name as the site presents it. */
+  companyName: string | null
+  commerceType: CommerceType
+  /** True when the business serves a place — a clinic, a shop, a tradesperson. */
+  isLocal: boolean
+  /** ISO-3166-1 alpha-2 when it can be established, else null. */
+  country: string | null
+  /** The page's own `lang`, not a guess from the text. */
+  language: string | null
+  /** Address and phone exactly as the site's JSON-LD states them. */
+  address: string | null
+  phone: string | null
 }
 
 export type FreeCheckResult = {
@@ -55,4 +70,11 @@ export type FreeCheckErrorCode =
   | 'daily_cap'
   | 'internal'
 
-export type FreeCheckResponse = { ok: true; result: FreeCheckResult } | { ok: false; code: FreeCheckErrorCode }
+export type FreeCheckResponse =
+  /**
+   * `claimToken` is a one-time capability that seeds the visitor's first
+   * project from THIS scan when they sign up. Absent when the ledger write
+   * failed; the signup link then simply carries no claim.
+   */
+  | { ok: true; result: FreeCheckResult; claimToken?: string }
+  | { ok: false; code: FreeCheckErrorCode }

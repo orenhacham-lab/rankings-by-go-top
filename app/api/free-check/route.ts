@@ -20,6 +20,7 @@
  * per-visitor and because a shared cache would defeat the rate limit.
  */
 import { NextResponse } from 'next/server'
+import { issueClaimToken } from '@/lib/free-check/claim'
 import { runFreeCheck } from '@/lib/free-check/run'
 import { checkGate, clientIpFrom, hashClient, recordRun } from '@/lib/free-check/store'
 import { domainKey, normalizeCheckUrl } from '@/lib/free-check/url-guard'
@@ -67,7 +68,14 @@ export async function POST(request: Request) {
   }
   if (!gate.allowed) return fail(gate.reason, gate.reason === 'rate_limited' ? 429 : 500)
   if (gate.cached) {
-    return NextResponse.json({ ok: true, result: gate.cached } satisfies FreeCheckResponse, { headers: NO_STORE })
+    // A replayed scan still gets its OWN claim token: the row is shared, the
+    // capability is not, so two visitors who scanned the same domain can each
+    // seed their own account and neither can redeem the other's.
+    const claimToken = gate.cachedCheckId ? await issueClaimToken(gate.cachedCheckId) : null
+    return NextResponse.json(
+      { ok: true, result: gate.cached, ...(claimToken ? { claimToken } : {}) } satisfies FreeCheckResponse,
+      { headers: NO_STORE },
+    )
   }
 
   let outcome
@@ -81,7 +89,11 @@ export async function POST(request: Request) {
 
   // The ledger write is also the rate-limit and spend record, so it happens on
   // every completed run — but it must never turn a good result into an error.
-  await recordRun({ domain, locale, url: outcome.result.url, result: outcome.result, clientHash })
+  const checkId = await recordRun({ domain, locale, url: outcome.result.url, result: outcome.result, clientHash })
+  const claimToken = checkId ? await issueClaimToken(checkId) : null
 
-  return NextResponse.json({ ok: true, result: outcome.result } satisfies FreeCheckResponse, { headers: NO_STORE })
+  return NextResponse.json(
+    { ok: true, result: outcome.result, ...(claimToken ? { claimToken } : {}) } satisfies FreeCheckResponse,
+    { headers: NO_STORE },
+  )
 }

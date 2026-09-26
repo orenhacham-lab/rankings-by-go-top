@@ -65,6 +65,11 @@ async function main() {
   check('no user-supplied header decides anything but the throttle key', !/request\.headers\.get\('authorization'\)/.test(route))
   check('node runtime (the guard needs DNS)', /export const runtime = 'nodejs'/.test(route))
 
+  check('every response carries its own claim token, cache hit included',
+    /issueClaimToken\(gate\.cachedCheckId\)/.test(route) && /issueClaimToken\(checkId\)/.test(route))
+  check('the token rides the response, never the stored result',
+    !/result: \{[^}]*claimToken/.test(route))
+
   const store = stripComments(read('../store.ts'))
   check('the raw IP is never stored, only a salted hash', /createHash\('sha256'\)/.test(store) && /FREE_CHECK_IP_SALT/.test(store))
   check('the ledger is only ever read scoped (client, domain, day)',
@@ -72,6 +77,16 @@ async function main() {
   const migration = read('../../../supabase/migrations/20260926000000_free_site_check.sql')
   check('ledger table has RLS on and is revoked from anon/authenticated',
     /enable row level security/i.test(migration) && /revoke all on public\.free_site_checks from anon, authenticated/i.test(migration))
+  check('the claims table is locked down the same way',
+    /create table if not exists public\.free_site_check_claims/i.test(migration)
+    && /alter table public\.free_site_check_claims enable row level security/i.test(migration)
+    && /revoke all on public\.free_site_check_claims from anon, authenticated/i.test(migration))
+  const claim = stripComments(read('../claim.ts'))
+  check('a claim is consumed inside the UPDATE, never select-then-update',
+    /\.update\(\{ consumed_at/.test(claim) && /\.is\('consumed_at', null\)/.test(claim))
+  check('the claim token itself is never stored', /hashClaimToken\(token\)/.test(claim) && !/token_hash: token\b/.test(claim))
+  const screen = stripComments(read('../../../components/free-check/FreeCheckExperience.tsx'))
+  check('the signup link carries the claim when there is one', /claim=\$\{encodeURIComponent\(claimToken\)\}/.test(screen))
 
   console.log('\nGATE) rate limit, cache and spend ceiling, against a real fake')
   const admin = (rows: Record<string, unknown>[], hooks?: ErrorHooks) =>
@@ -93,6 +108,8 @@ async function main() {
   check('a run inside 24h for the same domain is replayed', cacheHit.allowed && !!cacheHit.cached)
   check('a replayed result is marked cached', cacheHit.allowed && cacheHit.cached?.cached === true)
   check('a cache hit never permits a model call', cacheHit.allowed && cacheHit.allowAi === false)
+  check('a cache hit names the row it replayed, so a claim can point at it',
+    cacheHit.allowed && typeof cacheHit.cachedCheckId === 'string' && cacheHit.cachedCheckId.length > 0)
 
   const otherLocale = await checkGate({ domain: 'example.co.il', locale: 'en', clientHash: CLIENT }, admin(cachedRows), NOW)
   check('the cache is per locale (an English visitor gets English copy)', otherLocale.allowed && !otherLocale.cached)

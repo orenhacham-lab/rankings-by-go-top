@@ -57,10 +57,10 @@ export function clientIpFrom(headers: Headers): string {
   return headers.get('x-real-ip')?.trim() || 'unknown'
 }
 
-type LedgerRow = { result: FreeCheckResult; created_at: string }
+type LedgerRow = { id: string; result: FreeCheckResult; created_at: string }
 
 export type Gate =
-  | { allowed: true; cached?: FreeCheckResult; allowAi: boolean }
+  | { allowed: true; cached?: FreeCheckResult; cachedCheckId?: string; allowAi: boolean }
   | { allowed: false; reason: 'rate_limited' | 'internal' }
 
 /**
@@ -86,7 +86,7 @@ export async function checkGate(
   const cacheStart = new Date(now.getTime() - CACHE_TTL_MS).toISOString()
   const cachedRow = await admin
     .from('free_site_checks')
-    .select('result, created_at')
+    .select('id, result, created_at')
     .eq('domain', args.domain)
     .eq('locale', args.locale)
     .gt('created_at', cacheStart)
@@ -94,7 +94,7 @@ export async function checkGate(
     .limit(1)
   if (cachedRow.error) return { allowed: false, reason: 'internal' }
   const hit = (cachedRow.data as LedgerRow[] | null)?.[0]
-  if (hit?.result) return { allowed: true, cached: { ...hit.result, cached: true }, allowAi: false }
+  if (hit?.result) return { allowed: true, cached: { ...hit.result, cached: true }, cachedCheckId: hit.id, allowAi: false }
 
   // 3) Daily model-spend ceiling. Reaching it does not refuse the check — the
   //    deterministic part still runs and is still useful; only the model call
@@ -110,18 +110,30 @@ export async function checkGate(
   return { allowed: true, allowAi: (spent.count ?? 0) < dailyAiCap() }
 }
 
-/** Record a completed run. A write failure must never fail the response. */
+/**
+ * Record a completed run and hand back its row id, which is what a claim token
+ * is later issued against. A write failure must never fail the response — the
+ * visitor gets their result, and only the cache, the throttle record and the
+ * account handoff are lost with it, so the id comes back null instead.
+ */
 export async function recordRun(
   args: { domain: string; locale: Locale; url: string; result: FreeCheckResult; clientHash: string },
   admin: ServiceRoleClient = createAdminClient(),
-): Promise<void> {
-  const { error } = await admin.from('free_site_checks').insert({
-    domain: args.domain,
-    locale: args.locale,
-    url: args.url,
-    result: args.result,
-    ai_used: args.result.aiUsed,
-    client_hash: args.clientHash,
-  })
-  if (error) console.error('[free-check] ledger insert failed', { code: error.code })
+): Promise<string | null> {
+  const { data, error } = await admin
+    .from('free_site_checks')
+    .insert({
+      domain: args.domain,
+      locale: args.locale,
+      url: args.url,
+      result: args.result,
+      ai_used: args.result.aiUsed,
+      client_hash: args.clientHash,
+    })
+    .select('id')
+  if (error) {
+    console.error('[free-check] ledger insert failed', { code: error.code })
+    return null
+  }
+  return (data as { id: string }[] | null)?.[0]?.id ?? null
 }

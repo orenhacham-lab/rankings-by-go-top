@@ -45,6 +45,9 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
   const [error, setError] = useState<FreeCheckErrorCode | null>(null)
   const [step, setStep] = useState(0)
   const [result, setResult] = useState<FreeCheckResult | null>(null)
+  // The one-time capability that seeds this visitor's first project from this
+  // scan. It rides the signup link and nothing else; it is never stored.
+  const [claimToken, setClaimToken] = useState<string | null>(null)
   const inFlight = useRef(false)
 
   const start = useCallback(async (raw: string) => {
@@ -67,6 +70,7 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
         return
       }
       setResult(data.result)
+      setClaimToken(data.claimToken ?? null)
       setPhase('results')
     } catch {
       setError('internal')
@@ -113,10 +117,11 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
           copy={copy}
           locale={locale}
           result={result}
-          signupHref={signupHref}
+          signupHref={claimToken ? `${signupHref}?claim=${encodeURIComponent(claimToken)}` : signupHref}
           loginHref={loginHref}
           onRestart={() => {
             setResult(null)
+            setClaimToken(null)
             setUrl('')
             setPhase('form')
           }}

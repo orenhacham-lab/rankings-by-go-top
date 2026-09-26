@@ -14,7 +14,7 @@
 --
 --   bash scripts/qa/pg-probe.sh supabase/migrations/__qa__/free-site-check.probe.sql
 --
--- Result at time of commit: 9 passed, 0 failed.
+-- Result at time of commit: 16 passed, 0 failed.
 -- ============================================================================
 
 CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;
@@ -72,6 +72,68 @@ BEGIN
   SELECT bool_or(has_table_privilege(r, 'public.free_site_checks', 'SELECT')) INTO v
     FROM (VALUES ('anon'),('authenticated')) AS t(r);
   INSERT INTO probe VALUES (9,'anon and authenticated cannot read it at all', NOT v);
+END $$;
+
+-- ── claim tokens ────────────────────────────────────────────────────────────
+-- The handoff from an anonymous scan to a new account. Everything below is a
+-- property the JavaScript fake CANNOT prove: column defaults, the foreign key,
+-- the primary-key uniqueness that makes a token single-issue, and above all
+-- that "consume" is one UPDATE whose WHERE clause does the checking — the
+-- thing that stops two simultaneous redemptions both winning.
+DO $$
+DECLARE v_check uuid; n int; v boolean; v_created timestamptz;
+BEGIN
+  SELECT id INTO v_check FROM public.free_site_checks WHERE domain='a.co.il' AND locale='he'
+   ORDER BY created_at DESC LIMIT 1;
+
+  INSERT INTO public.free_site_check_claims (token_hash, check_id) VALUES ('hash-a', v_check);
+  SELECT created_at INTO v_created FROM public.free_site_check_claims WHERE token_hash='hash-a';
+  INSERT INTO probe VALUES (10,'created_at is filled by the column default', v_created IS NOT NULL);
+
+  SELECT consumed_at IS NULL INTO v FROM public.free_site_check_claims WHERE token_hash='hash-a';
+  INSERT INTO probe VALUES (11,'a fresh claim starts unconsumed', v);
+
+  -- Redemption, exactly as lib/free-check/claim.ts issues it.
+  WITH redeemed AS (
+    UPDATE public.free_site_check_claims SET consumed_at = now()
+     WHERE token_hash='hash-a' AND consumed_at IS NULL AND created_at > now() - interval '24 hours'
+     RETURNING check_id
+  ) SELECT count(*) INTO n FROM redeemed;
+  INSERT INTO probe VALUES (12,'the first redemption matches exactly one row', n = 1);
+
+  WITH redeemed AS (
+    UPDATE public.free_site_check_claims SET consumed_at = now()
+     WHERE token_hash='hash-a' AND consumed_at IS NULL AND created_at > now() - interval '24 hours'
+     RETURNING check_id
+  ) SELECT count(*) INTO n FROM redeemed;
+  INSERT INTO probe VALUES (13,'the second matches none — the WHERE clause is the lock', n = 0);
+
+  -- An expired claim is not redeemable even though it was never consumed.
+  INSERT INTO public.free_site_check_claims (token_hash, check_id, created_at)
+    VALUES ('hash-old', v_check, now() - interval '25 hours');
+  WITH redeemed AS (
+    UPDATE public.free_site_check_claims SET consumed_at = now()
+     WHERE token_hash='hash-old' AND consumed_at IS NULL AND created_at > now() - interval '24 hours'
+     RETURNING check_id
+  ) SELECT count(*) INTO n FROM redeemed;
+  INSERT INTO probe VALUES (14,'a claim older than the TTL cannot be redeemed', n = 0);
+
+  SELECT bool_or(has_table_privilege(r, 'public.free_site_check_claims', 'SELECT')) INTO v
+    FROM (VALUES ('anon'),('authenticated')) AS t(r);
+  INSERT INTO probe VALUES (15,'anon and authenticated cannot read the claims table', NOT v);
+END $$;
+
+-- A claim cannot outlive the scan it points at, and a token hash is unique.
+DO $$
+DECLARE ok boolean;
+BEGIN
+  BEGIN
+    INSERT INTO public.free_site_check_claims (token_hash, check_id)
+      VALUES ('hash-orphan', '00000000-0000-0000-0000-000000000000');
+    ok := false;
+  EXCEPTION WHEN foreign_key_violation THEN ok := true;
+  END;
+  INSERT INTO probe VALUES (16,'a claim for a scan that does not exist is rejected', ok);
 END $$;
 
 SELECT n, CASE WHEN ok THEN '  ✓ ' ELSE '  ✗ ' END || name AS result FROM probe ORDER BY n;

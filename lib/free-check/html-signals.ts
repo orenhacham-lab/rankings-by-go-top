@@ -35,7 +35,17 @@ export type SiteSignals = {
   /** Plain text of the page, capped — the only thing handed to the model. */
   text: string
   internalLinks: number
+  /** Unique internal URLs seen on the page, capped — a seeding scan's starting set. */
+  internalLinkUrls: string[]
   externalDomains: string[]
+  /** Postal address and phone as the page's own JSON-LD states them, never guessed. */
+  contact: { address: string | null; phone: string | null }
+  /**
+   * The CMS/commerce platform, read off the markup rather than inferred. null
+   * when the page gives nothing away — a caller may then ask the model, but a
+   * deterministic answer always wins.
+   */
+  platform: string | null
   viewportMeta: boolean
   openGraph: boolean
   /** robots.txt as fetched: null when it does not exist. */
@@ -152,6 +162,73 @@ const ORGANIZATION_TYPES = new Set([
   'WebSite', 'Person',
 ])
 
+/**
+ * Platform fingerprints, most specific first. Each is a marker the platform
+ * itself emits — an asset host, a generator meta, a global it defines — so a
+ * match is evidence rather than a guess. WooCommerce is checked before
+ * WordPress because every WooCommerce site is also a WordPress site and the
+ * commerce answer is the more useful one.
+ */
+const PLATFORM_FINGERPRINTS: { name: string; patterns: RegExp[] }[] = [
+  { name: 'Shopify', patterns: [/cdn\.shopify\.com/i, /Shopify\.theme/i, /myshopify\.com/i, /shopify-features/i] },
+  { name: 'Wix', patterns: [/static\.wixstatic\.com/i, /wix-?code/i, /<meta[^>]+generator["'][^>]*Wix\.com/i] },
+  { name: 'Squarespace', patterns: [/squarespace\.com/i, /Static\.SQUARESPACE_CONTEXT/i] },
+  { name: 'Webflow', patterns: [/assets\.website-files\.com/i, /webflow\.js/i, /data-wf-page/i] },
+  { name: 'WooCommerce', patterns: [/woocommerce[-.]/i, /wc-ajax/i, /generator["'][^>]*WooCommerce/i] },
+  { name: 'Magento', patterns: [/\/static\/version\d+\/frontend\//i, /Magento_/i, /mage\/cookies/i] },
+  { name: 'Duda', patterns: [/irp\.cdn-website\.com/i, /dmws\./i] },
+  { name: 'Joomla', patterns: [/generator["'][^>]*Joomla/i, /\/media\/jui\//i] },
+  { name: 'Drupal', patterns: [/generator["'][^>]*Drupal/i, /\/sites\/default\/files\//i, /drupal-settings-json/i] },
+  { name: 'WordPress', patterns: [/wp-content\//i, /wp-includes\//i, /generator["'][^>]*WordPress/i, /wp-json/i] },
+]
+
+/**
+ * The platform, read off the raw markup. Returns null rather than a low-
+ * confidence guess: an empty answer is honest and the caller can fall back.
+ */
+export function detectPlatform(html: string): string | null {
+  const head = html.slice(0, 400_000)
+  for (const { name, patterns } of PLATFORM_FINGERPRINTS) {
+    if (patterns.some((re) => re.test(head))) return name
+  }
+  return null
+}
+
+/** Flatten a JSON-LD PostalAddress into one line, in the order it reads. */
+function addressLine(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim().slice(0, 200) || null
+  if (!value || typeof value !== 'object') return null
+  const a = value as Record<string, unknown>
+  const parts = ['streetAddress', 'addressLocality', 'addressRegion', 'postalCode', 'addressCountry']
+    .map((k) => (typeof a[k] === 'string' ? (a[k] as string).trim() : ''))
+    .filter(Boolean)
+  return parts.length ? parts.join(', ').slice(0, 200) : null
+}
+
+const CONTACT_TYPES = new Set([...ORGANIZATION_TYPES])
+
+/**
+ * Address and phone AS THE SITE STATES THEM in JSON-LD. Only structured data is
+ * read — scraping a phone number out of body text produces fax numbers, order
+ * hotlines and tracking IDs, and a wrong business phone is worse than none.
+ */
+function extractContact(nodes: JsonLdNode[]): { address: string | null; phone: string | null } {
+  let address: string | null = null
+  let phone: string | null = null
+  for (const n of nodes) {
+    const t = n['@type']
+    const types = typeof t === 'string' ? [t] : Array.isArray(t) ? t.filter((x): x is string => typeof x === 'string') : []
+    if (!types.some((x) => CONTACT_TYPES.has(x))) continue
+    if (!address) address = addressLine(n.address)
+    if (!phone && typeof n.telephone === 'string') phone = n.telephone.trim().slice(0, 40) || null
+    if (address && phone) break
+  }
+  return { address, phone }
+}
+
+/** How many internal URLs a caller gets back — enough to seed, small enough to store. */
+export const MAX_INTERNAL_LINK_URLS = 50
+
 export function extractSiteSignals(
   html: string,
   finalUrl: string,
@@ -187,6 +264,7 @@ export function extractSiteSignals(
   })
 
   let internalLinks = 0
+  const internalLinkUrls = new Set<string>()
   const externalDomains = new Set<string>()
   let base: URL | null = null
   try { base = new URL(finalUrl) } catch { base = null }
@@ -195,7 +273,13 @@ export function extractSiteSignals(
     if (!base) continue
     try {
       const u = new URL(href, base)
-      if (u.hostname === base.hostname) internalLinks++
+      if (u.hostname === base.hostname) {
+        internalLinks++
+        if (internalLinkUrls.size < MAX_INTERNAL_LINK_URLS) {
+          u.hash = ''
+          internalLinkUrls.add(u.toString())
+        }
+      }
       else if (u.protocol === 'http:' || u.protocol === 'https:') externalDomains.add(u.hostname.replace(/^www\./, ''))
     } catch {
       // An unparseable href is not a link we can classify.
@@ -222,7 +306,10 @@ export function extractSiteSignals(
     wordCount,
     text,
     internalLinks,
+    internalLinkUrls: [...internalLinkUrls],
     externalDomains: [...externalDomains].slice(0, 30),
+    contact: extractContact(nodes),
+    platform: detectPlatform(html),
     viewportMeta: metaContent(head, 'viewport') !== null,
     openGraph: metaContent(head, 'og:title') !== null || metaContent(head, 'og:description') !== null,
     robotsTxt: extras.robotsTxt,
