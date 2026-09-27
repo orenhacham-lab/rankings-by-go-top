@@ -29,6 +29,8 @@ import { withDeadline } from '@/lib/active-project/useProjectRow'
 import { formatDateTime } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import CompetitorSummary from '@/components/competitors/CompetitorSummary'
+import { useProjectCompetitorComparison } from '@/components/competitors/useCompetitorComparison'
 
 interface LatestScan {
   id: string
@@ -146,6 +148,9 @@ function ProjectDashboard({ project }: { project: Project }) {
   const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
+  // Loaded alongside the snapshot but never part of it: a failure here is the
+  // card's own state and cannot take the rest of the dashboard down with it.
+  const competitorView = useProjectCompetitorComparison(project.id)
 
   useEffect(() => {
     let cancelled = false
@@ -201,6 +206,8 @@ function ProjectDashboard({ project }: { project: Project }) {
           />
         </Link>
       </div>
+
+      <CompetitorSummary view={competitorView} variant="compact" />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card padding={false}>

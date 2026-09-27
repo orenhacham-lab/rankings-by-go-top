@@ -164,6 +164,7 @@ export default function AIVisibilitySection({
   projectDomainAliases,
   projectCity,
   projectKeywords,
+  initialTab,
 }: {
   projectId: string
   projectCountry: string | null
@@ -174,12 +175,14 @@ export default function AIVisibilitySection({
   projectDomainAliases?: string[] | null
   projectCity?: string | null
   projectKeywords?: string[]
+  /** The tab to open on, e.g. from a link that manages competitors. */
+  initialTab?: TabType
 }) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const isHebrew = dashboardLanguage === 'he'
 
-  const [currentTab, setCurrentTab] = useState<TabType>('results')
+  const [currentTab, setCurrentTab] = useState<TabType>(initialTab ?? 'results')
   const [allResults, setAllResults] = useState<ResultRow[]>([])
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
@@ -2330,7 +2333,7 @@ export default function AIVisibilitySection({
         <>
           <CompetitorsPanel
             projectId={projectId}
-            defaultCollapsed={true}
+            defaultCollapsed={initialTab !== 'competitors'}
             onCompetitorsChanged={() => setCompetitorsRefreshKey((k) => k + 1)}
           />
           <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
