@@ -195,20 +195,20 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
       className={cn(
         'group relative w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1.5 md:gap-3 px-2 md:px-3 py-3 md:py-0 md:h-9 rounded-control text-caption md:text-copy font-medium text-center md:text-start leading-tight break-words',
         'transition-[background-color,color] duration-150 ease-snappy',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset',
         isActive
-          ? 'bg-action-soft text-action font-semibold'
-          : 'text-body hover:bg-sunk hover:text-ink'
+          ? 'bg-rail-active text-rail-ink font-semibold'
+          : 'text-rail-muted hover:bg-rail-hover hover:text-rail-ink'
       )}
     >
       {isActive && (
-        <span aria-hidden="true" className="absolute hidden md:block inset-y-2 -start-3 w-[3px] rounded-e-full bg-action" />
+        <span aria-hidden="true" className="absolute hidden md:block inset-y-1.5 -start-3 w-[3px] rounded-e-full bg-rail-accent shadow-[0_0_12px_rgb(157_180_255/0.7)]" />
       )}
       <IconComponent
         size={18}
         className={cn(
           'shrink-0 transition-colors duration-150',
-          isActive ? 'text-action' : 'text-muted group-hover:text-ink'
+          isActive ? 'text-rail-accent' : 'text-rail-label group-hover:text-rail-ink'
         )}
         strokeWidth={isActive ? 2.2 : 1.8}
       />
@@ -222,29 +222,21 @@ function Brand() {
   return (
     <Link
       href="/dashboard"
-      className="flex min-w-0 items-center gap-2.5 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+      className="flex min-w-0 items-center gap-1 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent"
     >
-      <Image
-        src="/gotop-primary.png"
-        alt="Go Top logo"
-        width={140}
-        height={56}
-        className="block dark:hidden h-8 w-auto object-contain"
-        sizes="80px"
-        priority
-      />
+      {/* The rail is ink in both themes, so the mark is always the one drawn for a dark ground. */}
       <Image
         src="/gotop-dark-transparent.png"
         alt="Go Top logo"
-        width={140}
-        height={56}
-        className="hidden dark:block h-8 w-auto object-contain"
-        sizes="80px"
+        width={500}
+        height={500}
+        className="size-14 shrink-0 object-contain"
+        sizes="56px"
         priority
       />
-      <span className="flex min-w-0 flex-col border-s border-line ps-2.5" dir="ltr">
-        <span className="text-copy font-semibold leading-tight text-ink">Rankings</span>
-        <span className="text-overline font-medium text-muted">by Go Top</span>
+      <span className="flex min-w-0 flex-col" dir="ltr">
+        <span className="text-[1.0625rem] font-bold leading-tight tracking-tight text-rail-ink">Rankings</span>
+        <span className="text-overline font-medium text-rail-muted">by Go Top</span>
       </span>
     </Link>
   )
@@ -258,7 +250,7 @@ const WHATSAPP_SUPPORT =
   'https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94'
 
 const QUIET_ROW =
-  'flex w-full items-center gap-3 px-3 h-9 rounded-control text-copy font-medium text-muted hover:bg-sunk hover:text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset'
+  'flex w-full items-center gap-3 px-3 h-9 rounded-control text-copy font-medium text-rail-muted hover:bg-rail-hover hover:text-rail-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset'
 
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
@@ -271,10 +263,10 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   useEffect(() => { setMenuOpen(false) }, [pathname])
 
   return (
-    <aside className="relative z-40 w-full md:w-64 md:shrink-0 bg-rail border-b md:border-b-0 md:border-e border-line">
+    <aside className="relative z-40 w-full md:w-64 md:shrink-0 bg-rail text-rail-ink border-b md:border-b-0 md:border-e border-rail-line">
       <div className="flex flex-col md:sticky md:top-0 md:h-dvh">
         {/* Brand — the same height as the top bar, so the two share one line. */}
-        <div className="flex h-14 shrink-0 items-center justify-between gap-3 px-4 md:px-5 md:border-b md:border-line">
+        <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-3 md:px-4">
           <Brand />
           <button
             type="button"
@@ -282,7 +274,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             aria-expanded={menuOpen}
             aria-controls="app-nav-mobile"
             aria-label={dict.common.menu}
-            className="md:hidden inline-flex size-10 items-center justify-center rounded-control border border-line bg-surface text-ink shadow-control transition-colors hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+            className="md:hidden inline-flex size-10 items-center justify-center rounded-control border border-rail-line bg-rail-hover text-rail-ink transition-colors hover:bg-rail-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent"
           >
             {menuOpen ? <X size={18} strokeWidth={2} /> : <Menu size={18} strokeWidth={2} />}
           </button>
@@ -292,7 +284,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         <div
           id="app-nav-mobile"
           className={cn(
-            'md:hidden absolute inset-x-0 top-full z-50 max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-b border-line bg-surface p-3 shadow-pop origin-top animate-pop-in',
+            'md:hidden absolute inset-x-0 top-full z-50 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-rail-line bg-rail p-3 shadow-pop origin-top animate-pop-in',
             !menuOpen && 'hidden'
           )}
         >
@@ -305,7 +297,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               ))}
             </ul>
           </nav>
-          <div className="mt-3 grid grid-cols-2 items-center gap-2 border-t border-line pt-3">
+          <div className="mt-3 grid grid-cols-2 items-center gap-2 border-t border-rail-line pt-3">
             <DashboardLanguageSwitcher />
             <ThemeToggle />
           </div>
@@ -323,7 +315,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             {navGroupKeys.map((group) => (
               group.items.length === 0 ? null : (
                 <div key={group.groupKey}>
-                  <p className="px-3 mb-1.5 text-overline font-semibold text-muted">
+                  <p className="px-3 mb-1.5 text-overline font-semibold text-rail-label">
                     {dict.sidebar[group.groupKey]}
                   </p>
                   <ul className="space-y-0.5">
@@ -340,7 +332,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             {/* Admin section — only shown to admins */}
             {isAdmin && (
               <div>
-                <p className="px-3 mb-1.5 text-overline font-semibold text-muted">{dict.sidebar.system}</p>
+                <p className="px-3 mb-1.5 text-overline font-semibold text-rail-label">{dict.sidebar.system}</p>
                 <ul className="space-y-0.5">
                   {adminItemKeys.map((item) => {
                     const IconComponent = item.icon
@@ -352,11 +344,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                           href={item.href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'group flex items-center gap-3 px-3 h-9 rounded-control text-copy font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset',
-                            isActive ? 'bg-action-soft text-action font-semibold' : 'text-muted hover:bg-sunk hover:text-ink'
+                            'group flex items-center gap-3 px-3 h-9 rounded-control text-copy font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset',
+                            isActive ? 'bg-rail-active text-rail-ink font-semibold' : 'text-rail-muted hover:bg-rail-hover hover:text-rail-ink'
                           )}
                         >
-                          <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-action' : 'text-muted group-hover:text-ink')} strokeWidth={1.8} />
+                          <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-rail-accent' : 'text-rail-label group-hover:text-rail-ink')} strokeWidth={1.8} />
                           <span>{label}</span>
                         </Link>
                       </li>
@@ -369,7 +361,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         </nav>
 
         {/* Footer - Desktop only: help, then the two preferences, then logout. */}
-        <div className="hidden md:block shrink-0 border-t border-line px-3 py-3 space-y-1">
+        <div className="hidden md:block shrink-0 border-t border-rail-line px-3 py-3 space-y-1">
           {!isAdmin && (
             <a href={WHATSAPP_SUPPORT} target="_blank" rel="noopener noreferrer" className={QUIET_ROW}>
               <MessageCircle size={18} className="shrink-0" strokeWidth={1.8} />

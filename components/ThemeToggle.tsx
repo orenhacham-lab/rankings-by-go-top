@@ -26,7 +26,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(isLight ? 'dark' : 'light')}
-      className="w-full flex items-center justify-between gap-3 px-3 h-9 rounded-control text-copy font-medium text-muted transition-colors duration-150 hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset"
+      className="w-full flex items-center justify-between gap-3 px-3 h-9 rounded-control text-copy font-medium text-rail-muted transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset"
       aria-label={isLight ? dict.common.switchToDarkMode : dict.common.switchToLightMode}
     >
       <span className="flex items-center gap-3">
@@ -36,7 +36,7 @@ export function ThemeToggle() {
       {/* The switch: the knob travels toward the logical END when dark is on. */}
       <span
         aria-hidden="true"
-        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${isLight ? 'bg-line-strong' : 'bg-action'}`}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${isLight ? 'bg-white/20' : 'bg-rail-accent'}`}
       >
         <span
           className={`absolute top-0.5 start-0.5 size-4 rounded-full bg-white shadow-control transition-transform duration-200 ease-snappy ${

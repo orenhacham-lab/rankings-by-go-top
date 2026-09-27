@@ -43,7 +43,19 @@
   /* Surfaces */
   --color-canvas: #f6f5f1;        /* the page behind everything: warm paper */
   --color-surface: #ffffff;       /* cards, panels, table rows */
-  --color-rail: #fbfaf7;          /* the sidebar: between canvas and surface */
+
+  /* The rail: the sidebar is the one confident, branded surface of the shell —
+     deep ink with the cobalt accent lit on it — so the paper-and-white screen
+     beside it reads as the work area. muted 7.8:1, label 5.8:1, white on the
+     active fill 13:1, accent icon on it 6.5:1. */
+  --color-rail: #10152a;
+  --color-rail-ink: #f5f6f8;
+  --color-rail-muted: #a3aabb;
+  --color-rail-label: #8a92a6;
+  --color-rail-line: rgba(255, 255, 255, 0.08);
+  --color-rail-hover: rgba(255, 255, 255, 0.06);
+  --color-rail-active: rgba(110, 145, 250, 0.2);
+  --color-rail-accent: #9db4ff;
   --color-sunk: #f0eee9;          /* table heads, insets, hover fills */
   --color-line: #e6e3dc;          /* every default border */
   --color-line-strong: #d3cfc6;   /* a border that has to be noticed */
@@ -160,7 +172,7 @@
 .dark {
   --color-canvas: #0d0f14;
   --color-surface: #14171e;
-  --color-rail: #111319;
+  --color-rail: #0a0c11;
   --color-sunk: #1b1f28;
   --color-line: #252a35;
   --color-line-strong: #353b48;

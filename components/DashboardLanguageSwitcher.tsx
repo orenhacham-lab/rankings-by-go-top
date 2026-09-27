@@ -15,17 +15,17 @@ import { cn } from '@/lib/utils'
 export function DashboardLanguageSwitcher() {
   const { language, setDashboardLanguage } = useDashboardLanguage()
 
-  // A segmented control: two options on one sunk track, the chosen one lifted
-  // onto a white chip. Each option names itself in its own language (lang=…),
+  // A segmented control on the sidebar's ink: two options on one track, the
+  // chosen one lifted onto a light chip. Each option names itself in its own language (lang=…),
   // so a screen reader pronounces "עברית" in Hebrew from an English screen.
   const option = (active: boolean) => cn(
     'h-7 rounded-[calc(var(--radius-control)-2px)] px-2 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-    active ? 'bg-surface text-ink shadow-control' : 'text-muted hover:text-ink'
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent',
+    active ? 'bg-rail-ink text-rail shadow-control' : 'text-rail-muted hover:text-rail-ink'
   )
 
   return (
-    <div className="grid grid-cols-2 gap-0.5 rounded-control border border-line bg-sunk p-0.5">
+    <div className="grid grid-cols-2 gap-0.5 rounded-control border border-rail-line bg-rail-hover p-0.5">
       <button
         type="button"
         lang="he"

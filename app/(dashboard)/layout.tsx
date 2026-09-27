@@ -63,7 +63,7 @@ export default async function DashboardLayout({
           <div className="flex flex-col md:flex-row min-h-screen bg-canvas text-body">
             <DashboardLocaleEffect />
             <Sidebar isAdmin={isAdmin} />
-            <main className="flex-1 min-w-0 min-h-screen">
+            <main className="flex-1 min-w-0 min-h-screen bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(53_83_215/0.07),transparent_70%)]">
               <DashboardDirectionWrapper>
                 {/* The top bar. Every screen shows the SAME workspace control, because
                     "which site am I looking at" is a question about the app, not about
