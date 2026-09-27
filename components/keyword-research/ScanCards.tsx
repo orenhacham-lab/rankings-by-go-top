@@ -20,6 +20,56 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { EmptyReason, ProgressStep } from '@/lib/keyword-research/scan-state'
 
+/**
+ * The tab before its first answer: the project list or the scan's two reads are
+ * still on their way, so nobody knows yet which screen this is. It used to render
+ * the no-scan screen meanwhile (the open research form and its empty state, in the
+ * older look), which a merchant WITH research saw for as long as the reads took,
+ * before the research replaced it. Now it is the research screen's own shape: the
+ * context card, the four tiles and the folded form, as placeholders, so the
+ * research lands where they were. Without research, the form takes their place.
+ */
+export function ScanLoadingSkeleton() {
+  const { language } = useDashboardLanguage()
+  const t = getDashboardDictionary(language).keywordResearchScan
+  const pulse = 'animate-pulse motion-reduce:animate-none'
+  return (
+    <section data-scan-state="loading" role="status" aria-busy="true" className="mb-8">
+      <span className="sr-only">{t.pending}</span>
+      <Card tone="ink" padding={false} className="relative isolate overflow-hidden shadow-pop">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-10%,rgb(99_130_246/0.38),transparent_70%),radial-gradient(28rem_14rem_at_0%_110%,rgb(240_176_63/0.16),transparent_70%)]"
+        />
+        <div aria-hidden="true" className="flex items-center justify-between gap-6 px-5 pb-16 pt-5 sm:px-8 sm:pb-20 sm:pt-7">
+          <div className="min-w-0 flex-1">
+            <span className={cn('block h-6 w-28 rounded-pill bg-white/10', pulse)} />
+            <span className={cn('mt-5 block h-9 w-3/4 max-w-xl rounded-control bg-white/10', pulse)} />
+            <span className={cn('mt-3 block h-4 w-1/3 rounded-control bg-white/10', pulse)} />
+          </div>
+          <span className={cn('hidden size-32 shrink-0 rounded-full border-[10px] border-white/10 md:block', pulse)} />
+        </div>
+      </Card>
+      <div aria-hidden="true" className="relative z-10 -mt-11 grid grid-cols-2 gap-3 px-2 sm:-mt-12 sm:px-4 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="rounded-card border border-line bg-surface p-4 shadow-pop">
+            <span className={cn('block h-3.5 w-20 rounded-pill bg-sunk', pulse)} />
+            <span className={cn('mt-4 block h-7 w-16 rounded-control bg-sunk', pulse)} />
+            <span className={cn('mt-3 block h-3 w-28 max-w-full rounded-pill bg-sunk', pulse)} />
+          </div>
+        ))}
+      </div>
+      <div aria-hidden="true" className="mt-8 flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card sm:px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="size-9 shrink-0 rounded-xl bg-action-soft" />
+          <span className={cn('block h-3.5 w-44 rounded-pill bg-sunk', pulse)} />
+        </div>
+        <span className={cn('h-9 w-24 shrink-0 rounded-control bg-sunk', pulse)} />
+      </div>
+    </section>
+  )
+}
+
 export function ScanPendingCard() {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan
