@@ -16,6 +16,7 @@
  * it to decide whether to attempt a publish, so it must be accurate.
  */
 
+import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { routeContentLocale } from '@/lib/i18n/request-locale'
 import { getServerLocale } from '@/lib/i18n/server-locale'
@@ -31,8 +32,14 @@ import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 import { embeddedPublishErrorMessage } from '@/lib/shopify/publish-error-display'
+import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
+
+// The store's first seeding scan runs in after() once the store is connected;
+// with the scan off for this merchant nothing is scheduled at all.
+export const maxDuration = 300
 
 export async function GET(request: Request) {
+  const startedAt = Date.now()
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const config = getShopifyOAuthConfig()
@@ -187,6 +194,13 @@ export async function GET(request: Request) {
         shopify_billing_last_error: null,
       })
     }
+  }
+
+  // A newly installed store's first seeding scan, after this response and never
+  // in its way (lib/seed-scan/shopify-install.ts): nothing at all while the
+  // scan is off for this merchant, whose role is already known here.
+  if (connection.connection_status === 'connected') {
+    scheduleShopifySeedScan(after, { admin, source: 'app_home', userId: connection.user_id, projectId: connection.project_id, connectionId: connection.id, isAdmin, startedAt })
   }
 
   // The language THIS SURFACE renders in, from the shared contract — the
