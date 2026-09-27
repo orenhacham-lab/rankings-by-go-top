@@ -37,6 +37,8 @@ const THEIRS: RegExp[] = [
   /סימנים תקינים/, /נקי מהבעיות שאנחנו בודקים/, /השלמת ההגדרה/, /פיזור דירוגים/,
   /הזדמנויות קלות/, /מחקר הושלם/, /הבדיקה הראשונה תתבצע הלילה/, /לאן ממשיכים היום/,
   /ברוכים הבאים למסע/, /בזמן שלא היית כאן/, /מצטטים עמודים שעונים על שאלות/,
+  // "תמונת מצב" is the name of their research page's first tab.
+  /תמונת מצב ראשונה/,
   /easy battles/i, /balance of power/i, /battlefield/i, /holding you back/i, /first research summary/i, /\beasy wins?\b/i,
 ]
 
@@ -84,7 +86,7 @@ console.log('\nno label repeats the competitor\'s')
   check('none of the four dictionaries uses one of the competitor\'s labels', hits.length === 0, hits.join(' | '))
   check('the two the owner named are reworded in both languages',
     !/קרבות|ניצחון/.test(dashboardHe.keywordResearchScan.easyWins.title) && !/מאזן|כוחות/.test(dashboardHe.competitors.title)
-    && !/battle/i.test(dashboardEn.keywordResearchScan.easyWins.title) && !/\bvs\.?\b/i.test(dashboardEn.competitors.title))
+    && !/battle/i.test(dashboardEn.keywordResearchScan.easyWins.title) && !/balance|power/i.test(dashboardEn.competitors.title))
 }
 
 console.log('\nmutation controls')

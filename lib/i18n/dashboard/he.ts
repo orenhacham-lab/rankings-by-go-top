@@ -1684,9 +1684,9 @@ export const dashboardHe = {
   // merged into one tab with a month board. Placed right after the content section it
   // grew out of.
   contentStrategy: {
-    nextEyebrow: 'המאמר הבא',
+    nextEyebrow: 'הבא בתור',
     nextNotScheduled: 'עוד לא בתור הפרסום',
-    whyTitle: 'למה נבחר דווקא הוא',
+    whyTitle: 'למה הנושא הזה',
     whyFallback: {
       queued: 'הוא הראשון בתור הפרסום, ולכן ייכתב ויעלה לפני כל השאר.',
       topic: 'זה הנושא שמחכה הכי הרבה זמן למאמר.',
@@ -1758,7 +1758,7 @@ export const dashboardHe = {
   },
   home: {
     title: 'לוח בקרה',
-    subtitle: 'מה קרה בפרויקט מאז הביקור הקודם, ומה הצעד הבא',
+    subtitle: 'מאז הביקור האחרון',
     keywords: 'מילות מפתח',
     keywordsSource: 'במעקב פעיל בפרויקט',
     scansPerformed: 'סריקות שבוצעו',
@@ -1786,8 +1786,8 @@ export const dashboardHe = {
   dashboardHome: {
     shortcutsLabel: 'קיצורי דרך',
     shortcuts: {
-      research: 'מחקר מילות מפתח',
-      schedule: 'לוח פרסום',
+      research: 'מחקר ביטויים',
+      schedule: 'יומן תוכן',
       articles: 'המאמרים שלי',
       keywords: 'מילות מפתח',
     },
@@ -1841,7 +1841,7 @@ export const dashboardHe = {
       },
     },
     holdingBack: {
-      title: 'מה כדאי לתקן באתר',
+      title: 'מה עוצר את האתר',
       subtitle: 'מהסריקה הראשונית של האתר',
       scannedAt: (when: string) => `נסרק ${when}`,
       findingsTitle: 'ממצאים באתר',
@@ -1865,7 +1865,7 @@ export const dashboardHe = {
       },
     },
     activity: {
-      title: 'פעולות אחרונות',
+      title: 'מה חדש בפרויקט',
       subtitle: 'מה קרה בפרויקט, מהחדש לישן',
       emptyTitle: 'עוד אין פעולות',
       empty: 'כל בדיקת דירוג, מאמר ונושא חדש יופיעו כאן, עם הזמן שבו קרו.',
@@ -1892,10 +1892,10 @@ export const dashboardHe = {
         b6: (n: number | null) => (n ? `נבדקו דירוגים ל-${n} מילות מפתח` : 'הסתיימה בדיקת הדירוג הראשונה'),
       },
       seedRunning: {
-        a1: 'סורקים את האתר',
-        a2: 'מזהים את העסק ואת הקהלים',
-        a3: 'בודקים מה כדאי לתקן באתר',
-        a4: 'מאתרים מתחרים',
+        a1: 'סורקים עמודים',
+        a2: 'מזהים שירותים ואזור',
+        a3: 'בודקים תגיות ותוכן בעמודים',
+        a4: 'מאתרים מתחרים בגוגל',
         b1: 'סורקים את העמודים המרכזיים באתר',
         b2: 'מחפשים מילות מפתח עם נפחי חיפוש',
         b3: 'בודקים על אילו מילים המתחרים מדורגים',
@@ -1944,10 +1944,10 @@ export const dashboardHe = {
       failed: 'לא הצלחנו ליצור את הנושא. נסו שוב.',
       emptyTitle: 'אין כרגע מילים בעמוד השני',
       empty: 'כשמילת מפתח במעקב תגיע למקומות 11-30, היא תופיע כאן עם הצעה למאמר שיקדם אותה.',
-      emptyCta: 'למחקר מילות מפתח',
+      emptyCta: 'למחקר ביטויים',
     },
     board: {
-      title: 'לוח פרסום',
+      title: 'יומן תוכן',
       subtitle: 'הבאים בתור ומה שפורסם לאחרונה',
       upcoming: 'הבאים בתור',
       published: 'פורסמו לאחרונה',
@@ -1981,7 +1981,7 @@ export const dashboardHe = {
       emptyCta: 'לנראות ב-AI',
     },
     account: {
-      title: 'מצב חשבון',
+      title: 'המנוי שלכם',
       plan: 'תוכנית',
       plans: {
         trial: 'ניסיון', regular: 'בייסיק', advanced: 'מתקדם', premium: 'פרימיום', large_agency: 'סוכנות',
@@ -2137,7 +2137,7 @@ export const dashboardHe = {
     },
   },
   competitors: {
-    title: 'השוואת דירוגים מול מתחרים',
+    title: 'אתם מול המתחרים',
     subtitle: 'על כמה ממילות המפתח כל מתחרה מדורג מעליך, לפי הבדיקה האחרונה של כל מילה',
     compactSubtitle: 'מי מדורג מעליך במילות המפתח שלך',
     aboveYouSentence: (name: string, ahead: number, compared: number) =>
@@ -3151,7 +3151,7 @@ export const dashboardHe = {
       submit: 'סרקו את האתר',
       creating: 'יוצרים את הפרויקט…',
       starting: 'מתחילים לסרוק…',
-      promise: 'זה לוקח עד דקה',
+      promise: 'כדקה. אפשר להמשיך לעבוד בינתיים',
       noConnection: 'בלי Search Console ובלי חיבור לאתר',
       fromFreeCheck: (domain: string) => `ממשיכים מהבדיקה החינמית של ${domain}`,
       errorEmpty: 'הזינו את כתובת האתר',
@@ -3164,17 +3164,17 @@ export const dashboardHe = {
       eyebrow: 'סקירה ראשונית של האתר',
       title: (domain: string) => `סורקים את ${domain}`,
       fromFreeCheck: 'ממשיכים מתוצאות הבדיקה החינמית',
-      promise: 'זה לוקח עד דקה',
+      promise: 'כדקה. אפשר להמשיך לעבוד בינתיים',
       stepOf: (n: number, total: number) => `שלב ${n} מתוך ${total}`,
-      nowLabel: 'מה קורה עכשיו',
+      nowLabel: 'בתהליך',
       stepsLabel: 'השלבים',
       finishingTitle: 'מסכמים את הממצאים',
       finishingLine: 'עוד רגע הסקירה מוכנה',
       steps: {
-        a1: { title: 'סריקת האתר', lines: ['קוראים את עמוד הבית', 'בודקים אם בוטים של AI יכולים להיכנס', 'סופרים את הכתובות במפת האתר'] },
-        a2: { title: 'זיהוי העסק והקהלים', lines: ['מזהים מה העסק מציע', 'מזהים את קהלי היעד', 'בוחרים את מילות המפתח הראשונות'] },
-        a3: { title: 'איתור נקודות לתיקון', lines: ['בודקים כותרות, תיאורים ותמונות', 'בודקים ארבעה סימנים של מוכנות ל-AI'] },
-        a4: { title: 'איתור מתחרים', lines: ['מחפשים בגוגל את מילות המפתח שלכם', 'בודקים מי מופיע לצדכם בתוצאות'] },
+        a1: { title: 'סריקת עמודים', lines: ['קוראים את עמוד הבית', 'בודקים אם בוטים של AI יכולים להיכנס', 'סופרים את הכתובות במפת האתר'] },
+        a2: { title: 'זיהוי שירותים ואזור', lines: ['מזהים מה העסק מציע', 'מזהים את קהלי היעד', 'בוחרים את מילות המפתח הראשונות'] },
+        a3: { title: 'בדיקת תגיות ותוכן', lines: ['בודקים כותרות, תיאורים ותמונות', 'בודקים ארבעה סימנים של מוכנות ל-AI'] },
+        a4: { title: 'איתור מתחרים בגוגל', lines: ['מחפשים בגוגל את מילות המפתח שלכם', 'בודקים מי מופיע לצדכם בתוצאות'] },
       },
       claimLines: {
         a1: ['פותחים את תוצאות הבדיקה החינמית'],
@@ -3211,7 +3211,7 @@ export const dashboardHe = {
         pending: 'ממתין',
       },
       business: {
-        title: 'העסק במבט אחד',
+        title: 'העסק שלכם, כפי שהאתר מציג אותו',
         niche: 'נישה',
         commerceType: 'סוג פעילות',
         platform: 'פלטפורמה',
@@ -3222,17 +3222,17 @@ export const dashboardHe = {
         locked: 'החנות נעולה בסיסמה, ולכן עוד לא קראנו מה היא מציעה.',
       },
       audiences: {
-        title: 'קהלי היעד',
+        title: 'למי אתם פונים',
         empty: 'עוד לא זיהינו קהלי יעד. אפשר להוסיף אותם בהגדרות.',
       },
       competitors: {
-        title: 'מתחרים בתוצאות החיפוש',
+        title: 'מי מתחרה אתכם בגוגל',
         seenIn: (n: number) => (n === 1 ? 'הופיע באחד מהחיפושים שלנו בגוגל' : `הופיע ב-${n} מהחיפושים שלנו בגוגל`),
         suggested: 'הצעה מניתוח האתר',
         empty: 'לא מצאנו מתחרים הפעם. המחקר המלא יחפש שוב.',
       },
       findings: {
-        title: 'מה כדאי לתקן באתר',
+        title: 'מה עוצר את האתר',
         clean: 'לא נמצאו בעיות באף אחת מהבדיקות שלנו',
         locked: 'לא נבדק: החנות נעולה בסיסמה',
         firewall: 'לא נבדק: האתר חוסם קריאה אוטומטית',
@@ -3245,7 +3245,7 @@ export const dashboardHe = {
         severity: { blocker: 'חוסם', warning: 'כדאי לתקן', info: 'לידיעה' },
       },
       keywords: {
-        title: 'מילות מפתח מומלצות למעקב',
+        title: 'ביטויים שכדאי לקדם',
         hint: 'סימנו את כולן. מה שיישאר מסומן ייכנס למעקב וייספר במכסת המילים של התוכנית.',
         selected: (n: number, total: number) => `${n} מתוך ${total} מסומנות`,
         limit: (max: number) => `אפשר לסמן עד ${max} מילים`,
@@ -3278,7 +3278,7 @@ export const dashboardHe = {
         fail: 'חסר',
       },
       articles: {
-        title: 'רעיונות למאמרים ראשונים',
+        title: 'מאמרים שיכולים להביא תנועה',
         empty: 'עוד אין נושאים. המחקר המלא יכין תוכנית תוכן.',
       },
       start: {
@@ -3543,7 +3543,7 @@ export const dashboardHe = {
       close: 'סגירת הטופס',
     },
     easyWins: {
-      title: 'הביטויים הכי משתלמים להתחלה',
+      title: 'הזדמנויות בהישג יד',
       subtitle: 'הביטויים שהכי כדאי להתחיל מהם: מספיק חיפושים, תחרות שאפשר לנצח, ומחיר קליק שמעיד על ערך.',
       keyword: 'ביטוי',
       searches: 'חיפושים בחודש',

@@ -1682,9 +1682,9 @@ export const dashboardEn = {
   // merged into one tab with a month board. Placed right after the content section it
   // grew out of.
   contentStrategy: {
-    nextEyebrow: 'Next article',
+    nextEyebrow: 'Up next',
     nextNotScheduled: 'Not in the publishing queue yet',
-    whyTitle: 'Why this one',
+    whyTitle: 'Why this topic',
     whyFallback: {
       queued: 'It is first in the publishing queue, so it is written and published before the rest.',
       topic: 'It is the topic that has waited longest for an article.',
@@ -1756,7 +1756,7 @@ export const dashboardEn = {
   },
   home: {
     title: 'Dashboard',
-    subtitle: 'What changed in this project since your last visit, and what to do next',
+    subtitle: 'Since your last visit',
     keywords: 'Keywords',
     keywordsSource: 'Actively tracked in this project',
     scansPerformed: 'Scans Performed',
@@ -1785,7 +1785,7 @@ export const dashboardEn = {
     shortcutsLabel: 'Shortcuts',
     shortcuts: {
       research: 'Keyword research',
-      schedule: 'Publishing schedule',
+      schedule: 'Content calendar',
       articles: 'My articles',
       keywords: 'Keywords',
     },
@@ -1839,7 +1839,7 @@ export const dashboardEn = {
       },
     },
     holdingBack: {
-      title: 'What to fix on the site',
+      title: 'What\'s slowing the site',
       subtitle: 'From the first scan of your site',
       scannedAt: (when: string) => `Scanned ${when}`,
       findingsTitle: 'On the site',
@@ -1863,7 +1863,7 @@ export const dashboardEn = {
       },
     },
     activity: {
-      title: 'Recent activity',
+      title: 'What\'s new',
       subtitle: 'What happened in this project, newest first',
       emptyTitle: 'No activity yet',
       empty: 'Every rank check, article and new topic shows up here, with when it happened.',
@@ -1890,10 +1890,10 @@ export const dashboardEn = {
         b6: (n: number | null) => (n ? `Rankings checked for ${n} keywords` : 'The first rank check finished'),
       },
       seedRunning: {
-        a1: 'Scanning the site',
-        a2: 'Identifying the business and its audiences',
-        a3: 'Checking what to fix on the site',
-        a4: 'Locating competitors',
+        a1: 'Scanning pages',
+        a2: 'Identifying services and area',
+        a3: 'Checking page tags and content',
+        a4: 'Finding competitors on Google',
         b1: 'Crawling the key pages of the site',
         b2: 'Finding keywords with search volumes',
         b3: 'Checking which keywords your competitors rank for',
@@ -1945,7 +1945,7 @@ export const dashboardEn = {
       emptyCta: 'Go to keyword research',
     },
     board: {
-      title: 'Publishing schedule',
+      title: 'Content calendar',
       subtitle: 'Up next, and what went live recently',
       upcoming: 'Up next',
       published: 'Recently published',
@@ -1979,7 +1979,7 @@ export const dashboardEn = {
       emptyCta: 'Go to AI visibility',
     },
     account: {
-      title: 'Account',
+      title: 'Your subscription',
       plan: 'Plan',
       plans: {
         trial: 'Trial', regular: 'Basic', advanced: 'Advanced', premium: 'Premium', large_agency: 'Agency',
@@ -2135,7 +2135,7 @@ export const dashboardEn = {
     },
   },
   competitors: {
-    title: 'How you rank against competitors',
+    title: 'You vs. competitors',
     subtitle: 'On how many of your keywords each competitor ranks above you, in each keyword\'s latest check',
     compactSubtitle: 'Who ranks above you on your keywords',
     aboveYouSentence: (name: string, ahead: number, compared: number) =>
@@ -3141,7 +3141,7 @@ export const dashboardEn = {
       submit: 'Scan the site',
       creating: 'Creating the project…',
       starting: 'Starting the scan…',
-      promise: 'It takes up to a minute',
+      promise: 'About a minute. You can keep working meanwhile',
       noConnection: 'No Search Console, no site connection',
       fromFreeCheck: (domain: string) => `Continuing from your free check of ${domain}`,
       errorEmpty: 'Enter the site\'s address',
@@ -3154,17 +3154,17 @@ export const dashboardEn = {
       eyebrow: 'Initial site review',
       title: (domain: string) => `Scanning ${domain}`,
       fromFreeCheck: 'Continuing from your free check results',
-      promise: 'It takes up to a minute',
+      promise: 'About a minute. You can keep working meanwhile',
       stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
-      nowLabel: 'What\'s happening now',
+      nowLabel: 'In progress',
       stepsLabel: 'Steps',
       finishingTitle: 'Putting the findings together',
       finishingLine: 'The review is almost ready',
       steps: {
-        a1: { title: 'Scanning the site', lines: ['Reading the home page', 'Checking whether AI bots can get in', 'Counting the addresses in the sitemap'] },
-        a2: { title: 'Identifying the business and audiences', lines: ['Working out what the business offers', 'Identifying the target audiences', 'Choosing the first keywords'] },
-        a3: { title: 'Spotting what to fix', lines: ['Checking titles, descriptions and images', 'Checking four signs of AI readiness'] },
-        a4: { title: 'Locating competitors', lines: ['Searching Google for your keywords', 'Checking who shows up next to you'] },
+        a1: { title: 'Page scan', lines: ['Reading the home page', 'Checking whether AI bots can get in', 'Counting the addresses in the sitemap'] },
+        a2: { title: 'Services and area', lines: ['Working out what the business offers', 'Identifying the target audiences', 'Choosing the first keywords'] },
+        a3: { title: 'Tags and content check', lines: ['Checking titles, descriptions and images', 'Checking four signs of AI readiness'] },
+        a4: { title: 'Competitors on Google', lines: ['Searching Google for your keywords', 'Checking who shows up next to you'] },
       },
       claimLines: {
         a1: ['Opening your free check results'],
@@ -3201,7 +3201,7 @@ export const dashboardEn = {
         pending: 'Pending',
       },
       business: {
-        title: 'The business at a glance',
+        title: 'Your business, as your site presents it',
         niche: 'Niche',
         commerceType: 'Business type',
         platform: 'Platform',
@@ -3212,17 +3212,17 @@ export const dashboardEn = {
         locked: 'The store is password protected, so we haven\'t read what it offers yet.',
       },
       audiences: {
-        title: 'Target audiences',
+        title: 'Who you serve',
         empty: 'We haven\'t identified target audiences yet. You can add them under Settings.',
       },
       competitors: {
-        title: 'Competitors in search results',
+        title: 'Who competes with you on Google',
         seenIn: (n: number) => (n === 1 ? 'Appeared in one of our Google searches' : `Appeared in ${n} of our Google searches`),
         suggested: 'Suggested by the site analysis',
         empty: 'We didn\'t find competitors this time. The full research will look again.',
       },
       findings: {
-        title: 'What to fix on the site',
+        title: 'What\'s slowing the site',
         clean: 'No issues found in any of our checks',
         locked: 'Not checked: the store is password protected',
         firewall: 'Not checked: the site blocks automated reads',
@@ -3235,7 +3235,7 @@ export const dashboardEn = {
         severity: { blocker: 'Blocking', warning: 'Worth fixing', info: 'Good to know' },
       },
       keywords: {
-        title: 'Recommended keywords to track',
+        title: 'Keywords worth pushing',
         hint: 'All are checked. What stays checked is tracked and counts toward your plan\'s keyword limit.',
         selected: (n: number, total: number) => `${n} of ${total} checked`,
         limit: (max: number) => `You can check up to ${max} keywords`,
@@ -3268,7 +3268,7 @@ export const dashboardEn = {
         fail: 'Missing',
       },
       articles: {
-        title: 'First article ideas',
+        title: 'Articles that can bring traffic',
         empty: 'No topics yet. The full research will prepare a content plan.',
       },
       start: {
@@ -3533,7 +3533,7 @@ export const dashboardEn = {
       close: 'Close the form',
     },
     easyWins: {
-      title: 'Best keywords to start with',
+      title: 'Within reach',
       subtitle: 'The keywords worth starting with: enough searches, competition you can beat, and a click price that signals value.',
       keyword: 'Keyword',
       searches: 'Searches a month',

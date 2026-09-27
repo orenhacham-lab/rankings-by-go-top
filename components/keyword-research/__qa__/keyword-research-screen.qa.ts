@@ -507,7 +507,7 @@ function main() {
     const heT = getDashboardDictionary('he').keywordResearchScan
     check('X5: the spec\'s Hebrew, word for word: the running line, the headline, the best keywords to start with (our own wording), the nine chips',
       heT.running.title === 'המחקר המלא רץ, זה לוקח כמה דקות' && heT.overview.headline('N', 'X') === 'מצאנו N ביטויים, X חיפושים בחודש'
-      && heT.easyWins.title === 'הביטויים הכי משתלמים להתחלה'
+      && heT.easyWins.title === 'הזדמנויות בהישג יד'
       && show(RESEARCH_CHIPS.map((c) => heT.chips[c])) === show(['הכל', 'מהמחקר', 'ממתחרים', 'מגוגל', 'נפח גבוה', 'תחרות נמוכה', 'שאלות', 'מוצע למעקב', 'כבר במעקב'])
       && heT.tiles.cpc.includes('CPC'))
   }
