@@ -67,6 +67,7 @@ import {
   type Tone,
 } from '@/lib/onboarding/summary-view'
 import { MAX_CONTINUE_KEYWORDS, type SeedRunView, type SeedSummary } from '@/lib/seed-scan/types'
+import SiteIcon from '@/components/ui/SiteIcon'
 import { cn } from '@/lib/utils'
 import FirstArticleButton from './FirstArticleButton'
 import { ActionLink, BlockNote, isolate, StatusDot, SummaryBlock } from './parts'
@@ -242,9 +243,13 @@ export default function ResearchSummary({
         <header data-summary-block="intro" className="relative grid gap-8 px-6 pt-7 pb-20 md:px-10 md:pt-10 md:pb-24 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg font-bold text-contrast-ink ring-1 ring-white/15">
-                {initial}
-              </span>
+              <SiteIcon
+                domain={domain}
+                icon={summary.siteIcon}
+                fallback={initial}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg font-bold text-contrast-ink ring-1 ring-white/15"
+                iconClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-2 ring-1 ring-white/15"
+              />
               <span className="min-w-0 truncate text-sm font-medium text-contrast-ink/80" dir="ltr">{domain}</span>
               <span className="inline-flex items-center gap-1.5 rounded-pill bg-white/10 px-3 py-1 text-caption font-semibold text-contrast-ink ring-1 ring-white/15">
                 <Sparkles className="h-3.5 w-3.5 text-[#9db4ff]" aria-hidden />

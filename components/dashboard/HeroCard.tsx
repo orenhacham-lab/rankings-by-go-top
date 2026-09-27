@@ -14,6 +14,7 @@ import type { RankingsView } from '@/lib/dashboard/rankings'
 import type { SeedPhase } from '@/lib/dashboard/seed'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { formatCount } from '@/components/gsc/format'
+import SiteIcon from '@/components/ui/SiteIcon'
 import { LinkButton } from './ui'
 
 export interface NextStep {
@@ -29,10 +30,12 @@ export type HeroNews =
   | { kind: 'move'; keyword: string; change: number; position: number }
   | null
 
-export default function HeroCard({ t, language, domain, rankings, news, seedPhase, next }: {
+export default function HeroCard({ t, language, domain, siteIcon, rankings, news, seedPhase, next }: {
   t: DashboardDictionary['dashboardHome']
   language: 'he' | 'en'
   domain: string
+  /** The icon the site declares, from its scan (the switcher's list carries it); /favicon.ico otherwise. */
+  siteIcon?: string | null
   rankings: RankingsView
   news: HeroNews
   seedPhase: SeedPhase | null
@@ -63,9 +66,13 @@ export default function HeroCard({ t, language, domain, rankings, news, seedPhas
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-3">
-            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lg font-bold ring-1 ring-white/15">
-              {initial}
-            </span>
+            <SiteIcon
+              domain={domain}
+              icon={siteIcon}
+              fallback={initial}
+              className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lg font-bold ring-1 ring-white/15"
+              iconClassName="grid size-10 shrink-0 place-items-center rounded-xl bg-white p-2 ring-1 ring-white/15"
+            />
             <p className="min-w-0 text-caption font-medium uppercase tracking-wide text-contrast-ink/70">
               {h.label} <span dir="ltr" className="block truncate text-copy font-semibold normal-case tracking-normal text-contrast-ink">{domain}</span>
             </p>

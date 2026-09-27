@@ -157,6 +157,8 @@ function ProjectDashboard({ project }: { project: Project }) {
   const dict = getDashboardDictionary(language)
   const home = dict.home
   const t = dict.dashboardHome
+  // The site icon its scan found, for the hero; the switcher's list carries it too.
+  const { projects } = useActiveProject()
 
   const [rankings, setRankings] = useState<RankingsView | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -254,6 +256,7 @@ function ProjectDashboard({ project }: { project: Project }) {
         t={t}
         language={language}
         domain={project.target_domain}
+        siteIcon={(seed.kind === 'run' ? seed.run.summary?.siteIcon : null) ?? projects.find((p) => p.id === project.id)?.site_icon}
         rankings={rankings}
         news={news}
         seedPhase={seed.kind === 'run' ? seed.phase : null}
