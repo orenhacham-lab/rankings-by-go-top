@@ -25,7 +25,11 @@ export function ScanPendingCard() {
   const t = getDashboardDictionary(language).keywordResearchScan
   return (
     <section data-scan-state="pending" className="mb-6" aria-busy="true">
-      <Card tone="ink" className="p-5 sm:p-7">
+      <Card tone="ink" className="relative isolate overflow-hidden p-5 shadow-pop sm:p-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-10%,rgb(99_130_246/0.38),transparent_70%),radial-gradient(28rem_14rem_at_0%_110%,rgb(240_176_63/0.16),transparent_70%)]"
+        />
         <span className="block h-5 w-28 rounded-pill bg-white/10" aria-hidden="true" />
         <span className="mt-5 block h-8 w-3/4 max-w-xl rounded-control bg-white/10" aria-hidden="true" />
         <span className="mt-3 block h-4 w-1/3 rounded-control bg-white/10" aria-hidden="true" />
@@ -40,12 +44,16 @@ export function ScanRunningCard({ seedKeywords, steps }: { seedKeywords: string[
   const t = getDashboardDictionary(language).keywordResearchScan.running
   return (
     <section data-scan-state="running" className="mb-6">
-      <Card tone="ink" className="p-5 sm:p-7">
-        <span className="inline-flex items-center gap-2 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-semibold">
+      <Card tone="ink" className="relative isolate overflow-hidden p-5 shadow-pop sm:p-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-10%,rgb(99_130_246/0.38),transparent_70%),radial-gradient(28rem_14rem_at_0%_110%,rgb(240_176_63/0.16),transparent_70%)]"
+        />
+        <span className="inline-flex items-center gap-2 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-semibold ring-1 ring-white/10">
           <span className="size-1.5 animate-pulse rounded-full bg-commit" aria-hidden="true" />
           {t.badge}
         </span>
-        <h2 className="mt-5 text-xl font-bold leading-tight tracking-tight sm:text-2xl">{t.title}</h2>
+        <h2 className="mt-5 text-xl font-bold leading-tight sm:text-[1.75rem] sm:leading-9">{t.title}</h2>
         <ol className="mt-5 grid gap-2 sm:grid-cols-3">
           {steps.map((s) => (
             <li
@@ -53,11 +61,11 @@ export function ScanRunningCard({ seedKeywords, steps }: { seedKeywords: string[
               data-step={s.step}
               data-step-state={s.state}
               className={cn(
-                'flex items-center gap-2.5 rounded-control px-3 py-2 text-sm transition-colors',
-                s.state === 'running' ? 'bg-white/15 text-contrast-ink' : 'bg-white/5 text-contrast-ink/70',
+                'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm ring-1 transition-colors',
+                s.state === 'running' ? 'bg-white/15 text-contrast-ink ring-white/25' : s.state === 'done' ? 'bg-white/10 text-contrast-ink ring-white/10' : 'bg-white/5 text-contrast-ink/70 ring-white/5',
               )}
             >
-              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-white/10" aria-hidden="true">
+              <span className={cn('grid size-6 shrink-0 place-items-center rounded-full', s.state === 'done' ? 'bg-ok-soft text-ok' : 'bg-white/10')} aria-hidden="true">
                 {s.state === 'done' ? <Check size={12} strokeWidth={3} /> : s.state === 'running' ? <Loader2 size={12} className="animate-spin" /> : <span className="size-1 rounded-full bg-current" />}
               </span>
               <span className="min-w-0 flex-1">{t.steps[s.step]}</span>
@@ -99,11 +107,11 @@ export function ScanEmptyCard({
     <section data-scan-state="empty" data-scan-reason={reason} className="mb-6">
       <Card>
         <div className="flex items-start gap-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-control bg-sunk text-muted" aria-hidden="true">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-warn-soft text-warn ring-1 ring-warn/15" aria-hidden="true">
             <SearchX size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-ink">{t.title}</h2>
+            <h2 className="text-lg font-bold leading-6 text-ink">{t.title}</h2>
             <p className="mt-1 text-sm text-muted">{t.reasons[reason]}</p>
             {reason === 'unreadable' && (
               <Button variant="secondary" size="sm" className="mt-3" onClick={onRetry}>{t.retry}</Button>

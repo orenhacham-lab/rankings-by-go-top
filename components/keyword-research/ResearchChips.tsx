@@ -41,12 +41,12 @@ export default function ResearchChips({
             aria-pressed={on}
             onClick={() => onChange(chip)}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-pill border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-              on ? 'border-action bg-action-soft font-semibold text-action' : 'border-line bg-surface text-body hover:bg-sunk',
+              'inline-flex h-9 shrink-0 items-center gap-2 rounded-pill border ps-3.5 pe-1.5 text-sm transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2',
+              on ? 'border-ink bg-ink font-semibold text-canvas shadow-sm' : 'border-line bg-surface font-medium text-body hover:border-line-strong hover:bg-sunk',
             )}
           >
             {t[chip]}
-            <span className={cn('text-xs tabular-nums', on ? 'text-action' : 'text-muted')} aria-busy={loading || undefined}>
+            <span className={cn('min-w-6 rounded-pill px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums', on ? 'bg-canvas/20 text-canvas' : 'bg-sunk text-muted')} aria-busy={loading || undefined}>
               {loading ? '…' : formatCount(counts[chip], language)}
             </span>
           </button>

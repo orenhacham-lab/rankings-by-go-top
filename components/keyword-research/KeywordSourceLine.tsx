@@ -5,6 +5,7 @@
  * where the research found it (the site, a competitor), and what Google reports
  * for it. Nothing at all for a keyword with none of these.
  */
+import { ScanSearch, Swords, TrendingUp } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCompact, formatCount } from '@/components/gsc/format'
@@ -25,17 +26,29 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
     })
   }
   if (!row.tracked && parts.length === 0) return null
+  // One small icon per source, so the line reads at a glance: the research's own mark
+  // is the same on almost every row, so it is only an icon (its words stay for screen
+  // readers and on hover); a competitor and Google keep their words, which differ per row.
+  const ICONS = { research: ScanSearch, competitor: Swords, google: TrendingUp } as const
   return (
-    <span data-keyword-source="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
+    <span data-keyword-source="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-caption text-muted">
       {row.tracked && (
         <span className="inline-flex items-center rounded-pill border border-ok/20 bg-ok-soft px-1.5 text-[11px] font-semibold text-ok">{t.tracked}</span>
       )}
-      {parts.map((p, i) => (
-        <span key={p.key} title={p.title} className="inline-flex items-center gap-2">
-          {i > 0 && <span aria-hidden="true">·</span>}
-          {p.text}
-        </span>
-      ))}
+      {parts.map((p) => {
+        const Icon = ICONS[p.key as keyof typeof ICONS]
+        return p.key === 'research' ? (
+          <span key={p.key} title={p.text} className="inline-grid size-5 place-items-center rounded-full bg-action-soft text-action">
+            <Icon size={11} strokeWidth={2.5} aria-hidden="true" />
+            <span className="sr-only">{p.text}</span>
+          </span>
+        ) : (
+          <span key={p.key} title={p.title} className="inline-flex items-center gap-1">
+            {Icon && <Icon size={12} strokeWidth={2} aria-hidden="true" className="shrink-0" />}
+            {p.text}
+          </span>
+        )
+      })}
     </span>
   )
 }
