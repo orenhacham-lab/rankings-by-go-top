@@ -129,6 +129,63 @@ function main() {
     buildGeoSignals({ ...s, hasFaqSchema: false, hasFaqSection: false }, 'he').find((g) => g.id === 'faq')?.title
       !== geo.find((g) => g.id === 'faq')?.title)
 
+  console.log('\nHOSTILE MARKUP) the parsers are linear, whatever the page opens and never closes')
+  const repeat = (unit: string, bytes: number) => {
+    let out = ''
+    while (out.length < bytes) out += unit
+    return out
+  }
+  const CAP = 1_500_000
+  const signalsOf = (html: string) => extractSiteSignals(html, 'https://a.co.il/', { robotsTxt: null, llmsTxt: false })
+
+  // Correctness first: the linear scanners must read a page the way the
+  // expressions they replaced did.
+  const tagBoundary = signalsOf('<html lang="he"><body><a href="/x">a</a><abbr title="t">b</abbr></body></html>')
+  check('a tag name is matched whole, so <a> does not also match <abbr>', tagBoundary.internalLinks === 1)
+  const unterminated = signalsOf('<html><body><h1>before</h1><!-- <h1>after</h1></body></html>')
+  check('an unterminated comment swallows the rest, as a browser reads it',
+    unterminated.h1.length === 1 && unterminated.h1[0] === 'before', JSON.stringify(unterminated.h1))
+  const unclosedScript = signalsOf('<html><body><h1>before</h1><script>var a = "<h1>after</h1>"</body></html>')
+  check('a script the page never closes ends what we read', unclosedScript.h1.length === 1)
+
+  // And the timings the rewrite exists for, at the fetch cap.
+  const hostile: [string, string][] = [
+    ['unclosed comments', repeat('<!--x', CAP)],
+    ["tags with no '>'", repeat('<img ', CAP)],
+    ['unclosed script', repeat('<script ', CAP)],
+    ['hundreds of thousands of script tags', repeat('<script>a</script>', CAP)],
+    ['unclosed headings', repeat('<h1 ', CAP)],
+    ['a well-formed page of the same size', `<html lang="he"><head><title>t</title></head><body>${repeat('<p>word</p>', CAP)}</body></html>`],
+  ]
+  for (const [label, html] of hostile) {
+    const t = performance.now()
+    signalsOf(html)
+    const ms = performance.now() - t
+    check(`1.5 MB of ${label}: ${ms.toFixed(0)}ms`, ms < 1_000)
+  }
+
+  // Weakenings: the two expression shapes this file no longer uses. A tenth of
+  // the cap keeps the control quick; both are quadratic, so the full cap costs
+  // a hundred times these numbers.
+  const TENTH = CAP / 10
+  const commentDoc = repeat('<!--x', TENTH)
+  const tLazy = performance.now()
+  commentDoc.replace(/<!--[\s\S]*?-->/g, ' ')
+  const lazyMs = performance.now() - tLazy
+  check(`CONTROL: the lazy comment regex costs ${lazyMs.toFixed(0)}ms at a TENTH of the cap, so ~${(lazyMs / 10).toFixed(0)}s at the cap`, lazyMs > 300)
+
+  const tagDoc = repeat('<img ', TENTH)
+  const tAttr = performance.now()
+  tagDoc.match(/<img\b[^>]*>/gi)
+  const attrMs = performance.now() - tAttr
+  check(`CONTROL: the [^>]* tag regex costs ${attrMs.toFixed(0)}ms at a TENTH of the cap, so ~${(attrMs / 10).toFixed(0)}s at the cap`, attrMs > 300)
+
+  const tLinear = performance.now()
+  signalsOf(tagDoc)
+  const linearMs = performance.now() - tLinear
+  check('CONTROL: the real parser reads the same document in a fraction of that',
+    linearMs * 10 < attrMs, `${linearMs.toFixed(0)}ms vs ${attrMs.toFixed(0)}ms`)
+
   console.log('\nMUTATION CONTROLS) weakened logic fails the assertions above')
   // Weakening: count an empty alt="" as present (the common off-by-one).
   const weakMissingAlt = (() => {
