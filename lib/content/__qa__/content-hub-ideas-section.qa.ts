@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { ideasSectionFromParam, ideasSectionToParam } from '../content-hub-ideas-section'
+import { strategyHref, STRATEGY_ANCHORS } from '../strategy/view'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -47,10 +48,17 @@ function main() {
     && (topics.match(/onClick=\{handleCreateTopic\}/g) || []).length === 1)
   check('handleCreateTopic → ideas section when automation on, else the modal',
     /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) goToIdeas\(\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(workspace))
-  // It used to scroll to a section of the one big page. The ideas destination is its own
-  // route now, so the same intent is a navigation — which survives a refresh and a share.
-  check('goToIdeas navigates to the automation screen on the automatic sub-tab',
-    /goToIdeas = useCallback[\s\S]*?router\.push\(`\$\{CONTENT_AUTOMATION_PATH\}\?section=\$\{ideasSectionToParam\('auto'\)\}`\)/.test(workspace))
+  // It used to scroll to a section of the one big page, then to navigate to the
+  // automation screen. That screen is the ideas section of the content strategy tab's
+  // list view now (W6c), so the same intent navigates there, on the automatic sub-tab —
+  // which survives a refresh and a share.
+  const toIdeas = (src: string) =>
+    /goToIdeas = useCallback[\s\S]*?router\.push\(strategyHref\('list', STRATEGY_ANCHORS\.ideas, \{ section: ideasSectionToParam\('auto'\) \}\)\)/.test(src)
+  check('goToIdeas navigates to the ideas section of the strategy list view, on the automatic sub-tab', toIdeas(workspace))
+  check('MUT: goToIdeas that still pushes the retired automation screen fails that check',
+    !toIdeas(workspace.replace("router.push(strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }))", "router.push('/content/automation?section=ideas')")))
+  check('…and that href is the list view at the ideas, with the sub-tab',
+    strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }) === '/content/strategy?view=list&section=ideas#ideas')
 
   // 2 — the ideas destination has auto + manual sub-tabs; manual reuses the SAME modal.
   check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(automation) && /t\.ideasSubTabs\.manual/.test(automation) && /changeIdeasSection\(key\)/.test(automation))

@@ -9,9 +9,10 @@
  * internal useState tabs. Nothing had its own URL and nothing could be reasoned
  * about in isolation.
  *
- * The workspace is now one route per concern (/content, /content/topics,
- * /content/automation; Search Console feeds the other screens and has none of its
- * own) and this provider owns only what genuinely crosses those screens:
+ * The workspace is now one route per concern (/content for the articles and
+ * /content/strategy for the content strategy, whose list view holds what used to be
+ * the topics and automation screens; Search Console feeds the other screens and has
+ * none of its own) and this provider owns only what genuinely crosses those screens:
  *   - the overview payload (/api/content/overview): counts, articles, platform
  *   - the topic list + per-topic link-plan summaries
  *   - the cross-screen enqueue workflow (ideas → link review → publishing queue)
@@ -28,7 +29,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { localizeShopifyPublishError } from '@/lib/i18n/dashboard/shopify-publish-error'
 import { ideasSectionFromParam, ideasSectionToParam, type IdeasSection } from '@/lib/content/content-hub-ideas-section'
-import { CONTENT_AUTOMATION_PATH, CONTENT_TOPICS_PATH } from '@/lib/content/content-workspace-nav'
+import { STRATEGY_ANCHORS, strategyHref } from '@/lib/content/strategy/view'
 import type { NewTopic } from '@/components/content/NewTopicsLinkPlanPanel'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import type { ArticleTopic } from '@/lib/supabase/types'
@@ -94,6 +95,10 @@ function useWorkspaceValue() {
   const [topics, setTopics] = useState<ArticleTopic[]>([])
   const [briefOpen, setBriefOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
+  // The brief modal's create-mode prefill: the content strategy tab opens it with the
+  // next idea's title, so "write the first article" goes through the ordinary topic
+  // flow. Cleared whenever the modal closes, so no other opener inherits it.
+  const [briefPrefill, setBriefPrefill] = useState<{ topic?: string; primaryKeyword?: string } | null>(null)
   // Phase 2F.1: internal-link planning step for freshly-created topics. Lifted
   // planStatus so the panel can seed the topic-row badges for those IDs only.
   const [newTopics, setNewTopics] = useState<NewTopic[] | null>(null)
@@ -118,25 +123,27 @@ function useWorkspaceValue() {
   // Phase 3F.3.7i — bumped when an enqueue succeeds from the drawer/review panel, so
   // the Automatic Ideas section shows + scrolls its success box into view.
   const [ideasSuccessSignal, setIdeasSuccessSignal] = useState<{ n: number; count: number } | null>(null)
-  // The publishing queue lives on the automation screen; the topics screen asks to be
-  // taken to it rather than scrolling a shared page.
+  // The publishing queue lives in the content strategy tab's list view; from anywhere
+  // else, asking for it is a navigation there.
   const scheduleSectionRef = useRef<HTMLDivElement>(null)
   const goToQueue = useCallback(() => {
     if (scheduleSectionRef.current) scheduleSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    else router.push(CONTENT_AUTOMATION_PATH)
+    else router.push(strategyHref('list', STRATEGY_ANCHORS.queue))
   }, [router])
 
   const handleTopicsQueued = useCallback((info: { topicIds: string[] }) => {
     setHighlightTopicIds(info.topicIds)
     window.setTimeout(() => setHighlightTopicIds([]), 4500)
   }, [])
-  // "Review the links first" used to scroll to the topic rows further down the same
-  // page. The topics are their own screen now, so it navigates there instead — and the
-  // highlight + hint survive the navigation because they live in this provider.
+  // "Review the links first" goes to the topic rows: in the content strategy tab's list
+  // view they sit below the ideas, so it scrolls there, and from anywhere else it
+  // navigates there. The highlight + hint survive either because they live here.
   const handleReviewLinks = useCallback((topicIds: string[]) => {
     setHighlightTopicIds(topicIds)
     setReviewLinksHint(true)
-    router.push(CONTENT_TOPICS_PATH)
+    const rows = document.getElementById(STRATEGY_ANCHORS.topics)
+    if (rows) rows.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else router.push(strategyHref('list', STRATEGY_ANCHORS.topics))
     window.setTimeout(() => setHighlightTopicIds([]), 6000)
   }, [router])
   const handleScheduled = useCallback(() => {
@@ -158,11 +165,11 @@ function useWorkspaceValue() {
     params.set('section', ideasSectionToParam(section))
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [router, pathname, searchParams])
-  // The "New article topic" button leads to the automatic article-ideas SCREEN. It used
-  // to scroll to a section of the one big page; it is now its own route, so the same
-  // intent is a navigation and the destination survives a refresh or a shared link.
+  // The "New article topic" button leads to the automatic article ideas, in the content
+  // strategy tab's list view. It is a navigation, so the destination survives a refresh
+  // or a shared link.
   const goToIdeas = useCallback(() => {
-    router.push(`${CONTENT_AUTOMATION_PATH}?section=${ideasSectionToParam('auto')}`)
+    router.push(strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }))
   }, [router])
   // Retargeted create-topic action: to the ideas destination when automation is on;
   // otherwise the manual brief modal directly (so manual creation always works).
@@ -171,6 +178,10 @@ function useWorkspaceValue() {
     else { setEditingTopic(null); setBriefOpen(true) }
   }, [automationEnabled, goToIdeas])
   const openManualBrief = useCallback(() => { setEditingTopic(null); setBriefOpen(true) }, [])
+  const openPrefilledBrief = useCallback((prefill: { topic?: string; primaryKeyword?: string }) => {
+    setEditingTopic(null); setBriefPrefill(prefill); setBriefOpen(true)
+  }, [])
+  const closeBrief = useCallback(() => { setBriefOpen(false); setBriefPrefill(null) }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -320,6 +331,7 @@ function useWorkspaceValue() {
     handleDrawerPlanSaved, handleReturnToQueue,
     // the shared "new article topic" action + its modal
     handleCreateTopic, openManualBrief, briefOpen, setBriefOpen, editingTopic, setEditingTopic,
+    briefPrefill, openPrefilledBrief, closeBrief,
   }
 }
 

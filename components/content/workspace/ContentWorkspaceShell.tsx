@@ -30,9 +30,24 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
   const {
     t, isHebrew, toast, projectId, projects, data, loading,
     projectsResolved, projectsError, reloadProjects,
-    briefOpen, setBriefOpen, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
+    briefOpen, closeBrief, briefPrefill, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
   } = useContentWorkspace()
   const screen = activeContentScreen(usePathname() ?? '')
+  // The content strategy tab opens with its plan (it works without a site connection),
+  // so there the connection cards follow the screen instead of preceding it.
+  const setupAfterScreen = screen === 'strategy'
+
+  // K5 — missing-connections onboarding (two independent setup cards, each hidden when
+  // its dimension is ready; whole block hidden when both are). Its buttons LINK to the
+  // screen that owns each connection.
+  const setup = projectId && data ? (
+    <ContentHubSetup
+      projectId={projectId}
+      platform={data.platform?.platform ?? 'none'}
+      platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed'}
+      shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
+    />
+  ) : null
 
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
@@ -61,17 +76,7 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
           {/* No project selector here: the top bar's switcher is the one control
               that picks the project, on this screen as on every other. */}
 
-          {/* K5 — missing-connections onboarding (two independent setup cards, each
-              hidden when its dimension is ready; whole block hidden when both are).
-              Its buttons now LINK to the screen that owns each connection. */}
-          {projectId && data && (
-            <ContentHubSetup
-              projectId={projectId}
-              platform={data.platform?.platform ?? 'none'}
-              platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed'}
-              shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
-            />
-          )}
+          {!setupAfterScreen && setup}
 
           {/* No project selected yet (multi-project) */}
           {!projectId ? (
@@ -81,15 +86,18 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
           ) : (
             children
           )}
+
+          {setupAfterScreen && <div className="mt-8">{setup}</div>}
         </>
       )}
 
       <ArticleBriefModal
         open={briefOpen}
-        onClose={() => setBriefOpen(false)}
+        onClose={closeBrief}
         projects={projects}
         defaultProjectId={projectId}
         editing={editingTopic}
+        prefill={briefPrefill}
         onSaved={loadTopics}
         onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
         onTopicsCreated={(created) => { if (created.length) { setNewTopicsUnchecked({}); setNewTopicsSelected({}); setNewTopics(created) } }}

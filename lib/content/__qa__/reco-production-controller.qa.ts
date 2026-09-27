@@ -300,7 +300,10 @@ async function main() {
     const uiSrc = read('../../../components/content/AutomationIdeas.tsx')
     const runSrc = read('../recommendations/production-run.ts')
     const ctrlSrc = read('../recommendations/production-controller.ts')
-    const pageSrc = read('../../../app/(dashboard)/content/(workspace)/automation/page.tsx')
+    // W6c content strategy: the automation screen now mounts inside the content strategy
+    // tab; its page resolves the flag and the screen hands it to AutomationScreen.
+    const pageSrc = read('../../../app/(dashboard)/content/(workspace)/strategy/page.tsx')
+      + read('../../../components/content-strategy/ContentStrategyScreen.tsx')
     const hubSrc = read('../../../components/content/workspace/AutomationScreen.tsx')
     check('G1. flag helper: RECO_PRO_FIRST_CONTROLLER, missing/invalid → false', /RECO_PRO_FIRST_CONTROLLER === 'true'/.test(authSrc) && /isProFirstControllerEnabled/.test(authSrc))
     check('G2. route routes to the Pro-first controller when the flag is on', /const useProFirst = isProFirstControllerEnabled\(\)/.test(routeSrc) && /runProFirstProduction/.test(routeSrc))
