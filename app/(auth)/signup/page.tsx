@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -10,6 +10,7 @@ import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { keepSeedClaim } from './claim-action'
 
 const SIGNUP_UI = {
   he: {
@@ -123,6 +124,20 @@ export function SignupForm() {
   const t = SIGNUP_UI[lang]
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+
+  // W4 onboarding: the free check's claim token (?claim=) goes to the server,
+  // which keeps it in an httpOnly cookie for the first project, and then leaves
+  // the address. The page never shows it or sends it anywhere else.
+  const claimParam = searchParams.get('claim')
+  useEffect(() => {
+    if (!claimParam) return
+    keepSeedClaim(claimParam)
+      .catch(() => {})
+      .finally(() => {
+        const rest = new URLSearchParams(Array.from(searchParams.entries()).filter(([key]) => key !== 'claim')).toString()
+        router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false })
+      })
+  }, [claimParam, pathname, router, searchParams])
 
   const [formData, setFormData] = useState({
     fullName: '',
