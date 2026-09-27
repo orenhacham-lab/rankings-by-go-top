@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
 import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
@@ -16,6 +16,15 @@ import { getSiteMetadata } from '@/lib/i18n/site-metadata'
  */
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
 const heebo = Heebo({ subsets: ['hebrew', 'latin'], display: 'swap', variable: '--font-heebo' })
+
+/**
+ * The viewport is its own export: inside `metadata` Next ignores it and logs
+ * "Unsupported metadata viewport" on every render. Same values as before.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
 
 /**
  * The document's metadata follows the SAME resolved locale as <html lang/dir>.
@@ -53,7 +62,6 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: 'https://www.gotopseo.com',
       languages: buildHreflangAlternates('/', '/en'),
     },
-    viewport: 'width=device-width, initial-scale=1',
     robots: 'index, follow',
     authors: [{ name: 'Go Top' }],
   }
