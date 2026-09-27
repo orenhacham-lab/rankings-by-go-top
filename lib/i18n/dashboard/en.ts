@@ -3719,6 +3719,7 @@ export const dashboardEn = {
       siteUrlHint: 'Optional. Shown on the card so you recognise the site.',
       siteId: 'Site ID',
       siteIdHint: 'It is in your Wix dashboard address, right after /dashboard/.',
+      siteIdPlaceholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
       apiKey: 'API key',
       apiKeyHint: 'Create it in your Wix account under API Keys, with blog permissions. Stored encrypted and never shown again.',
       test: 'Test connection',

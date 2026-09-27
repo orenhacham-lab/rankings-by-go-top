@@ -3729,6 +3729,7 @@ export const dashboardHe = {
       siteUrlHint: 'לא חובה. תוצג בכרטיס כדי שתזהו את האתר.',
       siteId: 'מזהה האתר (Site ID)',
       siteIdHint: 'מופיע בכתובת של לוח הבקרה ב-Wix, מיד אחרי ‎/dashboard/‎.',
+      siteIdPlaceholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
       apiKey: 'מפתח API',
       apiKeyHint: 'נוצר בחשבון Wix שלכם תחת API Keys, עם הרשאה לבלוג. נשמר מוצפן ולא יוצג שוב.',
       test: 'בדיקת חיבור',
