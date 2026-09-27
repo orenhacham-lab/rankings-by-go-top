@@ -244,7 +244,7 @@ export default function AudienceCard({
 
           <div role="radiogroup" aria-labelledby={`${ids}-local-label`}>
             <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-              <span id={`${ids}-local-label`} className="text-copy font-medium text-body">{t.audience.localLabel}</span>
+              <span id={`${ids}-local-label`} className="text-copy font-semibold text-ink">{t.audience.localLabel}</span>
               {fieldChip('is_local', localChanged)}
             </div>
             <div className="grid grid-cols-1 gap-1 rounded-control border border-line bg-sunk p-1 sm:grid-cols-2">
@@ -279,20 +279,20 @@ export default function AudienceCard({
 
         <div>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <span id={`${ids}-audiences`} className="text-copy font-medium text-body">{t.audience.audiencesLabel}</span>
+            <span id={`${ids}-audiences`} className="text-copy font-semibold text-ink">{t.audience.audiencesLabel}</span>
             <span className="text-caption tabular-nums text-muted">
               {fill(t.audience.audiencesCount, { n: draft.rows.length, max: MAX_AUDIENCES })}
             </span>
           </div>
           {draft.rows.length === 0 ? (
-            <p className="rounded-control border border-dashed border-line-strong px-3 py-4 text-center text-copy text-muted">{t.audience.empty}</p>
+            <p className="rounded-xl border border-dashed border-line-strong bg-sunk/40 px-4 py-6 text-center text-copy text-muted">{t.audience.empty}</p>
           ) : (
             <ol aria-labelledby={`${ids}-audiences`} className="space-y-2">
               {draft.rows.map((row, i) => {
                 const chip = rowChip(row)
                 return (
                   <li key={row.key} data-audience-row className="flex items-center gap-2 animate-pop-in">
-                    <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-pill bg-sunk text-caption font-semibold tabular-nums text-muted">
+                    <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-pill bg-action-soft text-caption font-bold tabular-nums text-action">
                       {i + 1}
                     </span>
                     <div className="flex min-w-0 flex-1 items-center gap-2">

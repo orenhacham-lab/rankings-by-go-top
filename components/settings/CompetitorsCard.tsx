@@ -168,7 +168,12 @@ export default function CompetitorsCard({
       description={c.body}
       actions={
         load.status === 'ready' ? (
-          <span className="rounded-pill border border-line bg-sunk px-2.5 py-0.5 text-caption font-semibold tabular-nums text-muted">
+          <span className="inline-flex items-center gap-2 rounded-pill border border-line bg-surface px-2.5 py-1 text-caption font-semibold tabular-nums text-ink">
+            <span aria-hidden className="flex gap-0.5">
+              {Array.from({ length: MAX_ACTIVE_COMPETITORS }, (_, i) => (
+                <span key={i} className={cn('h-2.5 w-1.5 rounded-full', i < active.length ? 'bg-action' : 'bg-line-strong')} />
+              ))}
+            </span>
             {active.length}/{MAX_ACTIVE_COMPETITORS}
           </span>
         ) : undefined
@@ -192,9 +197,9 @@ export default function CompetitorsCard({
         {load.status === 'ready' && (
           <>
             {active.length === 0 ? (
-              <p className="rounded-control border border-dashed border-line-strong px-3 py-4 text-center text-copy text-muted">{c.empty}</p>
+              <p className="rounded-xl border border-dashed border-line-strong bg-sunk/40 px-4 py-6 text-center text-copy text-muted">{c.empty}</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                 {active.map((item) => {
                   const key = competitorKey(item)
                   const shown = item.domain ?? item.name
@@ -204,11 +209,11 @@ export default function CompetitorsCard({
                       key={item.id}
                       data-competitor={key ?? item.id}
                       className={cn(
-                        'flex items-center gap-3 rounded-control border border-line bg-surface px-3 py-2.5 animate-pop-in transition-opacity',
+                        'flex items-center gap-3 bg-surface px-3.5 py-3 animate-pop-in transition-[opacity,background-color] hover:bg-sunk/50',
                         removing === item.id && 'opacity-50',
                       )}
                     >
-                      <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-sunk text-caption font-bold uppercase text-muted">
+                      <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-action-soft text-copy font-bold uppercase text-action">
                         {shown.replace(/^www\./, '').slice(0, 1)}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -235,7 +240,7 @@ export default function CompetitorsCard({
             )}
 
             <form onSubmit={add} noValidate>
-              <label htmlFor={inputId} className="mb-1.5 block text-copy font-medium text-body">{c.addLabel}</label>
+              <label htmlFor={inputId} className="mb-1.5 block text-copy font-semibold text-ink">{c.addLabel}</label>
               <div className="flex gap-2">
                 <input
                   id={inputId}
