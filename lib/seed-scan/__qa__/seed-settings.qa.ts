@@ -268,6 +268,13 @@ async function main() {
     check('an insert failure is reported, not thrown', (await addValidatedCompetitors(admin, SCOPE, ['a.com'], NOW)) === 'error')
   }
   check('domains are compared the way the competitors route stores them', competitorDomainKey('HTTPS://www.Example.com/path') === 'example.com' && competitorDomainKey('  ') === null)
+  {
+    // A run of slashes before a line separator made `/\/.*$/` backtrack quadratically.
+    const t0 = performance.now()
+    const key = competitorDomainKey('example.com' + '/'.repeat(30_000) + '\u2028x')
+    const ms = performance.now() - t0
+    check('a hostile path after the domain is cut in linear time', key === 'example.com' && ms < 50, `${ms.toFixed(1)} ms`)
+  }
   check('languages reduce to the primary subtag', projectLanguageFrom('he-IL') === 'he' && projectLanguageFrom('EN_us') === 'en' && projectLanguageFrom('hebrew') === null && projectLanguageFrom(null) === null)
 
   console.log('\n6) Every read and write names the owner')

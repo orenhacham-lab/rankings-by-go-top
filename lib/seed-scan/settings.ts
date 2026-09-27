@@ -381,7 +381,11 @@ async function replaceScanAudiences(
 export function competitorDomainKey(raw: string | null | undefined): string | null {
   const trimmed = (raw ?? '').trim().toLowerCase()
   if (!trimmed) return null
-  return trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '') || null
+  const host = trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '')
+  // Cut at the first '/' by index: a `/\/.*$/` backtracks quadratically on a
+  // run of slashes followed by a line separator.
+  const slash = host.indexOf('/')
+  return (slash >= 0 ? host.slice(0, slash) : host) || null
 }
 
 export type CompetitorInsertReport = { inserted: string[]; alreadyListed: string[]; overCap: string[] }
