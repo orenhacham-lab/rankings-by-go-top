@@ -16,6 +16,7 @@ import { sortTargetsByPosition } from '@/lib/sorting'
 import Link from 'next/link'
 import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
 import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
+import { GscKeywordLine, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
 
 interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
@@ -48,6 +49,9 @@ interface TrackingTargetsTableProps {
   /** You vs. competitors: when given, a line under each position shows the
    *  best-placed competitor of the same check. */
   competitorView?: CompetitorView
+  /** Search Console: when given, a line under each search volume shows the keyword's
+   *  clicks and impressions from Google over the last 28 days. */
+  gscKeywords?: GscKeywordsView
 }
 
 export default function TrackingTargetsTable({
@@ -69,6 +73,7 @@ export default function TrackingTargetsTable({
   projectDevice,
   onActionComplete,
   competitorView,
+  gscKeywords,
 }: TrackingTargetsTableProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
@@ -222,43 +227,46 @@ export default function TrackingTargetsTable({
                   <EngineBadge engine={target.engine_type} device={projectDevice} />
                 </Td>
                 <Td>
-                  {target.avg_monthly_searches !== null && target.avg_monthly_searches !== undefined ? (
-                    <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
-                      {target.avg_monthly_searches.toLocaleString()}
-                    </span>
-                  ) : volumePending ? (
-                    // TRUTHFUL PENDING STATE. An em dash is indistinguishable
-                    // from "this feature does not work"; a new keyword whose
-                    // volume is on its way should say so.
-                    <span className="text-slate-400 dark:text-slate-500 text-sm animate-pulse">
-                      {k.volumePending}
-                    </span>
-                  ) : volumeUnavailable && onRetryVolumes ? (
-                    <button
-                      type="button"
-                      onClick={onRetryVolumes}
-                      className="text-amber-600 dark:text-amber-400 text-xs underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 text-start"
-                      title={k.volumeRetry}
-                    >
-                      {k.volumeUnavailable} · {k.volumeRetry}
-                    </button>
-                  ) : onRetryVolumes ? (
-                    <button
-                      type="button"
-                      onClick={onRetryVolumes}
-                      className="text-slate-400 dark:text-slate-500 text-sm underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300"
-                      title={k.volumeRetry}
-                    >
-                      —
-                    </button>
-                  ) : (
-                    <span
-                      className="text-slate-400 dark:text-slate-500 text-sm"
-                      title={k.notChecked}
-                    >
-                      —
-                    </span>
-                  )}
+                  <div className="flex flex-col items-start gap-1">
+                    {target.avg_monthly_searches !== null && target.avg_monthly_searches !== undefined ? (
+                      <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
+                        {target.avg_monthly_searches.toLocaleString()}
+                      </span>
+                    ) : volumePending ? (
+                      // TRUTHFUL PENDING STATE. An em dash is indistinguishable
+                      // from "this feature does not work"; a new keyword whose
+                      // volume is on its way should say so.
+                      <span className="text-slate-400 dark:text-slate-500 text-sm animate-pulse">
+                        {k.volumePending}
+                      </span>
+                    ) : volumeUnavailable && onRetryVolumes ? (
+                      <button
+                        type="button"
+                        onClick={onRetryVolumes}
+                        className="text-amber-600 dark:text-amber-400 text-xs underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 text-start"
+                        title={k.volumeRetry}
+                      >
+                        {k.volumeUnavailable} · {k.volumeRetry}
+                      </button>
+                    ) : onRetryVolumes ? (
+                      <button
+                        type="button"
+                        onClick={onRetryVolumes}
+                        className="text-slate-400 dark:text-slate-500 text-sm underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300"
+                        title={k.volumeRetry}
+                      >
+                        —
+                      </button>
+                    ) : (
+                      <span
+                        className="text-slate-400 dark:text-slate-500 text-sm"
+                        title={k.notChecked}
+                      >
+                        —
+                      </span>
+                    )}
+                    {gscKeywords && <GscKeywordLine view={gscKeywords} targetId={target.id} />}
+                  </div>
                 </Td>
                 <Td>
                   <div className="flex flex-col items-start gap-1">

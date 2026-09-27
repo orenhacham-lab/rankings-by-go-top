@@ -9,7 +9,11 @@
  *  A) the retired project page is a redirect that keeps every old link working
  *     (Shopify "Open dashboard", the Shopify and Search Console returns,
  *     bookmarks) and can never send anyone off the site;
- *  B) nothing inside the app links to it any more;
+ *  S) so is the retired Search Console screen (/content/search-console): Search
+ *     Console feeds the other screens now, and its address forwards to keyword
+ *     research, or with a connection result to the Search Console section of
+ *     settings, keeping projectId and lang;
+ *  B) nothing inside the app links to either any more;
  *  C) a project created a moment ago is adopted from the url, after validation;
  *  D) creating a project opens it;
  *  E) the switcher is the tour's first stop in every state, and keeps a way to
@@ -27,7 +31,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { projectPageRedirect, PROJECT_PAGE_SECTION_PATHS } from '../project-page-redirect'
+import { projectPageRedirect, PROJECT_PAGE_SECTION_PATHS, searchConsoleScreenRedirect, SEARCH_CONSOLE_SCREEN_PATH } from '../project-page-redirect'
 import { deriveRow, withDeadline, type RowRead } from '../useProjectRow'
 import type { Project } from '../../supabase/types'
 
@@ -122,6 +126,55 @@ async function main() {
       !onlyRedirects(page + "\nconst row = await createClient().from('projects')"))
   }
 
+  // ── S) the retired Search Console screen ───────────────────────────────────
+  console.log('\nS) /content/search-console redirects: keyword research, or settings for a connection result')
+  {
+    const r = searchConsoleScreenRedirect
+    check('S1: a plain link opens keyword research, where the opportunities are now',
+      r({}) === '/keyword-research' && r({ projectId: 'p1' }) === '/keyword-research?projectId=p1', r({ projectId: 'p1' }))
+    check('S2: the project and the language are carried through the hop',
+      r({ projectId: 'p1', lang: 'en' }) === '/keyword-research?projectId=p1&lang=en', r({ projectId: 'p1', lang: 'en' }))
+    check('S3: a Search Console result lands on the Search Console section of settings, with the project and language',
+      r({ gsc: 'connected', projectId: 'p1' }) === '/settings?gsc=connected&projectId=p1#search-console'
+      && r({ projectId: 'p1', gsc_error: 'access_denied', lang: 'he' }) === '/settings?projectId=p1&gsc_error=access_denied&lang=he#search-console',
+      r({ projectId: 'p1', gsc_error: 'access_denied', lang: 'he' }))
+    check('S3b: an empty result value still counts as a result (the panel reads and clears it)',
+      r({ gsc: '' }) === '/settings?gsc=#search-console', r({ gsc: '' }))
+    const hostile: Record<string, string | string[]>[] = [
+      {}, { next: 'https://evil.test' }, { gsc: '//evil.test' }, { gsc_error: 'https://evil.test' },
+      { projectId: '//evil.test' }, { projectId: ['p1', 'https://evil.test'], lang: ['en', 'he'] }, { section: '/\\evil.test' },
+    ]
+    const paths = ['/keyword-research', '/settings']
+    const anchors = ['', '#search-console', '#platform']
+    const staysOnSite = (fn: typeof r) => hostile.every((q) => {
+      const url = new URL(fn(q), ORIGIN)
+      const sent = q.projectId === undefined ? [] : Array.isArray(q.projectId) ? q.projectId : [q.projectId]
+      return url.origin === ORIGIN && paths.includes(url.pathname) && anchors.includes(url.hash)
+        && JSON.stringify(url.searchParams.getAll('projectId')) === JSON.stringify(sent)
+    })
+    check('S4: every destination is a fixed path and section on this site; the request only ever fills parameters', staysOnSite(r))
+    const trustsNext = (q: Record<string, string | string[] | undefined>) => (typeof q.next === 'string' ? q.next : r(q))
+    check('S-MUT: a redirect that follows a `next` parameter fails S4', !staysOnSite(trustsNext))
+    const resultAsPath = (q: Record<string, string | string[] | undefined>) => (typeof q.gsc === 'string' ? `${q.gsc}#search-console` : r(q))
+    check('S-MUT2: a redirect that builds its path from the result fails S4', !staysOnSite(resultAsPath))
+
+    // A plain HTTP 307 before anything renders: outside the Suspense-wrapped group.
+    const PAGE = 'app/content/search-console/page.tsx'
+    const IN_GROUP = 'app/(dashboard)/content/(workspace)/search-console/page.tsx'
+    const outsideGroup = (files: string[]) => files.includes(PAGE) && !files.includes(IN_GROUP)
+    const present = [PAGE, IN_GROUP].filter((f) => existsSync(join(ROOT, f)))
+    check('S5: the redirect lives outside the dashboard group, and the old screen\'s page is gone', outsideGroup(present), present.join(', '))
+    check('S5-MUT: the screen back inside the group fails S5', !outsideGroup([...present, IN_GROUP]))
+    const onlyRedirects = (src: string) => !/'use client'/.test(src)
+      && /redirect\(searchConsoleScreenRedirect\(await searchParams\)\)/.test(src)
+      && !/createClient|\.from\(|fetch\(/.test(src)
+    const page = code(PAGE)
+    check('S6: the page is a server-side redirect that reads nothing', onlyRedirects(page))
+    check('S6-MUT: a page that renders the old screen instead fails S6',
+      !onlyRedirects(page.replace('redirect(searchConsoleScreenRedirect(await searchParams))', 'return null')))
+    check('S7: the address it answers is the retired screen\'s', SEARCH_CONSOLE_SCREEN_PATH === '/content/search-console')
+  }
+
   // ── B) no link inside the app points at the retired page ─────────────────
   console.log('\nB) links inside the app go to the tabs, not to the retired page')
   {
@@ -145,6 +198,21 @@ async function main() {
     check('B3: the Shopify returns name the result as `shopify`, which A5 routes to settings',
       /\{ shopify: 'error', reason \}/.test(code('app/api/shopify/oauth/start/route.ts'))
       && /shopify: 'warning', reason: 'no_active_plan'/.test(code('app/api/shopify/billing/return/route.ts')))
+
+    // Nor at the retired Search Console screen: not a link, not a nav entry, not the
+    // OAuth return. Its path is named once, where its redirect is declared.
+    const sourceFiles = (dir: string): string[] => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((d) => {
+      const rel = `${dir}/${d.name}`
+      if (d.isDirectory()) return d.name === '__qa__' || d.name === 'node_modules' ? [] : sourceFiles(rel)
+      return /\.tsx?$/.test(d.name) ? [rel] : []
+    })
+    const naming = (list: { path: string; src: string }[]) => list.filter((f) => f.src.includes('/content/search-console')).map((f) => f.path)
+    const all = ['app', 'components', 'lib'].flatMap(sourceFiles).map((path) => ({ path, src: code(path) }))
+    const named = naming(all)
+    check('B4: only the redirect\'s own module names /content/search-console',
+      named.length === 1 && named[0] === 'lib/active-project/project-page-redirect.ts', named.join(', '))
+    check('B4-MUT: an OAuth return still pointing there is found',
+      naming([...all, { path: 'app/api/gsc/callback/route.ts', src: "new URL(returnHub ? '/content/search-console' : '/settings', origin)" }]).length === 2)
   }
 
   // ── C) a project created a moment ago is adopted from the url ────────────

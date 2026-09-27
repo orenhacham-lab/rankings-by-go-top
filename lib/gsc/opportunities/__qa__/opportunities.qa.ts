@@ -270,19 +270,23 @@ async function main() {
     check('F3(11) different cluster → different id', base !== diffCluster)
   }
 
-  // ── FIX 4: mounted on the Search Console screen, not the project page; still read-only ─
+  // ── FIX 4: a section of keyword research, not the project page; still read-only ─
   {
-    const hub = read('components/content/workspace/SearchConsoleScreen.tsx')
-    check('F4(12) GscOpportunities imported into the Search Console screen', /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(hub))
-    // It is a DIAGNOSTIC, so it stays behind its own development flag — never beside
-    // the merchant-facing recommendations by default.
-    check('F4(12) rendered only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED',
-      /NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' &&[\s\S]{0,400}<GscOpportunities\s[\s\S]{0,160}projectId=\{projectId\}/.test(hub))
-    // It used to be an in-page tab gated inline. The Search Console SCREEN carries the
-    // same client flag on its own route, so a build with GSC off has no route to reach.
-    const route = read('app/(dashboard)/content/(workspace)/search-console/page.tsx')
-    check('F4(12) the Search Console screen is gated by the GSC client flag',
-      /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED !== 'true'/.test(route))
+    // It was a raw diagnostic on the content workspace's Search Console screen, behind
+    // NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. That screen is gone: Search Console feeds the
+    // screens that already exist, and the opportunities are keyword research's own
+    // section now, merchant-facing and always there (before Search Console is set up it
+    // says what it will show; lib/gsc/__qa__/gsc-in-tabs.qa.ts renders that state).
+    const research = read('app/(dashboard)/keyword-research/page.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const mountedAsSection = (src: string) =>
+      /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(src)
+      && /<div className="mt-8">\s*<GscOpportunities projectId=\{selectedProject\}/.test(src)
+      && !/NEXT_PUBLIC_GSC/.test(src)
+    check('F4(12) GscOpportunities is a section of keyword research, for the project the top bar names', mountedAsSection(research))
+    check('F4(12) MUT: mounting it behind a flag again fails that check',
+      !mountedAsSection(research.replace('<div className="mt-8">', "{process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && <div className=\"mt-8\">")))
+    check('F4(12) the Search Console screen that held it is gone',
+      !/GscOpportunities/.test((() => { try { return read('components/content/workspace/SearchConsoleScreen.tsx') } catch { return '' } })()))
     // The project page became tabs; its connection panels live in the project's settings.
     const settingsPage = read('app/(dashboard)/settings/page.tsx')
     check("F4(13) NOT mounted in the project's settings (it is data, not a connection)", !/GscOpportunities/.test(settingsPage))

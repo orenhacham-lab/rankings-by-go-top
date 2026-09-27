@@ -10,8 +10,8 @@
  * about in isolation.
  *
  * The workspace is now one route per concern (/content, /content/topics,
- * /content/automation, /content/search-console) and this provider owns only what
- * genuinely crosses those screens:
+ * /content/automation; Search Console feeds the other screens and has none of its
+ * own) and this provider owns only what genuinely crosses those screens:
  *   - the overview payload (/api/content/overview): counts, articles, platform
  *   - the topic list + per-topic link-plan summaries
  *   - the cross-screen enqueue workflow (ideas → link review → publishing queue)

@@ -8,6 +8,7 @@ import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/const
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
+import GscOpportunities from '@/components/content/GscOpportunities'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
@@ -139,6 +140,7 @@ export default function KeywordResearchPage() {
   const selectedProject = activeProjectId ?? ''
   const projectsLoading = !projectsResolved
   const activeProjectName = projects.find((p) => p.id === activeProjectId)?.name ?? ''
+  const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.name ?? '' })), [projects])
   const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
@@ -1314,6 +1316,13 @@ export default function KeywordResearchPage() {
           <p>{t.states.empty}</p>
         </div>
       )}
+
+      {/* Opportunities from Search Console: searches the site already shows up for.
+          A section of its own, for the project the top bar names, and always here:
+          before Search Console is set up it says what it will show. */}
+      <div className="mt-8">
+        <GscOpportunities projectId={selectedProject} projects={projectOptions} />
+      </div>
 
       {/* AI Questions Modal */}
       <AIQuestionsModal

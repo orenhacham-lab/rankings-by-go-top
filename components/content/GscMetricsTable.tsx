@@ -7,8 +7,8 @@
  * not-connected / no-property / reauth-required / never-synced / loading / error /
  * empty / data-available. It performs NO connection management (connect / property /
  * sync / disconnect stay in GscPanel) — messages point the user to that setup.
- * Reused on the project page (inside GscPanel) and in the Content Hub data sub-tab,
- * so there is exactly one SC data model and no duplicated sync logic.
+ * Shown inside GscPanel, in the project's settings (the Search Console screen that also
+ * showed it is gone), so there is exactly one SC data model and no duplicated sync logic.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ExternalLink } from 'lucide-react'

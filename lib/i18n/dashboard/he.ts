@@ -415,7 +415,6 @@ export const dashboardHe = {
       articles: 'מאמרים',
       topics: 'נושאים ואסטרטגיה',
       automation: 'אוטומציה ותזמון',
-      searchConsole: 'Search Console',
     },
     // One line of context per screen, shown under its heading. Each screen is its
     // own sidebar entry now, so it has to say what it is without a tab bar around it.
@@ -423,7 +422,6 @@ export const dashboardHe = {
       articles: 'כל המאמרים של הפרויקט, מהטיוטה ועד הפרסום',
       topics: 'נושאים שמחכים לאישור ותוכניות הקישורים הפנימיים שלהם',
       automation: 'רעיונות אוטומטיים למאמרים ותור הפרסום המתוזמן',
-      searchConsole: 'מה שגוגל כבר רואה באתר, וההמלצות שנגזרות מזה',
     },
     tabs: {
       articles: 'מאמרים',
@@ -432,12 +430,6 @@ export const dashboardHe = {
       gscIdeas: 'המלצות Search Console',
       gscRaw: 'Search Console (גולמי)',
       comingSoon: 'בקרוב',
-    },
-    // L2 — sub-tabs inside the Search Console area: the client recommendations vs the
-    // underlying Search Console data (the same read-only table shown on the project page).
-    gscSubTabs: {
-      recommendations: 'המלצות',
-      data: 'נתוני Search Console',
     },
     stats: {
       total: 'כל המאמרים',
@@ -1717,6 +1709,64 @@ export const dashboardHe = {
     cellNoCompetitors: 'לא הוגדרו מתחרים לפרויקט.',
     cellLoadFailed: 'לא הצלחנו לטעון את מיקומי המתחרים.',
   },
+  // Search Console inside the tabs: the widgets that read it on the dashboard, the
+  // keywords table, "my progress", keyword research and topics. Each has its title and
+  // one sentence on what it shows and why that is worth having; before Search Console
+  // is set up, that sentence stands next to the widget's one button.
+  gscWidgets: {
+    // The number first: after "Search Console" it would join the English run and
+    // show on the far side of the line from the days it counts.
+    source28: '28 הימים האחרונים · Search Console',
+    actions: {
+      not_connected: 'חבר Search Console',
+      reauth_required: 'חבר מחדש את Search Console',
+      no_property: 'בחר נכס',
+      never_synced: 'סנכרן את Search Console',
+    },
+    loading: 'טוען את נתוני Search Console',
+    loadError: 'לא הצלחנו לטעון את נתוני Search Console.',
+    retry: 'נסה שוב',
+    emptyTile: 'ממתין ל-Search Console',
+    clicks: {
+      title: 'קליקים מגוגל',
+      about: 'כמה כניסות גוגל שלח לאתר ב-28 הימים האחרונים, כדי לראות אם הדירוגים מביאים תנועה אמיתית.',
+    },
+    topPages: {
+      title: 'הדפים המובילים בגוגל',
+      about: 'חמשת הדפים שמקבלים הכי הרבה קליקים מגוגל, כדי לדעת על אילו דפים לשמור ועל מה לבנות.',
+      none: 'ב-28 הימים האחרונים גוגל לא שלח קליקים לאף דף באתר.',
+      clicks: (n: string) => `${n} קליקים`,
+      homePage: 'עמוד הבית',
+    },
+    performance: {
+      title: 'הביצועים שלכם בגוגל',
+      about: 'קליקים, חשיפות ומיקום ממוצע בגוגל ב-28 הימים האחרונים, עם המגמה לאורך הסנכרונים, כדי לראות אם העבודה משתלמת.',
+      clicks: 'קליקים',
+      impressions: 'חשיפות',
+      position: 'מיקום ממוצע',
+      vsPrevious: 'לעומת 28 הימים הקודמים',
+      trendPending: 'המגמה נבנית עם כל סנכרון שבועי',
+      trendOf: (label: string) => `${label} לאורך הסנכרונים האחרונים`,
+    },
+    keywords: {
+      title: 'קליקים וחשיפות לכל מילה',
+      about: 'ליד כל מילה יופיעו הקליקים והחשיפות שקיבלה מגוגל ב-28 הימים האחרונים, כדי לראות אילו דירוגים באמת מביאים מבקרים.',
+      legend: 'השורה מתחת לכל נפח חיפוש: קליקים · חשיפות מגוגל ב-28 הימים האחרונים.',
+      figures: (clicks: string, impressions: string) => `${clicks} קליקים · ${impressions} חשיפות מגוגל ב-28 הימים האחרונים`,
+      none: 'ב-28 הימים האחרונים גוגל לא דיווח על קליקים או חשיפות למילה הזו.',
+      notReady: 'הקליקים והחשיפות מגוגל יופיעו כאן אחרי הגדרת Search Console.',
+      loading: 'טוען קליקים וחשיפות',
+      loadFailed: 'לא הצלחנו לטעון קליקים וחשיפות.',
+    },
+    opportunities: {
+      title: 'הזדמנויות מ-Search Console',
+      about: 'חיפושים שבהם האתר כבר מופיע בגוגל, ומה לשפר בכל דף כדי לקבל יותר קליקים.',
+    },
+    recommendations: {
+      title: 'המלצות מ-Search Console',
+      about: 'המלצות ברורות לדפי האתר, מתוך האופן שבו אנשים כבר מוצאים אותו בגוגל, כדי שכל שינוי ייבנה על ביקוש אמיתי.',
+    },
+  },
   clients: {
     title: 'לקוחות',
     countSuffix: 'לקוחות',
@@ -2080,17 +2130,16 @@ export const dashboardHe = {
         },
       },
       // Stage E2A — רעיונות מ-Search Console (קריאה בלבד, אבחון). ללא יצירה/אישור/פרסום.
+      // Its title and description are the widget's, in `gscWidgets.opportunities`.
       gscOpportunities: {
-        title: 'רעיונות מ-Search Console',
-        subtitle: 'ניתוח קריאה בלבד של נתוני החיפוש שסונכרנו — להבנה בלבד. אינו יוצר, מאשר או מפרסם תוכן.',
         window28: '28 ימים',
         window90: '90 ימים',
         notConnected: 'החשבון אינו מחובר ל-Google Search Console.',
         noProperty: 'לא שויך נכס Search Console לפרויקט.',
         neverSynced: 'טרם בוצע סנכרון מוצלח לחלון הזה. הריצו סנכרון בלוח ה-Search Console.',
-        ctaConnect: 'חבר Google Search Console בעמוד הפרויקט',
-        ctaSelectProperty: 'בחר נכס Search Console בעמוד הפרויקט',
-        ctaSync: 'סנכרן נתוני Search Console בעמוד הפרויקט',
+        ctaConnect: 'חבר Search Console בהגדרות',
+        ctaSelectProperty: 'בחר נכס Search Console בהגדרות',
+        ctaSync: 'סנכרן את Search Console בהגדרות',
         noRows: 'לא נמצאו רעיונות ניתנים לפעולה בנתונים של חלון זה.',
         loading: 'טוען רעיונות…',
         apiError: 'טעינת הרעיונות נכשלה. נסו שוב.',
@@ -2191,9 +2240,8 @@ export const dashboardHe = {
           invalid_window: 'חלון זמן לא תקין.',
         },
       },
+      // Its title and description are the widget's, in `gscWidgets.recommendations`.
       gscRecommendations: {
-        title: 'המלצות מבוססות Search Console',
-        subtitle: 'ניתחנו את נתוני החיפוש שלך והפקנו המלצות פעולה ברורות. איננו יוצרים או מפרסמים תוכן באופן אוטומטי.',
         window28: '28 ימים',
         window90: '90 ימים',
         loading: 'טוען המלצות…',

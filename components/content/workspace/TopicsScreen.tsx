@@ -7,6 +7,10 @@
  * into articles. It used to be "Section 3" inside the one big content page, below
  * the article table and above the connection panels, so a merchant had to scroll
  * past everything else to reach it.
+ *
+ * Below the topics, the recommendations Search Console adds to the strategy. They
+ * used to be a Search Console screen of their own; they are always here now, and
+ * before Search Console is set up they say what they will show.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -15,6 +19,7 @@ import Button from '@/components/ui/Button'
 import TopicsList from '@/components/content/TopicsList'
 import NewTopicsLinkPlanPanel from '@/components/content/NewTopicsLinkPlanPanel'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
+import GscRecommendations from '@/components/content/GscRecommendations'
 import { Plus } from 'lucide-react'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT } from './types'
@@ -251,6 +256,13 @@ export default function TopicsScreen() {
           />
         </>
       )}
+
+      <div className="mt-8 border-t border-line pt-6">
+        <GscRecommendations
+          projectId={projectId}
+          onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+        />
+      </div>
     </div>
   )
 }

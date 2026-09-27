@@ -83,3 +83,20 @@ Measured at the time of commit, same stub, fresh database each run:
 | `next=https://evil.com` / `//evil.com` / `/\evil.com` | followed | replaced with a safe internal page |
 | cookie persisted through the redirect | no | yes |
 | **totals** | **12 passed, 10 failed** | **22 passed, 0 failed** |
+
+## Search Console, connected or not
+
+Search Console feeds widgets on the dashboard, reports, keywords, keyword research
+and Topics. The stub starts every journey with it NOT connected (every GSC table
+empty) and switches to a connected fixture on request, leaving every other table
+alone: one Google connection, a property on the project, ten weekly 28-day syncs
+with their property totals (stored newest first, because the stub ignores
+`order`), and the query+page rows of the latest sync.
+
+    curl http://127.0.0.1:5555/__stub/fixture?gsc=connected      # or gsc=disconnected
+
+`journey.js` checks the retired `/content/search-console` address (a 307 to
+keyword research, or to settings `#search-console` for a connection result), then
+visits each screen in both states: without a connection every widget keeps its
+title and offers one link to settings; with one it shows its figures; and no
+screen logs a console error.

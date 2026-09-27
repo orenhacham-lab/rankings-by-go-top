@@ -1,7 +1,13 @@
 'use client'
 
 /**
- * Stage E2C — client-facing Search Console RECOMMENDATIONS (RTL, Hebrew-first).
+ * Stage E2C — client-facing Search Console RECOMMENDATIONS.
+ *
+ * A section of the Topics screen now that Search Console is not a screen of its own.
+ * It is always there with its title; until Search Console can feed it, it says what it
+ * will show and offers the one step that is missing (the shared status decides which),
+ * and it asks for recommendations only once there is a sync to build them from. It
+ * follows the screen's direction (Hebrew right to left, English left to right).
  *
  * A small, bounded, plain-language set of page-level recommendations (categories A–D). No raw
  * queries, no numeric scores, no internal terminology, and NO topic creation — GSC new content
@@ -17,6 +23,9 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import GscSetupPrompt, { GscLoadError, GscLoading } from '@/components/gsc/GscSetupPrompt'
+import { useGscStatus } from '@/components/gsc/gsc-data'
+import { isGscSetupState } from '@/lib/gsc/widget-state'
 
 type WindowDays = 28 | 90
 const WINDOWS: WindowDays[] = [28, 90]
@@ -52,6 +61,10 @@ export default function GscRecommendations({ projectId, onToast }: {
 }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscRecommendations, [language])
+  const w = useMemo(() => getDashboardDictionary(language).gscWidgets.recommendations, [language])
+  // Whether there is anything to read at all: connection, property and a sync.
+  const gsc = useGscStatus(projectId)
+  const gscReady = gsc.view.state === 'ready'
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
   const [categoryFilter, setCategoryFilter] = useState<Category | null>(null)
@@ -72,7 +85,7 @@ export default function GscRecommendations({ projectId, onToast }: {
     } catch { setErrored(true); setData(null) } finally { setLoading(false) }
   }, [projectId, activeWindow])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (gscReady) load() }, [load, gscReady])
 
   async function decide(rec: Recommendation, decision: 'already_covered' | 'irrelevant') {
     setBusyId(rec.id)
@@ -113,12 +126,22 @@ export default function GscRecommendations({ projectId, onToast }: {
         : t.summaries.page_overlap(r.involvedPages?.length ?? 0)
 
   return (
-    <div dir="rtl">
+    <section data-gsc-widget="recommendations" data-gsc-state={gsc.view.state}>
       <div className="mb-4">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t.subtitle}</p>
+        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{w.title}</h3>
+        {gscReady && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{w.about}</p>}
       </div>
 
+      {isGscSetupState(gsc.view.state) ? (
+        <Card className="p-6">
+          <GscSetupPrompt state={gsc.view.state} about={w.about} projectId={projectId} />
+        </Card>
+      ) : gsc.view.state === 'error' ? (
+        <Card className="p-6"><GscLoadError onRetry={gsc.reload} /></Card>
+      ) : gsc.view.state === 'loading' ? (
+        <Card className="p-6"><GscLoading /></Card>
+      ) : (
+      <>
       {/* Window toggle */}
       <div className="flex items-center gap-2 mb-3">
         {WINDOWS.map((w) => (
@@ -214,7 +237,7 @@ export default function GscRecommendations({ projectId, onToast }: {
                     </button>
                     {expanded[r.id] && (
                       <div className="mt-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2.5 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
-                        <ul className="list-disc pr-4 space-y-0.5">
+                        <ul className="list-disc ps-4 space-y-0.5">
                           {r.reasonKeys.map((k) => <li key={k}>{t.reasons[k]}</li>)}
                         </ul>
                         {r.needGroups.length > 0 && (
@@ -253,6 +276,8 @@ export default function GscRecommendations({ projectId, onToast }: {
           </ul>
         </>
       )}
-    </div>
+      </>
+      )}
+    </section>
   )
 }

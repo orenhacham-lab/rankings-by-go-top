@@ -25,7 +25,6 @@ import {
   Settings,
   Target,
   CalendarClock,
-  LineChart,
 } from 'lucide-react'
 import {
   CONTENT_SCREENS,
@@ -58,14 +57,12 @@ type NavGroup = {
 /** Read as literal member expressions, which is what lets Next inline them. */
 const CONTENT_FLAGS = {
   NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION: process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION,
-  NEXT_PUBLIC_GSC_READ_ONLY_ENABLED: process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED,
 }
 
 const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
   articles: Newspaper,
   topics: Target,
   automation: CalendarClock,
-  searchConsole: LineChart,
 }
 
 /**

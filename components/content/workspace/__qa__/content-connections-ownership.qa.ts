@@ -15,7 +15,8 @@
  */
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { platformSetupHref, gscSetupHref, settingsGscHref } from '../../../../lib/content/content-hub-setup'
+import * as setupLinks from '../../../../lib/content/content-hub-setup'
+import { platformSetupHref, settingsGscHref } from '../../../../lib/content/content-hub-setup'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -88,9 +89,17 @@ function main() {
   check('MUT: a settings screen with a hand-typed anchor fails the anchor check',
     !anchorsPlatform(settingsPage.replace('id={PROJECT_CONNECTION_ANCHOR}', 'id="content-section"'))
     && !anchorsGsc(settingsPage.replace('id={SETTINGS_GSC_ANCHOR}', 'id="gsc-section"')))
-  check('and the Search Console setup card links to the screen that owns that panel',
-    gscSetupHref() === '/content/search-console#hub-setup-gsc'
-    && /id=\{GSC_SETUP_ANCHOR\}/.test(strip(read(join(WORKSPACE, 'SearchConsoleScreen.tsx')))))
+  // The Search Console card links to the settings section that owns the panel, the same
+  // place every Search Console widget sends a merchant: the content workspace's Search
+  // Console screen, where the card used to point, is gone.
+  const setupCard = strip(read(join('components', 'content', 'ContentHubSetup.tsx')))
+  const gscCardToSettings = (src: string) => /<Link href=\{settingsGscHref\(projectId\)\}>/.test(src) && !/search-console#|gscSetupHref/.test(src)
+  check("and the Search Console setup card links to that settings section, naming the project",
+    gscCardToSettings(setupCard))
+  check('…and the helper that linked to the retired screen is gone',
+    !('gscSetupHref' in setupLinks) && !('GSC_SETUP_ANCHOR' in setupLinks))
+  check('MUT: a card still linking to the retired Search Console screen fails that check',
+    !gscCardToSettings(setupCard.replace('<Link href={settingsGscHref(projectId)}>', "<Link href={'/content/search-console#hub-setup-gsc'}>")))
 
   // ── 5. Returning from Shopify OAuth still lands in the content workspace (K1). ──
   const cb = strip(read(join('app', 'api', 'shopify', 'oauth', 'callback', 'route.ts')))
