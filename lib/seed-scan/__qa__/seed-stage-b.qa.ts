@@ -355,6 +355,51 @@ async function main() {
       && B_STEPS.slice(1).every((st) => ['done', 'skipped', 'failed'].includes(String(stepRow(s.tables, st).status))) && value.outcome === 'finished', statusLine(s.tables))
   }
 
+  // ── 2b. robots.txt that cannot be read ────────────────────────────────────
+  console.log('\n2b) robots.txt that cannot be read keeps us out; one that does not exist does not (RFC 9309)')
+  {
+    const s = await setupB()
+    await s.run()
+    check("a1 records what its read came to: rules, which b1 then uses", detailOf(s.tables, 'a1').robots === 'rules' && !s.b1().some((r) => pathOf(r.url) === '/robots.txt'),
+      String(detailOf(s.tables, 'a1').robots))
+  }
+  const ROBOTS = `${BASE}/robots.txt`
+  const longRobots = `User-agent: *\nDisallow: /wp-admin/\n${'# padding so the file arrives in parts\n'.repeat(40)}Disallow: /\n`
+  for (const [name, route, a1State] of [
+    ['a 503', { status: 503, headers: { 'content-type': 'text/plain' }, body: 'User-agent: *\nDisallow:\n' }, 'unreadable'],
+    ['a 500', { status: 500, headers: { 'content-type': 'text/plain' }, body: '' }, 'unreadable'],
+    ['a 429', { status: 429, headers: { 'content-type': 'text/plain' }, body: 'slow down' }, 'unreadable'],
+    ['a 200 whose connection drops half way (the rest might say Disallow: /)', { status: 200, headers: { 'content-type': 'text/plain' }, body: longRobots, cut: 'break' }, 'unreadable'],
+  ] as [string, FakeRoute, string][]) {
+    const s = await setupB({ routes: { [ROBOTS]: route } })
+    const { value } = await s.run()
+    const urls = s.b1().map((r) => r.url)
+    check(`${name}: a1 records it unreadable, and b1 asks again itself`, detailOf(s.tables, 'a1').robots === a1State && urls[0] === ROBOTS, `${String(detailOf(s.tables, 'a1').robots)} ${urls[0]}`)
+    check('…still unreadable: b1 skipped crawl_disallowed, not one page read, no site index',
+      stepRow(s.tables, 'b1').status === 'skipped' && stepRow(s.tables, 'b1').error_code === 'crawl_disallowed' && detailOf(s.tables, 'b1').robots === 'unreadable'
+        && urls.length === 1 && (s.tables.site_crawl_index ?? []).length === 0,
+      `${statusLine(s.tables)} ${urls.map(pathOf).join(',')}`)
+    check('…the rest of stage B runs', value.outcome === 'finished' && B_STEPS.slice(1).every((st) => ['done', 'skipped', 'failed'].includes(String(stepRow(s.tables, st).status))), statusLine(s.tables))
+  }
+  {
+    // A claimed run (a1 read nothing): b1's own read is cut by its deadline.
+    const s = await setupB({ claim: true, routes: { [ROBOTS]: { status: 200, headers: { 'content-type': 'text/plain' }, body: longRobots, cut: 'stall' } } })
+    const t0 = Date.now()
+    await s.run({ budgets: { robotsMs: 200 } })
+    const ms = Date.now() - t0
+    const urls = s.b1().map((r) => r.url)
+    check('a robots.txt that stops arriving: cut at its deadline, and what arrived is not the file — skipped crawl_disallowed, nothing else read',
+      stepRow(s.tables, 'b1').error_code === 'crawl_disallowed' && urls.length === 1 && urls[0] === ROBOTS && ms < 5_000, `${statusLine(s.tables)} ${urls.length} ${ms}ms`)
+  }
+  for (const status of [404, 410, 403]) {
+    const s = await setupB({ routes: { [ROBOTS]: { status, headers: { 'content-type': 'text/html' }, body: '<h1>Not here</h1>' } } })
+    await s.run()
+    const urls = s.b1().map((r) => r.url)
+    check(`a ${status}: no rules for anyone — a1 records it absent, b1 does not ask again and crawls (done; the home page's links, as the sitemaps were named only in robots.txt)`,
+      detailOf(s.tables, 'a1').robots === 'absent' && !urls.includes(ROBOTS) && stepRow(s.tables, 'b1').status === 'done' && Number(detailOf(s.tables, 'b1').pagesRead) > 0 && urls.length > 0,
+      `${String(detailOf(s.tables, 'a1').robots)} ${statusLine(s.tables)} ${JSON.stringify(detailOf(s.tables, 'b1').pagesRead)}`)
+  }
+
   // ── 3. A claimed run ──────────────────────────────────────────────────────
   console.log('\n3) A claimed run: stage A read nothing, so b1 reads robots.txt first')
   {

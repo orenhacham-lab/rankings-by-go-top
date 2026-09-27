@@ -51,6 +51,7 @@ import {
   SECRET,
   USER,
   world,
+  type FakeRoute,
   type Tables,
 } from './_fixtures'
 
@@ -196,6 +197,32 @@ async function main() {
     check('a4 has nothing to search for (no search spent)', stepRow(tables, 'a4').error_code === 'no_seed_keywords' && search.calls.length === 0)
     check('only the home page and the password page were requested', net.requests.length === 2 && net.requests[1].endsWith('/password'), net.requests.join(','))
     check('settings are left alone', tables.project_profiles.length === 0 && tables.projects[0].business_name === null)
+  }
+
+  // ── 1b. robots.txt, whole or not at all ───────────────────────────────────
+  console.log('\n1b) robots.txt: a1 uses a file read whole; one it could not read is "no rules", as before')
+  {
+    const ROBOTS = 'https://www.plumber-tlv.co.il/robots.txt'
+    // GPTBot is kept out in the first half; the rest is padding.
+    const gptFirst = `User-agent: GPTBot\nDisallow: /\n${'# padding so the file arrives in parts\n'.repeat(20)}`
+    const plain = { 'content-type': 'text/plain' }
+    const cases: { name: string; route: FakeRoute; state: string; gptBlocked: boolean }[] = [
+      { name: 'read whole', route: { status: 200, headers: plain, body: gptFirst }, state: 'rules', gptBlocked: true },
+      { name: 'cut half way (the connection drops)', route: { status: 200, headers: plain, body: gptFirst, cut: 'break' }, state: 'unreadable', gptBlocked: false },
+      { name: 'a 503', route: { status: 503, headers: plain, body: gptFirst }, state: 'unreadable', gptBlocked: false },
+      { name: 'a 404', route: { status: 404, headers: { 'content-type': 'text/html' }, body: '<h1>Not found</h1>' }, state: 'absent', gptBlocked: false },
+    ]
+    for (const c of cases) {
+      const { tables, admin } = world(projectRow())
+      const net = new FakeNetwork({ ...heWordPressSite(), [ROBOTS]: c.route })
+      const created = await startRun(admin, { domain: HE_WP.key, url: 'https://plumber-tlv.co.il/' })
+      await run(admin, created, { fetchImpl: net.fetch, insight: fakeModel({ ok: true, insight: HE_WP_INSIGHT }).fn, search: fakeSearch(HE_WP_RESULTS).fn, now: () => NOW })
+      const detail = (stepRow(tables, 'a1').detail ?? {}) as Row
+      const robotsSignal = summaryOf(tables).geo.signals.find((g) => g.id === 'robots')
+      check(`robots.txt ${c.name}: a1 done, recorded ${c.state}; GPTBot ${c.gptBlocked ? 'blocked (its rules are used)' : 'not blocked (no rules are used)'}`,
+        stepRow(tables, 'a1').status === 'done' && detail.robots === c.state && robotsSignal?.ok === !c.gptBlocked,
+        `${String(stepRow(tables, 'a1').status)} ${String(detail.robots)} ${JSON.stringify(robotsSignal)}`)
+    }
   }
 
   // ── 4. A site with no sitemap ─────────────────────────────────────────────

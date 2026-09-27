@@ -11,6 +11,12 @@
  * group). Every b1 read sends the free check's User-Agent,
  * "GoTopFreeCheck/1.0", whose product token is SEED_CRAWLER_TOKEN.
  *
+ * The file is someone else's, so reading it costs linear time whatever it
+ * holds: lines are cut with indexOf, never with a pattern that can backtrack,
+ * and a rule is matched part by part with indexOf (never compiled into a
+ * RegExp, where a handful of `*` against a long path took seconds). What one
+ * read of the file comes to — rules, none, or unreadable — is robotsAnswer's.
+ *
  * KEY PAGES. At most MAX_KEY_PAGES reads per run, the home page included when
  * b1 has to read it. Candidates are the home page's own links first (what the
  * site itself features), then its sitemaps; each is put in a bucket by its URL
@@ -42,20 +48,91 @@ export const CRAWL_INDEX_VERSION = 'seed-crawl-1'
 
 // ── robots.txt ──────────────────────────────────────────────────────────────
 
-type RobotsRule = { allow: boolean; pattern: string }
+/**
+ * What one read of robots.txt comes to (RFC 9309, 2.3.1):
+ *   rules       a 2xx answer read whole: its rules govern (a file with none
+ *               allows everything);
+ *   absent      a 4xx answer other than 429: the site has no rules for anyone,
+ *               and everything is allowed;
+ *   unreadable  a 5xx or a 429, no answer (a timeout, a network error, a
+ *               redirect we will not follow), or a 2xx we did not get whole:
+ *               cut by a deadline or a broken stream, or as long as the part
+ *               the engine keeps. The rules are unknown: complete disallow.
+ */
+export type RobotsAnswer = { state: 'rules'; text: string } | { state: 'absent' } | { state: 'unreadable' }
+
+/** fetchSiteText keeps the first 100 000 characters of a file; a text this long may be the start of a longer one. */
+export const ROBOTS_TEXT_LIMIT = 100_000
+
+/**
+ * Classify one read. `read` is the engine's answer, null when it gave none;
+ * `complete` says whether its body was read to the end (hostPinnedFetch's
+ * `body` watch). A `rules` text has LF line ends only: RFC 9309 also ends a
+ * line with CR or CRLF, and the engine's own readers of this text split on LF
+ * and match each line with patterns that backtrack quadratically over a CR or
+ * a Unicode line separator left inside it.
+ */
+export function robotsAnswer(read: { status: number; text: string } | null, complete: boolean): RobotsAnswer {
+  if (!read) return { state: 'unreadable' }
+  if (read.status >= 200 && read.status < 300) {
+    if (!complete || read.text.length >= ROBOTS_TEXT_LIMIT) return { state: 'unreadable' }
+    return { state: 'rules', text: read.text.replace(/\r\n?|[\u2028\u2029]/g, '\n') }
+  }
+  if (read.status >= 400 && read.status < 500 && read.status !== 429) return { state: 'absent' }
+  return { state: 'unreadable' }
+}
+
+/**
+ * A rule longer than MAX_RULE_CHARS, or with more `*` than MAX_RULE_WILDCARDS
+ * (after `**` is read as `*`), is not matched as written: an Allow is dropped,
+ * and a Disallow is matched by its beginning — cut at both caps, no longer
+ * anchored — which keeps out every path the whole rule would, and more; it
+ * keeps its length as written for precedence. The matcher is linear either
+ * way; the caps bound what one line of the file can cost per URL.
+ */
+export const MAX_RULE_CHARS = 512
+export const MAX_RULE_WILDCARDS = 16
+
+type RobotsRule = {
+  allow: boolean
+  /** The rule as written; its length decides between two rules that match. */
+  pattern: string
+  /** What is matched: the decoded pattern cut at every `*`, and whether it ended in `$`. */
+  parts: string[]
+  anchored: boolean
+}
 export type RobotsGroup = { agents: string[]; rules: RobotsRule[] }
+
+const safeDecode = (s: string): string => {
+  try {
+    return decodeURI(s)
+  } catch {
+    return s
+  }
+}
+
+function compileRule(allow: boolean, pattern: string): RobotsRule | null {
+  const anchored = pattern.endsWith('$')
+  const body = safeDecode(anchored ? pattern.slice(0, -1) : pattern).replace(/\*{2,}/g, '*')
+  const parts = body.split('*')
+  if (pattern.length <= MAX_RULE_CHARS && parts.length - 1 <= MAX_RULE_WILDCARDS) return { allow, pattern, parts, anchored }
+  if (allow) return null
+  return { allow, pattern, parts: body.slice(0, MAX_RULE_CHARS).split('*').slice(0, MAX_RULE_WILDCARDS + 1), anchored: false }
+}
 
 export function parseRobots(txt: string | null | undefined): RobotsGroup[] {
   if (!txt) return []
   const groups: RobotsGroup[] = []
   let current: RobotsGroup | null = null
   let collectingAgents = false
-  for (const raw of txt.split(/\r?\n/)) {
-    const line = raw.replace(/#.*$/, '').trim()
-    const m = /^([A-Za-z-]+)\s*:\s*(.*)$/.exec(line)
-    if (!m) continue
-    const key = m[1].toLowerCase()
-    const value = m[2].trim()
+  for (const raw of txt.split(/\r\n|\r|\n/)) {
+    const hash = raw.indexOf('#')
+    const line = hash >= 0 ? raw.slice(0, hash) : raw
+    const colon = line.indexOf(':')
+    if (colon < 0) continue
+    const key = line.slice(0, colon).trim().toLowerCase()
+    if (!/^[a-z-]+$/.test(key)) continue
+    const value = line.slice(colon + 1).trim()
     if (key === 'user-agent') {
       if (!current || !collectingAgents) {
         current = { agents: [], rules: [] }
@@ -71,34 +148,40 @@ export function parseRobots(txt: string | null | undefined): RobotsGroup[] {
     if (!current || (key !== 'allow' && key !== 'disallow')) continue
     // An empty Disallow allows everything: it is not a rule.
     if (value === '') continue
-    current.rules.push({ allow: key === 'allow', pattern: value })
+    const rule = compileRule(key === 'allow', value)
+    if (rule) current.rules.push(rule)
   }
   return groups
 }
 
-const safeDecode = (s: string): string => {
-  try {
-    return decodeURI(s)
-  } catch {
-    return s
+/**
+ * Does the rule match the path? Its first part must begin the path, every
+ * later part must follow in order (each taken as early as it occurs, which
+ * leaves the most room for the rest), and with `$` the last part must end the
+ * path. Linear in the path for each part.
+ */
+function patternMatches(rule: RobotsRule, path: string): boolean {
+  const { parts, anchored } = rule
+  const first = parts[0]
+  if (!path.startsWith(first)) return false
+  if (parts.length === 1) return !anchored || path.length === first.length
+  let at = first.length
+  for (let i = 1; i < parts.length - 1; i++) {
+    if (parts[i] === '') continue
+    const found = path.indexOf(parts[i], at)
+    if (found < 0) return false
+    at = found + parts[i].length
   }
-}
-
-function patternMatches(pattern: string, path: string): boolean {
-  const anchored = pattern.endsWith('$')
-  const body = anchored ? pattern.slice(0, -1) : pattern
-  const source = safeDecode(body)
-    .split('*')
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('.*')
-  return new RegExp(`^${source}${anchored ? '$' : ''}`).test(path)
+  const last = parts[parts.length - 1]
+  if (anchored) return path.length - last.length >= at && path.endsWith(last)
+  return path.indexOf(last, at) >= 0
 }
 
 /** The longest matching rule decides; Allow wins a tie; no match means allowed. */
 function allowedByRules(rules: RobotsRule[], path: string): boolean {
   let best: RobotsRule | null = null
   for (const rule of rules) {
-    if (!patternMatches(rule.pattern, path)) continue
+    if (!patternMatches(rule, path)) continue
     if (!best || rule.pattern.length > best.pattern.length || (rule.pattern.length === best.pattern.length && rule.allow && !best.allow)) {
       best = rule
     }

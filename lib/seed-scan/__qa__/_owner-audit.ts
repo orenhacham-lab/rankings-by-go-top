@@ -18,8 +18,14 @@ export type AuditedQuery = { table: string; ours: boolean; file: string | null; 
 
 const RECORDED = ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'neq', 'in', 'is', 'gt', 'lt', 'or', 'order', 'limit'] as const
 const HELPERS = /(_fake-admin|_owner-audit|_fixtures)\.ts/
+/**
+ * Frames that only pass a query through: resume.ts's watchedFrom hands the
+ * entitlement check (explainAccess, lib/subscription.ts) a client whose
+ * answers it watches, so the query is the check's, judged by its own suites.
+ */
+const PASS_THROUGH: readonly (readonly [RegExp, string])[] = [[/lib\/seed-scan\/resume\.ts$/, 'watchedFrom']]
 
-/** The first frame outside the fakes: its file (relative to the repo) and function. */
+/** The first frame outside the fakes and the pass-throughs: its file (relative to the repo) and function. */
 function callerOf(stack: string): { file: string; fn: string } | null {
   for (const line of stack.split('\n').slice(1)) {
     const m = /at (?:async )?(?:([\w$.<>]+) )?\(?(.*?\.(?:ts|js|mjs|cjs)):\d+:\d+\)?/.exec(line)
@@ -27,6 +33,7 @@ function callerOf(stack: string): { file: string; fn: string } | null {
     if (HELPERS.test(m[2])) continue
     const file = m[2].replace(/^.*?\/(lib|app)\//, '$1/')
     const fn = (m[1] ?? '').split('.').pop() ?? ''
+    if (PASS_THROUGH.some(([f, name]) => f.test(file) && fn === name)) continue
     return { file, fn }
   }
   return null
