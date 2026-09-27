@@ -48,20 +48,20 @@ export function EngineBadge({ engine, device }: { engine: string; device?: strin
 }
 
 export function PositionChange({ change }: { change: number | null }) {
-  if (change === null) return <span className="text-slate-400">—</span>
+  if (change === null) return <span className="text-muted">—</span>
   if (change > 0) {
     return (
-      <span className="text-green-600 font-semibold text-sm">
+      <span className="text-ok font-semibold text-copy tabular-nums">
         ▲ {change}
       </span>
     )
   }
   if (change < 0) {
     return (
-      <span className="text-red-600 font-semibold text-sm">
+      <span className="text-bad font-semibold text-copy tabular-nums">
         ▼ {Math.abs(change)}
       </span>
     )
   }
-  return <span className="text-slate-400 text-sm">=</span>
+  return <span className="text-muted text-copy">=</span>
 }

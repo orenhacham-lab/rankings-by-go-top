@@ -12,6 +12,10 @@ import { ButtonHTMLAttributes, forwardRef } from 'react'
  * Everything else is quiet: `secondary` and `outline` are bordered surfaces,
  * `ghost` is text. `danger` stays filled because a destructive confirm has to
  * read as destructive, and it is never the page's own call to action.
+ *
+ * The feel is in the details, not in decoration: a hairline top highlight on the
+ * filled variants, a one-pixel drop on the bordered ones, a 2% press, and a focus
+ * ring that shows for the keyboard and never for the mouse.
  */
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'commit' | 'secondary' | 'danger' | 'ghost' | 'outline'
@@ -25,26 +29,30 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
         className={cn(
-          'inline-flex items-center justify-center gap-2 font-semibold rounded-control transition-[background-color,color,transform] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-50 disabled:cursor-not-allowed',
+          'inline-flex select-none items-center justify-center gap-2 font-semibold rounded-control',
+          'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-snappy active:scale-[0.98]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+          'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
           {
-            'bg-action text-action-ink hover:bg-action-hover': variant === 'primary',
-            'bg-commit text-commit-ink hover:bg-commit-hover': variant === 'commit',
-            'bg-surface text-body border border-line hover:bg-sunk': variant === 'secondary' || variant === 'outline',
-            'bg-bad text-white hover:opacity-90': variant === 'danger',
+            'bg-action text-action-ink hover:bg-action-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(20_24_60/0.18)]': variant === 'primary',
+            'bg-commit text-commit-ink hover:bg-commit-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_0_0_1px_rgb(120_70_0/0.14),0_1px_2px_rgb(80_50_0/0.12)]': variant === 'commit',
+            'bg-surface text-ink border border-line shadow-control hover:border-line-strong hover:bg-sunk/60': variant === 'secondary' || variant === 'outline',
+            'bg-bad text-bad-ink hover:opacity-90 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]': variant === 'danger',
             'text-body hover:bg-sunk hover:text-ink': variant === 'ghost',
           },
           {
-            'text-xs px-3 py-1.5 h-7': size === 'sm',
-            'text-sm px-4 py-2 h-9': size === 'md',
-            'text-base px-5 py-2.5 h-11': size === 'lg',
+            'text-caption px-3 h-8': size === 'sm',
+            'text-copy px-4 h-9': size === 'md',
+            'text-[0.9375rem] leading-6 px-5 h-11': size === 'lg',
           },
           className
         )}
         {...props}
       >
         {loading && (
-          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          <span aria-hidden="true" className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
         )}
         {children}
       </button>

@@ -10,6 +10,10 @@ import { cn } from '@/lib/utils'
  * Console · 30 days"), which is the difference between a number and evidence.
  *
  * `delta` is a change against the previous period, coloured only by direction.
+ *
+ * Layout: the label and its icon on top, the figure large and tabular, the
+ * source pinned to the bottom — so a row of tiles lines up
+ * figure-to-figure and source-to-source even when one label wraps.
  */
 export interface StatTileProps {
   label: string
@@ -26,21 +30,25 @@ export interface StatTileProps {
 export default function StatTile({ label, value, source, delta, icon, empty, className }: StatTileProps) {
   const hasValue = !empty
   return (
-    <div className={cn('rounded-card border border-line bg-surface p-4 flex flex-col gap-1', className)}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted">{label}</span>
-        {icon && <span className="text-muted shrink-0">{icon}</span>}
+    <div className={cn('flex h-full min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-caption font-medium text-muted">{label}</span>
+        {icon && (
+          <span className="-mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-sunk text-muted [&_svg]:size-4" aria-hidden="true">
+            {icon}
+          </span>
+        )}
       </div>
       {hasValue ? (
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-ink tabular-nums leading-tight">{value}</span>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-metric font-semibold tracking-tight text-ink tabular-nums">{value}</span>
           {delta && (
             <span
               className={cn(
-                'text-xs font-semibold tabular-nums',
-                delta.direction === 'up' && 'text-ok',
-                delta.direction === 'down' && 'text-bad',
-                delta.direction === 'flat' && 'text-muted'
+                'inline-flex items-center gap-0.5 rounded-pill px-1.5 text-caption font-semibold tabular-nums',
+                delta.direction === 'up' && 'bg-ok-soft text-ok',
+                delta.direction === 'down' && 'bg-bad-soft text-bad',
+                delta.direction === 'flat' && 'bg-sunk text-muted'
               )}
             >
               {delta.direction === 'up' ? '▲' : delta.direction === 'down' ? '▼' : '•'} {delta.value}
@@ -48,9 +56,9 @@ export default function StatTile({ label, value, source, delta, icon, empty, cla
           )}
         </div>
       ) : (
-        <span className="text-sm text-muted">{empty}</span>
+        <span className="mt-2 text-copy text-muted">{empty}</span>
       )}
-      {source && <span className="text-[11px] text-muted">{source}</span>}
+      {source && <span className="mt-auto pt-3 text-overline text-muted">{source}</span>}
     </div>
   )
 }

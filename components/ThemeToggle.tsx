@@ -17,29 +17,33 @@ export function ThemeToggle() {
   }, [])
 
   if (!mounted) {
-    return <div className="h-10" />
+    return <div className="h-9" />
   }
 
   const isLight = theme === 'light'
 
   return (
     <button
+      type="button"
       onClick={() => setTheme(isLight ? 'dark' : 'light')}
-      className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+      className="w-full flex items-center justify-between gap-3 px-3 h-9 rounded-control text-copy font-medium text-rail-muted transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset"
       aria-label={isLight ? dict.common.switchToDarkMode : dict.common.switchToLightMode}
     >
-      <span>{isLight ? dict.common.lightMode : dict.common.darkMode}</span>
-      <div className="flex items-center gap-1.5">
-        <Sun size={16} className={isLight ? 'text-amber-500' : 'text-slate-600 dark:text-slate-500'} />
-        <div className="w-8 h-5 rounded-full bg-slate-300 dark:bg-slate-700 relative transition-colors">
-          <div
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
-              isLight ? 'left-0.5' : 'right-0.5'
-            }`}
-          />
-        </div>
-        <Moon size={16} className={isLight ? 'text-slate-400' : 'text-blue-400'} />
-      </div>
+      <span className="flex items-center gap-3">
+        {isLight ? <Sun size={18} strokeWidth={1.8} className="shrink-0" /> : <Moon size={18} strokeWidth={1.8} className="shrink-0" />}
+        <span>{isLight ? dict.common.lightMode : dict.common.darkMode}</span>
+      </span>
+      {/* The switch: the knob travels toward the logical END when dark is on. */}
+      <span
+        aria-hidden="true"
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${isLight ? 'bg-white/20' : 'bg-rail-accent'}`}
+      >
+        <span
+          className={`absolute top-0.5 start-0.5 size-4 rounded-full bg-white shadow-control transition-transform duration-200 ease-snappy ${
+            isLight ? 'translate-x-0' : 'translate-x-4 rtl:-translate-x-4'
+          }`}
+        />
+      </span>
     </button>
   )
 }

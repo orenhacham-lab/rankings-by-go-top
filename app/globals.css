@@ -13,84 +13,147 @@
    `border-line`, `text-muted`, `bg-action`, and dark mode is one override of the
    same names — never a second set of classes.
 
-   The palette stays ours (indigo, slate). What is borrowed from the competitor
-   is the SYSTEM: flat surfaces with a real border instead of stacked shadows,
-   one accent colour, a second colour reserved for commitment, and a fixed set of
-   radii and shadows.
+   ── The palette, and why ─────────────────────────────────────────────
+   Paper and cobalt. The canvas is a warm off-white (not the blue-grey every
+   dashboard template ships with), cards are pure white on it, and ONE accent
+   carries every ordinary action: a cobalt taken from the Go Top mark, so the
+   product reads as ours and not as a default indigo. What is borrowed from the
+   competitor is the SYSTEM, not the colours: flat surfaces with a real border
+   instead of stacked shadows, one accent, a second colour reserved for
+   commitment, and a fixed set of radii and shadows.
+
+   Every text/background pair below is WCAG AA (4.5:1) in both themes; the
+   figures are in the comments so a change has to re-check them.
 
    ── Two action colours, and only two ────────────────────────────────
    `action`  — every ordinary action: save, generate, connect, publish.
    `commit`  — the few that cost money or cannot be taken back: upgrade, buy.
+              A warm amber fill with dark text, so it can never be mistaken
+              for the cobalt one.
    A third filled colour would make neither of them mean anything, so warnings
    and errors are SOFT (tinted background + dark text), never filled buttons.
    ═══════════════════════════════════════════════════════════════════ */
 @theme {
+  /* Type. Inter for Latin, Heebo for Hebrew: Inter has no Hebrew glyphs, so ONE
+     stack serves both languages — Latin (and the digits every metric is made of)
+     in Inter, Hebrew in Heebo, whose proportions sit well beside it. The two
+     variables are set by next/font in app/layout.tsx. */
+  --font-sans: var(--font-inter), var(--font-heebo), ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif;
+
   /* Surfaces */
-  --color-canvas: #f7f8fb;        /* the page behind everything */
+  --color-canvas: #f6f5f1;        /* the page behind everything: warm paper */
   --color-surface: #ffffff;       /* cards, panels, table rows */
-  --color-sunk: #f1f5f9;          /* table heads, insets, hover fills */
-  --color-line: #e2e8f0;          /* every default border */
-  --color-line-strong: #cbd5e1;   /* a border that has to be noticed */
 
-  /* Text */
-  --color-ink: #0f172a;           /* headings */
-  --color-body: #334155;          /* body copy */
-  --color-muted: #64748b;         /* labels, sub-labels, placeholders */
+  /* The rail: the sidebar is the one confident, branded surface of the shell —
+     deep ink with the cobalt accent lit on it — so the paper-and-white screen
+     beside it reads as the work area. muted 7.8:1, label 5.8:1, white on the
+     active fill 13:1, accent icon on it 6.5:1. */
+  --color-rail: #10152a;
+  --color-rail-ink: #f5f6f8;
+  --color-rail-muted: #a3aabb;
+  --color-rail-label: #8a92a6;
+  --color-rail-line: rgba(255, 255, 255, 0.08);
+  --color-rail-hover: rgba(255, 255, 255, 0.06);
+  --color-rail-active: rgba(110, 145, 250, 0.2);
+  --color-rail-accent: #9db4ff;
+  --color-sunk: #f0eee9;          /* table heads, insets, hover fills */
+  --color-line: #e6e3dc;          /* every default border */
+  --color-line-strong: #d3cfc6;   /* a border that has to be noticed */
 
-  /* Actions — exactly two */
-  --color-action: #4f46e5;
-  --color-action-hover: #4338ca;
+  /* Text — ink 16.4:1, body 9.7:1, muted 4.8:1 on canvas (4.55:1 on sunk) */
+  --color-ink: #15171c;           /* headings */
+  --color-body: #3b3f46;          /* body copy */
+  --color-muted: #686c73;         /* labels, sub-labels, placeholders */
+
+  /* Actions — exactly two. White on action 6.2:1; action as text 5.7:1. */
+  --color-action: #3553d7;
+  --color-action-hover: #2942b6;
   --color-action-ink: #ffffff;
-  --color-action-soft: #eef2ff;   /* selected rows, active chips */
-  --color-commit: #d97706;
-  --color-commit-hover: #b45309;
-  --color-commit-ink: #ffffff;
-  --color-commit-soft: #fffbeb;
+  --color-action-soft: #ecf0fe;   /* selected rows, active chips (action on it 5.5:1) */
+  --color-commit: #f0b03f;        /* commit-ink on it 9.2:1 */
+  --color-commit-hover: #e39e22;
+  --color-commit-ink: #231703;
+  --color-commit-soft: #fdf6e7;
 
-  /* States — soft pairs, never filled buttons */
-  --color-ok: #15803d;
-  --color-ok-soft: #f0fdf4;
-  --color-warn: #b45309;
-  --color-warn-soft: #fffbeb;
-  --color-bad: #b91c1c;
-  --color-bad-soft: #fef2f2;
-  --color-info: #1d4ed8;
-  --color-info-soft: #eff6ff;
+  /* States — soft pairs, never filled buttons (each pair ≥ 5:1) */
+  --color-ok: #157a3c;
+  --color-ok-soft: #eef8f1;
+  --color-warn: #a04a06;
+  --color-warn-soft: #fdf6e7;
+  --color-bad: #b42318;
+  --color-bad-soft: #fdf1ef;
+  --color-bad-ink: #ffffff;       /* text on a filled `bad` (a destructive confirm): 6.0:1 */
+  --color-info: #2346b8;
+  --color-info-soft: #eff3fe;
 
   /* The one dark surface: a screen's opening context card. Its own token,
      because it must stay dark in dark mode instead of inverting. */
-  --color-contrast: #0f172a;
-  --color-contrast-ink: #f8fafc;
+  --color-contrast: #12172a;
+  --color-contrast-ink: #f5f6f8;
 
-  /* Radii — a card, a control, a pill. Nothing else. */
-  --radius-card: 1.25rem;
-  --radius-control: 0.5rem;
+  /* The accent scale. Legacy screens still say `indigo-600` where the new ones
+     say `action`; remapping the scale to the same cobalt makes the two agree
+     without touching a single screen. Same lightness steps as Tailwind's indigo,
+     so every contrast those screens had is kept (600 on white: 6.2:1). */
+  --color-indigo-50: #f2f6ff;
+  --color-indigo-100: #e2ebff;
+  --color-indigo-200: #c6d7ff;
+  --color-indigo-300: #9eb8ff;
+  --color-indigo-400: #6f92f7;
+  --color-indigo-500: #4b6fee;
+  --color-indigo-600: #3553d7;
+  --color-indigo-700: #2942b6;
+  --color-indigo-800: #20358f;
+  --color-indigo-900: #1a2b6c;
+  --color-indigo-950: #0e1a43;
+
+  /* Radii — a card, an inset inside a card, a control, a pill. Nothing else. */
+  --radius-card: 1rem;
+  --radius-inset: 0.75rem;
+  --radius-control: 0.625rem;
   --radius-pill: 9999px;
 
-  /* Shadows — two. Depth comes from the border, not from stacked glows. */
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -16px rgba(15, 23, 42, 0.18);
-  --shadow-pop: 0 12px 32px -8px rgba(15, 23, 42, 0.18);
+  /* Shadows — depth comes from the border; a shadow only says "this floats".
+     `card` lifts a card a hair off the canvas, `control` gives a bordered
+     button its edge, `pop` is for what opens over the page. */
+  --shadow-card: 0 1px 2px rgba(28, 25, 18, 0.04), 0 4px 14px -8px rgba(28, 25, 18, 0.08);
+  --shadow-control: 0 1px 1px rgba(28, 25, 18, 0.05);
+  --shadow-pop: 0 18px 44px -14px rgba(22, 20, 15, 0.28), 0 2px 6px rgba(22, 20, 15, 0.06);
 
-  /* Type rhythm — four steps, each with its own line height, and nothing between them:
-     screen title / section title / copy / caption. A screen that needs a fifth size is a
-     screen that needs a different layout. (Named so no step shares a name with a colour
-     token: `text-body` is the body COLOUR, and one utility must mean one thing.) */
-  --text-title: 1.5rem;
-  --text-title--line-height: 2rem;
-  --text-section: 1rem;
+  /* Type rhythm. Each step has its own line height, and nothing sits between them:
+       display  — the one big number of a context card
+       title    — the screen's title
+       metric   — a figure in a stat tile
+       section  — a card or section heading
+       copy     — body text
+       caption  — labels, sources, meta
+       overline — group labels in the sidebar, eyebrows above a title
+     (Named so no step shares a name with a colour token: `text-body` is the body
+     COLOUR, and one utility must mean one thing.) */
+  --text-display: 2.5rem;
+  --text-display--line-height: 2.875rem;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.25rem;
+  --text-metric: 1.75rem;
+  --text-metric--line-height: 2rem;
+  --text-section: 1.0625rem;
   --text-section--line-height: 1.5rem;
   --text-copy: 0.875rem;
   --text-copy--line-height: 1.5rem;
   --text-caption: 0.75rem;
-  --text-caption--line-height: 1rem;
+  --text-caption--line-height: 1.125rem;
+  --text-overline: 0.6875rem;
+  --text-overline--line-height: 1rem;
 
-  /* Motion — one entrance, short and slightly springy, for anything that appears on
-     demand (a dropdown, a popover). Nothing animates on its own. */
-  --animate-pop-in: pop-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+  /* Motion — short, and out of the way: an ease that arrives quickly and settles,
+     for hover, press and anything that appears on demand. Nothing animates on
+     its own, and nothing blocks an action while it moves. */
+  --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-pop-in: pop-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes pop-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -102,41 +165,64 @@
   }
 }
 
-/* Dark mode redefines the SAME names, so no component carries a second palette. */
+/* Dark mode redefines the SAME names, so no component carries a second palette.
+   Ink-blue night, not pure black. The accent is LIGHTER here and carries dark
+   text (6.4:1), because white on a cobalt light enough to read as text on the
+   dark surface would fail; as text it is 6.1:1 on surface. */
 .dark {
-  --color-canvas: #0b1120;
-  --color-surface: #111827;
-  --color-sunk: #1e293b;
-  --color-line: #1f2b3d;
-  --color-line-strong: #334155;
+  --color-canvas: #0d0f14;
+  --color-surface: #14171e;
+  --color-rail: #0a0c11;
+  --color-sunk: #1b1f28;
+  --color-line: #252a35;
+  --color-line-strong: #353b48;
 
-  --color-ink: #f8fafc;
-  --color-body: #cbd5e1;
-  --color-muted: #94a3b8;
+  --color-ink: #f3f4f6;
+  --color-body: #c8ccd3;
+  --color-muted: #9097a3;         /* 6.1:1 on surface, 5.6:1 on sunk */
 
-  --color-action: #6366f1;
-  --color-action-hover: #818cf8;
-  --color-action-ink: #ffffff;
-  --color-action-soft: #1e1b4b;
-  --color-commit: #f59e0b;
-  --color-commit-hover: #fbbf24;
-  --color-commit-ink: #1c1917;
-  --color-commit-soft: #292014;
+  --color-action: #6e91fa;
+  --color-action-hover: #8aa6ff;
+  --color-action-ink: #0a0f24;
+  --color-action-soft: #1a2245;
+  --color-commit: #f0b03f;
+  --color-commit-hover: #f5c262;
+  --color-commit-ink: #231703;
+  --color-commit-soft: #2a2110;
 
-  --color-ok: #4ade80;
-  --color-ok-soft: #052e1b;
-  --color-warn: #fbbf24;
-  --color-warn-soft: #2a2010;
-  --color-bad: #f87171;
-  --color-bad-soft: #2c1414;
-  --color-info: #93c5fd;
-  --color-info-soft: #0f2038;
+  --color-ok: #5bd08a;
+  --color-ok-soft: #0f2419;
+  --color-warn: #f3bf5b;
+  --color-warn-soft: #2a2110;
+  --color-bad: #f58c80;
+  --color-bad-soft: #2e1614;
+  --color-bad-ink: #2a0c08;
+  --color-info: #9db4ff;
+  --color-info-soft: #131d3a;
 
-  --color-contrast: #1e293b;
-  --color-contrast-ink: #f8fafc;
+  --color-contrast: #181e33;
+  --color-contrast-ink: #f5f6f8;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
-  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px -10px rgba(0, 0, 0, 0.5);
+  --shadow-control: 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 18px 44px -12px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Base: one focus ring for everything that does not draw its own, the selection
+   in the accent, and tighter tracking for Latin headings only — spacing Hebrew
+   letters apart breaks the word, so Hebrew keeps the font's own spacing.
+   In @layer base so a component's own focus style still wins. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-action) 22%, transparent);
+  }
+  :where([lang='en'], [dir='ltr']) :where(h1, h2) {
+    letter-spacing: -0.015em;
+  }
 }
 
 /* ── Base RTL setup ────────────────────────────────────────────── */
@@ -164,9 +250,12 @@ html[dir="ltr"],
 }
 
 body {
-  /* Rubik loaded from Google Fonts in layout.tsx */
-  font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
+  /* Inter + Heebo, self-hosted by next/font in layout.tsx (see --font-sans). */
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11';
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background: var(--color-canvas);
   color: var(--color-body);
   min-height: 100vh;
@@ -209,8 +298,8 @@ select {
 
 /* ── Native dialog backdrop ────────────────────── */
 dialog::backdrop {
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(2px);
+  background: rgba(21, 23, 28, 0.42);
+  backdrop-filter: blur(3px);
 }
 
 /* ── Article Content Styles ───────────────────────────────────────── */

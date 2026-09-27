@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
 import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
@@ -6,6 +7,15 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
+
+/**
+ * The two faces of the type system (see --font-sans in globals.css): Inter for
+ * Latin and every digit, Heebo for Hebrew. Self-hosted by next/font, so no page
+ * waits on a third-party stylesheet and the fallback is metric-adjusted — the
+ * text does not jump when the font arrives.
+ */
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
+const heebo = Heebo({ subsets: ['hebrew', 'latin'], display: 'swap', variable: '--font-heebo' })
 
 /**
  * The document's metadata follows the SAME resolved locale as <html lang/dir>.
@@ -68,7 +78,7 @@ export default async function RootLayout({
   const { lang, dir } = documentLocaleAttributes(locale)
 
   return (
-    <html lang={lang} dir={dir} className="h-full" suppressHydrationWarning>
+    <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
@@ -97,12 +107,6 @@ export default async function RootLayout({
         {/* Google Tag Manager Script */}
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
 
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
         {/* JSON-LD Schema for SEO */}
         <script
           type="application/ld+json"

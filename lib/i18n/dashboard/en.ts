@@ -1996,6 +1996,7 @@ export const dashboardEn = {
   },
   common: {
     close: 'Close',
+    menu: 'Menu',
     logout: 'Log out',
     loading: 'Loading...',
     save: 'Save',
