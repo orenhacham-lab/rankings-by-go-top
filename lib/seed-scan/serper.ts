@@ -21,8 +21,19 @@ const SERPER_API_URL = 'https://google.serper.dev/search'
 export const SEARCH_TIMEOUT_MS = 6_000
 export const RESULTS_PER_QUERY = 10
 
+/**
+ * One organic result as a1's search-index fallback reads it: the link, its
+ * title and its snippet, each capped. Text we show nobody verbatim; it is only
+ * handed to the model as the site's description in Google's index. A link is
+ * never fetched.
+ */
+export type SearchPage = { url: string; title: string; snippet: string }
+
+export const PAGE_TITLE_CHARS = 200
+export const PAGE_SNIPPET_CHARS = 400
+
 export type SearchOutcome =
-  | { ok: true; domains: string[] }
+  | { ok: true; domains: string[]; pages?: SearchPage[] }
   | { ok: false; code: 'search_unavailable' | 'search_failed' | 'search_timeout' }
 
 /** One search: the distinct result domains of the top organic results, in rank order. */
@@ -116,7 +127,9 @@ export function isNonCompetitor(domain: string): boolean {
 
 // ── The request ─────────────────────────────────────────────────────────────
 
-type SerperOrganic = { link?: unknown }
+type SerperOrganic = { link?: unknown; title?: unknown; snippet?: unknown }
+
+const oneLine = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '')
 
 /**
  * A SearchFn bound to Serper. `apiKey` defaults to SERPER_API_KEY; without one
@@ -149,12 +162,16 @@ export function createSerperSearch(options: { apiKey?: string | null; fetchImpl?
       const organic = (payload as { organic?: unknown }).organic
       if (!Array.isArray(organic)) return { ok: false, code: 'search_failed' }
       const domains: string[] = []
+      const pages: SearchPage[] = []
       for (const r of organic.slice(0, RESULTS_PER_QUERY) as SerperOrganic[]) {
         if (typeof r?.link !== 'string') continue
         const d = normalizeResultDomain(r.link)
         if (d && !domains.includes(d)) domains.push(d)
+        if (/^https?:\/\//i.test(r.link) && r.link.length <= 2_000) {
+          pages.push({ url: r.link, title: oneLine(r.title, PAGE_TITLE_CHARS), snippet: oneLine(r.snippet, PAGE_SNIPPET_CHARS) })
+        }
       }
-      return { ok: true, domains }
+      return { ok: true, domains, pages }
     } catch (err) {
       const aborted = err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')
       return { ok: false, code: aborted ? 'search_timeout' : 'search_failed' }
