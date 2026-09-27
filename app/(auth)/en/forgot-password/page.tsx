@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
-import { ForgotPasswordForm } from '../../forgot-password/page'
+import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm'
 
 export default function EnForgotPasswordPage() {
   return (

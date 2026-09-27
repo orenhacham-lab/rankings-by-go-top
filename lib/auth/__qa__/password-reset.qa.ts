@@ -128,7 +128,7 @@ async function main() {
     check('B1: the link lands on our own callback, next fixed to /reset-password, in the form\'s language',
       REAL.recoveryRedirectTo('https://app.example', 'he') === 'https://app.example/api/auth/callback?next=%2Freset-password&lang=he'
       && REAL.recoveryRedirectTo('https://app.example', 'en') === 'https://app.example/api/auth/callback?next=%2Freset-password&lang=en')
-    const forgot = strip(read('app/(auth)/forgot-password/page.tsx'))
+    const forgot = strip(read('components/auth/ForgotPasswordForm.tsx'))
     const noCallerNext = (s: string) => !/get\(\s*['"]next['"]\s*\)/.test(s) && /recoveryRedirectTo\(appUrl, lang\)/.test(s)
     check('B2: the request form takes no destination from the address', noCallerNext(forgot))
     check('MUTATION CONTROL: a form that forwards ?next= is caught', !noCallerNext(forgot + "\nconst n = searchParams.get('next')"))
@@ -163,7 +163,7 @@ async function main() {
     const { PASSWORD_UI } = require(join(ROOT, 'lib/i18n/auth-password.ts'))
     const outcomes = ['too_short', 'mismatch', 'same_password', 'weak_password', 'link_expired', 'failed']
     check('C6: every refusal has its own line in both languages', outcomes.every((o) => HEBREW.test(PASSWORD_UI.he.reset.err[o]) && typeof PASSWORD_UI.en.reset.err[o] === 'string' && !HEBREW.test(PASSWORD_UI.en.reset.err[o])))
-    const pages = ['app/(auth)/forgot-password/page.tsx', 'app/(auth)/reset-password/page.tsx', 'lib/auth/password-reset.ts'].map((f) => strip(read(f))).join('\n')
+    const pages = ['components/auth/ForgotPasswordForm.tsx', 'components/auth/ResetPasswordForm.tsx', 'lib/auth/password-reset.ts'].map((f) => strip(read(f))).join('\n')
     const noProviderText = (s: string) => !/\.message\b/.test(s)
     check('C7: no page or helper reads a provider message (only codes)', noProviderText(pages))
     check('MUTATION CONTROL: setError(error.message) is caught', !noProviderText(pages + '\nsetError(error.message)'))

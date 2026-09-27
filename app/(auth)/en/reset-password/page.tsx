@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
-import { ResetPasswordForm } from '../../reset-password/page'
+import ResetPasswordForm from '@/components/auth/ResetPasswordForm'
 
 export default function EnResetPasswordPage() {
   return (

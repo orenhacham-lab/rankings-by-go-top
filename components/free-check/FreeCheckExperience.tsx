@@ -39,6 +39,7 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
   const copy = freeCheckCopy(locale)
   const dir = locale === 'he' ? 'rtl' : 'ltr'
   const loginHref = authHref('login', locale)
+  const signupHref = authHref('signup', locale)
 
   const [phase, setPhase] = useState<Phase>('form')
   const [url, setUrl] = useState(initialUrl)
@@ -117,7 +118,7 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
           copy={copy}
           locale={locale}
           result={result}
-          signupHref={authHref('signup', locale, { claim: claimToken })}
+          signupHref={claimToken ? `${signupHref}${signupHref.includes('?') ? '&' : '?'}claim=${encodeURIComponent(claimToken)}` : signupHref}
           loginHref={loginHref}
           onRestart={() => {
             setResult(null)
