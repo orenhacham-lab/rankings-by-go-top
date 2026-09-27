@@ -1,7 +1,7 @@
 /**
  * Site platforms beyond WordPress and Shopify: Wix and a custom site reached by
  * a signed webhook. One row per project in `site_platform_connections`
- * (supabase/migrations/20260928000000_site_platform_connections.sql).
+ * (supabase/migrations/20260928000100_site_platform_connections.sql).
  *
  * The secret (a Wix API key, or the webhook signing secret) is stored
  * AES-256-GCM encrypted and NEVER leaves the server: `sanitizeSiteConnection`

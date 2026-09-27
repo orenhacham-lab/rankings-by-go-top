@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20260928000000_site_platform_connections.sql
+-- EXECUTED PROBE — 20260928000100_site_platform_connections.sql
 --
 -- Applies the migration file itself (via \i, twice, for idempotency) to a
 -- disposable PostgreSQL cluster that carries Supabase's roles, its default
@@ -63,9 +63,9 @@ INSERT INTO public.projects VALUES
 INSERT INTO public.generated_articles (id, user_id, project_id, title, wp_post_id) VALUES
   ('c1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'existing article', 42);
 
-\i supabase/migrations/20260928000000_site_platform_connections.sql
+\i supabase/migrations/20260928000100_site_platform_connections.sql
 -- Idempotency: applying twice must not error.
-\i supabase/migrations/20260928000000_site_platform_connections.sql
+\i supabase/migrations/20260928000100_site_platform_connections.sql
 
 SET ROLE service_role;
 INSERT INTO public.site_platform_connections
@@ -174,7 +174,7 @@ GRANT ALL ON TABLE public.site_platform_connections TO anon, authenticated;
 SELECT run_checks('mutated');
 
 -- RESTORE: the migration file, applied over the broken state, repairs it.
-\i supabase/migrations/20260928000000_site_platform_connections.sql
+\i supabase/migrations/20260928000100_site_platform_connections.sql
 SELECT run_checks('restored');
 
 -- Constraints (as service_role, the only writer).
