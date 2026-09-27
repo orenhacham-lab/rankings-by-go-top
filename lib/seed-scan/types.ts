@@ -187,6 +187,8 @@ export const SEED_STEP_ERROR_CODES = [
   'site_unreadable',
   'project_missing',
   'superseded',
+  // the cron found the run's owner without access any more (resume.ts)
+  'entitlement_required',
   'internal_error',
 ] as const
 export type SeedErrorCode = (typeof SEED_STEP_ERROR_CODES)[number]

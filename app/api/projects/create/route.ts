@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 import { buildQuotaError, buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
+import { markScanOwnedFields, type SeedProjectField } from '@/lib/seed-scan/settings'
 
 // API Route for creating new projects
 // Replaces Server Action approach to avoid production crashes
@@ -116,6 +117,12 @@ export async function POST(request: NextRequest) {
       ? calculateNextScanDate(scanFrequency)
       : null
 
+    // Placeholders, not choices: a project created without a country or a
+    // language gets IL / he, and the seed scan may replace them (see below).
+    const placeholders: SeedProjectField[] = []
+    if (!formData.get('country')) placeholders.push('country')
+    if (!formData.get('language')) placeholders.push('language')
+
     const data = {
       user_id: user.id,
       client_id: clientId,
@@ -155,6 +162,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[API] Project created successfully for user:', user.id)
+
+    // The seed scan fills only a field that is empty or marked 'scan'
+    // (lib/seed-scan/settings.ts), so the placeholders above are marked as the
+    // scan's; a field the owner chose is never marked. Best effort: without
+    // the mark the placeholder simply stays, as it did before the scan existed.
+    const createdId = (insertResult as { id: string } | null)?.id
+    if (createdId && placeholders.length > 0) {
+      try {
+        const marked = await markScanOwnedFields(createAdminClient(), { projectId: createdId, userId: user.id }, placeholders)
+        if (!marked) console.warn('[API] Placeholder fields not marked for the scan:', { projectId: createdId })
+      } catch {
+        console.warn('[API] Placeholder fields not marked for the scan:', { projectId: createdId })
+      }
+    }
 
     // Revalidate the projects page
     revalidatePath('/projects')

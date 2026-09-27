@@ -88,9 +88,11 @@ import {
   pageKey,
   parseRobots,
   robotsAllows,
+  robotsAnswer,
   selectKeyPages,
   type CrawledPage,
   type PageBucket,
+  type RobotsAnswer,
 } from './crawl'
 import { readSeedIdeas, seedResearchKey, writeSeedIdeas, type SeedMarket, type SeedResearchKey, type SeedResearchOrigin } from './research'
 import type { SeedProject } from './settings'
@@ -292,22 +294,37 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
   // The home page and robots.txt as a1 read them (this site's, not a site the
   // project pointed at before). A claimed run read neither itself, so b1 reads
   // robots.txt first — nothing else before the rules are known — at the
-  // address the free check ended at, when that is this site.
+  // address the free check ended at, when that is this site. So does a run
+  // whose a1 could not read robots.txt whole.
   const onSite = (raw: string | null | undefined): URL | null => {
     const u = normalizeCheckUrl(raw ?? '')
     return u.ok && domainKey(u.url) === siteKey ? u.url : null
   }
-  const a1Signals = readStoredSignals((ctx.details.a1 ?? {}).signals)
+  const a1Detail = ctx.details.a1 ?? {}
+  const a1Signals = readStoredSignals(a1Detail.signals)
   const stored = a1Signals && onSite(a1Signals.finalUrl) ? a1Signals : null
   const homeUrl = new URL(stored?.finalUrl ?? onSite(ctx.summary.url)?.toString() ?? admitted.url.toString())
-  const readRobots = async (at: URL): Promise<string | null> => {
+  const readRobots = async (at: URL): Promise<RobotsAnswer> => {
     const robotsClock = deadline(deps.budgets.robotsMs)
-    const robotsFetch = hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: robotsClock.signal, trace: [], offHost: { hit: false } })
+    const robotsBody = { complete: false }
+    const robotsFetch = hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: robotsClock.signal, trace: [], offHost: { hit: false }, body: robotsBody })
     const robots = await settleWithin(() => deps.fetchText(new URL('/robots.txt', at), { fetchImpl: robotsFetch }), deps.budgets.robotsMs + GRACE_MS)
     robotsClock.clear()
-    return robots.kind === 'value' && robots.value.ok && robots.value.status === 200 ? robots.value.text : null
+    return robotsAnswer(robots.kind === 'value' && robots.value.ok ? robots.value : null, robotsBody.complete)
   }
-  let robotsTxt: string | null = stored ? stored.robotsTxt : await readRobots(homeUrl)
+  // a1's read counts when it came to rules (kept on its signals) or to none.
+  const fromA1: RobotsAnswer | null = !stored
+    ? null
+    : a1Detail.robots === 'rules' && typeof stored.robotsTxt === 'string'
+      ? { state: 'rules', text: stored.robotsTxt }
+      : a1Detail.robots === 'absent'
+        ? { state: 'absent' }
+        : null
+  let robots = fromA1 ?? (await readRobots(homeUrl))
+  // Unknown rules forbid everything (RFC 9309, 2.3.1.4): nothing is read.
+  const unreadable = () => finished('skipped', 'crawl_disallowed', ctx.summary, { detail: { attempted: true, ...counts, robots: 'unreadable' } })
+  if (robots.state === 'unreadable') return unreadable()
+  let robotsTxt = robots.state === 'rules' ? robots.text : null
   let rules = parseRobots(robotsTxt)
   const allow = (url: URL) => robotsAllows(rules, url)
   if (!allow(homeUrl)) return finished('skipped', 'crawl_disallowed', ctx.summary, { detail: { attempted: true, ...counts } })
@@ -354,7 +371,12 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
     // The home page answered from another address of the site (apex → www):
     // that address's robots.txt governs every read from here on.
     if (homePage && new URL(homePage.url).origin !== homeUrl.origin) {
-      robotsTxt = await readRobots(new URL(homePage.url))
+      robots = await readRobots(new URL(homePage.url))
+      if (robots.state === 'unreadable') {
+        crawlClock.clear()
+        return unreadable()
+      }
+      robotsTxt = robots.state === 'rules' ? robots.text : null
       rules = parseRobots(robotsTxt)
     }
   }

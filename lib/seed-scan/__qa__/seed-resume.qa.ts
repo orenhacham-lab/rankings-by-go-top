@@ -16,7 +16,9 @@
  * oldest first, at most MAX_RUNS_PER_TICK a tick, for every account, and every
  * query names the owner of the run it works on; out of time, runs wait or are
  * handed back; not a line when idle or off, one line when it acted or failed,
- * stable codes only; startIsolatedSeedResume's own deadline, cap and catch;
+ * stable codes only; a run whose owner has lost access is finished failed
+ * (entitlement_required) before any step, and one whose access cannot be read
+ * is left for the next tick; startIsolatedSeedResume's own deadline, cap and catch;
  * and, through the REAL cron route, that the runner's result is logged first
  * and unchanged whatever the resume does (throws, rejects, has no time left),
  * after which the real resume finishes a stage-B run stalled at b5.
@@ -32,7 +34,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 import type { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import type { ResumeReport, ResumedRun } from '../resume'
+import type { ResumeOptions, ResumeReport, ResumedRun } from '../resume'
 import type { StageADepsInput } from '../steps'
 import type { StageBDepsInput } from '../steps-b'
 import type { Tables } from './_fixtures'
@@ -106,6 +108,13 @@ const B_STEPS = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6']
 const ALL_A = 'a1:done a2:done a3:done a4:done'
 const PENDING_A = 'a1:pending a2:pending a3:pending a4:pending'
 const STAGE_B_ENV = { ENABLE_AI_VISIBILITY: 'true', GEMINI_API_KEY: 'qa-key' }
+/**
+ * The entitlement check, answered without a query, for the sections about
+ * something else (section 10 is about the check; section 9 runs the real one).
+ */
+const ENTITLED: NonNullable<ResumeOptions['access']> = async () => ({ allowed: true, authority: 'website' })
+/** A subscription row explainAccess accepts: active, no period end. */
+const activeSubscription = (userId: string) => ({ id: `sub-${userId}`, user_id: userId, status: 'active', trial_ends_at: null, current_period_end: null, created_at: NOW.toISOString() })
 
 const stepRow = (t: Tables, step: string, runId?: string) =>
   (t.project_seed_steps.find((s) => s.step === step && (!runId || s.run_id === runId)) ?? {}) as Row
@@ -225,9 +234,9 @@ async function stageBRun(start: Date = NOW, continueAt?: Date) {
 }
 
 /** One cron tick on what a dead worker left, `advanceMs` after its clock. */
-async function tickOn(snap: Tables, o: { advanceMs: number; deps?: StageADepsInput }) {
+async function tickOn(snap: Tables, o: { advanceMs: number; deps?: StageADepsInput; access?: ResumeOptions['access'] | null; hooks?: Record<string, unknown> }) {
   const copy = structuredClone(snap)
-  const { tables, fake, admin } = fx.world(copy.projects[0] as Row, copy)
+  const { tables, fake, admin } = fx.world(copy.projects[0] as Row, copy, o.hooks ?? {})
   const clk = fx.clock()
   clk.advance(o.advanceMs)
   const fakes = workerFakes()
@@ -236,6 +245,7 @@ async function tickOn(snap: Tables, o: { advanceMs: number; deps?: StageADepsInp
     resumeMod.resumeStalledSeedRuns(admin, {
       env: ON,
       now: clk.now,
+      access: o.access === null ? undefined : (o.access ?? ENTITLED),
       deps: { ...depsA(fakes, clk.now), ...o.deps },
       // Handed the merchant's functions as well: the cron must not use them.
       stageB: depsB(fakes, clk.now),
@@ -258,6 +268,13 @@ function crossOwner(audit: ReturnType<typeof auditOwners>, owners: Record<string
   }
   return out
 }
+
+/** The reads of the entitlement check (lib/subscription.ts and the Shopify resolver it asks). */
+const entitlementReads = (audit: ReturnType<typeof auditOwners>) =>
+  audit.queries.filter((q) => q.file === 'lib/subscription.ts' || q.file === 'lib/shopify/entitlement-resolver.ts')
+/** The user a read is for: its user_id filter, or a profile's id. */
+const ownerOf = (q: ReturnType<typeof auditOwners>['queries'][number]) =>
+  q.calls.find((c) => c.op === 'eq' && (c.args[0] === 'user_id' || (q.table === 'profiles' && c.args[0] === 'id')))?.args[1]
 
 // ── The cron route ──────────────────────────────────────────────────────────
 
@@ -431,7 +448,7 @@ async function main() {
     const audit = auditOwners(fake)
     const f = workerFakes()
 
-    const first = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, maxRuns: 10, deps: depsA(f, clk.now) }))
+    const first = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, maxRuns: 10, deps: depsA(f, clk.now) }))
     const w1 = workedOf(first.value)
     check(`asked for ten, it takes ${resumeMod.MAX_RUNS_PER_TICK}: the two oldest lapsed runs, whoever owns them`,
       resumeMod.MAX_RUNS_PER_TICK === 2 && !!w1 && w1.found === 2 && w1.runs.map((r) => r.runId).join() === [e1, e2].join(), JSON.stringify(first.value))
@@ -448,10 +465,10 @@ async function main() {
       audit.offenders([USER, OTHER_USER]).length === 0 && audit.ours().filter((q) => q.fn === 'listStalledSeedRuns').length === 1, audit.offenders([USER, OTHER_USER]).join('; '))
     check("…and it is the run's own owner, never the other account's", crossOwner(audit, owners).length === 0, crossOwner(audit, owners).join('; '))
 
-    const second = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deps: depsA(f, clk.now) }))
+    const second = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deps: depsA(f, clk.now) }))
     const w2 = workedOf(second.value)
     check('the next tick takes the third', !!w2 && w2.runs.map((r) => r.runId).join() === e3 && line(tables, A_STEPS, e3) === ALL_A, JSON.stringify(second.value))
-    const third = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deps: depsA(f, clk.now) }))
+    const third = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deps: depsA(f, clk.now) }))
     check('then there is nothing to do: idle, not a line', third.value.state === 'idle' && third.output === '', third.output)
     check('…the live run still untouched after three ticks', unchanged(before, tables, live))
   }
@@ -477,7 +494,7 @@ async function main() {
       },
     }
     const f = workerFakes()
-    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deps: depsA(f, clk.now) }))
+    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deps: depsA(f, clk.now) }))
     const res = workedOf(r.value)?.runs[0]?.result
     check('listed while lapsed, renewed before the takeover: not taken (not_running)', reasonOf(res) === 'not_running', JSON.stringify(r.value))
     check("…the worker's lease stands and nothing was done", runRow(tables, runId).lease_expires_at === renewed && line(tables, A_STEPS, runId) === PENDING_A
@@ -496,20 +513,20 @@ async function main() {
     clk.advance(store.LEASE_MS + MIN)
     const before = structuredClone(tables)
     const f = workerFakes()
-    const passed = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deadlineAt: clk.now().getTime() - 1, deps: depsA(f, clk.now) }))
+    const passed = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deadlineAt: clk.now().getTime() - 1, deps: depsA(f, clk.now) }))
     const wp = workedOf(passed.value)
     check('the deadline has passed: the run is left exactly as it is; the line says one is waiting',
       !!wp && wp.runs.length === 0 && wp.deferred === 1 && unchanged(before, tables, runId)
         && JSON.stringify(payloadOf(tagged(passed.output, '[seed-resume] tick')[0])) === JSON.stringify({ found: 1, runs: [], deferred: 1 }),
       passed.output)
 
-    const near = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deadlineAt: clk.now().getTime() + 10_000, deps: depsA(f, clk.now) }))
+    const near = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deadlineAt: clk.now().getTime() + 10_000, deps: depsA(f, clk.now) }))
     const nr = workedOf(near.value)?.runs[0]?.result
     check('ten seconds left and a1 may need 26: taken, then handed back at once (stopped time_cap), nothing read',
       reasonOf(nr) === 'time_cap' && runRow(tables, runId).status === 'running' && runRow(tables, runId).lease_expires_at === null
         && line(tables, A_STEPS, runId) === PENDING_A && f.net.requests.length === 0,
       `${JSON.stringify(near.value)} ${line(tables, A_STEPS, runId)}`)
-    const next = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deps: depsA(f, clk.now) }))
+    const next = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deps: depsA(f, clk.now) }))
     check('the next tick takes it at once, without waiting for a lease to lapse, and finishes it',
       statusOf(workedOf(next.value)?.runs[0]?.result) === 'done' && line(tables, A_STEPS, runId) === ALL_A, JSON.stringify(next.value))
   }
@@ -523,7 +540,7 @@ async function main() {
     clk.advance(store.LEASE_MS + MIN)
     const audit = auditOwners(fake)
     for (const env of [{}, { ENABLE_SEED_SCAN: 'false' }, { ENABLE_SEED_SCAN: '1' }] as Record<string, string>[]) {
-      const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env, now: clk.now }))
+      const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env, now: clk.now }))
       check(`ENABLE_SEED_SCAN=${env.ENABLE_SEED_SCAN ?? '(unset)'}: off — a stalled run is there, yet not one query and not one line`,
         r.value.state === 'disabled' && audit.queries.length === 0 && r.output === '', `${r.value.state} ${audit.queries.length} ${r.output}`)
     }
@@ -531,14 +548,14 @@ async function main() {
   {
     const { fake, admin } = fx.world(fx.projectRow())
     const audit = auditOwners(fake)
-    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: fx.clock().now }))
+    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: fx.clock().now }))
     check('on, nothing stalled: idle — one query (the listing) and not one line',
       r.value.state === 'idle' && audit.queries.length === 1 && r.output === '', `${r.value.state} ${audit.queries.length} ${r.output}`)
   }
   {
     const hooks: Record<string, unknown> = { project_seed_runs: { select: () => ({ code: 'XX000', message: SECRET }) } }
     const { admin } = fx.world(fx.projectRow(), {}, hooks)
-    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: fx.clock().now }))
+    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: fx.clock().now }))
     check('the listing fails with provider text in its error: failed list_failed, one line, the code only',
       r.value.state === 'failed' && r.output === '[seed-resume] failed {"reason":"list_failed"}', r.output)
   }
@@ -578,7 +595,7 @@ async function main() {
       },
     }
     const f = workerFakes()
-    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { env: ON, now: clk.now, deps: depsA(f, clk.now) }))
+    const r = await fx.captureConsole(() => resumeMod.resumeStalledSeedRuns(admin, { access: ENTITLED, env: ON, now: clk.now, deps: depsA(f, clk.now) }))
     const w = workedOf(r.value)
     check("the first run's resume throws: reported as threw RangeError; the second run is still worked",
       !!w && w.runs.length === 2 && w.runs[0].runId === a.runId && w.runs[0].result.outcome === 'threw' && (w.runs[0].result as { error: string }).error === 'RangeError'
@@ -762,6 +779,8 @@ async function main() {
     check('the worker died as b5 began: b1-b4 done', !!snap && line(snap, B_STEPS) === 'b1:done b2:done b3:done b4:done b5:running b6:pending', snap ? line(snap, B_STEPS) : 'no snapshot')
     if (snap) {
       const copy = structuredClone(snap)
+      // The real cron runs the real entitlement check: the owner subscribes.
+      copy.subscriptions = [activeSubscription(USER)]
       const { tables, fake } = fx.world(copy.projects[0] as Row, copy)
       const audit = auditOwners(fake)
       ADMIN_CLIENT = fake
@@ -791,11 +810,88 @@ async function main() {
           line(tables, B_STEPS))
         check('…no request left the process, and every query named the owner', requests.length === 0 && audit.offenders(USER).length === 0,
           `${requests.join(',')} ${audit.offenders(USER).join('; ')}`)
+        const accessReads = entitlementReads(audit)
+        check("…the entitlement was the route's own check (explainAccess), read for the run's owner alone",
+          accessReads.some((q) => q.table === 'profiles') && accessReads.some((q) => q.table === 'subscriptions') && accessReads.every((q) => ownerOf(q) === USER),
+          accessReads.map((q) => `${q.file} ${q.table} ${ownerOf(q)}`).join('; '))
       } finally {
         globalThis.fetch = savedFetch
         delete process.env.ENABLE_SEED_SCAN
       }
     }
+  }
+
+  // ── 10. Entitlement ───────────────────────────────────────────────────────
+  console.log("\n10) Only while entitled: the owner's access is checked again before a run is taken")
+  if (stageASnapshot) {
+    const snap = stageASnapshot
+    const lapsed = store.LEASE_MS + 1_000
+    const asked: string[] = []
+    const denied = await tickOn(snap, {
+      advanceMs: lapsed,
+      access: async (_admin, userId) => {
+        asked.push(userId)
+        return { allowed: false, authority: 'website' }
+      },
+    })
+    const res = workedOf(denied.report)?.runs[0]?.result
+    check("the check is asked once, for the run's own owner", asked.join() === USER, asked.join())
+    check('access gone: the run is finished failed, entitlement_required, its lease dropped',
+      statusOf(res) === 'failed' && (res as { errorCode?: string }).errorCode === 'entitlement_required'
+        && runRow(denied.tables).status === 'failed' && runRow(denied.tables).error_code === 'entitlement_required' && runRow(denied.tables).lease_expires_at === null,
+      JSON.stringify(denied.report))
+    check('…before any step: nothing read, asked or searched; the steps as the dead worker left them',
+      denied.fakes.net.requests.length === 0 && denied.fakes.model.calls.length === 0 && denied.fakes.search.calls.length === 0
+        && JSON.stringify(stepsOf(denied.tables, runRow(snap).id as string)) === JSON.stringify(stepsOf(snap, runRow(snap).id as string)),
+      `${denied.fakes.net.requests.length} ${denied.fakes.model.calls.length} ${denied.fakes.search.calls.length} ${line(denied.tables, A_STEPS)}`)
+    check('…one tick line with the code, and every query names the owner',
+      JSON.stringify((payloadOf(tagged(denied.output, '[seed-resume] tick')[0])?.runs as Row[] | undefined)?.[0]) ===
+        JSON.stringify({ runId: runRow(snap).id, projectId: PROJECT, stage: 'a', outcome: 'finished', status: 'failed', errorCode: 'entitlement_required' })
+        && denied.audit.offenders(USER).length === 0,
+      `${denied.output} ${denied.audit.offenders(USER).join('; ')}`)
+    const again = await tickOn(denied.tables, { advanceMs: lapsed, access: async () => ({ allowed: true, authority: 'website' }) })
+    check('…and it is over: a later tick finds nothing to resume', again.report.state === 'idle', JSON.stringify(again.report))
+
+    for (const [name, access] of [
+      ['cannot be read', async () => ({ allowed: false, authority: 'unreadable' })],
+      ['throws', async () => {
+        throw new TypeError(SECRET)
+      }],
+    ] as [string, NonNullable<ResumeOptions['access']>][]) {
+      const t = await tickOn(snap, { advanceMs: lapsed, access })
+      const r = workedOf(t.report)?.runs[0]?.result
+      check(`the check ${name}: the run is left exactly as it is, for the next tick (skipped entitlement_unavailable)`,
+        r?.outcome === 'skipped' && r.reason === 'entitlement_unavailable' && unchanged(snap, t.tables, runRow(snap).id as string)
+          && t.fakes.net.requests.length === 0 && t.fakes.model.calls.length === 0 && t.fakes.search.calls.length === 0,
+        JSON.stringify(t.report))
+      check('…one line, codes only', tagged(t.output, '[seed-resume]').length === 1 && t.output.includes('"reason":"entitlement_unavailable"') && !t.output.includes(SECRET), t.output)
+    }
+
+    // The real check (ownerAccess → explainAccess), on the tables.
+    const real = (extra: Tables, hooks: Record<string, unknown> = {}) => {
+      const copy = structuredClone(snap)
+      Object.assign(copy, extra)
+      return tickOn(copy, { advanceMs: lapsed, access: null, hooks })
+    }
+    const subscribed = await real({ subscriptions: [activeSubscription(USER)] })
+    check('the real check, an active subscription: the run is resumed and finished',
+      statusOf(workedOf(subscribed.report)?.runs[0]?.result) === 'done' && line(subscribed.tables, A_STEPS) === ALL_A, JSON.stringify(subscribed.report))
+    check("…its reads are the route's check, for the owner alone (and not counted as the scan's own queries)",
+      entitlementReads(subscribed.audit).length >= 2 && entitlementReads(subscribed.audit).every((q) => ownerOf(q) === USER && !q.ours) && subscribed.audit.offenders(USER).length === 0,
+      `${entitlementReads(subscribed.audit).map((q) => `${q.file}:${q.table}:${ownerOf(q)}`).join('; ')} | ${subscribed.audit.offenders(USER).join('; ')}`)
+    const admin = await real({ profiles: [{ id: USER, role: 'admin' }] })
+    check('an admin without a subscription passes, as in the route', statusOf(workedOf(admin.report)?.runs[0]?.result) === 'done', JSON.stringify(admin.report))
+    const expired = await real({ subscriptions: [{ ...activeSubscription(USER), status: 'trial', trial_ends_at: new Date(NOW.getTime() - HOUR).toISOString() }] })
+    check('a trial that ran out: failed entitlement_required, nothing spent',
+      runRow(expired.tables).error_code === 'entitlement_required' && expired.fakes.search.calls.length === 0 && expired.fakes.model.calls.length === 0, JSON.stringify(expired.report))
+    const someoneElse = await real({ subscriptions: [activeSubscription(OTHER_USER)] })
+    check("another account's subscription does not count", runRow(someoneElse.tables).error_code === 'entitlement_required', JSON.stringify(someoneElse.report))
+    const unreadable = await real({ subscriptions: [activeSubscription(USER)] }, { subscriptions: { select: () => ({ code: 'XX000', message: SECRET }) } })
+    const ur = workedOf(unreadable.report)?.runs[0]?.result
+    check('the subscription read fails (explainAccess alone would read "no subscription"): skipped, the run untouched',
+      ur?.outcome === 'skipped' && ur.reason === 'entitlement_unavailable' && unchanged(snap, unreadable.tables, runRow(snap).id as string), JSON.stringify(unreadable.report))
+    const profileDown = await real({ subscriptions: [activeSubscription(USER)] }, { profiles: { select: () => ({ code: 'XX000', message: SECRET }) } })
+    check('…the same when the profile read fails', workedOf(profileDown.report)?.runs[0]?.result.outcome === 'skipped', JSON.stringify(profileDown.report))
   }
 
   check('no unhandled rejection anywhere in this suite', unhandled.length === 0, String(unhandled.length))

@@ -4,10 +4,13 @@
  *
  *   G1  every Supabase query in lib/seed-scan names its owner (user_id; runs,
  *       steps and the crawl index are also written by project_id) — the
- *       service-role client bypasses RLS. Two named exceptions: the global
+ *       service-role client bypasses RLS. Three named exceptions: the global
  *       daily cap, a head-only count that returns a number and never a row;
- *       and the cron's listing of stalled runs, which returns their keys (ids,
- *       owner, stage) and nothing of their content. The crawl index is read
+ *       the cron's listing of stalled runs, which returns their keys (ids,
+ *       owner, stage) and nothing of their content; and the return of a claim
+ *       token that seeded nothing (the free check's ledger has no owner: the
+ *       row is named by the token's hash and the instant this request spent
+ *       it, and only its consumed_at is cleared). The crawl index is read
  *       and written by project AND owner, here and in lib/content/
  *       content-index.ts; tracking_targets is never written here (the
  *       keywords tab's own action adds keywords).
@@ -31,6 +34,9 @@
  *   G8  the cron resumes stalled runs only behind its own auth, only after the
  *       automation runner has finished and logged, only inside the isolating
  *       wrapper, and never as the merchant (no content plan, no rank check).
+ *   G9  creating a project marks for the scan only the placeholders the route
+ *       itself defaulted (country, language), by the new project and its
+ *       owner, once the project exists; a field the owner sent is never marked.
  *
  * Comments are stripped before matching (a lexer that keeps strings, template
  * literals and regular expressions intact). Every guard has a MUTATION
@@ -194,21 +200,30 @@ function queryChains(file: string, src: string): Chain[] {
 
 const GLOBAL_COUNT = /\.select\(\s*'id'\s*,\s*\{\s*count:\s*'exact',\s*head:\s*true\s*\}\s*\)/
 const STALLED_KEYS = /\.select\(\s*'id, project_id, user_id, stage'\s*\)/
+/**
+ * The one write to the free check's claims ledger: exactly this chain, which
+ * clears consumed_at on the row named by the token's hash AND the instant this
+ * request spent it, and reads back only the check id.
+ */
+const CLAIM_RESTORE = /^\.from\('free_site_check_claims'\)\s*\.update\(\{ consumed_at: null \}\)\s*\.eq\('token_hash', hashClaimToken\(token\)\)\s*\.eq\('consumed_at', consumedAt\.toISOString\(\)\)\s*\.select\('check_id'\)$/
 
-/** What a query says about its owner, and which of G1's two exceptions it is, if any. */
+/** What a query says about its owner, and which of G1's three exceptions it is, if any. */
 function ownerCheck(c: Chain) {
   const insertLike = /\.(insert|upsert)\(/.test(c.text)
   const mutation = insertLike || /\.(update|delete)\(/.test(c.text)
   const written = `${c.text}\n${c.payload}`
   const namesUser = insertLike ? /\buser_id\s*:/.test(written) : /\.eq\(\s*'user_id'\s*,/.test(c.text)
   const namesProject = insertLike ? /\bproject_id\s*:/.test(written) : /\.eq\(\s*'project_id'\s*,/.test(c.text)
-  const exception: 'global_count' | 'stalled_keys' | null = mutation
-    ? null
-    : c.fn === 'countAllSeedRunsSince' && GLOBAL_COUNT.test(c.text)
-      ? 'global_count'
-      : c.fn === 'listStalledSeedRuns' && c.table === 'project_seed_runs' && STALLED_KEYS.test(c.text)
-        ? 'stalled_keys'
-        : null
+  const exception: 'global_count' | 'stalled_keys' | 'claim_restore' | null =
+    c.fn === 'restoreClaimToken' && c.file === 'lib/seed-scan/claim.ts' && CLAIM_RESTORE.test(c.text)
+      ? 'claim_restore'
+      : mutation
+        ? null
+        : c.fn === 'countAllSeedRunsSince' && GLOBAL_COUNT.test(c.text)
+          ? 'global_count'
+          : c.fn === 'listStalledSeedRuns' && c.table === 'project_seed_runs' && STALLED_KEYS.test(c.text)
+            ? 'stalled_keys'
+            : null
   return { insertLike, mutation, namesUser, namesProject, exception }
 }
 
@@ -279,8 +294,8 @@ function main() {
   const offenders = ownerOffenders(chains)
   check('each filters or writes user_id; runs, steps and the crawl index are also written by project_id', offenders.length === 0, offenders.join(' ; '))
   const ownerless = chains.filter((c) => !ownerCheck(c).namesUser).map((c) => `${c.fn}:${ownerCheck(c).exception ?? 'none'}`).sort()
-  check('exactly two owner-less queries: the head-only global count and the keys-only listing of stalled runs',
-    ownerless.join(',') === 'countAllSeedRunsSince:global_count,listStalledSeedRuns:stalled_keys', ownerless.join(','))
+  check('exactly three owner-less queries: the head-only global count, the keys-only listing of stalled runs and the return of a spent claim token',
+    ownerless.join(',') === 'countAllSeedRunsSince:global_count,listStalledSeedRuns:stalled_keys,restoreClaimToken:claim_restore', ownerless.join(','))
   check('lib/seed-scan never builds a service-role client itself (the route and the cron inject it)', LIB_FILES.every((f) => !/createAdminClient\(/.test(stripComments(read(f)))))
   const crawlChainsOf = (files: [string, string][]) => files.flatMap(([f, src]) => queryChains(f, src)).filter((c) => c.table === 'site_crawl_index')
   const crawlProblems = (list: Chain[]) => list.filter((c) => { const o = ownerCheck(c); return !o.namesUser || !o.namesProject }).map((c) => `${c.file}:${c.fn}`)
@@ -322,6 +337,17 @@ function main() {
     const foreignRead = contentIndex.replace("      .eq('user_id', userId)\n", '')
     check('MUTATION CONTROL: the content index reading the crawl by project alone is caught',
       foreignRead !== contentIndex && crawlProblems(crawlChainsOf(crawlSources.map(([f, src]) => [f, f === CONTENT_INDEX ? foreignRead : src]))).length === 1)
+    const claimSrc = read('lib/seed-scan/claim.ts')
+    const claimOffenders = (src: string) => ownerOffenders(queryChains('lib/seed-scan/claim.ts', src)).filter((o) => o.includes('free_site_check_claims'))
+    const anyClaim = claimSrc.replace("    .eq('consumed_at', consumedAt.toISOString())\n", '')
+    check('MUTATION CONTROL: returning a claim token not fenced by the instant this request spent it is caught',
+      anyClaim !== claimSrc && claimOffenders(anyClaim).length === 1)
+    const byCheck = claimSrc.replace(".eq('token_hash', hashClaimToken(token))", ".eq('check_id', checkId)")
+    check('MUTATION CONTROL: returning a claim by anything but its token\'s hash is caught', byCheck !== claimSrc && claimOffenders(byCheck).length === 1)
+    const wider = claimSrc.replace('.update({ consumed_at: null })', '.update({ consumed_at: null, check_id: null })')
+    check('MUTATION CONTROL: a claim return that changes more than consumed_at is caught', wider !== claimSrc && claimOffenders(wider).length === 1)
+    const elsewhere = claimSrc.replace('export async function restoreClaimToken(', 'export async function reopenClaim(')
+    check('MUTATION CONTROL: the same chain under another name is caught', elsewhere !== claimSrc && claimOffenders(elsewhere).length === 1)
     const directInsert = trackingSrc.replace('    await action(form)\n', "    await admin.from('tracking_targets').insert(fresh.map((keyword) => ({ project_id: scope.projectId, user_id: scope.userId, keyword })))\n")
     check('MUTATION CONTROL: tracking keywords by inserting them directly (not through the tab\'s action) is caught',
       directInsert !== trackingSrc && trackingOffenders(queryChains('tracking.ts', directInsert), directInsert).length === 2)
@@ -364,7 +390,7 @@ function main() {
     ]
     return patterns.flatMap((re) => [...code.matchAll(re)].map((m) => m[1]))
   }
-  const STEP_SOURCES = ['lib/seed-scan/steps.ts', 'lib/seed-scan/steps-b.ts', 'lib/seed-scan/runner.ts']
+  const STEP_SOURCES = ['lib/seed-scan/steps.ts', 'lib/seed-scan/steps-b.ts', 'lib/seed-scan/runner.ts', 'lib/seed-scan/resume.ts']
   const undocumented = (list: string[], documented: readonly string[]) => [...new Set(list)].filter((c) => !documented.includes(c))
   const stepCodes = STEP_SOURCES.flatMap((f) => stepCodesOf(read(f)))
   const distinctStepCodes = new Set(stepCodes).size
@@ -715,6 +741,44 @@ function main() {
     resumers.join(',') === `${CRON},lib/seed-scan/resume.ts` && runResumers.join(',') === 'lib/seed-scan/resume.ts,lib/seed-scan/runner.ts', `${resumers.join(',')} | ${runResumers.join(',')}`)
   const withOther = new Map(everything).set('app/api/other/route.ts', "import { resumeStalledSeedRuns } from '@/lib/seed-scan/resume'\nresumeStalledSeedRuns(admin, { env })")
   check('MUTATION CONTROL: another route resuming runs is caught', namers('resumeStalledSeedRuns', withOther).length === 3)
+
+  console.log('\nG9) a new project marks for the scan only the placeholders the route defaulted')
+  const CREATE = 'app/api/projects/create/route.ts'
+  const createSrc = read(CREATE)
+  const markOffenders = (src: string): string[] => {
+    const code = stripComments(src)
+    const out: string[] = []
+    const pushes = [...code.matchAll(/placeholders\.push\(([^)]*)\)/g)].map((m) => m[1])
+    if (pushes.join(',') !== "'country','language'") out.push(`placeholders: ${pushes.join(',') || 'none'}`)
+    for (const f of ['country', 'language']) {
+      if (!code.includes(`if (!formData.get('${f}')) placeholders.push('${f}')`)) out.push(`${f} marked whatever the owner sent`)
+    }
+    const calls = [...code.matchAll(/markScanOwnedFields\(/g)]
+    if (calls.length !== 1) out.push(`${calls.length} markScanOwnedFields call(s)`)
+    else {
+      const at = calls[0].index as number
+      const args = chainFrom(code, at + 'markScanOwnedFields'.length)
+      if (args !== '(createAdminClient(), { projectId: createdId, userId: user.id }, placeholders)') out.push(`marked with ${args}`)
+      const inserted = code.indexOf("await supabase.from('projects').insert(data).select('id')")
+      const failed = code.indexOf('if (error) {', inserted)
+      if (inserted < 0 || failed < 0 || !(failed < at)) out.push('marked before the project exists')
+      // One row back: `.select('id')` gives an array, `.select('id').single()` the row itself.
+      if (!/const createdId = \(insertResult as \{ id: string \}\[\] \| null\)\?\.\[0\]\?\.id/.test(code)
+        && !(/\.insert\(data\)\.select\('id'\)\.single\(\)/.test(code) && /const createdId = \(insertResult as \{ id: string \} \| null\)\?\.id/.test(code))) out.push('not the id the insert returned')
+    }
+    return out
+  }
+  const marks = markOffenders(createSrc)
+  check('the create route marks only the defaulted country and language, of the project it just created, as its owner', marks.length === 0, marks.join(' ; '))
+  check('MUTATION CONTROL: marking a country the owner sent is caught',
+    markOffenders(createSrc.replace("if (!formData.get('country')) placeholders.push('country')", "placeholders.push('country')")).length === 1)
+  check('MUTATION CONTROL: marking the business name too is caught',
+    markOffenders(createSrc.replace("if (!formData.get('language')) placeholders.push('language')\n", "if (!formData.get('language')) placeholders.push('language')\n    placeholders.push('business_name')\n")).length === 1)
+  check('MUTATION CONTROL: marking under a user the request did not authenticate is caught',
+    markOffenders(createSrc.replace('{ projectId: createdId, userId: user.id }', '{ projectId: createdId, userId: clientId }')).length === 1)
+  check('MUTATION CONTROL: marking before the insert has succeeded is caught',
+    markOffenders(createSrc.replace(/( {4}const \{ data: insertResult, error \} = await supabase\.from\('projects'\)\.insert\(data\)\.select\('id'\)(?:\.single\(\))?\n)/,
+      "$1    await markScanOwnedFields(createAdminClient(), { projectId: createdId, userId: user.id }, placeholders)\n")).length > 0)
 
   finish()
 }

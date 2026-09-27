@@ -20,7 +20,9 @@
  * column still holds the exact value this worker wrote. Postgres evaluates the
  * condition under the row lock, so two workers can never both take one run: the
  * loser matches zero rows. A worker that lost its lease finds out on its next
- * renewal and stops without writing another step.
+ * renewal and stops without writing another step. The value compared is an
+ * instant, not a string: PostgREST reads the lease back as `…+00:00`, never in
+ * the `…Z` form it was written in, so a JS check uses sameInstant.
  *
  * RESUME. Steps are created as `pending` together with the run, and each one is
  * finished individually, so a run that died midway is exactly "the first step
@@ -74,6 +76,11 @@ export const STAGE_LEASE_MS: Record<SeedRunStage, number> = { a: LEASE_MS, b: ST
  */
 export const MAX_RESUME_AGE_MS = 24 * 60 * 60 * 1000
 
+/** A running run whose current stage began after this is still the cron's to resume. */
+function resumableSinceIso(now: Date): string {
+  return new Date(now.getTime() - MAX_RESUME_AGE_MS).toISOString()
+}
+
 const RUN_COLUMNS = 'id, project_id, user_id, trigger, stage, status, summary, error_code, lease_expires_at, started_at, finished_at, created_at'
 const STEP_COLUMNS = 'run_id, project_id, user_id, step, status, item_count, detail, error_code, started_at, finished_at'
 
@@ -87,6 +94,19 @@ export function leaseUntil(now: Date, ms: number = LEASE_MS): string {
   return new Date(now.getTime() + ms).toISOString()
 }
 
+/**
+ * Whether two timestamps name the same instant. A lease is written as
+ * toISOString() (`…T10:02:00.000Z`) and PostgREST reads it back as
+ * `…T10:02:00+00:00`: the same instant, another string. Postgres compares the
+ * instants in every fenced write; a check made in JS must do the same.
+ */
+export function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false
+  const x = Date.parse(a)
+  const y = Date.parse(b)
+  return Number.isFinite(x) && Number.isFinite(y) && x === y
+}
+
 // ── Runs ────────────────────────────────────────────────────────────────────
 
 export type CreateRunResult =
@@ -97,14 +117,19 @@ export type CreateRunResult =
  * Create a run with its lease already held, and its steps as `pending`.
  *
  * Single flight without a lock table: the run is inserted, then the project's
- * live runs are read back in (created_at, id) order, and only the first one may
- * proceed; the loser deletes its own row and answers "in progress".
+ * runs in progress are read back in (created_at, id) order, and only the first
+ * one may proceed; the loser deletes its own row and answers "in progress".
  * `created_at` is left to the database default (now() of the inserting
  * transaction), so the order is the order the inserts actually happened in:
  * whichever insert lands after another request's read also sorts after it and
  * yields, and two inserts that both land before either read are both seen by
- * both, which agree on one winner. A run still marked running whose lease has
- * lapsed is superseded first: its worker is gone.
+ * both, which agree on one winner.
+ *
+ * In progress means a live worker holds the run, or its worker is gone and the
+ * cron will still resume it (its current stage began within
+ * MAX_RESUME_AGE_MS): such a run is older than the new one, so the new one
+ * yields to it. Only a run the cron has given up on (lease lapsed, stage begun
+ * longer ago than that) is superseded, first.
  */
 export async function createSeedRun(
   admin: ServiceRoleClient,
@@ -120,6 +145,7 @@ export async function createSeedRun(
 ): Promise<CreateRunResult> {
   const nowIso = input.now.toISOString()
   const lease = leaseUntil(input.now)
+  const resumableSince = resumableSinceIso(input.now)
 
   const stale = await admin
     .from('project_seed_runs')
@@ -128,6 +154,7 @@ export async function createSeedRun(
     .eq('user_id', scope.userId)
     .eq('status', 'running')
     .or(`lease_expires_at.is.null,lease_expires_at.lt.${nowIso}`)
+    .lt('started_at', resumableSince)
   if (stale.error) return { ok: false, reason: 'db_error' }
 
   const inserted = await admin
@@ -169,7 +196,7 @@ export async function createSeedRun(
     .eq('project_id', scope.projectId)
     .eq('user_id', scope.userId)
     .eq('status', 'running')
-    .gt('lease_expires_at', nowIso)
+    .or(`lease_expires_at.gt.${nowIso},started_at.gt.${resumableSince}`)
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
     .limit(1)
@@ -433,8 +460,9 @@ export type StartStageBResult =
  * One conditional UPDATE decides it: it matches only while the run is still at
  * stage 'a' and done or partial, so of two concurrent requests exactly one
  * moves it (the other matches zero rows and answers not_continuable). Then
- * b1-b6 are added as `pending`. If that insert fails, the run is handed back
- * exactly as stage A left it, fenced by the lease just taken.
+ * b1-b6 are added as `pending`, rows an earlier attempt already added kept as
+ * they are. If that write fails, the run is handed back exactly as stage A left
+ * it, fenced by the lease just taken, and the merchant can simply continue again.
  *
  * `started_at` and `finished_at` bracket the run's current stage: the move
  * restarts the one and clears the other, so the cron's MAX_RESUME_AGE_MS counts
@@ -460,9 +488,13 @@ export async function startSeedStageB(
   if (moved.error) return { ok: false, reason: 'db_error' }
   if (((moved.data as unknown[] | null)?.length ?? 0) !== 1) return { ok: false, reason: 'not_continuable' }
 
+  // ON CONFLICT DO NOTHING on the key (run_id, step): an earlier attempt whose
+  // write landed but whose answer was lost left these very rows behind (its
+  // back-out below cannot know they exist), and a plain insert would then fail
+  // on them with 23505 at every later attempt.
   const steps = await admin
     .from('project_seed_steps')
-    .insert(
+    .upsert(
       STAGE_STEPS.b.map((step) => ({
         run_id: run.id,
         project_id: scope.projectId,
@@ -471,6 +503,7 @@ export async function startSeedStageB(
         status: 'pending',
         detail: {},
       })),
+      { onConflict: 'run_id,step', ignoreDuplicates: true },
     )
   if (steps.error) {
     await fencedRunUpdate(admin, scope, run.id, lease, {
@@ -505,7 +538,7 @@ export async function listStalledSeedRuns(admin: ServiceRoleClient, now: Date, l
     .select('id, project_id, user_id, stage')
     .eq('status', 'running')
     .or(`lease_expires_at.is.null,lease_expires_at.lt.${now.toISOString()}`)
-    .gt('started_at', new Date(now.getTime() - MAX_RESUME_AGE_MS).toISOString())
+    .gt('started_at', resumableSinceIso(now))
     .order('started_at', { ascending: true })
     .limit(limit)
   if (error) return 'error'
@@ -514,15 +547,21 @@ export async function listStalledSeedRuns(admin: ServiceRoleClient, now: Date, l
 
 // ── What the caps read ─────────────────────────────────────────────────────
 
-/** A run of this project that a live worker holds right now. */
-export async function findLiveSeedRun(admin: ServiceRoleClient, scope: SeedScope, now: Date): Promise<boolean | 'error'> {
+/**
+ * A run of this project still in progress: a live worker holds it, or its
+ * worker is gone and the cron will still resume it (its current stage began
+ * within MAX_RESUME_AGE_MS; listStalledSeedRuns). A run between two workers is
+ * neither live nor finished, and a new start must not supersede it: it may be
+ * a stage B the merchant already chose keywords for.
+ */
+export async function findSeedRunInProgress(admin: ServiceRoleClient, scope: SeedScope, now: Date): Promise<boolean | 'error'> {
   const { data, error } = await admin
     .from('project_seed_runs')
     .select('id')
     .eq('project_id', scope.projectId)
     .eq('user_id', scope.userId)
     .eq('status', 'running')
-    .gt('lease_expires_at', now.toISOString())
+    .or(`lease_expires_at.gt.${now.toISOString()},started_at.gt.${resumableSinceIso(now)}`)
     .limit(1)
   if (error) return 'error'
   return ((data as unknown[] | null)?.length ?? 0) > 0

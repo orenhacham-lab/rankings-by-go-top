@@ -9,8 +9,10 @@
  * 2) The real engine (generateFromBriefs, offline against the fixture Gemini
  *    server of lib/content/__qa__/_reco-harness): for a WordPress project, a
  *    crawl index next to it changes NOTHING — suggestions and the full
- *    diagnostics are byte-identical and the crawl table is not even read; for
- *    a project without WordPress, the crawl index is what it reads, and another
+ *    diagnostics are byte-identical and the crawl table is not even read; the
+ *    same for a Shopify-synced project (its callers add the store's entities
+ *    themselves: a crawl of that storefront would count its pages twice); for
+ *    a project with neither, the crawl index is what it reads, and another
  *    account's crawl row is not.
  * 3) Source guard: every read of the site index in the recommendation engine
  *    goes through getContentIndex (no getCachedIndex left in its five files),
@@ -98,6 +100,8 @@ type Case = {
   /** What the caller passes; null: not known (read from the project). */
   userId: string | null
   hooks?: Record<string, unknown>
+  /** The project's shopify_entities rows. */
+  shopify?: Row[]
   want: string | null
   crawlRead?: boolean
 }
@@ -108,6 +112,7 @@ function db(c: Case) {
     wordpress_connections: c.connection ? [{ project_id: PROJECT, connection_status: c.connection }] : [],
     wordpress_content_index: c.wp ? [c.wp] : [],
     site_crawl_index: c.crawl ?? [],
+    shopify_entities: c.shopify ?? [],
   }
   const fake = new FakeAdmin(tables, (c.hooks ?? {}) as never)
   const reads: { table: string; eqs: [string, unknown][] }[] = []
@@ -127,6 +132,7 @@ function db(c: Case) {
 }
 
 const FAIL = { select: () => ({ code: 'XX000', message: 'read failed' }) }
+const SHOPIFY_ENTITY: Row = { id: 'se1', project_id: PROJECT, is_active: true, title: 'שירותי אינסטלציה', handle: 'services', entity_type: 'page', canonical_url: `https://${HOST}/services` }
 
 const CASES: Case[] = [
   { name: "WordPress 'connected' with targets, a crawl next to it → the WordPress row, the crawl not even read", connection: 'connected', wp: wpRow(), crawl: [crawlRow()], userId: USER, want: 'wp-row', crawlRead: false },
@@ -143,6 +149,12 @@ const CASES: Case[] = [
   { name: 'nothing anywhere → null', userId: USER, want: null },
   { name: 'the crawl read fails → no index, never a throw', crawl: [crawlRow()], userId: USER, hooks: { site_crawl_index: FAIL }, want: null },
   { name: 'the WordPress read fails, a crawl exists → the crawl', connection: 'connected', wp: wpRow(), crawl: [crawlRow()], userId: USER, hooks: { wordpress_content_index: FAIL }, want: 'crawl-owner' },
+  { name: 'a Shopify-synced project, no WordPress, a crawl → nothing, as before (the crawl not even read)', shopify: [SHOPIFY_ENTITY], crawl: [crawlRow()], userId: USER, want: null, crawlRead: false },
+  { name: 'a Shopify-synced project whose WordPress row has no targets → that row, as before', shopify: [SHOPIFY_ENTITY], connection: 'connected', wp: wpRow([]), crawl: [crawlRow()], userId: USER, want: 'wp-row', crawlRead: false },
+  { name: 'a Shopify-synced project with WordPress connected → the WordPress row, as before', shopify: [SHOPIFY_ENTITY], connection: 'connected', wp: wpRow(), crawl: [crawlRow()], userId: USER, want: 'wp-row', crawlRead: false },
+  { name: 'Shopify entities all inactive → still no crawl', shopify: [{ ...SHOPIFY_ENTITY, is_active: false }], crawl: [crawlRow()], userId: USER, want: null, crawlRead: false },
+  { name: 'shopify_entities cannot be read → no crawl (withheld, never a throw)', crawl: [crawlRow()], userId: USER, hooks: { shopify_entities: FAIL }, want: null, crawlRead: false },
+  { name: "another project's Shopify entities do not withhold this project's crawl", shopify: [{ ...SHOPIFY_ENTITY, project_id: 'another-project' }], crawl: [crawlRow()], userId: USER, want: 'crawl-owner' },
 ]
 
 async function part1() {
@@ -287,6 +299,23 @@ async function part2() {
 
     const failedWp = await run(withCrawl(withWordPress(shopTables(), 'failed')))
     check("WordPress connection 'failed': the crawl, not the stale WordPress index", failedWp.diagnostics.evidence_inventory.site_scan_entities === 2)
+
+    // A Shopify-synced store: the engine adds its entities itself.
+    const synced = (t: Record<string, Row[]>) => {
+      t.shopify_entities = [
+        { id: 'se1', project_id: 'p1', is_active: true, title: 'צמחי מרפא', handle: 'herbs', entity_type: 'collection', canonical_url: `https://${SHOP}/c/herbs` },
+        { id: 'se2', project_id: 'p1', is_active: true, title: 'שינה טובה בלי תרופות', handle: 'sleep', entity_type: 'blog', canonical_url: `https://${SHOP}/blog/sleep` },
+      ]
+      return t
+    }
+    const shopOnly = await run(synced(shopTables()))
+    const shopAndCrawl = await run(withCrawl(synced(shopTables())))
+    check('Shopify-synced project: its entities are read, as before',
+      shopOnly.suggestions.length > 0 && Number(shopOnly.diagnostics.evidence_inventory.shopify_entities ?? 0) === 2, JSON.stringify(shopOnly.diagnostics.evidence_inventory))
+    check('…with a crawl of the same storefront next to it: suggestions and the FULL diagnostics byte-identical (no page counted twice)',
+      canon(shopOnly.suggestions) === canon(shopAndCrawl.suggestions) && canon(shopOnly.diagnostics) === canon(shopAndCrawl.diagnostics) && shopOnly.providerCalls === shopAndCrawl.providerCalls,
+      `${JSON.stringify(shopOnly.diagnostics.evidence_inventory)} vs ${JSON.stringify(shopAndCrawl.diagnostics.evidence_inventory)}`)
+    check('…and the crawl table was never read', !shopAndCrawl.tablesRead.includes('site_crawl_index'), shopAndCrawl.tablesRead.join(','))
   } finally {
     server.close()
     if (saved.key === undefined) delete process.env.GEMINI_API_KEY

@@ -89,6 +89,12 @@ export type FakeRoute = {
   delayMs?: number
   /** Send the headers, then never finish the body (until the request is aborted). */
   stallBody?: boolean
+  /**
+   * Send the first half of `body`, then: 'break' — the connection drops (the
+   * stream errors, as undici's "terminated"); 'stall' — nothing more until the
+   * request is aborted.
+   */
+  cut?: 'break' | 'stall'
 }
 
 const abortError = () => Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })
@@ -118,6 +124,31 @@ export class FakeNetwork {
     this.requests.push(url)
     const route = this.routes[url] ?? { status: 404, headers: { 'content-type': 'text/html' }, body: '<html><body>not found</body></html>' }
     if (route.delayMs) await wait(route.delayMs, init?.signal)
+    if (route.cut) {
+      const bytes = new TextEncoder().encode(route.body ?? '')
+      const half = bytes.slice(0, Math.floor(bytes.length / 2))
+      const signal = init?.signal
+      let sent = false
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (!sent) {
+            sent = true
+            controller.enqueue(half)
+            return
+          }
+          if (route.cut === 'break') return controller.error(new TypeError('terminated'))
+          return new Promise<void>((resolve) => {
+            const stop = () => {
+              controller.error(abortError())
+              resolve()
+            }
+            if (signal?.aborted) stop()
+            else signal?.addEventListener('abort', stop, { once: true })
+          })
+        },
+      })
+      return new Response(stream, { status: route.status, headers: route.headers })
+    }
     if (route.stallBody) {
       const signal = init?.signal
       const stream = new ReadableStream<Uint8Array>({
@@ -378,11 +409,137 @@ export function projectRow(over: Record<string, unknown> = {}): Record<string, u
   }
 }
 
+// ── Timestamps as PostgREST writes them ─────────────────────────────────────
+
 /**
- * A FakeAdmin with one project. FakeAdmin applies no column defaults, so the
- * one default the store relies on is simulated here: project_seed_runs.created_at
- * is `DEFAULT now()` of the inserting transaction, i.e. strictly in insert order
- * (`dbNow` is the database's clock; ties move forward a millisecond).
+ * The timestamptz columns the seed pipeline reads back, per table. PostgREST
+ * answers such a column as `2026-09-27T10:02:00+00:00` (fraction only when
+ * there is one, trailing zeros trimmed), never in the `…00.000Z` form the code
+ * writes with toISOString(): the same instant, another string.
+ */
+export const TIMESTAMP_COLUMNS: Record<string, readonly string[]> = {
+  project_seed_runs: ['lease_expires_at', 'started_at', 'finished_at', 'created_at'],
+  project_seed_steps: ['started_at', 'finished_at'],
+  project_profiles: ['scanned_at', 'created_at', 'updated_at'],
+  project_audiences: ['created_at'],
+  free_site_check_claims: ['created_at', 'consumed_at'],
+  subscriptions: ['trial_ends_at', 'current_period_end', 'created_at'],
+}
+
+/** `…T10:02:00.000Z` as PostgREST writes it: `…T10:02:00+00:00`. */
+export function postgrestTimestamp(iso: string): string {
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return iso
+  const [whole, frac] = new Date(t).toISOString().slice(0, -1).split('.')
+  const trimmed = frac.replace(/0+$/, '')
+  return `${whole}${trimmed ? `.${trimmed}` : ''}+00:00`
+}
+
+/** A timestamp value as the instant it names (toISOString), whatever form it came in; anything else as it is. */
+const asInstant = (v: unknown): unknown => {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(v)) return v
+  const t = Date.parse(v)
+  return Number.isFinite(t) ? new Date(t).toISOString() : v
+}
+
+type AnyFn = (...args: unknown[]) => unknown
+
+/**
+ * Make a FakeAdmin answer the TIMESTAMP_COLUMNS the way PostgREST does, and
+ * compare them the way Postgres does. Every value written or filtered on is
+ * taken as the instant it names (so the table keeps one form, and `eq` on a
+ * value read back matches, as it does in SQL); every row read comes back in
+ * PostgREST's form. Code that compares a read-back timestamp to the string it
+ * wrote, as strings, then fails here as it fails against Supabase.
+ */
+export function withPostgrestTimestamps(fake: FakeAdmin, columns: Record<string, readonly string[]> = TIMESTAMP_COLUMNS): void {
+  const from = fake.from.bind(fake)
+  ;(fake as unknown as { from: (name: string) => unknown }).from = (name: string) => {
+    const query = from(name) as unknown as Record<string, AnyFn>
+    const cols = columns[name]
+    if (!cols) return query
+    const isTs = (col: unknown) => typeof col === 'string' && cols.includes(col)
+    const rowIn = (row: unknown) => {
+      if (!row || typeof row !== 'object') return row
+      const out: Record<string, unknown> = { ...(row as Record<string, unknown>) }
+      for (const c of cols) if (c in out) out[c] = asInstant(out[c])
+      return out
+    }
+    const rowOut = (row: unknown) => {
+      if (!row || typeof row !== 'object') return row
+      const out: Record<string, unknown> = { ...(row as Record<string, unknown>) }
+      for (const c of cols) if (typeof out[c] === 'string') out[c] = postgrestTimestamp(out[c] as string)
+      return out
+    }
+    const answerOut = (res: unknown) => {
+      const r = res as { data: unknown }
+      return { ...r, data: Array.isArray(r.data) ? r.data.map(rowOut) : rowOut(r.data) }
+    }
+    const patch = (method: string, wrap: (orig: AnyFn) => AnyFn) => {
+      query[method] = wrap(query[method].bind(query))
+    }
+    for (const m of ['eq', 'neq', 'gt', 'lt']) patch(m, (orig) => (col, val) => orig(col, isTs(col) ? asInstant(val) : val))
+    patch('in', (orig) => (col, vals) => orig(col, isTs(col) ? (vals as unknown[]).map(asInstant) : vals))
+    patch('or', (orig) => (expr) =>
+      orig(
+        String(expr)
+          .split(',')
+          .map((clause) => {
+            const [col, op, ...rest] = clause.split('.')
+            const val = rest.join('.')
+            return isTs(col) && val !== 'null' ? `${col}.${op}.${String(asInstant(val))}` : clause
+          })
+          .join(','),
+      ),
+    )
+    for (const m of ['insert', 'update', 'upsert']) {
+      patch(m, (orig) => (payload, ...rest) => orig(Array.isArray(payload) ? payload.map(rowIn) : rowIn(payload), ...rest))
+    }
+    patch('then', (orig) => (resolve, reject) => (orig(answerOut) as Promise<unknown>).then(resolve as AnyFn, reject as AnyFn))
+    for (const m of ['maybeSingle', 'single']) patch(m, (orig) => async () => answerOut(await orig()))
+    return query
+  }
+}
+
+/**
+ * The next write to `table` lands, but its answer never arrives: the caller
+ * gets an error back (a connection dropped after the commit). Install it on
+ * a world's FakeAdmin; it wraps whatever the world already wraps.
+ */
+export function loseNextAnswer(fake: FakeAdmin, table: string): void {
+  const from = fake.from.bind(fake)
+  let armed = true
+  ;(fake as unknown as { from: (name: string) => unknown }).from = (name: string) => {
+    const query = from(name) as unknown as Record<string, AnyFn>
+    if (name !== table || !armed) return query
+    for (const m of ['insert', 'upsert', 'update']) {
+      const write = query[m].bind(query)
+      query[m] = (...args: unknown[]) => {
+        if (armed) {
+          armed = false
+          const then = query.then.bind(query)
+          query.then = (resolve, reject) =>
+            (then(() => ({ data: null, error: { message: 'fetch failed' } })) as Promise<unknown>).then(resolve as AnyFn, reject as AnyFn)
+        }
+        return write(...args)
+      }
+    }
+    return query
+  }
+}
+
+/** The error Postgres gives a second row with the same (run_id, step). */
+export const STEP_KEY_VIOLATION = { code: '23505', message: 'duplicate key value violates unique constraint "project_seed_steps_pkey"' }
+
+/**
+ * A FakeAdmin with one project, answering timestamps as PostgREST does
+ * (withPostgrestTimestamps). FakeAdmin applies no column defaults or keys, so
+ * what the store relies on is simulated here: project_seed_runs.created_at is
+ * `DEFAULT now()` of the inserting transaction, i.e. strictly in insert order
+ * (`dbNow` is the database's clock; ties move forward a millisecond), and
+ * project_seed_steps has its primary key (run_id, step): an insert of a row
+ * already there fails with 23505 and writes nothing, and an upsert with
+ * ignoreDuplicates (ON CONFLICT DO NOTHING) writes only the new rows.
  */
 export function world(
   project: Record<string, unknown> = projectRow(),
@@ -403,7 +560,7 @@ export function world(
   let last = 0
   const from = fake.from.bind(fake)
   ;(fake as unknown as { from: (name: string) => unknown }).from = (name: string) => {
-    const query = from(name) as unknown as { insert: (payload: unknown) => unknown }
+    const query = from(name) as unknown as Record<string, AnyFn>
     if (name === 'project_seed_runs') {
       const insert = query.insert.bind(query)
       query.insert = (payload: unknown) => {
@@ -415,8 +572,37 @@ export function world(
         return insert(Array.isArray(payload) ? payload.map(withDefault) : withDefault(payload as Record<string, unknown>))
       }
     }
+    if (name === 'project_seed_steps') {
+      const key = (row: Record<string, unknown>) => `${String(row.run_id)} ${String(row.step)}`
+      const rowsOf = (payload: unknown) => (Array.isArray(payload) ? payload : [payload]) as Record<string, unknown>[]
+      const taken = () => new Set((tables.project_seed_steps ?? []).map(key))
+      const insert = query.insert.bind(query)
+      const upsert = query.upsert.bind(query)
+      const then = query.then.bind(query)
+      let violation = false
+      query.insert = (payload: unknown) => {
+        const have = taken()
+        const keys = rowsOf(payload).map(key)
+        violation = keys.some((k) => have.has(k)) || new Set(keys).size !== keys.length
+        return insert(payload)
+      }
+      query.upsert = (payload: unknown, opts?: unknown) => {
+        if (!(opts as { ignoreDuplicates?: boolean } | undefined)?.ignoreDuplicates) return upsert(payload, opts)
+        const have = taken()
+        return upsert(rowsOf(payload).filter((row) => !have.has(key(row))), opts)
+      }
+      query.then = (resolve: unknown, reject: unknown) =>
+        violation
+          ? Promise.resolve({ data: null, error: STEP_KEY_VIOLATION }).then(resolve as AnyFn, reject as AnyFn)
+          : then(resolve, reject)
+      for (const m of ['maybeSingle', 'single']) {
+        const orig = query[m].bind(query)
+        query[m] = async () => (violation ? { data: null, error: STEP_KEY_VIOLATION } : orig())
+      }
+    }
     return query
   }
+  withPostgrestTimestamps(fake)
   return { tables, fake, admin: fake as unknown as ServiceRoleClient }
 }
 
