@@ -16,6 +16,9 @@ import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { formatCount } from '@/components/gsc/format'
 import { HeaderLink, LinkButton, Widget, WidgetEmpty } from './ui'
 
+/** The closer to the top of Google, the deeper the accent: one hue, read top to bottom. */
+const RANK_SHADES = ['bg-action', 'bg-action/85', 'bg-action/70', 'bg-action/60', 'bg-action/50'] as const
+
 export default function RankDistribution({ t, rankings, language }: {
   t: DashboardDictionary['dashboardHome']
   rankings: RankingsView
@@ -38,7 +41,7 @@ export default function RankDistribution({ t, rankings, language }: {
         />
       ) : (
         <ul className="space-y-2.5">
-          {rankings.buckets.map((b) => {
+          {rankings.buckets.map((b, i) => {
             const label = d.buckets[b.key]
             const sentence = d.bucketSentence(label, b.count, total)
             const share = Math.round((b.count / max) * 100)
@@ -47,10 +50,10 @@ export default function RankDistribution({ t, rankings, language }: {
                 className="grid grid-cols-[4.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
                 <span className="text-caption font-medium text-body tabular-nums" dir="ltr">{label}</span>
                 <span role="meter" aria-label={sentence} aria-valuemin={0} aria-valuemax={total} aria-valuenow={b.count}
-                  className="h-2.5 w-full overflow-hidden rounded-pill bg-sunk">
+                  className="h-3 w-full overflow-hidden rounded-pill bg-sunk">
                   <span
                     className={cn('block h-full rounded-pill transition-[width] duration-500',
-                      b.key === 'notFound' ? 'bg-line-strong' : 'bg-action', b.count === 0 && 'opacity-0')}
+                      b.key === 'notFound' ? 'bg-line-strong' : RANK_SHADES[Math.min(i, RANK_SHADES.length - 1)], b.count === 0 && 'opacity-0')}
                     style={{ width: `${Math.max(share, b.count > 0 ? 3 : 0)}%` }}
                   />
                 </span>

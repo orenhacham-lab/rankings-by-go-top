@@ -29,7 +29,7 @@ export default function HoldingBack({ t, model, scannedLabel, settingsHref }: {
   const subtitle = model.state === 'ready' && scannedLabel ? `${h.subtitle} · ${scannedLabel}` : h.subtitle
 
   return (
-    <Widget id="holding-back" state={model.state} title={h.title} subtitle={subtitle} icon={icon}>
+    <Widget id="holding-back" state={model.state} title={h.title} subtitle={subtitle} icon={icon} tone={model.state === 'ready' ? 'attention' : 'default'}>
       {model.state === 'pending' && (
         <div className="space-y-3">
           <p className="text-copy font-medium text-ink">{h.pendingTitle}</p>
@@ -55,8 +55,8 @@ export default function HoldingBack({ t, model, scannedLabel, settingsHref }: {
         </div>
       )}
       {model.state === 'ready' && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="min-w-0">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="min-w-0 rounded-xl bg-surface p-4 shadow-card ring-1 ring-warn/15">
             <h3 className="text-caption font-semibold uppercase tracking-wide text-muted">{h.findingsTitle}</h3>
             {model.findings.length === 0 ? (
               <p className="mt-3 flex items-center gap-2 text-copy text-body">
@@ -80,7 +80,7 @@ export default function HoldingBack({ t, model, scannedLabel, settingsHref }: {
             )}
             {model.hidden > 0 && <p className="mt-2 text-caption text-muted">{h.more(model.hidden)}</p>}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 rounded-xl bg-surface p-4 shadow-card ring-1 ring-warn/15">
             <h3 className="flex items-baseline justify-between gap-2 text-caption font-semibold uppercase tracking-wide text-muted">
               <span>{h.geoTitle}</span>
               {model.total > 0 && <span className="normal-case tracking-normal tabular-nums">{h.geoScore(model.passed, model.total)}</span>}
