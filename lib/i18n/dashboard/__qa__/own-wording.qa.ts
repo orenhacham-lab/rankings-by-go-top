@@ -83,14 +83,16 @@ console.log('\nno label repeats the competitor\'s')
   const hits = echoes(DICTS)
   check('none of the four dictionaries uses one of the competitor\'s labels', hits.length === 0, hits.join(' | '))
   check('the two the owner named are reworded in both languages',
-    dashboardHe.keywordResearchScan.easyWins.title !== 'קרבות קלים לניצחון' && dashboardHe.competitors.title !== 'מאזן הכוחות'
+    !/קרבות|ניצחון/.test(dashboardHe.keywordResearchScan.easyWins.title) && !/מאזן|כוחות/.test(dashboardHe.competitors.title)
     && !/battle/i.test(dashboardEn.keywordResearchScan.easyWins.title) && !/\bvs\.?\b/i.test(dashboardEn.competitors.title))
 }
 
 console.log('\nmutation controls')
 {
-  const withOld = (mutate: (d: typeof dashboardHe) => void) => {
-    const copy = JSON.parse(JSON.stringify(dashboardHe)) as typeof dashboardHe
+  // A plain, writable copy of the Hebrew strings (functions drop out, which is fine here).
+  type Writable = { keywordResearchScan: { easyWins: { title: string } }; competitors: { title: string }; seedOnboarding: { summary: { badge: string } } }
+  const withOld = (mutate: (d: Writable) => void) => {
+    const copy = JSON.parse(JSON.stringify(dashboardHe)) as Writable
     mutate(copy)
     return echoes({ dashboardHe: copy }).length > 0
   }
