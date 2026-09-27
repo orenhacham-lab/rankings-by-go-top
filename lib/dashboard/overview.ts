@@ -26,7 +26,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { resolveActivePlatform } from '@/lib/content/platform/active-platform'
+import { resolveActivePlatform, siteConnectionState } from '@/lib/content/platform/active-platform'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NO_STORE = { 'cache-control': 'no-store' }
@@ -73,7 +73,7 @@ export interface AiData {
 export interface SetupData {
   /** The business is described: a scanned or typed description, or a business name. */
   business: boolean
-  /** A publishing platform (WordPress or Shopify) is connected to this project. */
+  /** A publishing platform (WordPress, Shopify, Wix or a webhook site) is connected to this project. */
   platform: boolean
 }
 
@@ -325,24 +325,29 @@ async function readAi(admin: ServiceRoleClient, projectId: string, userId: strin
 }
 
 async function readSetup({ projectId, userId, db }: Scope, project: { business_name: string | null }): Promise<Section<SetupData>> {
-  const [profileRes, wpRes, shopifyRes] = await Promise.all([
+  const [profileRes, wpRes, shopifyRes, siteRes] = await Promise.all([
     db.from('project_profiles').select('description').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     db.from('wordpress_connections').select('connection_status').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     db.from('shopify_connections').select('connection_status, granted_scopes').eq('project_id', projectId).eq('user_id', userId).is('archived_at', null).maybeSingle(),
+    db.from('site_platform_connections').select('platform, connection_status').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
   ])
   if (profileRes.error || wpRes.error || shopifyRes.error) return { state: 'error' }
   const wp = wpRes.data as { connection_status?: string } | null
   const shop = shopifyRes.data as { connection_status?: string; granted_scopes?: string[] } | null
+  // Wix / webhook: an unreadable (or not yet migrated) table is "not connected",
+  // never an error for the whole setup section.
+  const site = siteConnectionState(siteRes.error ? null : siteRes.data as { platform?: unknown; connection_status?: unknown } | null)
   const platform = resolveActivePlatform({
     wordpress: { present: !!wp, connectionStatus: wp?.connection_status ?? null },
     shopify: { present: !!shop, connectionStatus: shop?.connection_status ?? null, canPublish: false },
+    site,
   })
   const description = str((profileRes.data as { description?: unknown } | null)?.description)
   return {
     state: 'ready',
     data: {
       business: !!description || !!str(project.business_name),
-      platform: platform.wordpressActive || platform.shopifyActive,
+      platform: platform.wordpressActive || platform.shopifyActive || platform.siteActive,
     },
   }
 }

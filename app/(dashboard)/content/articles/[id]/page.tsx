@@ -563,6 +563,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             connection state (never the WordPress post id). */}
         <ArticleEditorPublishGate
           projectId={projectId}
+          articleId={id}
           shopifyPanel={projectId && (
             <ShopifyPublishSettings
               projectId={projectId}

@@ -44,7 +44,7 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
     <ContentHubSetup
       projectId={projectId}
       platform={data.platform?.platform ?? 'none'}
-      platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed'}
+      platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed' || ((data.platform?.platform === 'wix' || data.platform?.platform === 'webhook') && data.platform?.siteActive === false)}
       shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
     />
   ) : null

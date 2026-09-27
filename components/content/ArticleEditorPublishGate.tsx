@@ -10,6 +10,7 @@
  *                            a later phase; NO fake/disabled CTA).
  *   - Neither              → a compact "connect a platform on the project page".
  *   - Both                 → a configuration-conflict warning (no publish flow).
+ *   - Wix / custom site    → the publish card for those platforms (SitePublishCard).
  *
  * UI-only: hides WordPress controls in non-WordPress projects rather than
  * rendering them disabled. No publishing behavior changes.
@@ -22,9 +23,10 @@ import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { resolveActivePlatform, type ActivePlatform } from '@/lib/content/platform/active-platform'
+import { resolveActivePlatform, siteConnectionState, type ActivePlatform } from '@/lib/content/platform/active-platform'
+import { SitePublishCard } from './site-platforms/SiteHubCard'
 
-export default function ArticleEditorPublishGate({ projectId, children, shopifyPanel }: { projectId: string | null; children: React.ReactNode; shopifyPanel?: React.ReactNode }) {
+export default function ArticleEditorPublishGate({ projectId, children, shopifyPanel, articleId }: { projectId: string | null; children: React.ReactNode; shopifyPanel?: React.ReactNode; articleId?: string }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.publishGate, [language])
   const dir: 'rtl' | 'ltr' = language === 'he' ? 'rtl' : 'ltr'
@@ -35,17 +37,20 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
   const load = useCallback(async () => {
     if (!projectId) { setLoading(false); return }
     try {
-      const [wpRes, shRes] = await Promise.all([
+      const [wpRes, shRes, siteRes] = await Promise.all([
         fetch(`/api/wordpress/connection?projectId=${projectId}`),
         fetch(`/api/shopify/connection?projectId=${projectId}`),
+        fetch(`/api/site-platforms/connection?projectId=${projectId}`),
       ])
       const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
       const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
+      const st = siteRes.ok ? await siteRes.json().catch(() => ({})) : {}
       // Platform by connection VALIDITY (shared resolver), not row existence — a
       // stale/failed WordPress row never masks a valid Shopify connection.
       setPlatform(resolveActivePlatform({
         wordpress: { present: !!wp.connection, connectionStatus: (wp.connection as { connection_status?: string } | null)?.connection_status ?? null },
         shopify: { present: !!sh.connection, connectionStatus: (sh.connection as { connection_status?: string } | null)?.connection_status ?? null, canPublish: !!(sh.connection as { can_publish?: boolean } | null)?.can_publish },
+        site: siteConnectionState(st.connection ?? null),
       }).platform)
     } catch { /* leave none */ } finally { setLoading(false) }
   }, [projectId])
@@ -95,6 +100,11 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
         </div>
       </Card>
     )
+  }
+
+  // Wix / custom site → publish straight to the connected site (no draft step).
+  if ((platform === 'wix' || platform === 'webhook') && projectId && articleId) {
+    return <SitePublishCard projectId={projectId} articleId={articleId} />
   }
 
   // Neither connected → direct the user to connect on the project page.

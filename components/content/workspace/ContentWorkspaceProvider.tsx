@@ -82,10 +82,12 @@ function useWorkspaceValue() {
   // Manual publish/draft actions route by this — a Shopify project never calls WordPress.
   const activePlatform: ActivePlatform = data?.platform?.platform ?? 'wordpress'
   const isShopify = activePlatform === 'shopify'
+  // Wix / custom site (webhook): publish-only platforms with no draft step.
+  const isSite = activePlatform === 'wix' || activePlatform === 'webhook'
   // Already exported on the ACTIVE platform (row eligibility + status).
   const exportedIdOf = useCallback(
-    (a: ArticleRow): string | number | null => (isShopify ? (a.shopify_article_id ?? null) : a.wp_post_id),
-    [isShopify],
+    (a: ArticleRow): string | number | null => (isShopify ? (a.shopify_article_id ?? null) : isSite ? null : a.wp_post_id),
+    [isShopify, isSite],
   )
   const [loading, setLoading] = useState(true)
   // M — ideas destination sub-tab (automatic ideas vs manual topic), carried in the URL
@@ -318,7 +320,7 @@ function useWorkspaceValue() {
     projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects,
     language, t, isHebrew, toast,
     // overview
-    data, loading, counts, activePlatform, isShopify, exportedIdOf, load, patchArticle, shopifyPublishError,
+    data, loading, counts, activePlatform, isShopify, isSite, exportedIdOf, load, patchArticle, shopifyPublishError,
     // topics
     topics, selectableTopics, articleByTopic, topicsLoading, loadTopics,
     planStatus, setPlanStatus, highlightTopicIds,

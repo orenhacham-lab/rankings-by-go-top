@@ -30,7 +30,7 @@ export function settingsGscHref(projectId: string): string {
   return `/settings?projectId=${encodeURIComponent(projectId)}#${SETTINGS_GSC_ANCHOR}`
 }
 
-export type PlatformState = 'wordpress' | 'shopify' | 'conflict' | 'none'
+export type PlatformState = 'wordpress' | 'shopify' | 'wix' | 'webhook' | 'conflict' | 'none'
 export type GscState = 'connected' | 'reauth_required' | 'revoked' | 'error' | 'none'
 
 /** Which platform card to show (null = platform is ready or handled elsewhere). */
