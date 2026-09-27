@@ -27,6 +27,7 @@
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { readSeedProject, type SeedProject } from './settings'
+import { SHOPIFY_STAGE_A_EXECUTORS } from './shopify-steps'
 import { GRACE_MS, STAGE_A_EXECUTORS, stageADeps, type StageABudgets, type StageADepsInput, type StepContext, type StepOutcome } from './steps'
 import { STAGE_B_EXECUTORS, stageBDeps, stageBStepBudgetMs, type StageBContext, type StageBDepsInput } from './steps-b'
 import {
@@ -203,7 +204,9 @@ async function workRun(args: RunArgs & { lease: string }, expect: SeedRunStage |
       try {
         if (stage === 'a') {
           const ctx: StepContext = { admin, scope, trigger: run.trigger, project, summary, details, deps: depsA, save }
-          outcome = await STAGE_A_EXECUTORS[step as 'a1' | 'a2' | 'a3' | 'a4'](ctx)
+          // A store's first run reads the store it was installed on (shopify-steps.ts).
+          const executors = run.trigger === 'shopify_install' ? SHOPIFY_STAGE_A_EXECUTORS : STAGE_A_EXECUTORS
+          outcome = await executors[step as 'a1' | 'a2' | 'a3' | 'a4'](ctx)
         } else {
           const ctx: StageBContext = {
             admin,

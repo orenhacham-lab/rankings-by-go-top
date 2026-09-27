@@ -128,6 +128,8 @@ export const SEED_STEP_ERROR_CODES = [
   'claim_payload_missing',
   // a2: understanding the business
   'storefront_locked',
+  // a2 of a store: no product, no collection and no public storefront to read
+  'store_empty',
   'claim_without_insight',
   'model_unavailable',
   'model_failed',

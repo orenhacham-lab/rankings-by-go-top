@@ -9,7 +9,7 @@
  * belong to the authenticated user before anything is written.
  */
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
@@ -19,8 +19,13 @@ import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue, loadValidPendingInst
 import { completeShopifyAppStoreLink } from '@/lib/shopify/app-store-link'
 import { missingScopes } from '@/lib/shopify/constants'
 import { buildShopifyAdminAppUrl } from '@/lib/shopify/billing-urls'
+import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
+
+// The store's first seeding scan may run in after(), once linked.
+export const maxDuration = 300
 
 export async function POST(request: Request) {
+  const startedAt = Date.now()
   if (!isContentModuleEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const supabase = await createClient()
@@ -98,6 +103,10 @@ export async function POST(request: Request) {
     const httpStatus = linked.reason === 'save_failed' ? 500 : linked.reason === 'pending_invalid' ? 400 : 409
     return clearCookie(NextResponse.json({ error: linked.reason }, { status: httpStatus }))
   }
+
+  // The store's first seeding scan, after this response (lib/seed-scan/
+  // shopify-install.ts decides whether: the feature, the plan, the caps).
+  if (status === 'connected') scheduleShopifySeedScan(after, { admin, source: 'link', userId: user.id, projectId, connectionId: linked.connectionId, startedAt })
 
   // Send the merchant back INTO the embedded app in Shopify Admin (where the
   // connector home's live billing check will prompt them to choose a plan)
