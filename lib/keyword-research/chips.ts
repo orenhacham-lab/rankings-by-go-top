@@ -21,7 +21,7 @@
  * Pure: no React, no I/O.
  */
 import { compareWins, competitionLevel, easyWin } from './easy-wins'
-import { compareByVolume, keywordKey, RESEARCH_ORIGINS, type AverageClickPrice, type KeywordIdea, type ScanOrigin } from './scan-research'
+import { compareByVolume, RESEARCH_ORIGINS, type AverageClickPrice, type KeywordIdea, type ScanOrigin } from './scan-research'
 
 export const RESEARCH_CHIPS = ['all', 'research', 'competitors', 'google', 'high_volume', 'low_competition', 'questions', 'suggested', 'tracked'] as const
 export type ResearchChip = (typeof RESEARCH_CHIPS)[number]
@@ -96,12 +96,4 @@ export function rowsForChip<T extends ChipRow>(rows: readonly T[], chip: Researc
   wins.sort(compareWins)
   rest.sort(compareByVolume)
   return [...wins.map((w) => w.row), ...rest]
-}
-
-/** The rank of each keyword in the suggested order, for sorting the table by it. */
-export function suggestionRanks(rows: readonly ChipRow[], average: AverageClickPrice | null): Map<string, number> {
-  const ranked = rowsForChip(rows, 'suggested', average)
-  const out = new Map<string, number>()
-  ranked.forEach((r, i) => out.set(keywordKey(r.keyword), i))
-  return out
 }

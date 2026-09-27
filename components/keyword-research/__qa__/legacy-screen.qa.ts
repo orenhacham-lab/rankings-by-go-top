@@ -64,7 +64,14 @@ function mismatches(scan: unknown, tag: string, source?: string): string[] {
   const bad: string[] = []
   for (const locale of LOCALES) {
     for (const [name, state] of Object.entries(HARNESS.LEGACY_SCENARIOS)) {
-      const html = HARNESS.renderPage(locale, { state, scan, tag, source })
+      let html: string
+      try {
+        html = HARNESS.renderPage(locale, { state, scan, tag, source })
+      } catch (err) {
+        // A page that cannot render a state does not match it.
+        bad.push(`${locale}/${name} (threw ${err instanceof Error ? err.name : typeof err})`)
+        continue
+      }
       const want = golden.scenarios[`${locale}/${name}`]
       if (!want || want.sha256 !== sha(html)) {
         bad.push(`${locale}/${name} (${html.length} chars, golden ${want?.length ?? 'missing'})`)
@@ -98,16 +105,15 @@ function main() {
 
   console.log('\nMUT) broken copies of the page fail the checks')
   const page = readFileSync(HARNESS.PAGE_PATH, 'utf8')
-  const mutate = (from: string, to: string) => {
-    if (!page.includes(from)) throw new Error(`mutation anchor missing: ${from}`)
-    return page.replace(from, to)
-  }
-  check('L1-MUT: a page whose header spacing changed fails L1',
-    mismatches(NONE, 'mut-header', mutate('<div className={`mb-8 ${isRTL ? \'text-right\' : \'text-left\'}`}>', '<div className={`mb-6 ${isRTL ? \'text-right\' : \'text-left\'}`}>')).length > 0)
-  check('L1-MUT2: a page that shows one more element with no scan fails L1',
-    mismatches(NONE, 'mut-extra', mutate('{/* Form */}', '<p>new</p>')).length > 0)
-  check('L1-MUT3: a table that lost a column fails L1 (a results state only)',
-    mismatches(NONE, 'mut-column', mutate('{t.results.lowCpc}', '{null}')).some((m) => !m.includes('/initial')))
+  // A control whose anchor is gone (the page changed) fails, loudly, instead of passing or crashing.
+  const mutate = (from: string, to: string): string | null => (page.includes(from) ? page.replace(from, to) : null)
+  const broken = (tag: string, source: string | null) => (source === null ? null : mismatches(NONE, tag, source))
+  const header = broken('mut-header', mutate('<div className={`mb-8 ${isRTL ? \'text-right\' : \'text-left\'}`}>', '<div className={`mb-6 ${isRTL ? \'text-right\' : \'text-left\'}`}>'))
+  check('L1-MUT: a page whose header spacing changed fails L1', !!header && header.length > 0, header ? undefined : 'anchor missing')
+  const extra = broken('mut-extra', mutate('{/* Form */}', '<p>new</p>'))
+  check('L1-MUT2: a page that shows one more element with no scan fails L1', !!extra && extra.length > 0, extra ? undefined : 'anchor missing')
+  const column = broken('mut-column', mutate('{t.results.lowCpc}', '{null}'))
+  check('L1-MUT3: a table that lost a column fails L1 (a results state only)', !!column && column.some((m) => !m.includes('/initial')), column ? undefined : 'anchor missing')
   check('L3-MUT: a state renamed in the page is caught by L3',
     !HARNESS.seedableSource(page.replace(/const \[opportunitiesOpen, setOpportunitiesOpen\]/, 'const [panelOpen, setOpportunitiesOpen]')).names.includes('opportunitiesOpen'))
 
