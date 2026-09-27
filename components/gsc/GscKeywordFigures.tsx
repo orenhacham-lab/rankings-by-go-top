@@ -74,13 +74,13 @@ export function GscKeywordsNotice({ projectId, view, className }: { projectId: s
         {t.keywords.title}
       </span>
       {isGscSetupState(state) ? (
-        <GscSetupPrompt state={state} about={t.keywords.about} projectId={projectId} layout="inline" className="min-w-0 flex-1" />
+        <GscSetupPrompt state={state} about={t.keywords.about} projectId={projectId} layout="inline" className="min-w-0 flex-1 basis-72" />
       ) : state === 'error' ? (
-        <GscLoadError onRetry={view.retry} className="min-w-0 flex-1" />
+        <GscLoadError onRetry={view.retry} className="min-w-0 flex-1 basis-72" />
       ) : state === 'ready' ? (
-        <p className="min-w-0 flex-1 text-sm text-muted">{t.keywords.legend}</p>
+        <p className="min-w-0 flex-1 basis-72 text-sm text-muted">{t.keywords.legend}</p>
       ) : (
-        <p className="min-w-0 flex-1 text-sm text-muted" aria-busy="true">{t.keywords.loading}</p>
+        <p className="min-w-0 flex-1 basis-72 text-sm text-muted" aria-busy="true">{t.keywords.loading}</p>
       )}
     </div>
   )

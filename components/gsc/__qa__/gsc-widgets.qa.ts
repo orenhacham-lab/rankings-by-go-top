@@ -689,6 +689,30 @@ async function main() {
       recOff === '' && new RegExp(`^<section [^>]*class="${SEPARATOR}"`).test(recOn), `${recOff.length} ${recOn.slice(0, 120)}`)
   }
 
+  // A phone (390px) scrolled sideways on Keywords: 481px in English. In a
+  // wrapping row, a `flex-1` sentence with no basis gives up all of its width,
+  // so the unbreakable "Connect Search Console" button never wraps and runs past
+  // the screen's edge. Measured before/after in a browser at 390px.
+  console.log('\nI) on a phone, an inline notice wraps instead of running off the screen')
+  {
+    const inlineSentence = (src: string) => {
+      const m = src.match(/<p className=\{cn\('text-sm text-muted', layout === 'inline' && '([^']*)'\)\}/)
+      return m ? m[1] : null
+    }
+    const wraps = (cls: string | null) => !!cls && /\bflex-1\b/.test(cls) && /\bbasis-(?!0\b)[\w[\].]+/.test(cls)
+    const prompt = code('components/gsc/GscSetupPrompt.tsx')
+    check('I1: an inline prompt\'s sentence keeps a basis, so its button wraps under it', wraps(inlineSentence(prompt)), String(inlineSentence(prompt)))
+    check('I1-MUT: the sentence without a basis is caught',
+      !wraps(inlineSentence(prompt.replace(/'min-w-0 flex-1 basis-[\w[\].]+'/, "'min-w-0 flex-1'"))))
+
+    const notice = code('components/gsc/GscKeywordFigures.tsx')
+    const body = notice.slice(notice.indexOf('export function GscKeywordsNotice'), notice.indexOf('export function GscKeywordLine'))
+    const beside = (src: string) => [...src.matchAll(/className="(min-w-0 flex-1[^"]*)"/g)].map((m) => m[1])
+    const besideOk = (src: string) => beside(src).length === 4 && beside(src).every(wraps)
+    check('I2: every part beside the Keywords notice\'s title keeps a basis, so it drops under the title on a phone', besideOk(body), beside(body).join(' | '))
+    check('I2-MUT: one part without a basis is caught', !besideOk(body.replace('min-w-0 flex-1 basis-72', 'min-w-0 flex-1')))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }
