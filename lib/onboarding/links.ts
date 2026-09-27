@@ -1,0 +1,54 @@
+/**
+ * Every place the onboarding screens send a merchant, built in one spot.
+ *
+ * Each is an internal path this app serves. The only `next` any of them
+ * carries is a path we built ourselves, and the sign-in screen sanitises it
+ * again, so nothing here can point at another site.
+ *
+ * The research summary lives at /projects/{id}/summary, under the project,
+ * and carries ?projectId= so the workspace switcher adopts that project too
+ * (the active-project provider reloads its list once for a project created a
+ * moment ago). Other screens link to it with summaryHref.
+ */
+
+const enc = encodeURIComponent
+
+export function summaryHref(projectId: string): string {
+  return `/projects/${enc(projectId)}/summary?projectId=${enc(projectId)}`
+}
+
+export function dashboardHref(projectId: string): string {
+  return `/dashboard?projectId=${enc(projectId)}`
+}
+
+/**
+ * The settings sections the summary's "Edit" opens: what the business is, its
+ * audiences, its competitors. The settings screen owns the sections; these are
+ * the anchors they are reached by.
+ */
+export const SUMMARY_EDIT_ANCHORS = {
+  business: 'business',
+  audiences: 'audiences',
+  competitors: 'competitors',
+} as const
+export type SummaryEditSection = keyof typeof SUMMARY_EDIT_ANCHORS
+
+export function settingsHref(projectId: string, section?: SummaryEditSection): string {
+  const base = `/settings?projectId=${enc(projectId)}`
+  return section ? `${base}#${SUMMARY_EDIT_ANCHORS[section]}` : base
+}
+
+export const BILLING_HREF = '/billing'
+export const CLIENTS_HREF = '/clients'
+export const NEW_PROJECT_HREF = '/projects/new'
+
+/** The sign-in screen, returning to `path` afterwards. Only an internal path is ever passed on. */
+export function signInHref(path: string): string {
+  const safe = path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\') ? path : '/dashboard'
+  return `/login?next=${enc(safe)}`
+}
+
+/** An article the first-article button wrote. */
+export function articleHref(articleId: string): string {
+  return `/content/articles/${enc(articleId)}`
+}
