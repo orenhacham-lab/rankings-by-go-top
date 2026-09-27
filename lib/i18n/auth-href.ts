@@ -23,7 +23,7 @@
 import type { Locale } from './locales'
 import { LANGUAGE_PARAM } from './request-locale'
 
-export type AuthPage = 'login' | 'signup'
+export type AuthPage = 'login' | 'signup' | 'forgot-password'
 
 /** The sign-in or sign-up page in `locale`, with any extra query (e.g. a plan or a claim token). */
 export function authHref(page: AuthPage, locale: Locale, query: Record<string, string | null | undefined> = {}): string {

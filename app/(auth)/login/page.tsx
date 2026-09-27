@@ -24,6 +24,7 @@ const LOGIN_UI = {
     passwordLabel: 'סיסמה',
     passwordPlaceholder: '••••••••',
     loginBtn: 'כניסה',
+    forgotPassword: 'שכחתם את הסיסמה?',
     dontHaveAccount: 'אין לך חשבון?',
     startTrial: 'התחל ניסיון חינם',
     accessibility: 'נגישות',
@@ -47,6 +48,7 @@ const LOGIN_UI = {
     passwordLabel: 'Password',
     passwordPlaceholder: '••••••••',
     loginBtn: 'Sign in',
+    forgotPassword: 'Forgot your password?',
     dontHaveAccount: "Don't have an account?",
     startTrial: 'Start free trial',
     accessibility: 'Accessibility',
@@ -163,6 +165,11 @@ export function AuthForm() {
               required
               autoComplete="current-password"
             />
+            <div className="-mt-2 text-end">
+              <Link href={authHref('forgot-password', lang)} className="text-sm text-blue-600 hover:underline" data-forgot-password>
+                {t.forgotPassword}
+              </Link>
+            </div>
 
             <Button
               type="submit"

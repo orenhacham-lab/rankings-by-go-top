@@ -150,7 +150,7 @@ async function main() {
     check('B8: after sign-in the app opens in the form\'s language', opensInLanguage(login))
     check('MUTATION CONTROL: router.replace(nextPath) without the language is caught', !opensInLanguage(login.replace('router.replace(withLocaleParam(nextPath, lang))', 'router.replace(nextPath)')))
     const signup = strip(read('app/(auth)/signup/page.tsx'))
-    check('B9: the sign-up no longer offers a password reset that does not exist', !/reset (?:your )?password|לאפס סיסמה/i.test(signup))
+    check('B9: the sign-up\'s "already registered" line sends the visitor to sign in (the reset link lives there), not to a reset of its own', !/reset (?:your )?password|לאפס סיסמה/i.test(signup))
 
     // The confirmation callback's failure path, run for real.
     const { NextRequest } = require('next/server')
