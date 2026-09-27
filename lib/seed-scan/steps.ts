@@ -334,7 +334,7 @@ async function a1(ctx: StepContext): Promise<StepOutcome> {
   return ctx.trigger === 'claim' ? a1Claim(ctx) : a1Live(ctx)
 }
 
-async function a1Live(ctx: StepContext): Promise<StepOutcome> {
+export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   const { deps } = ctx
   const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { mode: 'live' } })
 
@@ -363,8 +363,9 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   const fetched = page.kind === 'value' && page.value.ok && !(page.value.truncated && pageCutShort) ? page.value : null
 
   // A password-locked store answers with its password page (200 or 401). It is
-  // read as "locked", not as a site full of problems.
-  if (isLockedStorefront({ trace, html: fetched?.html ?? null, siteHost: start.hostname })) {
+  // read as "locked", not as a site full of problems. A store that was just
+  // installed IS Shopify, whatever its headers say (shopify-steps.ts).
+  if (isLockedStorefront({ trace, html: fetched?.html ?? null, siteHost: start.hostname, knownShopify: ctx.trigger === 'shopify_install' })) {
     const summary = withCounters({
       ...ctx.summary,
       url: fetched?.url ?? start.toString(),
@@ -475,7 +476,7 @@ async function a2(ctx: StepContext): Promise<StepOutcome> {
   return ctx.trigger === 'claim' ? a2Claim(ctx) : a2Live(ctx)
 }
 
-async function a2Live(ctx: StepContext): Promise<StepOutcome> {
+export async function a2Live(ctx: StepContext): Promise<StepOutcome> {
   const a1Detail = ctx.details.a1 ?? {}
   if (a1Detail.storefrontLocked === true) return finished('skipped', 'storefront_locked', ctx.summary)
   const signals = readStoredSignals(a1Detail.signals)
@@ -565,7 +566,7 @@ async function a3(ctx: StepContext): Promise<StepOutcome> {
   return ctx.trigger === 'claim' ? a3Claim(ctx) : a3Live(ctx)
 }
 
-async function a3Live(ctx: StepContext): Promise<StepOutcome> {
+export async function a3Live(ctx: StepContext): Promise<StepOutcome> {
   const a1Detail = ctx.details.a1 ?? {}
   if (a1Detail.storefrontLocked === true) {
     // Not measured, which is not the same as failing all four.
