@@ -106,6 +106,8 @@ function setup(o: Opts = {}) {
     runStage: async (args) => {
       runStageCalls.push(args)
     },
+    // `continue` has its own suite (seed-continue.qa.ts); start and claim never track keywords.
+    addKeywords: async (args) => ({ outcome: { requested: args.keywords.length, added: 0, code: 'no_keywords_selected' }, targetIds: [] }),
     locale: async () => 'he',
     now: c.now,
     env: { ENABLE_SEED_SCAN: 'true', ...o.env },

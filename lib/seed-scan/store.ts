@@ -6,9 +6,12 @@
  * only this server code writes them, with the service-role client. That client
  * bypasses RLS, so every query below names the owner explicitly —
  * `.eq('project_id', …)` AND `.eq('user_id', …)`, or both columns in the row it
- * inserts. The single exception is the global daily cap, a head-only count that
- * returns a number and no row (lib/seed-scan/__qa__/seed-source-guards.qa.ts
- * pins that down).
+ * inserts. Two exceptions, both pinned down by
+ * lib/seed-scan/__qa__/seed-source-guards.qa.ts: the global daily cap, a
+ * head-only count that returns a number and no row; and the cron's discovery
+ * of stalled runs, which has no owner to filter by and so returns only the
+ * keys (id, project_id, user_id, stage) that every later, owner-filtered
+ * query then uses.
  *
  * THE LEASE. A run is worked by whoever holds its lease, and `lease_expires_at`
  * itself is the fencing token: taking a lease is a conditional UPDATE that only
@@ -21,8 +24,12 @@
  *
  * RESUME. Steps are created as `pending` together with the run, and each one is
  * finished individually, so a run that died midway is exactly "the first step
- * that is not finished" plus everything the finished steps saved. Stage B adds
- * its steps to STAGE_STEPS; nothing here is specific to stage A.
+ * that is not finished" plus everything the finished steps saved.
+ *
+ * STAGE B. A finished stage A (done or partial) moves on to stage B in one
+ * conditional UPDATE (startSeedStageB): the same run, back to `running`, with a
+ * new lease, and b1-b6 added as `pending` next to its a1-a4. The condition is
+ * the stage and the status, so of two requests only one moves it.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
@@ -48,6 +55,25 @@ import {
  */
 export const LEASE_MS = 120_000
 
+/**
+ * Stage B's lease. Its longest step without an intermediate save is the content
+ * plan (steps-b.ts, 120s), and a worker renews before every step and every
+ * save, so the lease must outlast that step; 330s is also longer than the
+ * route's whole life (maxDuration 300), so a live worker's lease never lapses
+ * under it. A run whose worker died is taken over at most 5.5 minutes later.
+ */
+export const STAGE_B_LEASE_MS = 330_000
+
+export const STAGE_LEASE_MS: Record<SeedRunStage, number> = { a: LEASE_MS, b: STAGE_B_LEASE_MS }
+
+/**
+ * The cron leaves a run alone once its current stage began this long ago: it
+ * has been retried enough. Counted from `started_at`, which the move to stage B
+ * restarts (startSeedStageB), so a stage B continued days after stage A still
+ * gets its full day.
+ */
+export const MAX_RESUME_AGE_MS = 24 * 60 * 60 * 1000
+
 const RUN_COLUMNS = 'id, project_id, user_id, trigger, stage, status, summary, error_code, lease_expires_at, started_at, finished_at, created_at'
 const STEP_COLUMNS = 'run_id, project_id, user_id, step, status, item_count, detail, error_code, started_at, finished_at'
 
@@ -57,8 +83,8 @@ export type SeedStepRow = ProjectSeedStepRow
 /** Reads work with either client: the owner's RLS-scoped one or the service role. */
 type ReadDb = SupabaseClient
 
-export function leaseUntil(now: Date): string {
-  return new Date(now.getTime() + LEASE_MS).toISOString()
+export function leaseUntil(now: Date, ms: number = LEASE_MS): string {
+  return new Date(now.getTime() + ms).toISOString()
 }
 
 // ── Runs ────────────────────────────────────────────────────────────────────
@@ -257,17 +283,51 @@ export function nextSeedStep(stage: SeedRunStage, steps: Pick<SeedStepRow, 'step
  * The run's verdict from its steps: failed when the first step failed (nothing
  * was read, so nothing downstream means anything), partial when a later step
  * failed, done otherwise. A skipped step is a deliberate outcome, not a failure.
+ *
+ * A stage-B run is judged on all ten steps, and is never `failed`: its stage A
+ * read the site (it could not have continued otherwise), so whatever b1-b6
+ * found or did not find, the run is done or partial.
  */
 export function seedRunStatus(
   stage: SeedRunStage,
   steps: Pick<SeedStepRow, 'step' | 'status' | 'error_code'>[],
 ): { status: SeedRunStatus; errorCode: string | null } {
-  const ordered = STAGE_STEPS[stage].map((step) => steps.find((s) => s.step === step))
+  const order = stage === 'b' ? [...STAGE_STEPS.a, ...STAGE_STEPS.b] : STAGE_STEPS[stage]
+  const ordered = order.map((step) => steps.find((s) => s.step === step))
   const first = ordered[0]
-  if (first?.status === 'failed') return { status: 'failed', errorCode: first.error_code ?? 'internal_error' }
+  if (stage === 'a' && first?.status === 'failed') return { status: 'failed', errorCode: first.error_code ?? 'internal_error' }
   const failed = ordered.find((s) => s?.status === 'failed')
   if (failed) return { status: 'partial', errorCode: failed.error_code ?? 'internal_error' }
   return { status: 'done', errorCode: null }
+}
+
+/**
+ * Put back the rows of a stage that are missing (as `pending`), so a resumed
+ * run never meets a step it cannot mark. Nothing to do in the normal case: the
+ * rows are created with the run, or with its stage B.
+ */
+export async function insertMissingSeedSteps(
+  admin: ServiceRoleClient,
+  scope: SeedScope,
+  runId: string,
+  stage: SeedRunStage,
+  existing: Pick<SeedStepRow, 'step'>[],
+): Promise<boolean> {
+  const missing = STAGE_STEPS[stage].filter((step) => !existing.some((s) => s.step === step))
+  if (missing.length === 0) return true
+  const { error } = await admin
+    .from('project_seed_steps')
+    .insert(
+      missing.map((step) => ({
+        run_id: runId,
+        project_id: scope.projectId,
+        user_id: scope.userId,
+        step,
+        status: 'pending',
+        detail: {},
+      })),
+    )
+  return !error
 }
 
 // ── Snapshot and lease (all fenced by the lease value) ─────────────────────
@@ -311,8 +371,9 @@ export async function takeSeedLease(
   scope: SeedScope,
   runId: string,
   now: Date,
+  ms: number = LEASE_MS,
 ): Promise<string | null> {
-  const lease = leaseUntil(now)
+  const lease = leaseUntil(now, ms)
   const { data, error } = await admin
     .from('project_seed_runs')
     .update({ lease_expires_at: lease })
@@ -333,8 +394,9 @@ export async function renewSeedLease(
   runId: string,
   lease: string,
   now: Date,
+  ms: number = LEASE_MS,
 ): Promise<string | null> {
-  const next = leaseUntil(now)
+  const next = leaseUntil(now, ms)
   return (await fencedRunUpdate(admin, scope, runId, lease, { lease_expires_at: next })) ? next : null
 }
 
@@ -357,6 +419,97 @@ export function finishSeedRun(
     finished_at: outcome.now.toISOString(),
     lease_expires_at: null,
   })
+}
+
+// ── Stage B ─────────────────────────────────────────────────────────────────
+
+export type StartStageBResult =
+  | { ok: true; lease: string }
+  | { ok: false; reason: 'not_continuable' | 'db_error' }
+
+/**
+ * Move a finished stage A on to stage B, with the lease held by the caller.
+ *
+ * One conditional UPDATE decides it: it matches only while the run is still at
+ * stage 'a' and done or partial, so of two concurrent requests exactly one
+ * moves it (the other matches zero rows and answers not_continuable). Then
+ * b1-b6 are added as `pending`. If that insert fails, the run is handed back
+ * exactly as stage A left it, fenced by the lease just taken.
+ *
+ * `started_at` and `finished_at` bracket the run's current stage: the move
+ * restarts the one and clears the other, so the cron's MAX_RESUME_AGE_MS counts
+ * from the start of stage B, however long after stage A the merchant continued.
+ * Stage A's own times stay on a1-a4.
+ */
+export async function startSeedStageB(
+  admin: ServiceRoleClient,
+  scope: SeedScope,
+  run: Pick<SeedRunRow, 'id' | 'status' | 'error_code' | 'started_at' | 'finished_at'>,
+  now: Date,
+): Promise<StartStageBResult> {
+  const lease = leaseUntil(now, STAGE_B_LEASE_MS)
+  const moved = await admin
+    .from('project_seed_runs')
+    .update({ stage: 'b', status: 'running', error_code: null, started_at: now.toISOString(), finished_at: null, lease_expires_at: lease })
+    .eq('id', run.id)
+    .eq('project_id', scope.projectId)
+    .eq('user_id', scope.userId)
+    .eq('stage', 'a')
+    .in('status', ['done', 'partial'])
+    .select('id')
+  if (moved.error) return { ok: false, reason: 'db_error' }
+  if (((moved.data as unknown[] | null)?.length ?? 0) !== 1) return { ok: false, reason: 'not_continuable' }
+
+  const steps = await admin
+    .from('project_seed_steps')
+    .insert(
+      STAGE_STEPS.b.map((step) => ({
+        run_id: run.id,
+        project_id: scope.projectId,
+        user_id: scope.userId,
+        step,
+        status: 'pending',
+        detail: {},
+      })),
+    )
+  if (steps.error) {
+    await fencedRunUpdate(admin, scope, run.id, lease, {
+      stage: 'a',
+      status: run.status,
+      error_code: run.error_code,
+      started_at: run.started_at,
+      finished_at: run.finished_at,
+      lease_expires_at: null,
+    })
+    return { ok: false, reason: 'db_error' }
+  }
+  return { ok: true, lease }
+}
+
+// ── What the cron resumes ───────────────────────────────────────────────────
+
+export type StalledSeedRun = { id: string; project_id: string; user_id: string; stage: SeedRunStage }
+
+/**
+ * Runs still marked running whose worker is gone (lease empty or lapsed),
+ * oldest first, whose current stage began within MAX_RESUME_AGE_MS.
+ *
+ * The one read here with no owner to filter by — the cron works for every
+ * account — so it returns the run's keys and nothing else: no snapshot, no
+ * step, no lease. Every query that follows is filtered by the owner these keys
+ * name, and taking the lease is still the conditional UPDATE of takeSeedLease.
+ */
+export async function listStalledSeedRuns(admin: ServiceRoleClient, now: Date, limit: number): Promise<StalledSeedRun[] | 'error'> {
+  const { data, error } = await admin
+    .from('project_seed_runs')
+    .select('id, project_id, user_id, stage')
+    .eq('status', 'running')
+    .or(`lease_expires_at.is.null,lease_expires_at.lt.${now.toISOString()}`)
+    .gt('started_at', new Date(now.getTime() - MAX_RESUME_AGE_MS).toISOString())
+    .order('started_at', { ascending: true })
+    .limit(limit)
+  if (error) return 'error'
+  return ((data as StalledSeedRun[] | null) ?? []).filter((r) => r.stage === 'a' || r.stage === 'b')
 }
 
 // ── What the caps read ─────────────────────────────────────────────────────
@@ -421,9 +574,10 @@ export async function countUserSeedRunsSince(admin: ServiceRoleClient, userId: s
 }
 
 /**
- * Runs started since `since` across ALL accounts — the global ceiling. The one
- * query here without an owner filter, deliberately head-only: it returns a
- * count and never a row, so nothing of another tenant's crosses over.
+ * Runs started since `since` across ALL accounts — the global ceiling. One of
+ * the two queries here without an owner filter (the other is the cron's
+ * keys-only listStalledSeedRuns), deliberately head-only: it returns a count
+ * and never a row, so nothing of another tenant's crosses over.
  */
 export async function countAllSeedRunsSince(admin: ServiceRoleClient, since: Date): Promise<number | 'error'> {
   const { count, error } = await admin

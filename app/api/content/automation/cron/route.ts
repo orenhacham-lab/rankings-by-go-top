@@ -17,6 +17,12 @@
  * bounded by maxDuration; the per-item locks in the runner keep overlapping
  * runs from generating or publishing the same item twice. The outcome is in
  * the `[automation-cron] run complete` log line, as before.
+ *
+ * THEN, THE SEEDING SCAN'S STALLED RUNS. Once the runner has finished and
+ * logged, the same `after()` continues up to two seed runs whose worker is gone
+ * (lib/seed-scan/resume.ts). That part is isolated: its own try/catch and its
+ * own deadline inside what is left of maxDuration, and it never throws, so it
+ * cannot change, delay or fail the runner's result.
  */
 
 import { after } from 'next/server'
@@ -24,6 +30,7 @@ import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { runAutomation } from '@/lib/content/automation/runner'
 import { authorizeCronRequest } from '@/lib/auth/cron'
+import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/resume'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -45,6 +52,11 @@ async function handle(request: Request): Promise<Response> {
     } catch (e) {
       console.error('[automation-cron] run failed', { startedAt, message: e instanceof Error ? e.message : String(e) })
     }
+    // After the runner, never before or around it; resolves whatever the resume does.
+    await startIsolatedSeedResume(
+      (deadlineAt) => resumeStalledSeedRuns(createAdminClient(), { env: process.env, deadlineAt }),
+      { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
+    )
   })
   return Response.json({ ok: true, accepted: true, startedAt }, { status: 202 })
 }

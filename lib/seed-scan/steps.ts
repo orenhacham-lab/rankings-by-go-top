@@ -100,7 +100,7 @@ export const STAGE_A_BUDGETS: StageABudgets = {
 }
 
 /** The outer race gives the inner abort a moment to come back as a structured result. */
-const GRACE_MS = 1_000
+export const GRACE_MS = 1_000
 /** How many sitemap URLs are counted before the count reads "at least". */
 export const SITEMAP_URL_LIMIT = 1_000
 /** Page text kept for a resumed a2; the model prompt uses the first 6,000 characters. */
@@ -181,9 +181,9 @@ export type StepResult = {
 
 export type StepOutcome = StepResult | { kind: 'abort' }
 
-const ABORT: StepOutcome = { kind: 'abort' }
+export const ABORT: StepOutcome = { kind: 'abort' }
 
-function finished(
+export function finished(
   status: StepResult['status'],
   errorCode: SeedErrorCode | null,
   summary: SeedSummary,
@@ -202,14 +202,14 @@ function finished(
 
 // ── Time ────────────────────────────────────────────────────────────────────
 
-type Settled<T> = { kind: 'value'; value: T } | { kind: 'timeout' } | { kind: 'error' }
+export type Settled<T> = { kind: 'value'; value: T } | { kind: 'timeout' } | { kind: 'error' }
 
 /**
  * Run `work` for at most `ms`. A rejection is `error` and never escapes; a late
  * answer is ignored. Nothing about the error is kept: its text may be a
  * provider's.
  */
-async function settleWithin<T>(work: () => Promise<T>, ms: number): Promise<Settled<T>> {
+export async function settleWithin<T>(work: () => Promise<T>, ms: number): Promise<Settled<T>> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<Settled<T>>((resolve) => {
     timer = setTimeout(() => resolve({ kind: 'timeout' }), ms)
@@ -229,7 +229,7 @@ async function settleWithin<T>(work: () => Promise<T>, ms: number): Promise<Sett
 }
 
 /** An abort signal that fires after `ms`, and a way to disarm it. */
-function deadline(ms: number): { signal: AbortSignal; clear: () => void } {
+export function deadline(ms: number): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
   return { signal: controller.signal, clear: () => clearTimeout(timer) }
@@ -242,7 +242,7 @@ function storedSignals(signals: SiteSignals): SiteSignals {
   return { ...signals, text: signals.text.slice(0, STORED_TEXT_CHARS) }
 }
 
-function readStoredSignals(v: unknown): SiteSignals | null {
+export function readStoredSignals(v: unknown): SiteSignals | null {
   if (!v || typeof v !== 'object') return null
   const r = v as Partial<SiteSignals>
   const ok =

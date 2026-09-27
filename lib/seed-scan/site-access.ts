@@ -1,6 +1,7 @@
 /**
- * How step a1 reaches the network: only the project's own host, only within a
- * deadline, and with a record of every hop.
+ * How steps a1 and b1 reach the network: only the project's own host, only
+ * within a deadline, and with a record of every hop. b1 also passes its
+ * robots.txt check (`allow`), so a disallowed path is never requested.
  *
  * The engine's fetchers (lib/free-check/site-fetch.ts) already admit every hop
  * as a public address and cap bytes and time per request. A seeding scan needs
@@ -38,6 +39,14 @@ export class OffHostRequestError extends Error {
   }
 }
 
+/** Thrown for a request the caller's `allow` refuses (step b1: robots.txt). Also a network failure to the engine. */
+export class DisallowedRequestError extends Error {
+  constructor() {
+    super('request not allowed')
+    this.name = 'DisallowedRequestError'
+  }
+}
+
 function requestUrl(input: RequestInfo | URL): URL | null {
   try {
     if (typeof input === 'string') return new URL(input)
@@ -56,6 +65,10 @@ function shopifyHeaders(headers: Headers): boolean {
  * A fetch that only reaches hosts whose domainKey is `siteKey`, aborts at
  * `deadline`, and records every response in `trace`. `offHost` is set when a
  * request was refused, so the caller can tell "redirected away" from "down".
+ *
+ * `allow`, when given, is asked about every request on the host too — every
+ * redirect hop included — and a refused one never leaves (`disallowed` is
+ * then set). Step b1 passes its robots.txt check here.
  */
 export function hostPinnedFetch(args: {
   siteKey: string
@@ -63,12 +76,18 @@ export function hostPinnedFetch(args: {
   deadline: AbortSignal
   trace: FetchHop[]
   offHost: { hit: boolean }
+  allow?: (url: URL) => boolean
+  disallowed?: { hit: boolean }
 }): typeof fetch {
   return async (input, init) => {
     const url = requestUrl(input)
     if (!url || domainKey(url) !== args.siteKey) {
       args.offHost.hit = true
       throw new OffHostRequestError()
+    }
+    if (args.allow && !args.allow(url)) {
+      if (args.disallowed) args.disallowed.hit = true
+      throw new DisallowedRequestError()
     }
     const signal = init?.signal ? AbortSignal.any([init.signal, args.deadline]) : args.deadline
     const res = await args.base(url.toString(), { ...init, signal })

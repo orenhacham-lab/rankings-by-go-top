@@ -16,7 +16,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import { slugFromUrl } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
@@ -307,7 +308,7 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
     if (!error) data.ideas = (rows ?? []) as KeywordGuardData['ideas']
   } catch { /* ideas table optional */ }
   try {
-    const cacheRow = await getCachedIndex(admin, projectId)
+    const cacheRow = await getContentIndex(projectId, null, admin)
     if (cacheRow) data.scanTargets = (reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]
   } catch { /* scan cache optional */ }
   try {

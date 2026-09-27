@@ -642,8 +642,9 @@ Return ONLY JSON (no other text):
 
     return questions
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err)
-    console.error(`[Gemini Enrichment] Generation failed: ${errorMsg}`)
+    // The error's class only: its message is the provider's text, which is
+    // never logged (the seeding scan's stage B calls this too).
+    console.error('[Gemini Enrichment] Generation failed', { error: err instanceof Error ? err.name : typeof err })
     return []
   }
 }

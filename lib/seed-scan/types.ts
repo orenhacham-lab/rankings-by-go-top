@@ -22,7 +22,7 @@ export type { SeedRunStage, SeedRunStatus, SeedRunTrigger, SeedStep, SeedStepSta
 /** The owner a query is about. Every service-role query filters by both. */
 export type SeedScope = { projectId: string; userId: string }
 
-/** The steps of each stage, in execution order. Stage B adds its six here. */
+/** The steps of each stage, in execution order. A stage-B run keeps its stage-A rows. */
 export const STAGE_STEPS: Record<SeedRunStage, readonly SeedStep[]> = {
   a: ['a1', 'a2', 'a3', 'a4'],
   b: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'],
@@ -141,6 +141,48 @@ export const SEED_STEP_ERROR_CODES = [
   'search_timeout',
   'search_interrupted',
   'competitors_write_failed',
+  // b1: the key pages of the site
+  'crawl_disallowed',
+  'crawl_no_pages',
+  'crawl_write_failed',
+  'crawl_interrupted',
+  // b2 and b3: keyword ideas (Google Ads)
+  'market_unsupported',
+  'keyword_ideas_unavailable',
+  'keyword_ideas_failed',
+  'keyword_ideas_timeout',
+  'keyword_ideas_rate_limited',
+  'keyword_ideas_interrupted',
+  'keyword_ideas_write_failed',
+  'no_validated_competitors',
+  'site_vocabulary_missing',
+  // b4: the content plan (the recommendation engine)
+  'content_engine_disabled',
+  'content_entitlement_required',
+  'content_session_required',
+  'content_engine_unavailable',
+  'content_engine_busy',
+  'content_engine_failed',
+  'content_engine_timeout',
+  'content_engine_interrupted',
+  // b5: AI-visibility questions
+  'ai_visibility_disabled',
+  'no_business_profile',
+  'questions_unavailable',
+  'questions_failed',
+  'questions_timeout',
+  'questions_interrupted',
+  'questions_write_failed',
+  // b6: the keywords the merchant chose, and their first rank check
+  'no_keywords_added',
+  'keyword_quota_exceeded',
+  'keyword_entitlement_unavailable',
+  'keywords_add_failed',
+  'rank_check_session_required',
+  'rank_check_quota',
+  'rank_check_failed',
+  'rank_check_timeout',
+  'rank_check_interrupted',
   // any step, or the run itself
   'site_unreadable',
   'project_missing',
@@ -161,10 +203,32 @@ export const SEED_API_ERROR_CODES = [
   'user_daily_cap',
   'global_daily_cap',
   'claim_invalid',
+  // continue: the latest run is not a finished stage A, or its stage B already began
+  'not_continuable',
+  'stage_b_started',
   'unavailable',
   'internal',
 ] as const
 export type SeedApiErrorCode = (typeof SEED_API_ERROR_CODES)[number]
+
+/** At most this many of the run's own seed keywords are tracked by `continue`. */
+export const MAX_CONTINUE_KEYWORDS = 5
+
+/**
+ * What adding the chosen keywords to tracking came to. Adding goes through the
+ * keywords tab's own server action, so its quota and entitlement rules apply
+ * unchanged; a refusal is one of these codes and never stops stage B.
+ */
+export const SEED_TRACKING_CODES = [
+  'keywords_added',
+  'keywords_already_tracked',
+  'no_keywords_selected',
+  'keyword_quota_exceeded',
+  'keyword_entitlement_unavailable',
+  'keywords_add_failed',
+] as const
+export type SeedTrackingCode = (typeof SEED_TRACKING_CODES)[number]
+export type SeedTrackingOutcome = { requested: number; added: number; code: SeedTrackingCode }
 
 /** One step as the API shows it. */
 export type SeedStepView = {
@@ -193,5 +257,5 @@ export type SeedRunView = {
 
 export type SeedGetResponse = { ok: true; run: SeedRunView | null } | { ok: false; code: SeedApiErrorCode }
 export type SeedPostResponse =
-  | { ok: true; runId: string; trigger: SeedRunTrigger }
+  | { ok: true; runId: string; trigger: SeedRunTrigger; stage?: 'b'; tracking?: SeedTrackingOutcome }
   | { ok: false; code: SeedApiErrorCode; retryAfterSeconds?: number }

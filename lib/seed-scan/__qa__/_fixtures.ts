@@ -460,25 +460,42 @@ export function claimedScan(over: { domain?: string; url?: string; business?: bo
 
 // ── Logs ────────────────────────────────────────────────────────────────────
 
-/** Capture everything written to the console while `work` runs (and keep it quiet). */
+/** The captures running now, and the console they replaced. */
+const captures: string[][] = []
+let realConsole: Pick<Console, 'log' | 'warn' | 'error' | 'info'> | null = null
+
+/**
+ * Capture everything written to the console while `work` runs (and keep it
+ * quiet). Captures may overlap (two requests at once): every line goes to each
+ * capture running at that moment, and the real console comes back when the
+ * last of them ends, whatever order they end in.
+ */
 export async function captureConsole<T>(work: () => Promise<T>): Promise<{ value: T; output: string }> {
   const lines: string[] = []
-  const saved = { log: console.log, warn: console.warn, error: console.error, info: console.info }
-  const sink = (...args: unknown[]) => {
-    lines.push(args.map((a) => (typeof a === 'string' ? a : safeJson(a))).join(' '))
+  if (captures.length === 0) {
+    realConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info }
+    const sink = (...args: unknown[]) => {
+      const line = args.map((a) => (typeof a === 'string' ? a : safeJson(a))).join(' ')
+      for (const c of captures) c.push(line)
+    }
+    console.log = sink
+    console.warn = sink
+    console.error = sink
+    console.info = sink
   }
-  console.log = sink
-  console.warn = sink
-  console.error = sink
-  console.info = sink
+  captures.push(lines)
   try {
     const value = await work()
     return { value, output: lines.join('\n') }
   } finally {
-    console.log = saved.log
-    console.warn = saved.warn
-    console.error = saved.error
-    console.info = saved.info
+    captures.splice(captures.indexOf(lines), 1)
+    if (captures.length === 0 && realConsole) {
+      console.log = realConsole.log
+      console.warn = realConsole.warn
+      console.error = realConsole.error
+      console.info = realConsole.info
+      realConsole = null
+    }
   }
 }
 

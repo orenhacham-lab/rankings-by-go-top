@@ -4,8 +4,12 @@
  *
  *   POST  { action: 'start' }          → 202 { ok, runId, trigger }
  *         { action: 'claim', token }   → 202 { ok, runId, trigger: 'claim' }
+ *         { action: 'continue',        → 202 { ok, runId, trigger, stage: 'b',
+ *           keywords: string[] }               tracking } — stage B of the
+ *                                        latest run, see handleSeedContinue
  *   GET                                → 200 { ok, run } — the latest run, its
- *                                        steps and its snapshot, or run: null
+ *                                        steps (b1-b6 too once stage B began)
+ *                                        and its snapshot, or run: null
  *
  * ORDER OF CHECKS (POST). proxy.ts does not cover /api/*, so this does it all:
  *   1. signed in                                   401 unauthorized
@@ -26,6 +30,9 @@
  *   8. the run is created with its lease held, answered 202, and worked after
  *      the response (the route passes next/server's `after`).
  *
+ * `continue` shares steps 1-5 and has checks of its own instead of 6-8 (it
+ * starts no new run): see handleSeedContinue at the end of this file.
+ *
  * Every refusal is { ok: false, code } with a stable code (SEED_API_ERROR_CODES)
  * and a 429 also carries Retry-After. Nothing a provider or the database said
  * is ever part of a response or a log line.
@@ -45,11 +52,15 @@ import {
   findRecentCompletedSeedRun,
   getLatestSeedRun,
   listSeedSteps,
+  startSeedStageB,
+  updateSeedStep,
   type SeedRunRow,
   type SeedStepRow,
 } from './store'
 import { initialSummary, readSummary } from './summary'
+import type { SeedTrackingResult } from './tracking'
 import {
+  MAX_CONTINUE_KEYWORDS,
   STAGE_STEPS,
   type SeedApiErrorCode,
   type SeedGetResponse,
@@ -57,6 +68,7 @@ import {
   type SeedRunTrigger,
   type SeedRunView,
   type SeedScope,
+  type SeedTrackingOutcome,
 } from './types'
 
 // ── Limits ──────────────────────────────────────────────────────────────────
@@ -95,6 +107,12 @@ export type SeedRouteDeps = {
   /** Run work after the response has been sent (next/server's `after`). */
   schedule: (task: () => Promise<void>) => void
   runStage: (args: { admin: ServiceRoleClient; scope: SeedScope; runId: string; lease: string }) => Promise<unknown>
+  /**
+   * Track the keywords chosen on `continue` through the keywords tab's own
+   * server action (lib/seed-scan/tracking.ts addSeedKeywords), as the signed-in
+   * merchant. A refusal is a code in the result, never a throw.
+   */
+  addKeywords: (args: { admin: ServiceRoleClient; scope: SeedScope; keywords: string[]; targetDomain: string }) => Promise<SeedTrackingResult>
   /** The request's locale when the body names none. */
   locale: () => Promise<Locale>
   now: () => Date
@@ -167,7 +185,27 @@ async function gate(projectId: string, deps: SeedRouteDeps): Promise<Gate> {
   return { ok: true, userId: session.userId, db: session.db, project, admin: adminClient }
 }
 
-type PostBody = { action: 'start'; locale: Locale | null } | { action: 'claim'; token: string; locale: Locale | null }
+type PostBody =
+  | { action: 'start'; locale: Locale | null }
+  | { action: 'claim'; token: string; locale: Locale | null }
+  | { action: 'continue'; keywords: string[]; locale: Locale | null }
+
+/** A seed keyword is short text; anything longer is not one of ours. */
+const MAX_KEYWORD_CHARS = 200
+
+/** `keywords` of a continue: an array of at most MAX_CONTINUE_KEYWORDS distinct, non-empty strings; null otherwise. */
+function readContinueKeywords(v: unknown): string[] | null {
+  if (!Array.isArray(v) || v.length > MAX_CONTINUE_KEYWORDS) return null
+  const out: string[] = []
+  for (const x of v) {
+    if (typeof x !== 'string') return null
+    const k = x.trim()
+    if (!k || k.length > MAX_KEYWORD_CHARS) return null
+    if (out.some((o) => o.toLowerCase() === k.toLowerCase())) return null
+    out.push(k)
+  }
+  return out
+}
 
 async function readBody(request: Request): Promise<PostBody | null> {
   let raw: unknown
@@ -185,6 +223,10 @@ async function readBody(request: Request): Promise<PostBody | null> {
   if (r.action === 'start') return { action: 'start', locale }
   if (r.action === 'claim' && typeof r.token === 'string' && r.token.length > 0 && r.token.length <= 256) {
     return { action: 'claim', token: r.token, locale }
+  }
+  if (r.action === 'continue') {
+    const keywords = readContinueKeywords(r.keywords)
+    return keywords ? { action: 'continue', keywords, locale } : null
   }
   return null
 }
@@ -257,6 +299,8 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
     if (!access.allowed) return refuse(403, 'entitlement_required')
 
     const scope: SeedScope = { projectId: project.id, userId }
+    // Stage B of the latest run: it starts no new run, so no caps; its own checks.
+    if (body.action === 'continue') return handleSeedContinue(body, { admin, scope, targetDomain: project.target_domain }, deps)
     const now = deps.now()
     const caps = await checkSeedCaps(admin, scope, now, deps.env)
     if (!caps.ok) return refuse(caps.status, caps.code, caps.retryAfterSeconds)
@@ -324,10 +368,12 @@ export function seedRunView(run: SeedRunRow, steps: SeedStepRow[], now: Date): S
     stage: run.stage,
     status: run.status,
     errorCode: stableCode(run.error_code),
+    // The current stage's times: moving to stage B restarts them (stage A's stay on a1-a4).
     startedAt: run.started_at,
     finishedAt: run.finished_at,
     stalled: run.status === 'running' && !leaseLive,
-    steps: (STAGE_STEPS[run.stage] ?? []).map((step) => {
+    // A stage-B run shows all ten steps: stage A's as they finished, then b1-b6.
+    steps: (run.stage === 'b' ? [...STAGE_STEPS.a, ...STAGE_STEPS.b] : (STAGE_STEPS[run.stage] ?? [])).map((step) => {
       const row = steps.find((s) => s.step === step)
       return {
         step,
@@ -362,4 +408,79 @@ export async function handleSeedGet(projectId: string, deps: SeedRouteDeps): Pro
     console.error('[seed-scan] read failed', { projectId, error: errorName(err) })
     return refuse(500, 'internal')
   }
+}
+
+// ── POST { action: 'continue' } ─────────────────────────────────────────────
+
+const keywordKey = (k: string) => k.trim().toLowerCase()
+
+/**
+ * Stage B of the project's latest run, once the merchant chose which of its
+ * seed keywords to track. Reached only through handleSeedPost, after steps 1-5
+ * (signed in, their project read through their own client, the flag, a
+ * well-formed body, entitled). Then, in this order:
+ *
+ *   the latest run is a finished stage A (done or partial)     409 not_continuable
+ *   …whose stage B has not begun                               409 stage_b_started
+ *   every keyword is one of that run's own seed keywords,      400 invalid_request
+ *     MAX_CONTINUE_KEYWORDS at most (readBody)
+ *   the run moves to stage B in ONE conditional write, with    409 not_continuable
+ *     its lease held — of two requests, one moves it
+ *   the keywords are tracked through the keywords tab's own server action; a
+ *     refusal (the plan's keyword limit, an entitlement outage) is a code in
+ *     the answer and stage B runs anyway
+ *   b6 is told which keywords were added — the only ones it will check
+ *   202 { ok, runId, trigger, stage: 'b', tracking }; b1-b6 run after it.
+ */
+async function handleSeedContinue(
+  body: Extract<PostBody, { action: 'continue' }>,
+  ctx: { admin: ServiceRoleClient; scope: SeedScope; targetDomain: string },
+  deps: SeedRouteDeps,
+): Promise<Response> {
+  const { admin, scope } = ctx
+  const run = await getLatestSeedRun(admin, scope)
+  if (run === 'error') return refuse(500, 'internal')
+  if (!run) return refuse(409, 'not_continuable')
+  if (run.stage === 'b') return refuse(409, 'stage_b_started')
+  if (run.status !== 'done' && run.status !== 'partial') return refuse(409, 'not_continuable')
+
+  // Only the run's own seed keywords, in the spelling the run found them.
+  const seeds = new Map((readSummary(run.summary)?.seedKeywords ?? []).map((k) => [keywordKey(k), k]))
+  const keywords: string[] = []
+  for (const k of body.keywords) {
+    const seed = seeds.get(keywordKey(k))
+    if (!seed) return refuse(400, 'invalid_request')
+    keywords.push(seed)
+  }
+
+  const now = deps.now()
+  const started = await startSeedStageB(admin, scope, run, now)
+  if (!started.ok) return started.reason === 'not_continuable' ? refuse(409, 'not_continuable') : refuse(500, 'internal')
+  const runId = run.id
+  const lease = started.lease
+
+  let tracking: SeedTrackingOutcome
+  let targets: string[] = []
+  try {
+    const added = await deps.addKeywords({ admin, scope, keywords, targetDomain: ctx.targetDomain })
+    tracking = added.outcome
+    targets = added.targetIds
+  } catch (err) {
+    console.error('[seed-scan] keywords not added', { runId, projectId: scope.projectId, error: errorName(err) })
+    tracking = { requested: keywords.length, added: 0, code: 'keywords_add_failed' }
+  }
+  // What b6 checks: the keywords added just now, and nothing else.
+  const noted = await updateSeedStep(admin, scope, runId, 'b6', { status: 'pending', detail: { tracking, targets } })
+  if (!noted) console.warn('[seed-scan] b6 targets not saved', { runId, projectId: scope.projectId })
+
+  deps.schedule(async () => {
+    try {
+      await deps.runStage({ admin, scope, runId, lease })
+    } catch (err) {
+      console.error('[seed-scan] run crashed', { runId, projectId: scope.projectId, error: errorName(err) })
+    }
+  })
+  console.log('[seed-scan] stage b started', { runId, projectId: scope.projectId, tracking: tracking.code, added: tracking.added })
+  const answer: SeedPostResponse = { ok: true, runId, trigger: run.trigger, stage: 'b', tracking }
+  return Response.json(answer, { status: 202, headers: NO_STORE })
 }
