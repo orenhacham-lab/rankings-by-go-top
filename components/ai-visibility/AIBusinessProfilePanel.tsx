@@ -367,7 +367,7 @@ export default function AIBusinessProfilePanel({
                     type="button"
                     onClick={() => removeTag(tag, secondaryCategories, setSecondaryCategories)}
                     className="text-indigo-400 hover:text-indigo-700"
-                    aria-label="Remove tag"
+                    aria-label={t('remove_tag')}
                   >
                     ×
                   </button>
@@ -413,7 +413,7 @@ export default function AIBusinessProfilePanel({
                     type="button"
                     onClick={() => removeTag(tag, excludedTopics, setExcludedTopics)}
                     className="text-red-400 hover:text-red-700"
-                    aria-label="Remove tag"
+                    aria-label={t('remove_tag')}
                   >
                     ×
                   </button>

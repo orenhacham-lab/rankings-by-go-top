@@ -4,6 +4,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
+import { authHref } from '@/lib/i18n/auth-href'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -110,7 +111,7 @@ export default async function PricingPage() {
                 </p>
               </div>
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="inline-block whitespace-nowrap px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md hover:bg-blue-700 transition-colors"
               >
                 התחל ניסיון חינם
@@ -208,7 +209,7 @@ export default async function PricingPage() {
                   </ul>
 
                   <Link
-                    href={user ? '/dashboard' : `/signup?plan=${code}`}
+                    href={user ? '/dashboard' : authHref('signup', 'he', { plan: code })}
                     className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
                       highlighted
                         ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
@@ -285,7 +286,7 @@ export default async function PricingPage() {
                 התחל ניסיון חינם של {TRIAL_CATALOG.days} ימים ובדוק את היכולות בעצמך
               </p>
               <Link
-                href={user ? '/dashboard' : '/signup'}
+                href={user ? '/dashboard' : authHref('signup', 'he')}
                 className="inline-block px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
               >
                 {user ? 'לדאשבורד שלי' : 'התחל ניסיון חינם'}

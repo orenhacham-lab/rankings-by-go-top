@@ -4,6 +4,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { FileText, BarChart2, TrendingUp, Share2, Clock, Zap, Award } from 'lucide-react'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata: Metadata = {
   title: 'דוחות SEO/GEO מקצועיים | Rankings by Go Top',
@@ -47,7 +48,7 @@ export default function SEOGeoReportsFeaturePage() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-green-700 hover:to-emerald-700 transition-all text-center"
               >
                 התחילו ניסיון חינם
@@ -304,7 +305,7 @@ export default function SEOGeoReportsFeaturePage() {
               דוח ראשון בדקה אחת. שם קורה ההבדל.
             </p>
             <Link
-              href="/signup"
+              href={authHref('signup', 'he')}
               className="inline-block px-8 py-4 rounded-lg bg-white text-green-600 text-lg font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
               התחילו ניסיון חינם

@@ -5,7 +5,8 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Button from '@/components/ui/Button'
 import { Project, Client } from '@/lib/supabase/types'
-import { createProjectAction, updateProjectAction } from '@/app/actions/projects'
+import { saveProjectAction } from '@/app/actions/projects'
+import { apiErrorText } from '@/lib/i18n/user-facing-error'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { languageName, regionName, withCurrentOption } from '@/lib/project-settings/view'
@@ -89,7 +90,12 @@ export default function ProjectForm({
       let createdId: string | undefined
       if (project) {
         // Update existing project - use server action
-        await updateProjectAction(project.id, formData)
+        // The save returns its refusal in this screen's language.
+        const saved = await saveProjectAction(project.id, formData)
+        if (!saved.ok) {
+          setError(saved.error || dict.common.saveError)
+          return
+        }
         // The values as updateProjectAction stored them, for a caller that
         // records what the owner changed. The save itself already happened.
         try {
@@ -110,16 +116,17 @@ export default function ProjectForm({
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || f.errorCreate)
+          const errorData = await response.json().catch(() => null)
+          setError(apiErrorText(errorData, language, f.errorCreate))
+          return
         }
 
         const created = await response.json()
         createdId = typeof created?.data?.id === 'string' ? created.data.id : undefined
       }
       onSuccess(createdId)
-    } catch (err) {
-      setError((err as Error).message || dict.common.saveError)
+    } catch {
+      setError(dict.common.saveError)
     } finally {
       setLoading(false)
     }

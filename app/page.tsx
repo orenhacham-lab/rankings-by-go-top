@@ -6,6 +6,7 @@ import { Footer } from '@/components/Footer'
 import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { getShopifyOAuthConfig, detectSignedShopifyLaunch } from '@/lib/shopify/oauth'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export default async function HomePage({
   searchParams,
@@ -95,7 +96,7 @@ export default async function HomePage({
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
             <Link
-              href={user ? '/dashboard' : '/signup'}
+              href={user ? '/dashboard' : authHref('signup', 'he')}
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-base shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 hover:from-blue-700 hover:to-indigo-700 transition-all"
             >
               {user ? 'לדאשבורד' : 'התחילו 7 ימים בחינם'}
@@ -559,7 +560,7 @@ export default async function HomePage({
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
-                  href={user ? '/dashboard' : '/signup'}
+                  href={user ? '/dashboard' : authHref('signup', 'he')}
                   className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
                 >
                   {user ? 'לדאשבורד שלי' : 'התחילו 7 ימים בחינם'}

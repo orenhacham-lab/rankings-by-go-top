@@ -4,6 +4,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Brain, MessageSquare, Zap, TrendingUp, Link2, BarChart3 } from 'lucide-react'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata: Metadata = {
   title: 'מעקב נראות AI | Rankings by Go Top',
@@ -47,7 +48,7 @@ export default function AIVisibilityFeaturePage() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-purple-700 hover:to-indigo-700 transition-all text-center"
               >
                 התחילו ניסיון חינם
@@ -299,7 +300,7 @@ export default function AIVisibilityFeaturePage() {
               מעקב נראות AI אינו עוד אפשרות. בעוד שנה זה יהיה חיוני. התחילו עכשיו.
             </p>
             <Link
-              href="/signup"
+              href={authHref('signup', 'he')}
               className="inline-block px-8 py-4 rounded-lg bg-white text-purple-600 text-lg font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
               התחילו ניסיון חינם

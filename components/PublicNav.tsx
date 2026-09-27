@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Locale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
   const [scrolled, setScrolled] = useState(false)
@@ -17,8 +18,9 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
   const dict = getPublicDictionary(locale)
   const prefix = locale === 'en' ? '/en' : ''
-  const signupHref = locale === 'en' ? '/en/signup' : '/signup'
-  const loginHref = locale === 'en' ? '/en/login' : '/login'
+  // The auth pages in THIS page's language (lib/i18n/auth-href.ts).
+  const signupHref = authHref('signup', locale)
+  const loginHref = authHref('login', locale)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)

@@ -145,7 +145,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Request Section */}
                     {auditRequest && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Request</h4>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{t.auditRequest}</h4>
                         <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-2 text-sm">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -194,7 +194,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Response Section */}
                     {auditResponse && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Response</h4>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{t.auditResponse}</h4>
                         <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-3 text-sm">
                           <div>
                             <span className="text-slate-600 dark:text-slate-300">searchParameters.location:</span>
@@ -225,7 +225,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Decision Section */}
                     {auditDecision && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Decision</h4>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{t.auditDecision}</h4>
                         <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-3 text-sm">
                           <div>
                             <span className="text-slate-600 dark:text-slate-300">found:</span>

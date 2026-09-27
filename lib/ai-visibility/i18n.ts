@@ -17,6 +17,9 @@ const STRINGS = {
   selected: { he: 'נבחרו', en: 'selected' },
   of: { he: 'מתוך', en: 'of' },
   delete: { he: 'מחק', en: 'Delete' },
+  remove_tag: { he: 'הסרת התגית', en: 'Remove tag' },
+  priority_tag_help_label: { he: 'מה המשמעות של גבוה/טוב?', en: 'What do High and Good mean?' },
+  priority_tag_help: { he: 'התגית מציינת עדיפות למעקב, לא ציון הסריקה.', en: 'The tag marks tracking priority, not the scan score.' },
   delete_permanently: { he: 'מחק לצמיתות', en: 'Delete permanently' },
 
   // Header

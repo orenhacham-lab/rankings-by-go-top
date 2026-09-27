@@ -358,7 +358,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   if (!enabled) {
-    return <div className="py-20 text-center text-slate-400 text-sm">Not available.</div>
+    return <div className="py-20 text-center text-slate-400 text-sm">{getDashboardDictionary(language).common.notAvailable}</div>
   }
   if (loading) {
     return <div className="py-20 text-center text-slate-400 text-sm">{e.loading}</div>

@@ -74,6 +74,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Return to login on error
-  return NextResponse.redirect(`${origin}/login?error=oauth`)
+  // Return to login on error — in the language the visitor signed up in, where
+  // the login page now says the link was invalid or expired instead of showing
+  // an unexplained empty form.
+  const lang = searchParams.get('lang')
+  const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)
+  failed.searchParams.set('error', 'oauth')
+  if (lang === 'he') failed.searchParams.set('lang', 'he')
+  return NextResponse.redirect(failed.toString())
 }

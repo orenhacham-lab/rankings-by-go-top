@@ -10,12 +10,14 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
+import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 
 // Minimal locale-aware UI strings for the login page. Auth/Supabase logic
 // is fully language-agnostic — only the visible text changes per ?lang.
 const LOGIN_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
+    logoAlt: 'הלוגו של Go Top',
     heading: 'כניסה',
     emailLabel: 'כתובת אימייל',
     emailPlaceholder: 'you@example.com',
@@ -32,10 +34,13 @@ const LOGIN_UI = {
     articlesHref: '/articles',
     err: {
       badCredentials: 'שם משתמש או סיסמה שגויים',
+      emailNotConfirmed: 'כתובת האימייל עדיין לא אושרה. פתחו את הודעת האישור ששלחנו אליכם ולחצו על הקישור שבה.',
+      linkInvalid: 'קישור האישור אינו תקין או שפג תוקפו. התחברו, או הירשמו שוב כדי לקבל קישור חדש.',
     },
   },
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
+    logoAlt: 'Go Top logo',
     heading: 'Sign in',
     emailLabel: 'Email address',
     emailPlaceholder: 'you@example.com',
@@ -52,6 +57,8 @@ const LOGIN_UI = {
     articlesHref: '/en/articles',
     err: {
       badCredentials: 'Invalid email or password',
+      emailNotConfirmed: 'Your email address is not confirmed yet. Open the confirmation email we sent you and click the link in it.',
+      linkInvalid: 'This confirmation link is invalid or has expired. Sign in, or sign up again to get a new link.',
     },
   },
 } as const
@@ -79,7 +86,10 @@ export function AuthForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  // The email-confirmation callback sends a failed exchange back here as
+  // ?error=oauth. It used to be dropped silently: the visitor saw an empty
+  // sign-in form and no word about the link they had just clicked.
+  const [error, setError] = useState(searchParams.get('error') ? t.err.linkInvalid : '')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -90,11 +100,15 @@ export function AuthForm() {
 
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError) {
-      setError(t.err.badCredentials)
+      // Only the stable code is read, never the provider's text.
+      const code = ((authError as { code?: string }).code || '').toLowerCase()
+      setError(code === 'email_not_confirmed' || /email not confirmed/i.test(authError.message || '') ? t.err.emailNotConfirmed : t.err.badCredentials)
       setLoading(false)
       return
     }
-    router.replace(nextPath)
+    // The app opens in the language this form was shown in (the proxy persists
+    // it), not in whatever the account's first visit happened to set.
+    router.replace(withLocaleParam(nextPath, lang))
     router.refresh()
   }
 
@@ -106,7 +120,7 @@ export function AuthForm() {
           <div className="flex justify-center mb-4">
             <Image
               src="/gotop-primary.png"
-              alt="Go Top logo"
+              alt={t.logoAlt}
               width={160}
               height={64}
               className="h-16 w-auto object-contain"
@@ -165,7 +179,7 @@ export function AuthForm() {
             <p className="text-slate-600 text-sm">
               {t.dontHaveAccount}{' '}
               <Link
-                href={isEn ? '/en/signup' : '/signup'}
+                href={authHref('signup', lang)}
                 className="text-blue-600 font-medium hover:underline"
               >
                 {t.startTrial}

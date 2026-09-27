@@ -6,11 +6,7 @@ import Select from '@/components/ui/Select'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
 import { TrackingTarget, LocationMode } from '@/lib/supabase/types'
-import {
-  createTrackingTargetAction,
-  updateTrackingTargetAction,
-  createBulkTrackingTargetsAction,
-} from '@/app/actions/tracking-targets'
+import { saveTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -106,12 +102,12 @@ export default function TrackingTargetForm({
     // radius: center ZIP is required
     if (locationMode === 'radius') {
       if (!radiusCenterZip.trim()) {
-        setValidationError('דרוש ZIP code מרכזי עבור מצב "Radius Scan"')
+        setValidationError(t.errorRadiusZipRequired)
         return
       }
       const zipClean = radiusCenterZip.replace(/\D/g, '')
       if (zipClean.length !== 5) {
-        setValidationError('ZIP code חייב להיות בדיוק 5 ספרות')
+        setValidationError(t.errorRadiusZipFormat)
         return
       }
     }
@@ -138,19 +134,20 @@ export default function TrackingTargetForm({
     const formData = new FormData(e.currentTarget)
 
     try {
-      if (target) {
-        await updateTrackingTargetAction(target.id, formData)
-        onSuccess()
-      } else if (bulkMode) {
-        const result = await createBulkTrackingTargetsAction(formData)
-        setSuccessMsg(t.bulkSuccess(result.created, result.skipped))
+      // The save returns its refusal in the merchant's language; a thrown
+      // server-action message would reach the browser as React's own English
+      // production text instead.
+      const result = await saveTrackingTargetsAction(target ? 'update' : bulkMode ? 'bulk' : 'create', formData, target?.id)
+      if (!result.ok) {
+        setError(result.error || t.errorSave)
+      } else if (!target && bulkMode) {
+        setSuccessMsg(t.bulkSuccess(result.created ?? 0, result.skipped ?? 0))
         setTimeout(() => onSuccess(), 1200)
       } else {
-        await createTrackingTargetAction(formData)
         onSuccess()
       }
-    } catch (err) {
-      setError((err as Error).message || t.errorSave)
+    } catch {
+      setError(t.errorSave)
     } finally {
       setLoading(false)
     }

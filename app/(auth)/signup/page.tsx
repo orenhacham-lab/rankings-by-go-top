@@ -11,10 +11,12 @@ import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { keepSeedClaim } from './claim-action'
+import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 
 const SIGNUP_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
+    logoAlt: 'הלוגו של Go Top',
     heading: 'צור חשבון חדש',
     fullName: 'שם מלא',
     fullNamePlaceholder: 'ישראל כהן',
@@ -46,7 +48,7 @@ const SIGNUP_UI = {
       invalidPhone: 'מספר טלפון לא תקין',
       fieldRequired: 'שדה זה הוא חובה',
       termsRequired: 'עליך להסכים לתנאים ולמדיניות הפרטיות',
-      emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר או לאפס סיסמה.',
+      emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר.',
       emailRateLimit: 'נשלחו יותר מדי בקשות הרשמה בזמן קצר. נסו שוב בעוד כמה דקות או השתמשו בכתובת אימייל אחרת.',
       signupFailed: 'אירעה שגיאה ביצירת החשבון. אנא נסו שוב.',
       weakPasswordLength: (min: number) => `הסיסמה חייבת להכיל לפחות ${min} תווים`,
@@ -62,6 +64,7 @@ const SIGNUP_UI = {
   },
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
+    logoAlt: 'Go Top logo',
     heading: 'Create your account',
     fullName: 'Full name',
     fullNamePlaceholder: 'John Smith',
@@ -93,7 +96,7 @@ const SIGNUP_UI = {
       invalidPhone: 'Invalid phone number',
       fieldRequired: 'This field is required',
       termsRequired: 'You must agree to the terms and privacy policy',
-      emailExists: 'This email is already registered. Please sign in or reset your password.',
+      emailExists: 'This email is already registered. Please sign in instead.',
       emailRateLimit: 'Too many signup requests were sent in a short time. Please try again in a few minutes or use a different email address.',
       signupFailed: 'An error occurred while creating your account. Please try again.',
       weakPasswordLength: (min: number) => `Password must be at least ${min} characters`,
@@ -422,7 +425,7 @@ export function SignupForm() {
 
       // Redirect to dashboard after a short delay
       setTimeout(() => {
-        router.replace('/dashboard')
+        router.replace(withLocaleParam('/dashboard', lang))
         router.refresh()
       }, 1000)
     } catch (err) {
@@ -440,7 +443,7 @@ export function SignupForm() {
           <div className="flex justify-center mb-4">
             <Image
               src="/gotop-primary.png"
-              alt="Go Top logo"
+              alt={t.logoAlt}
               width={160}
               height={64}
               className="h-16 w-auto object-contain"
@@ -565,7 +568,7 @@ export function SignupForm() {
           <p className="text-slate-600 text-sm">
             {t.alreadyHaveAccount}{' '}
             <Link
-              href={isEn ? '/en/login' : '/login'}
+              href={authHref('login', lang)}
               className="text-blue-600 font-medium hover:underline"
             >
               {t.signIn}

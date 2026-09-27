@@ -4,6 +4,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { MapPin, Users, Phone, Star, Award, Navigation } from 'lucide-react'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata: Metadata = {
   title: 'מעקב דירוג בגוגל מפות | Rankings by Go Top',
@@ -47,7 +48,7 @@ export default function GoogleMapsFeaturePage() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-amber-700 hover:to-orange-700 transition-all text-center"
               >
                 התחילו ניסיון חינם
@@ -295,7 +296,7 @@ export default function GoogleMapsFeaturePage() {
               בדקו לראשונה בחינם. אתם מופתעים מהמיקום שלכם כרגע?
             </p>
             <Link
-              href="/signup"
+              href={authHref('signup', 'he')}
               className="inline-block px-8 py-4 rounded-lg bg-white text-amber-600 text-lg font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
               התחילו ניסיון חינם

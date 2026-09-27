@@ -1,6 +1,8 @@
 import { AlertCircle, CheckCircle2, Clock, Info } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export type NoticeTone = 'info' | 'wait' | 'ok' | 'bad'
 
@@ -22,6 +24,7 @@ export default function Notice({
   onDismiss?: () => void
   className?: string
 }) {
+  const closeLabel = getDashboardDictionary(useDashboardLanguage().language).common.close
   const Icon = tone === 'ok' ? CheckCircle2 : tone === 'bad' ? AlertCircle : tone === 'wait' ? Clock : Info
   return (
     <div
@@ -50,7 +53,7 @@ export default function Notice({
           onClick={onDismiss}
           className="shrink-0 rounded-control px-2 py-1 text-caption font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
         >
-          ✕<span className="sr-only">close</span>
+          ✕<span className="sr-only">{closeLabel}</span>
         </button>
       )}
     </div>

@@ -219,7 +219,7 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
 }
 
 /** The mark and the product name. The name is the brand, in Latin, in both languages. */
-function Brand() {
+function Brand({ logoAlt }: { logoAlt: string }) {
   return (
     <Link
       href="/dashboard"
@@ -228,7 +228,7 @@ function Brand() {
       {/* The rail is ink in both themes, so the mark is always the one drawn for a dark ground. */}
       <Image
         src="/gotop-dark-transparent.png"
-        alt="Go Top logo"
+        alt={logoAlt}
         width={500}
         height={500}
         className="size-14 shrink-0 object-contain"
@@ -270,7 +270,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       <div className="flex flex-col md:sticky md:top-0 md:h-dvh">
         {/* Brand — the same height as the top bar, so the two share one line. */}
         <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-3 md:px-4">
-          <Brand />
+          <Brand logoAlt={dict.sidebar.logoAlt} />
           <button
             type="button"
             onClick={() => setMenuOpenAt(menuOpen ? null : pathname)}
