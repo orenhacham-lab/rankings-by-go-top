@@ -9,7 +9,7 @@
  *
  * Run: npx tsx lib/seed-scan/__qa__/seed-serper.qa.ts
  */
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import * as ts from 'typescript'
 import { runStageA } from '../runner'
@@ -51,10 +51,16 @@ function functionSource(src: string, name: string): string {
 
 type Oracle = { normalizeDomain: (s: string) => string; isDomainMatch: (a: string, b: string) => boolean }
 
+/** Where the scanner keeps these helpers: google-search.ts, or domain-match.ts once the
+ *  competitor-positions change moved them there unchanged. Each is taken from the file
+ *  that defines it; one missing from both still fails the suite. */
+const SCANNER_SOURCES = ['lib/scanner/google-search.ts', 'lib/scanner/domain-match.ts']
+
 /** The scanner's own helpers, compiled from its source. */
 function scannerOracle(): Oracle {
-  const src = readFileSync(join(ROOT, 'lib/scanner/google-search.ts'), 'utf8')
-  const code = ['safeDecodeURL', 'unwrapRedirect', 'extractHostname', 'normalizeDomain', 'isDomainMatch'].map((n) => functionSource(src, n)).join('\n')
+  const sources = SCANNER_SOURCES.map((f) => join(ROOT, f)).filter((p) => existsSync(p)).map((p) => readFileSync(p, 'utf8'))
+  const sourceOf = (name: string) => functionSource(sources.find((s) => s.includes(`function ${name}(`)) ?? '', name)
+  const code = ['safeDecodeURL', 'unwrapRedirect', 'extractHostname', 'normalizeDomain', 'isDomainMatch'].map(sourceOf).join('\n')
   const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText
   return new Function(`${js}\nreturn { normalizeDomain, isDomainMatch }`)() as Oracle
 }
