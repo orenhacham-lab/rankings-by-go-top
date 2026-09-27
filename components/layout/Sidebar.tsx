@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
@@ -181,8 +181,8 @@ function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem
  * cannot drift apart. The tile shape (stacked icon over label) is the mobile
  * presentation; `md:` restores the row shape used in the sidebar proper.
  *
- * The active entry is a soft accent fill with a short bar on the sidebar's outer
- * edge — the logical START, so it sits on the right in Hebrew and on the left in
+ * The active entry is a translucent cobalt fill on the ink rail, with a short
+ * glowing bar on the sidebar's outer edge — the logical START, so it sits on the right in Hebrew and on the left in
  * English. A filled accent block would outshout every button on the screen.
  */
 function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; label: string }) {
@@ -259,8 +259,10 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const activeHref = activeNavHref(pathname ?? '', navItemKeys)
   // Phones: the nav is a menu behind one button instead of a wall of tiles above
   // every screen. It closes itself when the page changes.
-  const [menuOpen, setMenuOpen] = useState(false)
-  useEffect(() => { setMenuOpen(false) }, [pathname])
+  // The phone menu is open AT a pathname: navigating anywhere closes it without an effect,
+  // because the pathname it was opened at is no longer the current one.
+  const [menuOpenAt, setMenuOpenAt] = useState<string | null>(null)
+  const menuOpen = menuOpenAt !== null && menuOpenAt === pathname
 
   return (
     <aside className="relative z-40 w-full md:w-64 md:shrink-0 bg-rail text-rail-ink border-b md:border-b-0 md:border-e border-rail-line">
@@ -270,7 +272,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
           <Brand />
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => setMenuOpenAt(menuOpen ? null : pathname)}
             aria-expanded={menuOpen}
             aria-controls="app-nav-mobile"
             aria-label={dict.common.menu}
