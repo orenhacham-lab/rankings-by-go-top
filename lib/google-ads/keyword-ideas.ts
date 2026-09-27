@@ -51,7 +51,12 @@ export interface KeywordIdeaResult {
   currency: string
 }
 
-export type KeywordResearchType = 'keyword' | 'url' | 'keyword_url'
+/**
+ * 'site' asks for ideas from a whole domain (the request's `siteSeed`, see the
+ * v25 GenerateKeywordIdeasRequest: `siteSeed: { site }`, "the domain name of
+ * the site"); 'url' from one page of it.
+ */
+export type KeywordResearchType = 'keyword' | 'url' | 'keyword_url' | 'site'
 
 export interface KeywordIdeasInput {
   researchType: KeywordResearchType
@@ -59,6 +64,8 @@ export interface KeywordIdeasInput {
   keywords: string[]
   /** Validated absolute URL (required for 'url' / 'keyword_url'). */
   url?: string
+  /** A bare domain, e.g. example.com (required for 'site'). */
+  site?: string
   country: string
   language: string
   minMonthlySearches: number
@@ -103,6 +110,7 @@ type SeedField =
   | { keywordSeed: { keywords: string[] } }
   | { urlSeed: { url: string } }
   | { keywordAndUrlSeed: { url: string; keywords: string[] } }
+  | { siteSeed: { site: string } }
 
 /**
  * Run GenerateKeywordIdeas. Assumes inputs are already validated (country,
@@ -122,8 +130,11 @@ export async function generateKeywordIdeas(input: KeywordIdeasInput): Promise<Ke
   const languageId = LANGUAGE_IDS[language]
 
   let seed: SeedField
-  let seedType: 'keywordSeed' | 'urlSeed' | 'keywordAndUrlSeed'
-  if (researchType === 'url') {
+  let seedType: 'keywordSeed' | 'urlSeed' | 'keywordAndUrlSeed' | 'siteSeed'
+  if (researchType === 'site') {
+    seedType = 'siteSeed'
+    seed = { siteSeed: { site: (input.site ?? '').trim() } }
+  } else if (researchType === 'url') {
     seedType = 'urlSeed'
     seed = { urlSeed: { url: validUrl } }
   } else if (researchType === 'keyword_url') {
@@ -194,10 +205,13 @@ export async function generateKeywordIdeas(input: KeywordIdeasInput): Promise<Ke
       const apiMessage = errorBody.error?.message || ''
       const apiStatus = errorBody.error?.status || ''
 
+      // Codes only: Google's own message text is provider text, and it is
+      // never logged (the seeding scan's stage B calls this too). Its canonical
+      // status (e.g. INVALID_ARGUMENT) is a code, so it stays.
       console.error('[keyword-ideas] google ads api error', {
         httpStatus: apiResponse.status,
-        apiStatus,
-        message: apiMessage,
+        apiStatus: /^[A-Z_]{1,64}$/.test(apiStatus) ? apiStatus : apiStatus ? 'unrecognized' : '',
+        hasMessage: apiMessage.length > 0,
         page: pageCount,
       })
 

@@ -29,7 +29,8 @@ import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-resea
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
 import { slugFromUrl } from '@/lib/content/internal-links'
-import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
+import { reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
 import { isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
@@ -43,9 +44,9 @@ type Admin = ReturnType<typeof createAdminClient>
  * keyword-research pool with the catalogue's breadth. Read-only cached scan; no
  * rescan. Never hardcoded — purely project-derived.
  */
-async function deriveScanSeedConcepts(admin: Admin, projectId: string): Promise<string[]> {
+async function deriveScanSeedConcepts(admin: Admin, projectId: string, userId?: string | null): Promise<string[]> {
   try {
-    const cacheRow = await getCachedIndex(admin, projectId)
+    const cacheRow = await getContentIndex(projectId, userId, admin)
     if (!cacheRow) return []
     const report = reassembleReport(cacheRow)
     const targets = (report.targets ?? []) as ScannedTarget[]
@@ -72,8 +73,10 @@ async function deriveScanSeedConcepts(admin: Admin, projectId: string): Promise<
  * name, tracked keywords). Used as the relevance gate for keyword research —
  * a Google URL-idea sharing NO token with this set is unrelated to the site.
  * Purely project-derived; empty set when no scan exists (gate then skipped).
+ * The scan is the project's content index (lib/content/content-index.ts): the
+ * WordPress index when connected, else the seeding scan's crawl of the site.
  */
-async function buildSiteVocabulary(admin: Admin, projectId: string, extras: string[]): Promise<Set<string>> {
+export async function buildSiteVocabulary(admin: Admin, projectId: string, extras: string[], userId?: string | null): Promise<Set<string>> {
   const vocab = new Set<string>()
   // Phase 3H.2 — store prefix-stripped variants too so "לכלבים" ↔ "כלבים" match
   // in the alignment ratio regardless of which side carries the ל/ב/ה prefix.
@@ -84,7 +87,7 @@ async function buildSiteVocabulary(admin: Admin, projectId: string, extras: stri
     }
   }
   try {
-    const cacheRow = await getCachedIndex(admin, projectId)
+    const cacheRow = await getContentIndex(projectId, userId, admin)
     if (cacheRow) {
       const report = reassembleReport(cacheRow)
       for (const t of (report.targets ?? []) as ScannedTarget[]) {
@@ -401,7 +404,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   // topics), never the name alone. ownedCategories come from the project's own cached
   // scan taxonomy; existingTopics from its own article topics. Prevents the shared
   // (now domain-neutral) instructions from being mistaken for the business domain.
-  const ownedCategories = await deriveScanSeedConcepts(admin, input.projectId)
+  const ownedCategories = await deriveScanSeedConcepts(admin, input.projectId, input.userId)
   const focus = deriveProjectFocus({ projectName: project.business_name, domain: project.target_domain, ownedCategories, existingTopics: existingTitles })
   const projectBlock = projectContextBlock({
     projectName: project.business_name, domain: project.target_domain, language,
@@ -653,10 +656,10 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // Phase 3F.3.1e — DERIVE extra seed concepts from the site's own taxonomy
     // (category/tag/product target titles + reliable focus keywords) so the raw
     // keyword pool spans the whole catalogue, not just the homepage's terms.
-    const scanSeeds = await deriveScanSeedConcepts(admin, input.projectId)
+    const scanSeeds = await deriveScanSeedConcepts(admin, input.projectId, input.userId)
     const seedKeywords = Array.from(new Set([...trackingSeeds, ...scanSeeds].map((s) => s.trim()).filter(Boolean)))
     // Phase 3H — the site's own vocabulary gates Google's associative URL ideas.
-    const siteVocab = await buildSiteVocabulary(admin, input.projectId, [project.business_name || '', ...trackingSeeds])
+    const siteVocab = await buildSiteVocabulary(admin, input.projectId, [project.business_name || '', ...trackingSeeds], input.userId)
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
       seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])], siteVocab,
@@ -730,7 +733,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   let indexStale = false
   if (isInternalLinkPlanningEnabled()) {
     try {
-      const cacheRow = await getCachedIndex(admin, input.projectId)
+      const cacheRow = await getContentIndex(input.projectId, input.userId, admin)
       if (cacheRow) { const rep = reassembleReport(cacheRow); planTargets = (rep.targets ?? []) as ScannedTarget[]; planHosts = rep.hosts ?? []; indexStale = isStale(cacheRow) || isVersionStale(cacheRow) }
     } catch { /* no scan cache → heuristic fallback */ }
   }

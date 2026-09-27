@@ -141,15 +141,18 @@ export async function getGoogleAdsAccessToken(): Promise<string> {
       response.status === 0 ? 'network_error' :
       'unknown'
 
-    // Safe diagnostic log — no secrets.
+    // Safe diagnostic log — no secrets, and no provider text: the OAuth error
+    // code (RFC 6749, e.g. invalid_grant) and our classification of the
+    // description, never the description itself.
+    const oauthError = typeof tokenData.error === 'string' && /^[a-z_]{1,64}$/.test(tokenData.error) ? tokenData.error : tokenData.error ? 'unrecognized' : null
     console.error('[google-ads] OAuth token failure', {
       stage: 'oauth',
       timestamp: new Date().toISOString(),
       httpStatus: response.status,
       httpOk: response.ok,
       hasAccessToken: Boolean(tokenData.access_token),
-      oauthError: tokenData.error ?? null,
-      oauthErrorDescription: desc ?? null,
+      oauthError,
+      hasOauthErrorDescription: Boolean(tokenData.error_description),
       classification,
       hasClientId: Boolean(process.env.GOOGLE_ADS_CLIENT_ID),
       hasClientSecret: Boolean(process.env.GOOGLE_ADS_CLIENT_SECRET),

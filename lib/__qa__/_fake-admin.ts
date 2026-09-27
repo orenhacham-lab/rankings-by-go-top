@@ -1,5 +1,5 @@
 /**
- * Minimal in-memory Supabase admin fake. Applies real eq/is/gt/in/order/limit
+ * Minimal in-memory Supabase admin fake. Applies real eq/is/gt/in/like/order/limit
  * filter semantics so filtering, ordering, and error-path behavior are
  * genuinely exercised (not mocked away). Copied from lib/gsc/__qa__/_fake-admin.ts
  * (same shape needed here — entitlement/PayPal QA use the same select/update/
@@ -9,7 +9,9 @@ type Row = Record<string, unknown>
 /** Shared counter for auto-assigned ids on plain inserts (mirrors a real
  *  Postgres `DEFAULT gen_random_uuid()` id column). */
 let fakeRowIdCounter = 0
-interface Filter { kind: 'eq' | 'neq' | 'is' | 'gt' | 'lt' | 'in' | 'not_is'; col: string; val: unknown }
+interface Filter { kind: 'eq' | 'neq' | 'is' | 'gt' | 'lt' | 'in' | 'not_is' | 'like'; col: string; val: unknown }
+/** A SQL LIKE pattern as a RegExp: `%` any run of characters, `_` exactly one; case-sensitive. */
+const likePattern = (pattern: string) => new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '[\\s\\S]*').replace(/_/g, '[\\s\\S]')}$`)
 /** Per-op DB-error injectors, keyed by mutation kind, to exercise fail-closed handling. */
 export interface ErrorHooks { insert?: () => { code: string } | null; update?: () => { code?: string; message?: string } | null; upsert?: () => { code?: string; message?: string } | null; select?: () => { code?: string; message?: string } | null; delete?: () => { code?: string; message?: string } | null }
 
@@ -45,6 +47,8 @@ class FakeQuery {
   }
   gt(col: string, val: unknown) { this.filters.push({ kind: 'gt', col, val }); return this }
   lt(col: string, val: unknown) { this.filters.push({ kind: 'lt', col, val }); return this }
+  /** PostgREST .like(col, pattern) — SQL LIKE (no escape character modelled). */
+  like(col: string, pattern: string) { this.filters.push({ kind: 'like', col, val: pattern }); return this }
   order(col: string, opts?: { ascending?: boolean }) { this.orderSpec.push({ col, ascending: opts?.ascending !== false }); return this }
   limit(n: number) { this.limitN = n; return this }
   range(from: number, to: number) { this.rangeSpec = { from, to }; return this }
@@ -69,7 +73,8 @@ class FakeQuery {
         : f.kind === 'in' ? (f.val as unknown[]).includes(r[f.col])
           : f.kind === 'is' ? (f.val === null ? r[f.col] == null : r[f.col] === f.val)
             : f.kind === 'gt' ? (r[f.col] as string | number) > (f.val as string | number)
-              : (r[f.col] as string | number) < (f.val as string | number)
+              : f.kind === 'like' ? typeof r[f.col] === 'string' && likePattern(f.val as string).test(r[f.col] as string)
+                : (r[f.col] as string | number) < (f.val as string | number)
   }
 
   private match(r: Row): boolean {
