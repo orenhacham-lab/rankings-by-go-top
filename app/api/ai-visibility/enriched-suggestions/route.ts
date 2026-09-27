@@ -50,6 +50,7 @@ import {
   isWeakPromotionalQuestion,
 } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { readSeedScopeTerms, widenBusinessScope } from '@/lib/ai-visibility/seed-scope'
 import {
   buildFallbackSuggestions,
   isLegacyWeakQuestion,
@@ -151,13 +152,19 @@ export async function POST(request: Request) {
     return Response.json({ error: result.error }, { status: result.status })
   }
 
-  const { admin, project } = result
+  const { admin, project, user } = result
 
   try {
     // Extract allowed locations and service areas from project data
     const allowedLocations = extractAllowedLocations(project as Record<string, any>)
     const allowedServiceAreas = extractAllowedServiceAreas(project as Record<string, any>)
-    const businessScope = extractBusinessScope(project as Record<string, any>)
+    // The seeding scan's niche, audiences and seed keywords widen the scope,
+    // so the questions b5 prepared are not hidden here. Only added to; a project
+    // without a seed profile keeps exactly this scope (lib/ai-visibility/seed-scope.ts).
+    const businessScope = widenBusinessScope(
+      extractBusinessScope(project as Record<string, unknown>),
+      await readSeedScopeTerms(admin, projectId, user.id),
+    )
 
     console.log('[enriched-suggestions] API called', {
       projectId,

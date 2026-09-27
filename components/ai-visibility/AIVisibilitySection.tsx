@@ -18,7 +18,7 @@
  * the drawer for the just-completed scan.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BarChart3, Link, Bot, AlertTriangle, Award, Layers, Cpu, TrendingDown, Sparkles } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
@@ -140,6 +140,8 @@ type EngineMetrics = {
 }
 
 type TabType = 'results' | 'queries' | 'insights' | 'competitors'
+/** The tool's own tabs, for a page that asks it to open one (W6d). */
+export type AIVisibilityTab = TabType
 
 type CompetitorAnalysisData = {
   project: { name: string | null; mentionsCount: number; totalResults: number; mentionRate: number } | null
@@ -165,6 +167,12 @@ export default function AIVisibilitySection({
   projectCity,
   projectKeywords,
   initialTab,
+  overviewMode = false,
+  onRunsLoaded,
+  competitorsSlot,
+  openQueriesWhenEmpty = false,
+  suggestionsRefreshKey = 0,
+  requestedTab,
 }: {
   projectId: string
   projectCountry: string | null
@@ -177,12 +185,35 @@ export default function AIVisibilitySection({
   projectKeywords?: string[]
   /** The tab to open on, e.g. from a link that manages competitors. */
   initialTab?: TabType
+  // ── W6d: the AI-visibility tab's overview around the tool. Every one of these
+  // is optional and off by default, so a caller that passes none of them (a
+  // project without a seeding scan) gets the tool exactly as it was.
+  /** The page shows its own title, score and summary: leave out the tool's copies of them. */
+  overviewMode?: boolean
+  /** The runs this tool loaded (GET /api/ai-visibility/runs), or null when they could not be read. */
+  onRunsLoaded?: (runs: unknown[] | null) => void
+  /** Shown in the competitors tab in place of the editor (competitors are managed in settings). */
+  competitorsSlot?: React.ReactNode
+  /** On the first load, open the questions tab when there is no check yet. */
+  openQueriesWhenEmpty?: boolean
+  /** Bumped when new suggested questions were saved (the scan's b5): reload them from the cache. */
+  suggestionsRefreshKey?: number
+  /** Switch to a tab; `seq` makes the same tab requestable twice. */
+  requestedTab?: { tab: TabType; seq: number }
 }) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const isHebrew = dashboardLanguage === 'he'
 
   const [currentTab, setCurrentTab] = useState<TabType>(initialTab ?? 'results')
+  // W6d. Held in refs: loadAllResults must keep depending on the project alone,
+  // or a caller's new callback identity would reload every result on each render.
+  const onRunsLoadedRef = useRef(onRunsLoaded)
+  onRunsLoadedRef.current = onRunsLoaded
+  const openQueriesWhenEmptyRef = useRef(openQueriesWhenEmpty && !initialTab)
+  useEffect(() => {
+    if (requestedTab) setCurrentTab(requestedTab.tab)
+  }, [requestedTab])
   const [allResults, setAllResults] = useState<ResultRow[]>([])
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
@@ -314,6 +345,12 @@ export default function AIVisibilitySection({
 
       const runsData = await runsRes.json()
       const promptsData = await promptsRes.json()
+      onRunsLoadedRef.current?.(Array.isArray(runsData.runs) ? runsData.runs : [])
+      // Once, on the first load: nothing checked yet, so the questions are the place to start.
+      if (openQueriesWhenEmptyRef.current) {
+        openQueriesWhenEmptyRef.current = false
+        if (!Array.isArray(runsData.runs) || runsData.runs.length === 0) setCurrentTab('queries')
+      }
 
       // Project-level GEO Opportunity Mapping — server-computed, read-only.
       // Falls back to null when API has no aggregation (older deploy).
@@ -445,6 +482,7 @@ export default function AIVisibilitySection({
 
       setEngineMetrics(engineMap)
     } catch (e) {
+      onRunsLoadedRef.current?.(null)
       setError(e instanceof Error ? e.message : 'Failed to load results')
     } finally {
       setLoading(false)
@@ -742,7 +780,7 @@ export default function AIVisibilitySection({
     // must not re-run because a parent re-rendered. The parent now memoizes it
     // too; this makes the component immune to the next caller that forgets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywordsKey, manualProfile, projectId])
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, suggestionsRefreshKey, projectKeywordsKey, manualProfile, projectId])
 
   useEffect(() => {
     loadAllResults()
@@ -1705,7 +1743,8 @@ export default function AIVisibilitySection({
 
   return (
     <section id="ai-visibility" className="space-y-6 mb-10" dir={isHebrew ? 'rtl' : 'ltr'}>
-      {/* HEADER */}
+      {/* HEADER — the page carries its own in overview mode (W6d) */}
+      {!overviewMode && (
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-500/30">
@@ -1717,6 +1756,7 @@ export default function AIVisibilitySection({
           </div>
         </div>
       </div>
+      )}
 
       {error && (
         <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
@@ -1766,10 +1806,11 @@ export default function AIVisibilitySection({
       {/* TAB 1: RESULTS (includes overview) */}
       {currentTab === 'results' && (
         <>
-          {globalMetrics && (
+          {/* In overview mode the page's opening card shows the score and the totals (W6d). */}
+          {globalMetrics && !overviewMode && (
             <AIVisibilityScoreCard score={globalMetrics.mentionRate} t={t} isRTL={isHebrew} />
           )}
-          {globalMetrics && (
+          {globalMetrics && !overviewMode && (
             <OverviewSummaryStrip metrics={globalMetrics} totalResults={scoreResults.length} t={t} />
           )}
           <EngineMentionCards metrics={engineMetrics} t={t} />
@@ -2331,11 +2372,14 @@ export default function AIVisibilitySection({
       {/* TAB 3: COMPETITORS */}
       {currentTab === 'competitors' && (
         <>
+          {/* Competitors are added and removed in settings once the page passes a slot (W6d). */}
+          {competitorsSlot ?? (
           <CompetitorsPanel
             projectId={projectId}
             defaultCollapsed={initialTab !== 'competitors'}
             onCompetitorsChanged={() => setCompetitorsRefreshKey((k) => k + 1)}
           />
+          )}
           <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
         </>
       )}
