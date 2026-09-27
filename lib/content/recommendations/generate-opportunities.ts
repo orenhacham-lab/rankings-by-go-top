@@ -17,7 +17,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
@@ -144,7 +145,7 @@ export async function generateOpportunities(
   const entities: EntityNode[] = []
   let siteScanEntities = 0
   try {
-    const cacheRow = await getCachedIndex(admin, input.projectId)
+    const cacheRow = await getContentIndex(input.projectId, null, admin)
     const targets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
     for (const t of targets) if (t.targetTitle) { entities.push({ name: t.targetTitle, url: t.targetUrl, type: PAGE_TYPE(t.targetType) }); siteScanEntities++ }
   } catch { /* optional */ }

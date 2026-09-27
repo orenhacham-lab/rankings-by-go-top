@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { getUserEntitlement } from '@/lib/subscription'
-import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
+import { buildEntitlementUnavailableError, isEntitlementUnknown, KeywordQuotaError } from '@/lib/quota'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
 import type { ExactPointResolutionSource } from '@/lib/supabase/types'
 import { isAdminUser } from '@/lib/auth/admin-role'
@@ -364,13 +364,13 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
     const available = Math.max(0, limit - currentCount)
 
     if (available === 0) {
-      throw new Error(
+      throw new KeywordQuotaError(
         `הגעת למגבלת ${limit} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}.`
       )
     }
 
     if (toInsert.length > available) {
-      throw new Error(
+      throw new KeywordQuotaError(
         `ניתן להוסיף עוד ${available} מילות מפתח בלבד (מגבלת ${limit} בתוכנית ${entitlement.limits.label}).`
       )
     }

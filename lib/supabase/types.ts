@@ -125,6 +125,33 @@ export interface Database {
         Insert: Partial<Omit<GscQueryPageMetric, 'created_at'>> & { sync_run_id: string; project_id: string; query: string; page: string }
         Update: Partial<GscQueryPageMetric>
       }
+      // Seed scan (initial site scan). The owner writes profiles and audiences;
+      // runs, steps and the crawl index are written by the service role only.
+      project_profiles: {
+        Row: ProjectProfileRow
+        Insert: Partial<Omit<ProjectProfileRow, 'created_at' | 'updated_at'>> & { project_id: string; user_id: string }
+        Update: Partial<Omit<ProjectProfileRow, 'project_id' | 'created_at'>>
+      }
+      project_audiences: {
+        Row: ProjectAudienceRow
+        Insert: Partial<Omit<ProjectAudienceRow, 'id' | 'created_at'>> & { project_id: string; user_id: string; label: string }
+        Update: Partial<Omit<ProjectAudienceRow, 'id' | 'created_at'>>
+      }
+      project_seed_runs: {
+        Row: ProjectSeedRunRow
+        Insert: Partial<Omit<ProjectSeedRunRow, 'id' | 'created_at'>> & { project_id: string; user_id: string; trigger: SeedRunTrigger }
+        Update: Partial<Omit<ProjectSeedRunRow, 'id' | 'created_at'>>
+      }
+      project_seed_steps: {
+        Row: ProjectSeedStepRow
+        Insert: Partial<ProjectSeedStepRow> & { run_id: string; project_id: string; user_id: string; step: SeedStep }
+        Update: Partial<Omit<ProjectSeedStepRow, 'run_id' | 'step'>>
+      }
+      site_crawl_index: {
+        Row: SiteCrawlIndexRow
+        Insert: Partial<Omit<SiteCrawlIndexRow, 'id' | 'created_at'>> & { project_id: string; user_id: string }
+        Update: Partial<Omit<SiteCrawlIndexRow, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -896,3 +923,91 @@ export interface AIUsageLog {
   created_at: string
   updated_at: string
 }
+
+// ============================================================================
+// Seed scan — the initial site scan of a project
+// (supabase/migrations/20260927000000_project_seed_scan.sql).
+// ============================================================================
+
+/** Who set a value: the seed scan, or the owner. A rescan never overwrites 'user'. */
+export type SeedFieldSource = 'scan' | 'user'
+export type ProjectCommerceType = 'product' | 'service' | 'content' | 'other'
+
+/** Business profile of a project — one row per project. */
+export interface ProjectProfileRow {
+  project_id: string
+  user_id: string
+  /** At most 1500 characters. */
+  description: string | null
+  commerce_type: ProjectCommerceType | null
+  /** At most 120 characters. */
+  niche: string | null
+  is_local: boolean | null
+  /** At most 40 characters. */
+  detected_platform: string | null
+  /** Per-field origin, keyed by field name, e.g. { niche: 'scan', description: 'user' }. */
+  field_sources: Record<string, SeedFieldSource>
+  scanned_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** One target audience of a project, ordered by position. */
+export interface ProjectAudienceRow {
+  id: string
+  project_id: string
+  user_id: string
+  position: number
+  /** 1-300 characters after trimming. */
+  label: string
+  source: SeedFieldSource
+  created_at: string
+}
+
+export type SeedRunTrigger = 'create' | 'rescan' | 'claim' | 'shopify_install'
+export type SeedRunStage = 'a' | 'b'
+export type SeedRunStatus = 'running' | 'done' | 'partial' | 'failed'
+
+/** One seed-scan pipeline run. Written by the service role only; the owner may read. */
+export interface ProjectSeedRunRow {
+  id: string
+  project_id: string
+  user_id: string
+  trigger: SeedRunTrigger
+  stage: SeedRunStage
+  status: SeedRunStatus
+  summary: Record<string, unknown>
+  /** Stable code matching ^[a-z0-9_]{1,64}$, never provider text. */
+  error_code: string | null
+  lease_expires_at: string | null
+  started_at: string
+  finished_at: string | null
+  created_at: string
+}
+
+export type SeedStep = 'a1' | 'a2' | 'a3' | 'a4' | 'b1' | 'b2' | 'b3' | 'b4' | 'b5' | 'b6'
+export type SeedStepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed'
+
+/** One step of a seed-scan run; primary key (run_id, step). Service-role writes only. */
+export interface ProjectSeedStepRow {
+  run_id: string
+  project_id: string
+  user_id: string
+  step: SeedStep
+  status: SeedStepStatus
+  /** The number the activity feed shows; null when the step has nothing to count. */
+  item_count: number | null
+  detail: Record<string, unknown>
+  /** Stable code matching ^[a-z0-9_]{1,64}$, never provider text. */
+  error_code: string | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+/**
+ * Site index built by the seed-scan crawl — one row per project. The table has
+ * exactly the columns of wordpress_content_index, so the row type is the same
+ * and code that reads one index reads the other.
+ */
+export type SiteCrawlIndexStatus = WordPressContentIndexStatus
+export type SiteCrawlIndexRow = WordPressContentIndexRow

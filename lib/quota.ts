@@ -228,6 +228,17 @@ export function buildEntitlementUnavailableError(): EntitlementUnavailablePayloa
   }
 }
 
+/**
+ * The keyword-per-project limit refused an add. Thrown by the tracking server
+ * actions with the same message they always threw (the keywords tab shows
+ * `err.message`, and its name stays 'Error'), so nothing a merchant sees
+ * changes; server code that calls an action tells a quota refusal from any
+ * other failure by this class instead of by the Hebrew text.
+ */
+export class KeywordQuotaError extends Error {
+  readonly code = 'QUOTA_KEYWORDS_PER_PROJECT' as const
+}
+
 export function buildQuotaError(
   code: QuotaCode,
   plan: PlanType,

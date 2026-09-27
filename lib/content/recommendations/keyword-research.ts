@@ -209,6 +209,27 @@ function isBrandOrSupport(keyword: string, brandTokens: Set<string>): boolean {
   return false
 }
 
+export type ResearchKeywordIssue = 'brand_or_support' | 'noise' | 'nav_commerce' | 'too_generic' | 'unrelated'
+
+/**
+ * The keyword filters of recommendFromKeywordResearch, for ONE keyword, in the
+ * same order and with the same predicates: brand or support terms; noise,
+ * unless it is the site's own subject; store-navigation vocabulary; a single
+ * word; and, given a site vocabulary, a keyword whose meaningful words are not
+ * mostly the site's. Null when the keyword passes them all. `vocab` is used as
+ * given: a caller applies MIN_SITE_VOCAB_TOKENS itself, as that function does.
+ * (The seeding scan filters its keyword ideas with this.)
+ */
+export function researchKeywordIssue(keyword: string, ctx: { brandTokens: Set<string>; vocab: Set<string> | null }): ResearchKeywordIssue | null {
+  const kw = keyword.trim()
+  if (isBrandOrSupport(kw, ctx.brandTokens)) return 'brand_or_support'
+  if (isNoise(kw) && !(ctx.vocab && sharesSiteVocab(kw, ctx.vocab))) return 'noise'
+  if (hasNavCommerceToken(kw)) return 'nav_commerce'
+  if (isTooGeneric(kw)) return 'too_generic'
+  if (ctx.vocab && !isVocabAligned(kw, ctx.vocab)) return 'unrelated'
+  return null
+}
+
 function scoreFromVolume(volume: number): number {
   const s = 0.4 + 0.6 * (Math.log10(volume + 1) / 4)
   return Math.max(0.4, Math.min(1, Number(s.toFixed(2))))

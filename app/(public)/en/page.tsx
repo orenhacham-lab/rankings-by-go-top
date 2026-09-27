@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
+import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
 
 export default async function EnglishHomePage() {
   const supabase = await createClient()
@@ -46,6 +47,11 @@ export default async function EnglishHomePage() {
             review AI-assisted articles, schedule or publish them directly to your website, and
             monitor your visibility across Google Search, Google Maps and leading AI engines.
           </p>
+
+          {/* Free site check — the hero's primary action: one field, no signup. */}
+          <div className="mb-8">
+            <FreeCheckHeroForm locale="en" />
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
             <Link
