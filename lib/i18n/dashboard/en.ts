@@ -3676,4 +3676,11 @@ export const dashboardEn = {
       description: 'This account has full access to the system and does not require a billing plan.',
     },
   },
+  trialBar: {
+    daysLeft: (n: number) => `${n} days left in your free trial`,
+    lastDay: 'This is the last day of your free trial',
+    expired: 'Your free trial has ended',
+    upgrade: 'Upgrade now',
+    label: 'Free trial',
+  },
 } as const

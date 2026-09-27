@@ -3686,6 +3686,13 @@ export const dashboardHe = {
       description: 'לחשבון זה יש גישה מלאה למערכת ואינו דורש תוכנית חיוב.',
     },
   },
+  trialBar: {
+    daysLeft: (n: number) => (n === 2 ? 'נותרו יומיים בתקופת הניסיון החינמית שלך' : `נותרו ${n} ימים בתקופת הניסיון החינמית שלך`),
+    lastDay: 'זה היום האחרון בתקופת הניסיון החינמית שלך',
+    expired: 'תקופת הניסיון החינמית שלך הסתיימה',
+    upgrade: 'שדרג עכשיו',
+    label: 'תקופת הניסיון',
+  },
 } as const
 
 export type DashboardDictionary = typeof dashboardHe
