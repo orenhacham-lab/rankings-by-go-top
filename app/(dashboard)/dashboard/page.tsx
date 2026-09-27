@@ -66,6 +66,7 @@ import ContentOpportunities from '@/components/dashboard/ContentOpportunities'
 import { PublishingBoard, RecentArticles } from '@/components/dashboard/ContentWidgets'
 import AiVisibilityBrief from '@/components/dashboard/AiVisibilityBrief'
 import AccountStatus from '@/components/dashboard/AccountStatus'
+import MonthlyReportTeaser from '@/components/reports/monthly/MonthlyReportTeaser'
 
 /** A PostgREST page; far more than one scan of any project's keywords. */
 const RESULTS_READ = 1000
@@ -353,6 +354,10 @@ function ProjectDashboard({ project }: { project: Project }) {
           </div>
           <div className="order-6 min-w-0">
             <CompetitorsWidget t={t} model={competitors} manageHref={competitorView.manageHref ?? `${settingsHref}#competitors`} />
+          </div>
+          {/* The latest automatic monthly report, linking to it on the Reports screen. */}
+          <div className="order-9 min-w-0 empty:hidden">
+            <MonthlyReportTeaser projectId={project.id} language={language} />
           </div>
           {showAi && (
             <div className="order-10 min-w-0">

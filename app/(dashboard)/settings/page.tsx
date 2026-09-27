@@ -34,6 +34,7 @@ import DangerZone from '@/components/settings/DangerZone'
 import GoogleAdsCard from '@/components/settings/GoogleAdsCard'
 import Notice from '@/components/settings/Notice'
 import ProfileCard from '@/components/settings/ProfileCard'
+import WeeklyEmailCard from '@/components/reports/monthly/WeeklyEmailCard'
 import ScanBand from '@/components/settings/ScanBand'
 import SettingsIndex from '@/components/settings/SettingsIndex'
 import SettingsSkeleton from '@/components/settings/SettingsSkeleton'
@@ -231,6 +232,9 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
                 <p className="text-sm text-muted">{t.moreConnectionsSoon}</p>
               </Card>
             </section>
+
+            {/* Monthly report: the weekly-email switch (off by default; nothing sends yet). */}
+            <WeeklyEmailCard projectId={project.id} language={language} />
 
             <DangerZone project={project} deleteLabels={dict.projects.deleteDialog} t={t} />
           </div>
