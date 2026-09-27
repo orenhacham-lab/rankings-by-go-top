@@ -58,12 +58,130 @@ const QUESTION_MARKERS = [
   'how ', 'what ', 'why ', 'when ', 'where ', 'which ', 'faq', 'frequently asked',
 ]
 
+/**
+ * WHY THIS FILE AVOIDS REGEXES FOR MARKUP.
+ *
+ * Every pattern here would run over a document the site under check chooses,
+ * up to the 1.5 MB fetch cap, on a public route. Two shapes are quadratic on
+ * markup that never closes what it opens, and both were measured on this file's
+ * own expressions before they were replaced:
+ *
+ *   /<!--[\s\S]*?-->/g   on unclosed comments: 200 KB took 3.0 s
+ *   /<img\b[^>]*>/gi     on tags with no '>':  200 KB took 6.3 s
+ *
+ * In each case the scan runs to the end of the input from every occurrence and
+ * then fails, so the cost is quadratic in the body size — 1.5 MB never finished
+ * in a three-minute probe. indexOf cannot backtrack, so the helpers below do
+ * the same work at the same cost on hostile and well-formed markup alike.
+ */
+
+/** True for a character that can continue an HTML tag name. */
+function isNameChar(code: number): boolean {
+  return (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 45 || code === 58 || code === 95
+}
+
+/** How many tags of one name we collect from a document. Far above any real page. */
+const MAX_TAGS_SCANNED = 4_000
+
+/**
+ * Every `<tag …>` opening tag, in document order, as raw strings. The character
+ * after the name is checked so `<a` does not match `<abbr`, the way `\b` did.
+ */
+function openTags(html: string, tag: string): string[] {
+  const out: string[] = []
+  const hay = html.toLowerCase()
+  const needle = `<${tag.toLowerCase()}`
+  let i = 0
+  while (out.length < MAX_TAGS_SCANNED) {
+    const at = hay.indexOf(needle, i)
+    if (at < 0) break
+    i = at + needle.length
+    if (isNameChar(hay.charCodeAt(i))) continue
+    const close = hay.indexOf('>', i)
+    if (close < 0) break
+    out.push(html.slice(at, close + 1))
+    i = close + 1
+  }
+  return out
+}
+
+/**
+ * The content of the first `<tag …>…</tag>`, or null. An element the document
+ * opens and never closes yields null rather than the rest of the file.
+ */
+function firstElement(html: string, tag: string): string | null {
+  const hay = html.toLowerCase()
+  const needle = `<${tag.toLowerCase()}`
+  let i = 0
+  while (true) {
+    const at = hay.indexOf(needle, i)
+    if (at < 0) return null
+    i = at + needle.length
+    if (isNameChar(hay.charCodeAt(i))) continue
+    const open = hay.indexOf('>', i)
+    if (open < 0) return null
+    const end = hay.indexOf(`</${tag.toLowerCase()}`, open + 1)
+    if (end < 0) return null
+    return html.slice(open + 1, end)
+  }
+}
+
+/**
+ * Replace every `<tag …>…</tag>` with a space, including an unclosed one.
+ *
+ * One pass over one lowercased copy. Re-lowercasing the document per element
+ * would be quadratic in the NUMBER of elements, which a page with a few hundred
+ * script tags reaches on its own — a different shape of the same bug.
+ */
+function dropElements(html: string, tag: string): string {
+  const hay = html.toLowerCase()
+  const needle = `<${tag}`
+  if (!hay.includes(needle)) return html
+  const parts: string[] = []
+  let kept = 0
+  let i = 0
+  while (true) {
+    const at = hay.indexOf(needle, i)
+    if (at < 0) break
+    const nameEnd = at + needle.length
+    if (isNameChar(hay.charCodeAt(nameEnd))) { i = nameEnd; continue }
+    const open = hay.indexOf('>', nameEnd)
+    const end = open < 0 ? -1 : hay.indexOf(`</${tag}`, open + 1)
+    // A tag the document never closes: nothing after it is markup we can read.
+    if (end < 0) {
+      parts.push(html.slice(kept, at), ' ')
+      return parts.join('')
+    }
+    const endClose = hay.indexOf('>', end)
+    const cut = endClose < 0 ? hay.length : endClose + 1
+    parts.push(html.slice(kept, at), ' ')
+    kept = cut
+    i = cut
+  }
+  parts.push(html.slice(kept))
+  return parts.join('')
+}
+
+/** Replace every `<!-- … -->` with a space. An unterminated one ends the document. */
+function dropComments(html: string): string {
+  if (!html.includes('<!--')) return html
+  let out = ''
+  let i = 0
+  while (true) {
+    const at = html.indexOf('<!--', i)
+    if (at < 0) return out + html.slice(i)
+    const end = html.indexOf('-->', at + 4)
+    // Browsers treat an unterminated comment as swallowing the rest, and so do we.
+    if (end < 0) return `${out}${html.slice(i, at)} `
+    out += `${html.slice(i, at)} `
+    i = end + 3
+  }
+}
+
 function stripNoise(html: string): string {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
+  let out = html
+  for (const tag of ['script', 'style', 'noscript']) out = dropElements(out, tag)
+  return dropComments(out)
 }
 
 function decodeEntities(s: string): string {
@@ -77,14 +195,29 @@ function decodeEntities(s: string): string {
     .replace(/&[#a-z0-9]+;/gi, ' ')
 }
 
+/** Drop every tag. Same reason as above: `/<[^>]*>/g` is quadratic without a '>'. */
+function stripTags(fragment: string): string {
+  if (!fragment.includes('<')) return fragment
+  let out = ''
+  let i = 0
+  while (true) {
+    const at = fragment.indexOf('<', i)
+    if (at < 0) return out + fragment.slice(i)
+    const close = fragment.indexOf('>', at + 1)
+    if (close < 0) return `${out}${fragment.slice(i, at)} `
+    out += `${fragment.slice(i, at)} `
+    i = close + 1
+  }
+}
+
 function textOf(fragment: string): string {
-  return decodeEntities(fragment.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim()
+  return decodeEntities(stripTags(fragment)).replace(/\s+/g, ' ').trim()
 }
 
 /** All values of an attribute on tags matching `tag`, in document order. */
 function attrValues(html: string, tag: string, attr: string): string[] {
   const out: string[] = []
-  const tags = html.match(new RegExp(`<${tag}\\b[^>]*>`, 'gi')) ?? []
+  const tags = openTags(html, tag)
   const attrRe = new RegExp(`\\b${attr}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s">]+))`, 'i')
   for (const t of tags) {
     const m = t.match(attrRe)
@@ -95,7 +228,7 @@ function attrValues(html: string, tag: string, attr: string): string[] {
 
 /** Content of a `<meta name="x">` / `<meta property="x">`, first match wins. */
 function metaContent(html: string, key: string): string | null {
-  const tags = html.match(/<meta\b[^>]*>/gi) ?? []
+  const tags = openTags(html, 'meta')
   for (const t of tags) {
     const nameM = t.match(/\b(?:name|property)\s*=\s*("([^"]*)"|'([^']*)'|([^\s">]+))/i)
     const name = (nameM?.[2] ?? nameM?.[3] ?? nameM?.[4] ?? '').trim().toLowerCase()
@@ -109,12 +242,21 @@ function metaContent(html: string, key: string): string | null {
 
 function headings(html: string, tag: 'h1' | 'h2'): string[] {
   const out: string[] = []
-  const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')
-  let m: RegExpExecArray | null
-  while ((m = re.exec(html))) {
-    const t = textOf(m[1])
+  const hay = html.toLowerCase()
+  let i = 0
+  while (out.length < 40) {
+    const at = hay.indexOf(`<${tag}`, i)
+    if (at < 0) break
+    const nameEnd = at + tag.length + 1
+    i = nameEnd
+    if (isNameChar(hay.charCodeAt(nameEnd))) continue
+    const open = hay.indexOf('>', nameEnd)
+    if (open < 0) break
+    const end = hay.indexOf(`</${tag}`, open + 1)
+    if (end < 0) break
+    i = end + 1
+    const t = textOf(html.slice(open + 1, end))
     if (t) out.push(t.slice(0, 200))
-    if (out.length >= 40) break
   }
   return out
 }
@@ -134,11 +276,24 @@ function flattenJsonLd(value: unknown, into: JsonLdNode[], depth = 0): void {
 
 function jsonLdNodes(html: string): JsonLdNode[] {
   const nodes: JsonLdNode[] = []
-  const re = /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi
-  let m: RegExpExecArray | null
-  while ((m = re.exec(html))) {
+  const hay = html.toLowerCase()
+  let i = 0
+  let read = 0
+  while (read < 50) {
+    const at = hay.indexOf('<script', i)
+    if (at < 0) break
+    const nameEnd = at + '<script'.length
+    i = nameEnd
+    if (isNameChar(hay.charCodeAt(nameEnd))) continue
+    const open = hay.indexOf('>', nameEnd)
+    if (open < 0) break
+    const end = hay.indexOf('</script', open + 1)
+    if (end < 0) break
+    i = end + 1
+    if (!/type\s*=\s*["']?application\/ld\+json/i.test(hay.slice(nameEnd, open))) continue
+    read += 1
     try {
-      flattenJsonLd(JSON.parse(m[1].trim()), nodes)
+      flattenJsonLd(JSON.parse(html.slice(open + 1, end).trim()), nodes)
     } catch {
       // A malformed block is simply not a signal; never fail the whole check.
     }
@@ -171,15 +326,15 @@ const ORGANIZATION_TYPES = new Set([
  */
 const PLATFORM_FINGERPRINTS: { name: string; patterns: RegExp[] }[] = [
   { name: 'Shopify', patterns: [/cdn\.shopify\.com/i, /Shopify\.theme/i, /myshopify\.com/i, /shopify-features/i] },
-  { name: 'Wix', patterns: [/static\.wixstatic\.com/i, /wix-?code/i, /<meta[^>]+generator["'][^>]*Wix\.com/i] },
+  { name: 'Wix', patterns: [/static\.wixstatic\.com/i, /wix-?code/i, /<meta[^>]{1,200}generator["'][^>]{0,200}Wix\.com/i] },
   { name: 'Squarespace', patterns: [/squarespace\.com/i, /Static\.SQUARESPACE_CONTEXT/i] },
   { name: 'Webflow', patterns: [/assets\.website-files\.com/i, /webflow\.js/i, /data-wf-page/i] },
-  { name: 'WooCommerce', patterns: [/woocommerce[-.]/i, /wc-ajax/i, /generator["'][^>]*WooCommerce/i] },
+  { name: 'WooCommerce', patterns: [/woocommerce[-.]/i, /wc-ajax/i, /generator["'][^>]{0,200}WooCommerce/i] },
   { name: 'Magento', patterns: [/\/static\/version\d+\/frontend\//i, /Magento_/i, /mage\/cookies/i] },
   { name: 'Duda', patterns: [/irp\.cdn-website\.com/i, /dmws\./i] },
-  { name: 'Joomla', patterns: [/generator["'][^>]*Joomla/i, /\/media\/jui\//i] },
-  { name: 'Drupal', patterns: [/generator["'][^>]*Drupal/i, /\/sites\/default\/files\//i, /drupal-settings-json/i] },
-  { name: 'WordPress', patterns: [/wp-content\//i, /wp-includes\//i, /generator["'][^>]*WordPress/i, /wp-json/i] },
+  { name: 'Joomla', patterns: [/generator["'][^>]{0,200}Joomla/i, /\/media\/jui\//i] },
+  { name: 'Drupal', patterns: [/generator["'][^>]{0,200}Drupal/i, /\/sites\/default\/files\//i, /drupal-settings-json/i] },
+  { name: 'WordPress', patterns: [/wp-content\//i, /wp-includes\//i, /generator["'][^>]{0,200}WordPress/i, /wp-json/i] },
 ]
 
 /**
@@ -237,14 +392,14 @@ export function extractSiteSignals(
   const clean = stripNoise(html)
   const head = clean.slice(0, 200_000)
 
-  const titleM = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)
-  const title = titleM ? textOf(titleM[1]).slice(0, 300) || null : null
+  const titleInner = firstElement(head, 'title')
+  const title = titleInner === null ? null : textOf(titleInner).slice(0, 300) || null
 
-  const htmlTagM = html.match(/<html\b[^>]*>/i)
-  const langM = htmlTagM?.[0].match(/\blang\s*=\s*("([^"]*)"|'([^']*)'|([^\s">]+))/i)
+  const htmlTag = openTags(html, 'html')[0]
+  const langM = htmlTag?.match(/\blang\s*=\s*("([^"]*)"|'([^']*)'|([^\s">]+))/i)
   const htmlLang = (langM?.[2] ?? langM?.[3] ?? langM?.[4] ?? '').trim().toLowerCase() || null
 
-  const canonicalTag = (head.match(/<link\b[^>]*>/gi) ?? []).find((t) => /\brel\s*=\s*["']?canonical/i.test(t))
+  const canonicalTag = openTags(head, 'link').find((t) => /\brel\s*=\s*["']?canonical/i.test(t))
   const canonHref = canonicalTag?.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s">]+))/i)
   const canonical = (canonHref?.[2] ?? canonHref?.[3] ?? canonHref?.[4] ?? '').trim() || null
 
@@ -286,8 +441,8 @@ export function extractSiteSignals(
     }
   }
 
-  const bodyM = clean.match(/<body\b[^>]*>([\s\S]*)<\/body>/i)
-  const text = textOf(bodyM ? bodyM[1] : clean).slice(0, 20_000)
+  const bodyInner = firstElement(clean, 'body')
+  const text = textOf(bodyInner ?? clean).slice(0, 20_000)
   const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0
 
   return {
