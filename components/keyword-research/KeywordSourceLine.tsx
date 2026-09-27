@@ -30,6 +30,20 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
   // is the same on almost every row, so it is only an icon (its words stay for screen
   // readers and on hover); a competitor and Google keep their words, which differ per row.
   const ICONS = { research: ScanSearch, competitor: Swords, google: TrendingUp } as const
+  const researchMark = (key: string, text: string) => (
+    <span key={key} title={text} className="inline-grid size-5 place-items-center rounded-full bg-action-soft text-action">
+      <ScanSearch size={11} strokeWidth={2.5} aria-hidden="true" />
+      <span className="sr-only">{text}</span>
+    </span>
+  )
+  // Only the research's own mark: it sits beside the keyword, so the row keeps one line.
+  if (!row.tracked && parts.length === 1 && parts[0].key === 'research') {
+    return (
+      <span data-keyword-source="" className="ms-2 inline-flex align-[-4px]">
+        {researchMark(parts[0].key, parts[0].text)}
+      </span>
+    )
+  }
   return (
     <span data-keyword-source="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-caption text-muted">
       {row.tracked && (
@@ -37,12 +51,7 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
       )}
       {parts.map((p) => {
         const Icon = ICONS[p.key as keyof typeof ICONS]
-        return p.key === 'research' ? (
-          <span key={p.key} title={p.text} className="inline-grid size-5 place-items-center rounded-full bg-action-soft text-action">
-            <Icon size={11} strokeWidth={2.5} aria-hidden="true" />
-            <span className="sr-only">{p.text}</span>
-          </span>
-        ) : (
+        return p.key === 'research' ? researchMark(p.key, p.text) : (
           <span key={p.key} title={p.title} className="inline-flex items-center gap-1">
             {Icon && <Icon size={12} strokeWidth={2} aria-hidden="true" className="shrink-0" />}
             {p.text}
