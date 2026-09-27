@@ -11,7 +11,8 @@
  *
  * Before Search Console can give the figures, the same three tiles stand with their
  * titles and say they are waiting, and ONE card below them says what they will show
- * and offers the one step that is missing.
+ * and offers the one step that is missing. With Search Console switched off on the
+ * server there is no step to offer, and no section.
  */
 import { MousePointerClick, Eye, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ export default function GscPerformance({ projectId, className }: { projectId: st
   const summary = status.view.state === 'ready' ? status.view.summary : null
   // A sync that predates the property totals has no totals to show: one more sync.
   const state = status.view.state === 'ready' && !summary ? 'never_synced' : status.view.state
+  if (state === 'disabled') return null
   const points = trend.data.state === 'ready' ? trend.data.data : []
   const previous = previousPeriod(points)
   const retry = () => { status.reload(); trend.reload() }

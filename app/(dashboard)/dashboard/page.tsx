@@ -11,7 +11,9 @@
  * These are the widgets the page already had, scoped to the project, plus what
  * Search Console adds: clicks from Google and the top pages. Those two are always
  * here; until Search Console is set up they say what they will show, with the one
- * step that is missing. The redesigned dashboard is its own phase of the plan.
+ * step that is missing. With Search Console switched off on the server they render
+ * nothing, and the tile row closes up to the tiles it has. The redesigned dashboard
+ * is its own phase of the plan.
  */
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -192,7 +194,8 @@ function ProjectDashboard({ project }: { project: Project }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* One equal column per tile: three with the clicks tile, two without it. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-flow-col sm:auto-cols-fr">
         <Link href="/keywords" className="block rounded-card transition-shadow hover:shadow-card">
           <StatTile
             className="h-full"

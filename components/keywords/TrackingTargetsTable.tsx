@@ -16,7 +16,7 @@ import { sortTargetsByPosition } from '@/lib/sorting'
 import Link from 'next/link'
 import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
 import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
-import { GscKeywordLine, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
+import { GscVolumeCell, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
 
 interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
@@ -50,7 +50,8 @@ interface TrackingTargetsTableProps {
    *  best-placed competitor of the same check. */
   competitorView?: CompetitorView
   /** Search Console: when given, a line under each search volume shows the keyword's
-   *  clicks and impressions from Google over the last 28 days. */
+   *  clicks and impressions from Google over the last 28 days. While Search Console
+   *  is switched off on the server there is no line, and the cell is the volume alone. */
   gscKeywords?: GscKeywordsView
 }
 
@@ -227,7 +228,7 @@ export default function TrackingTargetsTable({
                   <EngineBadge engine={target.engine_type} device={projectDevice} />
                 </Td>
                 <Td>
-                  <div className="flex flex-col items-start gap-1">
+                  <GscVolumeCell view={gscKeywords} targetId={target.id}>
                     {target.avg_monthly_searches !== null && target.avg_monthly_searches !== undefined ? (
                       <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
                         {target.avg_monthly_searches.toLocaleString()}
@@ -265,8 +266,7 @@ export default function TrackingTargetsTable({
                         —
                       </span>
                     )}
-                    {gscKeywords && <GscKeywordLine view={gscKeywords} targetId={target.id} />}
-                  </div>
+                  </GscVolumeCell>
                 </Td>
                 <Td>
                   <div className="flex flex-col items-start gap-1">

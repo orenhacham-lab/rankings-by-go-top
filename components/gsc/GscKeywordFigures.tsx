@@ -13,6 +13,10 @@
  * set up, what they will be, with the one step that is missing. Every cell then shows
  * a dash that explains itself, never a 0 that only means "not connected".
  *
+ * With Search Console switched off on the server there is no step to offer: no line
+ * above the table, no box in any cell, and the search-volume cell is exactly what it
+ * was before Search Console fed the table (GscVolumeCell).
+ *
  * A keyword is matched to Search Console queries by the opportunity engine's own
  * normalization (lib/gsc/tab-metrics.ts, on the server).
  */
@@ -58,6 +62,7 @@ export function GscKeywordsNotice({ projectId, view, className }: { projectId: s
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const state = view.data.state
+  if (state === 'disabled') return null
   return (
     <div
       data-gsc-widget="keywords"
@@ -90,6 +95,7 @@ export function GscKeywordLine({ view, targetId }: { view: GscKeywordsView; targ
   const data = view.data
   const mark = <MousePointerClick size={12} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
 
+  if (data.state === 'disabled') return null
   if (data.state === 'loading') {
     return (
       <span className={BOX} data-gsc-keyword="loading" aria-busy="true">
@@ -115,6 +121,22 @@ export function GscKeywordLine({ view, targetId }: { view: GscKeywordsView; targ
       <span className="min-w-0 truncate text-muted tabular-nums" aria-hidden="true">{formatCompact(figures.impressions, language)}</span>
       <span className="sr-only">{full}</span>
     </span>
+  )
+}
+
+/**
+ * What the search-volume cell holds: the volume, with the box above stacked under it.
+ * With Search Console switched off on the server (or no view given) it is the volume
+ * alone, without the column that stacks the box, so the cell is exactly the one it was
+ * before Search Console fed the table.
+ */
+export function GscVolumeCell({ view, targetId, children }: { view: GscKeywordsView | undefined; targetId: string; children: React.ReactNode }) {
+  if (!view || view.data.state === 'disabled') return <>{children}</>
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {children}
+      <GscKeywordLine view={view} targetId={targetId} />
+    </div>
   )
 }
 

@@ -7,7 +7,8 @@
  * The number is the authoritative property total of the latest 28-day sync, never
  * a sum of query rows. Until Search Console can give it, the tile keeps its title
  * and says what it will show and why that matters, with the one step that is
- * missing; it never shows a 0 that only means "not connected".
+ * missing; it never shows a 0 that only means "not connected". With Search Console
+ * switched off on the server there is no step to offer, and no tile.
  */
 import { MousePointerClick } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,7 @@ export default function GscClicksTile({ projectId, className }: { projectId: str
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const { view, reload } = useGscStatus(projectId)
+  if (view.state === 'disabled') return null
   // A sync that predates the property totals has rows but no total yet: one more sync.
   const state = view.state === 'ready' && !view.summary ? 'never_synced' : view.state
   const icon = <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />

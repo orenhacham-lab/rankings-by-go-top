@@ -142,8 +142,9 @@ export default function KeywordResearchPage() {
   const projectsLoading = !projectsResolved
   const activeProjectName = projects.find((p) => p.id === activeProjectId)?.name ?? ''
   const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.name ?? '' })), [projects])
-  // What the Search Console section reports back (a decision saved or undone, a topic
-  // created, or why not): it has no other place on this screen to say it.
+  // What the raw Search Console opportunity browser reports back when it is on (a
+  // decision saved or undone, a topic created, or why not): it has no other place on
+  // this screen to say it.
   const gscToast = useToasts()
   const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
@@ -1321,15 +1322,18 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
-      {/* Opportunities from Search Console: searches the site already shows up for.
-          A section of its own, for the project the top bar names, and always here:
-          before Search Console is set up it says what it will show. Keyed by the
-          project, so a switch starts it afresh instead of showing, or later receiving,
-          the previous project's opportunities. */}
-      <div className="mt-8">
-        <GscOpportunities projectId={selectedProject} key={selectedProject} projects={projectOptions}
-          onToast={(kind, text) => (kind === 'success' ? gscToast.success(text) : gscToast.error(text))} />
-      </div>
+      {/* Internal/dev-only raw Search Console opportunity browser (Stage E2A/E2B) —
+          behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. It is a diagnostic, never the
+          merchant-facing view (a merchant-grade presentation of these opportunities
+          is a later package). For the project the top bar names, and keyed by it, so
+          a switch starts it afresh instead of showing, or later receiving, the
+          previous project's opportunities. */}
+      {process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && (
+        <div className="mt-8">
+          <GscOpportunities projectId={selectedProject} key={selectedProject} projects={projectOptions}
+            onToast={(kind, text) => (kind === 'success' ? gscToast.success(text) : gscToast.error(text))} />
+        </div>
+      )}
 
       {/* AI Questions Modal */}
       <AIQuestionsModal

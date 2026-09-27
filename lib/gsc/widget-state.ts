@@ -2,11 +2,16 @@
  * What a Search Console widget can show, decided once from GET /api/gsc/status.
  *
  * Search Console is not a screen of its own any more: it feeds the dashboard, the
- * keywords table, "my progress", keyword research and topics. Every widget that
- * reads it is always on its screen with its real title, and when the data is not
- * there it says what will appear and offers exactly one way to fix that. Which fix
- * depends on WHY the data is missing, and that reason is decided here, once, so the
- * widgets cannot disagree about it.
+ * keywords table, "my progress" and topics. Every widget that reads it is always on
+ * its screen with its real title, and when the data is not there it says what will
+ * appear and offers exactly one way to fix that. Which fix depends on WHY the data is
+ * missing, and that reason is decided here, once, so the widgets cannot disagree
+ * about it.
+ *
+ * The one exception is Search Console switched off on the server ('disabled'): there
+ * is nothing a merchant can do about that, and every route that would connect it
+ * refuses too, so every widget renders nothing at all and its screen looks as it did
+ * before Search Console fed it.
  *
  * Pure: no React, no I/O.
  */
@@ -30,6 +35,8 @@ export interface GscSummary28 {
 export type GscStatusView =
   | { state: 'loading' }
   | { state: 'error' }
+  /** Search Console is switched off on the server: the widget renders nothing. */
+  | { state: 'disabled' }
   | { state: GscSetupState }
   /** `summary` is null when the latest sync predates the property summary: its rows are
    *  still good, but its totals need one more sync (never summed from detail rows). */
@@ -57,12 +64,13 @@ type StatusBody = {
 /**
  * The status response → what the widgets show.
  *
- * A 404 means the Search Console feature is off on the server, which a merchant can
- * only experience as "not connected"; any other failure is an error, never a setup
- * state: a read that failed must not tell a connected merchant to connect.
+ * A 404 means the Search Console feature is off on the server (GSC_READ_ONLY_ENABLED):
+ * the connect routes refuse too, so offering "connect" would be a dead end. It is
+ * 'disabled', and the widgets render nothing. Any other failure is an error, never a
+ * setup state: a read that failed must not tell a connected merchant to connect.
  */
 export function gscStatusView(httpStatus: number, body: unknown): GscStatusView {
-  if (httpStatus === 404) return { state: 'not_connected' }
+  if (httpStatus === 404) return { state: 'disabled' }
   const b = (body ?? {}) as StatusBody
   if (httpStatus < 200 || httpStatus >= 300 || b.ok !== true) return { state: 'error' }
 

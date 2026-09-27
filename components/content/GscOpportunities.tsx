@@ -3,11 +3,13 @@
 /**
  * Stage E2A surface + Stage E2B controlled decisions.
  *
- * Opportunities from Search Console, a section of keyword research: searches the site
- * already shows up for, and what to improve on each page. It is always on that screen
- * with its title; until Search Console can feed it, it says what it will show and
- * offers the one step that is missing (the shared status decides which), and it asks
- * for opportunities only once there is a sync to read them from.
+ * The raw opportunity browser: an internal/dev-only DIAGNOSTIC, never the merchant-facing
+ * view. Keyword research mounts it only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED (a
+ * merchant-grade presentation of these opportunities is a later package). When mounted,
+ * until Search Console can feed it, it says what it will show and offers the one step
+ * that is missing (the shared status decides which), and it asks for opportunities only
+ * once there is a sync to read them from; with Search Console switched off on the
+ * server it renders nothing.
  *
  * E2A remains fully read-only. E2B adds human-triggered decisions — Create reviewed topic /
  * Already covered / Not relevant — gated behind NEXT_PUBLIC_GSC_ACTIONS_ENABLED (the server
@@ -201,6 +203,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
 
   const decidedLabel = (d: DecisionKind) => (d === 'created_topic' ? t.decidedCreatedTopic : d === 'already_covered' ? t.decidedAlreadyCovered : t.decidedIrrelevant)
 
+  if (gsc.view.state === 'disabled') return null
   return (
     <section data-gsc-widget="opportunities" data-gsc-state={gsc.view.state}>
     <Card className="hover:translate-y-0">

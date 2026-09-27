@@ -10,7 +10,8 @@
  *
  * Below the topics, the recommendations Search Console adds to the strategy. They
  * used to be a Search Console screen of their own; they are always here now, and
- * before Search Console is set up they say what they will show.
+ * before Search Console is set up they say what they will show (with Search Console
+ * switched off on the server they are not shown at all).
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -259,14 +260,14 @@ export default function TopicsScreen() {
 
       {/* Keyed by the project: the workspace stays mounted when the top bar switches
           projects, and a switch must not show, or later receive, the previous
-          project's recommendations. */}
-      <div className="mt-8 border-t border-line pt-6">
-        <GscRecommendations
-          projectId={projectId}
-          key={projectId}
-          onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
-        />
-      </div>
+          project's recommendations. The spacing and separator are the section's own,
+          so with Search Console switched off on the server nothing is left of it. */}
+      <GscRecommendations
+        projectId={projectId}
+        key={projectId}
+        className="mt-8 border-t border-line pt-6"
+        onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+      />
     </div>
   )
 }

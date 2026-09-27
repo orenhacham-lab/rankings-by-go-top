@@ -6,7 +6,8 @@
  * Summed per page from the latest 28-day sync's rows. A bar per page shows how the
  * clicks split between them, and every bar carries its number in words, so nothing is
  * read from the bar alone. Without Search Console the card keeps its title and says
- * what it will show, with the one step that is missing.
+ * what it will show, with the one step that is missing. With Search Console switched
+ * off on the server there is no step to offer, and no card.
  */
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -41,6 +42,7 @@ export default function GscTopPages({ projectId, className }: { projectId: strin
   const status = useGscStatus(projectId)
   const pages = useGscMetrics(projectId, status.view, 'pages', pickPages)
   const data = pages.data
+  if (data.state === 'disabled') return null
   const retry = () => { status.reload(); pages.reload() }
   const max = data.state === 'ready' ? Math.max(1, ...data.data.map((p) => p.clicks)) : 1
 

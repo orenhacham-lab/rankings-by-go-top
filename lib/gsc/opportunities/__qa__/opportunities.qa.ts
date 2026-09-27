@@ -270,21 +270,22 @@ async function main() {
     check('F3(11) different cluster → different id', base !== diffCluster)
   }
 
-  // ── FIX 4: a section of keyword research, not the project page; still read-only ─
+  // ── FIX 4: a dev-only diagnostic behind its own flag, not the project page; still read-only ─
   {
-    // It was a raw diagnostic on the content workspace's Search Console screen, behind
-    // NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. That screen is gone: Search Console feeds the
-    // screens that already exist, and the opportunities are keyword research's own
-    // section now, merchant-facing and always there (before Search Console is set up it
-    // says what it will show; lib/gsc/__qa__/gsc-in-tabs.qa.ts renders that state).
+    // It is a raw DIAGNOSTIC, never the merchant-facing view: on main (the content hub)
+    // and on the content workspace's Search Console screen it rendered only when
+    // NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true'. That screen is gone, and keyword
+    // research mounts it now, behind the same flag (a merchant-grade presentation of the
+    // opportunities is a later package; components/gsc/__qa__/gsc-widgets.qa.ts E4).
     const research = read('app/(dashboard)/keyword-research/page.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-    const mountedAsSection = (src: string) =>
+    const mountedBehindFlag = (src: string) =>
       /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(src)
-      && /<div className="mt-8">\s*<GscOpportunities projectId=\{selectedProject\}/.test(src)
-      && !/NEXT_PUBLIC_GSC/.test(src)
-    check('F4(12) GscOpportunities is a section of keyword research, for the project the top bar names', mountedAsSection(research))
-    check('F4(12) MUT: mounting it behind a flag again fails that check',
-      !mountedAsSection(research.replace('<div className="mt-8">', "{process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && <div className=\"mt-8\">")))
+      && (src.match(/<GscOpportunities\b/g) ?? []).length === 1
+      && /\{process\.env\.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && \(\s*<div className="mt-8">\s*<GscOpportunities projectId=\{selectedProject\}/.test(src)
+    check('F4(12) GscOpportunities renders in keyword research only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED, for the project the top bar names',
+      mountedBehindFlag(research))
+    check('F4(12) MUT: mounting it without the flag (merchant-facing) fails that check',
+      !mountedBehindFlag(research.replace("process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && ", '')))
     check('F4(12) the Search Console screen that held it is gone',
       !/GscOpportunities/.test((() => { try { return read('components/content/workspace/SearchConsoleScreen.tsx') } catch { return '' } })()))
     // The project page became tabs; its connection panels live in the project's settings.

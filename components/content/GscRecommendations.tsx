@@ -6,8 +6,10 @@
  * A section of the Topics screen now that Search Console is not a screen of its own.
  * It is always there with its title; until Search Console can feed it, it says what it
  * will show and offers the one step that is missing (the shared status decides which),
- * and it asks for recommendations only once there is a sync to build them from. It
- * follows the screen's direction (Hebrew right to left, English left to right).
+ * and it asks for recommendations only once there is a sync to build them from. With
+ * Search Console switched off on the server there is no step to offer, and no section
+ * (its spacing and separator are its own, so none is left behind). It follows the
+ * screen's direction (Hebrew right to left, English left to right).
  *
  * A small, bounded, plain-language set of page-level recommendations (categories A–D). No raw
  * queries, no numeric scores, no internal terminology, and NO topic creation — GSC new content
@@ -56,8 +58,8 @@ const safeDecode = (u: string) => { try { return decodeURI(u) } catch { return u
 const CATEGORIES: Category[] = ['improve_ctr', 'improve_page', 'internal_links', 'page_overlap']
 const OVERLAP_INITIAL = 3
 
-export default function GscRecommendations({ projectId, onToast }: {
-  projectId: string; onToast?: (kind: 'success' | 'error', text: string) => void
+export default function GscRecommendations({ projectId, onToast, className }: {
+  projectId: string; onToast?: (kind: 'success' | 'error', text: string) => void; className?: string
 }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscRecommendations, [language])
@@ -125,8 +127,9 @@ export default function GscRecommendations({ projectId, onToast }: {
       : r.category === 'internal_links' ? t.summaries.internal_links(fmtPos(r.metrics.averagePosition))
         : t.summaries.page_overlap(r.involvedPages?.length ?? 0)
 
+  if (gsc.view.state === 'disabled') return null
   return (
-    <section data-gsc-widget="recommendations" data-gsc-state={gsc.view.state}>
+    <section data-gsc-widget="recommendations" data-gsc-state={gsc.view.state} className={className}>
       <div className="mb-4">
         <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{w.title}</h3>
         {gscReady && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{w.about}</p>}

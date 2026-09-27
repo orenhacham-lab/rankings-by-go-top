@@ -4,24 +4,33 @@
  * Search Console stopped being a screen of its own and became a data source of the
  * screens that already exist: clicks and top pages on the dashboard, clicks and
  * impressions per keyword in the keywords table, a performance block on "my
- * progress", opportunities in keyword research and recommendations on Topics.
+ * progress" and recommendations on Topics. The raw opportunity browser is not one of
+ * them: it is an internal/dev-only diagnostic, mounted in keyword research only behind
+ * NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED (a merchant-grade presentation is a later package).
  *
  * The rule every one of them follows: a widget that depends on Search Console is
  * always on its screen with its real title. Before Search Console can feed it, it
  * shows one sentence on what will appear there and why it is worth it, and exactly
- * one button, to the Search Console section of the project's settings. It is never
- * hidden, and it never shows a bare zero.
+ * one button, to the Search Console section of the project's settings. The connection
+ * never hides it, and it never shows a bare zero. The one exception is Search Console
+ * switched off on the server (the status answers 404, 'disabled'): the connect routes
+ * refuse too, so "connect" would be a dead end, and every widget renders nothing.
  *
- *  A) the status → what a widget shows (and a failed read is never "not connected");
+ *  A) the status → what a widget shows (a 404 is 'disabled'; a failed read is never
+ *     "not connected" and never hidden);
  *  B) the figures: top pages, per-keyword matching (the engine's normalization), trend;
  *  C) the metrics route's new views are owner-gated, project-filtered and read-only;
  *  D) every widget, in every setup state and both languages, renders its title, its
- *     sentence and exactly one button to settings (the REAL components, first render);
- *  E) no screen hides a widget: each is mounted unconditionally, and no screen reads
- *     the connection to decide;
+ *     sentence and exactly one button to settings (the REAL components, first render),
+ *     and nothing at all when Search Console is switched off;
+ *  E) no merchant screen hides a widget: each is mounted unconditionally, and no screen
+ *     reads the connection to decide; the raw opportunity browser stays behind its flag;
  *  F) the copy exists in both languages, one sentence each, English without Hebrew;
  *  G) the two widgets that act and keep their own data: what they report reaches the
- *     screen, and a project switch starts them afresh.
+ *     screen, and a project switch starts them afresh;
+ *  H) switched off, the screens look as they did before Search Console fed them: the
+ *     keywords table's volume cell is the volume alone, the dashboard's tile row closes
+ *     up, and Topics keeps no separator for a section that is not there.
  *
  * Source guards strip comments first. Every guard has a mutation control that breaks
  * the rule on purpose and shows the guard fails.
@@ -102,7 +111,11 @@ async function main() {
     check('A1: no connection → not_connected; a revoked one too',
       v(200, STATUS_BODY.not_connected) === 'not_connected'
       && v(200, { ok: true, connection: { status: 'revoked' }, property: { siteUrl: 'x' }, windows: { 28: {} } }) === 'not_connected')
-    check('A2: the feature switched off on the server (404) reads as not connected', v(404, { error: 'Not found' }) === 'not_connected')
+    // Switched off, the connect routes answer 404 too: "connect" would be a dead end.
+    const offIsDisabled = (fn: typeof v) => fn(404, { error: 'Not found' }) === 'disabled' && fn(404, null) === 'disabled'
+    check('A2: the feature switched off on the server (404) is disabled, not "connect"', offIsDisabled(v))
+    check('A2-MUT: the old mapping, 404 → not connected (a dead-end "Connect"), fails A2',
+      !offIsDisabled((s, b) => (s === 404 ? 'not_connected' : v(s, b))))
     check('A3: connected without a property → no_property; expired without one → reauth_required',
       v(200, STATUS_BODY.no_property) === 'no_property' && v(200, STATUS_BODY.reauth_required) === 'reauth_required')
     check('A4: a property but no 28-day sync → never_synced; expired and never synced → reauth_required',
@@ -115,15 +128,40 @@ async function main() {
     check('A6: expired access with data already synced still shows that data', staleAuth.state === 'ready')
     const noTotals = gscStatusView(200, { ...READY_BODY, windows: { 28: { summaryResyncRequired: true, clicks: null } } })
     check('A7: a sync without property totals is ready with no summary (never summed from rows)', noTotals.state === 'ready' && noTotals.summary === null)
-    const failures: [number, unknown][] = [[500, { ok: false, error: 'gsc_error' }], [200, { ok: false }], [0, null], [401, { error: 'Unauthorized' }], [403, { error: 'Forbidden' }]]
+    const failures: [number, unknown][] = [[500, { ok: false, error: 'gsc_error' }], [200, { ok: false }], [0, null], [401, { error: 'Unauthorized' }], [403, { error: 'Forbidden' }],
+      [502, null], [503, { error: 'Service Unavailable' }], [429, { error: 'Too Many Requests' }]]
     const failuresAreErrors = (fn: typeof v) => failures.every(([s, b]) => fn(s, b) === 'error')
-    check('A8: a failed read is an error, never "connect Search Console"', failuresAreErrors(v))
+    check('A8: any other failed read is an error: never "connect Search Console", never hidden as switched off', failuresAreErrors(v))
     check('A8-MUT: a mapping that shows a failed read as not connected fails A8',
       !failuresAreErrors((s, b) => (s >= 500 ? 'not_connected' : v(s, b))))
+    check('A8-MUT2: a mapping that hides every failed read as switched off fails A8',
+      !failuresAreErrors((s, b) => (s !== 200 ? 'disabled' : v(s, b))))
     check('A9: the one button goes to the Search Console section of settings, naming the project',
       gscSettingsHref('p1') === '/settings?projectId=p1#search-console'
       && gscSettingsHref('a b') === '/settings?projectId=a%20b#search-console'
       && gscSettingsHref(null) === '/settings#search-console')
+
+    // The premise of 'disabled', against the real route: switched off, it answers 404
+    // before it reads anything; switched on, the same owned project without a
+    // connection is a 200 that reads as not connected (the 404 is the switch).
+    const { GET: statusGET } = require('../../../app/api/gsc/status/route.ts')
+    const ask = async () => {
+      const res: Response = await statusGET(new Request('http://app.test/api/gsc/status?projectId=p1'))
+      return { status: res.status, body: await res.json().catch(() => null) }
+    }
+    USER = { id: 'u1' }
+    ADMIN = new FakeAdmin({ projects: [{ id: 'p1', user_id: 'u1' }], gsc_connections: [], project_gsc_properties: [], gsc_sync_runs: [] })
+    delete process.env.GSC_READ_ONLY_ENABLED
+    const off = await ask()
+    process.env.GSC_READ_ONLY_ENABLED = 'true'
+    const on = await ask()
+    delete process.env.GSC_READ_ONLY_ENABLED
+    type Answer = { status: number; body: unknown }
+    const contract = (o: Answer, n: Answer) => o.status === 404 && v(o.status, o.body) === 'disabled' && n.status === 200 && v(n.status, n.body) === 'not_connected'
+    check('A10: the real status route, switched off, answers what reads as disabled; switched on, the same project reads as not connected',
+      contract(off, on), JSON.stringify({ off, on }))
+    check('A10-MUT: a switched-off route that answered with a failed read instead (an error box on every screen) fails A10',
+      !contract({ status: 503, body: { ok: false, error: 'disabled' } }, on))
   }
 
   // ── B) the figures ─────────────────────────────────────────────────────
@@ -315,7 +353,9 @@ async function main() {
       return anchors.length === 1 && !/<button\b/.test(html)
         && anchors[0].includes(`href="${esc(href)}"`) && anchors[0].replace(/<[^>]+>/g, '') === esc(label)
     }
-    const prime = (projectId: string, status: number, body: unknown) => data.primeGscResponse(data.gscStatusUrl(projectId), { status, body })
+    /** Every widget rendered nothing at all: no element, no text. */
+    const renderedNothing = (htmls: string[]) => htmls.length > 0 && htmls.every((html) => html === '')
+    const prime =(projectId: string, status: number, body: unknown) => data.primeGscResponse(data.gscStatusUrl(projectId), { status, body })
 
     let sample = ''
     for (const locale of ['he', 'en'] as Locale[]) {
@@ -342,11 +382,16 @@ async function main() {
         }
         check(`D1 (${locale}) ${widget.name}: title, one sentence, one button to settings in all four setup states`, failures.length === 0, failures.join(' | '))
       }
-      // Feature switched off on the server, and an account with no project yet.
+      // Feature switched off on the server: nothing to connect, so nothing at all, not even
+      // the title. Then an account with no project yet.
       prime('p1', 404, { error: 'Not found' })
-      const off = render(locale, WIDGETS[0].el('p1'))
-      check(`D2 (${locale}) the feature switched off reads as not connected, with the connect button`,
-        off.includes('data-gsc-state="not_connected"') && oneSettingsButton(off, '/settings?projectId=p1#search-console', w.actions.not_connected))
+      const off = WIDGETS.map((widget) => render(locale, widget.el('p1')))
+      check(`D2 (${locale}) the feature switched off on the server: every widget renders nothing (no title, no button)`,
+        renderedNothing(off), off.map((html, i) => `${WIDGETS[i].name}:${html.length}`).join(' '))
+      // Control: what the old mapping made of that 404 (not connected) is caught by D2.
+      prime('p1', 200, STATUS_BODY.not_connected)
+      check(`D2-MUT (${locale}) the widgets as the old mapping drew the 404 ("Connect") fail D2`,
+        !renderedNothing(WIDGETS.map((widget) => render(locale, widget.el('p1')))))
       const noProject = WIDGETS.map((widget) => render(locale, widget.el(null)))
       check(`D3 (${locale}) without a project every widget still shows, its button to settings`,
         noProject.every((html, i) => html.includes(esc(w[WIDGETS[i].copy].title)) && oneSettingsButton(html, '/settings#search-console', w.actions.not_connected)))
@@ -394,13 +439,12 @@ async function main() {
   }
 
   // ── E) no screen hides a widget ─────────────────────────────────────────
-  console.log('\nE) every screen mounts its widgets unconditionally')
+  console.log('\nE) every merchant screen mounts its widgets unconditionally; the raw browser stays behind its flag')
   {
     const SCREENS: [string, string[]][] = [
       ['app/(dashboard)/dashboard/page.tsx', ['<GscClicksTile projectId={project.id} />', '<GscTopPages projectId={project.id} />']],
       ['app/(dashboard)/reports/page.tsx', ['<GscPerformance projectId={activeProjectId}']],
       ['components/keywords/ProjectKeywordsPanel.tsx', ['<GscKeywordsNotice projectId={id} view={gscKeywords}', 'gscKeywords={gscKeywords}']],
-      ['app/(dashboard)/keyword-research/page.tsx', ['<GscOpportunities projectId={selectedProject}']],
       ['components/content/workspace/TopicsScreen.tsx', ['<GscRecommendations']],
     ]
     /** The element is there, nothing between it and the previous tag decides whether it
@@ -415,22 +459,49 @@ async function main() {
     const readsConnection = (src: string) => /NEXT_PUBLIC_GSC_(READ_ONLY|RAW_BROWSER)|\/api\/gsc\/status|useGscStatus|gscStatusView|\.view\.state/.test(src)
     const hidden = (list: [string, string, string][]) => list.filter(([, src, needle]) => !unconditional(src, needle) || readsConnection(src)).map(([p, , n]) => `${p}: ${n}`)
     const all: [string, string, string][] = SCREENS.flatMap(([p, needles]) => needles.map((n) => [p, code(p), n] as [string, string, string]))
-    check('E1: the dashboard, reports, keywords, keyword research and Topics mount their widgets whatever the connection', hidden(all).length === 0, hidden(all).join(' | '))
+    check('E1: the dashboard, reports, keywords and Topics mount their widgets whatever the connection', hidden(all).length === 0, hidden(all).join(' | '))
     const dash = all[0][1]
     check('E1-MUT: a dashboard that shows top pages only when connected fails E1',
       hidden([['dash', dash.replace('<GscTopPages projectId={project.id} />', '{gscConnected && <GscTopPages projectId={project.id} />}'), '<GscTopPages projectId={project.id} />']]).length === 1)
-    check('E1-MUT2: a keyword research that puts the section back behind a flag fails E1',
-      hidden([['kr', `${all[5][1]}\nconst on = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'`, '<GscOpportunities projectId={selectedProject}']]).length === 1)
+    check('E1-MUT2: a dashboard that puts its tile behind a Search Console flag fails E1',
+      hidden([['dash', `${dash}\nconst on = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'`, '<GscClicksTile projectId={project.id} />']]).length === 1)
+
+    // The raw opportunity browser is a diagnostic: on main and on the base branch it was
+    // rendered only when NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true', and it still is.
+    // It is mounted once, in keyword research, and only inside that gate.
+    const research = code('app/(dashboard)/keyword-research/page.tsx')
+    const behindRawFlag = (src: string) => (src.match(/<GscOpportunities\b/g) ?? []).length === 1
+      && /\{process\.env\.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && \(\s*<div className="mt-8">\s*<GscOpportunities\b[\s\S]*?\/>\s*<\/div>\s*\)\}/.test(src)
+    check('E4: keyword research mounts the raw opportunity browser only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED, never for merchants', behindRawFlag(research))
+    check('E4-MUT: the browser mounted without its gate (merchant-facing, as #77 first had it) fails E4',
+      !behindRawFlag(research.replace("process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && ", '')))
+    check('E4-MUT2: a gate on the Search Console flag production has on, instead of the dev flag, fails E4',
+      !behindRawFlag(research.replace('NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED', 'NEXT_PUBLIC_GSC_READ_ONLY_ENABLED')))
+    check('E4-MUT3: a second, ungated mount of the browser fails E4',
+      !behindRawFlag(`${research}\nconst extra = <GscOpportunities projectId={selectedProject} />`))
+
+    // The volume cell: GscVolumeCell alone decides whether a line goes under the volume
+    // (and, switched off, whether there is a column to stack it in at all).
     const table = code('components/keywords/TrackingTargetsTable.tsx')
-    check('E2: the keywords table draws the line under every search volume it is given',
-      /\{gscKeywords && <GscKeywordLine view=\{gscKeywords\} targetId=\{target\.id\} \/>\}/.test(table))
-    // The widgets never remove themselves: no state returns nothing, none reads a GSC flag.
+    const volumeInCell = (src: string) => /<Td>\s*<GscVolumeCell view=\{gscKeywords\} targetId=\{target\.id\}>\s*\{target\.avg_monthly_searches !== null[\s\S]*?<\/GscVolumeCell>\s*<\/Td>/.test(src)
+      && !/<GscKeywordLine\b/.test(src)
+    check('E2: the keywords table puts every search volume in the Search Console cell, which alone decides what goes under it', volumeInCell(table))
+    check('E2-MUT: a table that stacks the line itself, in a column kept in every state, fails E2',
+      !volumeInCell(table.replace('<GscVolumeCell view={gscKeywords} targetId={target.id}>', '<div className="flex flex-col items-start gap-1">')
+        .replace('</GscVolumeCell>', '{gscKeywords && <GscKeywordLine view={gscKeywords} targetId={target.id} />}</div>')))
+
+    // The widgets never remove themselves, except when Search Console is switched off on
+    // the server; none reads a Search Console flag to decide.
     const widgetFiles = ['components/gsc/GscClicksTile.tsx', 'components/gsc/GscTopPages.tsx', 'components/gsc/GscPerformance.tsx', 'components/gsc/GscKeywordFigures.tsx', 'components/gsc/GscSetupPrompt.tsx', 'components/content/GscOpportunities.tsx', 'components/content/GscRecommendations.tsx']
-    const selfHiding = (files: [string, string][]) => files.filter(([, src]) => /return null\b|NEXT_PUBLIC_GSC_(READ_ONLY|RAW_BROWSER)/.test(src)).map(([p]) => p)
+    const hidesOnlyWhenOff = (src: string) => (src.match(/return null\b/g) ?? []).length === (src.match(/if \((?:[\w.]+\.)?state === 'disabled'\) return null\b/g) ?? []).length
+      && !/NEXT_PUBLIC_GSC_(READ_ONLY|RAW_BROWSER)/.test(src)
+    const selfHiding = (files: [string, string][]) => files.filter(([, src]) => !hidesOnlyWhenOff(src)).map(([p]) => p)
     const widgetSrc = widgetFiles.map((p) => [p, code(p)] as [string, string])
-    check('E3: no widget returns nothing in any state, nor reads a Search Console flag', selfHiding(widgetSrc).length === 0, selfHiding(widgetSrc).join(', '))
+    check('E3: no widget returns nothing in any state but "switched off", nor reads a Search Console flag', selfHiding(widgetSrc).length === 0, selfHiding(widgetSrc).join(', '))
     check('E3-MUT: a tile that returns null when not connected fails E3',
       selfHiding([['tile', widgetSrc[0][1].replace("if (view.state === 'ready' && view.summary) {", "if (view.state === 'not_connected') return null\n  if (view.state === 'ready' && view.summary) {")]]).length === 1)
+    check('E3-MUT2: a widget that hides behind a Search Console flag fails E3',
+      selfHiding([['tile', `${widgetSrc[0][1]}\nconst off = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED !== 'true'`]]).length === 1)
   }
 
   // ── F) the copy ─────────────────────────────────────────────────────────
@@ -504,6 +575,81 @@ async function main() {
       !keyedByProject(research.replace(' key={selectedProject}', ''), 'GscOpportunities'))
     check('G2-MUT2: recommendations keyed by anything but their project fail G2',
       !keyedByProject(topics.replace('key={projectId}', 'key="recommendations"'), 'GscRecommendations'))
+  }
+
+  // ── H) switched off on the server, the screens look as they did before ──
+  // Every widget renders nothing (D2); what holds them must not leave a trace either.
+  console.log('\nH) switched off, the screens look as they did before Search Console fed them')
+  {
+    const render = (locale: Locale, node: unknown) =>
+      renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: locale, children: node }) as never)
+    const TrackingTargetsTable = require(join(ROOT, 'components/keywords/TrackingTargetsTable.tsx')).default
+    const GscRecommendations = require(join(ROOT, 'components/content/GscRecommendations.tsx')).default
+
+    // The keywords table, the REAL component: a keyword with a volume, and one without
+    // (its cell offers the retry), with no Search Console view, switched off, and on.
+    const TARGETS = [
+      { id: 't1', project_id: 'p1', keyword: 'running shoes', engine_type: 'google_search', avg_monthly_searches: 1234, is_active: true, notes: null, created_at: '2026-09-01T00:00:00Z' },
+      { id: 't2', project_id: 'p1', keyword: 'wool socks', engine_type: 'google_search', avg_monthly_searches: null, is_active: true, notes: null, created_at: '2026-09-01T00:00:00Z' },
+    ]
+    const view = (state: unknown) => ({ data: state, retry: () => {} })
+    const table = (locale: Locale, gscKeywords?: unknown) =>
+      render(locale, createElement(TrackingTargetsTable, { targets: TARGETS, projectId: 'p1', onRetryVolumes: () => {}, gscKeywords }))
+    /** The search-volume cell (the third) of every body row. */
+    const volumeCells = (html: string) => html.split('<tr').filter((row) => row.includes('<td'))
+      .map((row) => [...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)][2]?.[1] ?? '')
+    /** The volume alone (the number, or its dash or retry), with nothing stacked under it. */
+    const bareVolume = (cell: string) => /^<(span|button)\b/.test(cell) && !/<div\b|data-gsc-/.test(cell)
+    const looksAsBefore = (off: string, without: string) =>
+      off === without && volumeCells(off).length === TARGETS.length && volumeCells(off).every(bareVolume)
+    for (const locale of ['he', 'en'] as Locale[]) {
+      const without = table(locale)
+      const off = table(locale, view({ state: 'disabled' }))
+      check(`H1 (${locale}) switched off, the keywords table is the table without Search Console: each volume cell is the volume alone`,
+        looksAsBefore(off, without), volumeCells(off).map((c) => c.slice(0, 80)).join(' | '))
+      const on = table(locale, view({ state: 'ready', data: { t1: { clicks: 1500, impressions: 34567 } } }))
+      check(`H1b (${locale}) switched on, the same cells stack the Search Console box under the volume`,
+        volumeCells(on).length === TARGETS.length
+        && volumeCells(on).every((c) => c.startsWith('<div class="flex flex-col items-start gap-1">') && /data-gsc-keyword="(figures|none)"/.test(c)))
+      if (locale === 'en') {
+        const first = volumeCells(off)[0]
+        check('H1-MUT: a cell that keeps its stacking column when switched off, with nothing under it, fails H1',
+          !looksAsBefore(off.replace(first, `<div class="flex flex-col items-start gap-1">${first}</div>`), without))
+      }
+    }
+
+    // The dashboard's tile row: one equal column per tile it has, so without the clicks
+    // tile the two others share the row as they did, instead of leaving an empty third.
+    const dash = code('app/(dashboard)/dashboard/page.tsx')
+    const closesUp = (src: string) => {
+      const at = src.indexOf('<GscClicksTile')
+      const open = src.lastIndexOf('<div className="grid', at)
+      const cls = open < 0 ? '' : (/^<div className="([^"]*)"/.exec(src.slice(open))?.[1] ?? '')
+      return /(^|\s)sm:grid-flow-col(\s|$)/.test(cls) && /(^|\s)sm:auto-cols-fr(\s|$)/.test(cls) && !/(^|\s)sm:grid-cols-\d/.test(cls)
+    }
+    check('H2: the dashboard tile row has one equal column per tile, so it closes up when the clicks tile renders nothing', closesUp(dash))
+    check('H2-MUT: a fixed three-column row (an empty third when switched off) fails H2',
+      !closesUp(dash.replace('sm:grid-flow-col sm:auto-cols-fr', 'sm:grid-cols-3')))
+
+    // Topics: the separator above the recommendations is the section's own, so a section
+    // that renders nothing leaves no line behind.
+    const topics = code('components/content/workspace/TopicsScreen.tsx')
+    const SEPARATOR = 'mt-8 border-t border-line pt-6'
+    const ownSeparator = (src: string) => {
+      const at = src.indexOf('<GscRecommendations')
+      const el = at < 0 ? '' : src.slice(at, src.indexOf('/>', at) + 2)
+      const before = src.slice(0, Math.max(0, at)).replace(/\{\}\s*$/, '').trimEnd()
+      return el.includes(`className="${SEPARATOR}"`) && !/<div\b[^>]*>$/.test(before)
+    }
+    check('H3: Topics gives the recommendations their spacing and separator as their own', ownSeparator(topics))
+    check('H3-MUT: the separator back on a wrapper around them (a stray line when switched off) fails H3',
+      !ownSeparator(topics.replace('<GscRecommendations', `<div className="${SEPARATOR}">\n<GscRecommendations`)))
+    data.primeGscResponse(data.gscStatusUrl('p1'), { status: 404, body: { error: 'Not found' } })
+    const recOff = render('en', createElement(GscRecommendations, { projectId: 'p1', className: SEPARATOR }))
+    data.primeGscResponse(data.gscStatusUrl('p1'), { status: 200, body: STATUS_BODY.not_connected })
+    const recOn = render('en', createElement(GscRecommendations, { projectId: 'p1', className: SEPARATOR }))
+    check('H3b: …and the section draws them itself: on the section when it shows, nowhere when switched off',
+      recOff === '' && new RegExp(`^<section [^>]*class="${SEPARATOR}"`).test(recOn), `${recOff.length} ${recOn.slice(0, 120)}`)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

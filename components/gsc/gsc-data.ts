@@ -97,6 +97,7 @@ export function useGscStatus(projectId: string | null | undefined): { view: GscS
 export type GscData<T> =
   | { state: 'loading' }
   | { state: 'error' }
+  | { state: 'disabled' }
   | { state: GscSetupState }
   | { state: 'ready'; data: T }
 
