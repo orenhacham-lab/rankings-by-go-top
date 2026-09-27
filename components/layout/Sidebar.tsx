@@ -23,8 +23,7 @@ import {
   Lightbulb,
   Newspaper,
   Settings,
-  Target,
-  CalendarClock,
+  CalendarRange,
 } from 'lucide-react'
 import {
   CONTENT_SCREENS,
@@ -60,9 +59,8 @@ const CONTENT_FLAGS = {
 }
 
 const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
+  strategy: CalendarRange,
   articles: Newspaper,
-  topics: Target,
-  automation: CalendarClock,
 }
 
 /**
@@ -73,6 +71,9 @@ const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
  * sidebar, found a hub, and had to open it to learn what was inside. The entries are
  * DERIVED from the same CONTENT_SCREENS declaration the routes and the guards read,
  * so the sidebar cannot list a screen that has no page, or miss one that does.
+ *
+ * "Topics" and "automation" were two entries; they are one now, "content strategy",
+ * first, because what will be written comes before what was.
  *
  * Gated by the build-time content flag, exactly as the one hub entry was; each screen
  * is additionally subject to its own flag, so a screen hidden on its route is hidden
@@ -154,7 +155,7 @@ const adminItemKeys = [
  * The entry that owns a pathname: the LONGEST matching href wins.
  *
  * With the content screens promoted to entries of their own, /content is a prefix of
- * /content/topics — a plain prefix test would light up two entries at once. The
+ * /content/strategy — a plain prefix test would light up two entries at once. The
  * article editor at /content/articles/<id> has no entry, and correctly lights up the
  * articles entry it was opened from.
  */

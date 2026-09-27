@@ -6,8 +6,14 @@
  * connections all shared one URL and one component. Each concern now has its own
  * route, declared here once so the nav, the screens and the guards agree.
  *
- * Order is the order a merchant works in: what was written, what is planned, and
- * what runs automatically.
+ * Order is the order a merchant works in: what will be written and when (the content
+ * strategy), then what was written (the articles).
+ *
+ * "Topics" and "automation" used to be two screens here. They are one now, the
+ * content strategy tab: a month board of ideas, planned, written and published
+ * articles, with the old two screens as its list view. Their old addresses answer
+ * with a redirect to that list view (lib/content/strategy/view.ts), which is the only
+ * reason their constants are still declared below.
  *
  * Search Console is not a screen any more. It is a data source that feeds the screens
  * that already exist (the dashboard, keywords, keyword research, "my progress" and
@@ -17,11 +23,13 @@
  */
 
 export const CONTENT_ROOT_PATH = '/content'
+export const CONTENT_STRATEGY_PATH = '/content/strategy'
+/** Retired screens: each is a redirect into the strategy tab's list view now. */
 export const CONTENT_TOPICS_PATH = '/content/topics'
 export const CONTENT_AUTOMATION_PATH = '/content/automation'
 
 /** Label keys in the dashboard dictionary's `contentHub.screens` block. */
-export type ContentScreenKey = 'articles' | 'topics' | 'automation'
+export type ContentScreenKey = 'strategy' | 'articles'
 
 export type ContentScreen = {
   key: ContentScreenKey
@@ -31,9 +39,8 @@ export type ContentScreen = {
 }
 
 export const CONTENT_SCREENS: readonly ContentScreen[] = [
+  { key: 'strategy', href: CONTENT_STRATEGY_PATH },
   { key: 'articles', href: CONTENT_ROOT_PATH },
-  { key: 'topics', href: CONTENT_TOPICS_PATH },
-  { key: 'automation', href: CONTENT_AUTOMATION_PATH, flag: 'NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION' },
 ]
 
 /**
@@ -46,11 +53,14 @@ export function isContentScreenEnabled(screen: ContentScreen, env: Record<string
   return env[screen.flag] === 'true'
 }
 
-/** The nav entry that owns a pathname (longest matching href wins). */
+/**
+ * The screen that owns a pathname: the longest matching href wins, and anything the
+ * workspace renders that no screen claims (the root itself) is the articles screen.
+ */
 export function activeContentScreen(pathname: string): ContentScreenKey {
-  let best: ContentScreen = CONTENT_SCREENS[0]
+  let best: ContentScreen | null = null
   for (const s of CONTENT_SCREENS) {
-    if ((pathname === s.href || pathname.startsWith(`${s.href}/`)) && s.href.length > best.href.length) best = s
+    if ((pathname === s.href || pathname.startsWith(`${s.href}/`)) && (!best || s.href.length > best.href.length)) best = s
   }
-  return best.key
+  return best?.key ?? 'articles'
 }
