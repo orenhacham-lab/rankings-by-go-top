@@ -472,10 +472,13 @@ async function main() {
       if (!mine) return false
       const [min, hours, dom] = mine.schedule.split(' ')
       const otherHours = list.filter((c) => c !== mine).map((c) => c.schedule.split(' ')).filter(([m]) => m === '0').map(([, h]) => Number(h))
-      const [from, to] = hours.split('-').map(Number)
-      return min !== '0' && dom === '1,2' && otherHours.every((h) => h < from || h > (to ?? from))
+      // The Vercel plan allows one run a day per cron: a single hour, every day.
+      if (!/^\d+$/.test(hours) || dom !== '*') return false
+      const hour = Number(hours)
+      return min !== '0' && otherHours.every((h) => h < hour)
     }
-    check('C6: vercel.json runs it at :30 on the 1st and 2nd, after 05:00, 06:00 and 07:00', apart(crons), JSON.stringify(crons.at(-1)))
+    check('C6: vercel.json runs it once a day at :30, after 05:00, 06:00 and 07:00', apart(crons), JSON.stringify(crons.at(-1)))
+    check('C-MUT4: an hourly range (more than one run a day) fails C6', !apart(crons.map((c) => (c.path === '/api/reports/monthly/cron' ? { ...c, schedule: '30 8-23 1,2 * *' } : c))))
     check('C-MUT3: a schedule on the hour at 07:00 fails C6', !apart(crons.map((c) => (c.path === '/api/reports/monthly/cron' ? { ...c, schedule: '0 7 1 * *' } : c))))
     const owner = ['app/api/reports/monthly/route.ts', 'app/api/reports/monthly/generate/route.ts', 'app/api/reports/monthly/preferences/route.ts'].map((f) => strip(read(f)))
     check('C7: the owner routes all go through the handlers that check the session and ownership', owner.every((s) => /liveMonthlyDeps\(\)/.test(s) && /handle(Monthly|Preferences)\w+\(request, liveMonthlyDeps\(\)\)/.test(s)))

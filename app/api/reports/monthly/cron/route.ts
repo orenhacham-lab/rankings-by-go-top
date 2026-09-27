@@ -1,12 +1,12 @@
 /**
  * GET|POST /api/reports/monthly/cron — the monthly progress report run.
  *
- * vercel.json runs it at :30 past every hour from 08:30 to 23:30 UTC on the 1st
- * and the 2nd of each month: after the GSC (05:00), schedule (06:00) and
+ * vercel.json runs it once a day at 08:30 UTC (the Vercel plan allows at most
+ * one run a day per cron): after the GSC (05:00), schedule (06:00) and
  * automation (07:00) crons, and never on the hour they use. Each run reports on
  * the month that just ended for at most MONTHLY_REPORT_BATCH_SIZE projects still
- * missing it, so every project is covered over the runs, and a run over a
- * finished month does nothing.
+ * missing it, so every project is covered over the following days, and a run
+ * over a finished month does nothing.
  *
  * SECURITY — no browser session: authorized ONLY by `Authorization: Bearer
  * <CRON_SECRET>` through authorizeCronRequest, which FAILS CLOSED (503 when the

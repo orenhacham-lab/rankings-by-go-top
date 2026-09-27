@@ -8,9 +8,9 @@
  * grants no UPDATE at all (the migration), so this holds even if a caller forgot.
  *
  * BOUNDED. One cron invocation reports on at most `batchSize` projects and stops
- * starting new ones when its time budget is spent. The cron runs every hour on
- * the 1st and the 2nd (vercel.json), and each run picks up the projects still
- * missing the month, so any number of projects is covered over the runs.
+ * starting new ones when its time budget is spent. The cron runs once a day
+ * (vercel.json), and each run picks up the projects still missing the month,
+ * so any number of projects is covered over the following days.
  *
  * NO PROVIDER, NO MODEL: aggregates of stored rows only (store.ts, aggregate.ts).
  */

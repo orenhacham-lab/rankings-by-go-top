@@ -126,7 +126,7 @@ export function PlatformSwitchBody({
           {view.fields.includes('siteId') && (
             <Input
               label={t.wix.siteId} hint={t.wix.siteIdHint} type="text" dir="ltr" className="text-left" name="siteId" autoComplete="off" spellCheck={false}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={values.siteId ?? ''} disabled={disabled}
+              placeholder={t.wix.siteIdPlaceholder} value={values.siteId ?? ''} disabled={disabled}
               onChange={(e) => onChange('siteId', e.target.value)}
             />
           )}
