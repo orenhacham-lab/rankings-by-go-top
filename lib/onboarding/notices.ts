@@ -37,6 +37,7 @@ export const NOTICE_KEYS = [
   'keywordsNotAdded',
   'siteUnreachable',
   'siteBlocked',
+  'siteForbidden',
   'siteAddress',
   'scanStopped',
 ] as const
@@ -146,6 +147,9 @@ export function stageFailureNotice(code: string | null | undefined): Notice {
       return n('siteUnreachable', 'retry')
     case 'site_blocked':
       return n('siteBlocked', 'retry')
+    // The host refuses automated reads and Google shows none of its pages: not "check it opens".
+    case 'site_forbidden':
+      return n('siteForbidden', 'retry')
     case 'invalid_site_url':
     case 'site_not_html':
     case 'site_offsite_redirect':

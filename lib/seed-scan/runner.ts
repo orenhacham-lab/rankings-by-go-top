@@ -255,6 +255,10 @@ async function workRun(args: RunArgs & { lease: string }, expect: SeedRunStage |
         status: outcome.status,
         errorCode: outcome.errorCode,
         ms: finishedAt.getTime() - startedAt.getTime(),
+        // How a1 read the site, and why not directly: coarse values we set, never a site's or provider's text.
+        ...(outcome.detail.mode === 'search_index'
+          ? { mode: 'search_index', blockedReason: outcome.detail.blockedReason ?? null, blockedStatus: outcome.detail.blockedStatus ?? null }
+          : {}),
       })
     }
 

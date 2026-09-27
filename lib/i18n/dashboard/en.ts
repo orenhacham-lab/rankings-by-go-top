@@ -3186,6 +3186,11 @@ export const dashboardEn = {
       scannedDaysAgo: (domain: string, days: number) =>
         days === 1 ? `We scanned ${domain} yesterday` : `We scanned ${domain} ${days} days ago`,
       fromFreeCheck: 'From your free check',
+      fromSearchIndex: (domain: string) => `We built this research from what Google shows of ${domain}`,
+      firewall: {
+        title: 'The site blocks automated reads',
+        body: 'The site\'s firewall blocks automated readers like ours, so we built this research from what Google shows of the site. Connecting WordPress or Shopify, or allowing our crawler with your hosting company, gives a fuller scan.',
+      },
       edit: 'Edit',
       editLabel: (section: string) => `Edit: ${section}`,
       tiles: {
@@ -3221,6 +3226,7 @@ export const dashboardEn = {
         title: 'What\'s holding you back',
         clean: 'The site is clear of the issues we check',
         locked: 'Not checked: the store is password protected',
+        firewall: 'Not checked: the site blocks automated reads',
         failed: 'We couldn\'t finish this check',
         pending: 'This check hasn\'t finished yet',
         omitted: (n: number) =>
@@ -3252,6 +3258,8 @@ export const dashboardEn = {
         score: (passed: number, total: number) => `${passed} of ${total} signs in place`,
         locked: 'Not checked: the store is password protected',
         lockedBody: 'We\'ll check these signs once the store is open to the public.',
+        firewall: 'Not checked: the site blocks automated reads',
+        firewallBody: 'This check has to read the site itself. We\'ll check these signs once the site is connected or allows our crawler.',
         notChecked: 'Not checked',
         notCheckedBody: 'This check didn\'t run on this site.',
         pending: 'Waiting to be checked',
@@ -3325,6 +3333,10 @@ export const dashboardEn = {
       keywordsNotAdded: { title: 'The full research started, but the keywords weren\'t added yet', body: 'You can add them from the Keywords tab.' },
       siteUnreachable: { title: 'We couldn\'t reach the site', body: 'Make sure the site opens in a browser, then try again.' },
       siteBlocked: { title: 'The site blocked our reader', body: 'A security setting may be blocking automated readers. You can try again later.' },
+      siteForbidden: {
+        title: 'The site\'s firewall blocks automated reads',
+        body: 'The site blocks automated readers like ours, and Google doesn\'t show any of its pages yet. Allow our crawler with your hosting company, or connect WordPress or Shopify, then try again.',
+      },
       siteAddress: { title: 'The project\'s address doesn\'t lead to a site we can read', body: 'Check the address in the project settings.' },
       scanStopped: { title: 'The scan stopped before it finished', body: 'Try again. It takes up to a minute.' },
     },

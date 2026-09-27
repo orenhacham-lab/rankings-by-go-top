@@ -16,7 +16,9 @@
  *  10 "Start": tracks the keywords still checked, starts stage B, opens the dashboard
  *
  * Every block says honestly when it has nothing: a locked storefront is "not
- * checked", never failing and never 0/4; a step that did not finish says so.
+ * checked", never failing and never 0/4; so is a site whose firewall refused
+ * our reader, whose research was built from Google's index of it (a notice
+ * under the intro says so); a step that did not finish says so.
  * The snapshot's own text (the business, keywords, topics) is in the language
  * it was written in, so it carries its own `lang` and direction; the labels
  * around it follow the interface.
@@ -35,6 +37,7 @@ import {
   Lock,
   MapPin,
   Pencil,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Swords,
@@ -56,6 +59,7 @@ import {
   keywordReason,
   orderedCompetitors,
   scannedAgo,
+  siteFirewalled,
   stepStatusOf,
   storefrontLocked,
   tilesView,
@@ -137,6 +141,7 @@ export default function ResearchSummary({
 
   const a3 = stepStatusOf(run, 'a3')
   const locked = storefrontLocked(summary)
+  const firewalled = siteFirewalled(summary)
   const tiles = tilesView(summary, run)
   const findings = findingsView(summary, a3)
   const geo = geoView(summary, a3)
@@ -145,13 +150,16 @@ export default function ResearchSummary({
   const name = business?.companyName?.trim() || projectName.trim() || domain
   const ago = scannedAgo(summary.scannedAt, new Date(serverNow))
   const site = isolate(domain)
-  const scannedLine = !ago
-    ? null
-    : ago.kind === 'justNow'
-      ? t.scannedJustNow(site)
-      : ago.kind === 'hours'
-        ? t.scannedHoursAgo(site, ago.value)
-        : t.scannedDaysAgo(site, ago.value)
+  // Built from Google's index: the site itself was not scanned, so no "we just scanned it".
+  const scannedLine = firewalled
+    ? t.fromSearchIndex(site)
+    : !ago
+      ? null
+      : ago.kind === 'justNow'
+        ? t.scannedJustNow(site)
+        : ago.kind === 'hours'
+          ? t.scannedHoursAgo(site, ago.value)
+          : t.scannedDaysAgo(site, ago.value)
   // Evidence ("12 of 48 images") is written in the snapshot's language; shown only when it matches.
   const sameLanguage = summary.locale === language
   const snapshotText = { lang: summary.locale, dir: 'auto' as const }
@@ -334,6 +342,22 @@ export default function ResearchSummary({
         })}
       </section>
 
+      {firewalled && (
+        <div
+          data-summary-block="firewall"
+          role="note"
+          className="mt-8 flex items-start gap-3 rounded-card border border-warn/25 bg-warn-soft px-4 py-4 md:px-5"
+        >
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-warn">
+            <ShieldAlert className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">{t.firewall.title}</p>
+            <p className="mt-1 max-w-[80ch] text-sm leading-6 text-body">{t.firewall.body}</p>
+          </div>
+        </div>
+      )}
+
       <div className="mt-8 grid gap-4 md:gap-5 lg:grid-cols-12">
         {/* 3 ── the business */}
         <SummaryBlock id="business" index={1} icon={<Building2 />} title={t.business.title} action={editLink('business', t.business.title)} className="lg:col-span-7">
@@ -449,10 +473,22 @@ export default function ResearchSummary({
           ) : (
             <BlockNote
               icon={
-                findings.kind === 'locked' ? <Lock className="h-4 w-4" aria-hidden /> : findings.kind === 'pending' ? <CircleDashed className="h-4 w-4" aria-hidden /> : undefined
+                findings.kind === 'locked' ? (
+                  <Lock className="h-4 w-4" aria-hidden />
+                ) : findings.kind === 'firewall' ? (
+                  <ShieldAlert className="h-4 w-4" aria-hidden />
+                ) : findings.kind === 'pending' ? (
+                  <CircleDashed className="h-4 w-4" aria-hidden />
+                ) : undefined
               }
             >
-              {findings.kind === 'locked' ? t.findings.locked : findings.kind === 'pending' ? t.findings.pending : t.findings.failed}
+              {findings.kind === 'locked'
+                ? t.findings.locked
+                : findings.kind === 'firewall'
+                  ? t.findings.firewall
+                  : findings.kind === 'pending'
+                    ? t.findings.pending
+                    : t.findings.failed}
             </BlockNote>
           )}
         </SummaryBlock>
@@ -582,15 +618,35 @@ export default function ResearchSummary({
           ) : (
             <div className="flex items-start gap-3 rounded-control border border-line bg-sunk px-4 py-4" data-geo-state={geo.kind}>
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
-                {geo.kind === 'locked' ? <Lock className="h-4 w-4" aria-hidden /> : <CircleDashed className="h-4 w-4" aria-hidden />}
+                {geo.kind === 'locked' ? (
+                  <Lock className="h-4 w-4" aria-hidden />
+                ) : geo.kind === 'firewall' ? (
+                  <ShieldAlert className="h-4 w-4" aria-hidden />
+                ) : (
+                  <CircleDashed className="h-4 w-4" aria-hidden />
+                )}
               </span>
               <div className="min-w-0">
                 <p className="font-medium text-ink">
-                  {geo.kind === 'locked' ? t.geo.locked : geo.kind === 'pending' ? t.geo.pending : geo.kind === 'failed' ? t.geo.failed : t.geo.notChecked}
+                  {geo.kind === 'locked'
+                    ? t.geo.locked
+                    : geo.kind === 'firewall'
+                      ? t.geo.firewall
+                      : geo.kind === 'pending'
+                        ? t.geo.pending
+                        : geo.kind === 'failed'
+                          ? t.geo.failed
+                          : t.geo.notChecked}
                 </p>
                 {geo.kind !== 'failed' && (
                   <p className="mt-0.5 text-sm leading-6 text-muted">
-                    {geo.kind === 'locked' ? t.geo.lockedBody : geo.kind === 'pending' ? t.geo.pendingBody : t.geo.notCheckedBody}
+                    {geo.kind === 'locked'
+                      ? t.geo.lockedBody
+                      : geo.kind === 'firewall'
+                        ? t.geo.firewallBody
+                        : geo.kind === 'pending'
+                          ? t.geo.pendingBody
+                          : t.geo.notCheckedBody}
                   </p>
                 )}
               </div>

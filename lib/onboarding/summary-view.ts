@@ -9,6 +9,12 @@
  *     'storefront_locked'), the AI-readiness block and its tile read "not
  *     checked: the store is password protected", and the site findings do not
  *     claim the site is clean. No 0/4 anywhere.
+ *   - A site whose firewall refused our reader is NOT CHECKED either. Stage A
+ *     then built the research from Google's index of the site (siteAccess
+ *     'search_index'): the business, keywords and topics are there, but
+ *     nothing that needs the site itself was measured, so the findings and
+ *     the AI-readiness block read "not checked: the site blocks automated
+ *     reads", never "clean" and never 0/4.
  *   - Nothing is invented. A keyword's "why" states a property of the phrase
  *     itself (a question, a local search, the business's own name...), and a
  *     block with nothing in it says so instead of guessing.
@@ -75,9 +81,15 @@ export function storefrontLocked(summary: SeedSummary): boolean {
   return (summary.geo.state === 'unavailable' && summary.geo.unavailableReason === 'storefront_locked') || summary.storefrontLocked
 }
 
+/** The research was built from Google's index because the site's firewall refused our reader. */
+export function siteFirewalled(summary: SeedSummary): boolean {
+  return summary.siteAccess === 'search_index' || (summary.geo.state === 'unavailable' && summary.geo.unavailableReason === 'site_firewall')
+}
+
 export type GeoView =
   | { kind: 'measured'; passed: number; total: number; signals: GeoSignal[] }
   | { kind: 'locked' }
+  | { kind: 'firewall' }
   | { kind: 'notChecked' }
   | { kind: 'pending' }
   | { kind: 'failed' }
@@ -85,6 +97,7 @@ export type GeoView =
 export function geoView(summary: SeedSummary, a3: SeedStepStatus | null): GeoView {
   const geo = summary.geo
   if (storefrontLocked(summary) && geo.state !== 'measured') return { kind: 'locked' }
+  if (siteFirewalled(summary) && geo.state !== 'measured') return { kind: 'firewall' }
   if (geo.state === 'unavailable') return { kind: 'notChecked' }
   if (geo.state === 'pending') return a3 === 'failed' ? { kind: 'failed' } : { kind: 'pending' }
   if (geo.total <= 0 || geo.signals.length === 0) return { kind: 'notChecked' }
@@ -95,6 +108,7 @@ export type FindingsView =
   | { kind: 'list'; findings: FreeCheckFinding[]; omitted: number }
   | { kind: 'clean' }
   | { kind: 'locked' }
+  | { kind: 'firewall' }
   | { kind: 'failed' }
   | { kind: 'pending' }
 
@@ -102,6 +116,7 @@ const SEVERITY_ORDER: Record<string, number> = { blocker: 0, warning: 1, info: 2
 
 export function findingsView(summary: SeedSummary, a3: SeedStepStatus | null): FindingsView {
   if (storefrontLocked(summary)) return { kind: 'locked' }
+  if (siteFirewalled(summary)) return { kind: 'firewall' }
   if (a3 === 'failed') return { kind: 'failed' }
   if (!isTerminal(a3)) return { kind: 'pending' }
   const findings = summary.findings.slice().sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3))

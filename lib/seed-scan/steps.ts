@@ -25,6 +25,17 @@
  * `search_interrupted`. One model call and three searches per run is a hard
  * ceiling whatever happens.
  *
+ * A HOST THAT REFUSES US (a firewall answering 401/403/406/429/503 to a
+ * data-centre address, or dropping the connection) is not a failed run. a1
+ * then reads the site the way Google's index shows it: one `site:` search, and
+ * the bare domain when that one shows too little (at most two searches, inside
+ * one search budget). The indexed titles, snippets and URLs stand in for the
+ * page text a2 hands the model; a3 and b1 report what needs the site itself as
+ * unavailable, for the firewall's reason, never as the site's problems. No URL
+ * a search returned is ever fetched. Only when Google shows no page of the
+ * site either does a1 fail: `site_forbidden` when the host answered with a
+ * refusal, `site_unreachable` when it never answered at all.
+ *
  * A CLAIMED RUN (trigger 'claim') seeds a1-a3 from the free check the visitor
  * already watched, stored on a1 when the run was created: no fetch and no model
  * call. From the check's seed when its row has one — every finding, every
@@ -54,7 +65,17 @@ import {
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { claimMatchesProject, cleanList, readClaimSnapshot, toSeedBusiness } from './claim'
 import { robotsAnswer } from './crawl'
-import { createSerperSearch, isDomainMatch, isNonCompetitor, type SearchFn, type SearchOutcome } from './serper'
+import {
+  createSerperSearch,
+  isDomainMatch,
+  isNonCompetitor,
+  normalizeResultDomain,
+  PAGE_SNIPPET_CHARS,
+  PAGE_TITLE_CHARS,
+  type SearchFn,
+  type SearchOutcome,
+  type SearchPage,
+} from './serper'
 import {
   addValidatedCompetitors,
   applyBusinessToSettings,
@@ -109,6 +130,20 @@ export const SITEMAP_URL_LIMIT = 1_000
 /** Page text kept for a resumed a2; the model prompt uses the first 6,000 characters. */
 const STORED_TEXT_CHARS = 8_000
 export const MAX_SEARCHES = 3
+/** a1's search-index fallback: at most this many searches, all inside one `searchMs`. */
+export const MAX_INDEX_SEARCHES = 2
+/** Indexed pages of the site a1 keeps for a2; enough to characterise the business. */
+export const MAX_INDEX_PAGES = 10
+/** With this many of its pages from the `site:` search, the bare-domain search is not sent. */
+const ENOUGH_INDEX_PAGES = 3
+/** The second search is sent only with at least this much of the budget left. */
+const MIN_SECOND_SEARCH_MS = 1_500
+/**
+ * Statuses a host answers when it refuses WHO is asking rather than WHAT is
+ * asked: a firewall or a bot filter in front of a site that opens fine in a
+ * browser. Any other error status still reads as unreachable.
+ */
+export const REFUSAL_STATUSES: readonly number[] = [401, 403, 406, 429, 503]
 export const MAX_COMPETITORS = 5
 const MAX_RESULT_DOMAINS = 10
 
@@ -384,6 +419,10 @@ export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
 
   if (!fetched) {
     if (offHost.hit) return fail('site_offsite_redirect')
+    // The host answered, and refused us; or it never answered in time. DNS
+    // resolved (admission above), so the site exists: read Google's view of it.
+    const refused = hostRefusal(page, pageCutShort)
+    if (refused) return a1SearchIndex(ctx, start, siteKey, refused)
     if (page.kind !== 'value' || page.value.ok) return fail('site_unreachable')
     const reason = page.value.reason
     if (reason === 'blocked') return fail('site_blocked')
@@ -454,6 +493,155 @@ export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   })
 }
 
+/** Why the home page could not be read although its host exists. */
+export type HostRefusal = { reason: 'http_status' | 'timeout' | 'network'; status: number | null }
+
+function hostRefusal(page: Settled<Awaited<ReturnType<typeof fetchSiteHtml>>>, cutShort: boolean): HostRefusal | null {
+  if (page.kind === 'timeout') return { reason: 'timeout', status: null }
+  if (page.kind === 'error') return null
+  const v = page.value
+  // A page this deadline cut short: the host answered too slowly to read.
+  if (v.ok) return cutShort ? { reason: 'timeout', status: null } : null
+  if (v.reason === 'http_error' && typeof v.status === 'number' && REFUSAL_STATUSES.includes(v.status)) return { reason: 'http_status', status: v.status }
+  if (v.reason === 'timeout' || v.reason === 'network') return { reason: v.reason, status: null }
+  return null
+}
+
+/** The searches of the fallback, in order: the site's indexed pages, then its bare domain. */
+export function searchIndexQueries(siteKey: string): string[] {
+  return [`site:${siteKey}`, siteKey].slice(0, MAX_INDEX_SEARCHES)
+}
+
+const oneLine = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '')
+
+/**
+ * The indexed pages of THIS site among search results, as a1 stores them:
+ * on the site's host (or a subdomain of it), an http(s) URL, distinct, capped.
+ * Read back through the same function, so a stored row is re-validated.
+ */
+export function readIndexPages(v: unknown, siteKey: string): SearchPage[] {
+  if (!Array.isArray(v)) return []
+  const out: SearchPage[] = []
+  for (const x of v) {
+    if (!x || typeof x !== 'object') continue
+    const r = x as Record<string, unknown>
+    if (typeof r.url !== 'string' || r.url.length > 2_000 || !/^https?:\/\//i.test(r.url)) continue
+    if (!isDomainMatch(normalizeResultDomain(r.url), siteKey)) continue
+    if (out.some((p) => p.url === r.url)) continue
+    const title = oneLine(r.title, PAGE_TITLE_CHARS)
+    const snippet = oneLine(r.snippet, PAGE_SNIPPET_CHARS)
+    if (!title && !snippet) continue
+    out.push({ url: r.url, title, snippet })
+    if (out.length >= MAX_INDEX_PAGES) break
+  }
+  return out
+}
+
+/**
+ * The page signals a2 hands the model when the site could not be read: what
+ * Google's index shows of it. Only the fields the model reads carry anything;
+ * every measured property (schema, images, links, robots, llms.txt) is empty,
+ * and nothing downstream measures from these (a3 and b1 read `mode`).
+ */
+export function signalsFromSearchIndex(pages: SearchPage[], finalUrl: string): SiteSignals {
+  const isHome = (p: SearchPage) => {
+    try {
+      return new URL(p.url).pathname === '/'
+    } catch {
+      return false
+    }
+  }
+  const home = pages.find(isHome) ?? pages[0]
+  const lines = pages.map((p) => [p.title, p.snippet, p.url].filter(Boolean).join(' | '))
+  const text = [
+    "The site's firewall refused our reader. Below is how Google's search index shows this site: the title, snippet and address of each indexed page.",
+    ...lines,
+  ]
+    .join('\n')
+    .slice(0, STORED_TEXT_CHARS)
+  return {
+    finalUrl,
+    htmlLang: null,
+    title: home?.title || null,
+    metaDescription: home?.snippet || null,
+    canonical: null,
+    h1: [],
+    h2: pages.filter((p) => p !== home).map((p) => p.title).filter(Boolean).slice(0, 20),
+    images: { total: 0, missingAlt: 0 },
+    schemaTypes: [],
+    hasOrganizationSchema: false,
+    hasFaqSchema: false,
+    hasFaqSection: false,
+    wordCount: text.split(/\s+/).filter(Boolean).length,
+    text,
+    internalLinks: 0,
+    // Never the search results' URLs: nothing a search returned is fetched.
+    internalLinkUrls: [],
+    externalDomains: [],
+    contact: { address: null, phone: null },
+    platform: null,
+    viewportMeta: false,
+    openGraph: false,
+    robotsTxt: null,
+    llmsTxt: false,
+  }
+}
+
+type IndexSearchRecord = { query: string; ok: boolean; code: SearchFailure | null; pages: number }
+
+/**
+ * a1 when the host refused us: Google's view of the site in place of the site.
+ * At most MAX_INDEX_SEARCHES searches, one after the other inside one
+ * `searchMs`, the second only when the first showed too little. Spend is
+ * bounded per run like a4's: the attempt is saved first, and a resumed a1 that
+ * finds it does not search again.
+ */
+async function a1SearchIndex(ctx: StepContext, start: URL, siteKey: string, refused: HostRefusal): Promise<StepOutcome> {
+  const { deps } = ctx
+  const blocked = { mode: 'search_index', blockedReason: refused.reason, blockedStatus: refused.status }
+  // A host that answered with a refusal is a firewall; one that never answered may just be down.
+  const noIndex: SeedErrorCode = refused.reason === 'http_status' ? 'site_forbidden' : 'site_unreachable'
+  if (ctx.details.a1?.searchAttempted === true) {
+    return finished('failed', 'search_interrupted', ctx.summary, { detail: { ...blocked, searchAttempted: true } })
+  }
+  if (!(await ctx.save({ ...blocked, searchAttempted: true }))) return ABORT
+
+  const market = searchMarket(ctx.project)
+  const records: IndexSearchRecord[] = []
+  let found: SearchPage[] = []
+  const startedAt = performance.now()
+  for (const query of searchIndexQueries(siteKey)) {
+    const left = deps.budgets.searchMs - (performance.now() - startedAt)
+    if (records.length > 0 && (found.length >= ENOUGH_INDEX_PAGES || left < MIN_SECOND_SEARCH_MS)) break
+    const answer = await settleWithin<SearchOutcome>(() => deps.search(query, market), Math.max(0, left))
+    if (answer.kind !== 'value' || !answer.value || typeof answer.value !== 'object' || !answer.value.ok) {
+      const said = answer.kind === 'value' ? (answer.value as { code?: unknown } | null)?.code : null
+      const code: SearchFailure = answer.kind === 'timeout' ? 'search_timeout' : (SEARCH_FAILURES.find((c) => c === said) ?? 'search_failed')
+      records.push({ query, ok: false, code, pages: 0 })
+      continue
+    }
+    const own = readIndexPages(answer.value.pages, siteKey)
+    records.push({ query, ok: true, code: null, pages: own.length })
+    found = readIndexPages([...found, ...own], siteKey)
+  }
+
+  const detail = { ...blocked, searchAttempted: true, market, searches: records }
+  if (found.length === 0) return finished('failed', noIndex, ctx.summary, { detail })
+
+  const summary = withCounters({
+    ...ctx.summary,
+    url: start.toString(),
+    scannedAt: deps.now().toISOString(),
+    storefrontLocked: false,
+    siteAccess: 'search_index',
+    sitemapUrlCount: null,
+    sitemapTruncated: false,
+  })
+  return finished('done', null, summary, {
+    detail: { ...detail, storefrontLocked: false, signals: null, searchIndex: { pages: found } },
+  })
+}
+
 async function a1Claim(ctx: StepContext): Promise<StepOutcome> {
   const snapshot = readClaimSnapshot(ctx.details.a1)
   // The route only stores a snapshot of this very site; checked again anyway.
@@ -484,13 +672,17 @@ async function a2(ctx: StepContext): Promise<StepOutcome> {
 export async function a2Live(ctx: StepContext): Promise<StepOutcome> {
   const a1Detail = ctx.details.a1 ?? {}
   if (a1Detail.storefrontLocked === true) return finished('skipped', 'storefront_locked', ctx.summary)
-  const signals = readStoredSignals(a1Detail.signals)
+  // A host that refused us: the model reads Google's view of the site instead of its page.
+  const fromIndex = a1Detail.mode === 'search_index'
+  const indexed = fromIndex ? readIndexPages((a1Detail.searchIndex as { pages?: unknown } | undefined)?.pages, ctx.summary.domain) : []
+  const signals = fromIndex ? (indexed.length > 0 ? signalsFromSearchIndex(indexed, ctx.summary.url) : null) : readStoredSignals(a1Detail.signals)
   if (!signals) return finished('failed', 'site_unreadable', ctx.summary)
+  const basis = fromIndex ? { mode: 'search_index' } : {}
 
   const own = ctx.details.a2 ?? {}
   let insight = readStoredInsight(own.insight)
   if (!insight) {
-    const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { attempted: true } })
+    const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { ...basis, attempted: true } })
     // Resumed after the model was already asked and the answer was lost: the
     // run's one model call is spent.
     if (own.attempted === true) return fail('model_interrupted')
@@ -504,7 +696,7 @@ export async function a2Live(ctx: StepContext): Promise<StepOutcome> {
     if (!insight) return fail('model_failed')
     if (!(await ctx.save({ attempted: true, insight }))) return ABORT
   }
-  return applyInsight(ctx, insight, { attempted: true, insight })
+  return applyInsight(ctx, insight, { ...basis, attempted: true, insight })
 }
 
 async function a2Claim(ctx: StepContext): Promise<StepOutcome> {
@@ -577,6 +769,14 @@ export async function a3Live(ctx: StepContext): Promise<StepOutcome> {
     // Not measured, which is not the same as failing all four.
     const geo: SeedGeo = { state: 'unavailable', unavailableReason: 'storefront_locked', passed: 0, total: 0, signals: [] }
     return finished('skipped', 'storefront_locked', withCounters({ ...ctx.summary, findings: [], findingsOmitted: 0, geo }))
+  }
+  if (a1Detail.mode === 'search_index') {
+    // The firewall showed us nothing of the site itself: not measured, which
+    // is not the same as a site with no findings, or one failing all four.
+    const geo: SeedGeo = { state: 'unavailable', unavailableReason: 'site_firewall', passed: 0, total: 0, signals: [] }
+    return finished('skipped', 'site_forbidden', withCounters({ ...ctx.summary, findings: [], findingsOmitted: 0, geo }), {
+      detail: { mode: 'search_index', blockedStatus: typeof a1Detail.blockedStatus === 'number' ? a1Detail.blockedStatus : null },
+    })
   }
   const signals = readStoredSignals(a1Detail.signals)
   if (!signals) return finished('failed', 'site_unreadable', ctx.summary)

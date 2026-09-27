@@ -50,11 +50,12 @@ export type SeedBusiness = {
 /**
  * The four AI-readiness checks. `pending` until a3 has run; `unavailable` when
  * the site could not be measured honestly (a password-locked storefront shows
- * its password page, not the store), which is NOT the same as failing all four.
+ * its password page, not the store; a host whose firewall refuses automated
+ * reads shows us nothing at all), which is NOT the same as failing all four.
  */
 export type SeedGeo = {
   state: 'pending' | 'measured' | 'unavailable'
-  unavailableReason: 'storefront_locked' | null
+  unavailableReason: 'storefront_locked' | 'site_firewall' | null
   passed: number
   total: number
   signals: GeoSignal[]
@@ -96,6 +97,13 @@ export type SeedSummary = {
   locale: Locale
   /** A Shopify development store behind its password page. */
   storefrontLocked: boolean
+  /**
+   * How the site was read. 'search_index' when its host refused our reads (a
+   * firewall answering 403 to data-centre addresses, say) and a1 built the
+   * research from Google's index of the site instead: its titles, snippets and
+   * URLs. Nothing that needs the site itself was measured then.
+   */
+  siteAccess: 'direct' | 'search_index'
   business: SeedBusiness | null
   audiences: string[]
   seedKeywords: string[]
@@ -125,6 +133,8 @@ export const SEED_STEP_ERROR_CODES = [
   'site_unreachable',
   'site_not_html',
   'site_offsite_redirect',
+  // the host refuses automated reads and Google shows no page of it either
+  'site_forbidden',
   'claim_payload_missing',
   // a2: understanding the business
   'storefront_locked',

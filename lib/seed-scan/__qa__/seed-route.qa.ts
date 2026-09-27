@@ -512,7 +512,7 @@ async function main() {
       !/internalLinkUrls|robotsTxt|"attempted"|"insight"|"claim"|"results"/.test(done.text), done.text.slice(0, 200))
     const summary = view.summary as Row
     check('the snapshot has exactly the documented fields',
-      Object.keys(summary).sort().join(',') === 'audiences,business,competitors,counters,domain,findings,findingsOmitted,geo,locale,scannedAt,seedKeywords,sitemapTruncated,sitemapUrlCount,source,storefrontLocked,topics,url,version',
+      Object.keys(summary).sort().join(',') === 'audiences,business,competitors,counters,domain,findings,findingsOmitted,geo,locale,scannedAt,seedKeywords,siteAccess,sitemapTruncated,sitemapUrlCount,source,storefrontLocked,topics,url,version',
       Object.keys(summary).sort().join(','))
     s.tables.project_seed_runs[0].summary = { ...(s.tables.project_seed_runs[0].summary as Row), leaked: SECRET }
     const leak = await call(handleSeedGet(PROJECT, s.deps))
