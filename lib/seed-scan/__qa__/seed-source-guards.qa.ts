@@ -762,7 +762,9 @@ function main() {
       const inserted = code.indexOf("await supabase.from('projects').insert(data).select('id')")
       const failed = code.indexOf('if (error) {', inserted)
       if (inserted < 0 || failed < 0 || !(failed < at)) out.push('marked before the project exists')
-      if (!/const createdId = \(insertResult as \{ id: string \}\[\] \| null\)\?\.\[0\]\?\.id/.test(code)) out.push('not the id the insert returned')
+      // One row back: `.select('id')` gives an array, `.select('id').single()` the row itself.
+      if (!/const createdId = \(insertResult as \{ id: string \}\[\] \| null\)\?\.\[0\]\?\.id/.test(code)
+        && !(/\.insert\(data\)\.select\('id'\)\.single\(\)/.test(code) && /const createdId = \(insertResult as \{ id: string \} \| null\)\?\.id/.test(code))) out.push('not the id the insert returned')
     }
     return out
   }
@@ -775,8 +777,8 @@ function main() {
   check('MUTATION CONTROL: marking under a user the request did not authenticate is caught',
     markOffenders(createSrc.replace('{ projectId: createdId, userId: user.id }', '{ projectId: createdId, userId: clientId }')).length === 1)
   check('MUTATION CONTROL: marking before the insert has succeeded is caught',
-    markOffenders(createSrc.replace("    const { data: insertResult, error } = await supabase.from('projects').insert(data).select('id')\n",
-      "    const { data: insertResult, error } = await supabase.from('projects').insert(data).select('id')\n    await markScanOwnedFields(createAdminClient(), { projectId: createdId, userId: user.id }, placeholders)\n")).length > 0)
+    markOffenders(createSrc.replace(/( {4}const \{ data: insertResult, error \} = await supabase\.from\('projects'\)\.insert\(data\)\.select\('id'\)(?:\.single\(\))?\n)/,
+      "$1    await markScanOwnedFields(createAdminClient(), { projectId: createdId, userId: user.id }, placeholders)\n")).length > 0)
 
   finish()
 }
