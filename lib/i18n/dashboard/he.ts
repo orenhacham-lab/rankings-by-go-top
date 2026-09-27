@@ -3691,13 +3691,13 @@ export const dashboardHe = {
   sitePlatforms: {
     cardTitle: 'פלטפורמת האתר',
     cardBody: 'לכאן יעלו המאמרים שלכם. כל פרויקט מפרסם לפלטפורמה אחת.',
-    currentLabel: 'מחובר עכשיו',
+    currentLabel: 'מחובר',
     noneTitle: 'האתר עדיין לא מחובר',
     noneBody: 'ספרו לנו על מה האתר בנוי, ונחבר אותו כך שמאמרים יעלו אליו ישירות.',
     choose: 'חיבור האתר',
     change: 'החלפת פלטפורמה',
     conflictNote: 'לפרויקט יש יותר מחיבור אחד. נתקו את מה שלא בשימוש.',
-    status: { connected: 'פעיל', failed: 'דורש בדיקה', untested: 'טרם נבדק' },
+    status: { connected: 'מחובר', failed: 'דורש בדיקה', untested: 'טרם נבדק' },
     names: { wordpress: 'WordPress', shopify: 'Shopify', wix: 'Wix', webhook: 'אתר בפיתוח עצמאי' },
     blurbs: {
       wordpress: 'חיבור עם כתובת האתר וסיסמת אפליקציה של WordPress',

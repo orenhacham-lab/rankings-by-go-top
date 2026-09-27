@@ -3681,13 +3681,13 @@ export const dashboardEn = {
   sitePlatforms: {
     cardTitle: 'Site platform',
     cardBody: 'Where your articles go live. Each project publishes to one platform.',
-    currentLabel: 'Connected now',
+    currentLabel: 'Connected',
     noneTitle: 'Your site is not connected yet',
     noneBody: 'Tell us what your site runs on and we will connect it, so articles go straight to it.',
     choose: 'Connect your site',
     change: 'Switch platform',
     conflictNote: 'This project has more than one connection. Disconnect the one you do not use.',
-    status: { connected: 'Active', failed: 'Needs a check', untested: 'Not tested yet' },
+    status: { connected: 'Connected', failed: 'Needs a check', untested: 'Not tested yet' },
     names: { wordpress: 'WordPress', shopify: 'Shopify', wix: 'Wix', webhook: 'Custom-built site' },
     blurbs: {
       wordpress: 'Connect with your site address and a WordPress application password',
