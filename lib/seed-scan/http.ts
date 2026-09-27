@@ -28,7 +28,10 @@
  *      this user's runs today; everyone's today   429 user_daily_cap / global_daily_cap
  *   7. only now is a claim token redeemed, so no   400 claim_invalid
  *      refusal above can spend it; its site must
- *      be this project's site (never says why not)
+ *      be this project's site (never says why not).
+ *      A claimed row that carries the visitor's
+ *      anonymous stage A (lib/presignup) is replayed
+ *      from it: no step of stage A runs again
  *   8. the run is created with its lease held, answered 202, and worked after
  *      the response (the route passes next/server's `after`). When it cannot
  *      be created (another run won the race: 409; the database: 500), a token
@@ -46,7 +49,7 @@ import { normalizeCheckUrl, type ClaimOutcome } from '@/lib/free-check'
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import type { Locale } from '@/lib/i18n/locales'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { claimMatchesProject, claimSnapshot, projectSiteKey, restoreClaimToken, type ClaimSnapshot } from './claim'
+import { claimMatchesProject, claimSnapshot, projectSiteKey, readResearchSeed, researchStepDetail, restoreClaimToken, type ClaimSnapshot, type ResearchSeed } from './claim'
 import {
   countAllSeedRunsSince,
   countProjectSeedRuns,
@@ -312,6 +315,7 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
     const siteKey = projectSiteKey(project.target_domain)
     let trigger: SeedRunTrigger = caps.priorRuns === 0 ? 'create' : 'rescan'
     let snapshot: ClaimSnapshot | null = null
+    let research: ResearchSeed | null = null
     let spentToken: string | null = null
     if (body.action === 'claim') {
       // A project without a usable address cannot match any scan: refused
@@ -321,13 +325,18 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
       // Malformed, unknown, spent, expired or another site's scan: one answer.
       if (!claimed.ok || !claimMatchesProject(claimed.scan, siteKey)) return refuse(400, 'claim_invalid')
       spentToken = body.token
-      snapshot = claimSnapshot(claimed.scan)
+      // The visitor's whole anonymous stage A, when the row carries one: the
+      // run replays it step by step with no fetch, model call or search.
+      // Otherwise the free check's snapshot, as before.
+      research = readResearchSeed(claimed.scan.seed, siteKey)
+      if (!research) snapshot = claimSnapshot(claimed.scan)
       trigger = 'claim'
     }
 
-    const locale = snapshot?.locale ?? body.locale ?? (await deps.locale())
+    const locale = research?.marker.locale ?? snapshot?.locale ?? body.locale ?? (await deps.locale())
     const admitted = normalizeCheckUrl(project.target_domain ?? '')
     const summary = initialSummary({
+      // A claimed research IS a scan of this site, only run before sign-up.
       source: snapshot ? 'claim' : 'scan',
       domain: siteKey ?? (project.target_domain ?? '').slice(0, 253),
       url: admitted.ok ? admitted.url.toString() : (project.target_domain ?? '').slice(0, 2_000),
@@ -337,7 +346,7 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
       trigger,
       stage: 'a',
       summary,
-      stepDetail: snapshot ? { a1: { claim: snapshot } } : undefined,
+      stepDetail: research ? researchStepDetail(research) : snapshot ? { a1: { claim: snapshot } } : undefined,
       now,
     })
     if (!created.ok) {

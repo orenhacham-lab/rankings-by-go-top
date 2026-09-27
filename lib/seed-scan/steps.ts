@@ -42,6 +42,19 @@
  * competitor, the home page's links (b1's fallback) — and from its public
  * teaser when it does not (claim.ts). a4 still searches.
  *
+ * A CLAIMED RESEARCH (trigger 'claim' with a research marker on a1, see
+ * claim.ts readResearchSeed) is the visitor's anonymous stage A itself
+ * (lib/presignup): every step's own saved result is on its row before the run
+ * starts, so a1 takes its snapshot, a2 and a4 take their saved answers, and a3
+ * recomputes from the saved page. NOTHING is fetched, asked or searched again:
+ * a step whose saved answer is missing fails `claim_payload_missing` rather
+ * than spend. Only the project's own writes (settings, competitors) happen, as
+ * if the scan had run for the project.
+ *
+ * WHERE a2 AND a4 WRITE. A project's run fills its settings and competitors
+ * (settings.ts). An anonymous run has no project: lib/presignup passes writes
+ * that keep everything in the snapshot and touch no table (`ctx.writes`).
+ *
  * Failures are stable codes. Nothing a site, the model or the search provider
  * said is stored, returned or logged.
  */
@@ -83,8 +96,10 @@ import {
   competitorDomainKey,
   type SeedProject,
 } from './settings'
+import { readResearchMarker, type ResearchMarker } from './claim'
 import { hostPinnedFetch, isLockedStorefront, type FetchHop } from './site-access'
 import { withCounters } from './summary'
+import { SEED_STEP_ERROR_CODES } from './types'
 import type {
   SeedBusiness,
   SeedCompetitor,
@@ -189,6 +204,15 @@ export function stageADeps(input: StageADepsInput = {}): StageADeps {
 
 // ── The step contract ───────────────────────────────────────────────────────
 
+/** Where a2 and a4 put what they found, besides the snapshot. */
+export type StageAWrites = {
+  applyBusiness: typeof applyBusinessToSettings
+  addCompetitors: typeof addValidatedCompetitors
+}
+
+/** A project's run: its settings and its competitors, under the field-ownership rules. */
+export const PROJECT_WRITES: StageAWrites = { applyBusiness: applyBusinessToSettings, addCompetitors: addValidatedCompetitors }
+
 export type StepContext = {
   admin: ServiceRoleClient
   scope: SeedScope
@@ -204,6 +228,8 @@ export type StepContext = {
    * False means the run is no longer this worker's: the step must stop.
    */
   save: (detail: Record<string, unknown>) => Promise<boolean>
+  /** Where a2 and a4 write; a project's own tables when absent. */
+  writes?: StageAWrites
 }
 
 export type StepResult = {
@@ -370,8 +396,50 @@ function readSearchRecords(v: unknown): SearchRecord[] | null {
 
 // ── a1: read the site ───────────────────────────────────────────────────────
 
+/** The research a claimed run replays, when it is one (trigger 'claim' and a1's marker). */
+function researchOf(ctx: StepContext): ResearchMarker | null {
+  return ctx.trigger === 'claim' ? readResearchMarker(ctx.details.a1) : null
+}
+
 async function a1(ctx: StepContext): Promise<StepOutcome> {
+  const research = researchOf(ctx)
+  if (research) return a1Research(ctx, research)
   return ctx.trigger === 'claim' ? a1Claim(ctx) : a1Live(ctx)
+}
+
+/**
+ * a1 of a claimed research: the visitor's own read of this site, as it was
+ * saved (the page's signals, robots, sitemap, or Google's index of it). Nothing
+ * is fetched; the site must be this project's site.
+ */
+function a1Research(ctx: StepContext, research: ResearchMarker): StepOutcome {
+  if (research.domain !== ctx.summary.domain || research.steps.a1?.status !== 'done') {
+    return finished('failed', 'claim_payload_missing', ctx.summary, { detail: ctx.details.a1 ?? {} })
+  }
+  const summary = withCounters({
+    ...ctx.summary,
+    url: research.url,
+    scannedAt: research.scannedAt,
+    storefrontLocked: research.storefrontLocked,
+    siteAccess: research.siteAccess,
+    sitemapUrlCount: research.sitemapUrlCount,
+    sitemapTruncated: research.sitemapTruncated,
+  })
+  return finished('done', null, summary, { itemCount: research.sitemapUrlCount, detail: ctx.details.a1 ?? {} })
+}
+
+/**
+ * A step of a claimed research that did not finish 'done' when the visitor
+ * watched it ends here the same way, with its saved detail, and asks nothing.
+ * Only a2 and a4 come here: a1 must be done for a claim to exist, and a3
+ * always recomputes from the saved page.
+ */
+function replayResearchStep(ctx: StepContext, step: 'a2' | 'a4', research: ResearchMarker): StepOutcome | null {
+  const saved = research.steps[step]
+  if (!saved || saved.status === 'done') return null
+  const status = saved.status === 'skipped' ? 'skipped' : 'failed'
+  const code = SEED_STEP_ERROR_CODES.find((c) => c === saved.errorCode) ?? 'internal_error'
+  return finished(status, code, ctx.summary, { detail: ctx.details[step] ?? {} })
 }
 
 export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
@@ -666,6 +734,14 @@ async function a1Claim(ctx: StepContext): Promise<StepOutcome> {
 const MODEL_UNAVAILABLE_REASONS = new Set(['missing_gemini_api_key', 'gemini_init_failed'])
 
 async function a2(ctx: StepContext): Promise<StepOutcome> {
+  const research = researchOf(ctx)
+  if (research) {
+    const replayed = replayResearchStep(ctx, 'a2', research)
+    if (replayed) return replayed
+    // The saved answer is the only answer a claimed research may use: never the model.
+    if (!readStoredInsight(ctx.details.a2?.insight)) return finished('failed', 'claim_payload_missing', ctx.summary, { detail: ctx.details.a2 ?? {} })
+    return a2Live(ctx)
+  }
   return ctx.trigger === 'claim' ? a2Claim(ctx) : a2Live(ctx)
 }
 
@@ -736,7 +812,7 @@ async function applyInsight(ctx: StepContext, insight: StoredInsight, detail: Re
     topics: insight.articles,
     competitors: suggestedCompetitors(insight.competitors, ctx.summary.domain),
   })
-  const applied = await applyBusinessToSettings(ctx.admin, ctx.scope, {
+  const applied = await (ctx.writes ?? PROJECT_WRITES).applyBusiness(ctx.admin, ctx.scope, {
     project: ctx.project,
     business: insight.business,
     audiences: insight.audiences,
@@ -760,6 +836,8 @@ const SEVERITY_RANK: Record<FreeCheckFinding['severity'], number> = { blocker: 0
 const bySeverity = (list: FreeCheckFinding[]) => [...list].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
 
 async function a3(ctx: StepContext): Promise<StepOutcome> {
+  // A claimed research recomputes from the page it saved: no I/O either way.
+  if (researchOf(ctx)) return a3Live(ctx)
   return ctx.trigger === 'claim' ? a3Claim(ctx) : a3Live(ctx)
 }
 
@@ -889,6 +967,17 @@ async function searchOnce(deps: StageADeps, query: string, market: { gl: string;
 }
 
 async function a4(ctx: StepContext): Promise<StepOutcome> {
+  const research = researchOf(ctx)
+  if (research) {
+    const replayed = replayResearchStep(ctx, 'a4', research)
+    if (replayed) return replayed
+    // The searches the visitor's run made are the only ones a claimed research may use.
+    if (!readSearchRecords(ctx.details.a4?.results)) return finished('failed', 'claim_payload_missing', ctx.summary, { detail: ctx.details.a4 ?? {} })
+  }
+  return a4Search(ctx)
+}
+
+async function a4Search(ctx: StepContext): Promise<StepOutcome> {
   const insight = readStoredInsight(ctx.details.a2?.insight)
   const queries = (insight?.keywords ?? []).slice(0, MAX_SEARCHES)
   if (queries.length === 0) return finished('skipped', 'no_seed_keywords', ctx.summary)
@@ -916,7 +1005,7 @@ async function a4(ctx: StepContext): Promise<StepOutcome> {
     siteKey: ctx.summary.domain,
   })
   const summary = withCounters({ ...ctx.summary, competitors })
-  const added = await addValidatedCompetitors(ctx.admin, ctx.scope, competitors.map((c) => c.domain), ctx.deps.now())
+  const added = await (ctx.writes ?? PROJECT_WRITES).addCompetitors(ctx.admin, ctx.scope, competitors.map((c) => c.domain), ctx.deps.now())
   if (added === 'error') return finished('failed', 'competitors_write_failed', summary, { itemCount: competitors.length, detail })
   return finished('done', null, summary, { itemCount: competitors.length, detail: { ...detail, added } })
 }

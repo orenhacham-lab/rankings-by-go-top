@@ -12,6 +12,18 @@ export function seedScanFlagOn(env: Record<string, string | undefined>): boolean
   return env.ENABLE_SEED_SCAN === 'true'
 }
 
+/**
+ * Whether the free check runs the whole research (seed stage A) for a visitor
+ * before sign-up (lib/presignup). It needs the seeding scan on, because a
+ * claimed research becomes a project's seed run, AND its own switch,
+ * ENABLE_PRESIGNUP_RESEARCH=true, so a preview can keep the short check while
+ * the research's tables are not migrated. Production has both off: the free
+ * check is exactly today's, and the research API answers 404.
+ */
+export function presignupResearchOn(env: Record<string, string | undefined>): boolean {
+  return seedScanFlagOn(env) && env.ENABLE_PRESIGNUP_RESEARCH === 'true'
+}
+
 export async function seedScanAvailable(args: {
   env: Record<string, string | undefined>
   isAdmin: () => Promise<boolean>
