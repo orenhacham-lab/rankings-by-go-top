@@ -17,6 +17,7 @@ import { BarChart3, FileText, Zap } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscPerformance from '@/components/gsc/GscPerformance'
+import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
 
 type ReportType = 'google' | 'ai'
 
@@ -52,7 +53,7 @@ function ReportsContent() {
 
   // Area D — the selected project is the GLOBAL active project, picked in the top
   // bar like on every screen. This page has no project dropdown of its own.
-  const { activeProjectId } = useActiveProject()
+  const { activeProjectId, projects } = useActiveProject()
   const selectedProjectId = activeProjectId ?? ''
   const [reportType, setReportType] = useState<ReportType>('google')
   
@@ -360,6 +361,15 @@ function ReportsContent() {
       <Header
         title={t.title}
         subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}
+      />
+
+      {/* The automatic monthly reports, made on the 1st. Self-contained: it reads its
+          own route and renders nothing until the report tables exist. The reports
+          built by hand below are unchanged. */}
+      <MonthlyReports
+        projectId={activeProjectId}
+        projectLabel={projects.find((p) => p.id === activeProjectId)?.name ?? ''}
+        language={language}
       />
 
       {/* Clicks, impressions and position on Google, with their trend across syncs.
