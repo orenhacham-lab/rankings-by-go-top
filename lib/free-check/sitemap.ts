@@ -13,6 +13,7 @@
  * index expansion, and `limit` caps the result, so a site with a million URLs
  * costs the same as a small one.
  */
+import { stripLineComment } from './html-signals'
 import { fetchSiteText } from './site-fetch'
 import { normalizeCheckUrl } from './url-guard'
 
@@ -111,7 +112,7 @@ export function sitemapsFromRobots(robotsTxt: string | null): string[] {
   if (!robotsTxt) return []
   const out: string[] = []
   for (const line of robotsTxt.split(/\r?\n/)) {
-    const m = line.replace(/#.*$/, '').match(/^\s*sitemap\s*:\s*(\S+)\s*$/i)
+    const m = stripLineComment(line).match(/^\s*sitemap\s*:\s*(\S+)\s*$/i)
     if (m) out.push(m[1])
     if (out.length >= 10) break
   }

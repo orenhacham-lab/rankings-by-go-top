@@ -77,6 +77,12 @@ async function main() {
   check('Sitemap: lines are read out of robots.txt',
     sitemapsFromRobots('User-agent: *\nDisallow: /x/\nSitemap: https://a.co.il/sitemap_index.xml')[0] === 'https://a.co.il/sitemap_index.xml')
   check('a commented-out Sitemap line is not one', sitemapsFromRobots('# Sitemap: https://a.co.il/s.xml').length === 0)
+  const LONG_COMMENT = `${'#'.repeat(60_000)}\rx\nSitemap: https://a.co.il/s.xml`
+  const tRobots = performance.now()
+  const afterComment = sitemapsFromRobots(LONG_COMMENT)
+  const robotsMs = performance.now() - tRobots
+  check(`a 60 000-character comment line does not stall robots parsing (${robotsMs.toFixed(0)}ms)`, robotsMs < 100)
+  check('and the Sitemap line after it is still read', afterComment[0] === 'https://a.co.il/s.xml')
 
   const INDEX = `<?xml version="1.0"?><sitemapindex xmlns="x">
     <sitemap><loc>https://a.co.il/post-sitemap.xml</loc><lastmod>2026-09-01</lastmod></sitemap>
