@@ -277,6 +277,10 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
   const { deps } = ctx
   // Behind its password page a store shows nothing of itself to read.
   if (lockedStorefront(ctx)) return finished('skipped', 'storefront_locked', ctx.summary)
+  // The host's firewall refused a1's read of its home page (steps.ts, the
+  // search-index fallback): the crawl would meet the same refusal on every
+  // page. Not crawled, for the firewall's reason, not "no pages".
+  if ((ctx.details.a1 ?? {}).mode === 'search_index') return finished('skipped', 'site_forbidden', ctx.summary, { detail: { mode: 'search_index' } })
   const own = ctx.details.b1 ?? {}
   const counts = { pagesRead: 0, pagesFailed: 0, sitemapDocs: 0 }
   const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { attempted: true, ...counts } })

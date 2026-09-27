@@ -22,6 +22,7 @@ export function initialSummary(args: { source: 'scan' | 'claim'; domain: string;
     scannedAt: null,
     locale: args.locale,
     storefrontLocked: false,
+    siteAccess: 'direct',
     business: null,
     audiences: [],
     seedKeywords: [],
@@ -91,7 +92,8 @@ function readGeo(v: unknown): SeedGeo {
   const state = r.state === 'measured' || r.state === 'unavailable' ? r.state : 'pending'
   return {
     state,
-    unavailableReason: state === 'unavailable' && r.unavailableReason === 'storefront_locked' ? 'storefront_locked' : null,
+    unavailableReason:
+      state === 'unavailable' && (r.unavailableReason === 'storefront_locked' || r.unavailableReason === 'site_firewall') ? r.unavailableReason : null,
     passed: nonNegInt(r.passed),
     total: nonNegInt(r.total),
     signals: readGeoSignals(r.signals),
@@ -148,6 +150,7 @@ export function readSummary(raw: unknown): SeedSummary | null {
     scannedAt: str(r.scannedAt, 40),
     locale: r.locale === 'en' ? 'en' : 'he',
     storefrontLocked: bool(r.storefrontLocked),
+    siteAccess: r.siteAccess === 'search_index' ? 'search_index' : 'direct',
     business: readBusiness(r.business),
     audiences: strList(r.audiences, 5),
     seedKeywords: strList(r.seedKeywords, 5, 160),
