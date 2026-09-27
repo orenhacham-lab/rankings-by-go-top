@@ -83,7 +83,7 @@ const state = {
   deadlines: [] as number[],
   grantedScopes: ALL_SCOPES,
   discoverDelayMs: 0,
-  calls: { discover: 0, test: 0, identity: 0, exchange: 0, partner: 0 },
+  calls: { discover: 0, test: 0, identity: 0, exchange: 0, partner: 0, market: 0 },
   tokens: [] as string[],
   stageDeps: (): unknown => ({}),
 }
@@ -119,6 +119,12 @@ Module._load = function (request: string, parent: any, isMain: boolean) {
         state.calls.test++
         state.tokens.push(creds.accessToken)
         return { ok: true, status: 'connection_ok', shopName: SHOP_NAME, storefrontDomain: null, grantedScopes: state.grantedScopes, missingScopes: [], apiVersionRequested: creds.apiVersion, apiVersionActual: creds.apiVersion }
+      },
+      // The shop's market (a store in Canada, in English): read-only shop fields.
+      getShopMarket: async (creds: { accessToken: string }) => {
+        state.calls.market++
+        state.tokens.push(creds.accessToken)
+        return { country: 'CA', locale: 'en-CA' }
       },
       getShopIdentity: async (creds: { shopDomain: string }) => {
         state.calls.identity++
@@ -239,13 +245,13 @@ const shopTables = (): Tables => ({
 })
 
 function makeWorld(extra: Tables) {
-  const w = fx.world(fx.projectRow({ name: 'My store', target_domain: DEV_STORE, country: 'US', language: 'en' }), { ...shopTables(), ...extra }, {}, () => new Date())
+  const w = fx.world(fx.projectRow({ name: 'My store', target_domain: DEV_STORE, country: 'IL', language: 'he' }), { ...shopTables(), ...extra }, {}, () => new Date())
   const net = new fx.FakeNetwork(fx.lockedShopifySite401())
   const model = fx.fakeModel({ ok: true, insight: fx.EN_SHOP_INSIGHT })
   const search = fx.fakeSearch({ 'soy candles': ['boysmells.com', 'etsy.com'], 'hand poured candles': ['etsy.com'] })
   state.admin = w.fake
   state.stageDeps = () => ({ fetchImpl: net.fetch, insight: model.fn, search: search.fn })
-  state.calls = { discover: 0, test: 0, identity: 0, exchange: 0, partner: 0 }
+  state.calls = { discover: 0, test: 0, identity: 0, exchange: 0, partner: 0, market: 0 }
   state.tokens = []
   state.discoverDelayMs = 0
   state.partnerDelayMs = 0
@@ -457,11 +463,14 @@ async function main() {
   check('ON: one model call, in English; the run\'s snapshot is English', on.w.model.calls.length === 1 && on.w.model.calls[0].locale === 'en' && s?.locale === 'en')
   check('ON: the shop\'s name came from Shopify once; the sync ran once for the run and once for the button',
     on.calls.test === 1 && on.calls.discover === 2 && base.calls.discover === 1 && steps('a1').detail?.shop?.name === SHOP_NAME, JSON.stringify(on.calls))
+  check('ON: a project left at the form\'s IL / he is searched in the store\'s market (ca / en), and its country and language stay IL / he',
+    on.w.search.calls.length > 0 && on.w.search.calls.every((c) => c.gl === 'ca' && c.hl === 'en') && on.calls.market === 1 && base.calls.market === 0
+    && on.w.tables.projects[0].country === 'IL' && on.w.tables.projects[0].language === 'he', JSON.stringify(on.w.search.calls.map((c) => `${c.gl}/${c.hl}`)))
   check('ON: the Partner API is called exactly as in the baseline (the scan never asks it)', on.calls.partner === base.calls.partner && on.calls.partner === 3)
   check('ON: the database differs from the baseline only where the scan writes', changedTables(on.w.tables, base.w.tables).every((x) => SCAN_TABLES.includes(x)),
     changedTables(on.w.tables, base.w.tables).join(','))
   check('ON: the Admin API token was decrypted for Shopify\'s calls only — in no row and no log line',
-    on.tokens.length === 3 && on.tokens.every((x) => x === TOKEN) && !JSON.stringify(t).includes(TOKEN) && !on.steps.some((x) => x.taskLog.includes(TOKEN) || x.routeLog.includes(TOKEN)))
+    on.tokens.length === 4 && on.tokens.every((x) => x === TOKEN) && !JSON.stringify(t).includes(TOKEN) && !on.steps.some((x) => x.taskLog.includes(TOKEN) || x.routeLog.includes(TOKEN)))
   check('ON: no provider or database text in any log line', !on.steps.some((x) => x.taskLog.includes(SECRET) || /message|stack/i.test(x.taskLog)))
 
   // ── 2. The website merchant ───────────────────────────────────────────────

@@ -45,10 +45,13 @@ import {
   readShopInfo,
   readStoredCatalog,
   SHOPIFY_STAGE_A_EXECUTORS,
+  STORE_MARKET_FALLBACK,
   storefrontTarget,
+  storeMarket,
   storeSignals,
   type StoreCatalog,
 } from '../shopify-steps'
+import { getShopMarket } from '@/lib/shopify/client'
 import { MAX_SEARCHES, STAGE_A_EXECUTORS } from '../steps'
 import { createSeedRun } from '../store'
 import { initialSummary, readSummary } from '../summary'
@@ -235,6 +238,8 @@ type HarnessOpts = {
   loadRefused?: boolean
   loadThrows?: boolean
   shopName?: string | null
+  /** What the shop states of its market (lib/shopify/client.ts getShopMarket); 'throws' with provider text. */
+  market?: { country: string | null; locale: string | null } | 'throws'
   model?: ReturnType<typeof storeModel>
   /** How far the run's clock moves on every storefront request. */
   netClockMs?: number
@@ -259,7 +264,7 @@ function harness(o: HarnessOpts = {}) {
   }
   const model = o.model ?? storeModel()
   const search = fakeSearch(STORE_RESULTS)
-  const counts = { isAdmin: 0, access: 0, load: 0, sync: 0, shopName: 0, runStage: 0 }
+  const counts = { isAdmin: 0, access: 0, load: 0, sync: 0, shopName: 0, shopMarket: 0, runStage: 0 }
   const tokensSeen: string[] = []
   const deadlines: number[] = []
   const stageDeps = { fetchImpl, insight: model.fn, search: search.fn, now: clk.now }
@@ -288,6 +293,12 @@ function harness(o: HarnessOpts = {}) {
       counts.shopName++
       tokensSeen.push(creds.accessToken)
       return o.shopName === undefined ? SHOP_NAME : o.shopName
+    },
+    shopMarket: async (creds) => {
+      counts.shopMarket++
+      tokensSeen.push(creds.accessToken)
+      if (o.market === 'throws') throw new Error(`${SECRET}: Shopify answered 500`)
+      return o.market ?? { country: 'US', locale: 'en-US' }
     },
     runStage: (args) => {
       counts.runStage++
@@ -493,7 +504,13 @@ function storeStepOffenders(raw: string): string[] {
   const src = stripComments(raw)
   const out: string[] = []
   if (/\.insight\(|\.search\(|fetchImpl\(|\bfetch\(|createAdminClient\(/.test(src)) out.push('calls the model, a search or the network itself')
-  for (const via of ['a1Live(view)', 'a2Live({', 'a3Live(ctx)', 'a4: STAGE_A_EXECUTORS.a4']) if (!src.includes(via)) out.push(`does not go through ${via}`)
+  for (const via of ['a1Live(view)', 'a2Live({', 'a3Live(ctx)', 'a4: a4Store']) if (!src.includes(via)) out.push(`does not go through ${via}`)
+  // a4 is the ordinary a4, handed the store's market in place of the project's — a view, never a write.
+  const a4At = src.indexOf('async function a4Store(')
+  const a4Body = a4At >= 0 ? src.slice(a4At, src.indexOf('\n}\n', a4At)) : ''
+  if (!a4Body.includes('const market = storeSearchMarket(ctx.details)')
+    || !a4Body.includes('return STAGE_A_EXECUTORS.a4({ ...ctx, project: { ...ctx.project, country: market.country, language: market.language } })')) out.push('a4 does not search in the store\'s market')
+  if (/\.from\('projects'\)|\.update\(|\.upsert\(|\.insert\(/.test(src)) out.push('writes the database itself')
   const from = src.indexOf(".from('shopify_entities')")
   const to = src.indexOf('.limit(limit)', from)
   const query = from >= 0 && to > from ? src.slice(from, to) : ''
@@ -580,14 +597,14 @@ async function main() {
     check('AI readiness: "not checked, the store is password protected" — not four failures',
       s.geo.state === 'unavailable' && s.geo.unavailableReason === 'storefront_locked' && s.geo.total === 0 && s.geo.passed === 0 && s.counters.geoTotal === 0, JSON.stringify(s.geo))
     check('no finding is reported for a locked storefront', s.findings.length === 0 && s.counters.fixes === 0 && stepRow(t, 'a3').error_code === 'storefront_locked')
-    check(`a4: at most ${MAX_SEARCHES} searches, in the market the project chose (us / en)`,
+    check(`a4: at most ${MAX_SEARCHES} searches, in the market the store states (us / en)`,
       h.search.calls.length === 3 && h.search.calls.length <= MAX_SEARCHES && h.search.calls.every((c) => c.gl === 'us' && c.hl === 'en'), JSON.stringify(h.search.calls))
     const comp = s.competitors.map((c) => `${c.domain}:${c.source}`).join(' ')
     check('a4: competitors are the ones the searches showed', comp === 'boysmells.com:model etsy.com:search amazon.com:search', comp)
-    check('the catalog was already synced: no sync; the shop\'s name asked once', h.counts.sync === 0 && h.counts.shopName === 1 && h.counts.load === 1,
+    check('the catalog was already synced: no sync; the shop\'s name and market asked once each', h.counts.sync === 0 && h.counts.shopName === 1 && h.counts.shopMarket === 1 && h.counts.load === 1,
       JSON.stringify(h.counts))
     check('the Admin API token reached Shopify\'s own call only: in no row and no log line',
-      h.tokensSeen.length === 1 && h.tokensSeen.every((x) => x === TOKEN) && !JSON.stringify(t).includes(TOKEN) && !output.includes(TOKEN))
+      h.tokensSeen.length === 2 && h.tokensSeen.every((x) => x === TOKEN) && !JSON.stringify(t).includes(TOKEN) && !output.includes(TOKEN))
     check('log lines carry ids and codes only: no shop name, product or store address',
       output.includes('[seed-scan]') && !output.includes(SHOP_NAME) && !output.includes('Lavender') && !output.includes(DEV_STORE), output.slice(0, 300))
     check('stage B is not started: the run stays at stage A, with no stage-B step',
@@ -1075,7 +1092,7 @@ async function main() {
   // ── 11. Pieces ────────────────────────────────────────────────────────────
   console.log('\n11) The pieces: the address read, the shop read back, the catalog\'s text, the store\'s signals')
   {
-    const shop = { connectionId: CONN, name: SHOP_NAME, shopDomain: DEV_STORE, storefrontDomain: 'www.northwind-candles.com' }
+    const shop = { connectionId: CONN, name: SHOP_NAME, shopDomain: DEV_STORE, storefrontDomain: 'www.northwind-candles.com', market: null }
     check('the project\'s own address is what a1 reads', storefrontTarget('northwind-candles.com', shop) === 'northwind-candles.com')
     check('…falling back to the storefront, then the shop, only when the project has none usable',
       storefrontTarget('', shop) === 'www.northwind-candles.com' && storefrontTarget('localhost', { ...shop, storefrontDomain: null }) === DEV_STORE && storefrontTarget(null, null) === '')
@@ -1097,7 +1114,95 @@ async function main() {
     const sig = storeSignals(many, null, `https://${DEV_STORE}/`)
     check('the store\'s signals without a storefront: its name as the title, no language, Shopify, and at most 25 headings',
       sig.title === SHOP_NAME && sig.htmlLang === null && sig.platform === 'Shopify' && sig.h2.length <= 25 && sig.text === catalogText(many))
-    check('a4 of a store is the ordinary a4', SHOPIFY_STAGE_A_EXECUTORS.a4 === STAGE_A_EXECUTORS.a4 && SHOPIFY_STAGE_A_EXECUTORS.a1 !== STAGE_A_EXECUTORS.a1)
+    check('a store has its own a1-a4 (a4: the ordinary searches, in the store\'s market)',
+      (['a1', 'a2', 'a3', 'a4'] as const).every((k) => SHOPIFY_STAGE_A_EXECUTORS[k] !== STAGE_A_EXECUTORS[k]))
+  }
+
+  // ── 11b. The store's market ───────────────────────────────────────────────
+  console.log('\n11b) a4 searches in the store\'s own market — never the project\'s form defaults (IL / he) — and writes no project field')
+  const IL_HE = { country: 'IL', language: 'he' }
+  const a4Detail = (t: Tables) => detailOf(t, 'a4')
+  {
+    const h = harness({ project: storeProject(IL_HE), market: { country: 'CA', locale: 'fr-CA' } })
+    const { value: out } = await install(h)
+    const t = h.tables
+    check('a store in Canada, in French, on a project left at IL / he: every search is gl ca, hl fr',
+      isDone(out) && h.search.calls.length === 3 && h.search.calls.every((c) => c.gl === 'ca' && c.hl === 'fr'), JSON.stringify(h.search.calls.map((c) => `${c.gl}/${c.hl}`)))
+    check('…the market is noted on a1 as Shopify stated it, and on a4 as searched',
+      JSON.stringify((detailOf(t, 'a1').shop as Row)?.market) === '{"country":"CA","language":"fr"}' && JSON.stringify(a4Detail(t).market) === '{"gl":"ca","hl":"fr"}',
+      JSON.stringify(a4Detail(t).market))
+    check('…and the project\'s own country and language are not written (IL / he, as the merchant left them)',
+      t.projects[0].country === 'IL' && t.projects[0].language === 'he', JSON.stringify({ c: t.projects[0].country, l: t.projects[0].language }))
+    check('…the market asked once, with the store\'s own credentials', h.counts.shopMarket === 1 && h.tokensSeen.every((x) => x === TOKEN))
+  }
+  for (const c of [
+    { name: 'Shopify states no market', opts: { market: { country: null, locale: null } } as HarnessOpts },
+    { name: 'the market query fails, with provider text', opts: { market: 'throws' } as HarnessOpts },
+    { name: 'the credentials are refused (nothing asked)', opts: { loadRefused: true } as HarnessOpts },
+  ]) {
+    const h = harness({ project: storeProject(IL_HE), ...c.opts })
+    const { value: out, output } = await install(h)
+    const t = h.tables
+    check(`${c.name}: US / en, never IL / he — and the project untouched`,
+      isDone(out) && h.search.calls.length > 0 && h.search.calls.every((x) => x.gl === 'us' && x.hl === 'en') && t.projects[0].country === 'IL' && t.projects[0].language === 'he'
+      && !JSON.stringify(t).includes(SECRET) && !output.includes(SECRET), JSON.stringify(h.search.calls.map((x) => `${x.gl}/${x.hl}`)))
+  }
+  {
+    const h = harness({ project: storeProject(IL_HE), market: { country: 'DE', locale: null } })
+    await install(h)
+    check('a country with no locale: that country, in English', h.search.calls.every((x) => x.gl === 'de' && x.hl === 'en'), JSON.stringify(h.search.calls.map((x) => `${x.gl}/${x.hl}`)))
+  }
+  {
+    // What does not fit is the cron's: the resumed a4 reads the market a1 noted.
+    const h = harness({ project: storeProject(IL_HE), entities: [], syncLands: catalogRows(), syncClockMs: SHOPIFY_WORK_WINDOW_MS - 20_000, market: { country: 'GB', locale: 'en-GB' } })
+    const { value: out } = await install(h)
+    const r = (await captureConsole(() => resumeSeedRun({ admin: h.w.admin, scope: SCOPE, runId: String(runRow(h.tables).id), deps: h.stageDeps, quiet: true }))).value as SeedRunResult
+    check('resumed by the cron: a4 still searches in the store\'s market (gb / en)',
+      out.state === 'started' && r.outcome === 'finished' && r.status === 'done' && h.search.calls.length > 0 && h.search.calls.every((x) => x.gl === 'gb' && x.hl === 'en'), JSON.stringify(h.search.calls.map((x) => `${x.gl}/${x.hl}`)))
+  }
+  {
+    // A run whose a1 noted no market (an older run, or a malformed field): US / en.
+    const bad = readShopInfo({ shop: { connectionId: CONN, market: { country: 'Canada', language: 'fr' } } })
+    check('a malformed market is dropped when read back', bad?.market === null, JSON.stringify(bad))
+    check('what Shopify says, made the searches\' market: country upper-cased, the locale\'s language only, each part falling back on its own',
+      JSON.stringify(storeMarket({ country: 'ca', locale: 'fr-CA' })) === '{"country":"CA","language":"fr"}'
+      && JSON.stringify(storeMarket({ country: '*', locale: 'pt-BR' })) === '{"country":"US","language":"pt"}'
+      && JSON.stringify(storeMarket({ country: 'JP', locale: 'english' })) === '{"country":"JP","language":"en"}'
+      && JSON.stringify(storeMarket(null)) === JSON.stringify(STORE_MARKET_FALLBACK) && STORE_MARKET_FALLBACK.country === 'US' && STORE_MARKET_FALLBACK.language === 'en')
+  }
+  {
+    // lib/shopify/client.ts getShopMarket, over a fake Shopify: the shop's own fields only.
+    const creds = { shopDomain: DEV_STORE, accessToken: TOKEN, apiVersion: '2025-07' }
+    const realFetch = globalThis.fetch
+    const seen: { url: string; token: string | null; query: string }[] = []
+    const answer = (replies: (Record<string, unknown> | number)[]) => {
+      let i = 0
+      globalThis.fetch = (async (url: string, init: RequestInit) => {
+        const headers = new Headers(init.headers)
+        seen.push({ url: String(url), token: headers.get('x-shopify-access-token'), query: String(JSON.parse(String(init.body)).query) })
+        const r = replies[Math.min(i++, replies.length - 1)]
+        return typeof r === 'number' ? new Response('{}', { status: r }) : new Response(JSON.stringify(r), { status: 200, headers: { 'content-type': 'application/json' } })
+      }) as typeof fetch
+    }
+    try {
+      answer([{ data: { shop: { billingAddress: { countryCodeV2: 'CA' }, primaryDomain: { localization: { country: 'CA', defaultLocale: 'fr-CA' } } } } }])
+      const full = await getShopMarket(creds)
+      check('getShopMarket: the shop\'s country and its primary domain\'s default locale, from its own admin endpoint',
+        full.country === 'CA' && full.locale === 'fr-CA' && seen.length === 1 && seen[0].url === `https://${DEV_STORE}/admin/api/2025-07/graphql.json` && seen[0].token === TOKEN, JSON.stringify(full))
+      check('…asking for shop fields only — no locales query, nothing that needs a scope the app lacks',
+        /^\{ shop \{ billingAddress \{ countryCodeV2 \} primaryDomain \{ localization \{ country defaultLocale \} \} \} \}$/.test(seen[0].query), seen[0].query)
+      seen.length = 0
+      answer([{ errors: [{ message: 'Access denied for localization field.', extensions: { code: 'ACCESS_DENIED' } }] }, { data: { shop: { billingAddress: { countryCodeV2: 'AU' } } } }])
+      const partial = await getShopMarket(creds)
+      check('…the domain\'s localization refused: the address alone is asked, and its country kept',
+        partial.country === 'AU' && partial.locale === null && seen.length === 2 && seen[1].query === '{ shop { billingAddress { countryCodeV2 } } }', JSON.stringify(partial))
+      seen.length = 0
+      answer([401])
+      const none = await getShopMarket(creds)
+      check('…refused altogether: nulls, never a throw', none.country === null && none.locale === null, JSON.stringify(none))
+    } finally {
+      globalThis.fetch = realFetch
+    }
   }
 
   // ── 12. Source guards ─────────────────────────────────────────────────────
@@ -1156,6 +1261,27 @@ async function main() {
       storeStepOffenders(steps.replace("    if (shop?.connectionId) query = query.eq('connection_id', shop.connectionId)\n", '')).length > 0)
     check('MUTATION CONTROL: an empty store asking the model anyway is caught',
       storeStepOffenders(steps.replace("finished('skipped', 'store_empty'", "finished('skipped', 'site_unreadable'")).length > 0)
+    check('MUTATION CONTROL: a4 searching in the project\'s market is caught',
+      storeStepOffenders(steps.replace('country: market.country, language: market.language', 'country: ctx.project.country, language: ctx.project.language')).length > 0)
+    check('MUTATION CONTROL: the store\'s steps writing the project is caught',
+      storeStepOffenders(`${steps}\nconst w = (ctx: StepContext) => ctx.admin.from('projects').update({ country: 'US' })`).length > 0)
+
+    // lib/shopify/client.ts getShopMarket: the shop's own fields, read only — no locales query (read_locales is not a scope the app has).
+    const client = stripComments(read('lib/shopify/client.ts'))
+    const marketOffenders = (src: string): string[] => {
+      const at = src.indexOf('export async function getShopMarket(')
+      const body = at >= 0 ? src.slice(at, src.indexOf('\n}\n', at)) : ''
+      const out: string[] = []
+      if (!body) out.push('no getShopMarket')
+      if (/shopLocales|locales\s*\{|mutation|markets?\s*\(|fetch\(/.test(body)) out.push('asks for more than the shop\'s own fields')
+      const queries = body.match(/`\{ shop \{[^`]*`/g) ?? []
+      if (queries.length !== 2) out.push(`${queries.length} shop queries`)
+      return out
+    }
+    const mOff = marketOffenders(client)
+    check('client.ts getShopMarket: two read-only shop queries, no locales query', mOff.length === 0, mOff.join(' | '))
+    check('MUTATION CONTROL: a locales query (a scope the app lacks) is caught',
+      marketOffenders(client.replace('primaryDomain { localization { country defaultLocale } }', 'shopLocales { locale primary }')).length > 0)
 
     const logOff = hookLogOffenders(hook)
     check('shopify-install.ts logs ids and stable codes only', logOff.length === 0, logOff.join(' | '))

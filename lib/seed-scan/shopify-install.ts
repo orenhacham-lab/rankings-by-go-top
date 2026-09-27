@@ -34,7 +34,8 @@
  * readable: when none of its products or collections was synced yet, the
  * store's own sync runs once — the same one as the Sync button, with the
  * scopes the app already has; nothing is written to Shopify — and the shop's
- * name is noted. Then stage A is worked (shopify-steps.ts) inside the route's
+ * name and market (its country and primary locale, which a4 searches in) are
+ * noted. Then stage A is worked (shopify-steps.ts) inside the route's
  * work window; what does not fit is left to the cron, like any run. Stage B
  * starts only from the merchant's `continue`, as for any project.
  *
@@ -49,7 +50,7 @@ import { normalizeCheckUrl } from '@/lib/free-check'
 import { routeContentLocale } from '@/lib/i18n/request-locale'
 import type { Locale } from '@/lib/i18n/locales'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
-import { testShopifyConnection } from '@/lib/shopify/client'
+import { getShopMarket, testShopifyConnection } from '@/lib/shopify/client'
 import { runShopifySync } from '@/lib/shopify/sync'
 import type { ShopifyCredentials } from '@/lib/shopify/types'
 import { explainAccess } from '@/lib/subscription'
@@ -57,7 +58,7 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { projectSiteKey } from './claim'
 import { checkSeedCaps } from './http'
 import { runStageA, type SeedRunResult } from './runner'
-import { storefrontTarget, type ShopInfo } from './shopify-steps'
+import { storeMarket, storefrontTarget, type ShopInfo, type StoreMarket } from './shopify-steps'
 import { countProjectSeedRuns, createSeedRun, renewSeedLease, STAGE_B_LEASE_MS, updateSeedStep } from './store'
 import { initialSummary } from './summary'
 import type { SeedScope } from './types'
@@ -109,6 +110,8 @@ export type ShopifySeedDeps = {
   sync: (admin: ServiceRoleClient, loaded: Extract<LoadedConnection, { creds: unknown }>) => Promise<{ ok: boolean }>
   /** The shop's own name, or null. */
   shopName: (creds: ShopifyCredentials) => Promise<string | null>
+  /** What the shop states of its market: a country code and a locale, each or both null (lib/shopify/client.ts getShopMarket). */
+  shopMarket: (creds: ShopifyCredentials) => Promise<{ country: string | null; locale: string | null }>
   runStage: (args: { admin: ServiceRoleClient; scope: SeedScope; runId: string; lease: string; deadlineAt: number }) => Promise<SeedRunResult>
   now: () => Date
   env: Record<string, string | undefined>
@@ -121,6 +124,7 @@ export function shopifySeedDeps(overrides: Partial<ShopifySeedDeps> = {}): Shopi
     loadConnection: (admin, projectId) => loadShopifyConnection(admin, projectId),
     sync: (admin, loaded) => runShopifySync(admin, loaded.connection, loaded.creds),
     shopName: async (creds) => (await testShopifyConnection(creds)).shopName ?? null,
+    shopMarket: (creds) => getShopMarket(creds),
     runStage: (args) => runStageA(args),
     now: () => new Date(),
     env: process.env,
@@ -208,8 +212,9 @@ async function hasCatalog(admin: ServiceRoleClient, scope: SeedScope, connection
 
 /**
  * Make the store readable: its catalog synced once if nothing of it was yet
- * (never from the sync route, which just did), and its name. Best effort —
- * a1 reads whatever is there.
+ * (never from the sync route, which just did), its name, and its market — the
+ * country and language a4 searches in. Best effort: a1 reads whatever is
+ * there, and a store whose market is unknown is searched as US / en.
  */
 async function prepareStore(
   input: ShopifySeedInput,
@@ -218,7 +223,7 @@ async function prepareStore(
   deps: ShopifySeedDeps,
 ): Promise<{ shop: ShopInfo; synced: boolean }> {
   const needSync = input.source !== 'sync' && !(await hasCatalog(input.admin, scope, shop.connectionId ?? ''))
-  if (!needSync && shop.name) return { shop, synced: false }
+  if (!needSync && shop.name && shop.market) return { shop, synced: false }
   let loaded: LoadedConnection
   try {
     loaded = await deps.loadConnection(input.admin, scope.projectId)
@@ -243,7 +248,15 @@ async function prepareStore(
       name = null
     }
   }
-  return { shop: { ...shop, name }, synced }
+  let market: StoreMarket | null = shop.market
+  if (!market) {
+    try {
+      market = storeMarket(await deps.shopMarket(loaded.creds))
+    } catch {
+      market = null
+    }
+  }
+  return { shop: { ...shop, name, market }, synced }
 }
 
 /** The whole decision and the run, after the route's response. */
@@ -302,6 +315,7 @@ export async function startShopifySeedScan(input: ShopifySeedInput, deps: Shopif
     name: cleanName(input.shopName),
     shopDomain: connection.shop_domain,
     storefrontDomain: connection.storefront_domain,
+    market: null,
   }
   const target = storefrontTarget(project.target_domain, shop)
   const admitted = normalizeCheckUrl(target)
@@ -319,7 +333,7 @@ export async function startShopifySeedScan(input: ShopifySeedInput, deps: Shopif
 
   // 8. The store made readable, and what a1 needs to know about it.
   const prepared = await prepareStore(input, scope, shop, deps)
-  if (prepared.shop.name !== shop.name || prepared.synced) {
+  if (prepared.shop.name !== shop.name || prepared.shop.market !== shop.market || prepared.synced) {
     await updateSeedStep(admin, scope, runId, 'a1', { status: 'pending', detail: { mode: 'shopify', shop: prepared.shop, synced: prepared.synced } })
   }
 

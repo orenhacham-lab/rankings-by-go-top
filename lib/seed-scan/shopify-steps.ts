@@ -25,7 +25,11 @@
  *       protected" — geo state 'unavailable', reason 'storefront_locked', no
  *       finding — which is not the same as failing all four; an unreadable one
  *       is not checked either.
- *   a4  Unchanged: at most three searches for the seed keywords a2 found.
+ *   a4  At most three searches for the seed keywords a2 found — a4 itself, in
+ *       the STORE's market: its country and primary locale as Shopify states
+ *       them (noted on a1 by the install), else US / en. Never the project's
+ *       country and language, which for a project made with the form's
+ *       defaults say IL / he; the project row is not written for this.
  *
  * a1 keeps the live step's fields where later steps read them — `signals` (the
  * storefront's, or null) and `storefrontLocked` — so a2Live, a3Live and stage B's
@@ -68,6 +72,31 @@ export type ShopInfo = {
   shopDomain: string | null
   /** Its primary storefront host, when it has its own domain. */
   storefrontDomain: string | null
+  /** The market it sells in, as Shopify states it; null until asked. */
+  market: StoreMarket | null
+}
+
+/** A store's market: an ISO country code and a two-letter language, as the searches take them. */
+export type StoreMarket = { country: string; language: string }
+
+/** When Shopify states no market for the store. */
+export const STORE_MARKET_FALLBACK: StoreMarket = { country: 'US', language: 'en' }
+
+const countryCode = (v: unknown): string | null => {
+  const s = typeof v === 'string' ? v.trim().toUpperCase() : ''
+  return /^[A-Z]{2}$/.test(s) ? s : null
+}
+const languageCode = (v: unknown): string | null => {
+  const m = typeof v === 'string' ? /^([a-z]{2})(?:[-_][a-z0-9]+)*$/i.exec(v.trim()) : null
+  return m ? m[1].toLowerCase() : null
+}
+
+/** The market from what Shopify said (a country code, a locale like "fr-CA"), each part falling back on its own. */
+export function storeMarket(said: { country?: unknown; locale?: unknown } | null | undefined): StoreMarket {
+  return {
+    country: countryCode(said?.country) ?? STORE_MARKET_FALLBACK.country,
+    language: languageCode(said?.locale) ?? STORE_MARKET_FALLBACK.language,
+  }
 }
 
 const text = (v: unknown, max: number): string | null => {
@@ -86,11 +115,15 @@ export function readShopInfo(detail: Record<string, unknown> | undefined): ShopI
   const shop = detail?.shop
   if (!shop || typeof shop !== 'object') return null
   const r = shop as Record<string, unknown>
+  const m = r.market && typeof r.market === 'object' ? (r.market as Record<string, unknown>) : null
+  const country = countryCode(m?.country)
+  const language = typeof m?.language === 'string' && /^[a-z]{2}$/.test(m.language) ? m.language : null
   return {
     connectionId: text(r.connectionId, 64),
     name: text(r.name, 120),
     shopDomain: host(r.shopDomain),
     storefrontDomain: host(r.storefrontDomain),
+    market: country && language ? { country, language } : null,
   }
 }
 
@@ -322,10 +355,22 @@ async function a3Store(ctx: StepContext): Promise<StepOutcome> {
   })
 }
 
+/** The market a store's searches run in: the one the install noted, else US / en — never the project's. */
+export function storeSearchMarket(details: StepContext['details']): StoreMarket {
+  return readShopInfo(details.a1)?.market ?? STORE_MARKET_FALLBACK
+}
+
+async function a4Store(ctx: StepContext): Promise<StepOutcome> {
+  // a4 itself, reading the store's market where it reads the project's. A view
+  // only: nothing here writes the project's country or language.
+  const market = storeSearchMarket(ctx.details)
+  return STAGE_A_EXECUTORS.a4({ ...ctx, project: { ...ctx.project, country: market.country, language: market.language } })
+}
+
 /** The executors of a 'shopify_install' run. The runner picks them by the run's trigger. */
 export const SHOPIFY_STAGE_A_EXECUTORS: typeof STAGE_A_EXECUTORS = {
   a1: a1Store,
   a2: a2Store,
   a3: a3Store,
-  a4: STAGE_A_EXECUTORS.a4,
+  a4: a4Store,
 }
