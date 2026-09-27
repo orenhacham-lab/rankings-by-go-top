@@ -37,6 +37,7 @@ import {
   nextSeedStep,
   releaseSeedLease,
   renewSeedLease,
+  sameInstant,
   seedRunStatus,
   STAGE_LEASE_MS,
   takeSeedLease,
@@ -130,7 +131,8 @@ async function workRun(args: RunArgs & { lease: string }, expect: SeedRunStage |
 
   const run = await getSeedRun(admin, scope, runId)
   if (run === 'error') return stop('write_failed')
-  if (!run || run.status !== 'running' || (expect !== null && run.stage !== expect) || run.lease_expires_at !== lease) {
+  // The lease as an instant: it is read back as `…+00:00`, written as `…Z`.
+  if (!run || run.status !== 'running' || (expect !== null && run.stage !== expect) || !sameInstant(run.lease_expires_at, lease)) {
     return { outcome: 'stopped', reason: 'not_running' }
   }
   stage = run.stage

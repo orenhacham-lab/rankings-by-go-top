@@ -12,12 +12,11 @@ import { isAdminUser } from '@/lib/auth/admin-role'
 import {
   loadSettings,
   markBusinessFieldsAsUser,
-  prepareFirstScan,
   saveSection,
   type LoadResult,
   type SettingsDeps,
 } from '@/lib/project-settings/data'
-import type { BusinessField, SaveErrorCode, SaveResult, SectionSaveInput } from '@/lib/project-settings/types'
+import type { BusinessField, SaveResult, SectionSaveInput } from '@/lib/project-settings/types'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -70,15 +69,5 @@ export async function markBusinessFieldsAction(projectId: string, fields: Busine
   } catch (err) {
     console.error('[settings] mark failed', { error: errorName(err) })
     return { ok: false, code: 'save_failed' }
-  }
-}
-
-/** Before a project's first scan: the business values it holds become the owner's. */
-export async function prepareSiteScanAction(projectId: string): Promise<{ ok: true } | { ok: false; code: SaveErrorCode }> {
-  try {
-    return await prepareFirstScan(liveDeps(), projectId)
-  } catch (err) {
-    console.error('[settings] scan preparation failed', { error: errorName(err) })
-    return { ok: false, code: 'unavailable' }
   }
 }

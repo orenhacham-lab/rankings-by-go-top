@@ -13,7 +13,8 @@
  */
 import type { BusinessInsight } from '@/lib/free-check'
 import { world } from '@/lib/seed-scan/__qa__/_fixtures'
-import { markBusinessFieldsAsUser, prepareFirstScan, saveSection } from '../data'
+import { markScanOwnedFields } from '@/lib/seed-scan/settings'
+import { markBusinessFieldsAsUser, saveSection } from '../data'
 import {
   audienceRows,
   HE_WP_INSIGHT,
@@ -25,6 +26,8 @@ import {
   projectRow,
   scan,
   scannedTables,
+  SCOPE,
+  seedAdmin,
   settingsDeps,
   type Tables,
 } from './_settings-fixtures'
@@ -131,21 +134,22 @@ async function main() {
     check('CONTROL: an empty list without the owner\'s mark is refilled by the rescan', labels(c).length === 2)
   }
 
-  console.log('\n4) the first scan of a project set up by hand, started from this screen')
+  console.log('\n4) the first scan of a project set up by hand')
   {
-    const hand = () => world(projectRow({ business_name: 'Hand Made Plumbing', country: 'GB', language: 'en', city: 'London' })).tables
-    const t = hand()
-    const prep = await prepareFirstScan(settingsDeps(t).deps, PROJECT)
+    // The seed contract keeps any value it did not write (not empty, not marked
+    // 'scan'), so a hand-set market needs no mark from this screen; a creation
+    // placeholder handed to the scan (markScanOwnedFields) is replaced.
+    const t = world(projectRow({ business_name: 'Hand Made Plumbing', country: 'GB', language: 'en', city: 'London' })).tables
     await scan(t, { trigger: 'create', at: later(1), insight: NEXT })
     const p = t.projects[0]
-    check('after prepareFirstScan, the create run keeps every value the owner had set',
-      prep.ok && p.business_name === 'Hand Made Plumbing' && p.country === 'GB' && p.language === 'en' && p.city === 'London', JSON.stringify(p))
+    check('the first (create) run keeps every value the owner had set, with no mark needed',
+      p.business_name === 'Hand Made Plumbing' && p.country === 'GB' && p.language === 'en' && p.city === 'London', JSON.stringify(p))
     check('…and still fills the profile it had nothing in', profileRow(t)?.description === 'תיאור אחר לגמרי שהסריקה השנייה כתבה.')
-
-    const c = hand()
+    const c = world(projectRow({ business_name: 'Hand Made Plumbing', country: 'IL', language: 'he' })).tables
+    await markScanOwnedFields(seedAdmin(c, NOW), SCOPE, ['country', 'language'], NOW)
     await scan(c, { trigger: 'create', at: later(1), insight: NEXT })
-    check('CONTROL: without it, the create run replaces the hand-set name and market',
-      c.projects[0].business_name === 'שם חדש מהסריקה' && c.projects[0].country === 'US', JSON.stringify(c.projects[0]))
+    check('CONTROL: placeholders handed to the scan are replaced; the owner\'s name is not',
+      c.projects[0].country === 'US' && c.projects[0].language === 'en' && c.projects[0].business_name === 'Hand Made Plumbing', JSON.stringify(c.projects[0]))
   }
 
   finish()

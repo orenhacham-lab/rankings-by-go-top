@@ -21,14 +21,18 @@
  *   5. entitled — explainAccess, unchanged: admin  403 entitlement_required
  *      first, then Shopify governance, then an      503 entitlement_unavailable
  *      active trial or subscription
- *   6. caps: a live run of this project;           409 run_in_progress
+ *   6. caps: a run of this project in progress —   409 run_in_progress
+ *      live, or its worker gone but still the
+ *      cron's to resume (MAX_RESUME_AGE_MS);
  *      a finished run less than 24h ago;          429 rescan_too_soon
  *      this user's runs today; everyone's today   429 user_daily_cap / global_daily_cap
  *   7. only now is a claim token redeemed, so no   400 claim_invalid
  *      refusal above can spend it; its site must
  *      be this project's site (never says why not)
  *   8. the run is created with its lease held, answered 202, and worked after
- *      the response (the route passes next/server's `after`).
+ *      the response (the route passes next/server's `after`). When it cannot
+ *      be created (another run won the race: 409; the database: 500), a token
+ *      step 7 spent is given back, so the visitor can claim again.
  *
  * `continue` shares steps 1-5 and has checks of its own instead of 6-8 (it
  * starts no new run): see handleSeedContinue at the end of this file.
@@ -42,14 +46,14 @@ import { normalizeCheckUrl, type ClaimOutcome } from '@/lib/free-check'
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import type { Locale } from '@/lib/i18n/locales'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { claimMatchesProject, claimSnapshot, projectSiteKey, type ClaimSnapshot } from './claim'
+import { claimMatchesProject, claimSnapshot, projectSiteKey, restoreClaimToken, type ClaimSnapshot } from './claim'
 import {
   countAllSeedRunsSince,
   countProjectSeedRuns,
   countUserSeedRunsSince,
   createSeedRun,
-  findLiveSeedRun,
   findRecentCompletedSeedRun,
+  findSeedRunInProgress,
   getLatestSeedRun,
   listSeedSteps,
   startSeedStageB,
@@ -247,9 +251,9 @@ export async function checkSeedCaps(
 ): Promise<Caps> {
   const internal: Caps = { ok: false, status: 500, code: 'internal' }
 
-  const live = await findLiveSeedRun(admin, scope, now)
-  if (live === 'error') return internal
-  if (live) return { ok: false, status: 409, code: 'run_in_progress' }
+  const inProgress = await findSeedRunInProgress(admin, scope, now)
+  if (inProgress === 'error') return internal
+  if (inProgress) return { ok: false, status: 409, code: 'run_in_progress' }
 
   const recent = await findRecentCompletedSeedRun(admin, scope, new Date(now.getTime() - RESCAN_COOLDOWN_MS))
   if (recent === 'error') return internal
@@ -308,6 +312,7 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
     const siteKey = projectSiteKey(project.target_domain)
     let trigger: SeedRunTrigger = caps.priorRuns === 0 ? 'create' : 'rescan'
     let snapshot: ClaimSnapshot | null = null
+    let spentToken: string | null = null
     if (body.action === 'claim') {
       // A project without a usable address cannot match any scan: refused
       // before the token is spent.
@@ -315,6 +320,7 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
       const claimed = await deps.consumeClaim(admin, body.token, now)
       // Malformed, unknown, spent, expired or another site's scan: one answer.
       if (!claimed.ok || !claimMatchesProject(claimed.scan, siteKey)) return refuse(400, 'claim_invalid')
+      spentToken = body.token
       snapshot = claimSnapshot(claimed.scan)
       trigger = 'claim'
     }
@@ -334,7 +340,13 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
       stepDetail: snapshot ? { a1: { claim: snapshot } } : undefined,
       now,
     })
-    if (!created.ok) return created.reason === 'in_progress' ? refuse(409, 'run_in_progress') : refuse(500, 'internal')
+    if (!created.ok) {
+      // No run took the claim: give the token back (step 8 in the header).
+      if (spentToken && !(await restoreClaimToken(admin, spentToken, now).catch(() => false))) {
+        console.warn('[seed-scan] claim not restored', { projectId: scope.projectId })
+      }
+      return created.reason === 'in_progress' ? refuse(409, 'run_in_progress') : refuse(500, 'internal')
+    }
 
     const runId = created.run.id
     const lease = created.lease

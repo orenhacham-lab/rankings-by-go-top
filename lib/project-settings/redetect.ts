@@ -65,7 +65,7 @@ import { projectSiteKey } from '@/lib/seed-scan/claim'
 import { capFromEnv } from '@/lib/seed-scan/http'
 import { profileValues, projectValues } from '@/lib/seed-scan/settings'
 import { insightFromModel, readStoredSignals, settleWithin, STAGE_A_BUDGETS, type StoredInsight } from '@/lib/seed-scan/steps'
-import { findLiveSeedRun, getLatestSeedRun } from '@/lib/seed-scan/store'
+import { findSeedRunInProgress, getLatestSeedRun } from '@/lib/seed-scan/store'
 import { readSummary } from '@/lib/seed-scan/summary'
 import {
   REDETECT_SECTIONS,
@@ -301,7 +301,7 @@ export async function handleRedetect(request: Request, projectId: string, deps: 
 
     // 6. No scan running.
     const now = deps.now()
-    const live = await findLiveSeedRun(admin, scope, now)
+    const live = await findSeedRunInProgress(admin, scope, now)
     if (live === 'error') return refuse(500, 'internal')
     if (live) return refuse(409, 'run_in_progress')
 

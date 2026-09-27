@@ -3,9 +3,12 @@
  *
  * What must hold: a run is created with all its steps pending (so a resumed
  * run is "the first step not finished"); two starts for one project agree on a
- * single winner; a stalled run is superseded, a live one is not; a lease can be
- * taken only when it is empty or lapsed, and every later write is fenced by the
- * exact lease value; nothing is readable or writable under another owner.
+ * single winner; a run the cron may still resume is in progress, and only one
+ * it gave up on is superseded; a lease can be taken only when it is empty or
+ * lapsed, and every later write is fenced by the exact lease value, compared
+ * as the instant it is (PostgREST reads it back in another form); stage B's
+ * rows survive an attempt whose answer was lost; nothing is readable or
+ * writable under another owner.
  *
  * Run: npx tsx lib/seed-scan/__qa__/seed-store.qa.ts
  */
@@ -15,23 +18,28 @@ import {
   countUserSeedRunsSince,
   createSeedRun,
   finishSeedRun,
-  findLiveSeedRun,
   findRecentCompletedSeedRun,
+  findSeedRunInProgress,
   getLatestSeedRun,
   getSeedRun,
   LEASE_MS,
+  leaseUntil,
   listSeedSteps,
+  MAX_RESUME_AGE_MS,
   nextSeedStep,
   releaseSeedLease,
   renewSeedLease,
+  sameInstant,
   seedRunStatus,
+  startSeedStageB,
   takeSeedLease,
   updateSeedStep,
   writeSeedSummary,
+  type SeedRunRow,
 } from '../store'
 import { initialSummary, readSummary, withCounters } from '../summary'
 import type { SeedStepStatus } from '../types'
-import { clock, makeChecker, NOW, OTHER_PROJECT, OTHER_USER, PROJECT, projectRow, USER, world } from './_fixtures'
+import { clock, loseNextAnswer, makeChecker, NOW, OTHER_PROJECT, OTHER_USER, postgrestTimestamp, PROJECT, projectRow, USER, world } from './_fixtures'
 
 const { check, finish } = makeChecker()
 const SCOPE = { projectId: PROJECT, userId: USER }
@@ -73,21 +81,52 @@ async function main() {
     // caps checks): the order is the database's insert order, so it yields.
     const early = await createSeedRun(admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: new Date(NOW.getTime() - 5_000) })
     check('a start that read the clock earlier but inserted later still yields', !early.ok && early.reason === 'in_progress' && tables.project_seed_runs.length === 1)
-    check('findLiveSeedRun sees it', (await findLiveSeedRun(admin, SCOPE, NOW)) === true)
+    check('findSeedRunInProgress sees it', (await findSeedRunInProgress(admin, SCOPE, NOW)) === true)
   }
+
+  console.log('\n2b) A run whose worker is gone is still in progress while the cron may resume it')
+  // The cron resumes a run whose lease is empty or lapsed for MAX_RESUME_AGE_MS
+  // after its stage began (listStalledSeedRuns). Until then it is neither live
+  // nor finished, and a new start must wait for it, not supersede it.
+  const expired = new Date(NOW.getTime() + MAX_RESUME_AGE_MS + 1)
   {
     const { tables, admin } = world(projectRow())
     await createSeedRun(admin, SCOPE, { trigger: 'create', stage: 'a', summary: summary(), now: NOW })
     const later = new Date(NOW.getTime() + LEASE_MS + 1)
-    check('once its lease lapses the run is no longer live', (await findLiveSeedRun(admin, SCOPE, later)) === false)
-    const fresh = await createSeedRun(admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: later })
-    check('a new start supersedes the stalled run', fresh.ok && tables.project_seed_runs[0].status === 'failed' && tables.project_seed_runs[0].error_code === 'superseded'
+    check('its lease lapsed: still in progress, the cron will resume it', (await findSeedRunInProgress(admin, SCOPE, later)) === true)
+    const blocked = await createSeedRun(admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: later })
+    check('…so a new start yields to it, and it stays running',
+      !blocked.ok && blocked.reason === 'in_progress' && tables.project_seed_runs.length === 1 && tables.project_seed_runs[0].status === 'running', JSON.stringify(blocked))
+    check('once the cron has given up on it (MAX_RESUME_AGE_MS), it is no longer in progress', (await findSeedRunInProgress(admin, SCOPE, expired)) === false)
+    const fresh = await createSeedRun(admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: expired })
+    check('…and a new start supersedes it', fresh.ok && tables.project_seed_runs[0].status === 'failed' && tables.project_seed_runs[0].error_code === 'superseded'
       && tables.project_seed_runs[0].lease_expires_at === null)
     const released = world(projectRow())
     const r = await createSeedRun(released.admin, SCOPE, { trigger: 'create', stage: 'a', summary: summary(), now: NOW })
     if (r.ok) await releaseSeedLease(released.admin, SCOPE, r.run.id, r.lease)
     const again = await createSeedRun(released.admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: NOW })
-    check('a run whose worker handed the lease back is superseded too', again.ok && released.tables.project_seed_runs[0].error_code === 'superseded')
+    check('a run whose worker handed the lease back is in progress too', !again.ok && again.reason === 'in_progress' && released.tables.project_seed_runs[0].status === 'running')
+    const gone = await createSeedRun(released.admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: expired })
+    check('…until the cron gives up on it: then it is superseded', gone.ok && released.tables.project_seed_runs[0].error_code === 'superseded')
+  }
+  {
+    // Stage A done; an hour later the merchant continues; the worker hands
+    // the run back between two steps (a failed write, or its time cap).
+    const { tables, admin } = world(projectRow())
+    const created = await createSeedRun(admin, SCOPE, { trigger: 'create', stage: 'a', summary: summary(), now: NOW })
+    if (!created.ok) return finish()
+    await finishSeedRun(admin, SCOPE, created.run.id, created.lease, { status: 'done', errorCode: null, now: NOW })
+    const continuedAt = new Date(NOW.getTime() + 60 * 60 * 1000)
+    const moved = await startSeedStageB(admin, SCOPE, (await getSeedRun(admin, SCOPE, created.run.id)) as SeedRunRow, continuedAt)
+    if (moved.ok) await releaseSeedLease(admin, SCOPE, created.run.id, moved.lease)
+    const next = new Date(continuedAt.getTime() + 5 * 60 * 1000)
+    check('a stage B between two workers (no lease) is in progress', moved.ok && (await findSeedRunInProgress(admin, SCOPE, next)) === true)
+    const start = await createSeedRun(admin, SCOPE, { trigger: 'rescan', stage: 'a', summary: summary(), now: next })
+    check('…and a new start does not supersede it (its keywords are chosen)',
+      !start.ok && start.reason === 'in_progress' && tables.project_seed_runs.length === 1 && tables.project_seed_runs[0].stage === 'b' && tables.project_seed_runs[0].status === 'running')
+    check('its hours count from the start of stage B, not of the run',
+      (await findSeedRunInProgress(admin, SCOPE, expired)) === true
+      && (await findSeedRunInProgress(admin, SCOPE, new Date(continuedAt.getTime() + MAX_RESUME_AGE_MS + 1))) === false)
   }
   {
     const { tables, admin } = world(projectRow(), {}, { project_seed_steps: { insert: () => ({ code: 'XX000' }) } })
@@ -182,7 +221,43 @@ async function main() {
     check("everyone's runs today", (await countAllSeedRunsSince(admin, day)) === 3)
     check("this project's runs, ever", (await countProjectSeedRuns(admin, SCOPE)) === 3)
     const recent = await findRecentCompletedSeedRun(admin, SCOPE, new Date('2026-09-26T09:00:00.000Z'))
-    check('the newest finished run since a moment — failed runs do not count', recent !== 'error' && recent?.created_at === '2026-09-27T01:00:00.000Z', JSON.stringify(recent))
+    check('the newest finished run since a moment — failed runs do not count',
+      recent !== 'error' && sameInstant(recent?.created_at, '2026-09-27T01:00:00.000Z'), JSON.stringify(recent))
+  }
+
+  console.log('\n7) The lease is an instant: PostgREST reads it back as …+00:00')
+  {
+    const { admin } = world(projectRow())
+    const created = await createSeedRun(admin, SCOPE, { trigger: 'create', stage: 'a', summary: summary(), now: NOW })
+    if (!created.ok) return finish()
+    const read = (await getSeedRun(admin, SCOPE, created.run.id)) as SeedRunRow
+    check('the fixture answers as PostgREST does: written as …Z, read back as …+00:00',
+      created.lease.endsWith('.000Z') && read.lease_expires_at === postgrestTimestamp(created.lease) && read.lease_expires_at !== created.lease, `${created.lease} → ${read.lease_expires_at}`)
+    check('sameInstant: the two forms of one lease are the same lease', sameInstant(read.lease_expires_at, created.lease))
+    check('sameInstant: a lease a millisecond later is not', !sameInstant(read.lease_expires_at, leaseUntil(NOW, LEASE_MS + 1)))
+    check('sameInstant: no lease, or no time at all, is never the same',
+      !sameInstant(null, created.lease) && !sameInstant(created.lease, undefined) && !sameInstant('', '') && !sameInstant('soon', 'soon'))
+    check('a fenced write given the value read back still matches: Postgres compares instants',
+      await writeSeedSummary(admin, SCOPE, created.run.id, read.lease_expires_at as string, summary()))
+  }
+
+  console.log("\n8) Stage B's rows: an attempt whose write landed but whose answer was lost")
+  {
+    const { tables, fake, admin } = world(projectRow())
+    const created = await createSeedRun(admin, SCOPE, { trigger: 'create', stage: 'a', summary: summary(), now: NOW })
+    if (!created.ok) return finish()
+    await finishSeedRun(admin, SCOPE, created.run.id, created.lease, { status: 'partial', errorCode: 'model_failed', now: NOW })
+    const run = (await getSeedRun(admin, SCOPE, created.run.id)) as SeedRunRow
+    const bRows = () => tables.project_seed_steps.filter((s) => String(s.step).startsWith('b'))
+    loseNextAnswer(fake, 'project_seed_steps')
+    const first = await startSeedStageB(admin, SCOPE, run, NOW)
+    const row = tables.project_seed_runs[0]
+    check('the answer is lost: db_error, and the run is handed back as stage A left it',
+      !first.ok && first.reason === 'db_error' && row.stage === 'a' && row.status === 'partial' && row.error_code === 'model_failed' && row.lease_expires_at === null, JSON.stringify(first))
+    check('…while its six rows did land', bRows().length === 6)
+    const again = await startSeedStageB(admin, SCOPE, run, new Date(NOW.getTime() + 1_000))
+    check('continuing again works: the rows already there are kept, none is added twice',
+      again.ok && bRows().length === 6 && tables.project_seed_runs[0].stage === 'b' && tables.project_seed_runs[0].status === 'running', JSON.stringify(again))
   }
 
   finish()

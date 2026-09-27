@@ -77,6 +77,12 @@ async function main() {
   check('Sitemap: lines are read out of robots.txt',
     sitemapsFromRobots('User-agent: *\nDisallow: /x/\nSitemap: https://a.co.il/sitemap_index.xml')[0] === 'https://a.co.il/sitemap_index.xml')
   check('a commented-out Sitemap line is not one', sitemapsFromRobots('# Sitemap: https://a.co.il/s.xml').length === 0)
+  const LONG_COMMENT = `${'#'.repeat(60_000)}\rx\nSitemap: https://a.co.il/s.xml`
+  const tRobots = performance.now()
+  const afterComment = sitemapsFromRobots(LONG_COMMENT)
+  const robotsMs = performance.now() - tRobots
+  check(`a 60 000-character comment line does not stall robots parsing (${robotsMs.toFixed(0)}ms)`, robotsMs < 100)
+  check('and the Sitemap line after it is still read', afterComment[0] === 'https://a.co.il/s.xml')
 
   const INDEX = `<?xml version="1.0"?><sitemapindex xmlns="x">
     <sitemap><loc>https://a.co.il/post-sitemap.xml</loc><lastmod>2026-09-01</lastmod></sitemap>
@@ -146,6 +152,69 @@ async function main() {
   check('the same-host child is still read', hostile.sitemaps.includes('https://a.co.il/page-sitemap.xml'))
   check('nothing from the off-host document reaches the entries',
     hostile.entries.every((e) => e.url.startsWith('https://a.co.il/')))
+
+  console.log('\nPARSE) one linear pass, so a hostile document cannot stall the route')
+  const NO_WRAPPER = '<urlset xmlns="x"><loc>https://a.co.il/bare</loc>'
+  const bare = await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': NO_WRAPPER }) })
+  check('a loc outside any <url> wrapper is still read',
+    bare.entries.length === 1 && bare.entries[0].url === 'https://a.co.il/bare', JSON.stringify(bare.entries))
+
+  // Without an element boundary, the lastmod of the SECOND entry would be read
+  // as the first entry's, and the index expansion orders children by it.
+  const BORROW = `<urlset xmlns="x">
+    <url><loc>https://a.co.il/first</loc></url>
+    <url><loc>https://a.co.il/second</loc><lastmod>2026-09-20</lastmod></url>
+  </urlset>`
+  const borrow = await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': BORROW }) })
+  check('a lastmod is not borrowed from the next element',
+    borrow.entries.find((e) => e.url === 'https://a.co.il/first')?.lastmod === null)
+  check('it still belongs to its own element',
+    borrow.entries.find((e) => e.url === 'https://a.co.il/second')?.lastmod === '2026-09-20')
+
+  const LONG_LOC = `<urlset xmlns="x"><url><loc>https://a.co.il/${'p'.repeat(3_000)}</loc></url><url><loc>https://a.co.il/ok</loc></url></urlset>`
+  const longLoc = await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': LONG_LOC }) })
+  check('an absurdly long loc is dropped without stopping the document',
+    longLoc.entries.length === 1 && longLoc.entries[0].url === 'https://a.co.il/ok', JSON.stringify(longLoc.entries.map((e) => e.url)))
+
+  // The bug this section exists for: a document of UNCLOSED <url> tags, at our
+  // 1.5 MB fetch cap, chosen by an anonymous visitor of the public free check.
+  const hostileDoc = (bytes: number) => {
+    let out = '<urlset xmlns="x">'
+    while (out.length < bytes) out += '<url><loc>https://a.co.il/a</loc>'
+    return out
+  }
+  const CAP = 1_500_000
+  const atCap = hostileDoc(CAP)
+  const t0 = performance.now()
+  await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': atCap }) })
+  const linearMs = performance.now() - t0
+  check(`a 1.5 MB document of unclosed tags parses in well under a second (${linearMs.toFixed(0)}ms)`,
+    linearMs < 500)
+
+  const WELL_FORMED_CAP = (() => {
+    let out = '<urlset xmlns="x">'
+    while (out.length < CAP) out += '<url><loc>https://a.co.il/a</loc><lastmod>2026-01-01</lastmod></url>'
+    return out + '</urlset>'
+  })()
+  const t1 = performance.now()
+  await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': WELL_FORMED_CAP }) })
+  const cleanMs = performance.now() - t1
+  check(`a well-formed document of the same size costs no more (${cleanMs.toFixed(0)}ms)`,
+    cleanMs < 500)
+
+  // Weakening: the lazy element regex this parser replaced. Same document, on a
+  // fifth of the input, so the control itself stays quick.
+  const SMALL = hostileDoc(CAP / 5)
+  const t2 = performance.now()
+  SMALL.match(/<(?:url|sitemap)\b[\s\S]*?<\/(?:url|sitemap)>/gi)
+  const regexMs = performance.now() - t2
+  const t3 = performance.now()
+  await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': SMALL }) })
+  const linearSmallMs = performance.now() - t3
+  check(`CONTROL: the lazy element regex is orders slower on the same input (${regexMs.toFixed(0)}ms vs ${linearSmallMs.toFixed(0)}ms at a fifth of the cap)`,
+    regexMs > Math.max(linearSmallMs * 20, 50))
+  check('CONTROL: and it is quadratic, so the full cap would be 25x that again',
+    regexMs * 25 > 1_000)
 
   console.log('\nCLAIM) one scan, one account, one time')
   const CHECK_ID = '11111111-2222-3333-4444-555555555555'

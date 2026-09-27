@@ -55,6 +55,8 @@ const ProfileCard = load('components/settings/ProfileCard.tsx').default as Compo
 const AudienceCard = load('components/settings/AudienceCard.tsx').default as ComponentType<Record<string, unknown>>
 const BusinessCard = load('components/settings/BusinessCard.tsx').default as ComponentType<Record<string, unknown>>
 const DangerZone = load('components/settings/DangerZone.tsx').default as ComponentType<Record<string, unknown>>
+const CompetitorsCard = load('components/settings/CompetitorsCard.tsx').default as ComponentType<Record<string, unknown>>
+const { LINKED_SECTIONS } = load('components/settings/anchors.ts') as { LINKED_SECTIONS: readonly string[] }
 
 function render(locale: Locale, C: ComponentType<Record<string, unknown>>, props: Record<string, unknown>): string {
   return renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: locale }, createElement(C, props)))
@@ -152,6 +154,25 @@ function main() {
       const html = render(locale, DangerZone, { project, deleteLabels: (locale === 'he' ? dashboardHe : dashboardEn).projects.deleteDialog, t })
       check('the danger zone: deactivate and delete, each behind its confirmation (closed at first)', html.includes(t.danger.deactivate) && html.includes(t.danger.delete) && !html.includes('role="dialog"'))
     }
+  }
+
+  console.log('\nthe onboarding summary\'s links: #business, #audiences, #competitors')
+  {
+    const locale = 'he' as const
+    const biz = render(locale, BusinessCard, { ...cardProps(locale, true), project, clients: [], data: settingsData(scanned, true), onSaved: () => {} })
+    const aud = render(locale, AudienceCard, { ...cardProps(locale, true), profile: scanned, audiences })
+    const comp = render(locale, CompetitorsCard, { projectId: PROJECT_ID, projectDomain: 'x.co.il', scanCompetitors: [], seedFeatures: true, onScanLink: () => {}, t: copy(locale) })
+    check('the three sections carry exactly those ids, from the first paint',
+      /<section id="business"/.test(biz) && /<section id="audiences"/.test(aud) && /<section id="competitors"/.test(comp))
+    check('…and they are the screen\'s linked sections', JSON.stringify(LINKED_SECTIONS) === JSON.stringify(['business', 'audiences', 'competitors']))
+    const page = strip(read('app/(dashboard)/settings/page.tsx'))
+    const scrolls = (src: string) =>
+      /const id = window\.location\.hash\.slice\(1\)/.test(src) &&
+      /id !== PROJECT_CONNECTION_ANCHOR && id !== SETTINGS_GSC_ANCHOR && !LINKED_SECTIONS\.includes\(id\)\)\) return/.test(src) &&
+      /document\.getElementById\(id\)\?\.scrollIntoView\(/.test(src) && /new ResizeObserver\(jump\)/.test(src)
+    check('the page scrolls to them on load, the way it scrolls to #platform and #search-console', scrolls(page))
+    check('MUT: a page that scrolls only to the connection anchors fails it',
+      !scrolls(page.replace(' && !LINKED_SECTIONS.includes(id)', '')))
   }
 
   console.log('\nthe page mounts only what it can serve (source)')

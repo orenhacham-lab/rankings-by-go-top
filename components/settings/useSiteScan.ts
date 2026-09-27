@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { prepareSiteScanAction } from '@/app/(dashboard)/settings/actions'
 import type { Locale } from '@/lib/i18n/locales'
 import type { RescanView } from '@/lib/project-settings/types'
 import { rescanNotice, retryAfterFrom, type RescanNotice } from '@/lib/project-settings/view'
@@ -30,10 +29,6 @@ async function readRun(projectId: string): Promise<RunRead> {
  * until it ends and reload what it filled. Every answer of the route becomes
  * ONE notice (lib/project-settings/view.ts rescanNotice); nothing the route or
  * a provider said is shown.
- *
- * Before a project's FIRST scan, the business values it already holds are made
- * the owner's (prepareSiteScanAction), so the scan fills what is missing and
- * never replaces the market the project already tracks.
  *
  * A run that was already going when the screen opened (from onboarding, or
  * another tab) is followed the same way.
@@ -124,21 +119,6 @@ export function useSiteScan({
     setNotice(null)
     setEndSeen(false)
 
-    if (rescan?.latest === null) {
-      let prepared: Awaited<ReturnType<typeof prepareSiteScanAction>>
-      try {
-        prepared = await prepareSiteScanAction(projectId)
-      } catch {
-        prepared = { ok: false, code: 'unavailable' }
-      }
-      if (mine !== generation.current) return
-      if (!prepared.ok) {
-        setNotice(prepared.code === 'unauthorized' ? { kind: 'signed_out' } : { kind: 'failed' })
-        setPhase('idle')
-        return
-      }
-    }
-
     let status = 0
     let code: unknown = null
     let retryAfter: number | null = null
@@ -164,7 +144,7 @@ export function useSiteScan({
     } else {
       setPhase('idle')
     }
-  }, [enabled, phase, rescan?.latest, projectId, locale, follow])
+  }, [enabled, phase, projectId, locale, follow])
 
   const dismiss = useCallback(() => setNotice(null), [])
   // A run is going: the one this screen started, or one that was going when it opened.

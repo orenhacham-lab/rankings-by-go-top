@@ -23,11 +23,7 @@
  *   - the audience list, once the owner saves it, is theirs as a whole
  *     (field_sources.audiences = 'user'): the scan keeps a list the owner
  *     shaped, a deletion or an emptied list included. A row keeps 'scan' until
- *     its own label is edited, so its chip stays true about where it came from;
- *   - before a project's FIRST scan starts from this screen, the business
- *     values it already holds become the owner's (prepareFirstScan): a first
- *     scan is a 'create', which may otherwise replace any value not marked
- *     'user', and on a project created by hand those values are the owner's.
+ *     its own label is edited, so its chip stays true about where it came from.
  *
  * CONCURRENCY. The scan may write while the owner saves. The profile is written
  * with a compare-and-set on `updated_at`, the guard the scan uses too, so of
@@ -54,7 +50,6 @@ import {
   type ProfileView,
   type Readable,
   type RescanView,
-  type SaveErrorCode,
   type SaveResult,
   type SettingsData,
 } from './types'
@@ -515,39 +510,4 @@ export async function markBusinessFieldsAsUser(deps: SettingsDeps, projectId: un
   const marks = Object.fromEntries(list.map((f) => [f, 'user' as const]))
   if ((await writeProfile(o.db, o.scope, {}, marks, deps.now())) === 'error') return { ok: false, code: 'save_failed' }
   return { ok: true, data: await readSettingsData(deps, o) }
-}
-
-const hasValue = (v: unknown) => typeof v === 'string' && v.trim() !== ''
-
-/**
- * Before the FIRST scan of a project starts from this screen. That run is a
- * 'create', which writes every business field not marked 'user', even one that
- * holds a value (lib/seed-scan/settings.ts); on a project the owner set up by
- * hand, those values are theirs, and a scan must not replace a market the
- * keyword tracking already runs in. So every business field with a value and
- * no mark becomes 'user' first. A project that has been scanned before needs
- * nothing: its next run is a 'rescan', which only fills empty fields.
- *
- * `ok: true` means the scan may start. Anything else means it must not.
- */
-export async function prepareFirstScan(deps: SettingsDeps, projectId: unknown): Promise<{ ok: true } | { ok: false; code: SaveErrorCode }> {
-  const o = await owner(deps, projectId)
-  if (!o.ok) return { ok: false, code: o.code }
-  const runs = await o.db
-    .from('project_seed_runs')
-    .select('id')
-    .eq('project_id', o.scope.projectId)
-    .eq('user_id', o.scope.userId)
-    .limit(1)
-  if (runs.error) return { ok: false, code: 'unavailable' }
-  if (((runs.data as unknown[] | null)?.length ?? 0) > 0) return { ok: true }
-
-  const row = await readProfileRow(o.db, o.scope)
-  if (row === 'error') return { ok: false, code: 'unavailable' }
-  const sources = cleanSources(row?.field_sources)
-  const fields = BUSINESS_FIELDS.filter((f) => !sources[f] && hasValue(o.project[f]))
-  if (fields.length === 0) return { ok: true }
-  const marks = Object.fromEntries(fields.map((f) => [f, 'user' as const]))
-  if ((await writeProfile(o.db, o.scope, {}, marks, deps.now())) === 'error') return { ok: false, code: 'save_failed' }
-  return { ok: true }
 }

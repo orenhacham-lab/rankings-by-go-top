@@ -21,9 +21,16 @@
  * competitors are the two shown, and there are no links. a4 makes up for the
  * competitors by adding what the search results show. Either way the claim
  * path fetches nothing and asks no model.
+ *
+ * A SPENT TOKEN THAT SEEDED NOTHING. The route redeems the token only after
+ * every check it makes before creating the run (so no refusal of theirs spends
+ * it), but creating the run comes after, and can still fail: another run of the
+ * project won the race, or the database answered with an error. Then
+ * restoreClaimToken gives the token back, so the visitor can claim again.
  */
 import {
   domainKey,
+  hashClaimToken,
   MAX_INTERNAL_LINK_URLS,
   normalizeCheckUrl,
   type ClaimedScan,
@@ -32,6 +39,7 @@ import {
   type GeoSignal,
 } from '@/lib/free-check'
 import type { Locale } from '@/lib/i18n/locales'
+import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import type { SeedBusiness } from './types'
 
 /** Exactly what a1-a3 (and b1) need from the claimed row, validated. Stored on step a1. */
@@ -231,4 +239,20 @@ export function readClaimSnapshot(detail: Record<string, unknown> | null | undef
     basis: r.basis === 'seed' ? 'seed' : 'teaser',
     internalLinkUrls: siteLinks(r.internalLinkUrls, r.domain),
   }
+}
+
+/**
+ * Give back a token this request redeemed at `consumedAt` and then could not
+ * use (its run was never created). Conditional on the very consumption this
+ * request made: the row's consumed_at must still be that instant, so it never
+ * revives a token some other redemption spent. true when it is claimable again.
+ */
+export async function restoreClaimToken(admin: ServiceRoleClient, token: string, consumedAt: Date): Promise<boolean> {
+  const { data, error } = await admin
+    .from('free_site_check_claims')
+    .update({ consumed_at: null })
+    .eq('token_hash', hashClaimToken(token))
+    .eq('consumed_at', consumedAt.toISOString())
+    .select('check_id')
+  return !error && ((data as unknown[] | null)?.length ?? 0) === 1
 }

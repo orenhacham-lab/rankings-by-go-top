@@ -1,22 +1,30 @@
 /**
  * What the scan may write into a project's settings, and what it may not.
  *
- * THE CONTRACT with the settings screen: every field the scan fills is marked
- * 'scan' in project_profiles.field_sources; an edit by the owner marks it
- * 'user'; and the scan never overwrites a 'user' field — not on a rescan, not
- * ever. Concretely:
+ * THE CONTRACT with the settings screen, as the migration states it on
+ * project_profiles.field_sources: the pipeline fills only fields that are
+ * empty or marked 'scan' (and marks what it wrote 'scan'); an edit by the
+ * owner marks the field 'user'. So the scan never overwrites a value it did
+ * not write: not the owner's, and not one the project already had before it
+ * was ever scanned (a project's country, language and business name drive its
+ * live rank checks) — on the first scan as on every rescan. Concretely:
  *
  *   project_profiles  description, commerce_type, niche, is_local,
- *                     detected_platform — written when the field is not marked
- *                     'user' and the scan has a value for it; then marked 'scan'.
+ *                     detected_platform — written when the field is empty or
+ *                     marked 'scan' and the scan has a value for it; then
+ *                     marked 'scan'.
  *   project_audiences if ANY audience came from the owner, or the owner saved
  *                     the list (field_sources.audiences = 'user'), all are left
  *                     alone; otherwise the scan's own rows are replaced by up to
  *                     five new ones. An empty answer replaces nothing.
- *   projects          business_name, country, language, city — written when not
- *                     marked 'user' AND (the column is empty OR this is the first
- *                     seed right after creation: trigger create or claim), then
- *                     marked 'scan'. Nothing else on the project is touched.
+ *   projects          business_name, country, language, city — the same rule
+ *                     as the profile, column by column. Nothing else on the
+ *                     project is touched.
+ *
+ * A PLACEHOLDER is not a value anyone chose: the create route puts IL and he
+ * into a project created without a country or language. The flow that sets
+ * one marks it 'scan' right away with markScanOwnedFields, and the first scan
+ * then replaces it like any field of its own.
  *   ai_visibility_competitors
  *                     validated competitors are ADDED, as the competitors route
  *                     adds them, within its three-active cap. Existing rows —
@@ -34,7 +42,7 @@
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import type { SeedFieldSource } from '@/lib/supabase/types'
-import type { SeedBusiness, SeedRunTrigger, SeedScope } from './types'
+import type { SeedBusiness, SeedScope } from './types'
 
 /** The project columns a2 may fill, and the shape of the row it reads. */
 export type SeedProject = {
@@ -53,6 +61,8 @@ const PROFILE_FIELDS = ['description', 'commerce_type', 'niche', 'is_local', 'de
 type ProfileField = (typeof PROFILE_FIELDS)[number]
 const PROJECT_FIELDS = ['business_name', 'country', 'language', 'city'] as const
 type ProjectField = (typeof PROJECT_FIELDS)[number]
+/** A project column the scan may fill (and a creation flow may hand to it). */
+export type SeedProjectField = ProjectField
 
 /** Mirrors MAX_ACTIVE_COMPETITORS in app/api/projects/[id]/ai-visibility/competitors/route.ts. */
 export const MAX_ACTIVE_COMPETITORS = 3
@@ -71,7 +81,7 @@ type ProfileRow = {
 }
 
 export type SettingsReport = {
-  profile: { written: ProfileField[]; keptUser: ProfileField[] }
+  profile: { written: ProfileField[]; keptUser: ProfileField[]; keptValue: ProfileField[] }
   project: { written: ProjectField[]; keptUser: ProjectField[]; keptValue: ProjectField[] }
   audiences: 'replaced' | 'kept_user' | 'none'
 }
@@ -79,6 +89,13 @@ export type SettingsReport = {
 export type ApplyResult = { ok: true; report: SettingsReport; project: SeedProject } | { ok: false }
 
 const isEmpty = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '')
+
+/** The contract's rule for one field: the owner's stays; a value the scan did not write stays; else the scan's. */
+function ruling(source: SeedFieldSource | undefined, current: unknown): 'keptUser' | 'keptValue' | 'fill' {
+  if (source === 'user') return 'keptUser'
+  if (source !== 'scan' && !isEmpty(current)) return 'keptValue'
+  return 'fill'
+}
 
 /** The primary language subtag of `lang`, as the project's language column holds it ('he', 'en'). */
 export function projectLanguageFrom(lang: string | null): string | null {
@@ -173,12 +190,11 @@ async function applyProjectColumns(
 export async function applyBusinessToSettings(
   admin: ServiceRoleClient,
   scope: SeedScope,
-  input: { trigger: SeedRunTrigger; project: SeedProject; business: SeedBusiness; audiences: string[]; now: Date },
+  input: { project: SeedProject; business: SeedBusiness; audiences: string[]; now: Date },
 ): Promise<ApplyResult> {
   // The project must be the one the scope names, as read for its owner.
   if (input.project.id !== scope.projectId || input.project.user_id !== scope.userId) return { ok: false }
   const nowIso = input.now.toISOString()
-  const firstSeed = input.trigger === 'create' || input.trigger === 'claim'
   const scanProfile = profileValues(input.business)
   const scanProject = projectValues(input.business)
   let project = input.project
@@ -191,7 +207,7 @@ export async function applyBusinessToSettings(
     // Project columns first, so their 'scan' marks below are only for values
     // that actually landed.
     const report: SettingsReport = {
-      profile: { written: [], keptUser: [] },
+      profile: { written: [], keptUser: [], keptValue: [] },
       project: { written: [], keptUser: [], keptValue: [] },
       audiences: 'none',
     }
@@ -199,8 +215,8 @@ export async function applyBusinessToSettings(
     for (const f of PROJECT_FIELDS) {
       const value = scanProject[f]
       if (value === null) continue
-      if (sources[f] === 'user') { report.project.keptUser.push(f); continue }
-      if (!isEmpty(project[f]) && !firstSeed) { report.project.keptValue.push(f); continue }
+      const rule = ruling(sources[f], project[f])
+      if (rule !== 'fill') { report.project[rule].push(f); continue }
       wanted[f] = value
     }
     const columns = await applyProjectColumns(admin, scope, project, wanted)
@@ -213,7 +229,8 @@ export async function applyBusinessToSettings(
     for (const f of PROFILE_FIELDS) {
       const value = scanProfile[f]
       if (value === null) continue
-      if (sources[f] === 'user') { report.profile.keptUser.push(f); continue }
+      const rule = ruling(sources[f], profile?.[f])
+      if (rule !== 'fill') { report.profile[rule].push(f); continue }
       profilePatch[f] = value
       sources[f] = 'scan'
       report.profile.written.push(f)
@@ -254,6 +271,64 @@ export async function applyBusinessToSettings(
     return { ok: true, report, project }
   }
   return { ok: false }
+}
+
+/**
+ * Hand project columns a creation flow filled with a placeholder to the scan:
+ * mark them 'scan' in field_sources, so the first scan replaces them (the rule
+ * above fills a field marked 'scan'). The create route calls it for the
+ * country and language it defaults. A field that already has a source keeps
+ * it: one marked 'user' stays the owner's. true when every field asked for now
+ * has a source; false when the project is not the scope's or the write failed
+ * (the placeholder then simply stays, as an unmarked value would).
+ */
+export async function markScanOwnedFields(
+  admin: ServiceRoleClient,
+  scope: SeedScope,
+  fields: readonly SeedProjectField[],
+  now: Date = new Date(),
+): Promise<boolean> {
+  const asked = PROJECT_FIELDS.filter((f) => fields.includes(f))
+  if (asked.length === 0) return true
+  // The project must be the scope's own, as read for its owner.
+  const project = await readSeedProject(admin, scope)
+  if (project === 'error' || !project) return false
+  const nowIso = now.toISOString()
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const profile = await readProfile(admin, scope)
+    if (profile === 'error') return false
+    const sources: Record<string, SeedFieldSource> = { ...(profile?.field_sources ?? {}) }
+    const unmarked = asked.filter((f) => sources[f] === undefined)
+    if (unmarked.length === 0) return true
+    for (const f of unmarked) sources[f] = 'scan'
+
+    if (!profile) {
+      const { error } = await admin.from('project_profiles').insert({
+        project_id: scope.projectId,
+        user_id: scope.userId,
+        field_sources: sources,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      // 23505: a profile appeared since the read. Re-read and merge.
+      if (error) { if (error.code === '23505') continue; return false }
+      return true
+    }
+    const { data, error } = await admin
+      .from('project_profiles')
+      .update({ field_sources: sources, updated_at: nowIso })
+      .eq('project_id', scope.projectId)
+      .eq('user_id', scope.userId)
+      .eq('updated_at', profile.updated_at)
+      .select('project_id')
+    if (error) return false
+    // Zero rows: the profile changed since the read. Re-read, so a field just
+    // marked 'user' keeps that mark.
+    if (((data as unknown[] | null)?.length ?? 0) === 0) continue
+    return true
+  }
+  return false
 }
 
 /** Trimmed, de-duplicated labels the audiences table accepts (1-300 characters). */
@@ -312,7 +387,11 @@ async function replaceScanAudiences(
 export function competitorDomainKey(raw: string | null | undefined): string | null {
   const trimmed = (raw ?? '').trim().toLowerCase()
   if (!trimmed) return null
-  return trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '') || null
+  const host = trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '')
+  // Cut at the first '/' by index: a `/\/.*$/` backtracks quadratically on a
+  // run of slashes followed by a line separator.
+  const slash = host.indexOf('/')
+  return (slash >= 0 ? host.slice(0, slash) : host) || null
 }
 
 export type CompetitorInsertReport = { inserted: string[]; alreadyListed: string[]; overCap: string[] }

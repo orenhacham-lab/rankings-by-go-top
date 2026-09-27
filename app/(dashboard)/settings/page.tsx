@@ -37,7 +37,7 @@ import ProfileCard from '@/components/settings/ProfileCard'
 import ScanBand from '@/components/settings/ScanBand'
 import SettingsIndex from '@/components/settings/SettingsIndex'
 import SettingsSkeleton from '@/components/settings/SettingsSkeleton'
-import { SECTION, scrollToSection } from '@/components/settings/anchors'
+import { LINKED_SECTIONS, SECTION, scrollToSection } from '@/components/settings/anchors'
 import { useClock } from '@/components/settings/useDraft'
 import { useProjectSettings } from '@/components/settings/useProjectSettings'
 import { useSiteScan } from '@/components/settings/useSiteScan'
@@ -102,7 +102,8 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
     void startScan()
   }, [startScan])
 
-  // Links from elsewhere open a section of this screen (#platform, #search-console).
+  // Links from elsewhere open a section of this screen (#platform, #search-console,
+  // and the onboarding summary's #business, #audiences, #competitors).
   // The sections exist only once the project and its settings have loaded, after
   // the browser's own jump to the anchor, so the jump happens here. The panels
   // then finish loading and grow, which moves the section, so the jump follows the
@@ -112,7 +113,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
     if (!ready) return
     const id = window.location.hash.slice(1)
     const root = rootRef.current
-    if (!root || (id !== PROJECT_CONNECTION_ANCHOR && id !== SETTINGS_GSC_ANCHOR)) return
+    if (!root || (id !== PROJECT_CONNECTION_ANCHOR && id !== SETTINGS_GSC_ANCHOR && !LINKED_SECTIONS.includes(id))) return
     const jump = () => document.getElementById(id)?.scrollIntoView({ block: 'start' })
     const follow = new ResizeObserver(jump)
     const userEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const

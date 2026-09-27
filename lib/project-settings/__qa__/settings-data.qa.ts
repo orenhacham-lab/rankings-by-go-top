@@ -22,7 +22,7 @@ import { checkSeedCaps, RESCAN_COOLDOWN_MS } from '@/lib/seed-scan/http'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { world } from '@/lib/seed-scan/__qa__/_fixtures'
-import { loadSettings, markBusinessFieldsAsUser, prepareFirstScan, saveSection } from '../data'
+import { loadSettings, markBusinessFieldsAsUser, saveSection } from '../data'
 import type { SettingsData } from '../types'
 import {
   audienceRows,
@@ -296,7 +296,7 @@ async function main() {
   }
 
   // ── 6. The business card's marks, and the first scan ───────────────────────
-  console.log('\n6) the business card marks what changed; a first scan keeps a hand-made project\'s values')
+  console.log('\n6) the business card marks what changed')
   {
     const t = structuredClone(base)
     const r = seen(await markBusinessFieldsAsUser(settingsDeps(t).deps, PROJECT, ['business_name', 'business_name']))
@@ -309,21 +309,9 @@ async function main() {
     check('only business fields may be marked (not profile fields, not an empty list)', all)
   }
   {
-    const { tables } = world(projectRow({ business_name: 'Hand Made Plumbing', country: 'US', language: 'en', city: null }))
-    const r = await prepareFirstScan(settingsDeps(tables).deps, PROJECT)
-    const s = sources(tables)
-    check('before a first scan: the business values the owner set become user, an empty one does not',
-      r.ok && s.business_name === 'user' && s.country === 'user' && s.language === 'user' && s.city === undefined, JSON.stringify(s))
-    const again = structuredClone(base)
-    const before = JSON.stringify(again.project_profiles)
-    const r2 = await prepareFirstScan(settingsDeps(again).deps, PROJECT)
-    check('a project scanned before needs nothing (its next run is a rescan)', r2.ok && JSON.stringify(again.project_profiles) === before)
-    const { tables: t3 } = world(projectRow({ business_name: 'X' }))
-    const r3 = seen(await prepareFirstScan(settingsDeps(t3, { hooks: { project_seed_runs: { select: fail } } }).deps, PROJECT))
-    check('the runs unreadable: the scan must not start (unavailable), nothing written', !r3.ok && r3.code === 'unavailable' && t3.project_profiles.length === 0)
-    const { tables: t4 } = world(projectRow({ user_id: OTHER_USER, business_name: 'X' }))
-    const r4 = seen(await prepareFirstScan(settingsDeps(t4).deps, PROJECT))
-    check("someone else's project: not_found, nothing written", !r4.ok && r4.code === 'not_found' && t4.project_profiles.length === 0)
+    const { tables } = world(projectRow({ user_id: OTHER_USER, business_name: 'X' }))
+    const r = seen(await markBusinessFieldsAsUser(settingsDeps(tables).deps, PROJECT, ['business_name']))
+    check("marking someone else's project: not_found, nothing written", !r.ok && r.code === 'not_found' && tables.project_profiles.length === 0)
   }
 
   check('SECRET_PROVIDER_TEXT never reached a result', !allResults.includes(SECRET))

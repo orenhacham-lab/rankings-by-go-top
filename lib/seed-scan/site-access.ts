@@ -25,6 +25,12 @@
  *
  * The hop record is what lets a1 recognise a password-locked Shopify store even
  * when the password page itself answers 401 and the engine returns no HTML.
+ *
+ * WHOLE OR NOT. The engine hands back whatever text arrived when a body read
+ * breaks off (a deadline, a dropped connection), with nothing to say so. For
+ * robots.txt that difference decides everything (a cut file's missing half may
+ * be its Disallow lines), so a caller can pass `body`, and learns whether the
+ * body of the last response was read to its very end.
  */
 import { detectPlatform, domainKey } from '@/lib/free-check'
 
@@ -82,8 +88,14 @@ export function hostPinnedFetch(args: {
   offHost: { hit: boolean }
   allow?: (url: URL) => boolean
   disallowed?: { hit: boolean }
+  /** Set to whether the body of the latest response was read to its end: not cut, not broken off. */
+  body?: { complete: boolean }
 }): typeof fetch {
+  let hops = 0
   return async (input, init) => {
+    // A new request: nothing of it is known to be whole yet.
+    const hop = ++hops
+    if (args.body) args.body.complete = false
     const url = requestUrl(input)
     if (!url || domainKey(url) !== args.siteKey) {
       args.offHost.hit = true
@@ -96,6 +108,32 @@ export function hostPinnedFetch(args: {
     const signal = init?.signal ? AbortSignal.any([init.signal, args.deadline]) : args.deadline
     const res = await args.base(url.toString(), { ...init, signal })
     args.trace.push({ url: url.toString(), status: res.status, shopify: shopifyHeaders(res.headers) })
+    return args.body ? watchedBody(res, args.body, hop, () => hops) : res
+  }
+}
+
+/**
+ * The response with its body passed through a stream that marks `watch`
+ * complete only when the body ends normally — never when it errors (an abort,
+ * a dropped connection) or is cancelled (the engine's size cap) — and only for
+ * the latest hop, so a redirect's unread body never counts.
+ */
+function watchedBody(res: Response, watch: { complete: boolean }, hop: number, latest: () => number): Response {
+  if (!res.body) {
+    if (hop === latest()) watch.complete = true
+    return res
+  }
+  try {
+    const piped = res.body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        flush() {
+          if (hop === latest()) watch.complete = true
+        },
+      }),
+    )
+    return new Response(piped, { status: res.status, statusText: res.statusText, headers: res.headers })
+  } catch {
+    // Not a response we can re-wrap: its body is never known to be whole.
     return res
   }
 }

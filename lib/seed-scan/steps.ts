@@ -53,6 +53,7 @@ import {
 } from '@/lib/free-check'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { claimMatchesProject, cleanList, readClaimSnapshot, toSeedBusiness } from './claim'
+import { robotsAnswer } from './crawl'
 import { createSerperSearch, isDomainMatch, isNonCompetitor, type SearchFn, type SearchOutcome } from './serper'
 import {
   addValidatedCompetitors,
@@ -389,16 +390,22 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
     return fail('site_unreachable')
   }
 
-  // robots.txt and llms.txt: companions, not prerequisites. A failure reads as
-  // "absent", which is what a crawler would conclude.
+  // robots.txt and llms.txt: companions, not prerequisites, read together.
   const origin = new URL(new URL(fetched.url).origin)
   const companionClock = deadline(deps.budgets.companionMs)
+  const robotsBody = { complete: false }
+  const robotsFetch = hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: companionClock.signal, trace: [], offHost: { hit: false }, body: robotsBody })
   const companionFetch = hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: companionClock.signal, trace: [], offHost: { hit: false } })
-  const companion = (path: string) =>
-    settleWithin(() => deps.fetchText(new URL(path, origin), { fetchImpl: companionFetch }), deps.budgets.companionMs + GRACE_MS)
-  const [robots, llms] = await Promise.all([companion('/robots.txt'), companion('/llms.txt')])
+  const within = <T>(read: () => Promise<T>) => settleWithin(read, deps.budgets.companionMs + GRACE_MS)
+  const [robots, llms] = await Promise.all([
+    within(() => deps.fetchText(new URL('/robots.txt', origin), { fetchImpl: robotsFetch })),
+    within(() => deps.fetchText(new URL('/llms.txt', origin), { fetchImpl: companionFetch })),
+  ])
   companionClock.clear()
-  const robotsTxt = robots.kind === 'value' && robots.value.ok && robots.value.status === 200 ? robots.value.text : null
+  // Rules only from a file read whole; a cut one is unreadable (crawl.ts).
+  const robotsRead = robotsAnswer(robots.kind === 'value' && robots.value.ok ? robots.value : null, robotsBody.complete)
+  // Unreadable reads as "no rules" here, as before: a1 reads only the page the owner asked for. b1 crawls, so it does not.
+  const robotsTxt = robotsRead.state === 'rules' ? robotsRead.text : null
   const llmsTxt = llms.kind === 'value' && llms.value.ok && llms.value.status === 200 && llms.value.text.trim().length > 0
 
   const signals = deps.extractSignals(fetched.html, fetched.url, { robotsTxt, llmsTxt })
@@ -434,6 +441,8 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
       mode: 'live',
       storefrontLocked: false,
       htmlTruncated: fetched.truncated,
+      // What b1 may take from here: the rules (signals.robotsTxt), or that there are none.
+      robots: robotsRead.state,
       signals: storedSignals(signals),
       sitemap: {
         count: sitemapUrlCount,
@@ -535,7 +544,6 @@ async function applyInsight(ctx: StepContext, insight: StoredInsight, detail: Re
     competitors: suggestedCompetitors(insight.competitors, ctx.summary.domain),
   })
   const applied = await applyBusinessToSettings(ctx.admin, ctx.scope, {
-    trigger: ctx.trigger,
     project: ctx.project,
     business: insight.business,
     audiences: insight.audiences,
