@@ -18,11 +18,8 @@
  *   3. the seeding scan is on for them               404 not_found
  *      (ENABLE_SEED_SCAN=true, or an administrator)
  *   4. a well-formed body                            400 invalid_request
- *      { locale?: 'he' | 'en', fromUrl?: boolean }
- *   5. a project the new-project flow just created from its address
- *      (fromUrl, no run yet) has its placeholders marked "scan"
- *      (lib/onboarding/scan-owned.ts)
- *   6. the claim cookie, when there is one, is looked up WITHOUT being spent:
+ *      { locale?: 'he' | 'en' }
+ *   5. the claim cookie, when there is one, is looked up WITHOUT being spent:
  *        usable and this project's site  → seed POST { action: 'claim' }
  *          202          → the cookie is cleared (the token is spent)
  *          claim_invalid → the cookie is cleared, and a plain scan starts
@@ -40,12 +37,10 @@ import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import type { Locale } from '@/lib/i18n/locales'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { claimMatchesProject, projectSiteKey } from '@/lib/seed-scan/claim'
-import { countProjectSeedRuns } from '@/lib/seed-scan/store'
 import type { SeedApiErrorCode, SeedScope } from '@/lib/seed-scan/types'
 import { seedScanAvailable } from './availability'
 import { claimCookieFromHeader, clearedClaimCookie, requestIsHttps } from './claim-cookie'
 import type { ClaimPeek } from './claim-peek'
-import { markUrlProjectPlaceholders } from './scan-owned'
 
 export type OnboardingStartDeps = {
   session: () => Promise<{ userId: string | null; db: SupabaseClient }>
@@ -67,7 +62,7 @@ function refuse(status: number, code: SeedApiErrorCode, extraHeaders: Record<str
   return Response.json({ ok: false, code }, { status, headers: { ...NO_STORE, ...extraHeaders } })
 }
 
-type StartBody = { locale: Locale | null; fromUrl: boolean }
+type StartBody = { locale: Locale | null }
 
 async function readBody(request: Request): Promise<StartBody | null> {
   let text: string
@@ -77,7 +72,7 @@ async function readBody(request: Request): Promise<StartBody | null> {
     return null
   }
   if (text.length > MAX_BODY_CHARS) return null
-  if (text.trim() === '') return { locale: null, fromUrl: false }
+  if (text.trim() === '') return { locale: null }
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -88,8 +83,7 @@ async function readBody(request: Request): Promise<StartBody | null> {
   const r = raw as Record<string, unknown>
   const locale = r.locale === undefined ? null : normalizeLocale(r.locale)
   if (r.locale !== undefined && !locale) return null
-  if (r.fromUrl !== undefined && typeof r.fromUrl !== 'boolean') return null
-  return { locale, fromUrl: r.fromUrl === true }
+  return { locale }
 }
 
 type OwnProject = {
@@ -156,16 +150,6 @@ export async function handleOnboardingStart(request: Request, projectId: string,
     const locale = body.locale ? { locale: body.locale } : {}
     const scope: SeedScope = { projectId: project.id, userId }
     const now = deps.now()
-
-    // A project the new-project flow created a moment ago from its address
-    // alone: the placeholders the create path wrote are the scan's to replace.
-    if (body.fromUrl) {
-      const runs = await countProjectSeedRuns(admin(), scope)
-      if (runs === 0) {
-        const marked = await markUrlProjectPlaceholders(admin(), scope, project, now)
-        if (!marked) console.warn('[onboarding] placeholders not marked', { projectId: scope.projectId })
-      }
-    }
 
     const secure = requestIsHttps(request.headers, request.url)
     const cookie = claimCookieFromHeader(request.headers.get('cookie'))

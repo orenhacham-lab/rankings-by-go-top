@@ -8,12 +8,6 @@
  * shows that notice with its one action and then removes both from the
  * address. Only a known key is read and only a positive whole wait, so the
  * address can select one of our own sentences and nothing else.
- *
- * A handed-over notice also tells the screen the project was created from its
- * address a moment ago, so its "Scan the site" asks the start route to mark
- * the create route's placeholders as the scan's to fill (see
- * lib/onboarding/scan-owned.ts); the route checks for itself that the project
- * has never been scanned and still holds exactly those placeholders.
  */
 import { summaryHref } from './links'
 import type { Notice, NoticeAction, NoticeKey } from './notices'

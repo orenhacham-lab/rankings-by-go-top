@@ -113,7 +113,7 @@ export default function NewProjectFlow({
       const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/onboarding/start`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ locale: language, fromUrl: true }),
+        body: JSON.stringify({ locale: language }),
       })
       const body = await res.json().catch(() => null)
       if (!(res.status === 202 && body?.ok === true)) refusal = startNotice(res.status, body)

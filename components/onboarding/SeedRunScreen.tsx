@@ -50,9 +50,6 @@ export default function SeedRunScreen({
   const { run, readError, reconnecting, awaitingStart, refresh, expectNewRun } = useSeedRun(projectId, initialRun)
   const [startRefusal, setStartRefusal] = useState<Notice | null>(initialNotice)
   const [starting, setStarting] = useState(false)
-  // A handed-over notice means this project was created from its address a moment
-  // ago and never scanned: a scan started here still marks its placeholders.
-  const [createdFromUrl] = useState(initialNotice !== null)
 
   // ── The address and the workspace switcher ──
   const urlProjectId = searchParams.get('projectId')
@@ -78,7 +75,7 @@ export default function SeedRunScreen({
       const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/onboarding/start`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(createdFromUrl ? { locale: language, fromUrl: true } : { locale: language }),
+        body: JSON.stringify({ locale: language }),
       })
       const body = await res.json().catch(() => null)
       if (res.status === 202 && body?.ok === true) {

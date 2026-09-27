@@ -141,3 +141,24 @@ export async function resolveSummarySurface(
     serverNow: deps.now.toISOString(),
   }
 }
+
+/**
+ * Whether /projects/[id]/summary exists for this request. It is decided in the
+ * route's own layout, above the dashboard shell and its Suspense boundary, so
+ * "not found" is a real 404 and not a 404 page streamed with a 200.
+ *
+ *   signed out        render: the dashboard shell sends them to sign in
+ *   no surface        not_found: not their project, or the scan is off for them
+ *   an outage         render: the page says so itself, with a refresh
+ */
+export type SummaryGate = 'render' | 'not_found'
+
+export async function decideSummaryGate(signedIn: boolean, load: () => Promise<SummarySurface | null>): Promise<SummaryGate> {
+  if (!signedIn) return 'render'
+  try {
+    return (await load()) ? 'render' : 'not_found'
+  } catch (err) {
+    if (err instanceof SurfaceUnavailableError) return 'render'
+    throw err
+  }
+}
