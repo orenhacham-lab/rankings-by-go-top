@@ -37,13 +37,13 @@ export function LinkButton({ href, children, variant = 'primary', size = 'md', c
 /** The one link a widget's header may carry ("View all", "Manage competitors"). */
 export function HeaderLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="shrink-0 rounded-control text-copy font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+    <Link href={href} className="shrink-0 rounded-pill px-2.5 py-1 text-caption font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
       {children}
     </Link>
   )
 }
 
-export function Widget({ id, title, subtitle, icon, action, state, className, children }: {
+export function Widget({ id, title, subtitle, icon, action, state, tone = 'default', className, children }: {
   /** Stable name, also the data attribute a journey or a screenshot looks for. */
   id: string
   title: string
@@ -52,24 +52,41 @@ export function Widget({ id, title, subtitle, icon, action, state, className, ch
   action?: ReactNode
   /** What the widget is showing: ready, empty, error, loading, or a state of its own. */
   state: string
+  /** `attention`: a warm tint for the one widget that lists what needs fixing, so it is not one more white card. */
+  tone?: 'default' | 'attention'
   className?: string
   children: ReactNode
 }) {
   const titleId = `dashboard-${id}-title`
+  const attention = tone === 'attention'
   return (
     <section
       aria-labelledby={titleId}
       data-dashboard-widget={id}
       data-state={state}
-      className={cn('min-w-0 rounded-card border border-line bg-surface shadow-card', className)}
+      className={cn(
+        'min-w-0 overflow-hidden rounded-card border shadow-card',
+        attention ? 'border-warn/25 bg-warn-soft/60' : 'border-line bg-surface',
+        className,
+      )}
     >
       <header className="flex items-start justify-between gap-3 px-5 pt-5">
-        <div className="min-w-0">
-          <h2 id={titleId} className="flex items-center gap-2 text-section font-semibold text-ink">
-            {icon && <span className="shrink-0 text-muted" aria-hidden="true">{icon}</span>}
-            <span className="min-w-0">{title}</span>
-          </h2>
-          {subtitle && <p className="mt-0.5 text-caption text-muted">{subtitle}</p>}
+        <div className="flex min-w-0 items-start gap-3">
+          {icon && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'grid size-9 shrink-0 place-items-center rounded-xl ring-1',
+                attention ? 'bg-surface text-warn ring-warn/20' : 'bg-action-soft text-action ring-action/10',
+              )}
+            >
+              {icon}
+            </span>
+          )}
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-section font-bold text-ink">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-caption text-muted">{subtitle}</p>}
+          </div>
         </div>
         {action}
       </header>
@@ -91,8 +108,8 @@ export function WidgetEmpty({ icon, title, body, action }: {
   action?: ReactNode
 }) {
   return (
-    <div data-empty="" className="flex items-start gap-3 rounded-control bg-sunk/70 p-4">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-action-soft text-action" aria-hidden="true">
+    <div data-empty="" className="flex items-start gap-3 rounded-xl border border-dashed border-line-strong bg-sunk/50 p-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-action shadow-card ring-1 ring-line" aria-hidden="true">
         {icon}
       </span>
       <div className="min-w-0 space-y-1">

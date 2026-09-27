@@ -47,32 +47,41 @@ export default function HeroCard({ t, language, domain, rankings, news, seedPhas
     : checked ? h.firstPage(rankings.firstPage, rankings.checked) : h.noChecksYet(rankings.tracked)
   const scanLine = seedPhase === 'stage_b' ? h.scanRunning : seedPhase === 'stage_a' ? h.scanReading : null
 
+  const initial = domain.replace(/^www\./, '').slice(0, 1).toUpperCase()
+  const share = checked && rankings.checked > 0 ? Math.min(1, rankings.firstPage / rankings.checked) : null
+
   return (
     <section
       data-dashboard-widget="hero"
       data-state={checked ? 'ranked' : rankings.tracked === 0 ? 'no_keywords' : 'not_checked'}
       aria-label={h.label}
-      className="relative overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-card sm:p-6"
+      className="relative isolate overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-pop sm:p-8"
     >
-      {/* One quiet shape for depth; never an animation of its own. */}
-      <div aria-hidden="true" className="pointer-events-none absolute -end-16 -top-24 h-64 w-64 rounded-pill bg-action/25 blur-3xl" />
-      <div className="relative grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+      {/* Depth, never an animation of its own: two soft glows and a faint grid that fades out. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,rgb(99_130_246/0.38),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,rgb(240_176_63/0.16),transparent_70%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:32px_32px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
-          <p className="text-caption font-medium uppercase tracking-wide text-contrast-ink/60">
-            {h.label} <span dir="ltr" className="normal-case tracking-normal">· {domain}</span>
+          <div className="flex min-w-0 items-center gap-3">
+            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lg font-bold ring-1 ring-white/15">
+              {initial}
+            </span>
+            <p className="min-w-0 text-caption font-medium uppercase tracking-wide text-contrast-ink/70">
+              {h.label} <span dir="ltr" className="block truncate text-copy font-semibold normal-case tracking-normal text-contrast-ink">{domain}</span>
+            </p>
+          </div>
+          <p className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[3.5rem] font-bold leading-none tabular-nums sm:text-[4.25rem]">{formatCount(big, language)}</span>
+            <span className="text-section font-medium text-contrast-ink/75">{unit}</span>
           </p>
-          <p className="mt-3 flex items-baseline gap-3">
-            <span className="text-[3.25rem] font-semibold leading-none tabular-nums tracking-tight">{formatCount(big, language)}</span>
-            <span className="text-section font-medium text-contrast-ink/70">{unit}</span>
-          </p>
-          <p className="mt-3 max-w-xl text-copy text-contrast-ink/85">{sentence}</p>
+          <p className="mt-3 max-w-xl text-[0.9375rem] leading-6 text-contrast-ink/85">{sentence}</p>
           {news && (
-            <p className="mt-3 flex min-w-0 items-center gap-2 text-copy text-contrast-ink/85">
+            <p className="mt-4 flex min-w-0 max-w-xl items-center gap-2.5 rounded-xl bg-white/[0.06] px-3 py-2 text-copy text-contrast-ink/90 ring-1 ring-white/10">
               {news.kind === 'article'
-                ? <Newspaper size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-contrast-ink/60" />
+                ? <Newspaper size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-contrast-ink/70" />
                 : news.change > 0
-                  ? <TrendingUp size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-ok" />
-                  : <TrendingDown size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-bad" />}
+                  ? <TrendingUp size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[#6ee7a0]" />
+                  : <TrendingDown size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[#fca5a5]" />}
               <span className="truncate">
                 {news.kind === 'article'
                   ? h.newsArticle(news.title)
@@ -83,7 +92,7 @@ export default function HeroCard({ t, language, domain, rankings, news, seedPhas
             </p>
           )}
           {scanLine && (
-            <p data-scan-line={seedPhase ?? ''} className="mt-3 flex items-start gap-2 text-caption text-contrast-ink/75">
+            <p data-scan-line={seedPhase ?? ''} className="mt-3 flex items-start gap-2 text-caption text-contrast-ink/80">
               <span aria-hidden="true" className="relative mt-1 flex h-2 w-2 shrink-0">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-pill bg-action opacity-60 motion-reduce:hidden" />
                 <span className="relative inline-flex h-2 w-2 rounded-pill bg-action" />
@@ -92,15 +101,40 @@ export default function HeroCard({ t, language, domain, rankings, news, seedPhas
             </p>
           )}
         </div>
-        {next && (
-          <div className="flex flex-col items-start gap-1.5 md:items-end">
-            <LinkButton href={next.href} variant={next.commit ? 'commit' : 'primary'} className={cn('shadow-card')}>
-              {next.label}
-            </LinkButton>
-            {next.note && <span className="text-caption text-contrast-ink/60">{next.note}</span>}
-          </div>
-        )}
+        <div className="flex flex-col items-start gap-5 md:items-end">
+          {share !== null && <FirstPageRing share={share} />}
+          {next && (
+            <div className="flex flex-col items-start gap-1.5 md:items-end">
+              <LinkButton href={next.href} variant={next.commit ? 'commit' : 'primary'} className={cn('h-11 px-5 shadow-pop')}>
+                {next.label}
+              </LinkButton>
+              {next.note && <span className="text-caption text-contrast-ink/70">{next.note}</span>}
+            </div>
+          )}
+        </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * The share of the checked keywords that are on Google's first page, as a ring. The
+ * sentence beside it says the same in words, so it is hidden from screen readers.
+ */
+function FirstPageRing({ share }: { share: number }) {
+  const r = 44
+  const c = 2 * Math.PI * r
+  return (
+    <div aria-hidden="true" className="relative grid size-28 place-items-center">
+      <svg viewBox="0 0 100 100" className="absolute inset-0 size-full -rotate-90 rtl:scale-y-[-1]">
+        <circle cx="50" cy="50" r={r} fill="none" stroke="rgb(255 255 255 / 0.1)" strokeWidth="9" />
+        <circle
+          cx="50" cy="50" r={r} fill="none" stroke="#9db4ff" strokeWidth="9" strokeLinecap="round"
+          strokeDasharray={`${c * share} ${c}`}
+          className="transition-[stroke-dasharray] duration-700 ease-out motion-reduce:transition-none"
+        />
+      </svg>
+      <span className="text-2xl font-bold tabular-nums">{Math.round(share * 100)}%</span>
+    </div>
   )
 }

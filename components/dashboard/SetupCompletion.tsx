@@ -21,14 +21,14 @@ export default function SetupCompletion({ t, setup, hrefs }: {
   const s = t.setup
   return (
     <Widget id="setup" state="open" title={s.title} subtitle={s.subtitle} icon={<ListChecks size={16} strokeWidth={2} />}
-      action={<span className="shrink-0 text-copy font-semibold tabular-nums text-ink">{setup.percent}%</span>}>
+      action={<span className="shrink-0 text-title font-bold tabular-nums text-action">{setup.percent}%</span>}>
       <div
         role="progressbar"
         aria-label={s.progress(setup.done, setup.tasks.length)}
         aria-valuemin={0}
         aria-valuemax={setup.tasks.length}
         aria-valuenow={setup.done}
-        className="h-1.5 w-full overflow-hidden rounded-pill bg-action-soft"
+        className="h-2 w-full overflow-hidden rounded-pill bg-action-soft"
       >
         <div className="h-full rounded-pill bg-action transition-[width] duration-500" style={{ width: `${setup.percent}%` }} />
       </div>
