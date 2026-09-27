@@ -17,7 +17,7 @@ import { dashboardHref } from '@/lib/onboarding/links'
 import { activeStep, finishedSteps, STAGE_A_STEPS, stepStatusOf, type StageAStep } from '@/lib/onboarding/summary-view'
 import type { SeedRunView, SeedStepStatus } from '@/lib/seed-scan/types'
 import { cn } from '@/lib/utils'
-import { ActionLink, Eyebrow, isolate } from './parts'
+import { ActionLink, capsLabel, Eyebrow, isolate } from './parts'
 
 const STEP_ICONS: Record<StageAStep, LucideIcon> = { a1: Globe, a2: Store, a3: ScanSearch, a4: Users }
 
@@ -146,11 +146,11 @@ export default function SeedProgress({
                   <Icon className="relative h-6 w-6" aria-hidden />
                 </span>
                 <div className="min-w-0">
-                  <p className="font-mono text-xs uppercase tracking-[0.14em] text-contrast-ink/55">{t.stepOf(position, total)}</p>
+                  <p className={cn('text-xs text-contrast-ink/55', language === 'en' ? 'font-mono' : 'font-medium', capsLabel(language))}>{t.stepOf(position, total)}</p>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl md:text-[1.75rem] md:leading-tight">{title}</h2>
                 </div>
               </div>
-              <p className="mt-8 text-caption font-semibold uppercase tracking-[0.14em] text-contrast-ink/45">{t.nowLabel}</p>
+              <p className={cn('mt-8 text-caption font-semibold text-contrast-ink/45', capsLabel(language))}>{t.nowLabel}</p>
               <ul className="mt-3 space-y-3">
                 {lines.map((line, i) => (
                   <li
@@ -167,7 +167,7 @@ export default function SeedProgress({
           </div>
 
           <div className="border-t border-white/10 px-5 py-7 sm:px-8 md:border-s md:border-t-0 md:px-8 md:py-10">
-            <p className="text-caption font-semibold uppercase tracking-[0.14em] text-contrast-ink/45">{t.stepsLabel}</p>
+            <p className={cn('text-caption font-semibold text-contrast-ink/45', capsLabel(language))}>{t.stepsLabel}</p>
             <ol className="mt-4 space-y-1">
               {STAGE_A_STEPS.map((step, i) => {
                 const s = shown(step)

@@ -146,6 +146,8 @@ async function main() {
       html.includes(locale === 'he' ? 'bg-gradient-to-l' : 'bg-gradient-to-r') && !html.includes(locale === 'he' ? 'bg-gradient-to-r' : 'bg-gradient-to-l'))
     check(`${locale}: the pulsing stops for a merchant who asked for less motion`,
       count(html, /animate-ping/g) === 2 && count(html, /animate-ping[^"]*motion-reduce:animate-none/g) === 2)
+    check(`${locale}: small letter-spaced capitals in English only (Hebrew letters are never spaced apart)`,
+      locale === 'he' ? !html.includes('tracking-[0.14em]') : count(html, /uppercase tracking-\[0\.14em\]/g) >= 3)
     if (locale === 'en') check('en: no Hebrew anywhere on the English progress', !HEBREW.test(html))
   }
   {
@@ -472,6 +474,7 @@ async function main() {
     check(`${locale}: the site the free check scanned is filled in, and said so`,
       /\svalue="shop\.example\.com"/.test(claimedInput) && has(claimed, t.fromFreeCheck('shop.example.com')))
     check(`${locale}: …without one, nothing is claimed`, !has(html, t.fromFreeCheck('shop.example.com').replace('shop.example.com', '').trim()))
+    check(`${locale}: …its labels letter-spaced in English only`, locale === 'he' ? !html.includes('tracking-[0.14em]') : html.includes('uppercase tracking-[0.14em]'))
     if (locale === 'en') check('en: no Hebrew anywhere on the English new-project screen', !HEBREW.test(html) && !HEBREW.test(claimed))
   }
 

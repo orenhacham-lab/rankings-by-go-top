@@ -7,8 +7,18 @@
  */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import type { Locale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 import type { Tone } from '@/lib/onboarding/summary-view'
+
+/**
+ * Small letter-spaced capitals, for Latin labels only: Hebrew has no capitals,
+ * and spacing its letters apart breaks the word into single letters.
+ */
+export function capsLabel(language: Locale): string {
+  return language === 'en' ? 'uppercase tracking-[0.14em]' : ''
+}
 
 /**
  * A site address or a phrase in another script, isolated inside a sentence
@@ -71,7 +81,8 @@ export function StatusDot({ tone, className }: { tone: Tone; className?: string 
 
 /** The small label above a heading. */
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn('text-caption font-semibold uppercase tracking-[0.14em]', className)}>{children}</p>
+  const { language } = useDashboardLanguage()
+  return <p className={cn('text-caption font-semibold', capsLabel(language), className)}>{children}</p>
 }
 
 /**
