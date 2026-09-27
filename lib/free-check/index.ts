@@ -38,7 +38,7 @@ export type { BusinessInsight, InsightResult } from './business-insight'
 
 // One whole check, end to end.
 export { runFreeCheck } from './run'
-export type { RunDeps, RunOutcome } from './run'
+export type { RunDeps, RunOutcome, FreeCheckSeed } from './run'
 
 // The anonymous-scan → account handoff.
 export { consumeClaimToken, issueClaimToken, isWellFormedClaimToken, hashClaimToken } from './claim'

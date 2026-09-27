@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
   // The ledger write is also the rate-limit and spend record, so it happens on
   // every completed run — but it must never turn a good result into an error.
-  const checkId = await recordRun({ domain, locale, url: outcome.result.url, result: outcome.result, clientHash })
+  const checkId = await recordRun({ domain, locale, url: outcome.result.url, result: outcome.result, seed: outcome.seed, clientHash })
   const claimToken = checkId ? await issueClaimToken(checkId) : null
 
   return NextResponse.json(

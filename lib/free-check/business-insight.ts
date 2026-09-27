@@ -150,8 +150,16 @@ export async function fetchBusinessInsight(signals: SiteSignals, locale: Locale,
       },
     }
   } catch (err) {
-    // Never surface provider text to a merchant; log a message, return a code.
-    console.error('[free-check] gemini error', { message: err instanceof Error ? err.message : String(err) })
+    // Neither the merchant NOR the logs get provider text. A provider's error
+    // message is free-form and can carry back pieces of what we sent it —
+    // page content, prompt text — into a log stream with a different audience
+    // and a different retention. The error's class is enough to tell a timeout
+    // from a rejection; anything more specific belongs in the provider's own
+    // dashboard.
+    console.error('[free-check] gemini error', {
+      reason: 'gemini_request_failed',
+      kind: err instanceof Error ? err.name : 'unknown',
+    })
     return { ok: false, reason: 'gemini_request_failed' }
   }
 }

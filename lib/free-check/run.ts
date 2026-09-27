@@ -12,7 +12,7 @@ import { buildFindings, buildGeoSignals, splitFindings } from './findings'
 import { extractSiteSignals } from './html-signals'
 import { fetchSiteHtml, fetchSiteText } from './site-fetch'
 import { domainKey } from './url-guard'
-import type { FreeCheckErrorCode, FreeCheckResult } from './types'
+import type { FreeCheckErrorCode, FreeCheckFinding, FreeCheckResult } from './types'
 import type { Locale } from '@/lib/i18n/locales'
 
 export type RunDeps = {
@@ -22,7 +22,24 @@ export type RunDeps = {
   now?: () => Date
 }
 
-export type RunOutcome = { ok: true; result: FreeCheckResult } | { ok: false; code: FreeCheckErrorCode }
+/**
+ * What a run produces: the PUBLIC result (gated exactly as the screen shows it)
+ * and, separately, the full ungated set. They are separate fields rather than
+ * one richer result on purpose — the public result is what gets cached and
+ * replayed, so anything the teaser must not reveal cannot live inside it.
+ */
+export type FreeCheckSeed = {
+  /** Every finding, including the ones the teaser locks. */
+  findings: FreeCheckFinding[]
+  /** Every competitor the analysis produced, not only the two shown. */
+  competitors: string[]
+  /** The page's own internal links, for a seeding crawl. */
+  internalLinkUrls: string[]
+}
+
+export type RunOutcome =
+  | { ok: true; result: FreeCheckResult; seed: FreeCheckSeed }
+  | { ok: false; code: FreeCheckErrorCode }
 
 export async function runFreeCheck(
   url: URL,
@@ -69,6 +86,7 @@ export async function runFreeCheck(
 
   return {
     ok: true,
+    seed: { findings: findingsAll, competitors, internalLinkUrls: signals.internalLinkUrls },
     result: {
       url: page.url,
       domain,
