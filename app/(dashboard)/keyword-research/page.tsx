@@ -12,6 +12,21 @@ import GscOpportunities from '@/components/content/GscOpportunities'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
+import { useScanResearch } from '@/components/keyword-research/useScanResearch'
+import ScanOverview from '@/components/keyword-research/ScanOverview'
+import { ScanEmptyCard, ScanPendingCard, ScanRunningCard } from '@/components/keyword-research/ScanCards'
+import ResearchFormBar, { ResearchFormClose } from '@/components/keyword-research/ResearchFormBar'
+import EasyWins from '@/components/keyword-research/EasyWins'
+import ResearchChips from '@/components/keyword-research/ResearchChips'
+import ScanGscNotice from '@/components/keyword-research/ScanGscNotice'
+import KeywordSourceLine from '@/components/keyword-research/KeywordSourceLine'
+import { useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
+import { formatCount } from '@/components/gsc/format'
+import { researchModel } from '@/lib/keyword-research/model'
+import { EASY_WINS_SHOWN } from '@/lib/keyword-research/easy-wins'
+import { keywordKey, type ScanKeyword, type TrackedKeyword } from '@/lib/keyword-research/scan-research'
+import type { ResearchChip } from '@/lib/keyword-research/chips'
+import type { ResearchRow } from '@/lib/keyword-research/rows'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
 
 interface KeywordIdeaResult {
@@ -26,6 +41,11 @@ interface KeywordIdeaResult {
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
 type OpportunityKey = 'high' | 'medium' | 'low'
+
+/** With the scan's research on screen: rows the table shows at once, and adds per "show more". */
+const TABLE_PAGE = 100
+const NO_SCAN_KEYWORDS: ScanKeyword[] = []
+const NO_TRACKED: TrackedKeyword[] = []
 
 function getWordCount(keyword: string): number {
   return keyword.trim().split(/\s+/).filter(Boolean).length
@@ -143,8 +163,9 @@ export default function KeywordResearchPage() {
   const activeProjectName = projects.find((p) => p.id === activeProjectId)?.name ?? ''
   const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.name ?? '' })), [projects])
   // What the raw Search Console opportunity browser reports back when it is on (a
-  // decision saved or undone, a topic created, or why not): it has no other place on
-  // this screen to say it.
+  // decision saved or undone, a topic created, or why not), and what tracking one
+  // keyword of the scan's research came to: neither has another place on this
+  // screen to say it.
   const gscToast = useToasts()
   const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
@@ -152,8 +173,9 @@ export default function KeywordResearchPage() {
   const [addToProjectError, setAddToProjectError] = useState('')
   const [lastAddedProjectId, setLastAddedProjectId] = useState('')
 
-  // Sorting state for results table
-  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc' | 'opportunity'
+  // Sorting state for results table. 'rank' keeps the order the active chip gives
+  // ("suggested to track" is ranked by the easy-wins score).
+  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc' | 'opportunity' | 'rank'
   const [sortBy, setSortBy] = useState<SortKey>('monthlySearches')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -182,6 +204,43 @@ export default function KeywordResearchPage() {
   const [trendError, setTrendError] = useState('')
   const [trendCache, setTrendCache] = useState<Map<string, TrendData>>(new Map())
   const [trendData, setTrendData] = useState<TrendData | undefined>()
+
+  // ── The seeding scan's research (components/keyword-research, lib/keyword-research) ──
+  // With no scan (the flag off, an older project, a read that failed), and while the
+  // first answer is on its way, everything below renders exactly today's screen
+  // (components/keyword-research/__qa__/legacy-screen.qa.ts). Opening the tab only
+  // reads: the scan's run and its cached research, never Google Ads, Serper or a model.
+  const ts = dict.keywordResearchScan
+  const scan = useScanResearch(activeProjectId)
+  const scanView = scan.view
+  const scanOn = scanView.kind === 'none' || scanView.kind === 'loading' ? null : scanView
+  const scanMode = scanOn !== null
+  const scanKeywords = scanOn?.kind === 'seeded' ? scanOn.research.keywords : NO_SCAN_KEYWORDS
+  const scanTracked = scanOn ? scanOn.tracked : NO_TRACKED
+  // A research the merchant runs from the form takes the screen until they go back to the scan's.
+  const [manualActive, setManualActive] = useState(false)
+  const [chip, setChip] = useState<ResearchChip>('all')
+  const [shownRows, setShownRows] = useState(TABLE_PAGE)
+  // null: the form folds by itself once there is research on screen; true/false: the merchant chose.
+  const [formChoice, setFormChoice] = useState<boolean | null>(null)
+  const [trackingKeys, setTrackingKeys] = useState<Set<string>>(new Set())
+  // Search Console's keywords view, asked for only with the scan's research on screen.
+  const trackedIdsKey = useMemo(() => scanTracked.map((k) => k.id).sort().join(','), [scanTracked])
+  const gscKeywords = useGscKeywordFigures(scanMode ? activeProjectId : null, trackedIdsKey)
+  const googleFigures = gscKeywords.data.state === 'ready' ? gscKeywords.data.data : null
+  const model = useMemo(
+    () => researchModel({
+      scanKeywords,
+      tracked: scanTracked,
+      manual: results.length > 0 && (manualActive || scanKeywords.length === 0) ? results : null,
+      google: googleFigures,
+      chip,
+    }),
+    [scanKeywords, scanTracked, manualActive, results, googleFigures, chip],
+  )
+  // The table's rows: the active chip's, with the scan's research on screen; otherwise the results, as always.
+  const tableSource: KeywordIdeaResult[] = scanMode && model.mode ? model.chipRows : results
+  const formOpen = !scanMode || (formChoice ?? (!(model.mode || scanView.kind === 'pending') || loading || !!error))
 
   // Parse multiple keywords from comma/semicolon/newline separated input
   const parseKeywords = (input: string): string[] => {
@@ -309,6 +368,20 @@ export default function KeywordResearchPage() {
     }
   }
 
+  // The form's submit. With the scan's research on screen, what the merchant runs
+  // takes the screen (and the form folds again once it has results); the research
+  // itself is handleSearch, unchanged.
+  const submitResearch = (e: React.FormEvent) => {
+    if (scanMode) {
+      setManualActive(true)
+      setChip('all')
+      setSortBy((current) => (current === 'rank' ? 'monthlySearches' : current))
+      setShownRows(TABLE_PAGE)
+      setFormChoice(null)
+    }
+    return handleSearch(e)
+  }
+
   const clearAddToProjectSuccess = () => {
     if (addToProjectMessage || lastAddedProjectId) {
       setAddToProjectMessage('')
@@ -334,7 +407,7 @@ export default function KeywordResearchPage() {
   const selectAll = () => {
     clearAddToProjectSuccess()
     setAIQuestionsError('')
-    setSelectedKeywords(new Set(results.map((r) => r.keyword)))
+    setSelectedKeywords(new Set(tableSource.map((r) => r.keyword)))
   }
 
   const deselectAll = () => {
@@ -458,7 +531,7 @@ export default function KeywordResearchPage() {
 
     try {
       // Include metrics from research result so they are stored on the new targets.
-      const resultsByKeyword = new Map(results.map((r) => [r.keyword, r]))
+      const resultsByKeyword = new Map((scanMode ? [...model.rows, ...results] : results).map((r) => [r.keyword, r]))
       const keywordsArray = Array.from(selectedKeywords).map((kw) => {
         const r = resultsByKeyword.get(kw)
         return {
@@ -488,6 +561,9 @@ export default function KeywordResearchPage() {
       if (!response.ok || !result.success) {
         if (response.status === 402) {
           setAddToProjectError(t.addToProject.errorQuota)
+        } else if (scanMode) {
+          // With the scan's research on screen, our own words only, never the route's text.
+          setAddToProjectError(response.status === 503 ? ts.add.unavailable : t.addToProject.errorGeneral)
         } else {
           setAddToProjectError(result.message || t.addToProject.errorGeneral)
         }
@@ -496,6 +572,8 @@ export default function KeywordResearchPage() {
 
       setAddToProjectMessage(t.addToProject.success(result.added || 0, result.skipped || 0))
       setLastAddedProjectId(projectIdUsed)
+      // "Already tracked", the suggestions and Google's figures follow the keywords just added.
+      if (scanMode) scan.reloadTracked()
       // Keep selection visible after success so the user can see what they added
       // and the "Go to project" button. The success state is cleared the next time
       // the user searches, toggles a checkbox, or dismisses the message manually.
@@ -665,10 +743,10 @@ export default function KeywordResearchPage() {
   }
 
   const sortedResults = useMemo(() => {
-    if (results.length === 0) return results
+    if (tableSource.length === 0) return tableSource
     const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
     const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
-    const copy = [...results]
+    const copy = [...tableSource]
     const dir = sortDir === 'asc' ? 1 : -1
     copy.sort((a, b) => {
       if (sortBy === 'opportunity') {
@@ -707,7 +785,7 @@ export default function KeywordResearchPage() {
       return (aVal - bVal) * dir
     })
     return copy
-  }, [results, sortBy, sortDir])
+  }, [tableSource, sortBy, sortDir])
 
   const sortIndicator = (key: SortKey) => {
     if (sortBy !== key) return ' ↕'
@@ -750,6 +828,90 @@ export default function KeywordResearchPage() {
     }
   }
 
+  // ── With the scan's research on screen: chips, pages of rows, one-click tracking ──
+  const tableVisible = scanMode ? model.mode !== null : results.length > 0
+
+  const chooseChip = (next: ResearchChip) => {
+    setChip(next)
+    setShownRows(TABLE_PAGE)
+    setSortBy((current) => (next === 'suggested' ? 'rank' : current === 'rank' ? 'monthlySearches' : current))
+  }
+
+  const showSuggestions = () => {
+    chooseChip('suggested')
+    document.getElementById('research-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const backToScan = () => {
+    setManualActive(false)
+    setChip('all')
+    setSortBy((current) => (current === 'rank' ? 'monthlySearches' : current))
+    setShownRows(TABLE_PAGE)
+    setSelectedKeywords(new Set())
+    clearAddToProjectSuccess()
+  }
+
+  const fillSeedKeywords = () => {
+    if (!scanOn || scanOn.seedKeywords.length === 0) return
+    setResearchType('keyword')
+    setKeyword(scanOn.seedKeywords.join(', '))
+    setFormChoice(true)
+  }
+
+  // One keyword, one click: the same action and quota check as the add section, for
+  // the project the top bar names. What it came to is said in our own words only.
+  const trackKeyword = async (row: ResearchRow) => {
+    const key = keywordKey(row.keyword)
+    if (!selectedProject || trackingKeys.has(key)) return
+    setTrackingKeys((prev) => new Set(prev).add(key))
+    try {
+      const response = await fetch('/api/keyword-research/add-to-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProject,
+          engineType,
+          language,
+          keywords: [{
+            keyword: row.keyword,
+            avgMonthlySearches: row.avgMonthlySearches,
+            competition: row.competition,
+            competitionIndex: row.competitionIndex,
+            lowTopOfPageBid: row.lowTopOfPageBid,
+            highTopOfPageBid: row.highTopOfPageBid,
+            currency: row.currency || null,
+          }],
+        }),
+      })
+      const result = await response.json().catch(() => null)
+      if (response.ok && result?.success) {
+        gscToast.success(result.added > 0 ? ts.add.added(row.keyword) : ts.add.skipped(row.keyword))
+        scan.reloadTracked()
+      } else {
+        gscToast.error(response.status === 402 ? t.addToProject.errorQuota : response.status === 503 ? ts.add.unavailable : ts.add.errorGeneral)
+      }
+    } catch {
+      gscToast.error(ts.add.errorGeneral)
+    } finally {
+      setTrackingKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
+  const sourceLineFor = (kw: string) => {
+    const row = model.byKey.get(keywordKey(kw))
+    return row ? <KeywordSourceLine row={row} /> : null
+  }
+
+  const gscState = gscKeywords.data.state
+  const googleChip = gscState === 'disabled' ? 'hidden' : gscState === 'loading' ? 'loading' : 'counted'
+  const gscNotice = scanMode ? (
+    <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} retry={gscKeywords.retry} />
+  ) : null
+
   return (
     <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`}>
       {/* Header */}
@@ -758,9 +920,30 @@ export default function KeywordResearchPage() {
         <p className="text-slate-600 dark:text-slate-300">{t.subtitle}</p>
       </div>
 
+      {/* The seeding scan's research opens the screen, before the form. */}
+      {scanOn?.kind === 'pending' && <ScanPendingCard />}
+      {scanOn?.kind === 'running' && <ScanRunningCard seedKeywords={scanOn.seedKeywords} steps={scanOn.steps} />}
+      {scanOn?.kind === 'empty' && model.mode !== 'manual' && (
+        <ScanEmptyCard reason={scanOn.reason} seedKeywords={scanOn.seedKeywords} onRetry={scan.retry} onUseSeeds={fillSeedKeywords} />
+      )}
+      {scanMode && model.mode && (
+        <ScanOverview
+          totals={model.totals}
+          easyWins={model.wins.length}
+          mode={model.mode}
+          domain={scanOn?.domain ?? null}
+          fetchedAt={scanOn?.kind === 'seeded' ? scanOn.research.fetchedAt : null}
+          running={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.running}
+          truncated={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.research.truncated}
+          onBackToScan={model.mode === 'manual' && scanKeywords.length > 0 ? backToScan : undefined}
+        />
+      )}
+
       {/* Form */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6 mb-8">
-        <form onSubmit={handleSearch} className="space-y-4">
+      {scanMode && !formOpen && <ResearchFormBar onOpen={() => setFormChoice(true)} />}
+      {scanMode && formOpen && model.mode && <ResearchFormClose onClose={() => setFormChoice(false)} />}
+      <div hidden={scanMode && !formOpen ? true : undefined} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6 mb-8">
+        <form onSubmit={submitResearch} className="space-y-4">
           {/* Research type */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -945,16 +1128,37 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
+      {/* Easy battles to win: the best keywords of the research on screen. */}
+      {scanMode && model.mode && (
+        <EasyWins
+          wins={model.wins.slice(0, EASY_WINS_SHOWN)}
+          total={model.wins.length}
+          adding={trackingKeys}
+          onTrack={trackKeyword}
+          onShowAll={model.mode === 'scan' ? showSuggestions : undefined}
+        />
+      )}
+
+      {/* Search Console's source, where there is no table for it to sit in. */}
+      {scanMode && !tableVisible && <div className="mb-6">{gscNotice}</div>}
+
       {/* Results */}
-      {results.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+      {tableVisible && (
+        <div id={scanMode ? 'research-table' : undefined} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+          {/* The chips of the scan's research, and Search Console's source under them. */}
+          {scanMode && (
+            <div className="mb-4 space-y-3 scroll-mt-4">
+              <ResearchChips counts={model.counts} active={chip} onChange={chooseChip} google={googleChip} />
+              {gscNotice}
+            </div>
+          )}
           {/* Results Toolbar */}
           <div className={`flex flex-col sm:flex-row gap-2 mb-4 justify-between items-start sm:items-center`}>
             <div className={`text-sm font-medium text-slate-700 dark:text-slate-200`}>
-              {t.results.resultsCount}: <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span>
+              {t.results.resultsCount}: <span className="font-bold text-slate-900 dark:text-slate-100">{tableSource.length}</span>
             </div>
             <div className="flex gap-2 flex-wrap">
-              {topOpportunities.length > 0 && (
+              {!scanMode && topOpportunities.length > 0 && (
                 <button
                   onClick={() => setOpportunitiesOpen((v) => !v)}
                   className="text-xs px-3 py-1 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors flex items-center gap-1"
@@ -1126,7 +1330,7 @@ export default function KeywordResearchPage() {
           )}
 
           {/* Opportunities Panel — opt-in, compact, no extra API calls */}
-          {opportunitiesOpen && topOpportunities.length > 0 && (
+          {!scanMode && opportunitiesOpen && topOpportunities.length > 0 && (
             <div className="mb-4 p-3 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
               <div className={`mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
                 <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
@@ -1188,7 +1392,7 @@ export default function KeywordResearchPage() {
                   <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100 w-6">
                     <input
                       type="checkbox"
-                      checked={selectedKeywords.size === results.length && results.length > 0}
+                      checked={selectedKeywords.size === tableSource.length && tableSource.length > 0}
                       onChange={(e) => (e.target.checked ? selectAll() : deselectAll())}
                       className="rounded"
                     />
@@ -1253,7 +1457,7 @@ export default function KeywordResearchPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedResults.map((result, idx) => (
+                {(scanMode ? sortedResults.slice(0, shownRows) : sortedResults).map((result, idx) => (
                   <tr key={idx} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-4 py-3">
                       <input
@@ -1265,6 +1469,7 @@ export default function KeywordResearchPage() {
                     </td>
                     <td className={`px-4 py-3 text-slate-900 dark:text-slate-100 ${isRTL ? 'text-right' : 'text-left'}`}>
                       {result.keyword}
+                      {scanMode && sourceLineFor(result.keyword)}
                     </td>
                     <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
                       {result.avgMonthlySearches?.toLocaleString() ?? '—'}
@@ -1312,11 +1517,28 @@ export default function KeywordResearchPage() {
               </tbody>
             </table>
           </div>
+          {scanMode && sortedResults.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted">{ts.chips.empty}</p>
+          )}
+          {scanMode && sortedResults.length > shownRows && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShownRows((n) => n + TABLE_PAGE)}
+                className="inline-flex h-9 items-center rounded-control border border-line bg-surface px-4 text-sm font-semibold text-body transition-colors hover:bg-sunk"
+              >
+                {ts.table.showMore(
+                  formatCount(Math.min(TABLE_PAGE, sortedResults.length - shownRows), language),
+                  formatCount(sortedResults.length - shownRows, language),
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Empty State */}
-      {!loading && results.length === 0 && !error && (
+      {!scanMode && !loading && results.length === 0 && !error && (
         <div className={`text-center py-12 text-slate-500 dark:text-slate-400`}>
           <p>{t.states.empty}</p>
         </div>
