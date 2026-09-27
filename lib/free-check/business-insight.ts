@@ -112,7 +112,13 @@ function buildBusiness(parsed: Record<string, unknown>, summary: string, signals
 /** Keep only plausible bare domains, and never the site's own. */
 function cleanDomains(value: unknown, self: string): string[] {
   return cleanList(value, MAX_COMPETITORS, 80)
-    .map((d) => d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').trim())
+    // slice at the first '/' rather than /\/.*$/, which backtracks quadratically
+    // on a value holding a CR or U+2028. See stripLineComment in html-signals.
+    .map((d) => {
+      const bare = d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '')
+      const at = bare.indexOf('/')
+      return (at < 0 ? bare : bare.slice(0, at)).trim()
+    })
     .filter((d) => /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(d) && d !== self && !d.endsWith(`.${self}`))
 }
 

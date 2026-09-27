@@ -78,6 +78,24 @@ function main() {
   check('a shared group blocks every agent in it', grouped.blockedBots.length === 2)
   check('comments are stripped before parsing', readRobots('# Disallow: /\nUser-agent: *\nDisallow: /x/').blocksAiBots === false)
   check('Allow: / after Disallow: / re-opens the group', !readRobots('User-agent: GPTBot\nDisallow: /\nAllow: /').blocksAiBots)
+  check('a comment mid-line does not swallow the directive',
+    readRobots('User-agent: *\nDisallow: / # everything').blocksEveryone)
+
+  // robots.txt comes from the site under check, up to the 1.5 MB fetch cap. The
+  // expression this replaced backtracked from every '#' on a line holding a CR
+  // or U+2028, so one long line stalled the route.
+  const CR_LINE = `User-agent: *\n${'#'.repeat(60_000)}\rx\nDisallow: /`
+  const t0 = performance.now()
+  const crVerdict = readRobots(CR_LINE)
+  const robotsMs = performance.now() - t0
+  check(`a 60 000-character comment line is read in milliseconds (${robotsMs.toFixed(0)}ms)`, robotsMs < 100)
+  check('and the directive after it is still parsed', crVerdict.blocksEveryone)
+
+  const t1 = performance.now()
+  CR_LINE.replace(/#.*$/, '')
+  const regexMs = performance.now() - t1
+  check(`CONTROL: the comment-strip regex is orders slower on the same line (${regexMs.toFixed(0)}ms)`,
+    regexMs > Math.max(robotsMs * 20, 200))
 
   console.log('\nFINDINGS) measured signals become merchant-facing findings')
   const clean = buildFindings(s, 'he')
