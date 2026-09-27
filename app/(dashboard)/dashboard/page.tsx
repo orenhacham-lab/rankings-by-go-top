@@ -46,7 +46,7 @@ import { useProjectCompetitorComparison } from '@/components/competitors/useComp
 import GscClicksTile from '@/components/gsc/GscClicksTile'
 import GscTopPages from '@/components/gsc/GscTopPages'
 import { formatCount } from '@/components/gsc/format'
-import { CONTENT_TOPICS_PATH } from '@/lib/content/content-workspace-nav'
+import { strategyHref } from '@/lib/content/strategy/view'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { buildRankings, type DashboardResult, type DashboardTarget, type RankingsView } from '@/lib/dashboard/rankings'
 import { holdingBack, seedFeed } from '@/lib/dashboard/seed'
@@ -141,13 +141,13 @@ function nextStep(input: {
   if (rankings.tracked === 0) return { href: '/keyword-research', label: t.actions.addKeywords, commit: false, note: null }
   const articles = overview?.articles
   if (content && articles?.state === 'ready' && articles.data.total === 0) {
-    return { href: CONTENT_TOPICS_PATH, label: t.actions.writeFirstArticle, commit: true, note: t.actions.articleQuota }
+    return { href: strategyHref('board'), label: t.actions.writeFirstArticle, commit: true, note: t.actions.articleQuota }
   }
   if (overview?.setup.state === 'ready' && !overview.setup.data.platform) {
     return { href: platformSetupHref(input.projectId), label: t.actions.connectSite, commit: false, note: null }
   }
   if (content && articles?.state === 'ready') {
-    return { href: CONTENT_TOPICS_PATH, label: t.actions.writeArticle, commit: true, note: t.actions.articleQuota }
+    return { href: strategyHref('board'), label: t.actions.writeArticle, commit: true, note: t.actions.articleQuota }
   }
   return null
 }
@@ -334,7 +334,7 @@ function ProjectDashboard({ project }: { project: Project }) {
             <div className="order-8 grid min-w-0 gap-5 md:grid-cols-2">
               <PublishingBoard t={t} language={language} section={sectionOf('board')} retry={reload} />
               <RecentArticles t={t} language={language} section={sectionOf('articles')} retry={reload}
-                firstArticleHref={heroHasFirstArticle ? null : CONTENT_TOPICS_PATH} />
+                firstArticleHref={heroHasFirstArticle ? null : strategyHref('board')} />
             </div>
           )}
           <div className="order-11 min-w-0 empty:hidden">

@@ -8,7 +8,8 @@
 import Link from 'next/link'
 import { CalendarClock, KeyRound, Lightbulb, Newspaper } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { CONTENT_AUTOMATION_PATH, CONTENT_ROOT_PATH, CONTENT_SCREENS, CONTENT_TOPICS_PATH, isContentScreenEnabled } from '@/lib/content/content-workspace-nav'
+import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
+import { STRATEGY_ANCHORS, strategyHref } from '@/lib/content/strategy/view'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 
 /** Read as literal member expressions, which is what lets Next inline them. */
@@ -20,10 +21,9 @@ export function contentEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 }
 
-/** The schedule lives on the automation screen when this build has it, on topics otherwise. */
+/** The publishing schedule is the queue section of the content strategy tab's list view, when this build has automation; its topics otherwise. */
 export function scheduleHref(): string {
-  const automation = CONTENT_SCREENS.find((s) => s.href === CONTENT_AUTOMATION_PATH)
-  return automation && isContentScreenEnabled(automation, FLAGS) ? CONTENT_AUTOMATION_PATH : CONTENT_TOPICS_PATH
+  return strategyHref('list', FLAGS.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' ? STRATEGY_ANCHORS.queue : STRATEGY_ANCHORS.topics)
 }
 
 export default function Shortcuts({ t }: { t: DashboardDictionary['dashboardHome'] }) {
