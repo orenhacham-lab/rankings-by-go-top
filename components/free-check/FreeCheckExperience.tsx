@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { FreeCheckErrorCode, FreeCheckResponse, FreeCheckResult } from '@/lib/free-check/types'
 import type { Locale } from '@/lib/i18n/locales'
+import { authHref } from '@/lib/i18n/auth-href'
 
 type Phase = 'form' | 'scanning' | 'results'
 
@@ -37,8 +38,8 @@ const SEVERITY_STYLES: Record<string, { dot: string; chip: string; label: { he: 
 export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Locale; initialUrl?: string }) {
   const copy = freeCheckCopy(locale)
   const dir = locale === 'he' ? 'rtl' : 'ltr'
-  const signupHref = locale === 'en' ? '/en/signup' : '/signup'
-  const loginHref = locale === 'en' ? '/en/login' : '/login'
+  const loginHref = authHref('login', locale)
+  const signupHref = authHref('signup', locale)
 
   const [phase, setPhase] = useState<Phase>('form')
   const [url, setUrl] = useState(initialUrl)
@@ -117,7 +118,7 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
           copy={copy}
           locale={locale}
           result={result}
-          signupHref={claimToken ? `${signupHref}?claim=${encodeURIComponent(claimToken)}` : signupHref}
+          signupHref={claimToken ? `${signupHref}${signupHref.includes('?') ? '&' : '?'}claim=${encodeURIComponent(claimToken)}` : signupHref}
           loginHref={loginHref}
           onRestart={() => {
             setResult(null)

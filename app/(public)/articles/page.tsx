@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
+import { authHref } from '@/lib/i18n/auth-href'
 
 interface Article {
   id: string
@@ -170,7 +171,7 @@ export default function ArticlesPage() {
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Link
-                      href="/signup"
+                      href={authHref('signup', 'he')}
                       className="px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
                     >
                       התחילו ניסיון חינם

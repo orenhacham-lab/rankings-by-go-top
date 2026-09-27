@@ -1,6 +1,7 @@
 import { planLimitLines } from '@/lib/plans/features'
 export const dashboardHe = {
   sidebar: {
+    logoAlt: 'הלוגו של Go Top',
     groupMain: 'ראשי',
     groupResearch: 'מחקר ותוכן',
     groupMonitoring: 'ניטור ודוחות',
@@ -365,6 +366,7 @@ export const dashboardHe = {
         read_failed: () => 'Search Console לא היה זמין בסריקה הנוכחית. יתר מקורות הסריקה המשיכו כרגיל.',
       },
       keywordPlaceholder: 'הקלד מילת מפתח…',
+      aiUnavailable: 'שירות ה-AI אינו זמין כרגע, ולכן הסריקה לא בוצעה. נסו שוב מאוחר יותר.',
       generate: 'מצא רעיונות',
       generating: 'מחפש רעיונות…',
       siteScanAnalyzing: 'מנתח את סריקת האתר ומחפש הזדמנויות לנושאים חדשים…',
@@ -2014,6 +2016,7 @@ export const dashboardHe = {
     saveError: 'שגיאה בשמירה',
     back: '← חזרה',
     notFound: 'לא נמצא',
+    notAvailable: 'לא זמין.',
     lightMode: 'מצב בהיר',
     darkMode: 'מצב כהה',
     switchToDarkMode: 'עבור למצב כהה',
@@ -3013,6 +3016,8 @@ export const dashboardHe = {
     errorInvalidCoords: 'קואורדינטות לא תקינות: lat (-90..90), lng (-180..180)',
     errorAddressRequired: 'דרוש להזין כתובת מלאה עבור מצב "נקודה מדויקת"',
     errorSave: 'שגיאה בשמירה',
+    errorRadiusZipRequired: 'בסריקת רדיוס יש להזין מיקוד (ZIP code) למרכז הסריקה',
+    errorRadiusZipFormat: 'מיקוד (ZIP code) חייב להכיל בדיוק 5 ספרות',
     bulkSuccess: (created: number, skipped: number) =>
       `נוספו ${created} מילות מפתח${skipped > 0 ? ` (${skipped} כבר קיימות)` : ''}`,
   },
@@ -3055,6 +3060,9 @@ export const dashboardHe = {
       notFound: 'לא נמצא',
       errorPrefix: 'שגיאה',
       noAuditData: 'נתוני בדיקה מורחבים זמינים רק עבור סריקות Google Maps חדשות. תוצאת המיקום עדיין נשמרה ומוצגת למעלה.',
+      auditRequest: 'הבקשה',
+      auditResponse: 'התשובה',
+      auditDecision: 'ההחלטה',
     },
   },
   reports: {
@@ -3685,6 +3693,32 @@ export const dashboardHe = {
       title: 'חשבון מנהל — גישה מלאה',
       description: 'לחשבון זה יש גישה מלאה למערכת ואינו דורש תוכנית חיוב.',
     },
+  },
+  trialBar: {
+    daysLeft: (n: number) => (n === 2 ? 'נותרו יומיים בתקופת הניסיון החינמית שלך' : `נותרו ${n} ימים בתקופת הניסיון החינמית שלך`),
+    lastDay: 'זה היום האחרון בתקופת הניסיון החינמית שלך',
+    expired: 'תקופת הניסיון החינמית שלך הסתיימה',
+    upgrade: 'שדרג עכשיו',
+    label: 'תקופת הניסיון',
+  },
+  articleEditorToolbar: {
+    heading2: 'כותרת 2',
+    heading3: 'כותרת 3',
+    bold: 'מודגש',
+    italic: 'נטוי',
+    bulletList: 'רשימה',
+    orderedList: 'רשימה ממוספרת',
+    link: 'קישור',
+    linkPrompt: 'כתובת הקישור (השאירו ריק כדי להסיר)',
+    column: 'עמודה',
+    row: 'שורה',
+    table: 'טבלה',
+    addColumn: 'הוספת עמודה',
+    addRow: 'הוספת שורה',
+    deleteTable: 'מחיקת הטבלה',
+    insertTable: 'הוספת טבלה',
+    undo: 'ביטול',
+    redo: 'חזרה',
   },
 } as const
 

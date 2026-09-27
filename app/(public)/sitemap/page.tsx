@@ -6,6 +6,7 @@ import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
 import { createClient } from '@/lib/supabase/client'
+import { authHref } from '@/lib/i18n/auth-href'
 
 interface Article {
   id: string
@@ -64,8 +65,8 @@ export default function SitemapPage() {
     {
       title: 'חשבון וחוקים',
       links: [
-        { label: 'כניסה לחשבון', href: '/login' },
-        { label: 'התחילו ניסיון חינם', href: '/signup' },
+        { label: 'כניסה לחשבון', href: authHref('login', 'he') },
+        { label: 'התחילו ניסיון חינם', href: authHref('signup', 'he') },
         { label: 'מדיניות פרטיות', href: '/privacy' },
         { label: 'תקנון ותנאי שימוש', href: '/terms' },
       ],

@@ -329,7 +329,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
             <button
               type="button"
               onClick={() => setScanMessage('')}
-              aria-label="Close"
+              aria-label={dict.common.close}
               className="shrink-0 w-6 h-6 inline-flex items-center justify-center rounded hover:bg-black/5"
             >
               ×

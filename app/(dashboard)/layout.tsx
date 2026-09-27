@@ -1,5 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
+import TrialBar from '@/components/layout/TrialBar'
+import { loadTrialBar } from '@/lib/billing/trial-bar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
 import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -13,6 +15,16 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
+
+/**
+ * The trial bar's answer, read on the server for the signed-in user only. Its
+ * own Suspense boundary, so the two small reads never hold up the screen.
+ */
+async function TrialBarSlot({ userId }: { userId: string }) {
+  let admin: ReturnType<typeof createAdminClient>
+  try { admin = createAdminClient() } catch { return null }
+  return <TrialBar state={await loadTrialBar(admin, userId)} />
+}
 
 export default async function DashboardLayout({
   children,
@@ -71,6 +83,9 @@ export default async function DashboardLayout({
                 <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md backdrop-saturate-150 md:px-8">
                   <WorkspaceSwitcher />
                 </div>
+                <Suspense fallback={null}>
+                  <TrialBarSlot userId={user.id} />
+                </Suspense>
                 <div className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 md:px-8 md:py-8">{children}</div>
               </DashboardDirectionWrapper>
             </main>

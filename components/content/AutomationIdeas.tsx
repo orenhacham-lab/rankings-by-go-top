@@ -313,7 +313,7 @@ export default function AutomationIdeas({
           setMessage({ text: t.keywordPlaceholder, ok: false })
         } else if (data?.error === 'billing_exhausted' || data?.meta?.reason === 'billing_exhausted') {
           // HONEST billing state — never "try a broader keyword". No provider details.
-          setMessage({ text: 'יתרת Gemini API הסתיימה ולכן הסריקה לא בוצעה. יש להוסיף קרדיט בחשבון Google AI Studio ולנסות שוב.', ok: false })
+          setMessage({ text: t.aiUnavailable, ok: false })
         } else if (data?.error === 'run_in_progress') {
           // A duplicate click while a run is active — silently ignore.
         } else {

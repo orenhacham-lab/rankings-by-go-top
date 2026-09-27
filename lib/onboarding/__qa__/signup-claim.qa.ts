@@ -147,7 +147,8 @@ async function main() {
   check('…then takes it out of the address, keeping every other parameter', /\.filter\(\(\[key\]\) => key !== 'claim'\)/.test(page) && /router\.replace\(rest \? `\$\{pathname\}\?\$\{rest\}` : pathname, \{ scroll: false \}\)/.test(page))
   check('…and never renders it', !/\{\s*claimParam\s*\}/.test(page) && page.slice(page.indexOf('return (')).indexOf('claimParam') === -1)
   check('where sign-up leads is unchanged: the dashboard, and the confirmation link\'s next=/dashboard',
-    /router\.replace\('\/dashboard'\)/.test(page) && /next=\$\{encodeURIComponent\('\/dashboard'\)\}/.test(page))
+    // (still the dashboard; since the language pass it carries the form's ?lang, see lib/i18n/auth-href.ts)
+    /router\.replace\(withLocaleParam\('\/dashboard', lang\)\)/.test(page) &&/next=\$\{encodeURIComponent\('\/dashboard'\)\}/.test(page))
   {
     const offenders: string[] = []
     const walk = (dir: string) => {

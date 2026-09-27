@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { sendSignupNotification } from '@/lib/notifications/signup-email'
+import { RESET_PASSWORD_PATH, recoveryFailureUrl } from '@/lib/auth/password-reset'
 
 /**
  * Supabase auth callback (email confirmation and Supabase-hosted OAuth, PKCE).
@@ -74,6 +75,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Return to login on error
-  return NextResponse.redirect(`${origin}/login?error=oauth`)
+  // Return to login on error — in the language the visitor signed up in, where
+  // the login page now says the link was invalid or expired instead of showing
+  // an unexplained empty form.
+  const lang = searchParams.get('lang')
+  // A password-recovery link that could not be exchanged (expired, used
+  // twice) goes back to the request form, which says so and offers a new one.
+  if (next === RESET_PASSWORD_PATH) return NextResponse.redirect(recoveryFailureUrl(origin, lang).toString())
+  const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)
+  failed.searchParams.set('error', 'oauth')
+  if (lang === 'he') failed.searchParams.set('lang', 'he')
+  return NextResponse.redirect(failed.toString())
 }

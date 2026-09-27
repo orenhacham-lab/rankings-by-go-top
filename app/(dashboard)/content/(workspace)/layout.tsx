@@ -12,14 +12,11 @@
 import { Suspense, type ReactNode } from 'react'
 import { ContentWorkspaceProvider } from '@/components/content/workspace/ContentWorkspaceProvider'
 import ContentWorkspaceShell from '@/components/content/workspace/ContentWorkspaceShell'
+import ContentNotAvailable from '@/components/content/ContentNotAvailable'
 
 export default function ContentLayout({ children }: { children: ReactNode }) {
   if (process.env.NEXT_PUBLIC_ENABLE_CONTENT !== 'true') {
-    return (
-      <div className="py-20 text-center text-slate-400 dark:text-slate-500 text-sm">
-        Not available.
-      </div>
-    )
+    return <ContentNotAvailable />
   }
 
   return (

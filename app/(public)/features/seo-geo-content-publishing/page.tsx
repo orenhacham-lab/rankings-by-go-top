@@ -16,6 +16,7 @@ import {
   Brain,
 } from 'lucide-react'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata: Metadata = {
   title: 'יצירת, תזמון ופרסום מאמרי SEO ו-GEO | Rankings by Go Top',
@@ -60,7 +61,7 @@ export default function SeoGeoContentPublishingFeaturePage() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-emerald-700 hover:to-teal-700 transition-all text-center"
               >
                 להתנסות בחינם
@@ -335,7 +336,7 @@ export default function SeoGeoContentPublishingFeaturePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-emerald-700 hover:to-teal-700 transition-all"
               >
                 להתנסות בחינם

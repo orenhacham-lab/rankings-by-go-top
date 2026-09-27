@@ -2217,7 +2217,7 @@ export default function AIVisibilitySection({
                         <span
                           className="cursor-help text-indigo-400 dark:text-indigo-500 flex-shrink-0"
                           tabIndex={0}
-                          aria-label="מה המשמעות של גבוה/טוב?"
+                          aria-label={t('priority_tag_help_label')}
                         >
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="10"/>
@@ -2228,7 +2228,7 @@ export default function AIVisibilitySection({
                           role="tooltip"
                           className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1.5 rounded bg-slate-900 dark:bg-slate-700 text-white text-[10px] font-medium normal-case tracking-normal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md w-max max-w-[200px] text-center"
                         >
-                          התגית מציינת עדיפות למעקב, לא ציון הסריקה.
+                          {t('priority_tag_help')}
                         </span>
                       </span>
                     </h3>

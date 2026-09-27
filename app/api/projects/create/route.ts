@@ -6,6 +6,7 @@ import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 import { buildQuotaError, buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
 import { markScanOwnedFields, type SeedProjectField } from '@/lib/seed-scan/settings'
+import { bilingualError } from '@/lib/i18n/action-messages'
 
 // API Route for creating new projects
 // Replaces Server Action approach to avoid production crashes
@@ -19,14 +20,14 @@ export async function POST(request: NextRequest) {
     if (userError) {
       console.error('[API] Auth error:', userError.message)
       return NextResponse.json(
-        { error: 'שגיאה בקבלת פרטי משתמש' },
+        bilingualError('userLookupFailed'),
         { status: 401 }
       )
     }
     if (!user) {
       console.error('[API] No authenticated user')
       return NextResponse.json(
-        { error: 'משתמש לא מחובר' },
+        bilingualError('notSignedIn'),
         { status: 401 }
       )
     }
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       if (countError) {
         console.error('[API] Error counting projects:', countError.message)
         return NextResponse.json(
-          { error: 'שגיאה בבדיקת הפרויקטים הקיימים' },
+          bilingualError('projectsCheckFailed'),
           { status: 500 }
         )
       }
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (!name) {
       console.error('[API] Missing required field: name')
       return NextResponse.json(
-        { error: 'שם הפרויקט הוא שדה חובה' },
+        bilingualError('projectNameRequired'),
         { status: 400 }
       )
     }
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (!targetDomain) {
       console.error('[API] Missing required field: target_domain')
       return NextResponse.json(
-        { error: 'דומיין יעד הוא שדה חובה' },
+        bilingualError('targetDomainRequired'),
         { status: 400 }
       )
     }
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (!clientId) {
       console.error('[API] Missing required field: client_id')
       return NextResponse.json(
-        { error: 'בחירת לקוח היא שדה חובה' },
+        bilingualError('clientRequired'),
         { status: 400 }
       )
     }
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
     // Phase 3 — reject weekly (and any other unsupported value) server-side,
     // never relying solely on the DB CHECK constraint.
     if (!isValidScanFrequency(rawScanFrequency)) {
-      return NextResponse.json({ error: 'תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.' }, { status: 400 })
+      return NextResponse.json(bilingualError('unsupportedFrequency'), { status: 400 })
     }
     const scanFrequency = rawScanFrequency
     const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
         code: error.code,
       })
       return NextResponse.json(
-        { error: 'שגיאה בהוספת פרויקט' },
+        bilingualError('projectCreateFailed'),
         { status: 400 }
       )
     }
@@ -185,10 +186,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'שגיאה בעיבוד הבקשה'
-    console.error('[API] Unexpected error:', message, err)
+    // Logged here; never returned — a thrown message is not written for the merchant.
+    console.error('[API] Unexpected error:', err instanceof Error ? err.message : 'unknown', err)
     return NextResponse.json(
-      { error: message },
+      bilingualError('requestFailed'),
       { status: 500 }
     )
   }

@@ -210,7 +210,7 @@ export default function TopicsList({
       {genError && (
         <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
           <span>{genError.text}</span>
-          <button type="button" onClick={() => setGenError(null)} className="shrink-0 text-red-500 hover:text-red-700" aria-label="close">✕</button>
+          <button type="button" onClick={() => setGenError(null)} className="shrink-0 text-red-500 hover:text-red-700" aria-label={getDashboardDictionary(language).common.close}>✕</button>
         </div>
       )}
       <Table>

@@ -4,6 +4,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Search, TrendingUp, Globe, Smartphone, BarChart3, Clock } from 'lucide-react'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata: Metadata = {
   title: 'מעקב דירוג בגוגל חיפוש | Rankings by Go Top',
@@ -47,7 +48,7 @@ export default function GoogleOrganicFeaturePage() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link
-                href="/signup"
+                href={authHref('signup', 'he')}
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all text-center"
               >
                 התחילו ניסיון חינם
@@ -288,7 +289,7 @@ export default function GoogleOrganicFeaturePage() {
               ניסיון חינם לשבוע, ללא כרטיס אשראי. בדקו בעצמכם איך זה עובד.
             </p>
             <Link
-              href="/signup"
+              href={authHref('signup', 'he')}
               className="inline-block px-8 py-4 rounded-lg bg-white text-blue-600 text-lg font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
               התחילו ניסיון חינם
