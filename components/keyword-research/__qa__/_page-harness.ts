@@ -133,7 +133,7 @@ const loaded = new Map<string, { Page: any; names: string[] }>()
 export function loadPage(tag = 'current', source?: string): { Page: any; names: string[] } {
   const hit = loaded.get(tag)
   if (hit) return hit
-  const text = source ?? origRead.call(fs, PAGE_PATH, 'utf8')
+  const text = source ?? String(origRead.call(fs, PAGE_PATH, 'utf8'))
   const seeded = seedableSource(text)
   const path = join(PAGE_DIR, `page.qa-virtual-${tag}.tsx`)
   virtual.set(path, seeded.source)
