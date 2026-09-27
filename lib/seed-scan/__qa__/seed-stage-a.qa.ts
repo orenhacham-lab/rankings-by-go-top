@@ -9,14 +9,14 @@
  *
  * Fixtures: a Hebrew WordPress services site, an English Shopify store, a
  * password-locked Shopify store (401 and 200 variants), a site with no
- * sitemap, and sites whose model call or search fails with provider text that
- * must never surface.
+ * sitemap, sites whose model call or search fails with provider text that
+ * must never surface, and claimed free checks with and without their seed.
  *
  * Run: npx tsx lib/seed-scan/__qa__/seed-stage-a.qa.ts
  */
-import { buildFindings, domainKey, extractSiteSignals, fetchSiteHtml, splitFindings } from '@/lib/free-check'
+import { buildFindings, domainKey, extractSiteSignals, fetchSiteHtml, MAX_INTERNAL_LINK_URLS, splitFindings, type FreeCheckSeed } from '@/lib/free-check'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { claimSnapshot } from '../claim'
+import { claimSnapshot, readClaimSnapshot } from '../claim'
 import { resumeSeedRun, runStageA, type StageAResult } from '../runner'
 import type { SearchFn } from '../serper'
 import { MAX_SEARCHES, type StageADepsInput } from '../steps'
@@ -26,6 +26,7 @@ import type { SeedRunTrigger, SeedScope, SeedSummary } from '../types'
 import {
   captureConsole,
   claimedScan,
+  claimSeed,
   clock,
   dnsOverrides,
   EN_SHOP,
@@ -460,6 +461,15 @@ async function main() {
     check('settings seeded from the claim (first seed)', tables.projects[0].business_name === 'אינסטלציה מהירה' && tables.project_profiles.length === 1)
     check('competitors: the claim\'s two suggestions validated, plus discoveries',
       s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il', s.competitors.map((c) => c.domain).join(','))
+    // A row recorded before free_site_checks.seed: its public teaser, nothing more.
+    const snap = (stepRow(tables, 'a1').detail as Row).claim as Row
+    const a2 = stepRow(tables, 'a2').detail as Row
+    const a3 = stepRow(tables, 'a3').detail as Row
+    check('no seed on the row: the snapshot is the teaser (basis teaser), with no links',
+      snap.basis === 'teaser' && Array.isArray(snap.internalLinkUrls) && (snap.internalLinkUrls as unknown[]).length === 0, JSON.stringify({ b: snap.basis, l: snap.internalLinkUrls }))
+    check('…a2 has the two competitors shown, a3 the three findings shown and two by count',
+      a2.basis === 'teaser' && ((a2.insight as Row).competitors as string[]).join(',') === 'rival-plumber.co.il,pipes-pro.co.il'
+      && a3.basis === 'teaser' && a3.findings === 3 && a3.omitted === 2 && stepRow(tables, 'a3').item_count === 5, JSON.stringify({ a2: a2.basis, a3 }))
   }
   {
     const { tables, admin } = world(projectRow())
@@ -474,6 +484,123 @@ async function main() {
     const created = await startRun(admin, { trigger: 'claim', domain: HE_WP.key, url: 'https://plumber-tlv.co.il/' })
     await run(admin, created, { fetchImpl: new FakeNetwork(heWordPressSite()).fetch, insight: fakeModel({ ok: true, insight: HE_WP_INSIGHT }).fn, search: fakeSearch().fn, now: () => NOW })
     check('a claim run without its stored scan fails at a1 (claim_payload_missing), fetching nothing', stepRow(tables, 'a1').error_code === 'claim_payload_missing' && runRow(tables).status === 'failed')
+  }
+
+  // ── 10. A claim that carries its seed ─────────────────────────────────────
+  console.log("\n10) A claimed check that kept its seed (09ee926): every finding, every competitor, the home page's links — still no fetch, no model call")
+  // One search shows the leak-detection firm only the seed names (the teaser
+  // locks it). a4 keeps a model suggestion seen in one list, but discovers a
+  // domain on its own only from two, so the firm is there only from the seed.
+  const LEAK_RESULTS: Record<string, string[]> = { ...HE_WP_RESULTS, 'איתור נזילות': [...HE_WP_RESULTS['איתור נזילות'], 'leak-finders.co.il'] }
+  const SITE = `https://www.${HE_WP.key}`
+  // Longer than the 300 characters the engine's URL admission takes: kept all the same.
+  const longSlug = `${SITE}/${encodeURIComponent('מדריך מלא לאיתור נזילות ללא הרס בתל אביב רמת גן גבעתיים וחולון')}`
+  {
+    const links = [
+      `${SITE}/services`,
+      `${SITE}/services#faq`,
+      'https://plumber-tlv.co.il/contact',
+      'https://evil.example.com/steal',
+      'https://shop.plumber-tlv.co.il/cart',
+      `https://www.${HE_WP.key}:8443/admin`,
+      `https://user:pw@www.${HE_WP.key}/x`,
+      'javascript:alert(1)',
+      'not a url',
+      `${SITE}/${'%D7%90'.repeat(400)}`,
+      42,
+      longSlug,
+      `${SITE}/about`,
+    ] as unknown as string[]
+    const seed = claimSeed({
+      internalLinkUrls: links,
+      findings: [...claimSeed().findings, { id: 'bogus', severity: 'critical', title: 'x', detail: 'y' } as unknown as FreeCheckSeed['findings'][number]],
+    })
+    const { tables, admin } = world(projectRow())
+    const net = new FakeNetwork(heWordPressSite())
+    const model = fakeModel({ ok: true, insight: HE_WP_INSIGHT })
+    const search = fakeSearch(LEAK_RESULTS)
+    const created = await startRun(admin, { trigger: 'claim', domain: HE_WP.key, url: 'https://plumber-tlv.co.il/', claim: claimedScan({ seed }) })
+    const { value: result } = await run(admin, created, { fetchImpl: net.fetch, insight: model.fn, search: search.fn, now: () => NOW })
+    const s = summaryOf(tables)
+    const snap = (stepRow(tables, 'a1').detail as Row).claim as Row
+    const a2 = stepRow(tables, 'a2').detail as Row
+    const a3 = stepRow(tables, 'a3').detail as Row
+    const leak = s.competitors.find((c) => c.domain === 'leak-finders.co.il')
+    check('the run is done', result.outcome === 'finished' && result.status === 'done', statusLine(tables))
+    check('still NO request to the site and NO model call; a4 searches three times', net.requests.length === 0 && model.calls.length === 0 && search.calls.length === 3,
+      JSON.stringify({ r: net.requests.length, m: model.calls.length, s: search.calls.length }))
+    check('a1 keeps the snapshot of the seed (basis seed)', snap.basis === 'seed', String(snap.basis))
+    check('snapshot: EVERY finding, none withheld: the two the teaser locked included, a malformed one dropped',
+      s.findings.length === 5 && s.findingsOmitted === 0 && s.counters.fixes === 5 && ['no_canonical', 'no_open_graph'].every((id) => s.findings.some((f) => f.id === id)) && !s.findings.some((f) => f.id === 'bogus'),
+      s.findings.map((f) => f.id).join(','))
+    check('…in severity order', s.findings.map((f) => f.severity).join(',') === 'blocker,warning,warning,info,info', s.findings.map((f) => f.severity).join(','))
+    check('a3 says so: basis seed, five findings, none omitted', a3.basis === 'seed' && a3.findings === 5 && a3.omitted === 0 && stepRow(tables, 'a3').item_count === 5, JSON.stringify(a3))
+    check('a2: every competitor the model named, the one the teaser locked included',
+      a2.basis === 'seed' && ((a2.insight as Row).competitors as string[]).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,leak-finders.co.il', JSON.stringify((a2.insight as Row).competitors))
+    check('a4 validated it against the searches: it stays, as the model\'s, ahead of the discoveries',
+      s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,leak-finders.co.il,easy.co.il,zap.co.il' && leak?.source === 'model' && leak?.validated === true,
+      s.competitors.map((c) => c.domain).join(','))
+    check("the home page's links: this site's pages only (www or not), no fragment, each once, a long Hebrew slug kept",
+      JSON.stringify(snap.internalLinkUrls) === JSON.stringify([`${SITE}/services`, 'https://plumber-tlv.co.il/contact', longSlug, `${SITE}/about`]),
+      JSON.stringify(snap.internalLinkUrls))
+  }
+  {
+    // The same searches, from a row without its seed: the locked firm is never known.
+    const { tables, admin } = world(projectRow())
+    const created = await startRun(admin, { trigger: 'claim', domain: HE_WP.key, url: 'https://plumber-tlv.co.il/', claim: claimedScan() })
+    await run(admin, created, { fetchImpl: new FakeNetwork(heWordPressSite()).fetch, insight: fakeModel({ ok: true, insight: HE_WP_INSIGHT }).fn, search: fakeSearch(LEAK_RESULTS).fn, now: () => NOW })
+    const s = summaryOf(tables)
+    check('the same searches from a teaser: the locked competitor never checked, three findings listed and two by count',
+      s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il' && s.findings.length === 3 && s.findingsOmitted === 2,
+      s.competitors.map((c) => c.domain).join(','))
+  }
+  {
+    const many = Array.from({ length: MAX_INTERNAL_LINK_URLS + 30 }, (_, i) => `${SITE}/page-${i + 1}`)
+    const capped = claimSnapshot(claimedScan({ seed: claimSeed({ internalLinkUrls: many }) }))
+    check(`at most ${MAX_INTERNAL_LINK_URLS} links are kept, the first ones`,
+      capped.internalLinkUrls.length === MAX_INTERNAL_LINK_URLS && capped.internalLinkUrls[MAX_INTERNAL_LINK_URLS - 1] === `${SITE}/page-${MAX_INTERNAL_LINK_URLS}`, String(capped.internalLinkUrls.length))
+    const empty = claimSnapshot(claimedScan({ seed: claimSeed({ findings: [], internalLinkUrls: [] }) }))
+    check('a seed with no findings is a clean result, not a teaser: nothing listed, nothing withheld',
+      empty.basis === 'seed' && empty.findings.length === 0 && empty.findingsOmitted === 0, JSON.stringify({ b: empty.basis, f: empty.findings.length, o: empty.findingsOmitted }))
+    const malformed: unknown[] = [
+      { findings: 'all of them', competitors: [], internalLinkUrls: [] },
+      { findings: [], competitors: [] },
+      { findings: [], competitors: 'x', internalLinkUrls: [] },
+      [],
+      'seed',
+      7,
+    ]
+    const asTeaser = malformed.map((m) => claimSnapshot(claimedScan({ seed: m as FreeCheckSeed })))
+    check('a seed that is not three lists is no seed: the teaser, as before',
+      asTeaser.every((x) => x.basis === 'teaser' && x.findings.length === 3 && x.findingsOmitted === 2 && x.competitors.length === 2 && x.internalLinkUrls.length === 0),
+      JSON.stringify(asTeaser.map((x) => [x.basis, x.findings.length, x.findingsOmitted])))
+    const tampered = readClaimSnapshot({
+      claim: { ...claimSnapshot(claimedScan({ seed: claimSeed() })), internalLinkUrls: ['https://evil.example.com/x', `${SITE}/services`, 'javascript:alert(1)'] },
+    })
+    check('a stored snapshot is read back defensively: its links checked against its site again',
+      JSON.stringify(tampered?.internalLinkUrls) === JSON.stringify([`${SITE}/services`]), JSON.stringify(tampered?.internalLinkUrls))
+  }
+  {
+    // A snapshot stored before the seed was read (no basis, no links): a run
+    // created before this change and resumed after it reads as the teaser it was.
+    const { tables, admin } = world(projectRow())
+    const old: Record<string, unknown> = { ...claimSnapshot(claimedScan()) }
+    delete old.basis
+    delete old.internalLinkUrls
+    const created = await createSeedRun(admin, SCOPE, {
+      trigger: 'claim',
+      stage: 'a',
+      summary: initialSummary({ source: 'claim', domain: HE_WP.key, url: 'https://plumber-tlv.co.il/', locale: 'he' }),
+      stepDetail: { a1: { claim: old } },
+      now: NOW,
+    })
+    if (!created.ok) throw new Error(`createSeedRun: ${created.reason}`)
+    await run(admin, created, { fetchImpl: new FakeNetwork({}).fetch, insight: fakeModel({ ok: true, insight: HE_WP_INSIGHT }).fn, search: fakeSearch(HE_WP_RESULTS).fn, now: () => NOW })
+    const snap = (stepRow(tables, 'a1').detail as Row).claim as Row
+    const a3 = stepRow(tables, 'a3').detail as Row
+    check('a snapshot stored before the seed existed reads as a teaser: no links, two findings by count',
+      runRow(tables).status === 'done' && snap.basis === 'teaser' && Array.isArray(snap.internalLinkUrls) && snap.internalLinkUrls.length === 0 && a3.basis === 'teaser' && a3.omitted === 2,
+      JSON.stringify({ st: runRow(tables).status, b: snap.basis, a3 }))
   }
 
   finish()

@@ -8,6 +8,7 @@
  */
 import type { FallbackQuestionResponse } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import type { writeSuggestionsToCache } from '@/lib/ai-visibility/suggestion-cache'
+import type { FreeCheckSeed } from '@/lib/free-check'
 import type { KeywordIdeaResult, KeywordIdeasInput } from '@/lib/google-ads/keyword-ideas'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { claimSnapshot } from '../claim'
@@ -241,10 +242,16 @@ export function fakeRoute<T>(answer: (input: T) => RouteAnswer | Promise<RouteAn
 
 /**
  * Run a real stage A of the plumber's site with the stage-A fakes; returns the
- * run id. `claim` seeds it from a claimed free check instead (a1 reads nothing).
+ * run id. `claim` seeds it from a claimed free check instead (a1 reads nothing):
+ * a row recorded before free_site_checks.seed, or with `seed`, one that has it.
  */
-export async function finishedStageA(admin: ServiceRoleClient, net: { fetch: typeof fetch }, now: () => Date, opts: { claim?: boolean } = {}): Promise<string> {
-  const snapshot = opts.claim ? claimSnapshot(claimedScan()) : null
+export async function finishedStageA(
+  admin: ServiceRoleClient,
+  net: { fetch: typeof fetch },
+  now: () => Date,
+  opts: { claim?: boolean; seed?: FreeCheckSeed | null } = {},
+): Promise<string> {
+  const snapshot = opts.claim ? claimSnapshot(claimedScan({ seed: opts.seed ?? null })) : null
   const created = await createSeedRun(admin, SCOPE, {
     trigger: snapshot ? 'claim' : 'create',
     stage: 'a',

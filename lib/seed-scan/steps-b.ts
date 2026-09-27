@@ -79,6 +79,7 @@ import { GoogleAdsError } from '@/lib/google-ads/client'
 import { isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
 import { generateKeywordIdeas, type KeywordIdeaResult, type KeywordIdeasInput } from '@/lib/google-ads/keyword-ideas'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
+import { readClaimSnapshot } from './claim'
 import {
   CRAWL_INDEX_VERSION,
   CRAWL_SITEMAP_LIMIT,
@@ -359,17 +360,15 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
   }
 
   // Sitemaps: the site's own list of its pages, read through the same pins.
+  // The engine asks only for documents on the site's own host (09ee926); the
+  // pin still refuses any redirect hop that leaves it.
   const origin = new URL((homePage ? new URL(homePage.url) : homeUrl).origin)
   const sitemapClock = deadline(deps.budgets.sitemapMs)
   const sitemapFetch = hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: sitemapClock.signal, trace: [], offHost: { hit: false }, allow })
   const readSitemapText: typeof fetchSiteText = async (url) => {
     if (counts.sitemapDocs >= MAX_SITEMAP_DOCS) return { ok: false as const, reason: 'network' as const }
     counts.sitemapDocs++
-    try {
-      return await deps.fetchText(url, { fetchImpl: sitemapFetch })
-    } catch {
-      return { ok: false as const, reason: 'network' as const }
-    }
+    return deps.fetchText(url, { fetchImpl: sitemapFetch })
   }
   const discovery = await settleWithin(
     () => deps.discoverSitemap(origin, { limit: CRAWL_SITEMAP_LIMIT, robotsTxt }, { fetchText: readSitemapText }),
@@ -378,8 +377,13 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
   sitemapClock.clear()
   const sitemapUrls = discovery.kind === 'value' ? discovery.value.entries.map((e) => e.url) : []
 
+  // The home page's links: a1's copy or b1's own read of it. When a claimed
+  // run's read of it failed, the links the free check read on it stand in
+  // (the claim's seed); nothing is fetched for them.
+  const claimLinks = homePage ? [] : (readClaimSnapshot(ctx.details.a1)?.internalLinkUrls ?? [])
+  const homeLinksFrom = stored ? 'a1' : homePage ? 'page' : claimLinks.length > 0 ? 'claim' : 'none'
   const selection = selectKeyPages({
-    homeLinks: homePage?.internalLinkUrls ?? [],
+    homeLinks: homePage ? homePage.internalLinkUrls : claimLinks,
     sitemapUrls,
     siteKey,
     homeUrl,
@@ -390,6 +394,7 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
     attempted: true,
     ...counts,
     sitemapUrls: sitemapUrls.length,
+    homeLinksFrom,
     candidates: selection.candidates,
     disallowed: selection.disallowed,
   })
@@ -436,7 +441,7 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
     attempted: counts.pagesRead,
     failed: counts.pagesFailed,
     truncated: cutShort,
-    notes: [...(stored ? ['home_page_from_a1'] : []), ...(cutShort ? ['crawl_cut_short'] : [])],
+    notes: [...(stored ? ['home_page_from_a1'] : []), ...(homeLinksFrom === 'claim' ? ['home_links_from_claim'] : []), ...(cutShort ? ['crawl_cut_short'] : [])],
     errors: counts.pagesFailed > 0 ? ['page_read_failed'] : [],
     timingMs: finishedAt.getTime() - startedAt.getTime(),
   })

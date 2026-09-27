@@ -10,7 +10,7 @@
  * which the engine's resolver reads at call time.
  */
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
-import type { BusinessInsight, FreeCheckResult, InsightResult } from '@/lib/free-check'
+import type { BusinessInsight, FreeCheckFinding, FreeCheckResult, FreeCheckSeed, InsightResult } from '@/lib/free-check'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import type { SearchFn, SearchOutcome } from '../serper'
 
@@ -422,8 +422,40 @@ export function world(
 
 // ── Claims ──────────────────────────────────────────────────────────────────
 
-/** A free-check ledger row as consumeClaimToken returns it (the gated, public result). */
-export function claimedScan(over: { domain?: string; url?: string; business?: boolean; locale?: 'he' | 'en' } = {}) {
+/** The three findings the teaser shows: its blocker, then the first two of the rest. */
+const SHOWN_FINDINGS: FreeCheckFinding[] = [
+  { id: 'robots_blocks_ai', severity: 'blocker', title: 'AI blocked', detail: 'robots.txt blocks GPTBot' },
+  { id: 'images_alt', severity: 'warning', title: 'Alt text', detail: 'Images without alt', evidence: '1 of 2' },
+  { id: 'thin_content', severity: 'warning', title: 'Thin', detail: 'Little text' },
+]
+
+/**
+ * The ungated set a check recorded since 09ee926 keeps next to its public
+ * result (free_site_checks.seed): the three findings shown and the two the
+ * teaser locks, the two competitors shown and the one it locks (a
+ * leak-detection firm), and the home page's internal links as the engine
+ * read them from HE_WP.html.
+ */
+export function claimSeed(over: Partial<FreeCheckSeed> = {}): FreeCheckSeed {
+  const base = `https://www.${HE_WP.key}`
+  return {
+    findings: [
+      ...SHOWN_FINDINGS.map((f) => ({ ...f })),
+      { id: 'no_canonical', severity: 'info', title: 'Canonical', detail: 'No canonical link' },
+      { id: 'no_open_graph', severity: 'info', title: 'Open Graph', detail: 'No Open Graph tags' },
+    ],
+    competitors: [...HE_WP_INSIGHT.competitors.slice(0, 2), 'leak-finders.co.il'],
+    internalLinkUrls: [`${base}/services`, `${base}/contact`],
+    ...over,
+  }
+}
+
+/**
+ * A free-check ledger row as consumeClaimToken returns it: the gated, public
+ * result, and `seed` — null (the default) for a row recorded before the column
+ * existed, or its ungated set (claimSeed).
+ */
+export function claimedScan(over: { domain?: string; url?: string; business?: boolean; locale?: 'he' | 'en'; seed?: FreeCheckSeed | null } = {}) {
   const domain = over.domain ?? HE_WP.key
   const result: FreeCheckResult = {
     url: over.url ?? `https://www.${domain}/`,
@@ -435,11 +467,7 @@ export function claimedScan(over: { domain?: string; url?: string; business?: bo
     articles: over.business === false ? [] : HE_WP_INSIGHT.articles,
     competitors: HE_WP_INSIGHT.competitors.slice(0, 2),
     lockedCompetitors: 1,
-    findings: [
-      { id: 'robots_blocks_ai', severity: 'blocker', title: 'AI blocked', detail: 'robots.txt blocks GPTBot' },
-      { id: 'images_alt', severity: 'warning', title: 'Alt text', detail: 'Images without alt', evidence: '1 of 2' },
-      { id: 'thin_content', severity: 'warning', title: 'Thin', detail: 'Little text' },
-    ],
+    findings: SHOWN_FINDINGS.map((f) => ({ ...f })),
     lockedFindings: 2,
     geo: {
       passed: 2,
@@ -456,7 +484,7 @@ export function claimedScan(over: { domain?: string; url?: string; business?: bo
     cached: false,
   }
   // seed: null is a check recorded before free_site_checks.seed existed (09ee926).
-  return { checkId: 'check-1', domain, url: result.url, locale: result.locale, result, seed: null }
+  return { checkId: 'check-1', domain, url: result.url, locale: result.locale, result, seed: over.seed ?? null }
 }
 
 // ── Logs ────────────────────────────────────────────────────────────────────

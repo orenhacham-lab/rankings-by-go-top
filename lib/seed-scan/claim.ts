@@ -11,22 +11,38 @@
  * The stored result is data we wrote, but it is read defensively all the same:
  * every list is re-validated and capped before it becomes part of a project.
  *
- * What a claim cannot carry: the free check stores only its public teaser, so
- * the findings beyond the teaser are known by count only (findingsOmitted), and
- * the model's competitor list is cut to the first two. a4 compensates for the
- * second by adding what the search results show.
+ * WHAT A CLAIM CARRIES. A check recorded since free_site_checks.seed exists
+ * (09ee926) carries its ungated set next to the public result: every finding,
+ * every competitor the model named, and the home page's own internal links.
+ * The snapshot takes those (`basis: 'seed'`): a3 reports every finding, a4
+ * checks every competitor, and b1 has the home page's links to fall back on.
+ * An older row has no seed and only its public teaser (`basis: 'teaser'`): the
+ * findings beyond the teaser are known by count only (findingsOmitted), the
+ * competitors are the two shown, and there are no links. a4 makes up for the
+ * competitors by adding what the search results show. Either way the claim
+ * path fetches nothing and asks no model.
  */
-import { domainKey, normalizeCheckUrl, type ClaimedScan, type FreeCheckBusiness, type FreeCheckFinding, type GeoSignal } from '@/lib/free-check'
+import {
+  domainKey,
+  MAX_INTERNAL_LINK_URLS,
+  normalizeCheckUrl,
+  type ClaimedScan,
+  type FreeCheckBusiness,
+  type FreeCheckFinding,
+  type GeoSignal,
+} from '@/lib/free-check'
 import type { Locale } from '@/lib/i18n/locales'
 import type { SeedBusiness } from './types'
 
-/** Exactly what a1-a3 need from the claimed row, validated. Stored on step a1. */
+/** Exactly what a1-a3 (and b1) need from the claimed row, validated. Stored on step a1. */
 export type ClaimSnapshot = {
   checkId: string
   url: string
   domain: string
   locale: Locale
   scannedAt: string | null
+  /** 'seed': the row's ungated set was used; 'teaser': a row without one, its public result only. */
+  basis: 'seed' | 'teaser'
   business: SeedBusiness | null
   audiences: string[]
   keywords: string[]
@@ -35,6 +51,8 @@ export type ClaimSnapshot = {
   findings: FreeCheckFinding[]
   findingsOmitted: number
   geo: { passed: number; total: number; signals: GeoSignal[] }
+  /** The home page's internal links on this site, as the free check read them; empty on a teaser. */
+  internalLinkUrls: string[]
 }
 
 /** The domain key of a project's target_domain, or null when it is not a public web address. */
@@ -121,24 +139,67 @@ function geo(v: unknown): ClaimSnapshot['geo'] {
 
 const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0)
 
-/** Build the stored snapshot from a redeemed claim. */
+/** A stored link longer than this is not kept (a percent-encoded Hebrew slug runs to a few hundred). */
+const MAX_LINK_CHARS = 2_048
+
+/**
+ * The page's links that are this site's own pages: absolute http(s) URLs with
+ * no credentials and no port whose domainKey is `siteKey`, the fragment
+ * dropped, distinct, at most as many as the engine extracts from a page
+ * (MAX_INTERNAL_LINK_URLS). b1 admits each again before it reads one.
+ */
+export function siteLinks(v: unknown, siteKey: string): string[] {
+  if (!Array.isArray(v)) return []
+  const out: string[] = []
+  for (const x of v) {
+    if (out.length >= MAX_INTERNAL_LINK_URLS) break
+    if (typeof x !== 'string' || x.length > MAX_LINK_CHARS) continue
+    let url: URL
+    try {
+      url = new URL(x)
+    } catch {
+      continue
+    }
+    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password || url.port) continue
+    if (domainKey(url) !== siteKey) continue
+    url.hash = ''
+    const link = url.toString()
+    if (!out.includes(link)) out.push(link)
+  }
+  return out
+}
+
+/** The row's ungated set when it has a usable one (three lists), else null: a row recorded before the column. */
+function readSeed(v: unknown): { findings: unknown[]; competitors: unknown[]; internalLinkUrls: unknown[] } | null {
+  if (!v || typeof v !== 'object') return null
+  const r = v as Record<string, unknown>
+  if (!Array.isArray(r.findings) || !Array.isArray(r.competitors) || !Array.isArray(r.internalLinkUrls)) return null
+  return { findings: r.findings, competitors: r.competitors, internalLinkUrls: r.internalLinkUrls }
+}
+
+/** Build the stored snapshot from a redeemed claim: from its seed when it has one, from its teaser otherwise. */
 export function claimSnapshot(scan: ClaimedScan): ClaimSnapshot {
   const result = (scan.result ?? {}) as unknown as Record<string, unknown>
   const biz = toSeedBusiness(result.business as FreeCheckBusiness | null | undefined)
+  const seed = readSeed(scan.seed)
   return {
     checkId: scan.checkId,
     url: scan.url,
     domain: scan.domain,
     locale: scan.locale === 'en' ? 'en' : 'he',
     scannedAt: typeof result.scannedAt === 'string' ? result.scannedAt.slice(0, 40) : null,
+    basis: seed ? 'seed' : 'teaser',
     business: biz,
     audiences: cleanList((result.business as FreeCheckBusiness | null | undefined)?.audiences, 5, 300),
     keywords: cleanList(result.keywords, 5, 160),
     articles: cleanList(result.articles, 5, 200),
-    competitors: cleanList(result.competitors, 6, 120),
-    findings: findings(result.findings),
-    findingsOmitted: count(result.lockedFindings),
+    // Every competitor the model named, capped as a live a2 caps them; a teaser shows two.
+    competitors: cleanList(seed ? seed.competitors : result.competitors, 6, 120),
+    // Every finding; a teaser's locked ones are known by count only.
+    findings: findings(seed ? seed.findings : result.findings),
+    findingsOmitted: seed ? 0 : count(result.lockedFindings),
     geo: geo(result.geo),
+    internalLinkUrls: seed ? siteLinks(seed.internalLinkUrls, scan.domain) : [],
   }
 }
 
@@ -166,5 +227,8 @@ export function readClaimSnapshot(detail: Record<string, unknown> | null | undef
     findings: findings(r.findings),
     findingsOmitted: count(r.findingsOmitted),
     geo: geo(r.geo),
+    // A snapshot stored before the seed existed reads as the teaser it was.
+    basis: r.basis === 'seed' ? 'seed' : 'teaser',
+    internalLinkUrls: siteLinks(r.internalLinkUrls, r.domain),
   }
 }

@@ -23,6 +23,7 @@
  * Run: npx tsx lib/seed-scan/__qa__/seed-stage-b.qa.ts
  */
 import { normalizeLanguage } from '@/lib/ai-visibility/prompt-templates'
+import type { FreeCheckSeed } from '@/lib/free-check'
 import { getContentIndex } from '@/lib/content/content-index'
 import { buildSiteVocabulary } from '@/lib/content/recommendations/engine'
 import { reassembleReport, SCAN_INDEX_VERSION } from '@/lib/content/wordpress-content-index'
@@ -36,7 +37,7 @@ import { contentVerdict, MAX_IDEA_CALLS, MAX_SITEMAP_DOCS, rankVerdict, type Sta
 import { STAGE_B_LEASE_MS } from '../store'
 import { readSummary } from '../summary'
 import type { SeedSummary } from '../types'
-import { captureConsole, clock, FakeNetwork, HE_WP, installFakeDns, makeChecker, PROJECT, projectRow, SECRET, USER, world, type FakeRoute, type Tables } from './_fixtures'
+import { captureConsole, claimSeed, clock, FakeNetwork, HE_WP, installFakeDns, makeChecker, PROJECT, projectRow, SECRET, USER, world, type FakeRoute, type Tables } from './_fixtures'
 import { auditOwners } from './_owner-audit'
 import {
   BASE,
@@ -127,12 +128,22 @@ function depsOf(fakes: Fakes, fetchImpl: typeof fetch, now: () => Date): StageBD
 type Tracking = { requested: number; added: number; code: string }
 
 async function setupB(
-  o: { robots?: string; sitemapIndexes?: number; claim?: boolean; targets?: string[]; tracking?: Tracking; fakes?: Partial<Fakes>; routes?: Record<string, FakeRoute> } = {},
+  o: {
+    robots?: string
+    sitemapIndexes?: number
+    claim?: boolean
+    /** With `claim`: the claimed row's seed (none: a row recorded before the column). */
+    seed?: FreeCheckSeed
+    targets?: string[]
+    tracking?: Tracking
+    fakes?: Partial<Fakes>
+    routes?: Record<string, FakeRoute>
+  } = {},
 ) {
   const { tables, fake, admin } = world(projectRow())
   const clk = clock()
   const web = recordingNet({ ...crawlSite({ robots: o.robots, sitemapIndexes: o.sitemapIndexes }), ...o.routes })
-  const runId = await finishedStageA(admin, { fetch: web.fetch }, clk.now, { claim: o.claim })
+  const runId = await finishedStageA(admin, { fetch: web.fetch }, clk.now, { claim: o.claim, seed: o.seed })
   const afterA = web.log.length
   // The keywords `continue` added (through the keywords tab's action).
   tables.tracking_targets = [
@@ -396,6 +407,60 @@ async function main() {
       stepRow(s.tables, 'b1').status === 'done' && b1d.pagesFailed === 4 && b1d.pagesRead === MAX_KEY_PAGES, JSON.stringify({ r: b1d.pagesRead, f: b1d.pagesFailed }))
     check('…and not in the site index: what arrived before the deadline is not the page',
       targets.length > 0 && !targets.some((x) => String(x.targetUrl ?? '').startsWith(STALLED)), String(targets.length))
+  }
+
+  // ── 3d. A claimed run whose home page b1 cannot read ──────────────────────
+  console.log("\n3d) A claimed run whose home page b1 cannot read: the free check's links stand in (its seed); nothing more is fetched")
+  {
+    // The team page is linked from the home page only: no sitemap lists it.
+    const TEAM = `${BASE}/team`
+    const teamPage: FakeRoute = {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>הצוות | אינסטלציה מהירה</title></head><body><h1>הצוות שלנו</h1><p>אינסטלטורים מוסמכים בתל אביב.</p></body></html>',
+    }
+    const homeDown: Record<string, FakeRoute> = {
+      [HE_WP.home]: { status: 503, headers: { 'content-type': 'text/html' }, body: '<html><body>maintenance</body></html>' },
+      [TEAM]: teamPage,
+    }
+    const seed = claimSeed({ internalLinkUrls: [TEAM, `${BASE}/services`, 'https://evil.example.com/team'] })
+    const withSeed = await setupB({ claim: true, seed, routes: homeDown })
+    await withSeed.run()
+    const teaser = await setupB({ claim: true, routes: homeDown })
+    await teaser.run()
+    const seedUrls = withSeed.b1().map((r) => r.url)
+    const teaserUrls = teaser.b1().map((r) => r.url)
+    const seedB1 = detailOf(withSeed.tables, 'b1')
+    const teaserB1 = detailOf(teaser.tables, 'b1')
+    const notesOf = (t: Tables) => (((t.site_crawl_index ?? [])[0]?.warnings as Row | undefined)?.notes ?? []) as string[]
+    const targetsOf = (t: Tables) => (((t.site_crawl_index ?? [])[0]?.targets ?? []) as { targetUrl?: string }[]).map((x) => String(x.targetUrl ?? ''))
+    const notPages = (urls: string[]) => urls.filter((u) => pathOf(u).endsWith('.xml') || pathOf(u) === '/robots.txt')
+    check('with the seed: the home page failed, b1 read the page only the home page links to, and says where the links came from',
+      stepRow(withSeed.tables, 'b1').status === 'done' && seedUrls.includes(HE_WP.home) && seedUrls.filter((u) => u === TEAM).length === 1
+      && seedB1.homeLinksFrom === 'claim' && notesOf(withSeed.tables).includes('home_links_from_claim'),
+      JSON.stringify({ st: stepRow(withSeed.tables, 'b1').status, from: seedB1.homeLinksFrom, team: seedUrls.filter((u) => u === TEAM).length, notes: notesOf(withSeed.tables) }))
+    check('…and indexed it', targetsOf(withSeed.tables).some((u) => u.startsWith(TEAM)), String(targetsOf(withSeed.tables).length))
+    check('…within the same 25 reads, and nothing fetched for the links: the same robots.txt and sitemap reads as without them',
+      seedB1.pagesRead === MAX_KEY_PAGES && teaserB1.pagesRead === MAX_KEY_PAGES && seedB1.pagesFailed === teaserB1.pagesFailed
+      && notPages(seedUrls).length > 1 && JSON.stringify(notPages(seedUrls)) === JSON.stringify(notPages(teaserUrls)),
+      JSON.stringify({ seed: [seedB1.pagesRead, seedB1.pagesFailed, notPages(seedUrls).length], teaser: [teaserB1.pagesRead, teaserB1.pagesFailed, notPages(teaserUrls).length] }))
+    check('…every request on the host: the seed\'s link to another site never reaches b1', seedUrls.every((u) => new URL(u).hostname === 'www.plumber-tlv.co.il'), seedUrls.filter((u) => new URL(u).hostname !== 'www.plumber-tlv.co.il').join(','))
+    check('without a seed (a teaser): no links to stand in, so the team page is never read, and b1 still finishes from the sitemaps',
+      stepRow(teaser.tables, 'b1').status === 'done' && teaserB1.homeLinksFrom === 'none' && !teaserUrls.includes(TEAM) && !notesOf(teaser.tables).includes('home_links_from_claim'),
+      JSON.stringify({ st: stepRow(teaser.tables, 'b1').status, from: teaserB1.homeLinksFrom }))
+  }
+  {
+    // The home page as b1 reads it now wins over the free check's copy of its links.
+    const TEAM = `${BASE}/team`
+    const s = await setupB({
+      claim: true,
+      seed: claimSeed({ internalLinkUrls: [TEAM] }),
+      routes: { [TEAM]: { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: '<!doctype html><html lang="he"><head><title>הצוות</title></head><body><h1>הצוות</h1></body></html>' } },
+    })
+    await s.run()
+    const b1d = detailOf(s.tables, 'b1')
+    check("a claimed run that reads its home page takes the links from that read, not from the seed",
+      stepRow(s.tables, 'b1').status === 'done' && b1d.homeLinksFrom === 'page' && !s.b1().some((r) => r.url === TEAM), JSON.stringify({ from: b1d.homeLinksFrom }))
   }
 
   // ── 4. Keyword ideas: the cache, failures, markets, competitors ───────────

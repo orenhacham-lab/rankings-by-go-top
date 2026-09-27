@@ -11,13 +11,17 @@
  * including the children of a sitemap index:
  *
  *   1. ONLY THE PROJECT'S HOST. A merchant's project scans the merchant's site.
- *      A redirect to another domain, or a sitemap index that lists a child on
- *      another domain, is refused before any request leaves: `www.` and the bare
- *      domain are the same site (domainKey), anything else is not.
- *   2. A DEADLINE ACROSS HOPS AND BODY. The engine's per-request timeout ends
- *      when the headers arrive; the deadline signal passed here is also the
- *      request's signal, so it bounds reading the body too, and it bounds a
- *      whole redirect chain rather than each hop.
+ *      A redirect to another domain is refused before any request leaves:
+ *      `www.` and the bare domain are the same site (domainKey), anything else
+ *      is not. (The engine itself now asks only for sitemap documents on the
+ *      origin host, 09ee926; its redirects need only a public address, so this
+ *      pin is what keeps every hop on the site.)
+ *   2. A DEADLINE ACROSS HOPS AND BODY. The engine's own timeout now covers
+ *      the body as well (09ee926), but it restarts at every redirect hop; the
+ *      deadline signal passed here is also the request's signal, so it bounds a
+ *      whole redirect chain, body included, at the step's own budget. A read it
+ *      cuts short comes back as what arrived, truncated; a1 and b1 do not take
+ *      such a page as read.
  *
  * The hop record is what lets a1 recognise a password-locked Shopify store even
  * when the password page itself answers 401 and the engine returns no HTML.

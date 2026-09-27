@@ -26,6 +26,7 @@ import { SEED_API_ERROR_CODES, type SeedGetResponse, type SeedScope } from '../t
 import {
   captureConsole,
   claimedScan,
+  claimSeed,
   clock,
   FakeNetwork,
   fakeModel,
@@ -144,7 +145,7 @@ function isStableRefusal(r: { json: Row; status: number }, code: string): boolea
 function claimTables(token: string, scan: ReturnType<typeof claimedScan>, over: Row = {}): Tables {
   return {
     free_site_check_claims: [{ token_hash: hashClaimToken(token), check_id: scan.checkId, consumed_at: null, created_at: new Date(NOW.getTime() - 60_000).toISOString(), ...over }],
-    free_site_checks: [{ id: scan.checkId, domain: scan.domain, url: scan.url, locale: scan.locale, result: scan.result }],
+    free_site_checks: [{ id: scan.checkId, domain: scan.domain, url: scan.url, locale: scan.locale, result: scan.result, seed: scan.seed }],
   }
 }
 
@@ -340,12 +341,31 @@ async function main() {
     check('…the scan is stored on a1 for the runner', ((a1?.detail as Row)?.claim as Row)?.checkId === scan.checkId)
     const claimSummary = s.tables.project_seed_runs[0].summary as Row
     check("…the snapshot is a claim, in the scan's language (en), not the request's (he)", claimSummary.source === 'claim' && claimSummary.locale === 'en')
+    const stored = ((a1?.detail as Row)?.claim ?? {}) as Row
+    check('…a row with no seed (recorded before the column) is stored as its teaser: three findings, two by count, two competitors, no links',
+      stored.basis === 'teaser' && (stored.findings as unknown[] | undefined)?.length === 3 && stored.findingsOmitted === 2 && (stored.competitors as unknown[] | undefined)?.length === 2
+      && Array.isArray(stored.internalLinkUrls) && (stored.internalLinkUrls as unknown[]).length === 0, JSON.stringify({ b: stored.basis, o: stored.findingsOmitted }))
     check('…and the token is spent', !!s.tables.free_site_check_claims[0].consumed_at)
     // The same token on another project of the same user and site.
     s.tables.projects.push(projectRow({ id: OTHER_PROJECT }))
     const again = await call(handleSeedPost(new Request('https://app.example/x', { method: 'POST', body: JSON.stringify({ action: 'claim', token }) }), OTHER_PROJECT, s.deps))
     check('a token is single-use: the second redemption → 400 claim_invalid', again.status === 400 && isStableRefusal(again, 'claim_invalid'), again.text)
     check('…and no second run exists', s.tables.project_seed_runs.length === 1)
+  }
+  {
+    // A row recorded since free_site_checks.seed: redeemed through the engine,
+    // which reads the column, and stored as its ungated set.
+    const token = randomBytes(32).toString('hex')
+    const site = `https://www.${HE_WP.key}`
+    const scan = claimedScan({ seed: claimSeed({ internalLinkUrls: [`${site}/services`, 'https://evil.example.com/x', `${site}/contact#form`] }) })
+    const s = setup({ extra: claimTables(token, scan) })
+    const r = await call(handleSeedPost(post({ action: 'claim', token }), PROJECT, s.deps))
+    const stored = ((s.tables.project_seed_steps.find((x) => x.step === 'a1')?.detail as Row)?.claim ?? {}) as Row
+    check('a claim whose row kept its seed → 202, and a1 stores the seed: every finding, none withheld, every competitor',
+      r.status === 202 && stored.basis === 'seed' && (stored.findings as unknown[] | undefined)?.length === 5 && stored.findingsOmitted === 0
+      && (stored.competitors as string[] | undefined)?.join(',') === 'rival-plumber.co.il,pipes-pro.co.il,leak-finders.co.il', `${r.status} ${JSON.stringify({ b: stored.basis, o: stored.findingsOmitted })}`)
+    check("…and of its links, only this site's pages", JSON.stringify(stored.internalLinkUrls) === JSON.stringify([`${site}/services`, `${site}/contact`]), JSON.stringify(stored.internalLinkUrls))
+    check('…the token is spent, one run', !!s.tables.free_site_check_claims[0].consumed_at && s.tables.project_seed_runs.length === 1)
   }
   {
     const token = randomBytes(32).toString('hex')

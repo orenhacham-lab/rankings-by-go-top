@@ -27,7 +27,9 @@
  *
  * A CLAIMED RUN (trigger 'claim') seeds a1-a3 from the free check the visitor
  * already watched, stored on a1 when the run was created: no fetch and no model
- * call. a4 still searches.
+ * call. From the check's seed when its row has one — every finding, every
+ * competitor, the home page's links (b1's fallback) — and from its public
+ * teaser when it does not (claim.ts). a4 still searches.
  *
  * Failures are stable codes. Nothing a site, the model or the search provider
  * said is stored, returned or logged.
@@ -396,16 +398,13 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
 
   const signals = deps.extractSignals(fetched.html, fetched.url, { robotsTxt, llmsTxt })
 
-  // Sitemaps: how many real URLs the site publishes. A body cut off by the
-  // deadline throws inside the engine; here that is one unreadable sitemap.
+  // Sitemaps: how many real URLs the site publishes. A document cut off by the
+  // deadline comes back as what arrived (the engine no longer throws), and the
+  // count then reads "at least" (cutShort below).
   const sitemapClock = deadline(deps.budgets.sitemapMs)
   const sitemapFetch = hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: sitemapClock.signal, trace: [], offHost: { hit: false } })
   const readSitemapText: typeof fetchSiteText = async (url) => {
-    try {
-      return await deps.fetchText(url, { fetchImpl: sitemapFetch })
-    } catch {
-      return { ok: false as const, reason: 'network' as const }
-    }
+    return deps.fetchText(url, { fetchImpl: sitemapFetch })
   }
   const discovery = await settleWithin(
     () => deps.discoverSitemap(origin, { limit: SITEMAP_URL_LIMIT, robotsTxt }, { fetchText: readSitemapText }),
@@ -504,9 +503,10 @@ async function a2Claim(ctx: StepContext): Promise<StepOutcome> {
     audiences: cleanAudienceLabels(snapshot.audiences),
     keywords: snapshot.keywords,
     articles: snapshot.articles,
+    // Every competitor the model named when the claim has its seed; the two shown otherwise.
     competitors: snapshot.competitors,
   }
-  return applyInsight(ctx, insight, { mode: 'claim', insight })
+  return applyInsight(ctx, insight, { mode: 'claim', basis: snapshot.basis, insight })
 }
 
 /** The model's competitor suggestions, before a4 has checked any of them. */
@@ -596,11 +596,13 @@ async function a3Claim(ctx: StepContext): Promise<StepOutcome> {
     snapshot.geo.total > 0
       ? { state: 'measured', unavailableReason: null, ...snapshot.geo }
       : { state: 'unavailable', unavailableReason: null, passed: 0, total: 0, signals: [] }
+  // With the claim's seed, every finding and none omitted; from a teaser, the
+  // shown ones and the count of the rest.
   const findings = bySeverity(snapshot.findings)
   const summary = withCounters({ ...ctx.summary, findings, findingsOmitted: snapshot.findingsOmitted, geo })
   return finished('done', null, summary, {
     itemCount: findings.length + snapshot.findingsOmitted,
-    detail: { mode: 'claim', findings: findings.length, omitted: snapshot.findingsOmitted, geoPassed: geo.passed, geoTotal: geo.total },
+    detail: { mode: 'claim', basis: snapshot.basis, findings: findings.length, omitted: snapshot.findingsOmitted, geoPassed: geo.passed, geoTotal: geo.total },
   })
 }
 
