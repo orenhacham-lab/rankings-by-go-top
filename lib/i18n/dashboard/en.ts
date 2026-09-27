@@ -415,7 +415,6 @@ export const dashboardEn = {
       articles: 'Articles',
       topics: 'Topics & strategy',
       automation: 'Automation & schedule',
-      searchConsole: 'Search Console',
     },
     // One line of context per screen, shown under its heading. Each screen is its
     // own sidebar entry now, so it has to say what it is without a tab bar around it.
@@ -423,7 +422,6 @@ export const dashboardEn = {
       articles: 'Every article in this project, from draft to published',
       topics: 'Topics awaiting approval and their internal-link plans',
       automation: 'Automatic article ideas and the scheduled publishing queue',
-      searchConsole: 'What Google already sees on the site, and what it recommends',
     },
     tabs: {
       articles: 'Articles',
@@ -432,12 +430,6 @@ export const dashboardEn = {
       gscIdeas: 'Search Console Recommendations',
       gscRaw: 'Search Console (raw)',
       comingSoon: 'Coming soon',
-    },
-    // L2 — sub-tabs inside the Search Console area: the client recommendations vs the
-    // underlying Search Console data (the same read-only table shown on the project page).
-    gscSubTabs: {
-      recommendations: 'Recommendations',
-      data: 'Search Console data',
     },
     stats: {
       total: 'All articles',
@@ -1715,6 +1707,62 @@ export const dashboardEn = {
     cellNoCompetitors: 'No competitors are set up for this project.',
     cellLoadFailed: 'We could not load competitor positions.',
   },
+  // Search Console inside the tabs: the widgets that read it on the dashboard, the
+  // keywords table, "my progress", keyword research and topics. Each has its title and
+  // one sentence on what it shows and why that is worth having; before Search Console
+  // is set up, that sentence stands next to the widget's one button.
+  gscWidgets: {
+    source28: 'Search Console · last 28 days',
+    actions: {
+      not_connected: 'Connect Search Console',
+      reauth_required: 'Reconnect Search Console',
+      no_property: 'Choose a property',
+      never_synced: 'Sync Search Console',
+    },
+    loading: 'Loading Search Console data',
+    loadError: 'We could not load the Search Console data.',
+    retry: 'Try again',
+    emptyTile: 'Waiting for Search Console',
+    clicks: {
+      title: 'Clicks from Google',
+      about: 'How many visits Google sent to your site in the last 28 days, so you can see whether your rankings bring real traffic.',
+    },
+    topPages: {
+      title: 'Top pages on Google',
+      about: 'The five pages that get the most clicks from Google, so you know which pages to protect and build on.',
+      none: 'Google has not sent a click to any of your pages in the last 28 days.',
+      clicks: (n: string) => `${n} clicks`,
+      homePage: 'Home page',
+    },
+    performance: {
+      title: 'Your Google Search performance',
+      about: 'Clicks, impressions and average position on Google over the last 28 days, with the trend across syncs, so you can see whether the work is paying off.',
+      clicks: 'Clicks',
+      impressions: 'Impressions',
+      position: 'Average position',
+      vsPrevious: 'vs. the previous 28 days',
+      trendPending: 'The trend builds up with each weekly sync',
+      trendOf: (label: string) => `${label} over the last syncs`,
+    },
+    keywords: {
+      title: 'Clicks and impressions per keyword',
+      about: 'Each keyword will show the clicks and impressions it got from Google in the last 28 days, so you can see which rankings actually bring visitors.',
+      legend: 'The line under each search volume: clicks · impressions from Google in the last 28 days.',
+      figures: (clicks: string, impressions: string) => `${clicks} clicks · ${impressions} impressions from Google in the last 28 days`,
+      none: 'Google reported no clicks or impressions for this keyword in the last 28 days.',
+      notReady: 'Clicks and impressions from Google appear here once Search Console is set up.',
+      loading: 'Loading clicks and impressions',
+      loadFailed: 'We could not load clicks and impressions.',
+    },
+    opportunities: {
+      title: 'Opportunities from Search Console',
+      about: 'Searches where your site already shows up on Google, and what to improve on each page to win more clicks.',
+    },
+    recommendations: {
+      title: 'Recommendations from Search Console',
+      about: 'Clear recommendations for your pages, drawn from how people already find your site on Google, so each change builds on real demand.',
+    },
+  },
   clients: {
     title: 'Clients',
     countSuffix: 'clients',
@@ -2075,17 +2123,16 @@ export const dashboardEn = {
         },
       },
       // Stage E2A — Search Console opportunity ideas (read-only, diagnostic). No create/approve/publish.
+      // Its title and description are the widget's, in `gscWidgets.opportunities`.
       gscOpportunities: {
-        title: 'Search Console ideas',
-        subtitle: 'Read-only analysis of your synced search data — for understanding only. It never creates, approves, or publishes content.',
         window28: '28 days',
         window90: '90 days',
         notConnected: 'The account is not connected to Google Search Console.',
         noProperty: 'No Search Console property is assigned to this project.',
         neverSynced: 'No successful sync yet for this window. Run a sync in the Search Console panel.',
-        ctaConnect: 'Connect Google Search Console on the project page',
-        ctaSelectProperty: 'Select a Search Console property on the project page',
-        ctaSync: 'Sync Search Console data on the project page',
+        ctaConnect: 'Connect Search Console in settings',
+        ctaSelectProperty: 'Choose a Search Console property in settings',
+        ctaSync: 'Sync Search Console in settings',
         noRows: 'No actionable ideas were found in this window’s data.',
         loading: 'Loading ideas…',
         apiError: 'Could not load ideas. Please try again.',
@@ -2186,9 +2233,8 @@ export const dashboardEn = {
           invalid_window: 'Invalid window.',
         },
       },
+      // Its title and description are the widget's, in `gscWidgets.recommendations`.
       gscRecommendations: {
-        title: 'Search Console recommendations',
-        subtitle: 'We analyzed your search data and turned it into clear, actionable recommendations. Nothing is created or published automatically.',
         window28: '28 days',
         window90: '90 days',
         loading: 'Loading recommendations…',

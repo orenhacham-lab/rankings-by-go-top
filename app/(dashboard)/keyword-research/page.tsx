@@ -8,6 +8,8 @@ import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/const
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
+import GscOpportunities from '@/components/content/GscOpportunities'
+import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
@@ -139,6 +141,11 @@ export default function KeywordResearchPage() {
   const selectedProject = activeProjectId ?? ''
   const projectsLoading = !projectsResolved
   const activeProjectName = projects.find((p) => p.id === activeProjectId)?.name ?? ''
+  const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.name ?? '' })), [projects])
+  // What the raw Search Console opportunity browser reports back when it is on (a
+  // decision saved or undone, a topic created, or why not): it has no other place on
+  // this screen to say it.
+  const gscToast = useToasts()
   const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
@@ -1315,6 +1322,19 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
+      {/* Internal/dev-only raw Search Console opportunity browser (Stage E2A/E2B) —
+          behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. It is a diagnostic, never the
+          merchant-facing view (a merchant-grade presentation of these opportunities
+          is a later package). For the project the top bar names, and keyed by it, so
+          a switch starts it afresh instead of showing, or later receiving, the
+          previous project's opportunities. */}
+      {process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && (
+        <div className="mt-8">
+          <GscOpportunities projectId={selectedProject} key={selectedProject} projects={projectOptions}
+            onToast={(kind, text) => (kind === 'success' ? gscToast.success(text) : gscToast.error(text))} />
+        </div>
+      )}
+
       {/* AI Questions Modal */}
       <AIQuestionsModal
         open={aiQuestionsOpen}
@@ -1350,6 +1370,8 @@ export default function KeywordResearchPage() {
         error={trendError}
         data={trendData}
       />
+
+      <ToastHost toasts={gscToast.toasts} dismiss={gscToast.dismiss} dir={isRTL ? 'rtl' : 'ltr'} />
     </div>
   )
 }

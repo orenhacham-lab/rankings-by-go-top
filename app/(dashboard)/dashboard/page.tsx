@@ -8,8 +8,12 @@
  * a workspace now, picked in the top bar, so the dashboard shows that one site:
  * its keywords, its scans and what moved in its rankings.
  *
- * These are the widgets the page already had, scoped to the project. The
- * redesigned dashboard is its own phase of the plan.
+ * These are the widgets the page already had, scoped to the project, plus what
+ * Search Console adds: clicks from Google and the top pages. Those two are always
+ * here; until Search Console is set up they say what they will show, with the one
+ * step that is missing. With Search Console switched off on the server they render
+ * nothing, and the tile row closes up to the tiles it has. The redesigned dashboard
+ * is its own phase of the plan.
  */
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -31,6 +35,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import CompetitorSummary from '@/components/competitors/CompetitorSummary'
 import { useProjectCompetitorComparison } from '@/components/competitors/useCompetitorComparison'
+import GscClicksTile from '@/components/gsc/GscClicksTile'
+import GscTopPages from '@/components/gsc/GscTopPages'
 
 interface LatestScan {
   id: string
@@ -188,9 +194,11 @@ function ProjectDashboard({ project }: { project: Project }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* One equal column per tile: three with the clicks tile, two without it. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-flow-col sm:auto-cols-fr">
         <Link href="/keywords" className="block rounded-card transition-shadow hover:shadow-card">
           <StatTile
+            className="h-full"
             label={home.keywords}
             value={snapshot.keywords}
             source={home.keywordsSource}
@@ -199,12 +207,14 @@ function ProjectDashboard({ project }: { project: Project }) {
         </Link>
         <Link href="/scans" className="block rounded-card transition-shadow hover:shadow-card">
           <StatTile
+            className="h-full"
             label={home.scansPerformed}
             value={snapshot.scans}
             source={home.scansSource}
             icon={<Search size={16} strokeWidth={2} />}
           />
         </Link>
+        <GscClicksTile projectId={project.id} />
       </div>
 
       <CompetitorSummary view={competitorView} variant="compact" />
@@ -266,6 +276,8 @@ function ProjectDashboard({ project }: { project: Project }) {
           empty={home.noRecentDrops}
         />
       </div>
+
+      <GscTopPages projectId={project.id} />
     </div>
   )
 }

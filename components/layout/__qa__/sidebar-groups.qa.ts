@@ -7,9 +7,11 @@
  * which", but "every entry sits in a named group, every label exists in both
  * languages, and every href is a real route".
  *
- * Since the content workspace lost its hub entry, the sidebar also carries the four
+ * Since the content workspace lost its hub entry, the sidebar also carries the
  * content SCREENS directly, derived from CONTENT_SCREENS rather than re-listed here.
  * That is the second contract below: derived, not duplicated, and one active entry.
+ * Search Console is not one of them any more: it feeds the other screens, and its
+ * connection is a section of the project's settings.
  *
  * Mostly a SOURCE guard — it reads Sidebar.tsx and the two dictionaries and strips
  * comments before matching, so prose in a comment can never satisfy a check. The
@@ -171,6 +173,11 @@ function main() {
   // how the concept would creep back into a sidebar that no longer has one screen for it.
   check('the retired hub label is gone from both dictionaries',
     !/\n\s{4}content:\s*'/.test(he) && !/\n\s{4}content:\s*'/.test(en))
+  // Search Console left the sidebar with its screen: no entry, icon or flag for it.
+  const noSearchConsoleEntry = (sidebar: string) => !/searchConsole|\/content\/search-console|NEXT_PUBLIC_GSC_READ_ONLY_ENABLED/.test(sidebar)
+  check('the sidebar has no Search Console entry, icon or flag', noSearchConsoleEntry(src))
+  check('MUT: a sidebar with the Search Console icon back fails that check',
+    !noSearchConsoleEntry(src.replace('automation: CalendarClock,', 'automation: CalendarClock,\n  searchConsole: LineChart,')))
 
   // ── Every screen is a tab of the current project ──────────────────────────
   // The project is picked in the top bar's workspace switcher, so there is no

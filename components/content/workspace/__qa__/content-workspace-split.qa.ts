@@ -7,16 +7,21 @@
  * tabs. Nothing had a URL, nothing could be reasoned about alone, and "content" was
  * the one screen a merchant could not describe.
  *
- * This suite pins the shape that replaced it: four routes, one shared provider, one
+ * This suite pins the shape that replaced it: three routes, one shared provider, one
  * shell, and screens that do not reach into each other. Each screen is also a sidebar
  * entry of its own — the hub entry they used to hide behind is gone — so the workspace
  * has no tab bar and every screen names itself. It is a SOURCE contract: it checks
  * structure, not rendered output; the journeys cover behaviour.
+ *
+ * There were four until Search Console stopped being a screen: it is a data source of
+ * the screens that already exist now (its recommendations are a section of Topics), and
+ * its old address is a redirect (section S of lib/active-project/__qa__/workspace-structure.qa.ts
+ * pins where it goes).
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
-  CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_AUTOMATION_PATH, CONTENT_SEARCH_CONSOLE_PATH,
+  CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH,
   activeContentScreen, isContentScreenEnabled,
 } from '../../../../lib/content/content-workspace-nav'
 import { getDashboardDictionary } from '../../../../lib/i18n/dashboard/getDashboardDictionary'
@@ -32,13 +37,18 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 const WS = join('components', 'content', 'workspace')
 const APP = join('app', '(dashboard)', 'content', '(workspace)')
 
-/** Screen file → the components that belong to OTHER screens and must not appear in it. */
+/** Screen file → the components that belong to OTHER screens and must not appear in it.
+ *  Search Console's recommendations belong to Topics now; its data table stays in the
+ *  project's settings (GscPanel) and its opportunities in keyword research. */
 const NOT_IN: Record<string, readonly string[]> = {
   'ArticlesScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'TopicsList', 'NewTopicsLinkPlanPanel', 'GscRecommendations', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
-  'TopicsScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'GscRecommendations', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
+  'TopicsScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
   'AutomationScreen.tsx': ['TopicsList', 'NewTopicsLinkPlanPanel', 'GscRecommendations', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
-  'SearchConsoleScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'TopicsList', 'NewTopicsLinkPlanPanel'],
 }
+
+/** The workspace's screens, and nothing else: Search Console is not one of them. */
+const SCREEN_KEYS = ['articles', 'topics', 'automation']
+const isTheThreeScreens = (keys: readonly string[]) => JSON.stringify(keys) === JSON.stringify(SCREEN_KEYS)
 
 const screenFiles = Object.keys(NOT_IN)
 const workspaceFiles = readdirSync(join(ROOT, WS), { withFileTypes: true })
@@ -94,7 +104,13 @@ function main() {
   for (const s of CONTENT_SCREENS) {
     check(`screen "${s.key}" has a page at ${s.href}`, routeFileFor(s.href) !== null)
   }
-  check('all four routes live under ONE layout, so the frame is shared',
+  check('the screens are articles, topics and automation — Search Console is not a screen',
+    isTheThreeScreens(CONTENT_SCREENS.map((s) => s.key)), CONTENT_SCREENS.map((s) => s.key).join(', '))
+  check('MUT: a screen list that still declares Search Console fails that check',
+    !isTheThreeScreens([...CONTENT_SCREENS.map((s) => s.key), 'searchConsole']))
+  check('the Search Console screen has no page and no component inside the workspace',
+    !existsSync(join(ROOT, APP, 'search-console')) && !existsSync(join(ROOT, WS, 'SearchConsoleScreen.tsx')))
+  check('all three routes live under ONE layout, so the frame is shared',
     existsSync(join(ROOT, APP, 'layout.tsx')))
   // The article editor sits beside them and must NOT inherit the workspace frame —
   // that is why the screens are in a route group of their own.
@@ -108,6 +124,8 @@ function main() {
     const leaked = NOT_IN[file].filter((c) => new RegExp(`<${c}[\\s/>]`).test(src))
     check(`${file} renders only its own subject`, leaked.length === 0, leaked.join(', '))
   }
+  check('Topics carries the Search Console recommendations the retired screen used to show',
+    /<GscRecommendations\s/.test(strip(read(join(WS, 'TopicsScreen.tsx')))))
 
   // ── 4. One loader for the shared payload, in the provider. ──
   const providerSrc = strip(read(join(WS, 'ContentWorkspaceProvider.tsx')))
@@ -171,7 +189,7 @@ function main() {
   check('the root path resolves to the articles screen', activeContentScreen(CONTENT_ROOT_PATH) === 'articles')
   check('a nested path resolves to its own screen, not the root',
     activeContentScreen(CONTENT_AUTOMATION_PATH) === 'automation'
-    && activeContentScreen(CONTENT_SEARCH_CONSOLE_PATH) === 'searchConsole')
+    && activeContentScreen(CONTENT_TOPICS_PATH) === 'topics')
   check('a deeper path still belongs to its screen', activeContentScreen(`${CONTENT_AUTOMATION_PATH}/anything`) === 'automation')
   const flagged = CONTENT_SCREENS.find((s) => s.flag)!
   check('a flagged screen is hidden when its flag is absent, empty or not exactly "true"',

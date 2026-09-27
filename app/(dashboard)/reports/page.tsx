@@ -16,6 +16,7 @@ import { sortTargetsByPosition } from '@/lib/sorting'
 import { BarChart3, FileText, Zap } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import GscPerformance from '@/components/gsc/GscPerformance'
 
 type ReportType = 'google' | 'ai'
 
@@ -360,6 +361,11 @@ function ReportsContent() {
         title={t.title}
         subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}
       />
+
+      {/* Clicks, impressions and position on Google, with their trend across syncs.
+          Always here: before Search Console is set up it says what it will show
+          (with Search Console switched off on the server it renders nothing). */}
+      <GscPerformance projectId={activeProjectId} className="mb-6" />
 
       {/* Report type. The project is the one the top bar names. */}
       <Card className="mb-6">

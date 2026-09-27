@@ -28,6 +28,7 @@ import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import CompetitorSummary from '@/components/competitors/CompetitorSummary'
 import { useCompetitorComparison, type CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import type { OwnCheck } from '@/lib/competitors/comparison'
+import { GscKeywordsNotice, useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
 
 export default function ProjectKeywordsPanel({ project }: { project: Project }) {
   const id = project.id
@@ -306,6 +307,10 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     ? { ...comparedView, status: 'error', retry: () => { void loadTargets() } }
     : comparedView
 
+  // Clicks and impressions from Search Console, per keyword: read again when the list changes.
+  const targetsKey = useMemo(() => targets.map((t) => t.id).join(','), [targets])
+  const gscKeywords = useGscKeywordFigures(id, targetsKey)
+
   return (
     <div>
       {scanMessage && (
@@ -391,6 +396,10 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         </div>
       </div>
 
+      {/* What the line under each search volume is, or, before Search Console is set
+          up, what it will be and the one step that is missing. */}
+      <GscKeywordsNotice projectId={id} view={gscKeywords} className="mb-3" />
+
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
         <p className="rounded-card border border-line bg-surface px-4 py-10 text-center text-sm text-muted">{kp.noMatches}</p>
       ) : (
@@ -413,6 +422,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           projectDevice={project.device_type}
           onActionComplete={loadTargets}
           competitorView={competitorView}
+          gscKeywords={gscKeywords}
         />
       )}
 

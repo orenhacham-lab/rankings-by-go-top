@@ -1,7 +1,15 @@
 'use client'
 
 /**
- * Stage E2A surface + Stage E2B controlled decisions (RTL, Hebrew-first).
+ * Stage E2A surface + Stage E2B controlled decisions.
+ *
+ * The raw opportunity browser: an internal/dev-only DIAGNOSTIC, never the merchant-facing
+ * view. Keyword research mounts it only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED (a
+ * merchant-grade presentation of these opportunities is a later package). When mounted,
+ * until Search Console can feed it, it says what it will show and offers the one step
+ * that is missing (the shared status decides which), and it asks for opportunities only
+ * once there is a sync to read them from; with Search Console switched off on the
+ * server it renders nothing.
  *
  * E2A remains fully read-only. E2B adds human-triggered decisions — Create reviewed topic /
  * Already covered / Not relevant — gated behind NEXT_PUBLIC_GSC_ACTIONS_ENABLED (the server
@@ -19,6 +27,9 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
+import GscSetupPrompt, { GscLoadError, GscLoading } from '@/components/gsc/GscSetupPrompt'
+import { useGscStatus } from '@/components/gsc/gsc-data'
+import { isGscSetupState } from '@/lib/gsc/widget-state'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -68,6 +79,10 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
 }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscOpportunities, [language])
+  const w = useMemo(() => getDashboardDictionary(language).gscWidgets.opportunities, [language])
+  // Whether there is anything to read at all: connection, property and a sync.
+  const gsc = useGscStatus(projectId)
+  const gscReady = gsc.view.state === 'ready'
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
   const [typeFilter, setTypeFilter] = useState<FilterValue | null>(null)
@@ -102,7 +117,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
     } catch { setErrored(true); setData(null) } finally { setLoading(false) }
   }, [projectId, activeWindow, typeFilter, page, decisionState])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (gscReady) load() }, [load, gscReady])
   useEffect(() => { setPage(0) }, [activeWindow, typeFilter, decisionState])
 
   const reasonText = (r: ReasonCode) => (t.reasons as Record<string, string>)[r.code] ?? r.detail
@@ -188,13 +203,24 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
 
   const decidedLabel = (d: DecisionKind) => (d === 'created_topic' ? t.decidedCreatedTopic : d === 'already_covered' ? t.decidedAlreadyCovered : t.decidedIrrelevant)
 
+  if (gsc.view.state === 'disabled') return null
   return (
+    <section data-gsc-widget="opportunities" data-gsc-state={gsc.view.state}>
     <Card className="hover:translate-y-0">
       <div className="flex items-center gap-2 mb-1">
         <Lightbulb size={18} className="text-amber-500 dark:text-amber-400" />
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{w.title}</h3>
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.subtitle}</p>
+
+      {isGscSetupState(gsc.view.state) ? (
+        <GscSetupPrompt state={gsc.view.state} about={w.about} projectId={projectId} className="mt-2" />
+      ) : gsc.view.state === 'error' ? (
+        <GscLoadError onRetry={gsc.reload} className="mt-2" />
+      ) : gsc.view.state === 'loading' ? (
+        <GscLoading className="mt-3" />
+      ) : (
+      <>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{w.about}</p>
 
       {/* Window toggle */}
       <div className="flex gap-2 mb-3">
@@ -347,6 +373,8 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
           )}
         </div>
       )}
+      </>
+      )}
 
       {/* Reused topic-creation modal (create mode, prefilled, fully editable). Only mounted
           when the actions flag is on and a "create topic" action was triggered. */}
@@ -365,5 +393,6 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
         />
       )}
     </Card>
+    </section>
   )
 }

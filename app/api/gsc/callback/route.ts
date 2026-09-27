@@ -20,22 +20,19 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest) {
   const origin = new URL(request.url).origin
 
-  // K4 — where to return after the flow (set at /api/gsc/connect only for a hub-
-  // initiated connect). A fixed enum; the destination path is built server-side from
-  // the VALIDATED state's project id below, never from any client-supplied URL. Every
-  // terminal redirect clears this cookie so a stale value can't affect a later flow.
-  const returnHub = request.cookies.get(GSC_RETURN_COOKIE)?.value === 'hub'
-  // Both destinations are the screens that mount the panel reading `gsc`/`gsc_error`:
-  // the content Search Console screen for a hub connect, the project's settings for
-  // any other (they replaced the project page, which held that panel before).
+  // Where to return after the flow: the project's settings, the one screen that mounts
+  // the panel reading `gsc`/`gsc_error`, straight to its Search Console section. The
+  // path is fixed and the project comes from the VALIDATED state below, never from any
+  // client-supplied URL. The content workspace's Search Console screen, the other
+  // return address (K4, chosen by a 'hub' value of the return cookie), is gone: Search
+  // Console feeds the other screens now, so a hub connect returns here too. Every
+  // terminal redirect still clears that cookie so a stale value can't affect anything.
   const back = (projectId: string | null, params: Record<string, string>): NextResponse => {
-    const url = projectId
-      ? new URL(returnHub ? '/content/search-console' : '/settings', origin)
-      : new URL('/projects', origin)
+    const url = projectId ? new URL('/settings', origin) : new URL('/projects', origin)
     if (projectId) url.searchParams.set('projectId', projectId)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
     // Settings is a long screen; the result shows in its Search Console section.
-    if (projectId && !returnHub) url.hash = SETTINGS_GSC_ANCHOR
+    if (projectId) url.hash = SETTINGS_GSC_ANCHOR
     const res = NextResponse.redirect(url)
     res.cookies.set(GSC_RETURN_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 })
     return res

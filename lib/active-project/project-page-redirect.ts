@@ -22,6 +22,9 @@
  * The destination path is always one of the fixed internal paths below; nothing
  * from the request is ever used as a path or a host, so this cannot redirect off
  * the site.
+ *
+ * The retired Search Console screen is a redirect too, to the Search Console section
+ * of settings; it is at the end of this file.
  */
 import { PROJECT_CONNECTION_ANCHOR, SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
 
@@ -68,4 +71,39 @@ export function projectPageRedirect(projectId: string, query: Query): string {
       : ['/dashboard', '']
 
   return `${path}?${params.toString()}${anchor ? `#${anchor}` : ''}`
+}
+
+/**
+ * Where a link to the retired Search Console screen lands now.
+ *
+ * `/content/search-console` was the content workspace's Search Console screen. Search
+ * Console is a data source of the other screens now (Topics has its recommendations;
+ * the dashboard, keywords and "my progress" its clicks and impressions), and the one
+ * place about Search Console itself is its section of the project's settings, where
+ * the connection is. That is where the address leads. (Keyword research, where the
+ * opportunities used to be, has no Search Console section for merchants.) It still has
+ * to work: merchants bookmarked it, and it was the return address of the Search
+ * Console connection flow.
+ *
+ * Every request goes to that section, whose panel also reads and clears a connection
+ * result (`gsc`, `gsc_error`). The one exception is a Shopify result (`shopify`), which
+ * goes to the platform section, as it does from the project page above.
+ *
+ * Every query parameter is carried over as it came: `projectId` names the project (the
+ * active-project provider adopts it only after validating it against the signed-in
+ * user's own projects) and `lang` keeps the language through the hop. The destination
+ * is the fixed settings path and one of its fixed sections; nothing from the request
+ * becomes a path, a section or a host.
+ */
+export const SEARCH_CONSOLE_SCREEN_PATH = '/content/search-console'
+
+export function searchConsoleScreenRedirect(query: Query): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    for (const one of values(value)) params.append(key, one)
+  }
+  const result = CONNECTION_RESULTS.find(([param]) => values(query[param]).length > 0)
+  const anchor = result ? result[1] : SETTINGS_GSC_ANCHOR
+  const search = params.toString()
+  return `/settings${search ? `?${search}` : ''}#${anchor}`
 }

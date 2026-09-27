@@ -8,9 +8,9 @@
  * Each card hides when its dimension is ready; the whole block hides when both are.
  *
  * The buttons REUSE the existing K3 (WP/Shopify) and K4 (GscPanel) flows by LINKING to
- * the screen that owns each one — no duplicated OAuth/token logic here. They used to
- * scroll to panels further down the same page, which stopped meaning anything once the
- * content workspace became one screen per concern.
+ * the settings section that owns each one — no duplicated OAuth/token logic here. They
+ * used to scroll to panels further down the same page, which stopped meaning anything
+ * once the content workspace became one screen per concern.
  */
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -19,7 +19,7 @@ import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
-  selectSetupCards, platformSetupHref, gscSetupHref,
+  selectSetupCards, platformSetupHref, settingsGscHref,
   type PlatformState, type GscState,
 } from '@/lib/content/content-hub-setup'
 
@@ -91,7 +91,7 @@ export default function ContentHubSetup({
             {gscCard === 'no_property' ? s.gscNoPropertyBody : gscCard === 'reauth' ? s.gscReauthBody : s.gscNoneBody}
           </p>
           <div className="mt-2">
-            <Link href={gscSetupHref()}>
+            <Link href={settingsGscHref(projectId)}>
               <Button size="sm" variant="outline">
                 {gscCard === 'no_property' ? s.gscChooseProperty : gscCard === 'reauth' ? s.gscReconnect : s.gscConnect}
               </Button>
