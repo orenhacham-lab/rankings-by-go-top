@@ -410,7 +410,7 @@ async function main() {
 
   console.log('\n4) The page at /projects/[id]/summary')
   {
-    const Page = load('app/(dashboard)/projects/[id]/summary/page.tsx')
+    const Page = load('app/(onboarding)/projects/[id]/summary/page.tsx')
     const d = dict('he')
     const base: SummarySurface = { projectId: PROJECT, domain: DOMAIN, projectName: DOMAIN, contentEnabled: false, initialRun: null, serverNow: NOW.toISOString() }
     const seen: string[] = []

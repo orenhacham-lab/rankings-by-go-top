@@ -11,18 +11,26 @@
  * keeps the cookie" are checked against the code that decides them.
  *
  * Also here, for the lead's request: a project created from its address alone
- * has the create route's placeholders (business_name, country, language, city)
- * marked "scan" in project_profiles.field_sources before its first run.
+ * ends up with its placeholders owned by the scan. The REAL create route
+ * (app/api/projects/create/route.ts, with only its session, service role,
+ * entitlement and cache substituted) is called with exactly the form the
+ * new-project screen sends, the start route runs on the project it made, and
+ * the pipeline's own settings writer (lib/seed-scan/settings.ts) then applies
+ * what the scan read. The start route marks nothing itself: marking twice is
+ * checked against.
  *
  * Run: npx tsx lib/onboarding/__qa__/onboarding-start.qa.ts
  */
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
 import { randomBytes } from 'crypto'
-import { readFileSync } from 'fs'
+import { readdirSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { consumeClaimToken, hashClaimToken } from '@/lib/free-check'
 import { handleSeedPost, type SeedRouteDeps } from '@/lib/seed-scan/http'
+import { applyBusinessToSettings, type SeedProject } from '@/lib/seed-scan/settings'
+import type { SeedBusiness } from '@/lib/seed-scan/types'
 import {
   captureConsole,
   claimedScan,
@@ -158,8 +166,6 @@ const liveRun = (): Row => ({
   created_at: NOW.toISOString(),
 })
 
-const failedRun = (): Row => ({ ...liveRun(), id: 'run-failed', status: 'failed', lease_expires_at: null, finished_at: NOW.toISOString(), error_code: 'site_unreachable' })
-
 function request(body: unknown, o: { cookie?: string; url?: string; forwardedProto?: string; raw?: string } = {}) {
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (o.cookie !== undefined) headers.cookie = o.cookie
@@ -192,6 +198,86 @@ async function call(res: Promise<Response>) {
 }
 
 const CLEARED = `${SEED_CLAIM_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`
+
+/** Exactly the form components/onboarding/NewProjectFlow.tsx sends to /api/projects/create. */
+const FLOW_FORM: Record<string, string> = { name: HE_WP.key, target_domain: HE_WP.key, client_id: 'client-a' }
+
+/** What the scan's stage A reads off the site. */
+const READ_OFF_SITE: SeedBusiness = {
+  companyName: 'Tel Aviv Plumbing',
+  description: 'A plumber in Tel Aviv.',
+  commerceType: 'service',
+  niche: 'plumbing',
+  isLocal: true,
+  platform: null,
+  language: 'en',
+  country: 'US',
+}
+
+/** What the create route's session and service role are, for the call being made. */
+let createCtx: { userDb: FakeAdmin; admin: unknown } | null = null
+
+/**
+ * The create route's surroundings, substituted: its session (a signed-in
+ * merchant, reading and writing through a FakeAdmin), its service role (the
+ * suite's), the entitlement answer (a plan with room) and the cache
+ * revalidation. The route's own code and the real markScanOwnedFields run.
+ */
+function installCreateRouteSurroundings(): () => void {
+  const Mod: any = require('module')
+  const origLoad = Mod._load
+  Mod._load = function (request: string, parent: any, isMain: boolean) {
+    if (request === '@/lib/supabase/server') {
+      return {
+        createClient: async () => ({
+          auth: { getUser: async () => ({ data: { user: { id: USER } }, error: null }) },
+          from: (name: string) => createCtx!.userDb.from(name),
+        }),
+      }
+    }
+    if (request === '@/lib/supabase/admin') return { createAdminClient: () => createCtx!.admin }
+    if (request === 'next/cache') return { revalidatePath: () => {} }
+    if (request === '@/lib/subscription') {
+      return { getUserEntitlement: async () => ({ plan: 'pro', isAdmin: false }), PLAN_LIMITS: { pro: { maxProjects: 10 } } }
+    }
+    return origLoad.call(this, request, parent, isMain)
+  }
+  return () => {
+    Mod._load = origLoad
+  }
+}
+
+/** POST /api/projects/create as the merchant, the new row taking the suite's project id. */
+async function createProject(s: ReturnType<typeof setup>, form: Record<string, string>): Promise<{ status: number }> {
+  // The project does not exist until the route makes it.
+  s.tables.projects.splice(0, s.tables.projects.length)
+  const userDb = new FakeAdmin(s.tables)
+  const from = userDb.from.bind(userDb)
+  ;(userDb as unknown as { from: (n: string) => unknown }).from = (name: string) => {
+    const query = from(name) as unknown as { insert: (payload: Row) => unknown }
+    if (name === 'projects') {
+      const insert = query.insert.bind(query)
+      query.insert = (payload: Row) => insert({ id: PROJECT, ...payload })
+    }
+    return query
+  }
+  createCtx = { userDb, admin: s.admin }
+  const { POST } = require(join(ROOT, 'app/api/projects/create/route.ts'))
+  const body = new FormData()
+  for (const [k, v] of Object.entries(form)) body.set(k, v)
+  const { value: res } = await captureConsole(() => POST(new Request('https://app.example/api/projects/create', { method: 'POST', body })) as Promise<Response>)
+  return { status: res.status }
+}
+
+/** The .ts and .tsx files under `dir` (relative to the repository), tests left out. */
+function sourceFiles(dir: string): string[] {
+  const abs = join(ROOT, dir)
+  return readdirSync(abs).flatMap((name) => {
+    const rel = `${dir}/${name}`
+    if (statSync(join(ROOT, rel)).isDirectory()) return name === '__qa__' ? [] : sourceFiles(rel)
+    return /\.tsx?$/.test(name) ? [rel] : []
+  })
+}
 
 async function main() {
   console.log('\n1) Who may start, in order')
@@ -229,8 +315,8 @@ async function main() {
   for (const flag of [undefined, '', 'false', 'TRUE', '1', 'yes']) {
     const token = randomBytes(32).toString('hex')
     const s = setup({ env: { ENABLE_SEED_SCAN: flag }, extra: claimTables(token, claimedScan()) })
-    const r = await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    const r2 = await call(handleOnboardingStart(request({ fromUrl: true }, { cookie: cookieFor(token) }), PROJECT, s.deps))
+    const r = await call(handleOnboardingStart(request({}), PROJECT, s.deps))
+    const r2 = await call(handleOnboardingStart(request({}, { cookie: cookieFor(token) }), PROJECT, s.deps))
     check(`flag ${JSON.stringify(flag)}, not an administrator → 404 not_found; no run, no marks, no cookie change, the token unspent`,
       r.status === 404 && r.json.code === 'not_found' && r2.status === 404 && s.seedCalls.length === 0 && s.tables.project_seed_runs.length === 0
       && s.tables.project_profiles.length === 0 && r2.setCookie === null && s.tables.free_site_check_claims[0].consumed_at === null, `${r.status} ${r2.setCookie}`)
@@ -243,7 +329,7 @@ async function main() {
   for (const [label, raw] of [
     ['a locale we do not have', JSON.stringify({ locale: 'fr' })],
     ['an array', '[]'],
-    ['fromUrl that is not a boolean', JSON.stringify({ fromUrl: 'yes' })],
+    ['a locale that is not a string', JSON.stringify({ locale: 5 })],
     ['not JSON', '{'],
     ['a body over 1024 characters', JSON.stringify({ locale: 'he', pad: 'x'.repeat(1100) })],
   ] as const) {
@@ -361,85 +447,61 @@ async function main() {
   }
   check('no token appears in any answer, header or log line of this suite', tokensSeen.length > 0 && tokensSeen.every((t) => !allOutput.includes(t)))
 
-  console.log('\n4) The placeholders of a project created from its address')
+  console.log('\n4) A project created from its address: the create route marks its placeholders, once')
+  const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
   {
-    const s = setup()
-    const r = await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    const profile = s.tables.project_profiles[0]
-    const sources = (profile?.field_sources ?? {}) as Row
-    check('fromUrl, never scanned → 202, and business_name, country, language and city are marked "scan"',
-      r.status === 202 && ['business_name', 'country', 'language', 'city'].every((f) => sources[f] === 'scan'), JSON.stringify(sources))
-    check('…on a profile row that belongs to this project and its owner', profile?.project_id === PROJECT && profile?.user_id === USER)
-    check('…every service-role query on project_profiles names the project AND its owner (the read filtered by both, the insert carrying both)',
-      ownerScoped(s.adminQueries, 'project_profiles') && s.adminQueries.filter((q) => q.table === 'project_profiles').length === 2)
-    check('…nothing else is marked', Object.keys(sources).sort().join(',') === 'business_name,city,country,language')
-    check('…and the marks are in place BEFORE the run is started', ((s.profilesAtSeed[0]?.[0]?.field_sources ?? {}) as Row).country === 'scan')
+    const flow = strip(readFileSync(join(ROOT, 'components/onboarding/NewProjectFlow.tsx'), 'utf8'))
+    const sets = [...flow.matchAll(/form\.set\('([a-z_]+)'/g)].map((m) => m[1])
+    check('the new-project screen creates its project through /api/projects/create with a name, the address and the client only (no country, language, city or business name)',
+      sets.join(',') === 'name,target_domain,client_id' && /fetch\('\/api\/projects\/create', \{ method: 'POST', body: form \}\)/.test(flow), sets.join(','))
   }
-  {
-    const s = setup({ extra: { project_profiles: [{ project_id: PROJECT, user_id: USER, field_sources: { country: 'user', niche: 'scan' }, updated_at: '2026-09-20T00:00:00.000Z', created_at: '2026-09-20T00:00:00.000Z' }] } })
-    await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    const sources = s.tables.project_profiles[0].field_sources as Row
-    check('a field the owner marked "user" stays theirs; the others become "scan"; other marks are kept',
-      sources.country === 'user' && sources.business_name === 'scan' && sources.language === 'scan' && sources.city === 'scan' && sources.niche === 'scan', JSON.stringify(sources))
-    check('…written as a compare-and-set that moved updated_at', s.tables.project_profiles[0].updated_at === NOW.toISOString() && s.tables.project_profiles.length === 1)
-    check('…the read and the compare-and-set are both filtered by the project AND its owner',
-      ownerScoped(s.adminQueries, 'project_profiles') && s.adminQueries.filter((q) => q.table === 'project_profiles').length === 2)
-  }
-  {
-    // The owner saves the settings between the marks' read and their write: the compare-and-set
-    // misses, the profile is read again, and the owner's choice stands.
-    const s = setup({ extra: { project_profiles: [{ project_id: PROJECT, user_id: USER, field_sources: {}, updated_at: '2026-09-20T00:00:00.000Z', created_at: '2026-09-20T00:00:00.000Z' }] } })
-    const from = s.admin.from.bind(s.admin)
-    let raced = false
-    ;(s.admin as unknown as { from: (n: string) => unknown }).from = (name: string) => {
-      const query = from(name) as unknown as { update: (payload: Row) => unknown }
-      if (name === 'project_profiles' && !raced) {
-        const update = query.update.bind(query)
-        query.update = (payload: Row) => {
-          raced = true
-          s.tables.project_profiles[0] = { ...s.tables.project_profiles[0], field_sources: { country: 'user' }, updated_at: '2026-09-27T09:59:00.000Z' }
-          return update(payload)
-        }
-      }
-      return query
+  const restore = installCreateRouteSurroundings()
+  try {
+    {
+      const s = setup()
+      const created = await createProject(s, FLOW_FORM)
+      const row = s.tables.projects.find((p) => p.id === PROJECT)
+      const profile = s.tables.project_profiles[0]
+      const sources = (profile?.field_sources ?? {}) as Row
+      check('the real create route, given that form → 201, and the project holds its placeholders (IL, he) with no business name or city',
+        created.status === 201 && row?.country === 'IL' && row?.language === 'he' && row?.business_name === null && row?.city === null, `${created.status} ${JSON.stringify(row)}`)
+      check('…it marked exactly the placeholders it defaulted, country and language, "scan"',
+        JSON.stringify(sources) === JSON.stringify({ country: 'scan', language: 'scan' }), JSON.stringify(sources))
+      check('…on a profile row of this project and its owner, every service-role query on project_profiles naming both',
+        profile?.project_id === PROJECT && profile?.user_id === USER && ownerScoped(s.adminQueries, 'project_profiles'))
+
+      const before = JSON.stringify(s.tables.project_profiles)
+      const r = await call(handleOnboardingStart(request({ locale: 'he' }), PROJECT, s.deps))
+      check('the start route on that project → 202, and it marks nothing again: the profile is exactly as the create route left it when the run starts',
+        r.status === 202 && s.profilesAtSeed.length === 1 && JSON.stringify(s.profilesAtSeed[0]) === before, `${r.status} ${JSON.stringify(s.profilesAtSeed[0])}`)
+
+      const project = s.tables.projects.find((p) => p.id === PROJECT) as unknown as SeedProject
+      const applied = await applyBusinessToSettings(s.admin, { projectId: PROJECT, userId: USER }, { project, business: READ_OFF_SITE, audiences: [], now: NOW })
+      const after = s.tables.projects.find((p) => p.id === PROJECT) ?? {}
+      const owned = (s.tables.project_profiles[0]?.field_sources ?? {}) as Row
+      check('the first scan then replaces the placeholders with what it read off the site, and they end up "scan" (country, language, business name)',
+        applied.ok && after.country === 'US' && after.language === 'en' && after.business_name === 'Tel Aviv Plumbing'
+        && owned.country === 'scan' && owned.language === 'scan' && owned.business_name === 'scan', JSON.stringify({ after, owned }))
     }
-    const r = await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    const sources = s.tables.project_profiles[0].field_sources as Row
-    check('an owner\'s edit that lands between the read and the write wins: the write misses and is made again on the new profile',
-      raced && r.status === 202 && sources.country === 'user' && sources.language === 'scan' && sources.business_name === 'scan' && s.tables.project_profiles.length === 1, JSON.stringify(sources))
+    {
+      // Control: the old form, where the merchant chose the country and the language.
+      const s = setup()
+      const created = await createProject(s, { ...FLOW_FORM, country: 'IL', language: 'he' })
+      const marks = s.tables.project_profiles.length
+      const project = s.tables.projects.find((p) => p.id === PROJECT) as unknown as SeedProject
+      await applyBusinessToSettings(s.admin, { projectId: PROJECT, userId: USER }, { project, business: READ_OFF_SITE, audiences: [], now: NOW })
+      const after = s.tables.projects.find((p) => p.id === PROJECT) ?? {}
+      check('control: a country and language the merchant chose are not marked, and the scan leaves them as they are',
+        created.status === 201 && marks === 0 && after.country === 'IL' && after.language === 'he', JSON.stringify(after))
+    }
+  } finally {
+    restore()
   }
   {
-    const s = setup({ project: projectRow({ business_name: 'Acme Plumbing', country: 'US', language: 'he', city: '' }) })
-    await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    const sources = (s.tables.project_profiles[0]?.field_sources ?? {}) as Row
-    check('values that are not the placeholders are not claimed for the scan (a name, a country other than IL)',
-      sources.business_name === undefined && sources.country === undefined && sources.language === 'scan' && sources.city === 'scan', JSON.stringify(sources))
-  }
-  {
-    const s = setup()
-    await call(handleOnboardingStart(request({}), PROJECT, s.deps))
-    const s2 = setup()
-    await call(handleOnboardingStart(request({ fromUrl: false, locale: 'he' }), PROJECT, s2.deps))
-    check('without fromUrl nothing is marked (a project made on the old form keeps its chosen country and language)',
-      s.tables.project_profiles.length === 0 && s2.tables.project_profiles.length === 0)
-  }
-  {
-    const s = setup({ extra: { project_seed_runs: [failedRun()] } })
-    await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    check('a project that was scanned before is not re-marked, even with fromUrl', s.tables.project_profiles.length === 0)
-  }
-  {
-    const s = setup({ hooks: { project_profiles: { insert: () => ({ code: 'XX000', message: SECRET }) } } })
-    const r = await call(handleOnboardingStart(request({ fromUrl: true }), PROJECT, s.deps))
-    check('marks that cannot be written do not stop the scan (202), and say nothing of the database', r.status === 202 && !r.text.includes(SECRET) && !r.output.includes(SECRET))
-  }
-  {
-    const token = randomBytes(32).toString('hex')
-    tokensSeen.push(token)
-    const s = setup({ extra: claimTables(token, claimedScan()) })
-    const r = await call(handleOnboardingStart(request({ fromUrl: true }, { cookie: cookieFor(token) }), PROJECT, s.deps))
-    const sources = (s.tables.project_profiles[0]?.field_sources ?? {}) as Row
-    check('a claimed first run marks the placeholders too', r.json.trigger === 'claim' && sources.country === 'scan' && sources.language === 'scan', JSON.stringify(sources))
+    const offenders = ['lib/onboarding', 'components/onboarding', 'app/api/projects/[id]/onboarding', 'app/(onboarding)']
+      .flatMap((dir) => sourceFiles(dir))
+      .filter((f) => /\bmarkScanOwnedFields\b|\bfield_sources\b|['"]project_profiles['"]/.test(strip(readFileSync(join(ROOT, f), 'utf8'))))
+    check('no onboarding code marks fields itself: the create route is the one place a new project\'s placeholders are marked', offenders.length === 0, offenders.join(', '))
   }
 
   console.log('\n5) The route file only wires the handler in')

@@ -26,7 +26,7 @@ import { hashClaimToken } from '@/lib/free-check'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { claimedScan, HE_WP, makeChecker, NOW, OTHER_USER, PROJECT, projectRow, SECRET, USER } from '@/lib/seed-scan/__qa__/_fixtures'
 import { peekSeedClaim } from '../claim-peek'
-import { resolveNewProjectSurface, resolveSummarySurface, SurfaceUnavailableError, type NewProjectSurface } from '../surfaces'
+import { decideSummaryGate, resolveNewProjectSurface, resolveSummarySurface, SurfaceUnavailableError, type NewProjectSurface } from '../surfaces'
 
 const { check, finish } = makeChecker()
 type Row = Record<string, unknown>
@@ -222,7 +222,7 @@ async function main() {
     check('the new-project layout hands its children through untouched when the surface is legacy', /if \(surface\.kind === 'legacy'\) return children\b/.test(layout))
     check('…and otherwise renders the one-field flow with the server\'s clients and claimed site',
       /<NewProjectFlow clients=\{surface\.clients\} claimedDomain=\{surface\.claimedDomain\} \/>/.test(layout) && /await loadNewProjectSurface\(\)/.test(layout))
-    const summary = strip(read('app/(dashboard)/projects/[id]/summary/page.tsx'))
+    const summary = strip(read('app/(onboarding)/projects/[id]/summary/page.tsx'))
     check('the summary page answers "not found" when the surface is null', /if \(!surface\) notFound\(\)/.test(summary))
     check('…and remounts its screen per project (the switcher can change it)', /<SeedRunScreen key=\{surface\.projectId\}/.test(summary))
   }
@@ -268,6 +268,64 @@ async function main() {
     } finally {
       Mod._load = origLoad
     }
+  }
+
+  console.log('\n4) /projects/[id]/summary answers a real 404, decided before anything streams')
+  {
+    const surface = await resolveSummarySurface(PROJECT, { ...setup().deps, contentEnabled: true })
+    const loads: string[] = []
+    const gate = (signedIn: boolean, load: () => Promise<unknown>) =>
+      decideSummaryGate(signedIn, async () => {
+        loads.push('load')
+        return (await load()) as never
+      })
+    check('the owner, the scan on → render', (await gate(true, async () => surface)) === 'render')
+    check('no surface (not their project, the scan off for them) → not_found', (await gate(true, async () => null)) === 'not_found')
+    loads.length = 0
+    check('signed out → render, without reading anything: the dashboard shell sends them to sign in', (await gate(false, async () => null)) === 'render' && loads.length === 0)
+    check('an outage → render: the page says so itself, with a refresh', (await gate(true, async () => { throw new SurfaceUnavailableError() })) === 'render')
+    const boom = new Error(SECRET)
+    check('any other error passes through untouched (Next\'s own signals among them)', (await gate(true, async () => { throw boom }).catch((err: unknown) => err)) === boom)
+  }
+  for (const flag of FLAG_OFF_VALUES) {
+    const s = setup({ env: { ENABLE_SEED_SCAN: flag }, tables: { project_seed_runs: [runRow()] } })
+    const decided = await decideSummaryGate(true, () => resolveSummarySurface(PROJECT, { ...s.deps, contentEnabled: true }))
+    check(`flag ${JSON.stringify(flag)}, the owner, not an administrator → not_found`, decided === 'not_found')
+  }
+  {
+    // The layout itself, run with its loader and the dashboard shell substituted.
+    const Mod: any = require('module')
+    const origLoad = Mod._load
+    let gateAnswer = 'render'
+    const gateCalls: string[] = []
+    const Shell = function DashboardShell() { return null }
+    Mod._load = function (request: string, parent: any, isMain: boolean) {
+      if (request === '@/lib/onboarding/server') return { loadSummaryGate: async (id: string) => { gateCalls.push(id); return gateAnswer } }
+      if (request === '@/app/(dashboard)/layout') return { __esModule: true, default: Shell }
+      return origLoad.call(this, request, parent, isMain)
+    }
+    try {
+      const Layout = require(join(ROOT, 'app/(onboarding)/projects/[id]/summary/layout.tsx')).default
+      const children = { marker: 'the summary page' }
+      const shown = await Layout({ children, params: Promise.resolve({ id: PROJECT }) })
+      check('render → the page inside the same dashboard shell as every screen', shown?.type === Shell && shown?.props?.children === children && gateCalls.join() === PROJECT,
+        `${shown?.type?.name ?? typeof shown?.type} ${gateCalls.join()}`)
+      gateAnswer = 'not_found'
+      const refused = await Layout({ children, params: Promise.resolve({ id: PROJECT }) }).catch((err: unknown) => err)
+      check('not_found → Next\'s notFound() thrown by the layout itself, before the shell (and its Suspense) renders',
+        typeof (refused as { digest?: unknown })?.digest === 'string' && (refused as { digest: string }).digest.endsWith(';404'), String((refused as { digest?: unknown })?.digest))
+    } finally {
+      Mod._load = origLoad
+    }
+  }
+  {
+    const exists = (rel: string) => { try { readFileSync(join(ROOT, rel)); return true } catch { return false } }
+    check('the summary page is not under the dashboard group, whose shell wraps pages in Suspense (a notFound() there streams a 200)',
+      !exists('app/(dashboard)/projects/[id]/summary/page.tsx') && exists('app/(onboarding)/projects/[id]/summary/page.tsx'))
+    check('…nothing between the root layout and the gate can stream first: no other layout or loading file in its group, no Suspense in the root layout',
+      ['app/(onboarding)/layout.tsx', 'app/(onboarding)/projects/layout.tsx', 'app/(onboarding)/projects/[id]/layout.tsx',
+        'app/(onboarding)/loading.tsx', 'app/(onboarding)/projects/loading.tsx', 'app/(onboarding)/projects/[id]/loading.tsx', 'app/(onboarding)/projects/[id]/summary/loading.tsx']
+        .every((f) => !exists(f)) && !/Suspense/.test(strip(read('app/layout.tsx'))))
   }
 
   finish()
