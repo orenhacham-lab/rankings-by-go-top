@@ -19,7 +19,7 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_TOPICS_PATH } from '../../../lib/content/content-workspace-nav'
+import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH } from '../../../lib/content/content-workspace-nav'
 import { getDashboardDictionary } from '../../../lib/i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -177,7 +177,32 @@ function main() {
   const noSearchConsoleEntry = (sidebar: string) => !/searchConsole|\/content\/search-console|NEXT_PUBLIC_GSC_READ_ONLY_ENABLED/.test(sidebar)
   check('the sidebar has no Search Console entry, icon or flag', noSearchConsoleEntry(src))
   check('MUT: a sidebar with the Search Console icon back fails that check',
-    !noSearchConsoleEntry(src.replace('automation: CalendarClock,', 'automation: CalendarClock,\n  searchConsole: LineChart,')))
+    !noSearchConsoleEntry(src.replace('articles: Newspaper,', 'articles: Newspaper,\n  searchConsole: LineChart,')))
+
+  // ── "Topics" and "automation" are ONE entry now: the content strategy (W6c) ──
+  // Two entries for what will be written split one question across two screens. The
+  // merged tab is one entry, it comes before the articles, and the old two are gone
+  // from the declaration, the icons, the runtime list and both dictionaries.
+  const contentHrefs = navItemKeys.map((i) => i.href).filter((h) => h === CONTENT_ROOT_PATH || h.startsWith(`${CONTENT_ROOT_PATH}/`))
+  const oneStrategyEntry = (hrefs: readonly string[]) =>
+    JSON.stringify(hrefs) === JSON.stringify([CONTENT_STRATEGY_PATH, CONTENT_ROOT_PATH])
+  check('the content entries are the content strategy, then the articles, and nothing else',
+    oneStrategyEntry(contentHrefs), contentHrefs.join(', '))
+  check('MUT: a nav that keeps the topics and automation entries fails that check',
+    !oneStrategyEntry([...contentHrefs, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH])
+    && !oneStrategyEntry([CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH]))
+  const noOldEntries = (sidebar: string) => !/\b(topics|automation):\s*[A-Z]\w*,/.test(sidebar) && /strategy: [A-Z]\w*,/.test(sidebar)
+  check('the sidebar icons name the strategy entry, not the two old ones', noOldEntries(src))
+  check('MUT: a sidebar with the topics icon back fails that check',
+    !noOldEntries(src.replace('articles: Newspaper,', 'articles: Newspaper,\n  topics: Target,')))
+  for (const loc of ['he', 'en'] as const) {
+    const screens = getDashboardDictionary(loc).contentHub.screens as Record<string, string>
+    check(`(${loc}) the dictionary labels the strategy entry and no longer the two old ones`,
+      typeof screens.strategy === 'string' && screens.strategy.length > 0 && !('topics' in screens) && !('automation' in screens))
+  }
+  check('the strategy label is the plan\'s own name for the tab',
+    getDashboardDictionary('he').contentHub.screens.strategy === 'אסטרטגיית תוכן'
+    && (getDashboardDictionary('en').contentHub.screens.strategy as string) === 'Content strategy')
 
   // ── Every screen is a tab of the current project ──────────────────────────
   // The project is picked in the top bar's workspace switcher, so there is no
@@ -208,7 +233,7 @@ function main() {
     !aiGated(src.replace(/process\.env\.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'\s*\?/, 'true ?')))
 
   // ── Exactly one entry is current, whichever content screen is open ────────
-  // /content is a PREFIX of /content/topics, so a plain prefix test lit up two
+  // /content is a PREFIX of /content/strategy, so a plain prefix test lit up two
   // entries at once. The resolution keeps the longest match.
   // The naive rule this replaced — "pathname starts with href" — matches BOTH the
   // articles entry and the nested one. Asserting that it still would is what proves
@@ -218,8 +243,8 @@ function main() {
   check('the articles entry is current on the workspace root',
     activeNavHref(CONTENT_ROOT_PATH, navItemKeys) === CONTENT_ROOT_PATH)
   check('a nested screen matches TWO entries by prefix, and only the nested one is current',
-    naiveMatches(CONTENT_TOPICS_PATH) === 2
-    && activeNavHref(CONTENT_TOPICS_PATH, navItemKeys) === CONTENT_TOPICS_PATH)
+    naiveMatches(CONTENT_STRATEGY_PATH) === 2
+    && activeNavHref(CONTENT_STRATEGY_PATH, navItemKeys) === CONTENT_STRATEGY_PATH)
   check('the article editor keeps the articles entry current',
     activeNavHref(`${CONTENT_ROOT_PATH}/articles/abc-123`, navItemKeys) === CONTENT_ROOT_PATH)
   check('an unrelated path lights nothing', activeNavHref('/nowhere', navItemKeys) === null)
