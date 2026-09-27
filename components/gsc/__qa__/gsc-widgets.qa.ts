@@ -19,7 +19,9 @@
  *     sentence and exactly one button to settings (the REAL components, first render);
  *  E) no screen hides a widget: each is mounted unconditionally, and no screen reads
  *     the connection to decide;
- *  F) the copy exists in both languages, one sentence each, English without Hebrew.
+ *  F) the copy exists in both languages, one sentence each, English without Hebrew;
+ *  G) the two widgets that act and keep their own data: what they report reaches the
+ *     screen, and a project switch starts them afresh.
  *
  * Source guards strip comments first. Every guard has a mutation control that breaks
  * the rule on purpose and shows the guard fails.
@@ -462,6 +464,46 @@ async function main() {
     check('F5: the old copy that said "on the project page" is gone',
       !/project page/i.test(JSON.stringify(getDashboardDictionary('en').projectDetail.contentSection.gscOpportunities))
       && !/עמוד הפרויקט/.test(JSON.stringify(getDashboardDictionary('he').projectDetail.contentSection.gscOpportunities)))
+  }
+
+  // ── G) the widgets that act and keep their own data ─────────────────────
+  // Opportunities and recommendations say what happened to a decision, an undo or a
+  // created topic ONLY through onToast; and they keep the rows they read in their own
+  // state, read by a request nothing cancels. Neither can be shown by a first render.
+  console.log('\nG) what the acting widgets report reaches the screen; a project switch starts them afresh')
+  {
+    /** The element as written, from its tag to its self-closing end. */
+    const element = (src: string, name: string) => {
+      const i = src.indexOf(`<${name}`)
+      return i < 0 ? '' : src.slice(i, src.indexOf('/>', i) + 2)
+    }
+    /** onToast feeds a toast list that the same screen draws. */
+    const reportsBack = (src: string, name: string) => {
+      const list = /const (\w+) = useToasts\(\)/.exec(src)?.[1]
+      if (!list) return false
+      return element(src, name).includes(`onToast={(kind, text) => (kind === 'success' ? ${list}.success(text) : ${list}.error(text))}`)
+        && src.includes(`<ToastHost toasts={${list}.toasts} dismiss={${list}.dismiss}`)
+    }
+    /** Keyed by the same project it is given, so a switch mounts it anew. */
+    const keyedByProject = (src: string, name: string) => {
+      const el = element(src, name)
+      const id = /\bprojectId=\{([^}]+)\}/.exec(el)?.[1]
+      return !!id && el.includes(`key={${id}}`)
+    }
+    const research = code('app/(dashboard)/keyword-research/page.tsx')
+    const topics = code('components/content/workspace/TopicsScreen.tsx')
+    check('G1: keyword research hands the opportunities a toast, and draws it (a failed decision is not silent)',
+      reportsBack(research, 'GscOpportunities'))
+    check('G1-MUT: the opportunities mounted without onToast fail G1',
+      !reportsBack(research.replace(/\s*onToast=\{\(kind, text\) => \(kind === 'success' \? \w+\.success\(text\) : \w+\.error\(text\)\)\}/, ''), 'GscOpportunities'))
+    check('G1-MUT2: a toast list the screen never draws fails G1',
+      !reportsBack(research.replace(/<ToastHost [^>]*\/>/, ''), 'GscOpportunities'))
+    check('G2: opportunities (keyword research) and recommendations (Topics) are keyed by their project',
+      keyedByProject(research, 'GscOpportunities') && keyedByProject(topics, 'GscRecommendations'))
+    check('G2-MUT: an opportunities section that outlives a project switch fails G2',
+      !keyedByProject(research.replace(' key={selectedProject}', ''), 'GscOpportunities'))
+    check('G2-MUT2: recommendations keyed by anything but their project fail G2',
+      !keyedByProject(topics.replace('key={projectId}', 'key="recommendations"'), 'GscRecommendations'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

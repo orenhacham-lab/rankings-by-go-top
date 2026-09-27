@@ -257,9 +257,13 @@ export default function TopicsScreen() {
         </>
       )}
 
+      {/* Keyed by the project: the workspace stays mounted when the top bar switches
+          projects, and a switch must not show, or later receive, the previous
+          project's recommendations. */}
       <div className="mt-8 border-t border-line pt-6">
         <GscRecommendations
           projectId={projectId}
+          key={projectId}
           onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
         />
       </div>
