@@ -161,11 +161,11 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
           <Figure label={t.tiles.firstPage}
             value={r.state === 'ready' ? count(r.firstPageEnd, l) : '—'}
             tone={firstPageDelta > 0 ? 'up' : firstPageDelta < 0 ? 'down' : undefined}
-            note={r.state !== 'ready' ? t.tiles.noChecks : r.firstPageStart !== null ? t.tiles.wasAtStart(count(r.firstPageStart, l)) : t.tiles.firstPageSource} />
+            note={r.state === 'no_keywords' ? t.tiles.noKeywords : r.state !== 'ready' ? t.tiles.noChecks : r.firstPageStart !== null ? t.tiles.wasAtStart(count(r.firstPageStart, l)) : t.tiles.firstPageSource} />
           <Figure label={t.tiles.improved}
             value={r.state === 'ready' ? count(r.improvedCount, l) : '—'}
             tone={r.improvedCount > 0 ? 'up' : undefined}
-            note={r.state === 'ready' ? t.tiles.improvedSource(count(r.steadyCount, l)) : t.tiles.noChecks} />
+            note={r.state === 'ready' ? t.tiles.improvedSource(count(r.steadyCount, l)) : r.state === 'no_keywords' ? t.tiles.noKeywords : t.tiles.noChecks} />
           <Figure label={t.tiles.published} value={count(data.articles.published, l)} note={t.tiles.publishedSource} />
           <Figure label={t.tiles.clicks}
             value={gscReady ? count(data.gsc.current!.clicks, l) : '—'}

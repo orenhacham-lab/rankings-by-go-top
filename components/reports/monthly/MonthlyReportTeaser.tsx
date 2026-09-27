@@ -28,9 +28,9 @@ export function MonthlyTeaserBody({ body, language: l }: { body: MonthlyGetRespo
     )
   }
   const figures: [string, string, string?][] = [
-    [t.tiles.firstPage, count(latest.firstPageEnd, l)],
-    [t.tiles.improved, count(latest.improvedCount, l), latest.improvedCount > 0 ? 'text-ok' : undefined],
-    [t.tiles.published, count(latest.published, l)],
+    [t.teaser.firstPage, count(latest.firstPageEnd, l)],
+    [t.teaser.improved, count(latest.improvedCount, l), latest.improvedCount > 0 ? 'text-ok' : undefined],
+    [t.teaser.published, count(latest.published, l)],
   ]
   return (
     <div data-teaser-month={latest.month} className="space-y-3">

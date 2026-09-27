@@ -59,9 +59,11 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
             <CalendarRange size={22} />
           </span>
           <div className="min-w-0">
-            <h3 className="text-section font-bold text-ink">{t.firstTitle(nextDate)}</h3>
+            {/* With last month missing, the banner above is the action; this card only
+                says what a report holds and that the next one needs no click. */}
+            <h3 className="text-section font-bold text-ink">{body.missingMonth ? t.insideTitle : t.firstTitle(nextDate)}</h3>
             <p className="mt-1 max-w-2xl text-copy text-muted">
-              {t.firstBody(monthName(prevMonthKey(body.nextReportAt), l))}
+              {body.missingMonth ? t.insideBody(nextDate) : t.firstBody(monthName(prevMonthKey(body.nextReportAt), l))}
             </p>
             <ul className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
               {t.firstList.map((item) => (
