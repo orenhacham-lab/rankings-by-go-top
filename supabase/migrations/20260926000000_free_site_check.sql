@@ -21,7 +21,13 @@ create table if not exists public.free_site_checks (
   domain text not null,
   locale text not null,
   url text not null,
+  -- The PUBLIC result, exactly as the teaser shows it. This is what a cache
+  -- replay returns, so nothing the teaser gates may be stored in it.
   result jsonb not null,
+  -- The ungated set (every finding, every competitor, the page's internal
+  -- links), for seeding a project from a redeemed claim. Its own column so the
+  -- public replay path cannot reach it by accident.
+  seed jsonb,
   ai_used boolean not null default false,
   client_hash text not null,
   created_at timestamptz not null default now()

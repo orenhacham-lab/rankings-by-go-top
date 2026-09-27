@@ -455,7 +455,8 @@ export function claimedScan(over: { domain?: string; url?: string; business?: bo
     aiUsed: over.business !== false,
     cached: false,
   }
-  return { checkId: 'check-1', domain, url: result.url, locale: result.locale, result }
+  // seed: null is a check recorded before free_site_checks.seed existed (09ee926).
+  return { checkId: 'check-1', domain, url: result.url, locale: result.locale, result, seed: null }
 }
 
 // ── Logs ────────────────────────────────────────────────────────────────────

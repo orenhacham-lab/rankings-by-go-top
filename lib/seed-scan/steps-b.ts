@@ -325,8 +325,12 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
       allow,
     })
     const got = await settleWithin(() => deps.fetchHtml(url, { fetchImpl: pageFetch }), deps.budgets.pageMs + GRACE_MS)
+    const pageCutShort = pageClock.signal.aborted || crawlClock.signal.aborted
     pageClock.clear()
     if (got.kind !== 'value' || !got.value.ok) return null
+    // A page cut short by the page's or the crawl's deadline is a failed read,
+    // not a page: the engine keeps what arrived, but half a page indexes wrong.
+    if (got.value.truncated && pageCutShort) return null
     const signals = deps.extractSignals(got.value.html, got.value.url, { robotsTxt: null, llmsTxt: false })
     return {
       url: got.value.url,

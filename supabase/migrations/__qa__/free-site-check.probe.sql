@@ -14,7 +14,7 @@
 --
 --   bash scripts/qa/pg-probe.sh supabase/migrations/__qa__/free-site-check.probe.sql
 --
--- Result at time of commit: 16 passed, 0 failed.
+-- Result at time of commit: 19 passed, 0 failed.
 -- ============================================================================
 
 CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;
@@ -134,6 +134,30 @@ BEGIN
   EXCEPTION WHEN foreign_key_violation THEN ok := true;
   END;
   INSERT INTO probe VALUES (16,'a claim for a scan that does not exist is rejected', ok);
+END $$;
+
+-- The gated/ungated split is a COLUMN boundary, not a convention: the public
+-- replay reads `result`, a seeded project reads `seed`, and neither query can
+-- reach the other's data by mistake.
+DO $$
+DECLARE v_seed jsonb; v_result jsonb; v_id uuid;
+BEGIN
+  INSERT INTO public.free_site_checks (domain, locale, url, result, seed, ai_used, client_hash)
+    VALUES ('e.co.il','he','https://e.co.il/',
+            '{"competitors":["one.com","two.com"],"lockedCompetitors":2}',
+            '{"competitors":["one.com","two.com","three.com","four.com"]}', true, 'client-9')
+    RETURNING id INTO v_id;
+
+  SELECT result INTO v_result FROM public.free_site_checks WHERE id = v_id;
+  INSERT INTO probe VALUES (17,'the public result holds only the teaser',
+    jsonb_array_length(v_result->'competitors') = 2);
+
+  SELECT seed INTO v_seed FROM public.free_site_checks WHERE id = v_id;
+  INSERT INTO probe VALUES (18,'the seed column holds the full set',
+    jsonb_array_length(v_seed->'competitors') = 4);
+
+  INSERT INTO probe VALUES (19,'seed is nullable, so a pre-existing row still reads',
+    (SELECT count(*) FROM public.free_site_checks WHERE seed IS NULL) > 0);
 END $$;
 
 SELECT n, CASE WHEN ok THEN '  ✓ ' ELSE '  ✗ ' END || name AS result FROM probe ORDER BY n;

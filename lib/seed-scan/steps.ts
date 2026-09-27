@@ -351,8 +351,13 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
     () => deps.fetchHtml(start, { fetchImpl: hostPinnedFetch({ siteKey, base: deps.fetchImpl, deadline: pageClock.signal, trace, offHost }) }),
     deps.budgets.pageMs + GRACE_MS,
   )
+  const pageCutShort = pageClock.signal.aborted
   pageClock.clear()
-  const fetched = page.kind === 'value' && page.value.ok ? page.value : null
+  // The engine keeps whatever arrived when a read is cut short and calls the
+  // page truncated. A home page cut short by THIS deadline is not the page —
+  // its findings would be the missing half's — so it reads as unreachable. A
+  // page truncated at the engine's size cap, inside the deadline, is the page.
+  const fetched = page.kind === 'value' && page.value.ok && !(page.value.truncated && pageCutShort) ? page.value : null
 
   // A password-locked store answers with its password page (200 or 401). It is
   // read as "locked", not as a site full of problems.

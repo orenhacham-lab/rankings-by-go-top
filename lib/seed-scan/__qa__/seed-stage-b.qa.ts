@@ -126,10 +126,12 @@ function depsOf(fakes: Fakes, fetchImpl: typeof fetch, now: () => Date): StageBD
 
 type Tracking = { requested: number; added: number; code: string }
 
-async function setupB(o: { robots?: string; sitemapIndexes?: number; claim?: boolean; targets?: string[]; tracking?: Tracking; fakes?: Partial<Fakes> } = {}) {
+async function setupB(
+  o: { robots?: string; sitemapIndexes?: number; claim?: boolean; targets?: string[]; tracking?: Tracking; fakes?: Partial<Fakes>; routes?: Record<string, FakeRoute> } = {},
+) {
   const { tables, fake, admin } = world(projectRow())
   const clk = clock()
-  const web = recordingNet(crawlSite({ robots: o.robots, sitemapIndexes: o.sitemapIndexes }))
+  const web = recordingNet({ ...crawlSite({ robots: o.robots, sitemapIndexes: o.sitemapIndexes }), ...o.routes })
   const runId = await finishedStageA(admin, { fetch: web.fetch }, clk.now, { claim: o.claim })
   const afterA = web.log.length
   // The keywords `continue` added (through the keywords tab's action).
@@ -363,16 +365,37 @@ async function main() {
   console.log('\n3b) robots.txt names more sitemaps than a run may read')
   {
     // Two more indexes of five children each: nineteen documents in all, the
-    // fallback /sitemap.xml included, where the cap allows six.
+    // fallback /sitemap.xml included, where the cap allows six. The engine
+    // itself skips the index's off-host child (09ee926), so it is not among
+    // the six; the sixth is the first extra index, and nothing after it —
+    // its children, the second extra index, the fallback — is requested.
     const s = await setupB({ sitemapIndexes: 2 })
     await s.run()
     const urls = s.b1().map((r) => r.url)
     const sitemapReads = urls.filter((u) => pathOf(u).endsWith('.xml'))
     const b1d = detailOf(s.tables, 'b1')
-    check(`b1 tries ${MAX_SITEMAP_DOCS} sitemap documents and no more: none of the extra indexes is requested`,
-      b1d.sitemapDocs === MAX_SITEMAP_DOCS && sitemapReads.length <= MAX_SITEMAP_DOCS && !sitemapReads.some((u) => u.includes('/sitemap-extra-')),
+    const pastTheCap = (u: string) => /\/sitemap-extra-\d+-\d+\.xml$/.test(u) || pathOf(u) === '/sitemap-extra-2.xml' || pathOf(u) === '/sitemap.xml'
+    check(`b1 requests ${MAX_SITEMAP_DOCS} sitemap documents and no more: nothing past the sixth`,
+      b1d.sitemapDocs === MAX_SITEMAP_DOCS && sitemapReads.length === MAX_SITEMAP_DOCS && !sitemapReads.some(pastTheCap) && !sitemapReads.some((u) => /evil-sitemaps/.test(u)),
       `${JSON.stringify(b1d.sitemapDocs)} ${sitemapReads.map((u) => pathOf(u)).join(',')}`)
     check('…and b1 still reads its 25 pages and finishes done', stepRow(s.tables, 'b1').status === 'done' && b1d.pagesRead === MAX_KEY_PAGES, statusLine(s.tables))
+  }
+
+  // ── 3c. A page whose body never finishes ──────────────────────────────────
+  console.log('\n3c) A key page whose body never finishes is a failed read, not half a page')
+  {
+    const STALLED = `${BASE}/services/boilers`
+    const s = await setupB({ routes: { [STALLED]: { status: 200, stallBody: true, headers: { 'content-type': 'text/html; charset=utf-8' } } } })
+    const t0 = Date.now()
+    await s.run({ budgets: { pageMs: 200 } })
+    const ms = Date.now() - t0
+    const b1d = detailOf(s.tables, 'b1')
+    const targets = ((s.tables.site_crawl_index ?? [])[0]?.targets ?? []) as { targetUrl?: string }[]
+    check('the stalled page was requested, and cut at its deadline', s.b1().some((r) => r.url === STALLED) && ms < 5_000, `${ms}ms`)
+    check('…counted as a failed read (4: the three of the site, and this one), b1 still done',
+      stepRow(s.tables, 'b1').status === 'done' && b1d.pagesFailed === 4 && b1d.pagesRead === MAX_KEY_PAGES, JSON.stringify({ r: b1d.pagesRead, f: b1d.pagesFailed }))
+    check('…and not in the site index: what arrived before the deadline is not the page',
+      targets.length > 0 && !targets.some((x) => String(x.targetUrl ?? '').startsWith(STALLED)), String(targets.length))
   }
 
   // ── 4. Keyword ideas: the cache, failures, markets, competitors ───────────

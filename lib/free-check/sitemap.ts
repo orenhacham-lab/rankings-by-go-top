@@ -105,15 +105,22 @@ export async function discoverSitemapUrls(
   const seen = new Set<string>()
   let truncated = false
 
+  /**
+   * Read one sitemap document, but only from THIS site.
+   *
+   * The host check lives here rather than at the call sites because a sitemap
+   * index names the documents we fetch next, and a site's own sitemap is
+   * attacker-controllable content the moment the site is: without this, an
+   * index could point every child at another host and we would fetch it. The
+   * entries a document yields are pinned separately in `add`; this pins the
+   * documents themselves.
+   */
   const readSitemap = async (url: string): Promise<{ xml: string } | null> => {
     if (seen.has(url)) return null
     seen.add(url)
-    let target: URL
-    try {
-      target = new URL(url)
-    } catch {
-      return null
-    }
+    const admitted = normalizeCheckUrl(url)
+    if (!admitted.ok || admitted.url.hostname !== origin.hostname) return null
+    const target = admitted.url
     const res = await fetchText(target)
     if (!res.ok || res.status !== 200 || !/<(?:urlset|sitemapindex)\b/i.test(res.text)) return null
     sitemaps.push(url)

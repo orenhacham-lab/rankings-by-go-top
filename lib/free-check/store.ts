@@ -17,6 +17,7 @@
 import { createHash } from 'crypto'
 import { createAdminClient, type ServiceRoleClient } from '@/lib/supabase/admin'
 import type { FreeCheckResult } from './types'
+import type { FreeCheckSeed } from './run'
 import type { Locale } from '@/lib/i18n/locales'
 
 /** A cached result is replayed for this long. Matches "one check per day per domain". */
@@ -117,7 +118,7 @@ export async function checkGate(
  * account handoff are lost with it, so the id comes back null instead.
  */
 export async function recordRun(
-  args: { domain: string; locale: Locale; url: string; result: FreeCheckResult; clientHash: string },
+  args: { domain: string; locale: Locale; url: string; result: FreeCheckResult; seed: FreeCheckSeed; clientHash: string },
   admin: ServiceRoleClient = createAdminClient(),
 ): Promise<string | null> {
   const { data, error } = await admin
@@ -127,6 +128,10 @@ export async function recordRun(
       locale: args.locale,
       url: args.url,
       result: args.result,
+      // The ungated set lives in its OWN column, never inside `result`: the
+      // public replay path reads `result` and nothing else, so the teaser
+      // cannot leak what it locks even if a later edit forgets why.
+      seed: args.seed,
       ai_used: args.result.aiUsed,
       client_hash: args.clientHash,
     })

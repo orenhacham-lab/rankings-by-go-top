@@ -15,6 +15,7 @@
 import { createHash, randomBytes } from 'crypto'
 import { createAdminClient, type ServiceRoleClient } from '@/lib/supabase/admin'
 import { CACHE_TTL_MS } from './store'
+import type { FreeCheckSeed } from './run'
 import type { FreeCheckResult } from './types'
 import type { Locale } from '@/lib/i18n/locales'
 
@@ -54,7 +55,14 @@ export type ClaimedScan = {
   domain: string
   url: string
   locale: Locale
+  /** The public result, as the visitor saw it. */
   result: FreeCheckResult
+  /**
+   * The ungated set a seeded project needs: every finding, every competitor,
+   * the page's internal links. null for a row written before this column
+   * existed, so a caller must handle its absence rather than assume it.
+   */
+  seed: FreeCheckSeed | null
 }
 
 export type ClaimOutcome =
@@ -106,12 +114,15 @@ export async function consumeClaimToken(
 
   const scan = await admin
     .from('free_site_checks')
-    .select('id, domain, url, locale, result')
+    .select('id, domain, url, locale, result, seed')
     .eq('id', row.check_id)
     .limit(1)
   if (scan.error) return { ok: false, reason: 'internal' }
-  const found = (scan.data as { id: string; domain: string; url: string; locale: Locale; result: FreeCheckResult }[] | null)?.[0]
+  const found = (scan.data as { id: string; domain: string; url: string; locale: Locale; result: FreeCheckResult; seed: FreeCheckSeed | null }[] | null)?.[0]
   if (!found) return { ok: false, reason: 'not_found' }
 
-  return { ok: true, scan: { checkId: found.id, domain: found.domain, url: found.url, locale: found.locale, result: found.result } }
+  return {
+    ok: true,
+    scan: { checkId: found.id, domain: found.domain, url: found.url, locale: found.locale, result: found.result, seed: found.seed ?? null },
+  }
 }

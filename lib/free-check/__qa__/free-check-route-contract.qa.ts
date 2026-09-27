@@ -139,7 +139,7 @@ async function main() {
   let threw = false
   try {
     await recordRun(
-      { domain: 'example.co.il', locale: 'he', url: 'https://example.co.il/', result: { aiUsed: true } as unknown as FreeCheckResult, clientHash: CLIENT },
+      { domain: 'example.co.il', locale: 'he', url: 'https://example.co.il/', result: { aiUsed: true } as unknown as FreeCheckResult, seed: { findings: [], competitors: [], internalLinkUrls: [] }, clientHash: CLIENT },
       admin([], { insert: () => ({ code: '23505' }) }),
     )
   } catch { threw = true }
@@ -151,6 +151,66 @@ async function main() {
   check('no header at all still yields a bucket', clientIpFrom(new Headers()) === 'unknown')
   check('the same IP always hashes the same, and differs per IP',
     hashClient('203.0.113.9') === hashClient('203.0.113.9') && hashClient('203.0.113.9') !== hashClient('203.0.113.10'))
+
+  console.log('\nTIMEOUT) the deadline covers the body, and a broken stream is not a crash')
+  const fetchSrc = stripComments(read('../site-fetch.ts'))
+  check('the deadline is released by the caller, not when headers arrive',
+    /const done = \(\) => clearTimeout\(timer\)/.test(fetchSrc) && !/finally \{\s*clearTimeout\(timer\)/.test(fetchSrc))
+  check('both fetchers release it in a finally, so no timer leaks',
+    (fetchSrc.match(/finally \{\s*done\(\)/g) ?? []).length === 2)
+  check('a body read never throws out of the module', /catch \{[\s\S]{0,120}failed = true/.test(fetchSrc))
+  const brokenStream = await (async () => {
+    // A response whose body dies mid-stream: headers fine, then an error.
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('<html><body>'))
+        controller.error(new Error('socket hang up'))
+      },
+    })
+    const res = new Response(body, { status: 200, headers: { 'content-type': 'text/html' } })
+    const { fetchSiteHtml } = await import('../site-fetch')
+    return fetchSiteHtml(new URL('https://example.co.il/'), { fetchImpl: async () => res })
+  })()
+  check('a stream that dies with nothing usable is a fetch failure, not an exception',
+    !brokenStream.ok && brokenStream.reason === 'timeout', JSON.stringify(brokenStream))
+
+  console.log('\nSTORAGE) the row keeps the full set, the response keeps the teaser')
+  const richHtml = '<html lang="he"><head><title>x</title></head><body><a href="/a">a</a><a href="/b">b</a></body></html>'
+  const full = await runFreeCheck(new URL('https://example.co.il/'), 'he', { allowAi: true }, {
+    fetchHtml: async () => ({ ok: true, url: 'https://example.co.il/', status: 200, html: richHtml, truncated: false }),
+    fetchText: async () => ({ ok: false, reason: 'network' }),
+    insight: async () => ({
+      ok: true,
+      insight: {
+        business: { summary: 'x', audiences: [], niche: null, platform: null, companyName: null, commerceType: 'other', isLocal: false, country: null, language: 'he', address: null, phone: null },
+        keywords: ['a'],
+        articles: ['b'],
+        competitors: ['one.com', 'two.com', 'three.com', 'four.com'],
+      },
+    }),
+    now: () => NOW,
+  })
+  check('a run returns the ungated seed beside the public result', full.ok && !!full.seed)
+  if (full.ok) {
+    check('the public result still shows only two competitors',
+      full.result.competitors.length === 2 && full.result.lockedCompetitors === 2)
+    check('the seed carries every competitor', full.seed.competitors.length === 4)
+    check('the public result still gates findings', full.result.findings.length < full.seed.findings.length)
+    check('the seed carries every finding', full.seed.findings.length === full.result.findings.length + full.result.lockedFindings)
+    check('the seed carries the page\'s internal links', full.seed.internalLinkUrls.length === 2)
+    const written: Record<string, unknown[]> = { free_site_checks: [] }
+    await recordRun({ domain: 'example.co.il', locale: 'he', url: full.result.url, result: full.result, seed: full.seed, clientHash: CLIENT }, admin(written.free_site_checks as Record<string, unknown>[]))
+    const row = (written.free_site_checks as Record<string, unknown>[])[0]
+    check('the ledger row stores the seed in its OWN column, never inside result',
+      !!row && !!row.seed && !JSON.stringify(row.result).includes('three.com'), JSON.stringify(row?.result).slice(0, 80))
+    check('so a cache replay of that row cannot leak what the teaser gates',
+      !!row && JSON.stringify(row.result).includes('one.com') && !JSON.stringify(row.result).includes('four.com'))
+  }
+
+  console.log('\nLOGS) provider text never reaches them')
+  const insightSrc = stripComments(read('../business-insight.ts'))
+  check('the Gemini catch logs a stable code and the error class only',
+    /kind: err instanceof Error \? err\.name : 'unknown'/.test(insightSrc) && !/err\.message/.test(insightSrc))
 
   console.log('\nDEGRADATION) a model outage costs the teaser, not the check')
   const html = '<html lang="he"><head><title>חנות הבשמים המקורית של ישראל במשלוח חינם</title></head><body><h1>בשמים</h1><p>טקסט</p></body></html>'
