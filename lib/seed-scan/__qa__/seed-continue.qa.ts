@@ -279,7 +279,8 @@ async function main() {
 
   {
     let failSteps = false
-    const s = await setup({ adminHooks: { project_seed_steps: { insert: () => (failSteps ? { code: 'XX000', message: SECRET } : null) } } })
+    // b1-b6 are written as one ON CONFLICT DO NOTHING upsert (startSeedStageB).
+    const s = await setup({ adminHooks: { project_seed_steps: { upsert: () => (failSteps ? { code: 'XX000', message: SECRET } : null) } } })
     const before = structuredClone(runOf(s.tables))
     failSteps = true
     const r = await post({ action: 'continue', keywords: [SEEDS[0]] })
@@ -291,6 +292,18 @@ async function main() {
       moved.length === 0 && untouched(s.tables) && newTargets(s.tables).length === 0 && scheduled.length === 0, moved.join(','))
     const again = await post({ action: 'continue', keywords: [SEEDS[0]] })
     check('…so the merchant can simply continue again: 202, stage B', again.status === 202 && runOf(s.tables).stage === 'b' && scheduled.length === 1, again.text)
+  }
+  {
+    // The rows are written, but the answer never arrives (a dropped connection).
+    const s = await setup()
+    fx.loseNextAnswer(ADMIN_CLIENT, 'project_seed_steps')
+    const bRows = () => s.tables.project_seed_steps.filter((x: any) => String(x.step).startsWith('b'))
+    const r = await post({ action: 'continue', keywords: [SEEDS[0]] })
+    check('b1-b6 written but the answer lost: 500 internal, the run handed back as stage A left it, its six rows there',
+      r.status === 500 && r.body.code === 'internal' && runOf(s.tables).stage === 'a' && runOf(s.tables).lease_expires_at === null && bRows().length === 6 && scheduled.length === 0, r.text)
+    const again = await post({ action: 'continue', keywords: [SEEDS[0]] })
+    check('…continuing again works (no duplicate-key 500): 202, stage B, still six rows, one stage B scheduled',
+      again.status === 202 && runOf(s.tables).stage === 'b' && bRows().length === 6 && scheduled.length === 1, again.text)
   }
 
   // ── 3. Only the run's own seed keywords ───────────────────────────────────

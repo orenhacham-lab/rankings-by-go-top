@@ -18,6 +18,14 @@
  * uses (takeSeedLease): an empty or expired lease, or nothing. A live worker
  * is never disturbed, and two ticks never both work one run.
  *
+ * ONLY WHILE ENTITLED. Access can end while a run waits (a trial runs out, a
+ * subscription lapses), so before a run is taken its owner is checked again
+ * with the seed route's own check (explainAccess: an admin passes). No access:
+ * the run is finished as failed (entitlement_required) before any step, so
+ * nothing is spent on it. The check cannot be read (a failed query, which
+ * explainAccess would otherwise read as "no subscription"): the run is left
+ * as it is for the next tick.
+ *
  * WITHOUT THE MERCHANT. The cron has no session. b4 (the content plan) and b6
  * (the first rank check) act as the merchant, so a resumed run skips them with
  * content_session_required and rank_check_session_required. Everything else —
@@ -28,12 +36,13 @@
  * when it found runs to resume (worked, or left for the next tick) or failed:
  * ids, stages, counts and stable codes only.
  */
+import { explainAccess } from '@/lib/subscription'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { resumeSeedRun, type SeedRunResult } from './runner'
 import type { StageADepsInput } from './steps'
 import type { StageBDepsInput } from './steps-b'
-import { listStalledSeedRuns } from './store'
-import type { SeedRunStage } from './types'
+import { finishSeedRun, listStalledSeedRuns, takeSeedLease } from './store'
+import type { SeedRunStage, SeedScope } from './types'
 
 /** Runs one tick may take on. */
 export const MAX_RUNS_PER_TICK = 2
@@ -52,13 +61,18 @@ export type ResumeOptions = {
   /** Replace dependencies (tests). The cron never acts as a merchant: b4 and b6 get none. */
   deps?: StageADepsInput
   stageB?: StageBDepsInput
+  /** The entitlement check for a run's owner (tests). Default: ownerAccess. */
+  access?: (admin: ServiceRoleClient, userId: string) => Promise<ResumeAccess>
 }
+
+/** What the entitlement check answers: explainAccess's verdict, or 'unreadable'. */
+export type ResumeAccess = { allowed: boolean; authority: string }
 
 export type ResumedRun = {
   runId: string
   projectId: string
   stage: SeedRunStage
-  result: SeedRunResult | { outcome: 'threw'; error: string }
+  result: SeedRunResult | { outcome: 'threw'; error: string } | { outcome: 'skipped'; reason: 'entitlement_unavailable' }
 }
 
 export type ResumeReport =
@@ -74,10 +88,10 @@ function brief(r: ResumedRun) {
   const tail =
     res.outcome === 'finished'
       ? { status: res.status, errorCode: res.errorCode }
-      : res.outcome === 'stopped'
+      : res.outcome === 'stopped' || res.outcome === 'skipped'
         ? { reason: res.reason }
         : { error: res.error }
-  const stepErrors = res.outcome !== 'threw' && res.stepErrors ? { stepErrors: res.stepErrors } : {}
+  const stepErrors = (res.outcome === 'finished' || res.outcome === 'stopped') && res.stepErrors ? { stepErrors: res.stepErrors } : {}
   return { runId: r.runId, projectId: r.projectId, stage: r.stage, outcome: res.outcome, ...tail, ...stepErrors }
 }
 
@@ -95,21 +109,29 @@ export async function resumeStalledSeedRuns(admin: ServiceRoleClient, options: R
   }
   if (stalled.length === 0) return { state: 'idle' }
 
+  const access = options.access ?? ((db: ServiceRoleClient, userId: string) => ownerAccess(db, userId, now))
   const runs: ResumedRun[] = []
   for (const s of stalled) {
     // Out of time: the rest wait for the next tick, untouched.
     if (options.deadlineAt !== undefined && now().getTime() >= options.deadlineAt) break
+    const scope: SeedScope = { projectId: s.project_id, userId: s.user_id }
     let result: ResumedRun['result']
     try {
-      result = await resumeSeedRun({
-        admin,
-        scope: { projectId: s.project_id, userId: s.user_id },
-        runId: s.id,
-        deps: { ...options.deps, now },
-        stageB: { ...options.stageB, now, contentPlan: null, rankCheck: null },
-        deadlineAt: options.deadlineAt,
-        quiet: true,
-      })
+      const entitled = await entitlementOf(access, admin, s.user_id)
+      result =
+        entitled === 'unreadable'
+          ? { outcome: 'skipped', reason: 'entitlement_unavailable' }
+          : entitled === 'denied'
+            ? await endUnentitled(admin, scope, s.id, now)
+            : await resumeSeedRun({
+                admin,
+                scope,
+                runId: s.id,
+                deps: { ...options.deps, now },
+                stageB: { ...options.stageB, now, contentPlan: null, rankCheck: null },
+                deadlineAt: options.deadlineAt,
+                quiet: true,
+              })
     } catch (err) {
       result = { outcome: 'threw', error: errorName(err) }
     }
@@ -119,6 +141,91 @@ export async function resumeStalledSeedRuns(admin: ServiceRoleClient, options: R
   const deferred = stalled.length - runs.length
   console.log('[seed-resume] tick', { found: stalled.length, runs: runs.map(brief), deferred })
   return { state: 'worked', found: stalled.length, runs, deferred }
+}
+
+/** The check's verdict for one owner; a check that throws cannot be read. */
+async function entitlementOf(
+  access: NonNullable<ResumeOptions['access']>,
+  admin: ServiceRoleClient,
+  userId: string,
+): Promise<'entitled' | 'denied' | 'unreadable'> {
+  try {
+    const verdict = await access(admin, userId)
+    if (verdict.authority === 'unreadable') return 'unreadable'
+    return verdict.allowed ? 'entitled' : 'denied'
+  } catch {
+    return 'unreadable'
+  }
+}
+
+/**
+ * Finish a run whose owner has no access any more: failed, entitlement_required,
+ * before any step (nothing is fetched, asked or searched). Taken like any run,
+ * with the conditional UPDATE, so a run another worker holds is left alone.
+ */
+async function endUnentitled(admin: ServiceRoleClient, scope: SeedScope, runId: string, now: () => Date): Promise<SeedRunResult> {
+  const lease = await takeSeedLease(admin, scope, runId, now())
+  if (!lease) return { outcome: 'stopped', reason: 'not_running' }
+  const ended = await finishSeedRun(admin, scope, runId, lease, { status: 'failed', errorCode: 'entitlement_required', now: now() })
+  return ended ? { outcome: 'finished', status: 'failed', errorCode: 'entitlement_required' } : { outcome: 'stopped', reason: 'lease_lost' }
+}
+
+/**
+ * The seed route's entitlement check (explainAccess, admins first), for a
+ * run's owner, on reads that are watched: explainAccess reads a query that
+ * failed as "no row", which for the route is a 403 the merchant can retry,
+ * but here would end a paying merchant's run for good. Any failed read makes
+ * the answer unreadable instead.
+ */
+export async function ownerAccess(admin: ServiceRoleClient, userId: string, now: () => Date): Promise<ResumeAccess> {
+  let failed = false
+  const verdict = await explainAccess(userId, watchReads(admin, () => { failed = true }), now)
+  return failed ? { allowed: false, authority: 'unreadable' } : { allowed: verdict.allowed, authority: verdict.authority }
+}
+
+type AnyFn = (...args: unknown[]) => unknown
+
+/** `admin`, with the answer of every query made through it looked at: `onFailure` hears of each error. */
+function watchReads(admin: ServiceRoleClient, onFailure: () => void): ServiceRoleClient {
+  const watched = <T extends object>(target: T): T =>
+    new Proxy(target, {
+      get(obj, prop) {
+        const value: unknown = Reflect.get(obj, prop, obj)
+        if (typeof value !== 'function') return value
+        if (prop === 'then') {
+          return (resolve?: AnyFn, reject?: AnyFn) =>
+            (value as AnyFn).call(
+              obj,
+              (answer: unknown) => {
+                if (answer && typeof answer === 'object' && (answer as { error?: unknown }).error) onFailure()
+                return resolve ? resolve(answer) : answer
+              },
+              (err: unknown) => {
+                onFailure()
+                if (reject) return reject(err)
+                throw err
+              },
+            )
+        }
+        // Every builder a call returns (the same one, or a new one) is watched too.
+        return (...args: unknown[]) => {
+          const out = (value as AnyFn).apply(obj, args)
+          return out && typeof out === 'object' ? watched(out) : out
+        }
+      },
+    })
+  return new Proxy(admin, {
+    get(obj, prop) {
+      const value: unknown = Reflect.get(obj, prop, obj)
+      // Named: a query made through it is explainAccess's, not this file's (_owner-audit.ts).
+      if (prop === 'from' && typeof value === 'function') {
+        return function watchedFrom(table: string) {
+          return watched((value as (t: string) => object).call(obj, table))
+        }
+      }
+      return typeof value === 'function' ? (value as AnyFn).bind(obj) : value
+    },
+  })
 }
 
 export type ResumeWindow = {

@@ -21,7 +21,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { handleSeedGet, handleSeedPost, RESCAN_COOLDOWN_MS, type SeedRouteDeps } from '../http'
 import { runStageA } from '../runner'
-import { LEASE_MS } from '../store'
+import { restoreClaimToken } from '../claim'
+import { LEASE_MS, MAX_RESUME_AGE_MS } from '../store'
 import { SEED_API_ERROR_CODES, type SeedGetResponse, type SeedScope } from '../types'
 import {
   captureConsole,
@@ -269,8 +270,29 @@ async function main() {
     check('while it is live → 409 run_in_progress', again.status === 409 && isStableRefusal(again, 'run_in_progress') && s.tables.project_seed_runs.length === 1)
     s.c.advance(LEASE_MS + 1)
     const stalled = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s.deps))
-    check('once its worker is gone, a new start supersedes it (trigger rescan)', stalled.status === 202 && stalled.json.trigger === 'rescan'
-      && s.tables.project_seed_runs.find((x) => x.id === run.id)?.error_code === 'superseded', stalled.text)
+    check('its worker gone, the cron may still resume it: 409 run_in_progress, the run untouched',
+      stalled.status === 409 && isStableRefusal(stalled, 'run_in_progress') && s.tables.project_seed_runs.length === 1 && s.tables.project_seed_runs[0].status === 'running', stalled.text)
+    s.c.advance(MAX_RESUME_AGE_MS - LEASE_MS)
+    const abandoned = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s.deps))
+    check('once the cron has given up on it (a day after it began), a new start supersedes it (trigger rescan)', abandoned.status === 202 && abandoned.json.trigger === 'rescan'
+      && s.tables.project_seed_runs.find((x) => x.id === run.id)?.error_code === 'superseded', abandoned.text)
+  }
+  {
+    // Stage A three days ago; stage B continued an hour ago, its worker gone
+    // between two steps (no lease): the keywords are chosen, the work half done.
+    const between = doneRun({
+      status: 'running',
+      stage: 'b',
+      lease_expires_at: null,
+      created_at: new Date(NOW.getTime() - 72 * 3600_000).toISOString(),
+      started_at: new Date(NOW.getTime() - 3600_000).toISOString(),
+      finished_at: null,
+    })
+    const s = setup({ extra: { project_seed_runs: [between] } })
+    const before = JSON.stringify(s.tables.project_seed_runs)
+    const r = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s.deps))
+    check('a stage B between two workers → 409 run_in_progress: neither the cooldown skipped nor the run superseded',
+      r.status === 409 && isStableRefusal(r, 'run_in_progress') && JSON.stringify(s.tables.project_seed_runs) === before && s.scheduled.length === 0, r.text)
   }
   {
     const s = setup({ extra: { project_seed_runs: [doneRun({ created_at: new Date(NOW.getTime() - 2 * 3600_000).toISOString() })] } })
@@ -404,6 +426,63 @@ async function main() {
     const s = setup({ extra: claimTables(token, claimedScan()), hooks: { free_site_check_claims: { update: () => ({ code: 'XX000', message: SECRET }) } } })
     const { value: r, output } = await captureConsole(() => call(handleSeedPost(post({ action: 'claim', token }), PROJECT, s.deps)))
     check('a redemption that fails in the database → claim_invalid, no provider text', r.status === 400 && r.json.code === 'claim_invalid' && !r.text.includes(SECRET) && !output.includes(SECRET))
+  }
+  {
+    // The token is spent, then the run cannot be created: it is given back.
+    const token = randomBytes(32).toString('hex')
+    const hooks: Record<string, unknown> = { project_seed_runs: { insert: () => ({ code: 'XX000', message: SECRET }) } }
+    const s = setup({ extra: claimTables(token, claimedScan()), hooks })
+    const { value: r, output } = await captureConsole(() => call(handleSeedPost(post({ action: 'claim', token }), PROJECT, s.deps)))
+    check('the run cannot be written after the token was spent → 500 internal, and the token is claimable again',
+      r.status === 500 && isStableRefusal(r, 'internal') && s.tables.free_site_check_claims[0].consumed_at === null && s.tables.project_seed_runs.length === 0 && !output.includes(SECRET), `${r.text} ${String(s.tables.free_site_check_claims[0].consumed_at)}`)
+    delete hooks.project_seed_runs
+    const retry = await call(handleSeedPost(post({ action: 'claim', token }), PROJECT, s.deps))
+    check('…so the same token then seeds the run: 202, trigger claim, spent', retry.status === 202 && retry.json.trigger === 'claim' && !!s.tables.free_site_check_claims[0].consumed_at, retry.text)
+  }
+  {
+    // Another start wins the project between the caps and the create.
+    const token = randomBytes(32).toString('hex')
+    const hooks: Record<string, unknown> = {}
+    const s = setup({ extra: claimTables(token, claimedScan()), hooks })
+    let raced = false
+    hooks.free_site_check_claims = {
+      update: () => {
+        if (!raced) {
+          raced = true
+          s.tables.project_seed_runs.push(doneRun({ status: 'running', lease_expires_at: new Date(NOW.getTime() + 60_000).toISOString(), created_at: new Date(NOW.getTime() - 1_000).toISOString() }))
+        }
+        return null
+      },
+    }
+    const r = await call(handleSeedPost(post({ action: 'claim', token }), PROJECT, s.deps))
+    check('a run started by another request after the token was spent → 409 run_in_progress, and the token is given back',
+      raced && r.status === 409 && isStableRefusal(r, 'run_in_progress') && s.tables.free_site_check_claims[0].consumed_at === null, `${r.text} ${String(s.tables.free_site_check_claims[0].consumed_at)}`)
+  }
+  {
+    const token = randomBytes(32).toString('hex')
+    let updates = 0
+    const hooks: Record<string, unknown> = {
+      project_seed_runs: { insert: () => ({ code: 'XX000', message: SECRET }) },
+      // The redemption lands; the return fails.
+      free_site_check_claims: { update: () => (++updates === 2 ? { code: 'XX000', message: SECRET } : null) },
+    }
+    const s = setup({ extra: claimTables(token, claimedScan()), hooks })
+    const { value: r, output } = await captureConsole(() => call(handleSeedPost(post({ action: 'claim', token }), PROJECT, s.deps)))
+    check('the return itself fails: still 500 internal, one warning with the project only, no provider text',
+      r.status === 500 && updates === 2 && output.includes('[seed-scan] claim not restored') && output.includes(PROJECT) && !output.includes(SECRET) && !output.includes(token), output)
+  }
+  {
+    // restoreClaimToken on its own: only the consumption this request made.
+    const token = randomBytes(32).toString('hex')
+    const spentAt = new Date(NOW.getTime() - 1_000)
+    const other = new Date(NOW.getTime() - 5_000)
+    const s = setup({ extra: claimTables(token, claimedScan(), { consumed_at: other.toISOString() }) })
+    check('a token some other redemption spent (another instant) is never revived',
+      (await restoreClaimToken(s.admin, token, spentAt)) === false && s.tables.free_site_check_claims[0].consumed_at === other.toISOString())
+    const t2 = randomBytes(32).toString('hex')
+    const s2 = setup({ extra: claimTables(t2, claimedScan(), { consumed_at: spentAt.toISOString() }) })
+    check('…another token, spent at the same instant, is not touched', (await restoreClaimToken(s2.admin, token, spentAt)) === false && s2.tables.free_site_check_claims[0].consumed_at === spentAt.toISOString())
+    check('…the row this request spent is given back', (await restoreClaimToken(s2.admin, t2, spentAt)) === true && s2.tables.free_site_check_claims[0].consumed_at === null)
   }
 
   console.log('\n6) Reading the latest run')
