@@ -16,7 +16,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { hasWriteContent } from '@/lib/shopify/constants'
-import { resolveActivePlatform } from '@/lib/content/platform/active-platform'
+import { resolveActivePlatform, siteConnectionState } from '@/lib/content/platform/active-platform'
+import { isMissingRelation, SITE_TABLE } from '@/lib/site-platforms/store'
 import { loadActiveAlerts } from '@/lib/content/automation/load-active-alerts'
 import type { ActiveAlert } from '@/lib/content/automation/alert-read-model'
 
@@ -195,9 +196,20 @@ export async function GET(request: Request) {
   // ONE shared resolver decides the active publishing platform (by VALIDITY, not row
   // existence) so the client routes single-row Shopify/WordPress correctly and shows the
   // right panel; two genuinely-connected platforms are an explicit conflict.
+  // Wix / custom site (webhook): safe columns only, through the caller's own RLS
+  // client. A missing table (migration not yet applied) reads as "none".
+  const { data: siteData, error: siteError } = await supabase
+    .from(SITE_TABLE)
+    .select('platform, connection_status')
+    .eq('project_id', projectId)
+    .maybeSingle()
+  if (siteError && !isMissingRelation(siteError)) console.error('[content overview] site platform status load failed:', (siteError as { code?: string }).code ?? 'unknown')
+  const site = siteConnectionState(siteError ? null : siteData as { platform?: unknown; connection_status?: unknown } | null)
+
   const platform = resolveActivePlatform({
     wordpress: { present: !!wpData, connectionStatus: wordpress.status },
     shopify: { present: !!shData, connectionStatus: shopify.status, canPublish: shopify.canPublish },
+    site,
   })
 
   // ACTIVE ALERTS — the same decision /api/content/automation/alerts returns,

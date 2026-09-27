@@ -17,6 +17,9 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
+import SiteHubCard from '@/components/content/site-platforms/SiteHubCard'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
 import { ExternalLink, Plus } from 'lucide-react'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
@@ -25,9 +28,13 @@ import { BATCH_LIMIT, STATUS_TONE, type ArticleRow } from './types'
 export default function ArticlesScreen() {
   const {
     t, projectId, data, counts, toast, selectedProject,
-    activePlatform, isShopify, exportedIdOf, load, loadTopics, patchArticle, shopifyPublishError,
+    activePlatform, isShopify, isSite, exportedIdOf, load, loadTopics, patchArticle, shopifyPublishError,
     handleCreateTopic,
   } = useContentWorkspace()
+  // Wix / custom-site wording (the rest of this screen's copy is the content hub's).
+  const { language } = useDashboardLanguage()
+  const sp = getDashboardDictionary(language).sitePlatforms
+  const siteError = (code: unknown) => (sp.errors as Record<string, string>)[String(code ?? '')] ?? sp.errors.unexpected
 
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -63,6 +70,7 @@ export default function ArticlesScreen() {
     if (activePlatform === 'conflict') { toast.error(t.rowShopify.conflict); return }
     if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
     if (activePlatform === 'shopify') { await exportRowShopify(a, wpStatus); return }
+    if (isSite) { await exportRowSite(a, wpStatus); return }
     if (wpStatus === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
     let force = false
     if (a.wp_post_id) {
@@ -139,6 +147,29 @@ export default function ArticlesScreen() {
     }
   }
 
+  // Wix / custom site: publish only (these platforms have no draft step).
+  // Idempotent server-side: an article already on the site is reconciled.
+  async function exportRowSite(a: ArticleRow, mode: 'draft' | 'publish') {
+    if (mode === 'draft') { toast.error(sp.publish.draftUnsupported); return }
+    if (!window.confirm(sp.publish.confirm)) return
+    setRowBusy({ id: a.id, action: 'publish' })
+    try {
+      const res = await fetch(`/api/content/articles/${a.id}/site-platform`, { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) {
+        patchArticle(a.id, { status: 'published', published_at: new Date().toISOString() })
+        toast.success(sp.publish.published)
+        load()
+        return
+      }
+      toast.error(siteError(d.reason ?? d.error))
+    } catch {
+      toast.error(sp.errors.unexpected)
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
   async function markReadyRow(a: ArticleRow) {
     if (rowBusy) return
     setRowBusy({ id: a.id, action: 'ready' })
@@ -170,6 +201,7 @@ export default function ArticlesScreen() {
   function alreadyExported(a: ArticleRow): boolean {
     return activePlatform === 'shopify'
       ? !!a.shopify_article_id || a.status === 'published'
+      : isSite ? a.status === 'published'
       : !!a.wp_post_id || a.status === 'published'
   }
 
@@ -210,6 +242,13 @@ export default function ArticlesScreen() {
     const timer = setTimeout(() => controller.abort(), 60_000)
     const publishedPatch = (extra: ExportOnePatch): ExportOnePatch => ({ ...extra, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
     try {
+      if (isSite) {
+        if (mode === 'draft') return { ok: false, error: sp.publish.draftUnsupported }
+        const res = await fetch(`/api/content/articles/${id}/site-platform`, { method: 'POST', signal: controller.signal })
+        const d = await res.json().catch(() => ({}))
+        if (res.ok && d.ok) return { ok: true, patch: publishedPatch({}) }
+        return { ok: false, error: siteError(d.reason ?? d.error) }
+      }
       if (activePlatform === 'shopify') {
         const res = await fetch(`/api/content/articles/${id}/shopify`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -229,7 +268,7 @@ export default function ArticlesScreen() {
       return { ok: false, error: reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
-      return { ok: false, error: (activePlatform === 'shopify' ? t.rowShopify.errGeneric : t.rowWp.errGeneric) }
+      return { ok: false, error: (activePlatform === 'shopify' ? t.rowShopify.errGeneric : isSite ? sp.errors.unexpected : t.rowWp.errGeneric) }
     } finally {
       clearTimeout(timer)
     }
@@ -245,7 +284,8 @@ export default function ArticlesScreen() {
     })
     if (ids.length === 0) return
     if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
-    if (mode === 'publish' && !window.confirm(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : t.rowWp.publishConfirm)) return
+    if (isSite && mode === 'draft') { toast.error(sp.publish.draftUnsupported); return }
+    if (mode === 'publish' && !window.confirm(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : isSite ? sp.publish.confirm : t.rowWp.publishConfirm)) return
     articleBatchRef.current = true
     cancelArticleRef.current = false
     setArticleBatchRunning(true); setArticleBatchMode(mode)
@@ -263,7 +303,7 @@ export default function ArticlesScreen() {
       const r = await exportOne(id, mode)
       if (r.ok && r.patch) {
         ok++
-        if (activePlatform !== 'shopify' && r.seoStatus && r.seoStatus !== 'verified' && r.seoStatus !== 'plugin_unavailable') seoUnverified++
+        if (activePlatform !== 'shopify' && !isSite && r.seoStatus && r.seoStatus !== 'verified' && r.seoStatus !== 'plugin_unavailable') seoUnverified++
         patchArticle(id, r.patch)
         setArticleBatchState((s) => ({ ...s, [id]: { status: 'success' } }))
       } else {
@@ -316,7 +356,12 @@ export default function ArticlesScreen() {
           It is shown only once a platform IS connected. With none connected the
           setup card above already asks for exactly that, with the same links,
           and two cards asking one question is the clutter this split removes. */}
-      {activePlatform !== 'none' && (
+      {isSite && (
+        <div className="mb-4">
+          <SiteHubCard projectId={projectId} />
+        </div>
+      )}
+      {activePlatform !== 'none' && !isSite && (
         <div className="mb-4">
           <ContentHubPlatformCard projectId={projectId}>
             <div className="flex flex-wrap items-center gap-3">
@@ -391,9 +436,9 @@ export default function ArticlesScreen() {
           <Button size="sm" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
             {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedArticles.size))}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
+          {!isSite && <Button size="sm" variant="outline" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
             {articleBatchRunning && articleBatchMode === 'draft' ? t.rowWp.sending : t.batch.draftSelected.replace('{n}', String(selectedArticles.size))}
-          </Button>
+          </Button>}
           {articleBatchRunning ? (
             <Button size="sm" variant="ghost" onClick={cancelArticleBatch}>{t.batch.cancel}</Button>
           ) : (
@@ -421,7 +466,7 @@ export default function ArticlesScreen() {
                   Labelling it "WordPress" for a Shopify project was simply
                   wrong; a neutral heading is used whenever the row is not
                   WordPress. */}
-              <Th>{isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
+              <Th>{isShopify || isSite ? t.table.publication : t.table.wordpressUrl}</Th>
               <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
@@ -456,6 +501,11 @@ export default function ArticlesScreen() {
                     {(() => {
                       // Platform-aware publication state — a Shopify project shows Shopify
                       // status/URL and never WordPress wording.
+                      if (isSite) {
+                        return a.status === 'published'
+                          ? <Badge variant="success">{sp.publish.live}</Badge>
+                          : <span className="text-xs text-slate-400 dark:text-slate-500">{sp.publish.notSent}</span>
+                      }
                       if (isShopify) {
                         if (!a.shopify_article_id) return <span className="text-xs text-slate-400 dark:text-slate-500">{t.shopifyState.notSent}</span>
                         const published = a.status === 'published' || a.shopify_status === 'published'
@@ -511,10 +561,10 @@ export default function ArticlesScreen() {
                               (WordPress or Shopify). Hidden entirely for conflict/none. */}
                           {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
                             <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
-                              {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : t.rowWp.publish)}
+                              {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : isSite ? sp.publish.button : t.rowWp.publish)}
                             </Button>
                           )}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status === 'ready' && !exportedIdOf(a) && (
+                          {activePlatform !== 'conflict' && activePlatform !== 'none' && !isSite && a.status === 'ready' && !exportedIdOf(a) && (
                             <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
                               {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : (isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft)}
                             </Button>
