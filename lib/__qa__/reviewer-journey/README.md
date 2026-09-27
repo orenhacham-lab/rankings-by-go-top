@@ -97,9 +97,10 @@ because the stub ignores `order`), and the query+page rows of the latest sync.
 
     curl http://127.0.0.1:5555/__stub/fixture?gsc=connected      # or gsc=disconnected
 
-`journey.js` checks the retired `/content/search-console` address (a 307 to
-keyword research, or to settings `#search-console` for a connection result), then
-visits each screen in both states: without a connection every widget keeps its
-title and offers one link to settings; with one it shows its figures; keyword
-research shows no Search Console section and asks for no Search Console data in
-either state; and no screen logs a console error.
+`journey.js` checks the retired `/content/search-console` address (a 307 to the
+Search Console section of settings, `#search-console`, with every parameter, for a
+connection result too; a browser following it lands there), then visits each
+screen in both states: without a connection every widget keeps its title and
+offers one link to settings; with one it shows its figures; keyword research
+shows no Search Console section and asks for no Search Console data in either
+state; and no screen logs a console error.

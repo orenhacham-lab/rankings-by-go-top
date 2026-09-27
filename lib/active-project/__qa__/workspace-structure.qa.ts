@@ -10,9 +10,9 @@
  *     (Shopify "Open dashboard", the Shopify and Search Console returns,
  *     bookmarks) and can never send anyone off the site;
  *  S) so is the retired Search Console screen (/content/search-console): Search
- *     Console feeds the other screens now, and its address forwards to keyword
- *     research, or with a connection result to the Search Console section of
- *     settings, keeping projectId and lang;
+ *     Console feeds the other screens now, and its address forwards to the Search
+ *     Console section of settings (a Shopify result to its platform section),
+ *     keeping every parameter;
  *  B) nothing inside the app links to either any more;
  *  C) a project created a moment ago is adopted from the url, after validation;
  *  D) creating a project opens it;
@@ -127,36 +127,63 @@ async function main() {
   }
 
   // ── S) the retired Search Console screen ───────────────────────────────────
-  console.log('\nS) /content/search-console redirects: keyword research, or settings for a connection result')
+  console.log('\nS) /content/search-console redirects to the Search Console section of settings (a Shopify result to its platform section)')
   {
     const r = searchConsoleScreenRedirect
-    check('S1: a plain link opens keyword research, where the opportunities are now',
-      r({}) === '/keyword-research' && r({ projectId: 'p1' }) === '/keyword-research?projectId=p1', r({ projectId: 'p1' }))
-    check('S2: the project and the language are carried through the hop',
-      r({ projectId: 'p1', lang: 'en' }) === '/keyword-research?projectId=p1&lang=en', r({ projectId: 'p1', lang: 'en' }))
-    check('S3: a Search Console result lands on the Search Console section of settings, with the project and language',
+    type Q = Record<string, string | string[] | undefined>
+    // The destination before: keyword research, which has no Search Console section
+    // for merchants any more (a connection result already went to settings).
+    const toKeywordResearch = (q: Q) => {
+      if (['shopify', 'gsc', 'gsc_error'].some((k) => q[k] !== undefined)) return r(q)
+      const search = new URLSearchParams(Object.entries(q).flatMap(([k, v]) =>
+        (v === undefined ? [] : Array.isArray(v) ? v : [v]).map((one) => [k, one]))).toString()
+      return `/keyword-research${search ? `?${search}` : ''}`
+    }
+    const landsOnSettings = (fn: typeof r) =>
+      fn({}) === '/settings#search-console' && fn({ projectId: 'p1' }) === '/settings?projectId=p1#search-console'
+    check('S1: a plain link opens the Search Console section of settings, where the connection is', landsOnSettings(r), r({ projectId: 'p1' }))
+    check('S1-MUT: the old destination, keyword research (no Search Console section for merchants), fails S1', !landsOnSettings(toKeywordResearch))
+    const everything: Q = { projectId: 'p1', lang: 'he', utm_source: ['mail', 'app'], ref: 'bookmark' }
+    const carriesEvery = (fn: typeof r) => fn({ projectId: 'p1', lang: 'en' }) === '/settings?projectId=p1&lang=en#search-console'
+      && fn(everything) === '/settings?projectId=p1&lang=he&utm_source=mail&utm_source=app&ref=bookmark#search-console'
+    check('S2: every parameter is carried through the hop as it came, the project and the language above all', carriesEvery(r), r(everything))
+    check('S2-MUT: a redirect that keeps only the project and the language fails S2',
+      !carriesEvery((q) => r({ projectId: q.projectId, lang: q.lang })))
+    check('S3: a Search Console result lands on that same section, with the project and language',
       r({ gsc: 'connected', projectId: 'p1' }) === '/settings?gsc=connected&projectId=p1#search-console'
       && r({ projectId: 'p1', gsc_error: 'access_denied', lang: 'he' }) === '/settings?projectId=p1&gsc_error=access_denied&lang=he#search-console',
       r({ projectId: 'p1', gsc_error: 'access_denied', lang: 'he' }))
-    check('S3b: an empty result value still counts as a result (the panel reads and clears it)',
-      r({ gsc: '' }) === '/settings?gsc=#search-console', r({ gsc: '' }))
+    // A connection result opens the section whose panel reads and clears it, the same
+    // section the project page opens for it; an empty value still counts as a result.
+    const results: Q[] = [{ shopify: 'error', reason: 'x' }, { shopify: '' }, { gsc: 'connected' }, { gsc_error: '' }, { gsc: 'connected', shopify: 'warning' }]
+    const sectionAsProjectPage = (fn: typeof r) => fn({ shopify: 'error', projectId: 'p1' }) === '/settings?shopify=error&projectId=p1#platform'
+      && results.every((q) => {
+        const here = new URL(fn({ ...q, projectId: 'p1' }), ORIGIN), there = new URL(projectPageRedirect('p1', q), ORIGIN)
+        return here.pathname === there.pathname && here.hash === there.hash
+      })
+    check('S3b: a Shopify result goes to the platform section, as from the project page; an empty value still counts',
+      sectionAsProjectPage(r), r({ shopify: '' }))
+    check('S3b-MUT: a redirect that sends a Shopify result to the Search Console section too fails S3b',
+      !sectionAsProjectPage((q) => r(q).replace('#platform', '#search-console')))
     const hostile: Record<string, string | string[]>[] = [
-      {}, { next: 'https://evil.test' }, { gsc: '//evil.test' }, { gsc_error: 'https://evil.test' },
+      {}, { next: 'https://evil.test' }, { gsc: '//evil.test' }, { gsc_error: 'https://evil.test' }, { shopify: '//evil.test' },
       { projectId: '//evil.test' }, { projectId: ['p1', 'https://evil.test'], lang: ['en', 'he'] }, { section: '/\\evil.test' },
     ]
-    const paths = ['/keyword-research', '/settings']
-    const anchors = ['', '#search-console', '#platform']
+    const anchors = ['#search-console', '#platform']
     const staysOnSite = (fn: typeof r) => hostile.every((q) => {
       const url = new URL(fn(q), ORIGIN)
       const sent = q.projectId === undefined ? [] : Array.isArray(q.projectId) ? q.projectId : [q.projectId]
-      return url.origin === ORIGIN && paths.includes(url.pathname) && anchors.includes(url.hash)
+      return url.origin === ORIGIN && url.pathname === '/settings' && anchors.includes(url.hash)
         && JSON.stringify(url.searchParams.getAll('projectId')) === JSON.stringify(sent)
     })
-    check('S4: every destination is a fixed path and section on this site; the request only ever fills parameters', staysOnSite(r))
-    const trustsNext = (q: Record<string, string | string[] | undefined>) => (typeof q.next === 'string' ? q.next : r(q))
+    check('S4: every destination is settings, at one of its fixed sections, on this site; the request only ever fills parameters', staysOnSite(r))
+    const trustsNext = (q: Q) => (typeof q.next === 'string' ? q.next : r(q))
     check('S-MUT: a redirect that follows a `next` parameter fails S4', !staysOnSite(trustsNext))
-    const resultAsPath = (q: Record<string, string | string[] | undefined>) => (typeof q.gsc === 'string' ? `${q.gsc}#search-console` : r(q))
+    const resultAsPath = (q: Q) => (typeof q.gsc === 'string' ? `${q.gsc}#search-console` : r(q))
     check('S-MUT2: a redirect that builds its path from the result fails S4', !staysOnSite(resultAsPath))
+    const sectionFromRequest = (q: Q) => (typeof q.section === 'string' ? r(q).replace(/#.*$/, `#${q.section}`) : r(q))
+    check('S-MUT3: a redirect that takes its section from the request fails S4', !staysOnSite(sectionFromRequest))
+    check('S-MUT4: the old destination, keyword research, fails S4', !staysOnSite(toKeywordResearch))
 
     // A plain HTTP 307 before anything renders: outside the Suspense-wrapped group.
     const PAGE = 'app/content/search-console/page.tsx'

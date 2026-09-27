@@ -48,6 +48,7 @@ export function isGscSetupState(state: string): state is GscSetupState {
 
 type StatusBody = {
   ok?: boolean
+  error?: unknown
   connection?: { status?: string } | null
   property?: unknown
   windows?: Record<string, {
@@ -61,17 +62,24 @@ type StatusBody = {
   } | null>
 }
 
+/** The status route's answer, with a 404, when Search Console is switched off on the
+ *  server: its GSC_READ_ONLY_ENABLED guard, before it reads anything. */
+const SWITCHED_OFF_ERROR = 'Not found'
+
 /**
  * The status response → what the widgets show.
  *
- * A 404 means the Search Console feature is off on the server (GSC_READ_ONLY_ENABLED):
- * the connect routes refuse too, so offering "connect" would be a dead end. It is
- * 'disabled', and the widgets render nothing. Any other failure is an error, never a
- * setup state: a read that failed must not tell a connected merchant to connect.
+ * Switched off on the server, the route answers 404 `{ error: 'Not found' }`, and the
+ * connect routes refuse too, so offering "connect" would be a dead end. That answer,
+ * and only that one, is 'disabled': the widgets render nothing. The route also answers
+ * 404 `{ error: 'Project not found' }` when the project lookup finds nothing or fails
+ * (lib/content/api-auth.ts); that, like any other failure, is an error with its retry,
+ * never hidden and never a setup state: a read that failed must not tell a connected
+ * merchant to connect.
  */
 export function gscStatusView(httpStatus: number, body: unknown): GscStatusView {
-  if (httpStatus === 404) return { state: 'disabled' }
   const b = (body ?? {}) as StatusBody
+  if (httpStatus === 404 && b.error === SWITCHED_OFF_ERROR) return { state: 'disabled' }
   if (httpStatus < 200 || httpStatus >= 300 || b.ok !== true) return { state: 'error' }
 
   const connection = b.connection ?? null

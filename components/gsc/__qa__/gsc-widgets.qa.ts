@@ -13,11 +13,12 @@
  * shows one sentence on what will appear there and why it is worth it, and exactly
  * one button, to the Search Console section of the project's settings. The connection
  * never hides it, and it never shows a bare zero. The one exception is Search Console
- * switched off on the server (the status answers 404, 'disabled'): the connect routes
- * refuse too, so "connect" would be a dead end, and every widget renders nothing.
+ * switched off on the server (the status answers 404 "Not found", 'disabled'): the
+ * connect routes refuse too, so "connect" would be a dead end, and every widget renders
+ * nothing.
  *
- *  A) the status → what a widget shows (a 404 is 'disabled'; a failed read is never
- *     "not connected" and never hidden);
+ *  A) the status → what a widget shows (the switch's 404 is 'disabled'; any other 404,
+ *     like any failed read, is an error: never "not connected" and never hidden);
  *  B) the figures: top pages, per-keyword matching (the engine's normalization), trend;
  *  C) the metrics route's new views are owner-gated, project-filtered and read-only;
  *  D) every widget, in every setup state and both languages, renders its title, its
@@ -112,10 +113,18 @@ async function main() {
       v(200, STATUS_BODY.not_connected) === 'not_connected'
       && v(200, { ok: true, connection: { status: 'revoked' }, property: { siteUrl: 'x' }, windows: { 28: {} } }) === 'not_connected')
     // Switched off, the connect routes answer 404 too: "connect" would be a dead end.
-    const offIsDisabled = (fn: typeof v) => fn(404, { error: 'Not found' }) === 'disabled' && fn(404, null) === 'disabled'
-    check('A2: the feature switched off on the server (404) is disabled, not "connect"', offIsDisabled(v))
+    const offIsDisabled = (fn: typeof v) => fn(404, { error: 'Not found' }) === 'disabled'
+    check('A2: the feature switched off on the server (404 "Not found") is disabled, not "connect"', offIsDisabled(v))
     check('A2-MUT: the old mapping, 404 → not connected (a dead-end "Connect"), fails A2',
       !offIsDisabled((s, b) => (s === 404 ? 'not_connected' : v(s, b))))
+    // Only the switch's own answer: the route also answers 404 when it cannot find the
+    // project, or its lookup fails (lib/content/api-auth.ts). That is a failed read.
+    const otherNotFound: unknown[] = [{ error: 'Project not found' }, null, {}, { error: 'not found' }, { ok: false, error: 'Not found ' }]
+    const otherNotFoundIsError = (fn: typeof v) => otherNotFound.every((b) => fn(404, b) === 'error')
+    check('A2b: any other 404 (the project not found, its lookup failed, a page that is not the route) is an error with its retry, not hidden',
+      otherNotFoundIsError(v), otherNotFound.map((b) => `${JSON.stringify(b)}:${v(404, b)}`).join(' '))
+    check('A2b-MUT: a mapping that hides every 404 as switched off (a failed lookup would empty the screens) fails A2b',
+      !otherNotFoundIsError((s, b) => (s === 404 ? 'disabled' : v(s, b))))
     check('A3: connected without a property → no_property; expired without one → reauth_required',
       v(200, STATUS_BODY.no_property) === 'no_property' && v(200, STATUS_BODY.reauth_required) === 'reauth_required')
     check('A4: a property but no 28-day sync → never_synced; expired and never synced → reauth_required',
@@ -162,6 +171,23 @@ async function main() {
       contract(off, on), JSON.stringify({ off, on }))
     check('A10-MUT: a switched-off route that answered with a failed read instead (an error box on every screen) fails A10',
       !contract({ status: 503, body: { ok: false, error: 'disabled' } }, on))
+    check('A10-MUT2: a switched-off route that answered another 404 body (not what the mapping reads as the switch) fails A10',
+      !contract({ status: 404, body: { error: 'Search Console is off' } }, on))
+
+    // Its other 404s, against the same real route switched on: a project it cannot find,
+    // and a project lookup that fails. Both are a failed read, never "switched off".
+    process.env.GSC_READ_ONLY_ENABLED = 'true'
+    ADMIN = new FakeAdmin({ projects: [], gsc_connections: [], project_gsc_properties: [], gsc_sync_runs: [] })
+    const unknownProject = await ask()
+    ADMIN = new FakeAdmin({ projects: [{ id: 'p1', user_id: 'u1' }], gsc_connections: [], project_gsc_properties: [], gsc_sync_runs: [] },
+      { projects: { select: () => ({ code: '57014', message: 'canceling statement due to statement timeout' }) } })
+    const failedLookup = await ask()
+    delete process.env.GSC_READ_ONLY_ENABLED
+    const readsAsError = (fn: typeof v, answers: Answer[]) => answers.every((a) => a.status === 404 && fn(a.status, a.body) === 'error')
+    check('A10b: the real route\'s other 404s (a project it cannot find, a project lookup that fails) read as an error with its retry',
+      readsAsError(v, [unknownProject, failedLookup]), JSON.stringify({ unknownProject, failedLookup }))
+    check('A10b-MUT: the previous mapping, every 404 → disabled, reads them as switched off and fails A10b',
+      !readsAsError((s, b) => (s === 404 ? 'disabled' : v(s, b)), [unknownProject, failedLookup]))
   }
 
   // ── B) the figures ─────────────────────────────────────────────────────
@@ -402,6 +428,17 @@ async function main() {
         errored.every((html, i) => html.includes('data-gsc-state="error"') && html.includes(esc(w[WIDGETS[i].copy].title))
           && html.includes(esc(w.loadError)) && !/<a\b/.test(html) && !/(^|\s)0(\s|$)/.test(text(html))),
         errored.map((h, i) => `${WIDGETS[i].name}:${/data-gsc-state="([a-z_]+)"/.exec(h)?.[1]}`).join(' '))
+      // A 404 that is not the switch (the project not found, or its lookup failed) is
+      // that same failed read, retry included: never hidden as switched off.
+      const retry = `>${esc(w.retry)}</button>`
+      const asFailedRead = (htmls: string[]) => htmls.every((html, i) => html === errored[i] && html.includes(retry))
+      prime('p1', 404, { error: 'Project not found' })
+      const notFound = WIDGETS.map((widget) => render(locale, widget.el('p1')))
+      check(`D4b (${locale}) a 404 that is not the switch shows every widget as a failed read, with its retry`,
+        asFailedRead(notFound), notFound.map((h, i) => `${WIDGETS[i].name}:${/data-gsc-state="([a-z_]+)"/.exec(h)?.[1] ?? 'nothing'}`).join(' '))
+      prime('p1', 404, { error: 'Not found' })
+      check(`D4b-MUT (${locale}) the widgets as the previous mapping drew that 404 (nothing at all) fail D4b`,
+        !asFailedRead(WIDGETS.map((widget) => render(locale, widget.el('p1')))))
       // Still loading (nothing asked yet): the title and a placeholder, nothing to press.
       const loading = WIDGETS.map((widget) => render(locale, widget.el('p-loading')))
       check(`D5 (${locale}) while loading every widget shows its title and no number`,

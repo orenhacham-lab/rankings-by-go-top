@@ -23,8 +23,8 @@
  * from the request is ever used as a path or a host, so this cannot redirect off
  * the site.
  *
- * The retired Search Console screen follows the same rules; its redirect is at the
- * end of this file.
+ * The retired Search Console screen is a redirect too, to the Search Console section
+ * of settings; it is at the end of this file.
  */
 import { PROJECT_CONNECTION_ANCHOR, SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
 
@@ -77,20 +77,23 @@ export function projectPageRedirect(projectId: string, query: Query): string {
  * Where a link to the retired Search Console screen lands now.
  *
  * `/content/search-console` was the content workspace's Search Console screen. Search
- * Console is a data source of the other screens now (keyword research has its
- * opportunities, Topics its recommendations, the dashboard, keywords and "my progress"
- * its clicks and impressions), and its connection is a section of the project's
- * settings. The address still has to work: merchants bookmarked it, and it was the
- * return address of the Search Console connection flow.
+ * Console is a data source of the other screens now (Topics has its recommendations;
+ * the dashboard, keywords and "my progress" its clicks and impressions), and the one
+ * place about Search Console itself is its section of the project's settings, where
+ * the connection is. That is where the address leads. (Keyword research, where the
+ * opportunities used to be, has no Search Console section for merchants.) It still has
+ * to work: merchants bookmarked it, and it was the return address of the Search
+ * Console connection flow.
  *
- *  1. A connection result (`gsc`, `gsc_error`; `shopify` for completeness) goes to the
- *     settings section whose panel reads and clears it, as for the project page above.
- *  2. Anything else goes to keyword research, where the opportunities are now.
+ * Every request goes to that section, whose panel also reads and clears a connection
+ * result (`gsc`, `gsc_error`). The one exception is a Shopify result (`shopify`), which
+ * goes to the platform section, as it does from the project page above.
  *
  * Every query parameter is carried over as it came: `projectId` names the project (the
  * active-project provider adopts it only after validating it against the signed-in
  * user's own projects) and `lang` keeps the language through the hop. The destination
- * is one of the fixed internal paths; nothing from the request becomes a path or a host.
+ * is the fixed settings path and one of its fixed sections; nothing from the request
+ * becomes a path, a section or a host.
  */
 export const SEARCH_CONSOLE_SCREEN_PATH = '/content/search-console'
 
@@ -100,7 +103,7 @@ export function searchConsoleScreenRedirect(query: Query): string {
     for (const one of values(value)) params.append(key, one)
   }
   const result = CONNECTION_RESULTS.find(([param]) => values(query[param]).length > 0)
-  const [path, anchor] = result ? ['/settings', result[1]] : ['/keyword-research', '']
+  const anchor = result ? result[1] : SETTINGS_GSC_ANCHOR
   const search = params.toString()
-  return `${path}${search ? `?${search}` : ''}${anchor ? `#${anchor}` : ''}`
+  return `/settings${search ? `?${search}` : ''}#${anchor}`
 }

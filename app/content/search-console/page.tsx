@@ -3,8 +3,8 @@
  *
  * Search Console is not a screen any more: its data feeds the screens that already
  * exist and its connection is a section of the project's settings. The address only
- * forwards: a connection result to that settings section, anything else to keyword
- * research, with every parameter (projectId, lang) carried over. See
+ * forwards, to that settings section (a Shopify connection result to the platform
+ * section), with every parameter (projectId, lang) carried over. See
  * lib/active-project/project-page-redirect.ts for the rules and why they can never
  * leave the site.
  *
