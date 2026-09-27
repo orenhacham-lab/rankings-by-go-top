@@ -16,7 +16,7 @@ import Link from 'next/link'
 import { Lightbulb, Target } from 'lucide-react'
 import type { PageTwoKeyword } from '@/lib/dashboard/rankings'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-import { CONTENT_TOPICS_PATH } from '@/lib/content/content-workspace-nav'
+import { strategyHref } from '@/lib/content/strategy/view'
 import { formatCompact } from '@/components/gsc/format'
 import { cn } from '@/lib/utils'
 import { HeaderLink, LinkButton, linkButtonClass, Widget, WidgetEmpty } from './ui'
@@ -51,7 +51,7 @@ export default function ContentOpportunities({ t, language, projectId, items, ca
   return (
     <Widget id="opportunities" state={items.length ? 'ready' : 'empty'} title={o.title} subtitle={o.subtitle}
       icon={<Lightbulb size={16} strokeWidth={2} />}
-      action={items.length && canCreateTopics ? <HeaderLink href={CONTENT_TOPICS_PATH}>{t.actions.viewAll}</HeaderLink> : undefined}>
+      action={items.length && canCreateTopics ? <HeaderLink href={strategyHref('board')}>{t.actions.viewAll}</HeaderLink> : undefined}>
       {items.length === 0 ? (
         <WidgetEmpty
           icon={<Target size={18} strokeWidth={2} />}
@@ -78,7 +78,7 @@ export default function ContentOpportunities({ t, language, projectId, items, ca
                 </div>
                 {canCreateTopics && (
                   state === 'created' ? (
-                    <Link href={CONTENT_TOPICS_PATH} className="shrink-0 text-caption font-medium text-ok hover:underline">{o.created}</Link>
+                    <Link href={strategyHref('board')} className="shrink-0 text-caption font-medium text-ok hover:underline">{o.created}</Link>
                   ) : (
                     <button type="button" disabled={state === 'saving'} onClick={() => void createTopic(item)}
                       className={cn(linkButtonClass('secondary', 'sm'), 'shrink-0 disabled:opacity-60')}>

@@ -13,7 +13,8 @@
 import { CalendarClock, FileText, Newspaper } from 'lucide-react'
 import type { ArticleLine, ArticleStatus, BoardData, BoardStatus, Section } from '@/lib/dashboard/overview'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-import { CONTENT_ROOT_PATH, CONTENT_TOPICS_PATH } from '@/lib/content/content-workspace-nav'
+import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
+import { strategyHref } from '@/lib/content/strategy/view'
 import { HeaderLink, LinkButton, StatusPill, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
 
 type Copy = DashboardDictionary['dashboardHome']
@@ -40,12 +41,12 @@ export function PublishingBoard({ t, language, section, retry }: {
   const state = !section ? 'loading' : empty ? 'empty' : section.state
   return (
     <Widget id="board" state={state} title={b.title} subtitle={b.subtitle} icon={<CalendarClock size={16} strokeWidth={2} />}
-      action={section?.state === 'ready' && !empty ? <HeaderLink href={CONTENT_TOPICS_PATH}>{t.actions.viewAll}</HeaderLink> : undefined}>
+      action={section?.state === 'ready' && !empty ? <HeaderLink href={strategyHref('board')}>{t.actions.viewAll}</HeaderLink> : undefined}>
       {!section && <WidgetLoading lines={3} label={b.title} />}
       {section?.state === 'error' && <WidgetError message={t.loadError} retryLabel={t.actions.retry} onRetry={retry} />}
       {empty && (
         <WidgetEmpty icon={<CalendarClock size={18} strokeWidth={2} />} title={b.emptyTitle} body={b.empty}
-          action={<LinkButton href={CONTENT_TOPICS_PATH} variant="secondary" size="sm">{b.emptyCta}</LinkButton>} />
+          action={<LinkButton href={strategyHref('board')} variant="secondary" size="sm">{b.emptyCta}</LinkButton>} />
       )}
       {section?.state === 'ready' && !empty && (
         <div className="space-y-4">
@@ -103,7 +104,7 @@ export function RecentArticles({ t, language, section, retry, firstArticleHref }
               <span className="text-caption text-muted">{t.actions.articleQuota}</span>
             </div>
           ) : (
-            <LinkButton href={CONTENT_TOPICS_PATH} variant="secondary" size="sm">{t.board.emptyCta}</LinkButton>
+            <LinkButton href={strategyHref('board')} variant="secondary" size="sm">{t.board.emptyCta}</LinkButton>
           )} />
       )}
       {section?.state === 'ready' && !empty && (
