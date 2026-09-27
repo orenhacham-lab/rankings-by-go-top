@@ -8,7 +8,8 @@
  * Every read is bounded and every failure is a state the screen can show and
  * retry, never an endless spinner and never a thrown error. A reload keeps the
  * last answer on screen until the next one arrives, so a rescan does not blank
- * the summary or the competitor lines in the table.
+ * the summary or the competitor lines in the table; if the next one cannot be
+ * read, that is an error with a retry (competitorViewStatus).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -87,6 +88,29 @@ function manageHref(): string | null {
 }
 
 /**
+ * The state the screens show. A comparison read for EARLIER checks (before a
+ * rescan, an edit, a keyword added) stays on screen only while the read for the
+ * checks now on screen is on its way. Once that read has failed, keeping it
+ * would put the previous check's competitors under the new positions, and a
+ * keyword added since would show its loading line forever: that is an error,
+ * with a retry.
+ */
+export function competitorViewStatus(s: {
+  list: ListOutcome | null
+  competitorCount: number
+  hasComparison: boolean
+  /** The comparison on screen was read for the checks on screen now. */
+  comparisonCurrent: boolean
+  rowsFailed: boolean
+}): CompetitorViewStatus {
+  if (!s.list) return 'loading'
+  if (s.list.status === 'error') return 'error'
+  if (s.list.status === 'unavailable' || s.competitorCount === 0) return 'no_competitors'
+  if (s.rowsFailed && !(s.hasComparison && s.comparisonCurrent)) return 'error'
+  return s.hasComparison ? 'ready' : 'loading'
+}
+
+/**
  * For a screen that already holds the keywords and their latest checks (the
  * keywords tab). `checksReady` is false while those are still loading.
  */
@@ -131,13 +155,10 @@ export function useCompetitorComparison(projectId: string, checks: readonly OwnC
     else setRowsAttempt((n) => n + 1)
   }, [list?.status])
 
-  let status: CompetitorViewStatus
-  if (!list) status = 'loading'
-  else if (list.status === 'error') status = 'error'
-  else if (list.status === 'unavailable' || competitors.length === 0) status = 'no_competitors'
-  else if (comparison) status = 'ready'
-  else if (rowsFailed) status = 'error'
-  else status = 'loading'
+  const status = competitorViewStatus({
+    list, competitorCount: competitors.length, hasComparison: comparison !== null,
+    comparisonCurrent: snapshot?.checks === checks, rowsFailed,
+  })
 
   return { status, competitors, comparison, manageHref: manageHref(), retry }
 }
