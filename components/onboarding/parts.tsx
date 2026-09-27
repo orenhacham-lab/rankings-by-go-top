@@ -88,7 +88,10 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
 /**
  * One block of the research summary: a heading with its one action, then the
  * content. `index` is the block's place in the summary, shown as a quiet
- * numeral so the page reads as the ordered brief it is.
+ * numeral beside the section's icon so the page reads as the ordered brief it
+ * is. `tone="attention"` tints the whole block, for the one section that asks
+ * the merchant to act (what is holding the site back), so it does not sit in
+ * the same white as everything around it.
  */
 export function SummaryBlock({
   id,
@@ -96,6 +99,8 @@ export function SummaryBlock({
   title,
   description,
   action,
+  icon,
+  tone = 'default',
   children,
   className,
 }: {
@@ -104,16 +109,37 @@ export function SummaryBlock({
   title: string
   description?: ReactNode
   action?: ReactNode
+  icon?: ReactNode
+  tone?: 'default' | 'attention'
   children: ReactNode
   className?: string
 }) {
   const headingId = `seed-block-${id}`
   return (
-    <section aria-labelledby={headingId} data-summary-block={id} className={cn('rounded-card border border-line bg-surface p-5 shadow-card md:p-6', className)}>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <span aria-hidden className="font-mono text-xs tabular-nums text-muted">{String(index).padStart(2, '0')}</span>
+    <section
+      aria-labelledby={headingId}
+      data-summary-block={id}
+      className={cn(
+        'rounded-card border p-5 md:p-6',
+        tone === 'attention' ? 'border-warn/25 bg-warn-soft/70' : 'border-line bg-surface shadow-card',
+        className,
+      )}
+    >
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 items-start gap-3">
+          {icon && (
+            <span
+              aria-hidden
+              className={cn(
+                'flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] [&_svg]:h-[18px] [&_svg]:w-[18px]',
+                tone === 'attention' ? 'bg-warn/15 text-warn' : 'bg-action-soft text-action',
+              )}
+            >
+              {icon}
+            </span>
+          )}
           <div className="min-w-0">
+            <p aria-hidden className="font-mono text-[0.6875rem] leading-4 tabular-nums text-muted">{String(index).padStart(2, '0')}</p>
             <h2 id={headingId} className="text-section font-semibold text-ink">{title}</h2>
             {description && <p className="mt-1 max-w-[65ch] text-sm leading-6 text-muted">{description}</p>}
           </div>
