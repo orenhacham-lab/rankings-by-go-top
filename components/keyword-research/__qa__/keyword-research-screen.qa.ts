@@ -567,6 +567,25 @@ function main() {
       && count(gsc, 'fetch(') === 1 && /fetch\(url, \{ cache: 'no-store' \}\)/.test(gsc) && /`\/api\/gsc\/status\?projectId=/.test(gsc) && /`\/api\/gsc\/metrics\?projectId=/.test(gsc))
   }
 
+  console.log('\nY) narrow layouts (found in the 768 and 390 screenshots)')
+  {
+    const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
+    const wins = strip(readFileSync(join(ROOT, 'components/keyword-research/EasyWins.tsx'), 'utf8'))
+    // Beside the sidebar at 768 the card is ~450px wide: a viewport breakpoint turned
+    // its rows into a five-column table and squeezed the keyword to one letter a line.
+    check('Y1: the easy battles switch to columns by the card\'s own width (a container query), never by the viewport',
+      /<section data-easy-wins="" className="@container /.test(wins)
+      && /const GRID = '@3xl:grid-cols-\[/.test(wins)
+      && (wins.match(/@3xl:/g) ?? []).length >= 8
+      && !/\b(sm|md|lg|xl):(grid|block|col-|row-|w-|ps-)/.test(wins))
+    const notice = strip(readFileSync(join(ROOT, 'components/keyword-research/ScanGscNotice.tsx'), 'utf8'))
+    // At 390 the sentence shrank to one word a line and pushed the button out of the card.
+    check('Y2: the Google notice wraps on a narrow screen: every part beside its title has a basis, and the setup sentence one of its own, so the button drops below it instead of leaving the card',
+      /layout="inline" className="min-w-0 flex-1 basis-80 \[&>p\]:basis-52"/.test(notice)
+      && (notice.match(/className="min-w-0 flex-1 basis-80/g) ?? []).length === 4
+      && !/className="min-w-0 flex-1"/.test(notice))
+  }
+
   globalThis.fetch = realFetch
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

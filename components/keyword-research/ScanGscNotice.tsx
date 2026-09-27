@@ -47,13 +47,13 @@ export default function ScanGscNotice({
         {t.title}
       </span>
       {isGscSetupState(state) ? (
-        <GscSetupPrompt state={state} about={t.about} projectId={projectId} layout="inline" className="min-w-0 flex-1" />
+        <GscSetupPrompt state={state} about={t.about} projectId={projectId} layout="inline" className="min-w-0 flex-1 basis-80 [&>p]:basis-52" />
       ) : state === 'error' ? (
-        <GscLoadError onRetry={retry} className="min-w-0 flex-1" />
+        <GscLoadError onRetry={retry} className="min-w-0 flex-1 basis-80" />
       ) : state === 'ready' ? (
-        <p className="min-w-0 flex-1 text-sm text-muted">{count > 0 ? t.legend(formatCount(count, language)) : t.noneYet}</p>
+        <p className="min-w-0 flex-1 basis-80 text-sm text-muted">{count > 0 ? t.legend(formatCount(count, language)) : t.noneYet}</p>
       ) : (
-        <p className="min-w-0 flex-1 text-sm text-muted" aria-busy="true">{t.loading}</p>
+        <p className="min-w-0 flex-1 basis-80 text-sm text-muted" aria-busy="true">{t.loading}</p>
       )}
     </div>
   )
