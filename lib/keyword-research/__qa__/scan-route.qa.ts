@@ -274,7 +274,7 @@ async function main() {
     const adminOk = adminQueries.every((q) => {
       const e = eqs(q)
       if (q.table === 'site_crawl_index') return e.user_id === OWNER && e.project_id === PROJECT
-      if (q.table === 'wordpress_content_index' || q.table === 'wordpress_connections') return e.project_id === PROJECT
+      if (q.table === 'wordpress_content_index' || q.table === 'wordpress_connections' || q.table === 'shopify_entities') return e.project_id === PROJECT
       return false
     })
     const writes = all.flatMap((r) => r.log.flatMap((q) => q.calls.filter(([m]) => WRITES.has(m)).map(([m]) => `${q.client}:${q.table}.${m}`)))
