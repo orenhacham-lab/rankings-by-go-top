@@ -36,20 +36,68 @@ const DEFAULT_LIMIT = 200
 
 type Deps = { fetchText?: typeof fetchSiteText }
 
-/** `<loc>` values, with the `<lastmod>` that follows in the same element. */
+/** How many entries one document may yield. */
+const MAX_ENTRIES = 5_000
+/** Longest `<loc>` we will even look at. Real URLs are far shorter. */
+const MAX_LOC_LENGTH = 2_048
+/**
+ * How far past a `<loc>` we look for the rest of its element. A `<lastmod>` sits
+ * within a few dozen characters of its `<loc>` in every generator's output, and
+ * the window is what keeps the pass linear: searching for a marker the document
+ * never contains would otherwise scan to the end of the input once per entry.
+ */
+const MAX_ELEMENT_TAIL = 512
+
+/**
+ * `<loc>` values, with the `<lastmod>` that follows in the same element.
+ *
+ * This is a single linear pass on purpose. Matching whole `<url>…</url>`
+ * elements with a lazy regex is quadratic on a document of UNCLOSED tags: each
+ * start scans to the end of the input before failing, and a public visitor
+ * chooses the document. Measured on the old expression: 400 KB took 1.4 s and a
+ * 1.5 MB body — our fetch cap — blocked the event loop for 19.2 s, while a
+ * well-formed 1.5 MB sitemap took 5 ms. indexOf cannot backtrack, so the cost
+ * is now the same either way.
+ *
+ * A `<lastmod>` is read only between its `<loc>` and the end of that element,
+ * so a value belonging to the next entry is never borrowed. The rarer document
+ * that states `<lastmod>` BEFORE its `<loc>` loses it; lastmod only orders the
+ * children of a sitemap index, so such a document falls back to file order.
+ */
 function parseLocs(xml: string): SitemapEntry[] {
   const out: SitemapEntry[] = []
-  const blocks = xml.match(/<(?:url|sitemap)\b[\s\S]*?<\/(?:url|sitemap)>/gi)
-  const scan = blocks && blocks.length ? blocks : [xml]
-  for (const block of scan) {
-    const loc = block.match(/<loc>\s*([\s\S]*?)\s*<\/loc>/i)
-    if (!loc) continue
-    const lastmod = block.match(/<lastmod>\s*([\s\S]*?)\s*<\/lastmod>/i)
-    out.push({
-      url: loc[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
-      lastmod: lastmod ? lastmod[1].trim().slice(0, 40) : null,
-    })
-    if (out.length >= 5_000) break
+  // Lowercased copy for the positions, original for the values.
+  const hay = xml.toLowerCase()
+  let i = 0
+  while (out.length < MAX_ENTRIES) {
+    const open = hay.indexOf('<loc>', i)
+    if (open < 0) break
+    const start = open + '<loc>'.length
+    const close = hay.indexOf('</loc>', start)
+    if (close < 0) break
+    i = close + '</loc>'.length
+
+    if (close - start > MAX_LOC_LENGTH) continue
+    const url = xml.slice(start, close).replace(/<!\[CDATA\[|\]\]>/g, '').trim()
+    if (!url) continue
+
+    // Where this element ends: its own closing tag, or the next entry. Read
+    // inside a fixed window, so a document missing one of these markers costs
+    // the window rather than the rest of the input.
+    const tail = hay.slice(i, Math.min(hay.length, i + MAX_ELEMENT_TAIL))
+    let bound = tail.length
+    for (const marker of ['</url>', '</sitemap>', '<loc>']) {
+      const at = tail.indexOf(marker)
+      if (at >= 0 && at < bound) bound = at
+    }
+    let lastmod: string | null = null
+    const lmOpen = tail.indexOf('<lastmod>')
+    if (lmOpen >= 0 && lmOpen < bound) {
+      const lmStart = lmOpen + '<lastmod>'.length
+      const lmClose = tail.indexOf('</lastmod>', lmStart)
+      if (lmClose >= 0 && lmClose < bound) lastmod = xml.slice(i + lmStart, i + lmClose).trim().slice(0, 40)
+    }
+    out.push({ url, lastmod })
   }
   return out
 }

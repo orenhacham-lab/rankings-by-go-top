@@ -38,6 +38,10 @@ export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
 async function handle(request: Request): Promise<Response> {
+  // The content-automation kill switch stops the seed resume below as well: a
+  // stalled seed run waits (its project blocked from a new scan meanwhile)
+  // until automation is back on, or is superseded once MAX_RESUME_AGE_MS
+  // (24h, lib/seed-scan/store.ts) has passed.
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
   // Bearer CRON_SECRET, required — refuses when the secret is unset.

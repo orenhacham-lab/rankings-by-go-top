@@ -16,6 +16,13 @@
  * has targets, and otherwise with whatever the WordPress table holds (usually
  * nothing), which is again what the engine read before.
  *
+ * A project with synced Shopify entities (any row in shopify_entities) never
+ * gets the crawl: every caller already adds the store's own entities to the
+ * index it reads (loadShopifyScannedTargets, generate-from-briefs), so a crawl
+ * of the same storefront would count its pages twice. Such a project reads
+ * exactly what it read before the crawl existed. When that table cannot be
+ * read, the crawl is withheld too.
+ *
  * "Connected" is a wordpress_connections row that is not `failed`: 'connected',
  * or 'untested', the state a WordPress-only project is saved in and which the
  * publishing resolver (lib/content/platform/active-platform.ts) already treats
@@ -52,6 +59,17 @@ async function wordpressDisconnected(admin: Admin, projectId: string): Promise<b
   }
 }
 
+/** Any Shopify entity of the project, active or not. A read that fails counts as yes: it only withholds the crawl. */
+async function hasShopifyEntities(admin: Admin, projectId: string): Promise<boolean> {
+  try {
+    const { data, error } = await admin.from('shopify_entities').select('id').eq('project_id', projectId).limit(1)
+    if (error) return true
+    return Array.isArray(data) && data.length > 0
+  } catch {
+    return true
+  }
+}
+
 async function projectOwner(admin: Admin, projectId: string): Promise<string | null> {
   try {
     const { data, error } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
@@ -80,13 +98,14 @@ export async function getCrawlIndex(admin: Admin, projectId: string, userId: str
 }
 
 /**
- * The project's site index: WordPress when connected and usable, else the crawl.
- * `userId` is the owner when the caller knows it; otherwise it is read from the
- * project. Never throws.
+ * The project's site index: WordPress when connected and usable, else the
+ * crawl (never for a Shopify-synced project). `userId` is the owner when the
+ * caller knows it; otherwise it is read from the project. Never throws.
  */
 export async function getContentIndex(projectId: string, userId: string | null | undefined, admin: Admin): Promise<ContentIndexRow | null> {
   const wordpress = await getCachedIndex(admin, projectId)
   if (hasTargets(wordpress) && !(await wordpressDisconnected(admin, projectId))) return wordpress
+  if (await hasShopifyEntities(admin, projectId)) return wordpress
   const owner = userId || (await projectOwner(admin, projectId))
   const crawl = owner ? await getCrawlIndex(admin, projectId, owner) : null
   return hasTargets(crawl) ? crawl : wordpress
