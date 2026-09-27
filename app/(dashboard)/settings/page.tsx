@@ -11,22 +11,43 @@
  *
  * Scoped to the workspace the top bar names — there is no project picker on this
  * page, because the app has exactly one.
+ *
+ * Every section is its own card with its own save (components/settings). The
+ * fields the site scan fills carry a "from the scan" chip until the owner edits
+ * them, which makes them the owner's for good; "detect again with AI" only ever
+ * suggests; and "scan the site again" leads the screen. All of that exists only
+ * when the seed scan is on for the owner and its tables can be read
+ * (settingsVisibility): otherwise the screen is the business card, the
+ * sections whose tables can be read, and the connections, as before.
  */
-import { useEffect, useRef, useState } from 'react'
-import { Plug, Building2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Plug } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import { Card } from '@/components/ui/Card'
-import SectionHeading from '@/components/ui/SectionHeading'
-import ProjectForm from '@/components/projects/ProjectForm'
 import ContentSection from '@/components/content/ContentSection'
 import GscPanel from '@/components/content/GscPanel'
+import AudienceCard from '@/components/settings/AudienceCard'
+import BusinessCard from '@/components/settings/BusinessCard'
+import CompetitorsCard from '@/components/settings/CompetitorsCard'
+import DangerZone from '@/components/settings/DangerZone'
+import GoogleAdsCard from '@/components/settings/GoogleAdsCard'
+import Notice from '@/components/settings/Notice'
+import ProfileCard from '@/components/settings/ProfileCard'
+import ScanBand from '@/components/settings/ScanBand'
+import SettingsIndex from '@/components/settings/SettingsIndex'
+import SettingsSkeleton from '@/components/settings/SettingsSkeleton'
+import { LINKED_SECTIONS, SECTION, scrollToSection } from '@/components/settings/anchors'
+import { useClock } from '@/components/settings/useDraft'
+import { useProjectSettings } from '@/components/settings/useProjectSettings'
+import { useSiteScan } from '@/components/settings/useSiteScan'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { createClient } from '@/lib/supabase/client'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { PROJECT_CONNECTION_ANCHOR, SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
+import { fill, platformHint, settingsVisibility } from '@/lib/project-settings/view'
 import type { Project, Client } from '@/lib/supabase/types'
 
 export default function ProjectSettingsPage() {
@@ -45,22 +66,54 @@ export default function ProjectSettingsPage() {
 
 function ProjectSettings({ project, reload }: { project: Project; reload: () => void }) {
   const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).projectSettings
+  const dict = getDashboardDictionary(language)
+  const t = dict.projectSettings
   const [clients, setClients] = useState<Client[]>([])
-  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [competitorsShown, setCompetitorsShown] = useState(true)
   // A rename shows in the top bar's switcher too, so a save reloads its list.
   const { reloadProjects } = useActiveProject()
 
-  // Links from elsewhere open a section of this screen (#platform, #search-console).
-  // The sections exist only once the project has loaded, after the browser's own
-  // jump to the anchor, so the jump happens here. The panels then finish loading
-  // and grow, which moves the section, so the jump follows the screen's size
-  // until it settles or the user scrolls, whichever comes first.
+  // The profile, the audiences and the scan's state. The screen renders once they
+  // answered (or failed), so the cards appear in place instead of one by one.
+  const settings = useProjectSettings(project.id)
+  const data = settings.state.status === 'ready' ? settings.state.data : null
+  const ready = settings.state.status !== 'loading'
+  const visibility = settingsVisibility(data)
+  const now = useClock()
+
+  // A finished scan may have filled the business fields (the project row) and
+  // the switcher's name, as well as the profile and the audiences.
+  const reloadSettings = settings.reload
+  const onScanFinished = useCallback(async () => {
+    reload()
+    reloadProjects()
+    await reloadSettings()
+  }, [reload, reloadProjects, reloadSettings])
+  const scan = useSiteScan({
+    projectId: project.id,
+    enabled: visibility.seedFeatures,
+    rescan: data?.rescan ?? null,
+    locale: language,
+    onFinished: onScanFinished,
+  })
+  const startScan = scan.start
+  const scanFromCard = useCallback(() => {
+    scrollToSection(SECTION.scan)
+    void startScan()
+  }, [startScan])
+
+  // Links from elsewhere open a section of this screen (#platform, #search-console,
+  // and the onboarding summary's #business, #audiences, #competitors).
+  // The sections exist only once the project and its settings have loaded, after
+  // the browser's own jump to the anchor, so the jump happens here. The panels
+  // then finish loading and grow, which moves the section, so the jump follows the
+  // screen's size until it settles or the user scrolls, whichever comes first.
   const rootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!ready) return
     const id = window.location.hash.slice(1)
     const root = rootRef.current
-    if (!root || (id !== PROJECT_CONNECTION_ANCHOR && id !== SETTINGS_GSC_ANCHOR)) return
+    if (!root || (id !== PROJECT_CONNECTION_ANCHOR && id !== SETTINGS_GSC_ANCHOR && !LINKED_SECTIONS.includes(id))) return
     const jump = () => document.getElementById(id)?.scrollIntoView({ block: 'start' })
     const follow = new ResizeObserver(jump)
     const userEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
@@ -72,7 +125,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
     for (const e of userEvents) window.addEventListener(e, stop, { passive: true })
     const settle = window.setTimeout(stop, 3000)
     return () => { window.clearTimeout(settle); stop() }
-  }, [])
+  }, [ready])
 
   // The form's client list. RLS scopes the read to the signed-in owner.
   useEffect(() => {
@@ -82,48 +135,113 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
     return () => { cancelled = true }
   }, [])
 
+  const rescan = visibility.seedFeatures ? data?.rescan ?? null : null
+  const neverScanned = rescan?.latest === null
+  const profile = data?.profile.state === 'ok' ? data.profile.value : null
+  const audiences = data?.audiences.state === 'ok' ? data.audiences.value : []
+  const detected = visibility.seedFeatures ? platformHint(profile?.detected_platform) : null
+  const platform = detected && {
+    label: fill(detected.connect ? t.platformDetected : t.platformDetectedOther, { platform: detected.name }),
+    preferred: detected.connect,
+  }
+  const cardProps = {
+    projectId: project.id,
+    seedFeatures: visibility.seedFeatures,
+    scanBusy: scan.busy,
+    neverScanned,
+    onRescan: scanFromCard,
+    onData: settings.setData,
+    t,
+    locale: language,
+  }
+
+  const index: { id: string; label: string }[] = []
+  if (rescan) index.push({ id: SECTION.scan, label: t.scan.title })
+  index.push({ id: SECTION.business, label: t.businessTitle })
+  if (visibility.profileCard) index.push({ id: SECTION.profile, label: t.profile.title })
+  if (visibility.audienceCard) index.push({ id: SECTION.audience, label: t.audience.title })
+  if (competitorsShown) index.push({ id: SECTION.competitors, label: t.competitors.title })
+  index.push({ id: SECTION.connections, label: t.connectionsTitle }, { id: SECTION.danger, label: t.danger.title })
+
   return (
-    <div ref={rootRef} className="space-y-8">
-      <section>
-        <SectionHeading
-          title={t.businessTitle}
-          description={t.businessBody}
-          action={savedAt ? <span className="text-xs text-ok">{t.saved}</span> : undefined}
-        />
-        <Card>
-          <div className="flex items-center gap-2 mb-4 text-muted">
-            <Building2 size={16} />
-            <span className="text-xs font-medium">{t.businessHint}</span>
-          </div>
-          <ProjectForm
-            project={project}
-            clients={clients}
-            onSuccess={() => { setSavedAt(Date.now()); reload(); reloadProjects() }}
-            onCancel={reload}
-          />
-        </Card>
-      </section>
+    <div ref={rootRef}>
+      {!ready ? (
+        <SettingsSkeleton label={dict.common.loading} />
+      ) : (
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_13rem] xl:gap-10">
+          <div className="min-w-0 space-y-6">
+            {settings.state.status === 'failed' && (
+              <Notice tone="bad" action={{ label: t.retry, onClick: () => void settings.reload() }}>
+                {t.loadFailed}
+              </Notice>
+            )}
 
-      <section>
-        <SectionHeading title={t.connectionsTitle} description={t.connectionsBody} />
-        <div className="space-y-4">
-          {/* The publishing platform: WordPress or Shopify, one at a time. It owns
-              its own connect/disconnect flow; this page only gives it a home. */}
-          <div id={PROJECT_CONNECTION_ANCHOR} className="scroll-mt-20">
-            <ContentSection projectId={project.id} />
+            {rescan && (
+              <ScanBand rescan={rescan} scan={scan} domain={project.target_domain} now={now} t={t} locale={language} />
+            )}
+
+            <BusinessCard
+              {...cardProps}
+              project={project}
+              clients={clients}
+              data={data}
+              onSaved={() => { reload(); reloadProjects() }}
+            />
+
+            {visibility.profileCard && <ProfileCard {...cardProps} profile={profile} />}
+            {visibility.audienceCard && <AudienceCard {...cardProps} profile={profile} audiences={audiences} />}
+
+            <CompetitorsCard
+              projectId={project.id}
+              projectDomain={project.target_domain}
+              scanCompetitors={data?.scanCompetitors ?? []}
+              seedFeatures={visibility.seedFeatures}
+              onScanLink={() => scrollToSection(SECTION.scan)}
+              onAvailability={setCompetitorsShown}
+              t={t}
+            />
+
+            <section id={SECTION.connections} aria-labelledby={`${SECTION.connections}-title`} className="scroll-mt-20 space-y-4">
+              <div className="flex items-start gap-3 pt-2">
+                <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-action-soft text-action">
+                  <Plug size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 id={`${SECTION.connections}-title`} className="text-section font-semibold text-ink">{t.connectionsTitle}</h2>
+                  <p className="mt-0.5 text-copy text-muted">{t.connectionsBody}</p>
+                </div>
+              </div>
+
+              {/* The publishing platform: WordPress or Shopify, one at a time. It owns
+                  its own connect/disconnect flow; this page only gives it a home, and
+                  the platform the scan read off the site as a hint. */}
+              <div id={PROJECT_CONNECTION_ANCHOR} className="scroll-mt-20">
+                <ContentSection projectId={project.id} platformHint={platform} />
+              </div>
+
+              {/* Search Console: optional evidence, the same panel the content screens link to. */}
+              <div id={SETTINGS_GSC_ANCHOR} className="scroll-mt-20">
+                <GscPanel projectId={project.id} />
+              </div>
+
+              <GoogleAdsCard t={t} />
+
+              <Card tone="sunk" className="flex items-start gap-3">
+                <Plug size={16} className="mt-0.5 shrink-0 text-muted" />
+                <p className="text-sm text-muted">{t.moreConnectionsSoon}</p>
+              </Card>
+            </section>
+
+            <DangerZone project={project} deleteLabels={dict.projects.deleteDialog} t={t} />
           </div>
 
-          {/* Search Console: optional evidence, the same panel the content screens link to. */}
-          <div id={SETTINGS_GSC_ANCHOR} className="scroll-mt-20">
-            <GscPanel projectId={project.id} />
-          </div>
-
-          <Card tone="sunk" className="flex items-start gap-3">
-            <Plug size={16} className="mt-0.5 shrink-0 text-muted" />
-            <p className="text-sm text-muted">{t.moreConnectionsSoon}</p>
-          </Card>
+          <aside className="hidden xl:block">
+            <div className="sticky top-20">
+              <SettingsIndex items={index} title={t.onThisPage} />
+            </div>
+          </aside>
         </div>
-      </section>
+      )}
     </div>
   )
 }

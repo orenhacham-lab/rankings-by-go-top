@@ -8,6 +8,11 @@ import { Project, Client } from '@/lib/supabase/types'
 import { createProjectAction, updateProjectAction } from '@/app/actions/projects'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { languageName, regionName, withCurrentOption } from '@/lib/project-settings/view'
+
+/** The business fields the settings screen follows: where each came from, and what was saved. */
+type BusinessNoteField = 'business_name' | 'country' | 'language' | 'city'
+export type SavedBusinessValues = { business_name: string | null; country: string; language: string; city: string | null }
 
 interface ProjectFormProps {
   project?: Project
@@ -16,6 +21,12 @@ interface ProjectFormProps {
   /** On a create, receives the new project's id so the caller can open it. */
   onSuccess: (createdId?: string) => void
   onCancel: () => void
+  /** Start from these instead of the project's own values: suggestions the owner put into the form. */
+  initialValues?: Partial<{ business_name: string; country: string; language: string }>
+  /** A note under a field, such as where its value came from. */
+  fieldNotes?: Partial<Record<BusinessNoteField, React.ReactNode>>
+  /** After an update is saved, with the business values it saved. Never blocks the save. */
+  onUpdated?: (saved: SavedBusinessValues) => void | Promise<void>
 }
 
 export default function ProjectForm({
@@ -24,6 +35,9 @@ export default function ProjectForm({
   defaultClientId,
   onSuccess,
   onCancel,
+  initialValues,
+  fieldNotes,
+  onUpdated,
 }: ProjectFormProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
@@ -36,7 +50,11 @@ export default function ProjectForm({
   const [scanFreq, setScanFreq] = useState<'manual' | 'monthly'>(
     project?.scan_frequency || 'manual'
   )
-  const [country, setCountry] = useState(project?.country || 'IL')
+  // The values the form opened with stay selectable even when they are not in
+  // the short lists below (a scan can store any country and language).
+  const startCountry = initialValues?.country || project?.country || 'IL'
+  const startLanguage = initialValues?.language || project?.language || 'he'
+  const [country, setCountry] = useState(startCountry)
   const [city, setCity] = useState(project?.city || '')
 
   const validateUSCityFormat = (cityStr: string): boolean => {
@@ -72,6 +90,18 @@ export default function ProjectForm({
       if (project) {
         // Update existing project - use server action
         await updateProjectAction(project.id, formData)
+        // The values as updateProjectAction stored them, for a caller that
+        // records what the owner changed. The save itself already happened.
+        try {
+          await onUpdated?.({
+            business_name: (formData.get('business_name') as string) || null,
+            country: (formData.get('country') as string) || 'IL',
+            language: (formData.get('language') as string) || 'he',
+            city: (formData.get('city') as string) || null,
+          })
+        } catch {
+          /* the project is saved either way */
+        }
       } else {
         // Create new project - use API route
         const response = await fetch('/api/projects/create', {
@@ -133,35 +163,44 @@ export default function ProjectForm({
         hint={f.domainHint}
       />
 
-      <Input
-        label={f.businessNameLabel}
-        name="business_name"
-        defaultValue={project?.business_name || ''}
-        placeholder={f.businessNamePlaceholder}
-      />
+      <div>
+        <Input
+          label={f.businessNameLabel}
+          name="business_name"
+          defaultValue={initialValues?.business_name ?? (project?.business_name || '')}
+          placeholder={f.businessNamePlaceholder}
+        />
+        {fieldNotes?.business_name}
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Select
-          label={f.countryLabel}
-          name="country"
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-          options={[
-            { value: 'IL', label: f.countryIL },
-            { value: 'US', label: f.countryUS },
-            { value: 'GB', label: f.countryGB },
-          ]}
-        />
-        <Select
-          label={f.languageLabel}
-          name="language"
-          defaultValue={project?.language || 'he'}
-          options={[
-            { value: 'he', label: f.languageHe },
-            { value: 'en', label: f.languageEn },
-            { value: 'ar', label: f.languageAr },
-          ]}
-        />
+        <div>
+          <Select
+            label={f.countryLabel}
+            name="country"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            options={withCurrentOption([
+              { value: 'IL', label: f.countryIL },
+              { value: 'US', label: f.countryUS },
+              { value: 'GB', label: f.countryGB },
+            ], startCountry, (code) => regionName(code, language))}
+          />
+          {fieldNotes?.country}
+        </div>
+        <div>
+          <Select
+            label={f.languageLabel}
+            name="language"
+            defaultValue={startLanguage}
+            options={withCurrentOption([
+              { value: 'he', label: f.languageHe },
+              { value: 'en', label: f.languageEn },
+              { value: 'ar', label: f.languageAr },
+            ], startLanguage, (code) => languageName(code, language))}
+          />
+          {fieldNotes?.language}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -175,6 +214,7 @@ export default function ProjectForm({
             hint={country === 'US' ? f.cityHintUS : ''}
             required={country === 'US'}
           />
+          {fieldNotes?.city}
         </div>
         <Select
           label={f.deviceLabel}
