@@ -85,6 +85,7 @@ import {
 } from './settings'
 import { hostPinnedFetch, isLockedStorefront, type FetchHop } from './site-access'
 import { withCounters } from './summary'
+import { siteIconFromHtml } from './site-icon'
 import type {
   SeedBusiness,
   SeedCompetitor,
@@ -467,6 +468,8 @@ export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   const sitemapUrlCount = discovery.kind === 'value' ? discovery.value.entries.length : null
   const sitemapTruncated = discovery.kind === 'value' && (discovery.value.truncated || cutShort)
 
+  // The icon the page declares, read off the page already in hand (nothing is fetched for it).
+  const siteIcon = siteIconFromHtml(fetched.html, fetched.url)
   const summary = withCounters({
     ...ctx.summary,
     url: fetched.url,
@@ -474,6 +477,7 @@ export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
     storefrontLocked: false,
     sitemapUrlCount,
     sitemapTruncated,
+    ...(siteIcon ? { siteIcon } : {}),
   })
   return finished('done', null, summary, {
     itemCount: sitemapUrlCount,

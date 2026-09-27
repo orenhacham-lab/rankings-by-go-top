@@ -22,6 +22,8 @@ import { join } from 'node:path'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { FakeAdmin, type ErrorHooks } from '@/lib/__qa__/_fake-admin'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
+import { computeDisplayMatches, buildDomainList } from '@/lib/ai-visibility/display-classification'
+import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import {
   handleDashboardGet, type AccountData, type AiData, type ArticlesData, type BoardData, type DashboardDeps,
   type DashboardOverview, type EntitlementFacts, type ArticleAllowance, type SetupData, type ActivityEvent,
@@ -53,7 +55,7 @@ const SECRET = 'relation "billing_governance" leaked-provider-text-7731'
 function world(): Record<string, Record<string, unknown>[]> {
   return {
     projects: [
-      { id: P, user_id: USER, business_name: 'Bloom Florist' },
+      { id: P, user_id: USER, business_name: 'Bloom Florist', target_domain: 'bloom.co.il' },
       { id: P2, user_id: USER, business_name: null },
       { id: FOREIGN, user_id: OTHER, business_name: 'Not yours' },
     ],
@@ -93,15 +95,24 @@ function world(): Record<string, Record<string, unknown>[]> {
     ],
     ai_scan_results: [
       // r1: 4 scored answers, 3 mentions → 75; an excluded and a failed answer do not count.
-      { run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 2, excluded_from_score: false },
-      { run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 1, excluded_from_score: false },
-      { run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
-      { run_id: 'r1', project_id: P, status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
-      { run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 9, excluded_from_score: true },
-      { run_id: 'r1', project_id: P, status: 'failed', mentioned: true, citation_count: 9, excluded_from_score: false },
+      { id: 'r1a', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 2, excluded_from_score: false },
+      { id: 'r1b', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 1, excluded_from_score: false },
+      { id: 'r1c', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
+      { id: 'r1d', run_id: 'r1', project_id: P, status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
+      { id: 'r1e', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 9, excluded_from_score: true },
+      { id: 'r1f', run_id: 'r1', project_id: P, status: 'failed', mentioned: true, citation_count: 9, excluded_from_score: false },
       // r0: 2 answers, 1 mention → 50.
       { run_id: 'r0', project_id: P, status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
       { run_id: 'r0', project_id: P, status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
+    ],
+    // r1a lists the site among its 2 sources; r1b lists 1 other site; the
+    // excluded r1e and the failed r1f cite the site but are not scored.
+    ai_citations: [
+      { id: 'c1', result_id: 'r1a', project_id: P, domain: 'bloom.co.il', url: 'https://bloom.co.il/weddings', is_target_domain: false },
+      { id: 'c2', result_id: 'r1a', project_id: P, domain: 'wikipedia.org', url: 'https://wikipedia.org/wiki/Florist', is_target_domain: false },
+      { id: 'c3', result_id: 'r1b', project_id: P, domain: 'roselane.com', url: 'https://roselane.com/', is_target_domain: false },
+      { id: 'c4', result_id: 'r1e', project_id: P, domain: 'bloom.co.il', url: 'https://bloom.co.il/', is_target_domain: true },
+      { id: 'c5', result_id: 'r1f', project_id: P, domain: 'bloom.co.il', url: 'https://bloom.co.il/', is_target_domain: true },
     ],
     tracking_targets: [
       { id: 'k1', project_id: P, is_active: true },
@@ -226,7 +237,11 @@ async function main() {
     check('B3: every query of a table with an owner column is filtered to the signed-in owner', noOwner.length === 0, noOwner.map((q) => `${q.client}:${q.table}`))
     const adminTables = [...new Set(rest.filter((q) => q.client === 'admin').map((q) => q.table))].sort()
     check('B4: the service role reads only the AI-visibility tables (billing goes through the injected entitlement)',
-      JSON.stringify(adminTables) === JSON.stringify(['ai_scan_results', 'ai_scan_runs']), adminTables)
+      JSON.stringify(adminTables) === JSON.stringify(['ai_citations', 'ai_scan_results', 'ai_scan_runs']), adminTables)
+    const cites = rest.filter((q) => q.table === 'ai_citations')
+    check('B5b: sources are read only for this project\'s scored answers of those runs',
+      cites.length > 0 && cites.every((q) => q.calls.some((c) => c.op === 'in' && c.args[0] === 'result_id' && JSON.stringify(c.args[1]) === JSON.stringify(['r1a', 'r1b', 'r1c', 'r1d']))),
+      cites.map((q) => q.calls))
     const aiResults = rest.filter((q) => q.table === 'ai_scan_results')
     check('B5: AI answers are read only for this owner\'s runs of this project',
       aiResults.every((q) => q.calls.some((c) => c.op === 'in' && c.args[0] === 'run_id' && JSON.stringify(c.args[1]) === JSON.stringify(['r1', 'r0']))))
@@ -258,12 +273,56 @@ async function main() {
     const r = await call(P)
     const ai = ready<AiData>(r.body.ai)
     check('D1: the score is the share of scored answers that mention the business (3 of 4)', ai?.score === 75, ai)
-    check('D2: mentions and citations exclude excluded and failed answers', ai?.mentions === 3 && ai.citations === 3 && ai.answers === 4)
+    check('D2: mentions exclude excluded and failed answers; citations are the scored answers that cite the site (1), not the sum of their sources (3)', ai?.mentions === 3 && ai.citations === 1 && ai.answers === 4, ai)
     check('D3: the change is against this owner\'s previous run of this project (+25)', ai?.change === 25)
     check('D4: the last check time is the run\'s own', ai?.lastCheckAt === ago(1))
     const none = await call(P, { tables: (t) => { t.ai_scan_runs = [] } })
     const n = ready<AiData>(none.body.ai)
     check('D5: without a finished check the score is null, never zero', !!n && n.score === null && n.change === null)
+
+    // The owner's report: the dashboard said 33/100 and 32 citations while the
+    // AI tab said 0. The stored `mentioned` flag and `citation_count` (every
+    // source in the answer, whoever's) are not the business's own figures; the
+    // AI tab re-reads each answer with computeDisplayMatches. Same run, same rule.
+    const citing = (result: string, domains: string[]) => domains.map((d, i) => ({
+      id: `${result}-c${i}`, result_id: result, project_id: P, domain: d, url: `https://${d}/page-${i}`, is_target_domain: false,
+    }))
+    const other = ['petalhouse.co.il', 'roselane.com', 'wikipedia.org', 'yelp.com', 'flowers.net', 'easy.co.il', 'zap.co.il', 'b144.co.il']
+    const answers = [
+      // Stored as "mentioned" at scan time, but the answer names only others; 8 sources, none the site.
+      { id: 'a1', run_id: 'r2', project_id: P, status: 'success', excluded_from_score: false, mentioned: true, target_cited: false, citation_count: 8,
+        response_text: 'The best florists in Tel Aviv are Petal House and Rose Lane.' },
+      // Names the business in the answer and cites the site among 2 sources.
+      { id: 'a2', run_id: 'r2', project_id: P, status: 'success', excluded_from_score: false, mentioned: false, target_cited: false, citation_count: 2,
+        response_text: 'For wedding flowers, Bloom Florist on Dizengoff is a good choice.' },
+      // Stored as "mentioned", names no one; 3 sources, none the site.
+      { id: 'a3', run_id: 'r2', project_id: P, status: 'success', excluded_from_score: false, mentioned: true, target_cited: false, citation_count: 3,
+        response_text: 'Flower prices depend on the season.' },
+    ]
+    const allCitations = [...citing('a1', other), ...citing('a2', ['bloom.co.il', 'roselane.com']), ...citing('a3', other.slice(0, 3))]
+    const aiWorld = (t: Record<string, Record<string, unknown>[]>) => {
+      t.projects[0] = { ...t.projects[0], target_domain: 'bloom.co.il', brand_aliases: [], domain_aliases: [] }
+      t.ai_scan_runs = [{ id: 'r2', project_id: P, user_id: USER, status: 'completed', completed_at: ago(0.5), created_at: ago(0.5) }]
+      t.ai_scan_results = answers
+      t.ai_citations = allCitations
+    }
+    const own = ready<AiData>((await call(P, { tables: aiWorld })).body.ai)
+    // The AI tab's rule, applied here independently to the same rows (app/api/ai-visibility/runs/route.ts).
+    const probe = { ...world().projects[0], target_domain: 'bloom.co.il' } as { business_name: string; target_domain: string }
+    const variants = getBrandVariants(probe.business_name, probe.target_domain, [], [])
+    const tab =answers.map((r) => computeDisplayMatches({
+      responseText: r.response_text, brandVariants: variants, targetDomain: probe.target_domain,
+      domainList: buildDomainList(probe.target_domain, []), mentioned: r.mentioned, cited: r.target_cited,
+      citations: allCitations.filter((c) => c.result_id === r.id),
+    }))
+    const tabMentions = tab.filter((d) => d.displayMentioned).length
+    const tabCited = tab.filter((d) => d.displayCited).length
+    check('D6: mentions are the answers that name the business, as the AI tab counts them (1, not the 2 stored flags)',
+      own?.mentions === 1 && own.mentions === tabMentions, { own, tabMentions })
+    check('D7: citations are the answers that cite the site as a source (1), never every source in the answers (13)',
+      own?.citations === 1 && own.citations === tabCited, { own, tabCited })
+    check('D8: the score is the AI tab\'s share: answers naming the business out of scored answers (33)',
+      own?.score === Math.round((tabMentions / 3) * 100) && own?.score === 33, own)
   }
 
   // ── E) setup and activity ───────────────────────────────────────────────

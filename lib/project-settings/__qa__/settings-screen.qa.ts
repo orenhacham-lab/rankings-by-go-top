@@ -57,6 +57,7 @@ const BusinessCard = load('components/settings/BusinessCard.tsx').default as Com
 const DangerZone = load('components/settings/DangerZone.tsx').default as ComponentType<Record<string, unknown>>
 const CompetitorsCard = load('components/settings/CompetitorsCard.tsx').default as ComponentType<Record<string, unknown>>
 const { LINKED_SECTIONS } = load('components/settings/anchors.ts') as { LINKED_SECTIONS: readonly string[] }
+const GoogleAdsCard = load('components/settings/GoogleAdsCard.tsx').default as ComponentType<Record<string, unknown>>
 
 function render(locale: Locale, C: ComponentType<Record<string, unknown>>, props: Record<string, unknown>): string {
   return renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: locale }, createElement(C, props)))
@@ -190,6 +191,37 @@ function main() {
     check('MUT: a rescan band shown with the flag off fails it', !gated(page.replace('const rescan = visibility.seedFeatures ? data?.rescan ?? null : null', 'const rescan = data?.rescan ?? null')))
     check('MUT: an audience card mounted with its table unreadable fails it', !gated(page.replace('{visibility.audienceCard && <AudienceCard', '{<AudienceCard')))
     check('MUT: chips always on fails it', !gated(page.replace('seedFeatures: visibility.seedFeatures,', 'seedFeatures: true,')))
+  }
+
+  console.log('\nGoogle Ads is never this project\'s connected account')
+  {
+    // Google Ads is an app-level key for search volumes (lib/google-ads), not a
+    // project connection. The owner saw it marked "active" on a project with no
+    // Ads account: the card rendered a success badge, unconditionally.
+    const CONNECTED_WORDS = /פעיל|מחובר|\b(active|connected)\b/i
+    const text = (html: string) => html.replace(/<[^>]*>/g, ' ')
+    const claimsNothing = (html: string) => !CONNECTED_WORDS.test(text(html)) && !/\b(bg-ok-soft|text-ok|badge)\b/.test(html)
+    const stateless = (src: string) =>
+      /export default function GoogleAdsCard\(\{ t \}: \{ t: DashboardDictionary\['projectSettings'\] \}\)/.test(src) &&
+      !/<Badge\b|variant="success"|\bstatus\b|connected|isConnected|useEffect|fetch\(/.test(src)
+    for (const locale of ['he', 'en'] as const) {
+      const t = copy(locale)
+      const html = render(locale, GoogleAdsCard, { t })
+      check(`${locale}: the Google Ads row says it is not a project connection, and why none is needed`,
+        html.includes(t.googleAds.body) && html.includes(t.googleAds.note) && html.includes('id="google-ads"'))
+      check(`${locale}: …and claims no connection: no "active", no "connected", no success badge`, claimsNothing(html), html)
+      check(`${locale}: its copy has no status to show`, !('status' in t.googleAds) && Object.values(t.googleAds).every((v) => !CONNECTED_WORDS.test(String(v))))
+      check(`MUT (${locale}): the old success badge put back into the row fails it`,
+        !claimsNothing(html.replace('</p>', `</p><span class="bg-ok-soft text-ok border-ok/20">${locale === 'he' ? 'פעיל' : 'Active'}</span>`)))
+    }
+    const card = strip(read('components/settings/GoogleAdsCard.tsx'))
+    check('the card takes only its copy: no connection state it could show as connected, whatever the project', stateless(card))
+    check('MUT: an unconditional badge in the card fails it', !stateless(card.replace('<Card tone="sunk"', '<Badge variant="success">{t.googleAds.title}</Badge><Card tone="sunk"')))
+    check('MUT: a card that takes a connection flag fails it', !stateless(card.replace('{ t }: { t: DashboardDictionary', '{ t, connected }: { connected?: boolean; t: DashboardDictionary')))
+    const page = strip(read('app/(dashboard)/settings/page.tsx'))
+    const mountedPlain = (src: string) => /<GoogleAdsCard t=\{t\} \/>/.test(src) && !/<GoogleAdsCard [^>]*(connected|status)/.test(src)
+    check('the settings page mounts it with its copy only', mountedPlain(page))
+    check('MUT: a page that passes a status fails it', !mountedPlain(page.replace('<GoogleAdsCard t={t} />', '<GoogleAdsCard t={t} status="connected" />')))
   }
 
   console.log('\nwhat the screen sends and shows (source)')

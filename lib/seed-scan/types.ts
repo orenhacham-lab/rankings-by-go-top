@@ -123,6 +123,12 @@ export type SeedSummary = {
   sitemapUrlCount: number | null
   /** True when the count stopped at the discovery limit, i.e. "at least". */
   sitemapTruncated: boolean
+  /**
+   * The icon the home page declares (<link rel="icon">), as an https URL on the
+   * site itself; absent when a1 did not read the page or found none. Only the
+   * owner's browser ever loads it (lib/site-icon.ts).
+   */
+  siteIcon?: string
 }
 
 /** Stable codes a step or a run may end with. The UI maps each to copy. */

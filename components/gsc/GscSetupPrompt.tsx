@@ -45,7 +45,10 @@ export default function GscSetupPrompt({
         className,
       )}
     >
-      <p className={cn('text-sm text-muted', layout === 'inline' && 'min-w-0 flex-1')}>{about}</p>
+      {/* The sentence's basis is what lets the button wrap under it on a phone:
+          at basis 0 the sentence gives up all its width and the unbreakable
+          button runs past the screen's edge. */}
+      <p className={cn('text-sm text-muted', layout === 'inline' && 'min-w-0 flex-1 basis-56')}>{about}</p>
       <Link href={gscSettingsHref(projectId)} className={GSC_ACTION_LINK_CLASS}>
         {t.actions[state]}
       </Link>

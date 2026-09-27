@@ -14,7 +14,7 @@ import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
 import { useScanResearch } from '@/components/keyword-research/useScanResearch'
 import ScanOverview from '@/components/keyword-research/ScanOverview'
-import { ScanEmptyCard, ScanPendingCard, ScanRunningCard } from '@/components/keyword-research/ScanCards'
+import { ScanEmptyCard, ScanLoadingSkeleton, ScanPendingCard, ScanRunningCard } from '@/components/keyword-research/ScanCards'
 import ResearchFormBar, { ResearchFormClose } from '@/components/keyword-research/ResearchFormBar'
 import EasyWins from '@/components/keyword-research/EasyWins'
 import ResearchChips from '@/components/keyword-research/ResearchChips'
@@ -206,15 +206,19 @@ export default function KeywordResearchPage() {
   const [trendData, setTrendData] = useState<TrendData | undefined>()
 
   // ── The seeding scan's research (components/keyword-research, lib/keyword-research) ──
-  // With no scan (the flag off, an older project, a read that failed), and while the
-  // first answer is on its way, everything below renders exactly today's screen
-  // (components/keyword-research/__qa__/legacy-screen.qa.ts). Opening the tab only
-  // reads: the scan's run and its cached research, never Google Ads, Serper or a model.
+  // With no scan (the flag off, an older project, a read that failed), everything
+  // below renders exactly today's screen (components/keyword-research/__qa__/legacy-screen.qa.ts).
+  // Until the first answer is in (the project list, then the scan's two reads), the
+  // screen is the research screen's skeleton, never today's form: a project WITH
+  // research used to see that form, in the older look, until its research replaced
+  // it. Opening the tab only reads: the scan's run and its cached research, never
+  // Google Ads, Serper or a model.
   const ts = dict.keywordResearchScan
   const scan = useScanResearch(activeProjectId)
   const scanView = scan.view
   const scanOn = scanView.kind === 'none' || scanView.kind === 'loading' ? null : scanView
   const scanMode = scanOn !== null
+  const firstAnswerPending = !projectsResolved || scanView.kind === 'loading'
   const scanKeywords = scanOn?.kind === 'seeded' ? scanOn.research.keywords : NO_SCAN_KEYWORDS
   const scanTracked = scanOn ? scanOn.tracked : NO_TRACKED
   // A research the merchant runs from the form takes the screen until they go back to the scan's.
@@ -912,13 +916,27 @@ export default function KeywordResearchPage() {
     <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} retry={gscKeywords.retry} />
   ) : null
 
+  const header = (
+    <div className={`mb-8 ${isRTL ? 'text-right' : 'text-left'}`}>
+      <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
+      <p className="text-slate-600 dark:text-slate-300">{t.subtitle}</p>
+    </div>
+  )
+
+  // Nothing is known yet about which screen this is: its skeleton, not today's form.
+  if (firstAnswerPending) {
+    return (
+      <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`}>
+        {header}
+        <ScanLoadingSkeleton />
+      </div>
+    )
+  }
+
   return (
     <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`}>
       {/* Header */}
-      <div className={`mb-8 ${isRTL ? 'text-right' : 'text-left'}`}>
-        <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
-        <p className="text-slate-600 dark:text-slate-300">{t.subtitle}</p>
-      </div>
+      {header}
 
       {/* The seeding scan's research opens the screen, before the form. */}
       {scanOn?.kind === 'pending' && <ScanPendingCard />}

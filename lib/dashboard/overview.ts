@@ -27,6 +27,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { resolveActivePlatform, siteConnectionState } from '@/lib/content/platform/active-platform'
+import { buildDomainList, computeDisplayMatches, type DisplayCitationInput } from '@/lib/ai-visibility/display-classification'
+import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NO_STORE = { 'cache-control': 'no-store' }
@@ -273,8 +275,17 @@ async function readBoard({ projectId, userId, db }: Scope): Promise<Section<Boar
  * and only after the project was proven to be this user's: every query is
  * filtered by that project, and the runs by their owner too (only the project's
  * owner can start one). The answers are read only for those runs.
+ *
+ * THE BUSINESS'S OWN FIGURES, COUNTED AS THE AI TAB COUNTS THEM. Each answer is
+ * read again with computeDisplayMatches (app/api/ai-visibility/runs/route.ts
+ * does the same): a mention is an answer that names the business or its site,
+ * a citation is an answer that lists the site among its sources. The stored
+ * `mentioned` flag can disagree with the answer's text, and `citation_count` is
+ * every source in the answer, whoever's; neither is the business's figure.
  */
-async function readAi(admin: ServiceRoleClient, projectId: string, userId: string): Promise<Section<AiData>> {
+type AiProject = { target_domain?: string | null; business_name: string | null; brand_aliases?: string[] | null; domain_aliases?: string[] | null }
+
+async function readAi(admin: ServiceRoleClient, projectId: string, userId: string, project: AiProject): Promise<Section<AiData>> {
   const runsRes = await admin
     .from('ai_scan_runs')
     .select('id, status, completed_at, created_at')
@@ -290,19 +301,53 @@ async function readAi(admin: ServiceRoleClient, projectId: string, userId: strin
   const runIds = runs.map((r) => r.id).filter((v): v is string => typeof v === 'string')
   const resultsRes = await admin
     .from('ai_scan_results')
-    .select('run_id, mentioned, citation_count, status, excluded_from_score')
+    .select('id, run_id, mentioned, target_cited, response_text, status, excluded_from_score')
     .eq('project_id', projectId)
     .in('run_id', runIds)
     .limit(5000)
   if (resultsRes.error) return { state: 'error' }
+  const scored = ((resultsRes.data ?? []) as Array<Record<string, unknown>>).filter((r) =>
+    r.status === 'success' && r.excluded_from_score !== true && typeof r.run_id === 'string')
+
+  // The sources of the scored answers, to find the site among them.
+  const citationsByResult = new Map<string, DisplayCitationInput[]>()
+  const resultIds = scored.map((r) => r.id).filter((v): v is string => typeof v === 'string')
+  // In batches, so a long check never builds an over-long request URL.
+  for (let i = 0; i < resultIds.length; i += 150) {
+    const citationsRes = await admin
+      .from('ai_citations')
+      .select('result_id, domain, url, is_target_domain')
+      .eq('project_id', projectId)
+      .in('result_id', resultIds.slice(i, i + 150))
+      .limit(5000)
+    if (citationsRes.error) return { state: 'error' }
+    for (const c of (citationsRes.data ?? []) as Array<Record<string, unknown>>) {
+      if (typeof c.result_id !== 'string') continue
+      const list = citationsByResult.get(c.result_id) ?? []
+      list.push({ domain: str(c.domain), url: str(c.url, 2048), is_target_domain: c.is_target_domain === true })
+      citationsByResult.set(c.result_id, list)
+    }
+  }
+
+  const targetDomain = project.target_domain ?? null
+  const brandVariants = getBrandVariants(project.business_name, targetDomain, project.brand_aliases ?? [], project.domain_aliases ?? [])
+  const domainList = buildDomainList(targetDomain, project.domain_aliases ?? [])
   const byRun = new Map<string, { answers: number; mentions: number; citations: number }>()
-  for (const r of (resultsRes.data ?? []) as Array<Record<string, unknown>>) {
-    if (r.status !== 'success' || r.excluded_from_score === true || typeof r.run_id !== 'string') continue
-    const agg = byRun.get(r.run_id) ?? { answers: 0, mentions: 0, citations: 0 }
+  for (const r of scored) {
+    const display = computeDisplayMatches({
+      responseText: typeof r.response_text === 'string' ? r.response_text : null,
+      brandVariants,
+      targetDomain,
+      domainList,
+      mentioned: r.mentioned === true,
+      cited: r.target_cited === true,
+      citations: typeof r.id === 'string' ? citationsByResult.get(r.id) ?? null : null,
+    })
+    const agg = byRun.get(r.run_id as string) ?? { answers: 0, mentions: 0, citations: 0 }
     agg.answers++
-    if (r.mentioned === true) agg.mentions++
-    agg.citations += typeof r.citation_count === 'number' && r.citation_count > 0 ? r.citation_count : 0
-    byRun.set(r.run_id, agg)
+    if (display.displayMentioned) agg.mentions++
+    if (display.displayCited) agg.citations++
+    byRun.set(r.run_id as string, agg)
   }
   const score = (id: unknown) => {
     const agg = typeof id === 'string' ? byRun.get(id) : undefined
@@ -440,12 +485,12 @@ export async function handleDashboardGet(projectId: string, deps: DashboardDeps)
     // The project, read as its owner: RLS scopes the read and the filter says so too.
     const { data, error } = await session.db
       .from('projects')
-      .select('id, user_id, business_name')
+      .select('id, user_id, business_name, target_domain, brand_aliases, domain_aliases')
       .eq('id', projectId)
       .eq('user_id', userId)
       .maybeSingle()
     if (error) return refuse(500, 'internal')
-    const project = data as { id: string; user_id: string; business_name: string | null } | null
+    const project = data as ({ id: string; user_id: string } & AiProject) | null
     if (!project || project.user_id !== userId) return refuse(404, 'not_found')
 
     const scope: Scope = { projectId: project.id, userId, db: session.db }
@@ -457,7 +502,7 @@ export async function handleDashboardGet(projectId: string, deps: DashboardDeps)
     const [articles, board, ai, setup, activity, account] = await Promise.all([
       flags.content ? section('articles', projectId, () => readArticles(scope, now)) : Promise.resolve({ state: 'disabled' } as const),
       flags.content ? section('board', projectId, () => readBoard(scope)) : Promise.resolve({ state: 'disabled' } as const),
-      flags.ai ? section('ai', projectId, () => readAi(adminClient(), project.id, userId)) : Promise.resolve({ state: 'disabled' } as const),
+      flags.ai ? section('ai', projectId, () => readAi(adminClient(), project.id, userId, project)) : Promise.resolve({ state: 'disabled' } as const),
       section('setup', projectId, () => readSetup(scope, project)),
       section('activity', projectId, () => readActivity(scope, adminClient(), flags)),
       section('account', projectId, () => readAccount(scope, adminClient(), deps, now)),

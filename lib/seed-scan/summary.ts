@@ -10,6 +10,7 @@
 import type { FreeCheckFinding, GeoSignal } from '@/lib/free-check'
 import type { Locale } from '@/lib/i18n/locales'
 import type { SeedBusiness, SeedCompetitor, SeedCounters, SeedGeo, SeedSummary } from './types'
+import { safeSiteIcon } from '@/lib/site-icon'
 
 export const PENDING_GEO: SeedGeo = { state: 'pending', unavailableReason: null, passed: 0, total: 0, signals: [] }
 
@@ -162,5 +163,9 @@ export function readSummary(raw: unknown): SeedSummary | null {
     counters: { keywords: 0, fixes: 0, geoPassed: 0, geoTotal: 0, articles: 0, competitors: 0 },
     sitemapUrlCount: typeof r.sitemapUrlCount === 'number' && r.sitemapUrlCount >= 0 ? Math.floor(r.sitemapUrlCount) : null,
     sitemapTruncated: bool(r.sitemapTruncated),
+    // Checked again on every read (https, on this site, bounded), never trusted because stored.
+    ...siteIconField(safeSiteIcon(r.siteIcon, domain)),
   })
 }
+
+const siteIconField = (icon: string | null): { siteIcon?: string } => (icon ? { siteIcon: icon } : {})

@@ -207,9 +207,8 @@ export const dashboardEn = {
     },
     googleAds: {
       title: 'Google Ads',
-      status: 'Active',
-      body: 'Search volumes in keyword research and keywords already come from GoTop’s Google Ads account. There is nothing to connect.',
-      note: 'Connecting your own Google Ads account, to manage your campaigns, is a separate capability that is not available yet.',
+      body: 'Google Ads is not available as a project connection yet.',
+      note: 'Search volumes in keyword research and keywords come from Go Top’s own data source, so no connection is needed.',
     },
     platformDetected: 'We detected {platform} on your site',
     platformDetectedOther: 'We detected {platform} on your site. Articles publish to WordPress or Shopify.',
@@ -1685,9 +1684,9 @@ export const dashboardEn = {
   // merged into one tab with a month board. Placed right after the content section it
   // grew out of.
   contentStrategy: {
-    nextEyebrow: 'Next article',
+    nextEyebrow: 'Up next',
     nextNotScheduled: 'Not in the publishing queue yet',
-    whyTitle: 'Why this one',
+    whyTitle: 'Why this topic',
     whyFallback: {
       queued: 'It is first in the publishing queue, so it is written and published before the rest.',
       topic: 'It is the topic that has waited longest for an article.',
@@ -1759,7 +1758,7 @@ export const dashboardEn = {
   },
   home: {
     title: 'Dashboard',
-    subtitle: 'What changed in this project since your last visit, and what to do next',
+    subtitle: 'Since your last visit',
     keywords: 'Keywords',
     keywordsSource: 'Actively tracked in this project',
     scansPerformed: 'Scans Performed',
@@ -1788,7 +1787,7 @@ export const dashboardEn = {
     shortcutsLabel: 'Shortcuts',
     shortcuts: {
       research: 'Keyword research',
-      schedule: 'Publishing schedule',
+      schedule: 'Content calendar',
       articles: 'My articles',
       keywords: 'Keywords',
     },
@@ -1830,7 +1829,7 @@ export const dashboardEn = {
       unavailable: 'Not available right now',
     },
     setup: {
-      title: 'Finish setting up',
+      title: 'Get your project ready',
       subtitle: 'A few steps, and every screen fills with your own data',
       progress: (done: number, total: number) => `${done} of ${total}`,
       done: 'Done',
@@ -1842,14 +1841,14 @@ export const dashboardEn = {
       },
     },
     holdingBack: {
-      title: 'What is holding you back',
+      title: 'What\'s slowing the site',
       subtitle: 'From the first scan of your site',
       scannedAt: (when: string) => `Scanned ${when}`,
       findingsTitle: 'On the site',
-      geoTitle: 'AI answer readiness',
+      geoTitle: 'AI engine readiness',
       geoScore: (passed: number, total: number) => `${passed}/${total} in good shape`,
       why: 'Why it matters',
-      clean: 'The site is clean on everything we check.',
+      clean: 'No issues found in any of our checks.',
       more: (n: number) => `${n} more findings`,
       severity: { blocker: 'Blocking', warning: 'Worth fixing', info: 'Improvement' },
       checkState: { ok: 'In place', fail: 'Missing', notChecked: 'Not checked' },
@@ -1860,13 +1859,13 @@ export const dashboardEn = {
       failed: 'We could not read the whole site, so there are no findings yet. You can run the scan again from settings.',
       geo: {
         schema: { title: 'Structured data (Schema)', why: 'Tells Google and AI engines for certain who the business is and what it does.' },
-        faq: { title: 'Questions and answers', why: 'AI engines answer questions, so they cite pages that answer questions.' },
+        faq: { title: 'Questions and answers', why: 'A page with questions and answers gives an AI engine a ready answer to quote.' },
         robots: { title: 'AI bot access', why: 'A bot blocked in robots.txt cannot read the site, so it cannot cite it either.' },
         llms: { title: 'llms.txt file', why: 'Hands AI engines a tidy map of the site. Most of the market has not done it yet.' },
       },
     },
     activity: {
-      title: 'Recent activity',
+      title: 'What\'s new',
       subtitle: 'What happened in this project, newest first',
       emptyTitle: 'No activity yet',
       empty: 'Every rank check, article and new topic shows up here, with when it happened.',
@@ -1883,7 +1882,7 @@ export const dashboardEn = {
       seedDone: {
         a1: (n: number | null) => (n ? `Read the site: ${n} addresses in the sitemap` : 'Read the home page'),
         a2: () => 'Understood the business, its audiences and seed keywords',
-        a3: (n: number | null) => (n ? `Found ${n} things to fix on the site` : 'The site is clean on everything we check'),
+        a3: (n: number | null) => (n ? `Found ${n} fixes for the site` : 'No issues found in any of our checks'),
         a4: (n: number | null) => (n ? `Found ${n} competitors` : 'Looked for competitors in search results'),
         b1: (n: number | null) => (n ? `Crawled ${n} pages on the site` : 'Crawled the key pages of the site'),
         b2: (n: number | null) => (n ? `Found ${n} keywords` : 'Keyword research finished'),
@@ -1893,10 +1892,10 @@ export const dashboardEn = {
         b6: (n: number | null) => (n ? `Rankings checked for ${n} keywords` : 'The first rank check finished'),
       },
       seedRunning: {
-        a1: 'Reading the site',
-        a2: 'Understanding the business',
-        a3: 'Checking what holds the site back',
-        a4: 'Looking for competitors',
+        a1: 'Scanning pages',
+        a2: 'Identifying services and area',
+        a3: 'Checking page tags and content',
+        a4: 'Finding competitors on Google',
         b1: 'Crawling the key pages of the site',
         b2: 'Finding keywords with search volumes',
         b3: 'Checking which keywords your competitors rank for',
@@ -1907,7 +1906,7 @@ export const dashboardEn = {
       seedFailed: (label: string) => `Did not complete: ${label}`,
     },
     distribution: {
-      title: 'Ranking distribution',
+      title: 'Where your keywords rank',
       subtitle: 'Where each keyword sits on Google, from its latest check',
       buckets: { top3: '1-3', top10: '4-10', top20: '11-20', top50: '21-50', top100: '51-100', notFound: 'Not found' },
       bucketSentence: (label: string, n: number, total: number) => `${label}: ${n} of ${total} keywords`,
@@ -1948,7 +1947,7 @@ export const dashboardEn = {
       emptyCta: 'Go to keyword research',
     },
     board: {
-      title: 'Publishing schedule',
+      title: 'Content calendar',
       subtitle: 'Up next, and what went live recently',
       upcoming: 'Up next',
       published: 'Recently published',
@@ -1982,7 +1981,7 @@ export const dashboardEn = {
       emptyCta: 'Go to AI visibility',
     },
     account: {
-      title: 'Account',
+      title: 'Your subscription',
       plan: 'Plan',
       plans: {
         trial: 'Trial', regular: 'Basic', advanced: 'Advanced', premium: 'Premium', large_agency: 'Agency',
@@ -3144,13 +3143,13 @@ export const dashboardEn = {
     newProject: {
       eyebrow: 'New project',
       title: 'Which site are we starting with?',
-      subtitle: 'One address is enough. We read the site, understand the business and prepare a first research summary for you.',
+      subtitle: 'One address is enough. We read the site, understand the business and prepare an initial review for you.',
       urlLabel: 'Site address',
       urlPlaceholder: 'example.com',
       submit: 'Scan the site',
       creating: 'Creating the project…',
       starting: 'Starting the scan…',
-      promise: 'It takes up to a minute',
+      promise: 'About a minute. You can keep working meanwhile',
       noConnection: 'No Search Console, no site connection',
       fromFreeCheck: (domain: string) => `Continuing from your free check of ${domain}`,
       errorEmpty: 'Enter the site\'s address',
@@ -3160,20 +3159,20 @@ export const dashboardEn = {
       afterBody: 'You choose which keywords to track, and the full research continues in the background: keywords with search volumes, your competitors\' keywords and a content plan.',
     },
     progress: {
-      eyebrow: 'First research summary',
+      eyebrow: 'Initial site review',
       title: (domain: string) => `Scanning ${domain}`,
       fromFreeCheck: 'Continuing from your free check results',
-      promise: 'It takes up to a minute',
+      promise: 'About a minute. You can keep working meanwhile',
       stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
-      nowLabel: 'What\'s happening now',
+      nowLabel: 'In progress',
       stepsLabel: 'Steps',
       finishingTitle: 'Putting the findings together',
-      finishingLine: 'The summary is almost ready',
+      finishingLine: 'The review is almost ready',
       steps: {
-        a1: { title: 'Reading the site', lines: ['Reading the home page', 'Checking whether AI bots can get in', 'Counting the addresses in the sitemap'] },
-        a2: { title: 'Understanding the business', lines: ['Working out what the business offers', 'Identifying the target audiences', 'Choosing the first keywords'] },
-        a3: { title: 'Checking what holds you back', lines: ['Checking titles, descriptions and images', 'Checking four signs of AI readiness'] },
-        a4: { title: 'Finding competitors', lines: ['Searching Google for your keywords', 'Checking who shows up next to you'] },
+        a1: { title: 'Page scan', lines: ['Reading the home page', 'Checking whether AI bots can get in', 'Counting the addresses in the sitemap'] },
+        a2: { title: 'Services and area', lines: ['Working out what the business offers', 'Identifying the target audiences', 'Choosing the first keywords'] },
+        a3: { title: 'Tags and content check', lines: ['Checking titles, descriptions and images', 'Checking four signs of AI readiness'] },
+        a4: { title: 'Competitors on Google', lines: ['Searching Google for your keywords', 'Checking who shows up next to you'] },
       },
       claimLines: {
         a1: ['Opening your free check results'],
@@ -3182,17 +3181,17 @@ export const dashboardEn = {
       },
       state: { done: 'Done', running: 'Now', pending: 'Next', skipped: 'Skipped', failed: 'Not completed' },
       stalledTitle: 'This is taking longer than usual',
-      stalledBody: 'The scan keeps going in the background even if you leave this page, and the summary will be waiting for you here.',
+      stalledBody: 'The scan keeps going in the background even if you leave this page, and the review will be waiting for you here.',
       reconnecting: 'Reconnecting…',
     },
     summary: {
-      badge: 'First research summary',
-      title: (name: string) => `Here's what we found about ${name}`,
-      scannedJustNow: (domain: string) => `We just scanned ${domain}`,
+      badge: 'Initial site review',
+      title: (name: string) => `${name}: what we learned from the site`,
+      scannedJustNow: (domain: string) => `Scanned ${domain} just now`,
       scannedHoursAgo: (domain: string, hours: number) =>
-        hours === 1 ? `We scanned ${domain} an hour ago` : `We scanned ${domain} ${hours} hours ago`,
+        hours === 1 ? `Scanned ${domain} an hour ago` : `Scanned ${domain} ${hours} hours ago`,
       scannedDaysAgo: (domain: string, days: number) =>
-        days === 1 ? `We scanned ${domain} yesterday` : `We scanned ${domain} ${days} days ago`,
+        days === 1 ? `Scanned ${domain} yesterday` : `Scanned ${domain} ${days} days ago`,
       fromFreeCheck: 'From your free check',
       fromSearchIndex: (domain: string) => `We built this research from what Google shows of ${domain}`,
       firewall: {
@@ -3202,15 +3201,15 @@ export const dashboardEn = {
       edit: 'Edit',
       editLabel: (section: string) => `Edit: ${section}`,
       tiles: {
-        keywords: 'Keywords to promote',
-        fixes: 'Things to fix on the site',
-        geo: 'Ready for AI answers',
-        articles: 'Articles ready to write',
+        keywords: 'Recommended keywords',
+        fixes: 'Site fixes',
+        geo: 'AI engine readiness',
+        articles: 'Article ideas',
         notChecked: 'Not checked',
         pending: 'Pending',
       },
       business: {
-        title: 'What we understood about the business',
+        title: 'Your business, as your site presents it',
         niche: 'Niche',
         commerceType: 'Business type',
         platform: 'Platform',
@@ -3221,18 +3220,18 @@ export const dashboardEn = {
         locked: 'The store is password protected, so we haven\'t read what it offers yet.',
       },
       audiences: {
-        title: 'Who your customers are',
+        title: 'Who you serve',
         empty: 'We haven\'t identified target audiences yet. You can add them under Settings.',
       },
       competitors: {
-        title: 'Who you compete with',
+        title: 'Who competes with you on Google',
         seenIn: (n: number) => (n === 1 ? 'Appeared in one of our Google searches' : `Appeared in ${n} of our Google searches`),
         suggested: 'Suggested by the site analysis',
         empty: 'We didn\'t find competitors this time. The full research will look again.',
       },
       findings: {
-        title: 'What\'s holding you back',
-        clean: 'The site is clear of the issues we check',
+        title: 'What\'s slowing the site',
+        clean: 'No issues found in any of our checks',
         locked: 'Not checked: the store is password protected',
         firewall: 'Not checked: the site blocks automated reads',
         failed: 'We couldn\'t finish this check',
@@ -3244,7 +3243,7 @@ export const dashboardEn = {
         severity: { blocker: 'Blocking', warning: 'Worth fixing', info: 'Good to know' },
       },
       keywords: {
-        title: 'The keywords we\'d promote',
+        title: 'Keywords worth pushing',
         hint: 'All are checked. What stays checked is tracked and counts toward your plan\'s keyword limit.',
         selected: (n: number, total: number) => `${n} of ${total} checked`,
         limit: (max: number) => `You can check up to ${max} keywords`,
@@ -3261,9 +3260,9 @@ export const dashboardEn = {
         },
       },
       geo: {
-        title: 'Ready for AI answers',
+        title: 'AI engine readiness',
         intro: 'AI engines like ChatGPT and Perplexity don\'t rank sites, they quote them. These four signs decide how easily they can quote you.',
-        score: (passed: number, total: number) => `${passed} of ${total} signs in place`,
+        score: (passed: number, total: number) => `${passed} of ${total} checks passed`,
         locked: 'Not checked: the store is password protected',
         lockedBody: 'We\'ll check these signs once the store is open to the public.',
         firewall: 'Not checked: the site blocks automated reads',
@@ -3277,7 +3276,7 @@ export const dashboardEn = {
         fail: 'Missing',
       },
       articles: {
-        title: 'The articles we\'d write',
+        title: 'Articles that can bring traffic',
         empty: 'No topics yet. The full research will prepare a content plan.',
       },
       start: {
@@ -3316,7 +3315,7 @@ export const dashboardEn = {
     },
     noRun: {
       title: 'We haven\'t scanned this site yet',
-      body: 'The scan reads the site and prepares a first research summary. It takes up to a minute.',
+      body: 'The scan reads the site and prepares an initial review. It takes up to a minute.',
       action: 'Scan the site',
     },
     notices: {
@@ -3480,7 +3479,7 @@ export const dashboardEn = {
   // components/keyword-research). Without a scan none of this is shown.
   keywordResearchScan: {
     overview: {
-      badgeDone: 'Research complete',
+      badgeDone: 'Research ready',
       badgeRunning: 'Research still running',
       badgeManual: 'Your research',
       headline: (count: string, searches: string) => `We found ${count} keywords, ${searches} searches a month`,
@@ -3490,7 +3489,7 @@ export const dashboardEn = {
       fromManual: 'From the research you just ran',
       backToScan: "Back to your site's research",
       competitors: (n: string) => `${n} competitors checked`,
-      easyWins: (n: string) => `${n} easy wins`,
+      easyWins: (n: string) => `${n} keywords within reach`,
       stillRunning: 'The full research is still running, and the results update here by themselves.',
       truncated: (n: string) => `Showing the ${n} most searched keywords.`,
     },
@@ -3502,7 +3501,7 @@ export const dashboardEn = {
       cpc: 'Average CPC',
       cpcSource: (n: string) => `Average of ${n} keywords with a click price`,
       cpcNone: 'No click price',
-      easyWins: 'Easy wins',
+      easyWins: 'Within reach',
       easyWinsSource: 'Low or medium competition, 30+ searches',
     },
     running: {
@@ -3542,7 +3541,7 @@ export const dashboardEn = {
       close: 'Close the form',
     },
     easyWins: {
-      title: 'Easy battles to win',
+      title: 'Within reach',
       subtitle: 'The keywords worth starting with: enough searches, competition you can beat, and a click price that signals value.',
       keyword: 'Keyword',
       searches: 'Searches a month',
