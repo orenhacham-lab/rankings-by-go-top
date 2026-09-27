@@ -126,6 +126,27 @@ async function main() {
   check('a robots.txt pointing at another domain is not followed',
     offHost.sitemaps.length === 1 && offHost.sitemaps[0] === 'https://a.co.il/sitemap.xml', JSON.stringify(offHost.sitemaps))
 
+  // An index names the NEXT documents we fetch, and it is the site's own
+  // content — attacker-controllable the moment the site is. Pinning only the
+  // entries is not enough: the child documents must be pinned too.
+  const OFF_HOST_INDEX = `<sitemapindex xmlns="x">
+    <sitemap><loc>https://evil.example/sitemap.xml</loc><lastmod>2026-09-25</lastmod></sitemap>
+    <sitemap><loc>https://a.co.il/page-sitemap.xml</loc><lastmod>2026-09-20</lastmod></sitemap>
+  </sitemapindex>`
+  const fetched: string[] = []
+  const recordingServe = (map: Record<string, string>) => async (u: URL) => {
+    fetched.push(u.toString())
+    return serve(map)(u)
+  }
+  const hostile = await discoverSitemapUrls(origin, { robotsTxt: null }, {
+    fetchText: recordingServe({ 'https://a.co.il/sitemap.xml': OFF_HOST_INDEX, 'https://evil.example/sitemap.xml': PAGES, 'https://a.co.il/page-sitemap.xml': PAGES }),
+  })
+  check("an index's off-host child is never even fetched",
+    !fetched.some((u) => u.includes('evil.example')), JSON.stringify(fetched))
+  check('the same-host child is still read', hostile.sitemaps.includes('https://a.co.il/page-sitemap.xml'))
+  check('nothing from the off-host document reaches the entries',
+    hostile.entries.every((e) => e.url.startsWith('https://a.co.il/')))
+
   console.log('\nCLAIM) one scan, one account, one time')
   const CHECK_ID = '11111111-2222-3333-4444-555555555555'
   const ledger = () => ({
@@ -182,6 +203,12 @@ async function main() {
     aOk.ok && bOk.ok && aOk.scan.checkId === bOk.scan.checkId)
 
   console.log('\nMUTATION CONTROLS) the weaker designs this replaced')
+  // Weakening: pinning the ENTRIES but not the child DOCUMENTS, which is what
+  // this module did before — the entries came back clean while the fetch had
+  // already happened.
+  const entryOnlyPin = (childUrl: string) => childUrl.startsWith('https://')
+  check('CONTROL: an entry-only pin accepts an off-host child document', entryOnlyPin('https://evil.example/sitemap.xml'))
+  check('CONTROL: the real module never fetched it', !fetched.some((u) => u.includes('evil.example')))
   // Weakening #1: seeding by domain, which is what a claim token exists to stop.
   const byDomain = (domain: string) => shared.free_site_checks.find((r) => r.domain === domain)
   check('CONTROL: a domain-keyed handoff hands out a scan to anyone who types the domain', !!byDomain('a.co.il'))
