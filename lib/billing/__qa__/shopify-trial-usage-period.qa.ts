@@ -908,11 +908,15 @@ async function main() {
     const conditional = hub.indexOf("{ideasSection === 'manual' ? (")
     const conditionalEnd = hub.indexOf('</>\n      )}', conditional)
     const schedule = hub.indexOf('<AutomationSchedule')
-    const route = strip(read('app/(dashboard)/content/(workspace)/automation/page.tsx'))
+    // W6c content strategy: the automation screen has no route of its own any more; it
+    // is mounted in the content strategy tab's list view, behind the same flag.
+    const route = strip(read('components/content-strategy/ContentStrategyScreen.tsx'))
+    const provider = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
     check('B-c: it is rendered OUTSIDE the auto/manual conditional',
       conditionalEnd !== -1 && schedule > conditionalEnd)
-    check('B-d: and the screen itself is gated by the automation flag, on its route',
-      /NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION !== 'true'/.test(route))
+    check('B-d: and the screen itself is gated by the automation flag, where it is mounted',
+      /\{automationEnabled && \([\s\S]{0,300}<AutomationScreen /.test(route)
+      && /const automationEnabled = process\.env\.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true'/.test(provider))
     check('B-e: so section=manual renders the queue', conditionalEnd !== -1 && schedule > conditionalEnd)
     check('B-f: and section=auto renders the same one', (hub.match(/<AutomationSchedule/g) ?? []).length === 1)
     check('B-g: the manual branch still offers manual topic creation',
