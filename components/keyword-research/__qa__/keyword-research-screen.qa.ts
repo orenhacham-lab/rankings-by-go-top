@@ -505,9 +505,9 @@ function main() {
       && place.every((p) => p.next === 'keywordResearchScan' && p.last !== 'keywordResearchScan'),
       show({ diffs, hebrewInEn: hebrewInEn.map((s) => s.path), notHebrew: notHebrew.map((s) => s.path), place }))
     const heT = getDashboardDictionary('he').keywordResearchScan
-    check('X5: the spec\'s Hebrew, word for word: the running line, the headline, the easy battles, the nine chips',
+    check('X5: the spec\'s Hebrew, word for word: the running line, the headline, the best keywords to start with (our own wording), the nine chips',
       heT.running.title === 'המחקר המלא רץ, זה לוקח כמה דקות' && heT.overview.headline('N', 'X') === 'מצאנו N ביטויים, X חיפושים בחודש'
-      && heT.easyWins.title === 'קרבות קלים לניצחון'
+      && heT.easyWins.title === 'הביטויים הכי משתלמים להתחלה'
       && show(RESEARCH_CHIPS.map((c) => heT.chips[c])) === show(['הכל', 'מהמחקר', 'ממתחרים', 'מגוגל', 'נפח גבוה', 'תחרות נמוכה', 'שאלות', 'מוצע למעקב', 'כבר במעקב'])
       && heT.tiles.cpc.includes('CPC'))
   }

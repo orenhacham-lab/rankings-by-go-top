@@ -204,9 +204,8 @@ export const dashboardHe = {
     },
     googleAds: {
       title: 'Google Ads',
-      status: 'פעיל',
-      body: 'נפחי החיפוש במחקר הביטויים ובמילות המפתח כבר מגיעים מחשבון Google Ads של GoTop. אין צורך לחבר חשבון.',
-      note: 'חיבור חשבון Google Ads שלכם, לניהול הקמפיינים עצמם, הוא יכולת אחרת שאינה זמינה כרגע.',
+      body: 'Google Ads עוד לא זמין כחיבור לפרויקט.',
+      note: 'נפחי החיפוש במחקר הביטויים ובמילות המפתח מגיעים ממקור הנתונים של Go Top עצמה, ולכן אין צורך בחיבור.',
     },
     platformDetected: 'זיהינו {platform} באתר שלכם',
     platformDetectedOther: 'זיהינו {platform} באתר שלכם. פרסום מאמרים עובד עם WordPress או Shopify.',
@@ -1830,7 +1829,7 @@ export const dashboardHe = {
       unavailable: 'לא זמין כרגע',
     },
     setup: {
-      title: 'השלמת ההגדרה',
+      title: 'הכנת הפרויקט',
       subtitle: 'כמה צעדים, וכל מסך במערכת מתמלא בנתונים שלכם',
       progress: (done: number, total: number) => `${done} מתוך ${total}`,
       done: 'הושלם',
@@ -1842,14 +1841,14 @@ export const dashboardHe = {
       },
     },
     holdingBack: {
-      title: 'מה מעכב אתכם',
+      title: 'מה כדאי לתקן באתר',
       subtitle: 'מהסריקה הראשונית של האתר',
       scannedAt: (when: string) => `נסרק ${when}`,
       findingsTitle: 'ממצאים באתר',
-      geoTitle: 'מוכנות לתשובות AI',
+      geoTitle: 'התאמה למנועי AI',
       geoScore: (passed: number, total: number) => `${passed}/${total} תקינים`,
       why: 'למה זה חשוב',
-      clean: 'האתר נקי מהבעיות שאנחנו בודקים.',
+      clean: 'לא נמצאו בעיות באף אחת מהבדיקות שלנו.',
       more: (n: number) => `ועוד ${n} ממצאים`,
       severity: { blocker: 'חוסם', warning: 'כדאי לתקן', info: 'שיפור' },
       checkState: { ok: 'תקין', fail: 'חסר', notChecked: 'לא נבדק' },
@@ -1860,7 +1859,7 @@ export const dashboardHe = {
       failed: 'לא הצלחנו לקרוא את האתר עד הסוף, ולכן אין עדיין ממצאים. אפשר להריץ את הסריקה שוב מההגדרות.',
       geo: {
         schema: { title: 'נתונים מובנים (Schema)', why: 'אומרים לגוגל ולמנועי AI בוודאות מי העסק ובמה הוא עוסק.' },
-        faq: { title: 'שאלות ותשובות', why: 'מנועי AI עונים על שאלות, ולכן מצטטים עמודים שעונים על שאלות.' },
+        faq: { title: 'שאלות ותשובות', why: 'עמוד עם שאלות ותשובות נותן למנוע AI תשובה מוכנה לצטט.' },
         robots: { title: 'גישה לבוטים של AI', why: 'בוט שחסום ב-robots.txt לא יכול לקרוא את האתר, ולכן גם לא לצטט אותו.' },
         llms: { title: 'קובץ llms.txt', why: 'מגיש למנועי AI מפה מסודרת של האתר. רוב השוק עוד לא עשה את זה.' },
       },
@@ -1883,7 +1882,7 @@ export const dashboardHe = {
       seedDone: {
         a1: (n: number | null) => (n ? `נקרא האתר: ${n} כתובות במפת האתר` : 'נקרא עמוד הבית של האתר'),
         a2: () => 'זיהינו את העסק, את הקהלים ואת מילות הזרע',
-        a3: (n: number | null) => (n ? `נמצאו ${n} דברים לתקן באתר` : 'האתר נקי מהבעיות שאנחנו בודקים'),
+        a3: (n: number | null) => (n ? `נמצאו ${n} נקודות לתיקון באתר` : 'לא נמצאו בעיות באף אחת מהבדיקות שלנו'),
         a4: (n: number | null) => (n ? `נמצאו ${n} מתחרים` : 'חיפשנו מתחרים בתוצאות החיפוש'),
         b1: (n: number | null) => (n ? `נסרקו ${n} עמודים באתר` : 'נסרקו העמודים המרכזיים באתר'),
         b2: (n: number | null) => (n ? `נמצאו ${n} מילות מפתח` : 'הסתיים מחקר מילות המפתח'),
@@ -1893,10 +1892,10 @@ export const dashboardHe = {
         b6: (n: number | null) => (n ? `נבדקו דירוגים ל-${n} מילות מפתח` : 'הסתיימה בדיקת הדירוג הראשונה'),
       },
       seedRunning: {
-        a1: 'קוראים את האתר',
-        a2: 'מבינים את העסק',
-        a3: 'בודקים מה מעכב את האתר',
-        a4: 'מחפשים מתחרים',
+        a1: 'סורקים את האתר',
+        a2: 'מזהים את העסק ואת הקהלים',
+        a3: 'בודקים מה כדאי לתקן באתר',
+        a4: 'מאתרים מתחרים',
         b1: 'סורקים את העמודים המרכזיים באתר',
         b2: 'מחפשים מילות מפתח עם נפחי חיפוש',
         b3: 'בודקים על אילו מילים המתחרים מדורגים',
@@ -1907,7 +1906,7 @@ export const dashboardHe = {
       seedFailed: (label: string) => `לא הושלם: ${label}`,
     },
     distribution: {
-      title: 'פיזור דירוגים',
+      title: 'איפה מילות המפתח מדורגות',
       subtitle: 'איפה כל מילת מפתח נמצאת בגוגל, לפי הבדיקה האחרונה שלה',
       buckets: { top3: '1-3', top10: '4-10', top20: '11-20', top50: '21-50', top100: '51-100', notFound: 'לא נמצא' },
       bucketSentence: (label: string, n: number, total: number) => `${label}: ${n} מתוך ${total} מילות מפתח`,
@@ -2138,7 +2137,7 @@ export const dashboardHe = {
     },
   },
   competitors: {
-    title: 'מאזן הכוחות',
+    title: 'השוואת דירוגים מול מתחרים',
     subtitle: 'על כמה ממילות המפתח כל מתחרה מדורג מעליך, לפי הבדיקה האחרונה של כל מילה',
     compactSubtitle: 'מי מדורג מעליך במילות המפתח שלך',
     aboveYouSentence: (name: string, ahead: number, compared: number) =>
@@ -3146,7 +3145,7 @@ export const dashboardHe = {
     newProject: {
       eyebrow: 'פרויקט חדש',
       title: 'מאיזה אתר מתחילים?',
-      subtitle: 'כתובת אחת מספיקה. נקרא את האתר, נבין את העסק ונכין לכם תמצית מחקר ראשונה.',
+      subtitle: 'כתובת אחת מספיקה. נקרא את האתר, נבין את העסק ונכין לכם סקירה ראשונית.',
       urlLabel: 'כתובת האתר',
       urlPlaceholder: 'example.co.il',
       submit: 'סרקו את האתר',
@@ -3162,7 +3161,7 @@ export const dashboardHe = {
       afterBody: 'אתם בוחרים אחרי אילו מילות מפתח לעקוב, והמחקר המלא ממשיך ברקע: מילים עם נפחי חיפוש, המילים של המתחרים ותוכנית תוכן.',
     },
     progress: {
-      eyebrow: 'תמצית מחקר ראשונה',
+      eyebrow: 'סקירה ראשונית של האתר',
       title: (domain: string) => `סורקים את ${domain}`,
       fromFreeCheck: 'ממשיכים מתוצאות הבדיקה החינמית',
       promise: 'זה לוקח עד דקה',
@@ -3170,12 +3169,12 @@ export const dashboardHe = {
       nowLabel: 'מה קורה עכשיו',
       stepsLabel: 'השלבים',
       finishingTitle: 'מסכמים את הממצאים',
-      finishingLine: 'עוד רגע התמצית מוכנה',
+      finishingLine: 'עוד רגע הסקירה מוכנה',
       steps: {
-        a1: { title: 'קוראים את האתר', lines: ['קוראים את עמוד הבית', 'בודקים אם בוטים של AI יכולים להיכנס', 'סופרים את הכתובות במפת האתר'] },
-        a2: { title: 'מבינים את העסק', lines: ['מזהים מה העסק מציע', 'מזהים את קהלי היעד', 'בוחרים את מילות המפתח הראשונות'] },
-        a3: { title: 'בודקים מה מעכב', lines: ['בודקים כותרות, תיאורים ותמונות', 'בודקים ארבעה סימנים של מוכנות ל-AI'] },
-        a4: { title: 'מוצאים מתחרים', lines: ['מחפשים בגוגל את מילות המפתח שלכם', 'בודקים מי מופיע לצדכם בתוצאות'] },
+        a1: { title: 'סריקת האתר', lines: ['קוראים את עמוד הבית', 'בודקים אם בוטים של AI יכולים להיכנס', 'סופרים את הכתובות במפת האתר'] },
+        a2: { title: 'זיהוי העסק והקהלים', lines: ['מזהים מה העסק מציע', 'מזהים את קהלי היעד', 'בוחרים את מילות המפתח הראשונות'] },
+        a3: { title: 'איתור נקודות לתיקון', lines: ['בודקים כותרות, תיאורים ותמונות', 'בודקים ארבעה סימנים של מוכנות ל-AI'] },
+        a4: { title: 'איתור מתחרים', lines: ['מחפשים בגוגל את מילות המפתח שלכם', 'בודקים מי מופיע לצדכם בתוצאות'] },
       },
       claimLines: {
         a1: ['פותחים את תוצאות הבדיקה החינמית'],
@@ -3184,17 +3183,17 @@ export const dashboardHe = {
       },
       state: { done: 'הושלם', running: 'עכשיו', pending: 'בהמשך', skipped: 'דולג', failed: 'לא הושלם' },
       stalledTitle: 'זה לוקח יותר מהרגיל',
-      stalledBody: 'הסריקה ממשיכה ברקע גם אם תעזבו את הדף, והתמצית תחכה לכם כאן.',
+      stalledBody: 'הסריקה ממשיכה ברקע גם אם תעזבו את הדף, והסקירה תחכה לכם כאן.',
       reconnecting: 'מתחברים מחדש…',
     },
     summary: {
-      badge: 'תמצית מחקר ראשונה',
-      title: (name: string) => `הנה מה שמצאנו על ${name}`,
-      scannedJustNow: (domain: string) => `סרקנו את ${domain} הרגע`,
+      badge: 'סקירה ראשונית של האתר',
+      title: (name: string) => `${name}: מה למדנו מהאתר`,
+      scannedJustNow: (domain: string) => `האתר ${domain} נסרק הרגע`,
       scannedHoursAgo: (domain: string, hours: number) =>
-        hours === 1 ? `סרקנו את ${domain} לפני שעה` : hours === 2 ? `סרקנו את ${domain} לפני שעתיים` : `סרקנו את ${domain} לפני ${hours} שעות`,
+        hours === 1 ? `האתר ${domain} נסרק לפני שעה` : hours === 2 ? `האתר ${domain} נסרק לפני שעתיים` : `האתר ${domain} נסרק לפני ${hours} שעות`,
       scannedDaysAgo: (domain: string, days: number) =>
-        days === 1 ? `סרקנו את ${domain} אתמול` : days === 2 ? `סרקנו את ${domain} לפני יומיים` : `סרקנו את ${domain} לפני ${days} ימים`,
+        days === 1 ? `האתר ${domain} נסרק אתמול` : days === 2 ? `האתר ${domain} נסרק לפני יומיים` : `האתר ${domain} נסרק לפני ${days} ימים`,
       fromFreeCheck: 'מתוך הבדיקה החינמית',
       fromSearchIndex: (domain: string) => `בנינו את המחקר ממה שגוגל מציג על ${domain}`,
       firewall: {
@@ -3204,15 +3203,15 @@ export const dashboardHe = {
       edit: 'ערוך',
       editLabel: (section: string) => `ערוך: ${section}`,
       tiles: {
-        keywords: 'מילות מפתח שנקדם',
-        fixes: 'דברים לתקן באתר',
-        geo: 'מוכנות לתשובות AI',
-        articles: 'מאמרים מוכנים לכתיבה',
+        keywords: 'מילות מפתח מומלצות',
+        fixes: 'תיקונים באתר',
+        geo: 'התאמה למנועי AI',
+        articles: 'רעיונות למאמרים',
         notChecked: 'לא נבדק',
         pending: 'ממתין',
       },
       business: {
-        title: 'מה הבנו על העסק',
+        title: 'העסק במבט אחד',
         niche: 'נישה',
         commerceType: 'סוג פעילות',
         platform: 'פלטפורמה',
@@ -3223,18 +3222,18 @@ export const dashboardHe = {
         locked: 'החנות נעולה בסיסמה, ולכן עוד לא קראנו מה היא מציעה.',
       },
       audiences: {
-        title: 'מי הלקוחות שלכם',
+        title: 'קהלי היעד',
         empty: 'עוד לא זיהינו קהלי יעד. אפשר להוסיף אותם בהגדרות.',
       },
       competitors: {
-        title: 'מי המתחרים שלכם',
+        title: 'מתחרים בתוצאות החיפוש',
         seenIn: (n: number) => (n === 1 ? 'הופיע באחד מהחיפושים שלנו בגוגל' : `הופיע ב-${n} מהחיפושים שלנו בגוגל`),
         suggested: 'הצעה מניתוח האתר',
         empty: 'לא מצאנו מתחרים הפעם. המחקר המלא יחפש שוב.',
       },
       findings: {
-        title: 'מה מעכב אתכם',
-        clean: 'האתר נקי מהבעיות שאנחנו בודקים',
+        title: 'מה כדאי לתקן באתר',
+        clean: 'לא נמצאו בעיות באף אחת מהבדיקות שלנו',
         locked: 'לא נבדק: החנות נעולה בסיסמה',
         firewall: 'לא נבדק: האתר חוסם קריאה אוטומטית',
         failed: 'לא הצלחנו להשלים את הבדיקה הזו',
@@ -3246,7 +3245,7 @@ export const dashboardHe = {
         severity: { blocker: 'חוסם', warning: 'כדאי לתקן', info: 'לידיעה' },
       },
       keywords: {
-        title: 'המילים שהיינו מקדמים',
+        title: 'מילות מפתח מומלצות למעקב',
         hint: 'סימנו את כולן. מה שיישאר מסומן ייכנס למעקב וייספר במכסת המילים של התוכנית.',
         selected: (n: number, total: number) => `${n} מתוך ${total} מסומנות`,
         limit: (max: number) => `אפשר לסמן עד ${max} מילים`,
@@ -3263,9 +3262,9 @@ export const dashboardHe = {
         },
       },
       geo: {
-        title: 'מוכנות לתשובות AI',
+        title: 'התאמה למנועי AI',
         intro: 'מנועי AI כמו ChatGPT ו-Perplexity לא מדרגים אתרים, הם מצטטים אותם. ארבעת הסימנים האלה קובעים כמה קל להם לצטט אתכם.',
-        score: (passed: number, total: number) => `${passed} מתוך ${total} סימנים תקינים`,
+        score: (passed: number, total: number) => `${passed} מתוך ${total} בדיקות עברו`,
         locked: 'לא נבדק: החנות נעולה בסיסמה',
         lockedBody: 'נבדוק את הסימנים כשהחנות תיפתח לציבור.',
         firewall: 'לא נבדק: האתר חוסם קריאה אוטומטית',
@@ -3279,7 +3278,7 @@ export const dashboardHe = {
         fail: 'חסר',
       },
       articles: {
-        title: 'המאמרים שהיינו כותבים',
+        title: 'רעיונות למאמרים ראשונים',
         empty: 'עוד אין נושאים. המחקר המלא יכין תוכנית תוכן.',
       },
       start: {
@@ -3318,7 +3317,7 @@ export const dashboardHe = {
     },
     noRun: {
       title: 'עוד לא סרקנו את האתר הזה',
-      body: 'הסריקה קוראת את האתר ומכינה תמצית מחקר ראשונה. זה לוקח עד דקה.',
+      body: 'הסריקה קוראת את האתר ומכינה סקירה ראשונית. זה לוקח עד דקה.',
       action: 'סרקו את האתר',
     },
     notices: {
@@ -3482,7 +3481,7 @@ export const dashboardHe = {
   // components/keyword-research). Without a scan none of this is shown.
   keywordResearchScan: {
     overview: {
-      badgeDone: 'המחקר הושלם',
+      badgeDone: 'המחקר מוכן',
       badgeRunning: 'המחקר עוד רץ',
       badgeManual: 'המחקר שהרצתם',
       headline: (count: string, searches: string) => `מצאנו ${count} ביטויים, ${searches} חיפושים בחודש`,
@@ -3492,7 +3491,7 @@ export const dashboardHe = {
       fromManual: 'מתוך המחקר שהרצתם עכשיו',
       backToScan: 'חזרה למחקר של האתר',
       competitors: (n: string) => `${n} מתחרים נבדקו`,
-      easyWins: (n: string) => `${n} הזדמנויות קלות`,
+      easyWins: (n: string) => `${n} ביטויים בהישג יד`,
       stillRunning: 'המחקר המלא עוד רץ, והתוצאות יתעדכנו כאן מעצמן.',
       truncated: (n: string) => `מוצגים ${n} הביטויים המבוקשים ביותר.`,
     },
@@ -3504,7 +3503,7 @@ export const dashboardHe = {
       cpc: 'CPC ממוצע',
       cpcSource: (n: string) => `ממוצע של ${n} ביטויים עם מחיר קליק`,
       cpcNone: 'אין מחיר קליק',
-      easyWins: 'הזדמנויות קלות',
+      easyWins: 'ביטויים בהישג יד',
       easyWinsSource: 'תחרות נמוכה או בינונית, 30 חיפושים ומעלה',
     },
     running: {
@@ -3544,7 +3543,7 @@ export const dashboardHe = {
       close: 'סגירת הטופס',
     },
     easyWins: {
-      title: 'קרבות קלים לניצחון',
+      title: 'הביטויים הכי משתלמים להתחלה',
       subtitle: 'הביטויים שהכי כדאי להתחיל מהם: מספיק חיפושים, תחרות שאפשר לנצח, ומחיר קליק שמעיד על ערך.',
       keyword: 'ביטוי',
       searches: 'חיפושים בחודש',
