@@ -9,9 +9,10 @@
  *   project_profiles  description, commerce_type, niche, is_local,
  *                     detected_platform — written when the field is not marked
  *                     'user' and the scan has a value for it; then marked 'scan'.
- *   project_audiences if ANY audience came from the owner, all are left alone;
- *                     otherwise the scan's own rows are replaced by up to five
- *                     new ones. An empty answer replaces nothing.
+ *   project_audiences if ANY audience came from the owner, or the owner saved
+ *                     the list (field_sources.audiences = 'user'), all are left
+ *                     alone; otherwise the scan's own rows are replaced by up to
+ *                     five new ones. An empty answer replaces nothing.
  *   projects          business_name, country, language, city — written when not
  *                     marked 'user' AND (the column is empty OR this is the first
  *                     seed right after creation: trigger create or claim), then
@@ -85,7 +86,8 @@ export function projectLanguageFrom(lang: string | null): string | null {
   return /^[a-z]{2}$/.test(primary) ? primary : null
 }
 
-function profileValues(business: SeedBusiness): Record<ProfileField, string | boolean | null> {
+/** The profile columns a business fills, normalized as they are stored. Exported for the settings screen's suggestions. */
+export function profileValues(business: SeedBusiness): Record<ProfileField, string | boolean | null> {
   return {
     description: business.description.trim().slice(0, 1_500) || null,
     commerce_type: business.commerceType,
@@ -95,7 +97,8 @@ function profileValues(business: SeedBusiness): Record<ProfileField, string | bo
   }
 }
 
-function projectValues(business: SeedBusiness): Record<ProjectField, string | null> {
+/** The project columns a business fills, normalized as they are stored. Exported for the settings screen's suggestions. */
+export function projectValues(business: SeedBusiness): Record<ProjectField, string | null> {
   const country = (business.country ?? '').trim().toUpperCase()
   return {
     business_name: business.companyName?.trim().slice(0, 200) || null,
@@ -242,7 +245,10 @@ export async function applyBusinessToSettings(
       if (((data as unknown[] | null)?.length ?? 0) === 0) continue
     }
 
-    const audiences = await replaceScanAudiences(admin, scope, input.audiences, nowIso)
+    // The owner saved the audience list on the settings screen
+    // (lib/project-settings/data.ts marks it 'audiences': 'user'): the list is
+    // theirs as a whole, a deletion or an emptied list included, so it is kept.
+    const audiences = sources.audiences === 'user' ? 'kept_user' : await replaceScanAudiences(admin, scope, input.audiences, nowIso)
     if (audiences === 'error') return { ok: false }
     report.audiences = audiences
     return { ok: true, report, project }

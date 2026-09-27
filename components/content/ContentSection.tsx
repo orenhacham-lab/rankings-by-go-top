@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ScanSearch } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import WordPressConnectionPanel from './WordPressConnectionPanel'
@@ -25,7 +25,15 @@ import ShopifyConnectionPanel from './ShopifyConnectionPanel'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
-export default function ContentSection({ projectId }: { projectId: string }) {
+/**
+ * What the site scan read off the site, as a hint on the platform choice: its
+ * words (already in the screen's language) and the platform it points at, if
+ * it is one of the two this connects. A hint only: it orders the two buttons
+ * and nothing else; each still opens the same panel as before.
+ */
+export type PlatformHint = { label: string; preferred: 'wordpress' | 'shopify' | null }
+
+export default function ContentSection({ projectId, platformHint }: { projectId: string; platformHint?: PlatformHint | null }) {
   const router = useRouter()
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
@@ -137,10 +145,23 @@ export default function ContentSection({ projectId }: { projectId: string }) {
         <Card className="hover:translate-y-0">
           <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.platformChoiceTitle}</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{t.platformChoiceHint}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
-            <Button size="sm" variant="outline" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
-          </div>
+          {platformHint && (
+            <p data-platform-hint={platformHint.preferred ?? 'other'} className="mb-3 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-info/20 bg-info-soft px-2.5 py-1 text-caption font-medium text-info">
+              <ScanSearch size={13} className="shrink-0" aria-hidden />
+              <span className="min-w-0">{platformHint.label}</span>
+            </p>
+          )}
+          {platformHint?.preferred === 'shopify' ? (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
+              <Button size="sm" variant="outline" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
+              <Button size="sm" variant="outline" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
+            </div>
+          )}
         </Card>
       )}
     </section>
