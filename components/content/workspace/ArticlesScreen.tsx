@@ -356,13 +356,9 @@ export default function ArticlesScreen() {
           It is shown only once a platform IS connected. With none connected the
           setup card above already asks for exactly that, with the same links,
           and two cards asking one question is the clutter this split removes. */}
-      {isSite && (
+      {activePlatform !== 'none' && (
         <div className="mb-4">
-          <SiteHubCard projectId={projectId} />
-        </div>
-      )}
-      {activePlatform !== 'none' && !isSite && (
-        <div className="mb-4">
+          {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-slate-600 dark:text-slate-300">{t.manageConnection}</span>
@@ -371,6 +367,7 @@ export default function ArticlesScreen() {
               </Link>
             </div>
           </ContentHubPlatformCard>
+          )}
         </div>
       )}
 
@@ -466,7 +463,7 @@ export default function ArticlesScreen() {
                   Labelling it "WordPress" for a Shopify project was simply
                   wrong; a neutral heading is used whenever the row is not
                   WordPress. */}
-              <Th>{isShopify || isSite ? t.table.publication : t.table.wordpressUrl}</Th>
+              <Th>{isSite ? t.table.publication : isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
               <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
