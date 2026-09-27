@@ -262,7 +262,7 @@ export function readStoredSignals(v: unknown): SiteSignals | null {
 }
 
 /** What a2 learned, in the form a2 saves it and a4 reads it. */
-type StoredInsight = {
+export type StoredInsight = {
   business: SeedBusiness
   audiences: string[]
   keywords: string[]
@@ -270,7 +270,12 @@ type StoredInsight = {
   competitors: string[]
 }
 
-function insightFromModel(insight: BusinessInsight): StoredInsight | null {
+/**
+ * The model's answer through a2's cleaners. Exported so the settings screen's
+ * "detect again with AI" (lib/project-settings/redetect.ts) offers exactly what
+ * a2 would have written from the same answer.
+ */
+export function insightFromModel(insight: BusinessInsight): StoredInsight | null {
   const business = toSeedBusiness(insight.business)
   if (!business) return null
   return {
