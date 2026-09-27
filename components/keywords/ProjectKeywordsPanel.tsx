@@ -25,6 +25,9 @@ import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
+import CompetitorSummary from '@/components/competitors/CompetitorSummary'
+import { useCompetitorComparison, type CompetitorView } from '@/components/competitors/useCompetitorComparison'
+import type { OwnCheck } from '@/lib/competitors/comparison'
 
 export default function ProjectKeywordsPanel({ project }: { project: Project }) {
   const id = project.id
@@ -291,6 +294,18 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const activeTargets = targets.filter((t) => t.is_active)
   const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict)
 
+  // You vs. competitors: each keyword's latest check, the one the table shows,
+  // paired with the competitor positions recorded in that same check.
+  const checks = useMemo<OwnCheck[]>(() => targets.map((t) => {
+    const r = latestResults[t.id]
+    return { targetId: t.id, engine: t.engine_type, checkedAt: r?.checked_at ?? null, found: !!r?.found, position: r?.position ?? null }
+  }), [targets, latestResults])
+  const comparedView = useCompetitorComparison(id, checks, !targetsLoading && !targetsError)
+  // Keywords that could not be read cannot be compared: say so, and retry them.
+  const competitorView: CompetitorView = targetsError && comparedView.status !== 'no_competitors'
+    ? { ...comparedView, status: 'error', retry: () => { void loadTargets() } }
+    : comparedView
+
   return (
     <div>
       {scanMessage && (
@@ -333,6 +348,8 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           </span>
         </Fact>
       </dl>
+
+      <CompetitorSummary view={competitorView} variant="full" className="mb-6" />
 
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 gap-2">
@@ -395,6 +412,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           onRetryVolumes={handleUpdateVolumes}
           projectDevice={project.device_type}
           onActionComplete={loadTargets}
+          competitorView={competitorView}
         />
       )}
 

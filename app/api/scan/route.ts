@@ -20,6 +20,9 @@ import {
 } from '@/lib/ops/deadline'
 import { claimOperation, releaseOperationClaim, rankingScanScope } from '@/lib/ops/single-flight'
 import { isAdminUser } from '@/lib/auth/admin-role'
+import {
+  loadCompetitorDomainsForScan, recordCompetitorPositions, finishCompetitorSavesAfterResponse,
+} from '@/lib/competitors/scan-positions'
 
 /**
  * The platform ceiling this handler must ALWAYS answer inside.
@@ -307,6 +310,17 @@ export async function POST(request: Request) {
       await releaseIfReserved('project_not_found')
       return Response.json({ error: 'Project not found' }, { status: 404 })
     }
+
+    // COMPETITORS RIDE ALONG, NEVER IN THE WAY. The scanner locates the
+    // project's competitors in the result pages it fetches for the project
+    // anyway (no request of its own). Their list loads while the steps below
+    // run and is never awaited: a keyword dispatched before it arrives is
+    // scanned exactly as before, without competitors. Scoped to the project
+    // AND its owner, because this client bypasses RLS.
+    let competitorDomains: string[] = []
+    void loadCompetitorDomainsForScan(admin, { projectId, ownerId: project.user_id })
+      .then((domains) => { competitorDomains = domains })
+    const competitorSaves: Promise<unknown>[] = []
 
     // Load targets to scan
     let targetsQuery = admin
@@ -601,6 +615,7 @@ export async function POST(request: Request) {
             : null,
           exactPoint: exactPointInput,
           radiusCenter: radiusCenterInput,
+          ...(target.engine_type === 'google_search' && competitorDomains.length > 0 ? { competitorDomains } : {}),
         }
 
         if (locationMode === 'radius') {
@@ -730,6 +745,16 @@ export async function POST(request: Request) {
           // Scan attempted but API returned an error — result saved with error_message
         }
 
+        // Only once this check's own row is in: the competitors' positions are
+        // written under the SAME checked_at, which is how a screen pairs them
+        // with this position. Not awaited, and it never rejects.
+        if (scanOutput.competitorPositions) {
+          competitorSaves.push(recordCompetitorPositions(admin, {
+            ownerId: project.user_id, projectId, trackingTargetId: target.id,
+            checkedAt: resultData.checked_at as string, positions: scanOutput.competitorPositions,
+          }))
+        }
+
         results.push({
           targetId: target.id,
           keyword: target.keyword,
@@ -757,6 +782,9 @@ export async function POST(request: Request) {
         })
       }
     }
+
+    // Competitor inserts still in flight finish after the response.
+    finishCompetitorSavesAfterResponse(competitorSaves)
 
     // Cumulative tally across ALL attempts of this scan row (not just this
     // attempt's targetsToRun) — correct even when this request resumed a

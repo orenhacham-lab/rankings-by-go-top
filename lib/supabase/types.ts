@@ -53,6 +53,12 @@ export interface Database {
         Insert: Omit<AIVisibilityCompetitor, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<AIVisibilityCompetitor, 'id' | 'created_at'>>
       }
+      // W10 — written by the service role only; the owner reads it under RLS.
+      keyword_competitor_positions: {
+        Row: KeywordCompetitorPosition
+        Insert: Omit<KeywordCompetitorPosition, 'id' | 'created_at'>
+        Update: Partial<Omit<KeywordCompetitorPosition, 'id' | 'created_at'>>
+      }
       wordpress_connections: {
         Row: WordPressConnection
         Insert: Omit<WordPressConnection, 'id' | 'created_at' | 'updated_at'>
@@ -522,6 +528,28 @@ export interface AIVisibilityCompetitor {
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+/**
+ * W10 — where one competitor ranked on one of the project's keywords, read from
+ * the same Google result page as the project's own position (no extra request).
+ * One row per competitor per keyword check. `checked_at` equals the
+ * `checked_at` of the scan_results row of that same check, which is how a
+ * screen pairs the two. `competitor_domain` is normalized exactly as the
+ * scanner normalizes the project's domain.
+ * Table: keyword_competitor_positions (20260927000100).
+ */
+export interface KeywordCompetitorPosition {
+  id: string
+  user_id: string
+  project_id: string
+  tracking_target_id: string
+  competitor_domain: string
+  /** 1-20, or null when the competitor is not in the top 20. */
+  position: number | null
+  url: string | null
+  checked_at: string
+  created_at: string
 }
 
 // ============================================================================

@@ -13,6 +13,7 @@
  * routes it calls re-check the authoritative server flag on their own.
  */
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
@@ -47,6 +48,9 @@ export default function AIVisibilityPage() {
 
 function ProjectAIVisibility({ project }: { project: Project }) {
   const [keywords, setKeywords] = useState<string[]>([])
+  // "Manage competitors" links (the keywords tab, the dashboard) open this tab
+  // on the competitors. Only that value is honoured; anything else is ignored.
+  const initialTab = useSearchParams().get('tab') === 'competitors' ? 'competitors' as const : undefined
 
   // The tracked keywords seed the suggested AI questions. A failed read leaves the
   // list empty, which the section handles as "no keywords yet"; it never blocks
@@ -75,6 +79,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
       projectDomainAliases={project.domain_aliases}
       projectCity={project.city}
       projectKeywords={projectKeywords}
+      initialTab={initialTab}
     />
   )
 }

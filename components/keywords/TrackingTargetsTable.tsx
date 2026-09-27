@@ -14,6 +14,8 @@ import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/
 import { formatDateTime } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import Link from 'next/link'
+import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
+import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
 
 interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
@@ -43,6 +45,9 @@ interface TrackingTargetsTableProps {
   onRetryVolumes?: () => void
   projectDevice?: string | null
   onActionComplete?: () => void
+  /** You vs. competitors: when given, a line under each position shows the
+   *  best-placed competitor of the same check. */
+  competitorView?: CompetitorView
 }
 
 export default function TrackingTargetsTable({
@@ -63,6 +68,7 @@ export default function TrackingTargetsTable({
   onRetryTargets,
   projectDevice,
   onActionComplete,
+  competitorView,
 }: TrackingTargetsTableProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
@@ -255,17 +261,20 @@ export default function TrackingTargetsTable({
                   )}
                 </Td>
                 <Td>
-                  {result ? (
-                    result.found ? (
-                      <span className="font-bold text-slate-800 dark:text-slate-100 text-base">
-                        #{result.position}
-                      </span>
+                  <div className="flex flex-col items-start gap-1">
+                    {result ? (
+                      result.found ? (
+                        <span className="font-bold text-slate-800 dark:text-slate-100 text-base">
+                          #{result.position}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-500 text-sm">{k.notFound}</span>
+                      )
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500 text-sm">{k.notFound}</span>
-                    )
-                  ) : (
-                    <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>
-                  )}
+                      <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>
+                    )}
+                    {competitorView && <TopCompetitorLine view={competitorView} targetId={target.id} />}
+                  </div>
                 </Td>
                 <Td>
                   {result ? (
