@@ -55,7 +55,7 @@ export function monthKeyFromPeriod(periodMonth: string): MonthKey | null {
 }
 
 /**
- * The first run of the monthly cron (vercel.json: "30 8-23 1,2 * *") is 08:30 UTC
+ * The first run of the monthly cron (vercel.json: "30 8 * * *") is 08:30 UTC
  * on the 1st. The next report is due then, for the month running now.
  */
 export const REPORT_HOUR_UTC = 8
