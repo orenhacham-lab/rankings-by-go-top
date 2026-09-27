@@ -24,7 +24,9 @@
  *   F) the comparison the keywords tab and the dashboard card show;
  *   G) the copy, in Hebrew and in English;
  *   H) source guards for what behaviour alone cannot show, each with its own
- *      mutation control.
+ *      mutation control;
+ *   I) the state the screens show once the checks on screen change: the last
+ *      answer while the next read comes, an error with a retry if it fails.
  *
  * Nothing here contacts a provider or a database, and no quota is consumed.
  *
@@ -907,6 +909,50 @@ async function main() {
     check('H9: the screens never touch the service role; the data hook reads through the signed-in client', G.noServiceRole(screens))
     check('H9-MUT: importing the admin client into a screen fails H9',
       !G.noServiceRole(screens.map(([p, s], i) => [p, i === 0 ? `import { createAdminClient } from '@/lib/supabase/admin'\n${s}` : s] as const)))
+  }
+
+  // ── I) the state the screens show once the checks on screen change ────────
+  say('\nI) after a rescan, an edit or a new keyword: the last answer while the next one comes, an error if it cannot')
+  {
+    const { competitorViewStatus } = require('../../../components/competitors/useCompetitorComparison') as
+      typeof import('../../../components/competitors/useCompetitorComparison')
+    type StatusInput = Parameters<typeof competitorViewStatus>[0]
+    const LIST: StatusInput['list'] = { status: 'ok', competitors: [{ name: 'Rival Shoes', domain: 'rival-shoes.com' }] }
+    const BASE: StatusInput = { list: LIST, competitorCount: 1, hasComparison: true, comparisonCurrent: true, rowsFailed: false }
+    const RULE: Array<[string, Partial<StatusInput>, string]> = [
+      ['read for the checks on screen', {}, 'ready'],
+      ['read for earlier checks, the new read on its way', { comparisonCurrent: false }, 'ready'],
+      ['read for earlier checks, the new read FAILED', { comparisonCurrent: false, rowsFailed: true }, 'error'],
+      ['read for the checks on screen, a retry of them failed', { rowsFailed: true }, 'ready'],
+      ['nothing read yet, the read on its way', { hasComparison: false, comparisonCurrent: false }, 'loading'],
+      ['nothing read yet, the read failed', { hasComparison: false, comparisonCurrent: false, rowsFailed: true }, 'error'],
+      ['the competitor list still loading', { list: null, hasComparison: false }, 'loading'],
+      ['the competitor list failed', { list: { status: 'error' } }, 'error'],
+      ['no competitors', { list: { status: 'ok', competitors: [] }, competitorCount: 0, rowsFailed: true }, 'no_competitors'],
+      ['the feature is off', { list: { status: 'unavailable' }, competitorCount: 0 }, 'no_competitors'],
+    ]
+    const wrong = (rule: (s: StatusInput) => string) =>
+      RULE.filter(([, over, want]) => rule({ ...BASE, ...over }) !== want).map(([name]) => name)
+    check('I1: every state of the view, including a re-read that failed after a rescan (an error, not the previous check\'s lines)',
+      wrong(competitorViewStatus).length === 0, wrong(competitorViewStatus).join(' | '))
+    // The rule this replaced: any comparison on screen was "ready", so a failed re-read
+    // left the previous check's competitors under the new positions, with no retry.
+    const former = (s: StatusInput) => (!s.list ? 'loading' : s.list.status === 'error' ? 'error'
+      : s.list.status === 'unavailable' || s.competitorCount === 0 ? 'no_competitors'
+        : s.hasComparison ? 'ready' : s.rowsFailed ? 'error' : 'loading')
+    check('I1-MUT: the former rule (any comparison is ready) fails I1',
+      same(wrong(former), ['read for earlier checks, the new read FAILED']), wrong(former).join(' | '))
+
+    const hook = strip(read('components/competitors/useCompetitorComparison.ts'))
+    // The state is computed once, by the rule above, and returned as computed.
+    const decidesByRule = (s: string) =>
+      /const status = competitorViewStatus\(\{[^}]*comparisonCurrent: snapshot\?\.checks === checks,[^}]*\browsFailed,?\s*\}\)/.test(s)
+      && /return \{ status, competitors, comparison, manageHref: manageHref\(\), retry \}/.test(s)
+    check('I2: the hook decides its state through that rule, comparing the snapshot with the checks on screen', decidesByRule(hook))
+    check('I2-MUT: a hook that calls every comparison current fails I2',
+      !decidesByRule(hook.replace('comparisonCurrent: snapshot?.checks === checks,', 'comparisonCurrent: true,')))
+    check('I2-MUT: a hook that overrides the rule with "any comparison is ready" fails I2',
+      !decidesByRule(hook.replace('return { status, competitors,', "return { status: comparison ? 'ready' : status, competitors,")))
   }
 
   check('Z: no promise went unhandled anywhere in this suite', UNHANDLED.length === 0, UNHANDLED.map(String).join(' | ').slice(0, 200))
