@@ -35,12 +35,21 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
     return () => observer.disconnect()
   }, [ids])
 
+  const position = active ? items.findIndex((i) => i.id === active) : -1
   return (
-    <nav aria-label={title}>
-      <p className="mb-3 text-caption font-semibold text-muted">{title}</p>
-      <ul className="border-s border-line">
-        {items.map((item) => {
+    <nav aria-label={title} className="rounded-card border border-line bg-surface/80 p-3 shadow-card backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-2 px-2 pb-2.5 pt-1">
+        <p className="text-caption font-semibold text-ink">{title}</p>
+        {position >= 0 && (
+          <span aria-hidden className="text-caption tabular-nums text-muted">
+            {position + 1}/{items.length}
+          </span>
+        )}
+      </div>
+      <ol className="space-y-0.5">
+        {items.map((item, i) => {
           const on = active === item.id
+          const passed = position > i
           return (
             <li key={item.id}>
               <a
@@ -51,16 +60,26 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
                 }}
                 aria-current={on ? 'location' : undefined}
                 className={cn(
-                  '-ms-px block border-s-2 py-1.5 ps-4 text-copy transition-colors duration-150',
-                  on ? 'border-action font-medium text-ink' : 'border-transparent text-muted hover:border-line-strong hover:text-body',
+                  'group flex items-center gap-2.5 rounded-control px-2 py-1.5 text-copy transition-colors duration-150',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
+                  on ? 'bg-action-soft font-semibold text-action' : 'text-muted hover:bg-sunk hover:text-ink',
                 )}
               >
-                {item.label}
+                <span
+                  aria-hidden
+                  className={cn(
+                    'grid size-5 shrink-0 place-items-center rounded-full text-[0.625rem] font-bold tabular-nums transition-colors',
+                    on ? 'bg-action text-action-ink' : passed ? 'bg-line-strong/70 text-ink' : 'bg-sunk text-muted group-hover:bg-line',
+                  )}
+                >
+                  {i + 1}
+                </span>
+                <span className="min-w-0 truncate">{item.label}</span>
               </a>
             </li>
           )
         })}
-      </ul>
+      </ol>
     </nav>
   )
 }

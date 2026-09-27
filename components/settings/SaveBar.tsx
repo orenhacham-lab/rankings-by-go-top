@@ -31,12 +31,15 @@ export default function SaveBar({
   const saving = state.kind === 'saving'
   return (
     <>
-      <p className="min-w-0 flex-1 basis-48 text-caption" aria-live="polite">
+      <p className="min-w-0 flex-1 basis-48 text-caption" aria-live="polite" data-dirty={dirty || undefined}>
         {state.kind === 'error' ? (
           <span role="alert" className="font-medium text-bad">{t.save.errors[state.code]}</span>
         ) : dirty ? (
-          <span className="inline-flex items-center gap-2 font-medium text-body">
-            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-commit" />
+          <span className="inline-flex items-center gap-2 font-semibold text-ink">
+            <span aria-hidden className="relative flex size-2 shrink-0">
+              <span className="absolute inset-0 rounded-full bg-commit opacity-60 motion-safe:animate-ping motion-safe:[animation-iteration-count:3]" />
+              <span className="relative size-2 rounded-full bg-commit" />
+            </span>
             {note || t.save.dirty}
           </span>
         ) : state.kind === 'saved' ? (

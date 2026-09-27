@@ -80,7 +80,7 @@ export default function ScanBand({
   let status: React.ReactNode
   if (running) status = t.scan.running
   else if (stalled) status = t.scan.stalled
-  else if (never) status = fillRich(t.scan.never, { domain: <Ltr className="font-medium text-body">{domain}</Ltr> })
+  else if (never) status = fillRich(t.scan.never, { domain: <Ltr className="font-semibold text-contrast-ink">{domain}</Ltr> })
   else {
     const last =
       latest.status === 'failed'
@@ -91,44 +91,61 @@ export default function ScanBand({
 
   const notice = scan.notice ? rescanCopy(scan.notice, t, locale) : null
   const blocked = running || stalled || wait !== null
+  const initial = domain.replace(/^www\./, '').slice(0, 1).toUpperCase()
   return (
     <section id={SITE_SCAN_ANCHOR} aria-labelledby={`${SITE_SCAN_ANCHOR}-title`} className="scroll-mt-20" data-scan-band>
-      <div className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 sm:px-6">
-          <span
+      <div className="overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-pop ring-1 ring-black/5">
+        <div className="relative isolate">
+          {/* Two soft glows and a faint grid: the band is the one dark surface on the screen, the site itself. */}
+          <div
             aria-hidden
-            className={cn(
-              'relative grid h-10 w-10 shrink-0 place-items-center rounded-control transition-colors',
-              running ? 'bg-info text-white' : 'bg-info-soft text-info',
-            )}
-          >
-            <ScanSearch size={19} />
-            {running && (
-              <span className="absolute -end-0.5 -top-0.5 flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-info opacity-60" />
-                <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-surface bg-info" />
+            className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(36rem_14rem_at_85%_-20%,rgb(99_130_246/0.35),transparent_70%),radial-gradient(24rem_12rem_at_0%_120%,rgb(240_176_63/0.16),transparent_70%)]"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+          />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 py-5 sm:px-7 sm:py-6">
+            <span aria-hidden className="relative grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-2xl font-bold ring-1 ring-white/15">
+              {initial || <ScanSearch size={22} />}
+              <span
+                className={cn(
+                  'absolute -bottom-1.5 -end-1.5 grid size-6 place-items-center rounded-full ring-2 ring-contrast transition-colors',
+                  running ? 'bg-info-soft text-info' : 'bg-white text-contrast',
+                )}
+              >
+                <ScanSearch size={13} />
+                {running && <span className="absolute inset-0 rounded-full bg-info-soft opacity-70 motion-safe:animate-ping" />}
               </span>
-            )}
-          </span>
-          <div className="min-w-0 flex-1 basis-60">
-            <h2 id={`${SITE_SCAN_ANCHOR}-title`} className="text-section font-semibold text-ink">{t.scan.title}</h2>
-            <p className="mt-0.5 text-copy text-muted" aria-live="polite">{status}</p>
-            {!never && <p className="mt-1 text-caption text-muted">{t.scan.fieldsNote}</p>}
+            </span>
+            <div className="min-w-0 flex-1 basis-60">
+              <h2 id={`${SITE_SCAN_ANCHOR}-title`} className="text-caption font-semibold uppercase tracking-wide text-contrast-ink/70">
+                {t.scan.title}
+              </h2>
+              {!never && <Ltr className="mt-0.5 block truncate text-xl font-bold leading-7 text-contrast-ink">{domain}</Ltr>}
+              <p className="mt-1 text-copy text-contrast-ink/80" aria-live="polite">{status}</p>
+              {!never && <p className="mt-1 text-caption text-contrast-ink/60">{t.scan.fieldsNote}</p>}
+            </div>
+            <Button
+              variant={never ? 'primary' : 'secondary'}
+              onClick={() => void scan.start()}
+              loading={scan.phase === 'starting'}
+              disabled={blocked}
+              className={cn('w-full sm:w-auto', !never && 'border-transparent bg-contrast-ink text-contrast hover:bg-contrast-ink/90')}
+              data-rescan
+            >
+              {scan.phase !== 'starting' && <RefreshCw size={15} aria-hidden className={cn(running && 'animate-spin')} />}
+              {scan.phase === 'starting' ? t.scan.starting : never ? t.scan.start : t.scan.again}
+            </Button>
           </div>
-          <Button
-            variant={never ? 'primary' : 'secondary'}
-            onClick={() => void scan.start()}
-            loading={scan.phase === 'starting'}
-            disabled={blocked}
-            className="w-full sm:w-auto"
-            data-rescan
-          >
-            {scan.phase !== 'starting' && <RefreshCw size={15} aria-hidden className={cn(running && 'animate-spin')} />}
-            {scan.phase === 'starting' ? t.scan.starting : never ? t.scan.start : t.scan.again}
-          </Button>
+          {running && (
+            <div aria-hidden className="h-1 w-full bg-white/10">
+              <div className="h-full w-1/3 rounded-e-full bg-info-soft motion-safe:animate-pulse" />
+            </div>
+          )}
         </div>
         {notice && scan.notice && (
-          <div className="border-t border-line px-5 py-3 sm:px-6">
+          <div className="bg-surface px-5 py-3 text-body sm:px-7">
             <Notice tone={notice.tone} action={actionFor(rescanNoticeAction(scan.notice))} onDismiss={scan.dismiss}>
               {notice.text}
             </Notice>
