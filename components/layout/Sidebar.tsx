@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
@@ -25,6 +26,8 @@ import {
   Settings,
   Target,
   CalendarClock,
+  Menu,
+  X,
 } from 'lucide-react'
 import {
   CONTENT_SCREENS,
@@ -174,9 +177,13 @@ function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem
 }
 
 /**
- * One nav entry, shared by the mobile grid and the desktop groups so the two
+ * One nav entry, shared by the mobile menu and the desktop groups so the two
  * cannot drift apart. The tile shape (stacked icon over label) is the mobile
  * presentation; `md:` restores the row shape used in the sidebar proper.
+ *
+ * The active entry is a soft accent fill with a short bar on the sidebar's outer
+ * edge — the logical START, so it sits on the right in Hebrew and on the left in
+ * English. A filled accent block would outshout every button on the screen.
  */
 function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; label: string }) {
   const IconComponent = item.icon
@@ -186,21 +193,59 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
       data-onboarding={item.onboarding}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors duration-150 text-center md:text-start leading-tight break-words',
+        'group relative w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1.5 md:gap-3 px-2 md:px-3 py-3 md:py-0 md:h-9 rounded-control text-caption md:text-copy font-medium text-center md:text-start leading-tight break-words',
+        'transition-[background-color,color] duration-150 ease-snappy',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset',
         isActive
-          ? 'bg-indigo-600 dark:bg-indigo-600 text-white'
-          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
+          ? 'bg-action-soft text-action font-semibold'
+          : 'text-body hover:bg-sunk hover:text-ink'
       )}
     >
+      {isActive && (
+        <span aria-hidden="true" className="absolute hidden md:block inset-y-2 -start-3 w-[3px] rounded-e-full bg-action" />
+      )}
       <IconComponent
         size={18}
         className={cn(
-          'shrink-0 transition-colors',
-          isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+          'shrink-0 transition-colors duration-150',
+          isActive ? 'text-action' : 'text-muted group-hover:text-ink'
         )}
-        strokeWidth={2}
+        strokeWidth={isActive ? 2.2 : 1.8}
       />
-      <span>{label}</span>
+      <span className="min-w-0 truncate md:whitespace-nowrap">{label}</span>
+    </Link>
+  )
+}
+
+/** The mark and the product name. The name is the brand, in Latin, in both languages. */
+function Brand() {
+  return (
+    <Link
+      href="/dashboard"
+      className="flex min-w-0 items-center gap-2.5 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+    >
+      <Image
+        src="/gotop-primary.png"
+        alt="Go Top logo"
+        width={140}
+        height={56}
+        className="block dark:hidden h-8 w-auto object-contain"
+        sizes="80px"
+        priority
+      />
+      <Image
+        src="/gotop-dark-transparent.png"
+        alt="Go Top logo"
+        width={140}
+        height={56}
+        className="hidden dark:block h-8 w-auto object-contain"
+        sizes="80px"
+        priority
+      />
+      <span className="flex min-w-0 flex-col border-s border-line ps-2.5" dir="ltr">
+        <span className="text-copy font-semibold leading-tight text-ink">Rankings</span>
+        <span className="text-overline font-medium text-muted">by Go Top</span>
+      </span>
     </Link>
   )
 }
@@ -209,166 +254,139 @@ interface SidebarProps {
   isAdmin?: boolean
 }
 
+const WHATSAPP_SUPPORT =
+  'https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94'
+
+const QUIET_ROW =
+  'flex w-full items-center gap-3 px-3 h-9 rounded-control text-copy font-medium text-muted hover:bg-sunk hover:text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset'
+
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const activeHref = activeNavHref(pathname ?? '', navItemKeys)
+  // Phones: the nav is a menu behind one button instead of a wall of tiles above
+  // every screen. It closes itself when the page changes.
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   return (
-    <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
-      {/* Logo */}
-      <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 md:gap-1.5">
-        {/* Logo beside the wordmark, on both surfaces. */}
-        <div className="flex items-center justify-center gap-2 w-full">
-          <div className="flex items-center justify-center flex-shrink-0">
-            <Image
-              src="/gotop-primary.png"
-              alt="Go Top logo"
-              width={140}
-              height={56}
-              className="block dark:hidden w-[51px] md:w-[93px] h-auto object-contain"
-              sizes="(max-width: 768px) 51px, 93px"
-              priority
-            />
-            <Image
-              src="/gotop-dark-transparent.png"
-              alt="Go Top logo"
-              width={140}
-              height={56}
-              className="hidden dark:block w-[51px] md:w-[93px] h-auto object-contain"
-              sizes="(max-width: 768px) 51px, 93px"
-              priority
-            />
-          </div>
-
-          <div className="text-center md:text-center">
-            <div className="font-semibold text-slate-800 dark:text-slate-100 text-xs md:text-sm leading-tight">Rankings by</div>
-            <div className="font-bold text-blue-600 dark:text-blue-300 text-sm md:text-base leading-tight">Go Top</div>
-          </div>
+    <aside className="relative z-40 w-full md:w-64 md:shrink-0 bg-rail border-b md:border-b-0 md:border-e border-line">
+      <div className="flex flex-col md:sticky md:top-0 md:h-dvh">
+        {/* Brand — the same height as the top bar, so the two share one line. */}
+        <div className="flex h-14 shrink-0 items-center justify-between gap-3 px-4 md:px-5 md:border-b md:border-line">
+          <Brand />
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            aria-controls="app-nav-mobile"
+            aria-label={dict.common.menu}
+            className="md:hidden inline-flex size-10 items-center justify-center rounded-control border border-line bg-surface text-ink shadow-control transition-colors hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+          >
+            {menuOpen ? <X size={18} strokeWidth={2} /> : <Menu size={18} strokeWidth={2} />}
+          </button>
         </div>
-      </div>
 
-      {/* Language Switcher - Desktop */}
-      <div className="hidden md:block border-b border-slate-200 dark:border-slate-800">
-        <DashboardLanguageSwitcher />
-      </div>
-
-      {/* Language Switcher - Mobile (uses same DashboardLanguageProvider state) */}
-      <div className="block md:hidden border-b border-slate-200 dark:border-slate-800">
-        <DashboardLanguageSwitcher />
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
-        {/* Mobile: one flat two-column grid of tiles, logout included. */}
-        <ul className="grid grid-cols-2 gap-2 w-full md:hidden">
-          {navItemKeys.map((item) => (
-            <li key={item.href}>
-              <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
-            </li>
-          ))}
-
-          {/* Mobile logout button - appears in grid next to the last nav tile */}
-          <li>
-            <form action="/api/auth/signout" method="post" className="w-full h-full">
-              <button
-                type="submit"
-                className={cn(
-                  'group w-full min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-colors duration-150 text-center leading-tight break-words',
-                  'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
-                )}
-              >
-                <LogOut size={18} className="text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 shrink-0 transition-colors" strokeWidth={2} />
-                <span>{dict.common.logout}</span>
-              </button>
-            </form>
-          </li>
-        </ul>
+        {/* Mobile: one flat grid of tiles, then the language, the theme and logout. */}
+        <div
+          id="app-nav-mobile"
+          className={cn(
+            'md:hidden absolute inset-x-0 top-full z-50 max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-b border-line bg-surface p-3 shadow-pop origin-top animate-pop-in',
+            !menuOpen && 'hidden'
+          )}
+        >
+          <nav>
+            <ul className="grid grid-cols-3 gap-1.5 w-full">
+              {navItemKeys.map((item) => (
+                <li key={item.href}>
+                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="mt-3 grid grid-cols-2 items-center gap-2 border-t border-line pt-3">
+            <DashboardLanguageSwitcher />
+            <ThemeToggle />
+          </div>
+          <form action="/api/auth/signout" method="post" className="mt-1">
+            <button type="submit" className={QUIET_ROW}>
+              <LogOut size={18} className="shrink-0" strokeWidth={1.8} />
+              <span>{dict.common.logout}</span>
+            </button>
+          </form>
+        </div>
 
         {/* Desktop: the same order, split under its group headings. */}
-        <div className="hidden md:block space-y-2">
-          {navGroupKeys.map((group) => (
-            group.items.length === 0 ? null : (
-              <div key={group.groupKey}>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 px-3 mb-1">
-                  {dict.sidebar[group.groupKey]}
-                </p>
-                <ul className="space-y-1">
-                  {group.items.map((item) => (
-                    <li key={item.href}>
-                      <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
-                    </li>
-                  ))}
+        <nav className="hidden md:block flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-5">
+            {navGroupKeys.map((group) => (
+              group.items.length === 0 ? null : (
+                <div key={group.groupKey}>
+                  <p className="px-3 mb-1.5 text-overline font-semibold text-muted">
+                    {dict.sidebar[group.groupKey]}
+                  </p>
+                  <ul className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <li key={item.href}>
+                        <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            ))}
+
+            {/* Admin section — only shown to admins */}
+            {isAdmin && (
+              <div>
+                <p className="px-3 mb-1.5 text-overline font-semibold text-muted">{dict.sidebar.system}</p>
+                <ul className="space-y-0.5">
+                  {adminItemKeys.map((item) => {
+                    const IconComponent = item.icon
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                    const label = dict.sidebar[item.labelKey]
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'group flex items-center gap-3 px-3 h-9 rounded-control text-copy font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-inset',
+                            isActive ? 'bg-action-soft text-action font-semibold' : 'text-muted hover:bg-sunk hover:text-ink'
+                          )}
+                        >
+                          <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-action' : 'text-muted group-hover:text-ink')} strokeWidth={1.8} />
+                          <span>{label}</span>
+                        </Link>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
-            )
-          ))}
+            )}
+          </div>
+        </nav>
+
+        {/* Footer - Desktop only: help, then the two preferences, then logout. */}
+        <div className="hidden md:block shrink-0 border-t border-line px-3 py-3 space-y-1">
+          {!isAdmin && (
+            <a href={WHATSAPP_SUPPORT} target="_blank" rel="noopener noreferrer" className={QUIET_ROW}>
+              <MessageCircle size={18} className="shrink-0" strokeWidth={1.8} />
+              <span>{dict.sidebar.support}</span>
+            </a>
+          )}
+          <ThemeToggle />
+          <div className="px-1 py-1">
+            <DashboardLanguageSwitcher />
+          </div>
+          <form action="/api/auth/signout" method="post">
+            <button type="submit" className={QUIET_ROW}>
+              <LogOut size={18} className="shrink-0" strokeWidth={1.8} />
+              <span>{dict.common.logout}</span>
+            </button>
+          </form>
         </div>
-      </nav>
-
-      {/* Admin section — only shown to admins */}
-      {isAdmin && (
-        <div className="px-3 pb-3 hidden md:block">
-          <p className="text-xs font-medium text-slate-400 dark:text-slate-400 px-3 mb-1">{dict.sidebar.system}</p>
-          <ul className="space-y-1">
-            {adminItemKeys.map((item) => {
-              const IconComponent = item.icon
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              const label = dict.sidebar[item.labelKey]
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                      isActive
-                        ? 'bg-indigo-600 dark:bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
-                    )}
-                  >
-                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
-                    <span>{label}</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* Support link — shown to non-admins */}
-      {!isAdmin && (
-        <div className="px-3 pb-3 hidden md:block">
-          <a
-            href="https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-          >
-            <MessageCircle size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
-            <span>{dict.sidebar.support}</span>
-          </a>
-        </div>
-      )}
-
-      {/* Footer - Mobile only */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-700 block md:hidden">
-        <ThemeToggle />
-      </div>
-
-      {/* Footer - Desktop only */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-700 hidden md:block space-y-2">
-        <ThemeToggle />
-        <form action="/api/auth/signout" method="post">
-          <button
-            type="submit"
-            className="w-full text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center justify-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <LogOut size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
-            <span>{dict.common.logout}</span>
-          </button>
-        </form>
       </div>
     </aside>
   )

@@ -1,5 +1,23 @@
 import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { extendTailwindMerge } from 'tailwind-merge'
+
+/**
+ * tailwind-merge only knows Tailwind's own scale, so it read the design tokens'
+ * type steps (`text-copy`, `text-caption`, …) as COLOURS: `cn('text-caption
+ * text-muted')` kept the colour and silently dropped the size. It is told the
+ * token names here — the same names as the @theme block in app/globals.css —
+ * so a size and a colour are two things again, and a later radius or shadow
+ * still replaces an earlier one.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: ['display', 'title', 'metric', 'section', 'copy', 'caption', 'overline'],
+      radius: ['card', 'inset', 'control', 'pill'],
+      shadow: ['card', 'control', 'pop'],
+    },
+  },
+})
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

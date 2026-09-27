@@ -1540,6 +1540,7 @@ export const dashboardHe = {
   },
   common: {
     close: 'סגור',
+    menu: 'תפריט',
     logout: 'יציאה',
     loading: 'טוען...',
     save: 'שמור',

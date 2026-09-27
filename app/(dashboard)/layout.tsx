@@ -56,18 +56,22 @@ export default async function DashboardLayout({
           Wrapped in Suspense because the provider reads the URL via useSearchParams. */}
       <Suspense fallback={null}>
         <ActiveProjectProvider userId={user.id}>
-          <div className="flex flex-col md:flex-row h-full min-h-screen bg-canvas text-body">
+          {/* The shell: the sidebar on the logical START (right in Hebrew, left in
+              English — it follows the document's dir), the screen beside it. The
+              sidebar sits in the flow and sticks, instead of being fixed over a
+              matching margin, so the two can never disagree about its width. */}
+          <div className="flex flex-col md:flex-row min-h-screen bg-canvas text-body">
             <DashboardLocaleEffect />
             <Sidebar isAdmin={isAdmin} />
-            <main className="flex-1 md:mr-64 overflow-auto min-h-screen">
+            <main className="flex-1 min-w-0 min-h-screen">
               <DashboardDirectionWrapper>
                 {/* The top bar. Every screen shows the SAME workspace control, because
                     "which site am I looking at" is a question about the app, not about
                     the screen — it used to be answered by a different widget per page. */}
-                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur md:px-8">
+                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md backdrop-saturate-150 md:px-8">
                   <WorkspaceSwitcher />
                 </div>
-                <div className="p-4 md:p-8">{children}</div>
+                <div className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 md:px-8 md:py-8">{children}</div>
               </DashboardDirectionWrapper>
             </main>
           </div>
