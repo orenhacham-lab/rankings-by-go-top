@@ -2,10 +2,13 @@
  * A project's site icon (lib/site-icon.ts, lib/seed-scan/site-icon.ts,
  * components/ui/SiteIcon.tsx, GET /api/projects/active).
  *
- *  I) only an https icon on the project's own site, with a public host name, is
- *     ever shown; everything else falls back to /favicon.ico, then the initial;
- *  H) the icon the home page declares is read off the HTML a1 already has, in
- *     linear time on hostile markup;
+ *  I) only an https icon (an http one upgraded) on the project's own site or its
+ *     platform's CDN, with a public host name, is ever shown; everything else
+ *     falls back to /favicon.ico, its www twin, /apple-touch-icon.png, then the
+ *     initial (the misses and their patterns: site-icon-misses.qa.ts);
+ *  H) the icon the home page declares is read off the HTML a1 already has (the
+ *     head first, the rest of the page only when the head has none), in linear
+ *     time on hostile markup;
  *  R) a stored icon is checked again when the summary is read;
  *  G) source guards: a plain <img> with no referrer, no next/image, no
  *     third-party favicon service, and no server-side fetch of an icon anywhere;
@@ -40,16 +43,16 @@ console.log('I) what may be shown')
   const ok = ['https://gotopseo.com/favicon.png', 'https://www.gotopseo.com/wp-content/uploads/icon-32x32.png', 'https://cdn.gotopseo.com/i.svg']
   check('I3: https on the site, its www twin or a subdomain is kept', ok.every((u) => safeSiteIcon(u, 'gotopseo.com') === u))
   const no = [
-    'http://gotopseo.com/favicon.png', 'https://evil.com/x.png', 'https://gotopseo.com.evil.com/x.png', 'https://notgotopseo.com/x.png',
-    'https://static.wixstatic.com/x.png', 'data:image/png;base64,AAAA', 'javascript:alert(1)', 'https://user:pw@gotopseo.com/x.png',
+    'http://gotopseo.com:8080/favicon.png', 'https://evil.com/x.png', 'https://gotopseo.com.evil.com/x.png', 'https://notgotopseo.com/x.png',
+    'https://static.wixstatic.com.evil.com/x.png', 'https://x.cdn.shopify.com/x.png', 'ftp://gotopseo.com/x.png', 'data:image/png;base64,AAAA', 'javascript:alert(1)', 'https://user:pw@gotopseo.com/x.png',
     'https://gotopseo.com:8443/x.png', `https://gotopseo.com/${'a'.repeat(600)}.png`, 'https://127.0.0.1/x.png', '/relative.png',
   ]
-  check('I4: http, another site, a look-alike host, data:/javascript:, credentials, a port, an overlong or relative URL are refused',
+  check('I4: another site, a look-alike host (of the site or of a platform CDN), data:/javascript:/ftp:, credentials, a port, an overlong or relative URL are refused',
     no.every((u) => safeSiteIcon(u, 'gotopseo.com') === null), show(no.filter((u) => safeSiteIcon(u, 'gotopseo.com') !== null)))
-  check('I5: candidates: the declared icon first, then /favicon.ico',
-    show(siteIconCandidates('gotopseo.com', 'https://gotopseo.com/i.png')) === show(['https://gotopseo.com/i.png', 'https://gotopseo.com/favicon.ico']))
+  check('I5: candidates: the declared icon first, then /favicon.ico, its www twin, then /apple-touch-icon.png',
+    show(siteIconCandidates('gotopseo.com', 'https://gotopseo.com/i.png')) === show(['https://gotopseo.com/i.png', 'https://gotopseo.com/favicon.ico', 'https://www.gotopseo.com/favicon.ico', 'https://gotopseo.com/apple-touch-icon.png']))
   check('I6: an unsafe declared icon is dropped; no host, no candidate (the initial stays)',
-    show(siteIconCandidates('gotopseo.com', 'https://evil.com/i.png')) === show(['https://gotopseo.com/favicon.ico'])
+    show(siteIconCandidates('www.gotopseo.com', 'https://evil.com/i.png')) === show(['https://www.gotopseo.com/favicon.ico', 'https://gotopseo.com/favicon.ico', 'https://www.gotopseo.com/apple-touch-icon.png'])
     && siteIconCandidates('localhost', null).length === 0 && siteIconCandidates(null, null).length === 0)
   check('MUT: a check that trusts any https host fails I4', no.some((u) => {
     try { const x = new URL(u); return x.protocol === 'https:' } catch { return false }
@@ -69,11 +72,14 @@ console.log('\nH) the icon the page declares')
     siteIconFromHtml(head('<link rel="apple-touch-icon" href="/touch.png"><link rel="icon" href="/icon.svg">'), page) === 'https://www.gotopseo.com/icon.svg')
   check('H4: the touch icon when it is all there is', siteIconFromHtml(head('<link rel="apple-touch-icon" href="/touch.png">'), page) === 'https://www.gotopseo.com/touch.png')
   check('H5: an icon on another host is skipped for the next one on the site',
-    siteIconFromHtml(head('<link rel="icon" href="https://static.wixstatic.com/x.png"><link rel="shortcut icon" href="/f.ico">'), page) === 'https://www.gotopseo.com/f.ico')
-  check('H6: nothing declared (or only in <body>, or only stylesheets): null',
-    siteIconFromHtml(head('<link rel="stylesheet" href="/s.css">'), page) === null && siteIconFromHtml('<html><head></head></html>', page) === null)
-  check('H7: data:, javascript: and http icons are never kept',
-    siteIconFromHtml(head('<link rel="icon" href="data:image/png;base64,AAAA"><link rel="icon" href="javascript:alert(1)"><link rel="icon" href="http://www.gotopseo.com/i.png">'), page) === null)
+    siteIconFromHtml(head('<link rel="icon" href="https://evil.example/x.png"><link rel="shortcut icon" href="/f.ico">'), page) === 'https://www.gotopseo.com/f.ico')
+  check('H6: nothing declared, or only stylesheets: null; one only in <body> is taken only when the head has none',
+    siteIconFromHtml('<html><head><link rel="stylesheet" href="/s.css"></head><body></body></html>', page) === null
+    && siteIconFromHtml('<html><head></head></html>', page) === null
+    && siteIconFromHtml(head('<link rel="stylesheet" href="/s.css">'), page) === 'https://www.gotopseo.com/body.png')
+  check('H7: data: and javascript: icons are never kept; an http one on the site is upgraded to https',
+    siteIconFromHtml(head('<link rel="icon" href="data:image/png;base64,AAAA"><link rel="icon" href="javascript:alert(1)">'), page) === 'https://www.gotopseo.com/body.png'
+    && siteIconFromHtml(head('<link rel="icon" href="http://www.gotopseo.com/i.png">'), page) === 'https://www.gotopseo.com/i.png')
   const hostile = [
     '<link rel="icon" href="'.repeat(60_000),
     `<head>${'<link '.repeat(250_000)}`,
@@ -89,8 +95,9 @@ console.log('\nR) a stored icon is checked again when read')
   const base = { ...initialSummary({ source: 'scan', domain: 'gotopseo.com', url: 'https://gotopseo.com/', locale: 'he' }) }
   const withIcon = (siteIcon: unknown) => readSummary({ ...base, siteIcon })
   check('R1: a safe icon is kept', withIcon('https://gotopseo.com/i.png')?.siteIcon === 'https://gotopseo.com/i.png')
-  check('R2: an icon on another site, or not https, is dropped on read',
-    withIcon('https://evil.com/i.png')?.siteIcon === undefined && withIcon('http://gotopseo.com/i.png')?.siteIcon === undefined && withIcon(42)?.siteIcon === undefined)
+  check('R2: an icon on another site, on a port or not a string is dropped on read; an http one on the site is upgraded',
+    withIcon('https://evil.com/i.png')?.siteIcon === undefined && withIcon('http://gotopseo.com:8080/i.png')?.siteIcon === undefined && withIcon(42)?.siteIcon === undefined
+    && withIcon('http://gotopseo.com/i.png')?.siteIcon === 'https://gotopseo.com/i.png')
   check('R3: a summary without one has no such key (older runs read as before)', !('siteIcon' in (readSummary(base) ?? {})))
 }
 
@@ -138,17 +145,19 @@ console.log('\nG) source guards')
   const route = strip(read('app/api/projects/active/route.ts'))
   const rechecks = (src: string) => /site_icon: safeSiteIcon\(icons\.get\(r\.id\), r\.target_domain\)/.test(src) && /\.eq\('user_id', user\.id\)/.test(src)
   check('G6: the list route re-checks each stored icon against the project\'s own domain, for the caller\'s projects only', rechecks(route))
-  check('MUT: a route that passes the stored icon through unchecked fails G6', !rechecks(route.replace('safeSiteIcon(icons.get(r.id), r.target_domain)', 'icons.get(r.id) ?? null')))
+  check('MUT: a route that passes the stored icon through unchecked fails G6', !rechecks(route.replace('site_icon: safeSiteIcon(icons.get(r.id), r.target_domain)', 'site_icon: icons.get(r.id) ?? null')))
 
   const where: [string, RegExp][] = [
-    ['components/layout/WorkspaceSwitcher.tsx', /<SiteIcon[\s\S]*?domain=\{current\?\.target_domain\}[\s\S]*?<SiteIcon[\s\S]*?domain=\{p\.target_domain\}/],
-    ['components/dashboard/HeroCard.tsx', /<SiteIcon[\s\S]*?domain=\{domain\}[\s\S]*?fallback=\{initial\}/],
-    ['components/onboarding/ResearchSummary.tsx', /<SiteIcon[\s\S]*?icon=\{summary\.siteIcon\}[\s\S]*?fallback=\{initial\}/],
+    // Through SiteAvatar: SiteIcon with the one shared letter fallback (components/ui/SiteAvatar.tsx).
+    ['components/layout/WorkspaceSwitcher.tsx', /<SiteAvatar[^>]*domain=\{current\?\.target_domain\}[^>]*icon=\{current\?\.site_icon\}[\s\S]*?<SiteAvatar[^>]*domain=\{p\.target_domain\}[^>]*icon=\{p\.site_icon\}/],
+    ['components/dashboard/HeroCard.tsx', /<SiteAvatar[^>]*domain=\{domain\}[^>]*icon=\{siteIcon\}/],
+    ['components/onboarding/ResearchSummary.tsx', /<SiteAvatar[^>]*domain=\{domain\}[^>]*icon=\{summary\.siteIcon\}/],
+    ['components/ui/SiteAvatar.tsx', /<SiteIcon[\s\S]*?icon=\{icon\}[\s\S]*?fallback=\{siteInitial\(domain, name\)\}/],
   ]
   const shown = (entries: [string, string, RegExp][]) => entries.filter(([, src, re]) => !re.test(src)).map(([f]) => f)
   const entries = where.map(([f, re]) => [f, strip(read(f)), re] as [string, string, RegExp])
-  check('G7: the switcher (its button and its list), the dashboard hero and the summary hero show the icon, the initial as fallback', shown(entries).length === 0, show(shown(entries)))
-  check('MUT: a hero back to the bare initial fails G7', shown(entries.map(([f, s, re]) => [f, f.includes('HeroCard') ? s.replace(/<SiteIcon[\s\S]*?\/>/, '<span>{initial}</span>') : s, re])).length === 1)
+  check('G7: the switcher (its button and its list), the dashboard hero and the summary hero show the icon through SiteAvatar, one letter as fallback', shown(entries).length === 0, show(shown(entries)))
+  check('MUT: a hero back to the bare initial fails G7', shown(entries.map(([f, s, re]) => [f, f.includes('HeroCard') ? s.replace(/<SiteAvatar[\s\S]*?\/>/, '<span>{initial}</span>') : s, re])).length === 1)
 
   const config = read('next.config.ts')
   check('G8: next.config keeps its one image host (no icon host was opened) and sets no img-src', /hostname: '\*\.supabase\.co'/.test(config) && (config.match(/hostname:/g) ?? []).length === 1 && !/img-src/.test(config))

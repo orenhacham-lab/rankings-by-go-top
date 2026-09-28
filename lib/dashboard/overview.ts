@@ -29,6 +29,7 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { resolveActivePlatform, siteConnectionState } from '@/lib/content/platform/active-platform'
 import { buildDomainList, computeDisplayMatches, type DisplayCitationInput } from '@/lib/ai-visibility/display-classification'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
+import { latestAnswers, visibilityScore, type ScoredAnswer } from '@/lib/ai-visibility/score'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NO_STORE = { 'cache-control': 'no-store' }
@@ -270,20 +271,27 @@ async function readBoard({ projectId, userId, db }: Scope): Promise<Section<Boar
 }
 
 /**
- * The AI-visibility figures of the latest finished check, and the change against
- * the one before. Read with the service role, as every AI-visibility route does,
- * and only after the project was proven to be this user's: every query is
- * filtered by that project, and the runs by their owner too (only the project's
- * owner can start one). The answers are read only for those runs.
+ * The project's AI-visibility score, as lib/ai-visibility/score.ts defines it
+ * for every screen: the latest successful answer per question x engine, over the
+ * owner's recent finished checks (as many as the AI tab reads), and the change
+ * against the same picture without the newest check. Read with the service
+ * role, as every AI-visibility route does, and only after the project was proven
+ * to be this user's: every query is filtered by that project, and the runs by
+ * their owner too (only the project's owner can start one). The answers are
+ * read only for those runs.
  *
- * THE BUSINESS'S OWN FIGURES, COUNTED AS THE AI TAB COUNTS THEM. Each answer is
- * read again with computeDisplayMatches (app/api/ai-visibility/runs/route.ts
- * does the same): a mention is an answer that names the business or its site,
- * a citation is an answer that lists the site among its sources. The stored
- * `mentioned` flag can disagree with the answer's text, and `citation_count` is
- * every source in the answer, whoever's; neither is the business's figure.
+ * THE BUSINESS'S OWN FIGURES, COUNTED AS THE AI TAB COUNTS THEM. Each counted
+ * answer is read again with computeDisplayMatches (app/api/ai-visibility/runs/
+ * route.ts does the same): a mention is an answer that names the business or
+ * its site, a citation is an answer that lists the site among its sources. The
+ * stored `mentioned` flag can disagree with the answer's text, and
+ * `citation_count` is every source in the answer, whoever's; neither is the
+ * business's figure.
  */
 type AiProject = { target_domain?: string | null; business_name: string | null; brand_aliases?: string[] | null; domain_aliases?: string[] | null }
+
+/** Finished checks read for the score: the AI tab's own maximum (GET /api/ai-visibility/runs). */
+export const AI_RUNS_READ = 100
 
 async function readAi(admin: ServiceRoleClient, projectId: string, userId: string, project: AiProject): Promise<Section<AiData>> {
   const runsRes = await admin
@@ -293,25 +301,52 @@ async function readAi(admin: ServiceRoleClient, projectId: string, userId: strin
     .eq('user_id', userId)
     .in('status', ['completed', 'partial'])
     .order('created_at', { ascending: false })
-    .limit(2)
+    .limit(AI_RUNS_READ)
   if (runsRes.error) return { state: 'error' }
-  const runs = (runsRes.data ?? []) as Array<Record<string, unknown>>
-  if (runs.length === 0) return { state: 'ready', data: { score: null, mentions: 0, citations: 0, answers: 0, change: null, lastCheckAt: null } }
+  // Newest first by their own time, whatever order the rows arrived in.
+  const runTime = (r: Record<string, unknown>) => Date.parse(String(r.created_at ?? '')) || 0
+  const runs = [...((runsRes.data ?? []) as Array<Record<string, unknown>>)].sort((x, y) => runTime(y) - runTime(x))
+  const empty: AiData = { score: null, mentions: 0, citations: 0, answers: 0, change: null, lastCheckAt: null }
+  if (runs.length === 0) return { state: 'ready', data: empty }
 
   const runIds = runs.map((r) => r.id).filter((v): v is string => typeof v === 'string')
-  const resultsRes = await admin
-    .from('ai_scan_results')
-    .select('id, run_id, mentioned, target_cited, response_text, status, excluded_from_score')
-    .eq('project_id', projectId)
-    .in('run_id', runIds)
-    .limit(5000)
-  if (resultsRes.error) return { state: 'error' }
-  const scored = ((resultsRes.data ?? []) as Array<Record<string, unknown>>).filter((r) =>
-    r.status === 'success' && r.excluded_from_score !== true && typeof r.run_id === 'string')
+  const runAt = new Map(runs.map((r) => [String(r.id), ts(r.completed_at) ?? ts(r.created_at)]))
+  const rows: Array<Record<string, unknown>> = []
+  // In batches, so many checks never build an over-long request URL.
+  for (let i = 0; i < runIds.length; i += 50) {
+    const resultsRes = await admin
+      .from('ai_scan_results')
+      .select('id, run_id, prompt_id, engine, mentioned, target_cited, response_text, status, excluded_from_score')
+      .eq('project_id', projectId)
+      .in('run_id', runIds.slice(i, i + 50))
+      .limit(5000)
+    if (resultsRes.error) return { state: 'error' }
+    rows.push(...((resultsRes.data ?? []) as Array<Record<string, unknown>>).filter((r) => typeof r.run_id === 'string'))
+  }
 
-  // The sources of the scored answers, to find the site among them.
+  type Answer = ScoredAnswer & { runId: string; row: Record<string, unknown> }
+  const answers: Answer[] = rows.map((r) => ({
+    id: typeof r.id === 'string' ? r.id : null,
+    promptId: typeof r.prompt_id === 'string' ? r.prompt_id : null,
+    engine: typeof r.engine === 'string' ? r.engine : '',
+    at: runAt.get(r.run_id as string) ?? null,
+    status: typeof r.status === 'string' ? r.status : null,
+    excluded: r.excluded_from_score === true,
+    mentioned: false,
+    cited: false,
+    runId: r.run_id as string,
+    row: r,
+  }))
+  // The picture now, and the same picture without the newest check that counts.
+  const now = latestAnswers(answers)
+  if (now.length === 0) return { state: 'ready', data: { ...empty, lastCheckAt: runAt.get(String(runs[0].id)) ?? null } }
+  const newestCounted = runIds.find((id) => now.some((a) => a.runId === id))
+  const before = latestAnswers(answers.filter((a) => a.runId !== newestCounted))
+
+  // The sources of the counted answers, to find the site among them.
+  const counted = [...new Set([...now, ...before])]
   const citationsByResult = new Map<string, DisplayCitationInput[]>()
-  const resultIds = scored.map((r) => r.id).filter((v): v is string => typeof v === 'string')
+  const resultIds = counted.map((a) => a.id).filter((v): v is string => typeof v === 'string')
   // In batches, so a long check never builds an over-long request URL.
   for (let i = 0; i < resultIds.length; i += 150) {
     const citationsRes = await admin
@@ -332,8 +367,8 @@ async function readAi(admin: ServiceRoleClient, projectId: string, userId: strin
   const targetDomain = project.target_domain ?? null
   const brandVariants = getBrandVariants(project.business_name, targetDomain, project.brand_aliases ?? [], project.domain_aliases ?? [])
   const domainList = buildDomainList(targetDomain, project.domain_aliases ?? [])
-  const byRun = new Map<string, { answers: number; mentions: number; citations: number }>()
-  for (const r of scored) {
+  for (const a of counted) {
+    const r = a.row
     const display = computeDisplayMatches({
       responseText: typeof r.response_text === 'string' ? r.response_text : null,
       brandVariants,
@@ -341,30 +376,22 @@ async function readAi(admin: ServiceRoleClient, projectId: string, userId: strin
       domainList,
       mentioned: r.mentioned === true,
       cited: r.target_cited === true,
-      citations: typeof r.id === 'string' ? citationsByResult.get(r.id) ?? null : null,
+      citations: a.id ? citationsByResult.get(a.id) ?? null : null,
     })
-    const agg = byRun.get(r.run_id as string) ?? { answers: 0, mentions: 0, citations: 0 }
-    agg.answers++
-    if (display.displayMentioned) agg.mentions++
-    if (display.displayCited) agg.citations++
-    byRun.set(r.run_id as string, agg)
+    a.mentioned = display.displayMentioned
+    a.cited = display.displayCited
   }
-  const score = (id: unknown) => {
-    const agg = typeof id === 'string' ? byRun.get(id) : undefined
-    return agg && agg.answers > 0 ? Math.round((agg.mentions / agg.answers) * 100) : null
-  }
-  const latest = byRun.get(String(runs[0].id)) ?? { answers: 0, mentions: 0, citations: 0 }
-  const latestScore = score(runs[0].id)
-  const previousScore = runs[1] ? score(runs[1].id) : null
+  const latest = visibilityScore(now)
+  const previous = visibilityScore(before)
   return {
     state: 'ready',
     data: {
-      score: latestScore,
+      score: latest.score,
       mentions: latest.mentions,
       citations: latest.citations,
       answers: latest.answers,
-      change: latestScore !== null && previousScore !== null ? latestScore - previousScore : null,
-      lastCheckAt: ts(runs[0].completed_at) ?? ts(runs[0].created_at),
+      change: latest.score !== null && previous.score !== null ? latest.score - previous.score : null,
+      lastCheckAt: runAt.get(String(runs[0].id)) ?? null,
     },
   }
 }

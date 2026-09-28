@@ -12,6 +12,7 @@
  * stable for future Share of Voice / Timeline phases.
  */
 
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Plus, Trash2, RotateCcw, X, Check } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -361,6 +362,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
                 <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
                     <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <SiteAvatar domain={c.domain} name={c.name} size="sm" />
                       <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
                         {c.name}
                       </span>

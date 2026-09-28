@@ -9,8 +9,9 @@
  * error, the numbers) renders inside the same reserved height, so the table
  * or the cards underneath stay where they are when the data arrives.
  */
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import Link from 'next/link'
-import { Swords } from 'lucide-react'
+import { CompetitorIcon } from './CompetitorIcon'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -45,7 +46,7 @@ export default function CompetitorSummary({ view, variant, className }: {
         <header className={cn('min-w-0', compact && 'flex items-start justify-between gap-3')}>
           <div className="min-w-0">
             <h2 id={titleId} className="flex items-center gap-2 text-section font-semibold text-ink">
-              <Swords size={16} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
+              <CompetitorIcon size={16} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
               {c.title}
             </h2>
             {view.status !== 'no_competitors' && (
@@ -143,7 +144,8 @@ function StandingBlock({ standing: s, c }: { standing: CompetitorStanding; c: Co
   const share = s.compared > 0 ? Math.round((s.ahead / s.compared) * 100) : 0
   return (
     <li className="min-w-0" title={sentence}>
-      <p className="flex min-w-0 items-baseline gap-1.5 text-copy font-medium text-ink">
+      <p className="flex min-w-0 items-center gap-1.5 text-copy font-medium text-ink">
+        <SiteAvatar domain={s.domain} name={s.name} size="xs" />
         <span className="truncate">{s.name}</span>
         {s.name !== s.domain && (
           <span dir="ltr" className="hidden truncate text-caption font-normal text-muted sm:inline">{s.domain}</span>

@@ -46,6 +46,7 @@ export function OverviewStatusBar({ overview, questionsPending }: { overview: Ov
   const { c, language } = useCopy()
   const data = overview && overview !== 'error' ? overview : null
   const checked = new Set(data?.enginesChecked ?? [])
+  const mentioned = new Set(data?.enginesMentioned ?? [])
   const running = !!data?.running
 
   return (
@@ -61,18 +62,21 @@ export function OverviewStatusBar({ overview, questionsPending }: { overview: Ov
             {OVERVIEW_ENGINES.map((engine) => {
               const meta = ENGINE_META[engine]
               const on = checked.has(engine)
-              const label = `${meta?.name ?? engine}: ${on ? c.engineChecked : c.engineNotChecked}`
+              // The ✓ means "mentioned you", never merely "checked".
+              const named = on && mentioned.has(engine)
+              const label = `${meta?.name ?? engine}: ${named ? c.engineMentioned : on ? c.engineNotMentioned : c.engineNotChecked}`
               return (
                 <span
                   key={engine}
                   title={label}
+                  data-engine-state={named ? 'mentioned' : on ? 'not_mentioned' : 'not_checked'}
                   className={cn(
                     'relative inline-flex h-7 w-7 items-center justify-center rounded-pill border transition-colors',
                     on ? 'border-line bg-surface' : 'border-dashed border-line bg-sunk opacity-50 grayscale',
                   )}
                 >
                   {meta && <meta.Icon size={15} />}
-                  {on && (
+                  {named && (
                     <CheckCircle2 size={11} strokeWidth={2.5} aria-hidden="true" className="absolute -bottom-0.5 -end-0.5 rounded-pill bg-surface text-ok" />
                   )}
                   <span className="sr-only">{label}</span>
@@ -129,11 +133,14 @@ export function OverviewOpeningCard({
   overview,
   questionsPending,
   questionsSuggested,
+  questionsCount = null,
   onChooseQuestions,
 }: {
   overview: OverviewData
   questionsPending: boolean
   questionsSuggested: number | null
+  /** Questions the project tracks (the tool's own list); null until it has loaded. */
+  questionsCount?: number | null
   onChooseQuestions: () => void
 }) {
   const { c, language } = useCopy()
@@ -177,14 +184,18 @@ export function OverviewOpeningCard({
             </div>
           )}
 
+          {state === 'ready' && data && <NextStep c={c} data={data} onRunMore={onChooseQuestions} />}
+
           {state === 'empty' && (
             <div className="mt-6 max-w-[56ch]">
               <p className="text-section font-semibold">{c.emptyTitle}</p>
-              <p className="mt-1 text-copy text-contrast-ink/75">
-                {questionsPending ? c.emptyBodyPending : questionsSuggested ? c.emptyBodyQuestions(questionsSuggested) : c.emptyBody}
+              <p className="mt-1 text-copy text-contrast-ink/75" data-ai-empty-step={questionsCount ? 'check' : 'questions'}>
+                {questionsCount
+                  ? c.emptyBodyHasQuestions(questionsCount)
+                  : questionsPending ? c.emptyBodyPending : questionsSuggested ? c.emptyBodyQuestions(questionsSuggested) : c.emptyBody}
               </p>
               <Button size="md" className="mt-4" onClick={onChooseQuestions} data-ai-choose-questions="">
-                {c.chooseQuestions}
+                {questionsCount ? c.runFirstCheck : c.chooseQuestions}
               </Button>
             </div>
           )}
@@ -241,6 +252,33 @@ export function OverviewOpeningCard({
         )}
       </div>
     </section>
+  )
+}
+
+/**
+ * One plain sentence under the score: what to do now. A partial picture (not
+ * every engine checked) comes first, then "not mentioned yet", then "keep
+ * checking". The figures beside it stay what they were.
+ */
+export function nextStepKind(data: Pick<AiOverview, 'enginesChecked' | 'mentions'>): 'partial' | 'no_mentions' | 'keep_going' {
+  if (data.enginesChecked.length < OVERVIEW_ENGINES.length) return 'partial'
+  if (data.mentions === 0) return 'no_mentions'
+  return 'keep_going'
+}
+
+function NextStep({ c, data, onRunMore }: { c: Copy; data: AiOverview; onRunMore: () => void }) {
+  const kind = nextStepKind(data)
+  const text = kind === 'partial'
+    ? c.nextStepPartial(data.enginesChecked.length, OVERVIEW_ENGINES.length)
+    : kind === 'no_mentions' ? c.nextStepNoMentions : c.nextStepKeepGoing
+  return (
+    <div data-ai-next-step={kind} className="mt-5 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
+      <p className="text-caption font-semibold text-contrast-ink/80">{c.nextStepLabel}</p>
+      <p className="mt-0.5 text-copy text-contrast-ink/80">{text}</p>
+      {kind === 'partial' && (
+        <Button size="sm" variant="secondary" className="mt-3" onClick={onRunMore}>{c.runMoreChecks}</Button>
+      )}
+    </div>
   )
 }
 

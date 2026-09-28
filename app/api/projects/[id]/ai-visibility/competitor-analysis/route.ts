@@ -19,7 +19,9 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
-import { detectBrandNameMention } from '@/lib/ai-visibility/matching/mention-detector'
+import { detectBrandNameMention, getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
+import { buildDomainList, computeDisplayMatches } from '@/lib/ai-visibility/display-classification'
+import { latestAnswers } from '@/lib/ai-visibility/score'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 
 const ERR = {
@@ -59,7 +61,7 @@ async function authAndProject(projectId: string | null | undefined) {
 
   const { data: project, error: projectError } = await admin
     .from('projects')
-    .select('id, user_id, name, business_name, target_domain, country, language')
+    .select('id, user_id, name, business_name, target_domain, country, language, brand_aliases, domain_aliases')
     .eq('id', projectId)
     .maybeSingle()
 
@@ -137,7 +139,7 @@ export async function GET(
   // pulling every successful result for the project.
   const { data: scanResults, error: resultsError } = await auth.admin
     .from('ai_scan_results')
-    .select('id, run_id, prompt_id, engine, response_text, source_count, citation_count, mentioned, target_cited, status, scanned_at')
+    .select('id, run_id, prompt_id, engine, response_text, source_count, citation_count, mentioned, target_cited, status, scanned_at, excluded_from_score')
     .eq('project_id', auth.projectId)
     .eq('status', 'success')
     .order('scanned_at', { ascending: false })
@@ -150,17 +152,20 @@ export async function GET(
     return Response.json({ error: ERR.dbError }, { status: 500 })
   }
 
-  // Deduplicate by (prompt_id, engine) — keep only the latest result per pair.
-  // If a prompt has no id (legacy), key by engine + result id so it's kept.
-  const seenKeys = new Set<string>()
-  const allResults = (scanResults as any[]) || []
-  const resultsList: any[] = []
-  for (const r of allResults) {
-    const key = `${r.prompt_id || `__noprompt__${r.id}`}:${r.engine || 'unknown'}`
-    if (seenKeys.has(key)) continue
-    seenKeys.add(key)
-    resultsList.push(r)
-  }
+  // The answers the shared score counts (lib/ai-visibility/score.ts): the latest
+  // successful, non-archived answer per question x engine, on the engines the
+  // tool checks. The same answers the AI tab, its overview and the dashboard count.
+  type ResultRow = { id: string; run_id: string | null; prompt_id: string | null; engine: string | null; response_text: string | null; mentioned: boolean | null; target_cited: boolean | null; status: string | null; scanned_at: string | null; excluded_from_score: boolean | null }
+  const allResults = (scanResults as ResultRow[] | null) || []
+  const resultsList = latestAnswers(allResults.map((r) => ({
+    ...r,
+    promptId: r.prompt_id || null,
+    engine: r.engine || '',
+    at: r.scanned_at || null,
+    excluded: r.excluded_from_score === true,
+    mentioned: r.mentioned === true,
+    cited: r.target_cited === true,
+  })))
 
   const totalResults = resultsList.length
 
@@ -204,12 +209,16 @@ export async function GET(
   const projectName = projectBusinessName || projectFallbackName
   const projectDomain = (auth.project as any)?.target_domain || null
 
-  // Detect project mentions ONCE across all results (not per-competitor)
+  // The business's own mentions, read exactly as the AI tab reads them
+  // (computeDisplayMatches, as GET /api/ai-visibility/runs does), so its share
+  // here is the score it sees everywhere else.
+  const aliases = auth.project as { brand_aliases?: string[] | null; domain_aliases?: string[] | null }
+  const brandVariants = getBrandVariants(projectBusinessName, projectDomain, aliases.brand_aliases ?? [], aliases.domain_aliases ?? [])
+  const domainList = buildDomainList(projectDomain, aliases.domain_aliases ?? [])
   let projectMentions = 0
   const projectByEngine: EngineStats = {}
 
   for (const result of resultsList) {
-    const responseText = result.response_text || ''
     const engine = result.engine || 'unknown'
 
     if (!projectByEngine[engine]) {
@@ -217,12 +226,18 @@ export async function GET(
     }
     projectByEngine[engine].total += 1
 
-    if (projectName || projectDomain) {
-      const detectionResult = detectBrandNameMention(responseText, projectName, projectDomain)
-      if (detectionResult.mentioned) {
-        projectByEngine[engine].mentions += 1
-        projectMentions += 1
-      }
+    const display = computeDisplayMatches({
+      responseText: typeof result.response_text === 'string' ? result.response_text : null,
+      brandVariants,
+      targetDomain: projectDomain,
+      domainList,
+      mentioned: result.mentioned === true,
+      cited: result.target_cited === true,
+      citations: null,
+    })
+    if (display.displayMentioned) {
+      projectByEngine[engine].mentions += 1
+      projectMentions += 1
     }
   }
 
@@ -332,6 +347,7 @@ export async function GET(
     success: true,
     project: {
       name: projectName,
+      domain: projectDomain,
       mentionsCount: projectMentions,
       totalResults,
       mentionRate: totalResults > 0 ? Math.round((projectMentions / totalResults) * 100) : 0,

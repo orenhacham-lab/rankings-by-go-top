@@ -27,9 +27,9 @@ const STRINGS = {
   ai_visibility_platform: { he: 'נראות ב-AI', en: 'AI Search Visibility Platform' },
   monitor_engines: { he: 'מעקב אחר 6 מנועי AI', en: 'Monitor across 6 AI engines' },
   beta: { he: 'בטא', en: 'Beta' },
-  suggest: { he: '✨ הצע', en: '✨ Suggest' },
+  suggest: { he: 'הצע', en: 'Suggest' },
   new_query: { he: '+ שאלת AI חדשה', en: '+ New AI Query' },
-  recommend_questions: { he: '💡 שאלות מומלצות', en: '💡 Recommended Questions' },
+  recommend_questions: { he: 'שאלות מומלצות', en: 'Recommended questions' },
 
   // KPI labels
   visibility_score: { he: 'ציון נראות', en: 'Visibility Score' },
@@ -38,7 +38,7 @@ const STRINGS = {
   citation_share: { he: '% נתח ציטוט', en: 'Citation Share' },
   engine_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
   engines_coverage_help: { he: 'מספר מנועי AI שמצאו לפחות הזכרה אחת של העסק', en: 'Number of AI engines that found at least one mention of the business' },
-  share_of_voice: { he: 'Share of Voice', en: 'Share of Voice' },
+  share_of_voice: { he: 'נתח מהאזכורים', en: 'Share of mentions' },
   recommendation_present: { he: 'המלצה נוכחת', en: 'Recommendation Present' },
   mentioned: { he: 'הוזכר', en: 'Mentioned' },
   not_mentioned: { he: 'לא הוזכר', en: 'Not mentioned' },
@@ -89,6 +89,19 @@ const STRINGS = {
 
   // Empty states
   no_queries: { he: 'אין שאלות עדיין', en: 'No AI queries yet' },
+  // The questions tab, for an owner who never used an AI tool for business:
+  // what a question is, and the one next step on an empty list.
+  queries_explainer: {
+    he: 'שאלה היא מה שלקוח היה כותב ל-ChatGPT או ל-Gemini כשהוא מחפש את מה שאתם מציעים, למשל בקשה להמלצה על עסק בתחום שלכם. אנחנו שואלים את המנועים את השאלה ובודקים אם העסק שלכם מופיע בתשובה. שאלות טובות הן כאלה שלקוחות באמת שואלים, בלי שם העסק.',
+    en: 'A question is what a customer would type into ChatGPT or Gemini when looking for what you offer, for example asking for a recommended business in your field. We ask the engines that question and check whether your business shows up in the answer. Good questions are ones real customers ask, without your business name.',
+  },
+  no_queries_title: { he: 'עוד אין שאלות במעקב', en: 'No questions tracked yet' },
+  no_queries_body: {
+    he: 'הצעד הראשון: בחרו שאלה אחת או שתיים שלקוחות שלכם שואלים. אפשר לבחור מהשאלות המוצעות למטה או לכתוב שאלה משלכם. הוספת שאלה לא עולה כלום, רק בדיקה נספרת במכסה.',
+    en: 'First step: pick one or two questions your customers ask. Choose from the suggestions below or write your own. Adding a question costs nothing; only a check counts toward your allowance.',
+  },
+  no_queries_pick: { he: 'בחירה מהשאלות המוצעות', en: 'Pick a suggested question' },
+  no_queries_write: { he: 'כתיבת שאלה משלכם', en: 'Write your own question' },
   no_queries_help: {
     he: 'צור שאלות חכמות מותאמות לעסק שלך, או צור שאלה באופן ידני.',
     en: 'Generate smart AI questions tailored to your business, or create one manually.',
@@ -159,8 +172,8 @@ const STRINGS = {
   // instruction above them, and an accessible name that says what the click
   // does, is what makes an existing control discoverable.
   run_a_check_hint: {
-    he: 'לחצו על מנוע כדי להריץ בדיקת AI לשאילתה הזו',
-    en: 'Click an engine to run an AI check for this query',
+    he: 'כדי לבדוק שאלה, לחצו על שם של מנוע לידה (למשל ChatGPT). תוך כדקה תראו מה הוא ענה ואם הזכיר אתכם. כל בדיקה נספרת במכסה.',
+    en: 'To check a question, click an engine name next to it (for example ChatGPT). Within about a minute you see what it answered and whether it mentioned you. Each check counts toward your allowance.',
   },
   run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
   rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ' },
@@ -171,6 +184,19 @@ const STRINGS = {
     he: 'ניצלתם את כל בדיקות ה-AI במחזור החיוב הזה',
     en: 'You have used every AI check in this billing period',
   },
+  ai_allowance_not_included: { he: 'לא כלולות בחבילה', en: 'not included in your plan' },
+  ai_allowance_none_body: {
+    he: 'החבילה הנוכחית לא כוללת בדיקות AI, לכן אי אפשר להריץ בדיקה כרגע. אפשר כבר עכשיו להוסיף שאלות, ולבדוק אותן אחרי שדרוג.',
+    en: 'Your current plan does not include AI checks, so a check cannot run right now. You can add questions now and check them after upgrading.',
+  },
+  ai_allowance_upgrade: { he: 'לשדרוג החבילה', en: 'Upgrade your plan' },
+  chip_legend: {
+    he: 'סימן ✓ ליד מנוע: הוא הזכיר אתכם בבדיקה האחרונה. סימן –: נבדק ולא הזכיר אתכם. בלי סימן: עוד לא נבדק.',
+    en: 'A ✓ by an engine: it mentioned you in the last check. A –: checked, and it did not mention you. No mark: not checked yet.',
+  },
+  chip_mentioned: { he: 'הזכיר אתכם', en: 'mentioned you' },
+  chip_not_mentioned: { he: 'נבדק, לא הזכיר אתכם', en: 'checked, did not mention you' },
+  chip_not_checked: { he: 'עוד לא נבדק', en: 'not checked yet' },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },
@@ -232,7 +258,7 @@ const STRINGS = {
   mentions_by_engine: { he: 'אזכורים לפי מנוע AI', en: 'Mentions by AI Engine' },
   total_mentions: { he: 'סה״כ אזכורים', en: 'Total mentions' },
   visibility_percent: { he: 'אחוז נראות', en: 'Visibility' },
-  out_of_results: { he: 'מתוך {count} תוצאות', en: 'out of {count} results' },
+  out_of_results: { he: 'מתוך {count} תשובות', en: 'out of {count} answers' },
 
   // Delete AI question
   delete_question_title: { he: 'למחוק שאלה?', en: 'Delete question?' },
@@ -361,6 +387,8 @@ const STRINGS = {
   cat_appliance_store: { he: 'חנות מוצרי חשמל', en: 'Appliance store' },
   cat_ecommerce: { he: 'חנות אונליין', en: 'Online store' },
   cat_local_service: { he: 'שירות מקומי', en: 'Local service' },
+  cat_home_improvement_service: { he: 'בעלי מקצוע לבית (אינסטלציה, חשמל, שיפוצים)', en: 'Home services (plumbing, electrical, renovation)' },
+  cat_product_brand: { he: 'מותג מוצרים', en: 'Product brand' },
   cat_cleaning: { he: 'חברת ניקיון', en: 'Cleaning company' },
   cat_saas: { he: 'מוצר SaaS', en: 'SaaS product' },
   cat_restaurant: { he: 'מסעדה', en: 'Restaurant' },
@@ -439,14 +467,14 @@ const STRINGS = {
   competitor_zero_mentions: { he: 'אין אזכורים', en: 'No mentions' },
 
   // AI Share of Voice (Phase 3)
-  share_of_voice_title: { he: 'AI Share of Voice', en: 'AI Share of Voice' },
+  share_of_voice_title: { he: 'מי מוזכר יותר בתשובות AI', en: 'Who AI answers mention most' },
   share_of_voice_help: {
-    he: 'חלק יחסי מכלל האזכורים שנמצאו בתשובות AI.',
-    en: 'Relative share of all mentions found in AI answers.',
+    he: 'מכל הפעמים שהעסק שלכם או מתחרה הוזכרו בתשובות האחרונות, כמה מהן שייכות לכל אחד.',
+    en: 'Of all the times your business or a competitor was named in the latest answers, how many belong to each.',
   },
   share_of_voice_empty: {
-    he: 'אין עדיין אזכורים בתשובות AI עבור העסק או המתחרים. הריצו סריקות נוספות כדי לראות נתח שיח.',
-    en: 'No mentions yet for your business or competitors. Run more scans to see share of voice.',
+    he: 'עדיין אף תשובה לא הזכירה את העסק או מתחרה. בדקו עוד שאלות כדי לראות מי מוזכר יותר.',
+    en: 'No answer has named your business or a competitor yet. Check more questions to see who is named more.',
   },
   share_of_voice_mentions: { he: 'אזכורים', en: 'mentions' },
 
@@ -533,7 +561,7 @@ const STRINGS = {
   prompt_status_good: { he: 'טוב', en: 'Good' },
 
   // GEO Insights (Phase 1A — drawer-only compact section)
-  geo_insights_title: { he: 'תובנות GEO', en: 'GEO Insights' },
+  geo_insights_title: { he: 'למה זו התשובה', en: 'Why this answer' },
   geo_query_intent: { he: 'כוונת שאלה', en: 'Query intent' },
   geo_citation_types: { he: 'סוגי מקורות', en: 'Source types' },
   geo_content_signals: { he: 'דפוסי תוכן', en: 'Content patterns' },

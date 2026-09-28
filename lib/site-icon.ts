@@ -4,24 +4,43 @@
  * summary's hero.
  *
  * WHERE THE ICON COMES FROM. The owner's browser loads it straight from the
- * site, with a plain <img> (components/ui/SiteIcon.tsx):
+ * site, with a plain <img> (components/ui/SiteIcon.tsx), trying in order:
  *   1. the icon the site declares in its HTML (<link rel="icon"> and friends),
  *      when the seeding scan read the home page and found one (the run's
- *      summary, `siteIcon`; lib/seed-scan/site-icon.ts);
- *   2. otherwise https://<the site>/favicon.ico;
- *   3. otherwise, or when neither loads, the project's initial, as before.
+ *      summary, `siteIcon`; lib/seed-scan/site-icon.ts). A finished scan that
+ *      found none is read again, at most once a week, when the owner's project
+ *      list loads (lib/seed-scan/site-icon-refresh.ts);
+ *   2. https://<the site>/favicon.ico, then the same on its www twin (a site
+ *      that only answers on www, or only without it), then its
+ *      /apple-touch-icon.png (iOS asks every site for it, so many have one
+ *      even without a /favicon.ico);
+ *   3. otherwise, or when none loads, the project's initial, as before.
+ *
+ * WHY SITES MISSED THEIR ICON (the cases this file now accepts):
+ *   - the icon lives on the site's own PLATFORM CDN, not on the site: Shopify
+ *     (cdn.shopify.com), Wix (static.wixstatic.com), Squarespace, Webflow,
+ *     Duda, GoDaddy, WordPress with Jetpack (i0.wp.com). Those platforms often
+ *     have no /favicon.ico of their own, so the fallback failed too;
+ *   - the home page is served over http, so a relative href resolved to an
+ *     http:// URL and was dropped (a browser upgrades it anyway: it is now
+ *     upgraded to https here);
+ *   - the domain was typed with spaces or capitals ("Agibor. Co. Il");
+ *   - the site answers only on www (or only without it), so /favicon.ico on the
+ *     typed host never loaded.
  *
  * WHAT IS NEVER DONE. No third-party favicon service (it would tell that
  * service every domain the owner works on). No server-side fetch of an icon:
  * nothing here, in the scan or in any route, requests an icon URL, so a URL a
  * site or a request controls can never make our servers call anywhere. The
- * browser's request goes to the owner's own site, with no referrer.
+ * browser's request goes to the owner's own site or its platform's CDN, with no
+ * referrer.
  *
- * WHAT IS ACCEPTED. Only https, only on the project's own site (the same host,
- * its www twin, or a subdomain of it), only a public-looking host name (no IP
- * literal, no single label like `localhost`), and only a bounded length. A
- * stored icon is checked again on every read, never trusted because it was
- * stored.
+ * WHAT IS ACCEPTED. Only https (an http URL on the site is upgraded), only on
+ * the project's own site (the same host, its www twin, or a subdomain of it) or
+ * on one of the named platform CDN hosts (exact names, never a pattern), only a
+ * public-looking host name (no IP literal, no single label like `localhost`),
+ * no credentials or port, and only a bounded length. A stored icon is checked
+ * again on every read, never trusted because it was stored.
  */
 
 /** Longest icon URL kept or shown. */
@@ -35,7 +54,8 @@ const LABEL = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/
  * is not a public-looking name.
  */
 export function siteHost(domain: string | null | undefined): string | null {
-  const raw = (domain ?? '').trim()
+  // Typed domains carry stray spaces ("Agibor. Co. Il"); no host name has one.
+  const raw = (domain ?? '').replace(/\s+/g, '')
   if (!raw || raw.length > 253 + 12) return null
   let host: string
   try {
@@ -67,8 +87,31 @@ export function sameSite(iconHost: string, host: string): boolean {
 }
 
 /**
- * An icon URL as the owner's browser may load it: https, on the project's own
- * site, bounded. Anything else is null (and the caller falls back).
+ * The website platforms' own CDN hosts, where a site built on them keeps its
+ * icon. Exact host names only: a site may point its icon here, and the owner's
+ * browser then loads an image the site's own pages already load.
+ */
+export const PLATFORM_ICON_HOSTS: ReadonlySet<string> = new Set([
+  'cdn.shopify.com',
+  'static.wixstatic.com',
+  'images.squarespace-cdn.com',
+  'static1.squarespace.com',
+  'cdn.prod.website-files.com',
+  'uploads-ssl.webflow.com',
+  'assets.website-files.com',
+  'irp.cdn-website.com',
+  'lirp.cdn-website.com',
+  'img1.wsimg.com',
+  'i0.wp.com',
+  'i1.wp.com',
+  'i2.wp.com',
+  'i3.wp.com',
+])
+
+/**
+ * An icon URL as the owner's browser may load it: https (an http URL is
+ * upgraded, as the browser would), on the project's own site or its platform's
+ * CDN, bounded. Anything else is null (and the caller falls back).
  */
 export function safeSiteIcon(url: unknown, domain: string | null | undefined): string | null {
   if (typeof url !== 'string' || url.length === 0 || url.length > MAX_ICON_URL) return null
@@ -80,19 +123,37 @@ export function safeSiteIcon(url: unknown, domain: string | null | undefined): s
   } catch {
     return null
   }
+  if (u.protocol === 'http:' && !u.port) u.protocol = 'https:'
   if (u.protocol !== 'https:' || u.username || u.password || u.port) return null
-  if (!publicHost(u.hostname) || !sameSite(u.hostname, host)) return null
-  return u.toString()
+  if (!publicHost(u.hostname)) return null
+  if (!sameSite(u.hostname, host) && !PLATFORM_ICON_HOSTS.has(u.hostname)) return null
+  const out = u.toString()
+  return out.length > MAX_ICON_URL ? null : out
 }
 
-/** The URLs to try, in order: the site's declared icon (when safe), then its /favicon.ico. */
+/** The same site on its other name: www.x.com for x.com, x.com for www.x.com. */
+export function wwwTwin(host: string): string | null {
+  if (host.startsWith('www.')) {
+    const bareHost = host.slice(4)
+    return publicHost(bareHost) ? bareHost : null
+  }
+  // Only a registrable-looking name gets a www twin (never www.shop.example.com).
+  return host.split('.').length <= 3 ? `www.${host}` : null
+}
+
+/**
+ * The URLs to try, in order: the site's declared icon (when safe), its
+ * /favicon.ico, the same on its www twin, then its /apple-touch-icon.png.
+ */
 export function siteIconCandidates(domain: string | null | undefined, declared?: string | null): string[] {
   const host = siteHost(domain)
   if (!host) return []
   const out: string[] = []
-  const safe = safeSiteIcon(declared, domain)
-  if (safe) out.push(safe)
-  const fallback = `https://${host}/favicon.ico`
-  if (!out.includes(fallback)) out.push(fallback)
+  const add = (u: string | null) => { if (u && !out.includes(u)) out.push(u) }
+  add(safeSiteIcon(declared, domain))
+  add(`https://${host}/favicon.ico`)
+  const twin = wwwTwin(host)
+  if (twin) add(`https://${twin}/favicon.ico`)
+  add(`https://${host}/apple-touch-icon.png`)
   return out
 }

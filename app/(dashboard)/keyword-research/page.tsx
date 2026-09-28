@@ -35,7 +35,7 @@ import type { ResearchRow } from '@/lib/keyword-research/rows'
 import { Check, Copy, Loader2, CheckCircle, Plus, Sparkles, TrendingUp } from 'lucide-react'
 import ResearchLandscape, { LANDSCAPE_IDS } from '@/components/keyword-research/ResearchLandscape'
 import SectionNav from '@/components/keyword-research/SectionNav'
-import SiteMark from '@/components/keyword-research/SiteMark'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { NO_LANDSCAPE } from '@/components/keyword-research/landscape'
 
 interface KeywordIdeaResult {
@@ -943,7 +943,7 @@ export default function KeywordResearchPage() {
   const ti = dict.researchInsights
   const siteChip = ownDomain ? (
     <span data-research-site="" className="inline-flex max-w-full items-center gap-2 rounded-pill border border-line bg-surface py-1 pe-3 ps-1 shadow-control">
-      <SiteMark domain={ownDomain} icon={seedLandscape.siteIcon} size="sm" tone="own" className="size-6" />
+      <SiteAvatar domain={ownDomain} icon={seedLandscape.siteIcon} size="sm" />
       <span dir="ltr" className="truncate text-caption font-semibold text-ink">{ownDomain}</span>
       {seedLandscape.niche && <span className="hidden truncate border-s border-line ps-2 text-caption text-muted sm:inline">{seedLandscape.niche}</span>}
     </span>

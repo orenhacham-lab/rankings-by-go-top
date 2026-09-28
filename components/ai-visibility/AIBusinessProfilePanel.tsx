@@ -35,6 +35,8 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'appliance_store', labelKey: 'cat_appliance_store' },
   { value: 'ecommerce', labelKey: 'cat_ecommerce' },
   { value: 'local_service', labelKey: 'cat_local_service' },
+  { value: 'home_improvement_service', labelKey: 'cat_home_improvement_service' },
+  { value: 'product_brand', labelKey: 'cat_product_brand' },
   { value: 'cleaning', labelKey: 'cat_cleaning' },
   { value: 'saas', labelKey: 'cat_saas' },
   { value: 'restaurant', labelKey: 'cat_restaurant' },
@@ -56,6 +58,9 @@ function categoryLabelText(
   const opt = CATEGORY_OPTIONS.find((o) => o.value === raw)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (opt) return t(opt.labelKey as any)
+  // A code the list does not name yet is never shown raw (home_improvement_service
+  // was): the owner sees "Other" instead. A category they typed stays as typed.
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(raw)) return t('cat_generic')
   return raw
 }
 

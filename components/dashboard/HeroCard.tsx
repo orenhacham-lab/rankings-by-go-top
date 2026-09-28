@@ -17,7 +17,7 @@ import type { RankingsView } from '@/lib/dashboard/rankings'
 import type { SeedPhase } from '@/lib/dashboard/seed'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { formatCount } from '@/components/gsc/format'
-import SiteIcon from '@/components/ui/SiteIcon'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import CountUp from '@/components/ui/CountUp'
 import { LinkButton } from './ui'
 
@@ -54,8 +54,6 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
     : checked ? h.firstPage(rankings.firstPage, rankings.checked) : h.noChecksYet(rankings.tracked)
   const scanLine = seedPhase === 'stage_b' ? h.scanRunning : seedPhase === 'stage_a' ? h.scanReading : null
 
-  const initial = domain.replace(/^www\./, '').slice(0, 1).toUpperCase()
-
   return (
     <section
       data-dashboard-widget="hero"
@@ -69,13 +67,7 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-3">
-            <SiteIcon
-              domain={domain}
-              icon={siteIcon}
-              fallback={initial}
-              className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-lg font-bold ring-1 ring-white/15"
-              iconClassName="grid size-10 shrink-0 place-items-center rounded-xl bg-white p-2 ring-1 ring-white/15"
-            />
+            <SiteAvatar domain={domain} icon={siteIcon} size="lg" tone="dark" />
             <p className="min-w-0 text-caption font-medium uppercase tracking-wide text-contrast-ink/70">
               {h.label} <span dir="ltr" className="block truncate text-copy font-semibold normal-case tracking-normal text-contrast-ink">{domain}</span>
             </p>

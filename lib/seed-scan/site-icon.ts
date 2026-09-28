@@ -7,13 +7,19 @@
  *
  * The page is the site's, so reading it costs linear time whatever it holds:
  * tags are found with indexOf, only a bounded slice of one tag is ever matched
- * with a pattern, and the scan stops at </head> or after HEAD_LIMIT characters
- * (the same care as lib/free-check/html-signals.ts, which this does not touch).
+ * with a pattern, and nothing past SCAN_LIMIT characters is looked at (the same
+ * care as lib/free-check/html-signals.ts, which this does not touch).
+ *
+ * Where the icon is looked for: the <head> first. A page builder that prints
+ * its <link rel="icon"> after a stray </head> (or a page whose head holds
+ * hundreds of kilobytes of inline script before it) is read on to SCAN_LIMIT,
+ * and an icon found there is taken only when the head had none. Relative hrefs
+ * resolve against the page's own <base href> when it declares one.
  */
 import { safeSiteIcon } from '@/lib/site-icon'
 
-/** Icons are declared in <head>; nothing past this many characters is looked at. */
-const HEAD_LIMIT = 300_000
+/** Nothing past this many characters is looked at (the fetcher's own cap, lib/free-check/site-fetch.ts MAX_BYTES). */
+const SCAN_LIMIT = 1_500_000
 /** A <link> tag longer than this is not read. */
 const TAG_LIMIT = 2_000
 
@@ -37,27 +43,65 @@ function attrs(tag: string): Map<string, string> {
   return out
 }
 
-const decode = (s: string) => s.replace(/&amp;/gi, '&').trim()
+/** The entities an href carries in practice: &amp; and numeric ones (&#47; &#x2F;). */
+const decode = (s: string) =>
+  s
+    .replace(/&#(\d{1,7});/g, (_, n: string) => safeChar(Number(n)))
+    .replace(/&#x([0-9a-f]{1,6});/gi, (_, n: string) => safeChar(parseInt(n, 16)))
+    .replace(/&amp;/gi, '&')
+    .trim()
+const safeChar = (code: number) => (code > 0x1f && code < 0x10ffff ? String.fromCodePoint(code) : '')
 
 /**
  * The best icon the page declares, as an absolute https URL on the site itself
- * (safeSiteIcon), or null. `pageUrl` is where the page was read (after
- * redirects); relative and protocol-relative hrefs resolve against it.
+ * or its platform's CDN (safeSiteIcon), or null. `pageUrl` is where the page was
+ * read (after redirects); relative and protocol-relative hrefs resolve against
+ * it, or against the page's <base href>.
  */
 export function siteIconFromHtml(html: string, pageUrl: string): string | null {
   if (typeof html !== 'string' || !html) return null
-  let base: URL
+  let page: URL
   try {
-    base = new URL(pageUrl)
+    page = new URL(pageUrl)
   } catch {
     return null
   }
   // ASCII-only lowercasing keeps every index equal to the original's.
-  const lower = html.slice(0, HEAD_LIMIT).replace(/[A-Z]/g, (c) => c.toLowerCase())
+  const lower = html.slice(0, SCAN_LIMIT).replace(/[A-Z]/g, (c) => c.toLowerCase())
   const headEnd = lower.indexOf('</head')
-  const end = headEnd >= 0 ? headEnd : lower.length
-  let best: { rank: number; url: string } | null = null
+  const base = baseHref(html, lower, headEnd >= 0 ? headEnd : lower.length, page)
+  const inHead = pickIcon(html, lower, 0, headEnd >= 0 ? headEnd : lower.length, base, page.hostname)
+  if (inHead || headEnd < 0) return inHead
+  return pickIcon(html, lower, headEnd, lower.length, base, page.hostname)
+}
+
+/** The page's <base href> (the first one, as browsers read it), resolved; the page URL without one. */
+function baseHref(html: string, lower: string, end: number, page: URL): URL {
   let i = 0
+  while (i < end) {
+    const at = lower.indexOf('<base', i)
+    if (at < 0 || at >= end) break
+    const close = lower.indexOf('>', at)
+    if (close < 0) break
+    i = close + 1
+    const next = lower.charCodeAt(at + 5)
+    // "<basefont" is not <base>.
+    if (!(next === 32 || next === 9 || next === 10 || next === 13 || next === 47 || next === 62)) continue
+    if (close - at > TAG_LIMIT) continue
+    const href = attrs(html.slice(at + 5, close)).get('href')
+    if (!href) continue
+    try {
+      return new URL(decode(href), page)
+    } catch {
+      return page
+    }
+  }
+  return page
+}
+
+function pickIcon(html: string, lower: string, from: number, end: number, base: URL, siteHostname: string): string | null {
+  let best: { rank: number; url: string } | null = null
+  let i = from
   while (i < end) {
     const at = lower.indexOf('<link', i)
     if (at < 0 || at >= end) break
@@ -75,7 +119,7 @@ export function siteIconFromHtml(html: string, pageUrl: string): string | null {
     } catch {
       continue
     }
-    const safe = safeSiteIcon(resolved, base.hostname)
+    const safe = safeSiteIcon(resolved, siteHostname)
     if (safe) best = { rank: r, url: safe }
     if (best?.rank === 3) break
   }

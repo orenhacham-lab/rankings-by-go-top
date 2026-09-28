@@ -12,6 +12,7 @@
  * No new API calls to AI services — only analyzes saved scan results.
  */
 
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ChevronDown, ChevronUp, Info, BarChart3 } from 'lucide-react'
 import { createI18n } from '@/lib/ai-visibility/i18n'
@@ -54,6 +55,7 @@ type CompetitorData = {
 
 type ProjectData = {
   name: string | null
+  domain?: string | null
   mentionsCount: number
   totalResults: number
   mentionRate: number
@@ -262,11 +264,14 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
       {/* Project mention card */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-indigo-900/20 dark:to-indigo-800/10 p-3">
         <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div className={isRTL ? 'text-right' : 'text-left'}>
+          <div className={`flex min-w-0 items-center gap-2.5 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+            <SiteAvatar domain={data.project.domain} name={businessDisplayName} size="md" />
+            <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{businessDisplayName}</p>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               {formatResultsText(data.project.mentionsCount, data.project.totalResults)}
             </p>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.project.mentionRate}%</p>
@@ -284,11 +289,14 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
           >
             {/* Row */}
             <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{competitor.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {formatResultsText(competitor.mentionsCount, competitor.totalResults)}
-                </p>
+              <div className={`flex min-w-0 flex-1 items-center gap-2.5 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                <SiteAvatar domain={competitor.domain} name={competitor.name} size="md" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{competitor.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {formatResultsText(competitor.mentionsCount, competitor.totalResults)}
+                  </p>
+                </div>
               </div>
               <div className="text-right">
                 <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{competitor.mentionRate}%</p>

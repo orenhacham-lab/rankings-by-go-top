@@ -10,7 +10,9 @@
  * found some, those are shown as found by the scan. With none at all, one
  * sentence and one link to where competitors are added.
  */
-import { Swords, Users } from 'lucide-react'
+import SiteAvatar from '@/components/ui/SiteAvatar'
+import { Users } from 'lucide-react'
+import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import type { CompetitorRow } from '@/lib/dashboard/competitors'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import Button from '@/components/ui/Button'
@@ -41,7 +43,7 @@ export default function CompetitorsWidget({ t, model, manageHref, mapping, mappi
 }) {
   const c = t.competitors
   return (
-    <Widget id="competitors" state={model.state} title={c.title} subtitle={c.subtitle} icon={<Swords size={16} strokeWidth={2} />}
+    <Widget id="competitors" state={model.state} title={c.title} subtitle={c.subtitle} icon={<CompetitorIcon size={16} strokeWidth={2} />}
       action={model.state === 'ready' || model.state === 'scan_only' ? <HeaderLink href={manageHref}>{c.manage}</HeaderLink> : undefined}>
       {model.state === 'loading' && <WidgetLoading lines={3} label={c.title} />}
       {model.state === 'error' && <WidgetError message={t.loadError} retryLabel={t.actions.retry} onRetry={model.retry} />}
@@ -75,7 +77,7 @@ export default function CompetitorsWidget({ t, model, manageHref, mapping, mappi
           <p className="text-caption text-muted">{c.fromScan}</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {model.domains.map((d) => (
-              <li key={d} dir="ltr" className="rounded-pill border border-line bg-sunk px-3 py-1 text-caption font-medium text-body">{d}</li>
+              <li key={d} dir="ltr" className="inline-flex items-center gap-1.5 rounded-pill border border-line bg-sunk py-1 ps-1.5 pe-3 text-caption font-medium text-body"><SiteAvatar domain={d} size="xs" />{d}</li>
             ))}
           </ul>
         </div>
@@ -90,9 +92,12 @@ export default function CompetitorsWidget({ t, model, manageHref, mapping, mappi
                 {/* Name, then the domain on a line of its own (P1-6): side by side in an RTL
                     row the two ran together ("Rival Plumberrival-plumber.co.il"). */}
                 <div className="flex items-start justify-between gap-3">
-                  <p className="flex min-w-0 flex-col">
-                    <span className="truncate text-copy font-medium text-ink">{r.name}</span>
-                    {r.name !== r.domain && <span dir="ltr" data-competitor-domain className="max-w-full self-start truncate text-caption text-muted">{r.domain}</span>}
+                  <p className="flex min-w-0 items-center gap-2.5">
+                    <SiteAvatar domain={r.domain} name={r.name} size="sm" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-copy font-medium text-ink">{r.name}</span>
+                      {r.name !== r.domain && <span dir="ltr" data-competitor-domain className="max-w-full self-start truncate text-caption text-muted">{r.domain}</span>}
+                    </span>
                   </p>
                   {compared && r.best != null && <span className="shrink-0 text-caption tabular-nums text-muted">#{r.best}</span>}
                 </div>

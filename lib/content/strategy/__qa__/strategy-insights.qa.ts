@@ -199,12 +199,13 @@ console.log('\nS) the screen')
   check('S5: the tab\'s parts use the design tokens only (no raw palette colour)', raw(files).length === 0, show(raw(files)))
   check('S5-MUT: a raw slate colour fails S5', raw([{ n: 'x', src: files[0].src.replace('text-muted', 'text-slate-500') }]).length === 1)
   const THIRD = /google\.com\/s2\/favicons|gstatic\.com\/favicon|icons\.duckduckgo|icon\.horse|clearbit|favicon\.io|faviconkit/
-  const kr = ['SiteMark', 'LandscapeRivals', 'LandscapeAudiences', 'ResearchLandscape', 'SectionNav'].map((n) => strip(read(`components/keyword-research/${n}.tsx`)))
+  const kr = ['LandscapeRivals', 'LandscapeAudiences', 'ResearchLandscape', 'SectionNav'].map((n) => strip(read(`components/keyword-research/${n}.tsx`)))
   const all = [...files.map((f) => f.src), ...kr]
-  check('S6: site icons come from the sites themselves (SiteIcon), never a third-party icon service',
-    !all.some((s) => THIRD.test(s)) && /<SiteIcon\b/.test(kr[0]) && /SiteMark/.test(files.find((f) => f.n === 'TopicFacts')!.src))
+  check('S6: site icons are the one SiteAvatar (SiteIcon: from the sites themselves), never a third-party icon service',
+    !all.some((s) => THIRD.test(s)) && /<SiteAvatar\b/.test(kr[0]) && /<SiteAvatar\b/.test(files.find((f) => f.n === 'TopicFacts')!.src)
+    && /<SiteIcon\b/.test(strip(read('components/ui/SiteAvatar.tsx'))))
   check('S6-MUT: an icon from a favicon service fails S6', THIRD.test('https://www.google.com/s2/favicons?domain=x.com'))
-  const nav = kr[4]
+  const nav = strip(read('components/keyword-research/SectionNav.tsx'))
   const calm = (s: string) => /prefers-reduced-motion: reduce/.test(s) && /\? 'auto' : 'smooth'/.test(s)
   check('S7: scrolling is smooth only without reduced motion (the section nav and the list\'s links)', calm(nav) && calm(list))
   check('S7-MUT: an always-smooth scroll fails S7', !calm(list.replace("? 'auto' : 'smooth'", "? 'smooth' : 'smooth'")))

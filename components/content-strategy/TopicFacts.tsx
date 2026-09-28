@@ -9,7 +9,7 @@
 import { Search, UserRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
-import SiteMark from '@/components/keyword-research/SiteMark'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
 import type { Locale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -50,7 +50,7 @@ export default function TopicFacts({ insight, lang, dict, tone = 'light', classN
       {insight.rivals.length > 0 && (
         <li className={cn('inline-flex items-center gap-1.5 rounded-pill py-0.5 pe-2 ps-1', chip)} aria-label={f.rivalsAria(insight.rivals.join(', '))}>
           <span className="flex -space-x-1 rtl:space-x-reverse" aria-hidden="true">
-            {insight.rivals.map((d) => <SiteMark key={d} domain={d} size="sm" className="size-4 ring-2 ring-surface" />)}
+            {insight.rivals.map((d) => <SiteAvatar key={d} domain={d} size="xs" tone={ink ? 'dark' : 'light'} className="size-4" />)}
           </span>
           <span aria-hidden="true">{f.rivals} <span dir="ltr">{insight.rivals[0]}</span>{insight.rivals.length > 1 ? ` +${insight.rivals.length - 1}` : ''}</span>
         </li>

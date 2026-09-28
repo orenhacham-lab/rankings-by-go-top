@@ -19,7 +19,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Link, Bot, AlertTriangle, Award, Layers, Cpu, TrendingDown, Sparkles } from 'lucide-react'
+import { BarChart3, AlertTriangle, Check, Globe, Layers, Cpu, Minus, TrendingDown, Sparkles, SearchX } from 'lucide-react'
+import NextLink from 'next/link'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
@@ -35,6 +36,8 @@ import AIBusinessProfilePanel from './AIBusinessProfilePanel'
 import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
+import { SCORED_ENGINES, engineScores, latestAnswers, visibilityScore } from '@/lib/ai-visibility/score'
+import { dropOffTopicSuggestions, type ProjectVocabulary } from '@/lib/ai-visibility/question-relevance'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
@@ -62,7 +65,8 @@ import { dedupClientSide, applyDiversityFilter, deriveSuggestionMeta } from '@/l
 
 const MAX_SUGGESTIONS = 40
 
-const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
+/** The engines the tool checks: the shared score's list (lib/ai-visibility/score.ts). */
+const SUPPORTED_ENGINES = SCORED_ENGINES
 
 type ResultRow = {
   id: string
@@ -169,6 +173,7 @@ export default function AIVisibilitySection({
   initialTab,
   overviewMode = false,
   onRunsLoaded,
+  onQuestionsCount,
   competitorsSlot,
   openQueriesWhenEmpty = false,
   suggestionsRefreshKey = 0,
@@ -193,6 +198,8 @@ export default function AIVisibilitySection({
   overviewMode?: boolean
   /** The runs this tool loaded (GET /api/ai-visibility/runs), or null when they could not be read. */
   onRunsLoaded?: (runs: unknown[] | null) => void
+  /** How many questions the project tracks, once loaded (the page's next-step copy). */
+  onQuestionsCount?: (count: number) => void
   /** Shown in the competitors tab in place of the editor (competitors are managed in settings). */
   competitorsSlot?: React.ReactNode
   /** On the first load, open the questions tab when there is no check yet. */
@@ -217,12 +224,17 @@ export default function AIVisibilitySection({
   }, [requestedTab])
   const [allResults, setAllResults] = useState<ResultRow[]>([])
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
+  const onQuestionsCountRef = useRef(onQuestionsCount)
+  onQuestionsCountRef.current = onQuestionsCount
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [geoOpportunityMapping, setGeoOpportunityMapping] = useState<GeoOpportunityMapping | null>(null)
   const [geoCompetitorIntelligence, setGeoCompetitorIntelligence] = useState<GeoCompetitorIntelligence | null>(null)
   const [businessMentionIntelligence, setBusinessMentionIntelligence] = useState<BusinessMentionIntelligence | null>(null)
   const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    if (!loading) onQuestionsCountRef.current?.(allPrompts.length)
+  }, [loading, allPrompts.length])
   const [showAllResults, setShowAllResults] = useState(false)
   const [seenPrompts, setSeenPrompts] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -244,8 +256,12 @@ export default function AIVisibilitySection({
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   // Always strip the insufficient-context marker before it can enter state, so
   // it never lingers as a "+" card after the user generates new questions.
+  // The project's own words, for dropping suggestions about another trade
+  // (lib/ai-visibility/question-relevance.ts): read through a ref so every
+  // commit uses the latest ones.
+  const vocabularyRef = useRef<ProjectVocabulary>({})
   const commitSuggestedQuestions = useCallback((list: PromptSuggestion[]) => {
-    setSuggestedQuestions(list.filter((s) => !isInsufficientContextSuggestion(s)))
+    setSuggestedQuestions(dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current))
   }, [])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
   // Tracks normalized prompt text of every suggestion shown across all batches
@@ -284,6 +300,12 @@ export default function AIVisibilitySection({
   useEffect(() => { void loadAllowance() }, [loadAllowance])
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
+  vocabularyRef.current = {
+    keywords: projectKeywords ?? [],
+    offerings: manualProfile?.mode === 'manual' ? [manualProfile.primaryCategory, ...manualProfile.secondaryCategories] : [],
+    businessName: projectBrandName,
+    domain: projectDomain,
+  }
   const [showAllPrompts, setShowAllPrompts] = useState(false)
   const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -426,59 +448,27 @@ export default function AIVisibilitySection({
       setAllResults(resultsWithText)
       setAllPrompts(promptsArr)
 
-      // Score calculation must exclude archived results, regardless of display filter
-      const scoreResults = resultsWithText.filter((r) => r.excludedFromScore !== true)
-
-      const engines = new Set<string>()
+      // The shared score (lib/ai-visibility/score.ts): the latest answer per
+      // question x engine, archived answers and unchecked engines left out. The
+      // same number the overview, the dashboard and the competitor comparison show.
+      const scored = resultsWithText.map((r) => ({
+        id: r.id, promptId: r.promptId || null, engine: r.engine, at: r.scannedAt || null, status: r.status,
+        excluded: r.excludedFromScore === true, mentioned: r.displayMentioned === true, cited: r.displayCited === true,
+      }))
+      const total = visibilityScore(scored)
       const engineMap = new Map<string, EngineMetrics>()
-      let totalMentions = 0
-      let totalCitations = 0
-
-      SUPPORTED_ENGINES.forEach((engine) => {
-        engineMap.set(engine, { engine, scans: 0, mentions: 0, citations: 0, rate: 0 })
-      })
-
-      scoreResults.forEach((r) => {
-        if (r.status === 'success' && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) {
-          engines.add(r.engine)
-          // Summary counts must match the badges shown in the list — use the
-          // server-computed display values, not raw DB flags.
-          if (r.displayMentioned) totalMentions++
-          if (r.displayCited) totalCitations++
-
-          const existing = engineMap.get(r.engine) || {
-            engine: r.engine,
-            scans: 0,
-            mentions: 0,
-            citations: 0,
-            rate: 0,
-          }
-          existing.scans++
-          if (r.displayMentioned) existing.mentions++
-          existing.citations += r.citationCount
-          existing.rate = existing.scans > 0 ? Math.round((existing.mentions / existing.scans) * 100) : 0
-          engineMap.set(r.engine, existing)
-        }
-      })
-
-      const successfulScans = scoreResults.filter((r) => r.status === 'success').length
-
-      // Count engines that have at least one mention
-      let enginesWithMentions = 0
-      for (const [, metrics] of engineMap) {
-        if (metrics.mentions > 0) {
-          enginesWithMentions++
-        }
+      for (const [engine, m] of engineScores(scored)) {
+        engineMap.set(engine, { engine, scans: m.answers, mentions: m.mentions, citations: m.citations, rate: m.rate })
       }
 
       setGlobalMetrics({
-        totalScans: successfulScans,
-        totalMentions,
-        totalCitations,
-        mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
-        citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
+        totalScans: total.answers,
+        totalMentions: total.mentions,
+        totalCitations: total.citations,
+        mentionRate: total.score ?? 0,
+        citationRate: total.answers > 0 ? Math.round((total.citations / total.answers) * 100) : 0,
         enginesCovered: SUPPORTED_ENGINES.length,
-        enginesWithMentions,
+        enginesWithMentions: [...engineMap.values()].filter((m) => m.mentions > 0).length,
       })
 
       setEngineMetrics(engineMap)
@@ -827,6 +817,18 @@ export default function AIVisibilitySection({
       cancelled = true
     }
   }, [projectId, allResults.length, competitorsRefreshKey])
+
+  // What each question's latest answer on each engine said: true = the
+  // business was mentioned, false = checked and not mentioned; absent = never
+  // checked. The chip's mark says this, not merely "checked".
+  const mentionedByPair = useMemo(() => {
+    const m = new Map<string, boolean>()
+    const latest = latestAnswers(allResults.filter((r) => !!r.promptId).map((r) => ({
+      ...r, at: r.scannedAt, excluded: false, mentioned: r.displayMentioned === true, cited: r.displayCited === true,
+    })))
+    for (const a of latest) m.set(`${a.promptId}:${a.engine}`, a.mentioned)
+    return m
+  }, [allResults])
 
   const scannedSet = useMemo(() => {
     const s = new Set<string>()
@@ -2009,6 +2011,7 @@ export default function AIVisibilitySection({
             </div>
           </div>
 
+          <p data-ai-questions-explainer="" className="-mt-2 mb-4 max-w-[80ch] text-caption text-muted">{t('queries_explainer')}</p>
           {allPrompts.length > 0 ? (
             <>
               {/* THE CONTROL EXISTS — say so. The engine chips below dispatch a
@@ -2022,11 +2025,21 @@ export default function AIVisibilitySection({
                   {allowance == null ? null
                     : allowance.state === 'unmetered' ? t('ai_allowance_unmetered')
                     : allowance.state === 'unknown' ? t('ai_allowance_unknown')
+                    : allowance.limit === 0 ? `${t('ai_allowance')}: ${t('ai_allowance_not_included')}`
                     : `${t('ai_allowance')}: ${allowance.used}/${allowance.limit}`}
                 </span>
               </div>
+              <p className="mb-2 text-xs text-muted" data-ai-chip-legend="">{t('chip_legend')}</p>
+              {/* Nothing left to check with: say which case it is (a plan without
+                  AI checks is not "used them all") and where to get more. The
+                  link only opens the billing page; nothing here changes a plan. */}
               {allowance != null && allowance.state === 'known' && allowance.remaining === 0 && (
-                <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{t('ai_allowance_exhausted')}</p>
+                <p className="mb-2 text-xs text-warn" data-ai-allowance-out="">
+                  {allowance.limit === 0 ? t('ai_allowance_none_body') : t('ai_allowance_exhausted')}{' '}
+                  <NextLink href="/billing" className="font-semibold text-action underline underline-offset-2 hover:text-action-hover">
+                    {t('ai_allowance_upgrade')}
+                  </NextLink>
+                </p>
               )}
               <div className="space-y-2">
                 {allPrompts.slice(0, showAllPrompts ? undefined : 3).map((p) => (
@@ -2051,6 +2064,7 @@ export default function AIVisibilitySection({
                         const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
                         const key = `${p.id}:${engine}`
                         const scanned = scannedSet.has(key)
+                        const mentionedHere = mentionedByPair.get(key)
                         const scanning = scanningKey === key
                         const scannedAt = scannedDateMap.get(key)
                         const formatDate = (dateStr: string) => {
@@ -2067,15 +2081,18 @@ export default function AIVisibilitySection({
                         const tooltip = scanning
                           ? t('scanning')
                           : scanned
-                          ? t('rescan')
+                          ? `${mentionedHere === true ? t('chip_mentioned') : t('chip_not_mentioned')} · ${t('rescan')}`
                           : t('scan_this_engine')
                         // The ACCESSIBLE NAME says what the click does and to
                         // which engine. "ChatGPT ✓" named a status; "Run an AI
                         // check on ChatGPT" names an action, which is what a
                         // reviewer — and a screen reader — is looking for.
+                        // …and then what the last check found there.
+                        const outcomeLabel = mentionedHere === true ? t('chip_mentioned')
+                          : mentionedHere === false ? t('chip_not_mentioned') : t('chip_not_checked')
                         const actionLabel = scanning
                           ? t('scanning')
-                          : `${scanned ? t('rerun_check_on') : t('run_check_on')}${meta?.name || engine}`
+                          : `${scanned ? t('rerun_check_on') : t('run_check_on')}${meta?.name || engine} (${outcomeLabel})`
                         return (
                           <div
                             key={engine}
@@ -2090,10 +2107,13 @@ export default function AIVisibilitySection({
                                 className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
                                   scanning
                                     ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-body cursor-wait'
-                                    : scanned
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 cursor-pointer'
-                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
+                                    : mentionedHere === true
+                                    ? 'bg-ok-soft border-ok/40 text-ink hover:border-ok cursor-pointer'
+                                    : mentionedHere === false
+                                    ? 'bg-sunk border-line text-body hover:border-line-strong cursor-pointer'
+                                    : 'bg-surface border-line text-body hover:border-action hover:bg-action-soft cursor-pointer'
                                 }`}
+                                data-chip-outcome={mentionedHere === true ? 'mentioned' : mentionedHere === false ? 'not_mentioned' : 'not_checked'}
                               >
                                 {scanning && (
                                   <div
@@ -2105,7 +2125,8 @@ export default function AIVisibilitySection({
                                   {meta && <meta.Icon size={14} className={meta.accent} />}
                                 </span>
                                 <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
-                                {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
+                                {!scanning && mentionedHere === true && <Check aria-hidden size={13} strokeWidth={3} className="relative z-10 text-ok" />}
+                                {!scanning && mentionedHere === false && <Minus aria-hidden size={13} strokeWidth={3} className="relative z-10 text-muted" />}
                               </button>
                               {/* Custom CSS tooltip — appears instantly on hover/focus, not delayed like native title */}
                               <span
@@ -2140,8 +2161,13 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_queries')}</p>
+            <div data-ai-questions-empty="" className="rounded-card border border-dashed border-line bg-sunk px-5 py-8 text-center sm:px-8">
+              <p className="text-section font-semibold text-ink">{t('no_queries_title')}</p>
+              <p className="mx-auto mt-1 max-w-[60ch] text-copy text-body">{t('no_queries_body')}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <Button size="sm" onClick={() => setShowSuggestions(true)}>{t('no_queries_pick')}</Button>
+                <Button size="sm" variant="outline" onClick={() => setShowNewPrompt(true)}>{t('no_queries_write')}</Button>
+              </div>
             </div>
           )}
 
@@ -2751,29 +2777,37 @@ function PromptInsightRow({
 function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics>; t: T }) {
   const engineList = SUPPORTED_ENGINES.map(
     (engine) => metrics.get(engine) || { engine, scans: 0, mentions: 0, citations: 0, rate: 0 }
-  ).sort((a, b) => b.mentions - a.mentions)
+  ).sort((a, b) => b.mentions - a.mentions || b.scans - a.scans)
 
   return (
     <div>
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-4">
+      <h3 className="text-sm font-bold text-ink mb-4">
         {t('mentions_by_engine')}
       </h3>
       <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
         {engineList.map((em) => {
           const meta = ENGINE_META[em.engine as keyof typeof ENGINE_META]
-          const percent = em.scans > 0 ? Math.round((em.mentions / em.scans) * 100) : 0
+          // An engine nobody checked has no number: "not checked yet", never a green 0.
+          const checked = em.scans > 0
           return (
             <div
               key={em.engine}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 sm:p-4 hover:shadow-md transition flex flex-col items-center text-center"
+              data-engine-card={checked ? 'checked' : 'not_checked'}
+              className="rounded-lg border border-line bg-surface p-2.5 sm:p-4 flex flex-col items-center text-center"
             >
-              {meta && <meta.Icon size={32} className={`${meta.accent} mb-2 sm:mb-1`} />}
-              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-1 sm:mt-2 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
-              <div className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 sm:mt-2">{em.mentions}</div>
-              <div className="hidden sm:block text-xs text-slate-600 dark:text-slate-300 mt-2">
-                {t('out_of_results').replace('{count}', String(em.scans))}
-              </div>
-              {em.scans > 0 && <div className="text-[10px] sm:text-xs text-muted mt-0.5 sm:mt-1">({percent}%)</div>}
+              {meta && <meta.Icon size={32} className={`${meta.accent} mb-2 sm:mb-1 ${checked ? '' : 'opacity-50'}`} />}
+              <div className="font-semibold text-ink mt-1 sm:mt-2 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
+              {checked ? (
+                <>
+                  <div className={`text-xl sm:text-3xl font-bold mt-1 sm:mt-2 ${em.mentions > 0 ? 'text-ok' : 'text-ink'}`}>{em.mentions}</div>
+                  <div className="hidden sm:block text-xs text-body mt-2">
+                    {t('out_of_results').replace('{count}', String(em.scans))}
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-muted mt-0.5 sm:mt-1">({em.rate}%)</div>
+                </>
+              ) : (
+                <div className="text-xs text-muted mt-2 sm:mt-3">{t('chip_not_checked')}</div>
+              )}
             </div>
           )
         })}
@@ -3907,7 +3941,7 @@ function GeoOpportunityMappingSection({
     cards.push({
       title: isHebrew ? 'מה חסר כשהעסק לא מופיע' : 'What is missing when the business does not appear',
       tone: 'amber',
-      icon: <Award className="w-5 h-5" />,
+      icon: <SearchX className="w-5 h-5" />,
       sentences: missingGapsCard,
     })
   }
@@ -4414,7 +4448,7 @@ function GeoCompetitorIntelligenceSection({
         <IntelligenceCard
           title={t('geo_comp_card_sources')}
           tone="violet"
-          icon={<Award className="w-5 h-5" />}
+          icon={<Globe className="w-5 h-5" />}
           lines={trustedSourcesCard.lines}
           pills={trustedSourcesCard.pills}
           pillsLabel={t('geo_comp_pills_label')}
