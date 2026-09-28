@@ -208,9 +208,9 @@ export default function TopicsList({
   return (
     <div className="overflow-x-auto">
       {genError && (
-        <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+        <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-inset border border-bad/30 bg-bad-soft px-4 py-3 text-copy text-bad motion-safe:animate-pop-in">
           <span>{genError.text}</span>
-          <button type="button" onClick={() => setGenError(null)} className="shrink-0 text-red-500 hover:text-red-700" aria-label={getDashboardDictionary(language).common.close}>✕</button>
+          <button type="button" onClick={() => setGenError(null)} className="shrink-0 text-bad hover:text-bad" aria-label={getDashboardDictionary(language).common.close}>✕</button>
         </div>
       )}
       <Table>
@@ -240,7 +240,7 @@ export default function TopicsList({
               const selectable = !hasArticle
               const highlighted = highlightIds.includes(topic.id)
               return (
-                <TableRow key={topic.id} className={highlighted ? 'bg-emerald-50 dark:bg-emerald-900/20 transition-colors duration-1000' : undefined}>
+                <TableRow key={topic.id} className={highlighted ? 'bg-ok-soft transition-colors duration-1000' : undefined}>
                   {/* Batch selection — only for topics without an article. */}
                   <Td>
                     {selectable && (
@@ -254,15 +254,15 @@ export default function TopicsList({
                       />
                     )}
                   </Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{projectName}</span></Td>
+                  <Td><span className="text-copy text-body">{projectName}</span></Td>
                   {/* De-emphasize topics that already produced an article. */}
-                  <Td><span className={hasArticle ? 'text-slate-500 dark:text-slate-400' : 'font-medium'}>{topic.topic}</span></Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.primary_keyword || '—'}</span></Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.search_intent || '—'}</span></Td>
+                  <Td><span className={hasArticle ? 'text-muted' : 'font-medium'}>{topic.topic}</span></Td>
+                  <Td><span className="text-copy text-body">{topic.primary_keyword || '—'}</span></Td>
+                  <Td><span className="text-copy text-body">{topic.search_intent ? ((c.brief.intents as Record<string, string>)[topic.search_intent] ?? topic.search_intent).split(' — ')[0] : '—'}</span></Td>
                   <Td>
                     {bs && bs.status !== 'success' ? (
                       bs.status === 'generating' ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1.5 text-caption text-muted">
                           <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           {c.batch.generating}
                         </span>
@@ -272,17 +272,17 @@ export default function TopicsList({
                         <span className="inline-flex flex-col gap-0.5">
                           <span className="inline-flex items-center gap-2">
                             <Badge variant="danger">{c.batch.failed}</Badge>
-                            <button type="button" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50">{c.batch.retry}</button>
+                            <button type="button" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-caption text-action hover:underline disabled:opacity-50">{c.batch.retry}</button>
                           </span>
-                          {bs.error && <span className="text-[11px] text-red-600 dark:text-red-400 max-w-[16rem] truncate" title={bs.error}>{bs.error}</span>}
+                          {bs.error && <span className="text-caption text-bad max-w-[16rem] truncate" title={bs.error}>{bs.error}</span>}
                         </span>
                       )
                     ) : (
                       <Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge>
                     )}
                   </Td>
-                  <Td><span className="text-sm tabular-nums">{anchorCount}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
+                  <Td><span className="text-copy tabular-nums">{anchorCount}</span></Td>
+                  <Td><span className="text-caption text-muted">{formatDate(topic.created_at)}</span></Td>
                   <Td>
                     <div className="flex items-center gap-1 justify-end">
                       {/* Internal-link planning entry point (flag-gated). Opens the
@@ -293,7 +293,7 @@ export default function TopicsList({
                       {/* Visible feedback while (re)generating — the primary button
                           may be "Edit article" during a regenerate. */}
                       {creatingId === topic.id && (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1.5 text-caption text-muted">
                           <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           {c.creatingArticleWithImage}
                         </span>
@@ -301,14 +301,14 @@ export default function TopicsList({
                       {/* Primary action: create OR edit the article. */}
                       {articleByTopic[topic.id] ? (
                         <Link href={`/content/articles/${articleByTopic[topic.id].id}`}>
-                          <Button size="sm" variant="outline" className="h-7 whitespace-nowrap shadow-sm hover:translate-y-0">{c.openArticle}</Button>
+                          <Button size="sm" variant="outline" className="h-7 whitespace-nowrap shadow-control">{c.openArticle}</Button>
                         </Link>
                       ) : (
                         // Flatten the primary button's lift/shadow so it aligns with the
                         // outline link-planning + open buttons as equal row actions.
                         <Button
                           size="sm"
-                          className="h-7 whitespace-nowrap shadow-sm hover:translate-y-0 hover:shadow-md"
+                          className="h-7 whitespace-nowrap shadow-control hover:shadow-card"
                           onClick={() => createArticle(topic.id)}
                           loading={creatingId === topic.id}
                           disabled={busy || creatingId === topic.id || batchRunning}
@@ -342,7 +342,7 @@ export default function TopicsList({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+            className="inline-flex h-8 items-center justify-center gap-1 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
           >
             {expanded ? c.showLess : `${c.showMore} (${topics.length - 3})`}
           </button>
@@ -353,26 +353,26 @@ export default function TopicsList({
         const topic = topics.find((t) => t.id === menu.topicId)
         if (!topic) return null
         const hasArticle = !!articleByTopic[topic.id]
-        const item = 'block w-full text-start px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800'
+        const item = 'block w-full text-start px-3 py-2 text-copy hover:bg-sunk'
         return createPortal(
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} />
             <div
               dir={isHebrew ? 'rtl' : 'ltr'}
               style={{ position: 'fixed', top: menu.top, left: menu.left, minWidth: MENU_WIDTH }}
-              className="z-50 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1"
+              className="z-50 overflow-hidden rounded-inset border border-line bg-surface py-1 shadow-pop motion-safe:animate-pop-in"
             >
-              <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); onEdit(topic) }}>{c.topicActions.edit}</button>
+              <button type="button" className={`${item} text-body`} onClick={() => { setMenu(null); onEdit(topic) }}>{c.topicActions.edit}</button>
               {topic.status !== 'approved' && (
-                <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); setStatus(topic.id, 'approved') }}>{c.topicActions.approve}</button>
+                <button type="button" className={`${item} text-body`} onClick={() => { setMenu(null); setStatus(topic.id, 'approved') }}>{c.topicActions.approve}</button>
               )}
               {topic.status !== 'rejected' && (
-                <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); setStatus(topic.id, 'rejected') }}>{c.topicActions.reject}</button>
+                <button type="button" className={`${item} text-body`} onClick={() => { setMenu(null); setStatus(topic.id, 'rejected') }}>{c.topicActions.reject}</button>
               )}
               {hasArticle && (
-                <button type="button" className={`${item} text-indigo-600 dark:text-indigo-400`} onClick={() => { setMenu(null); regenerateArticle(topic.id) }}>{c.topicActions.regenerate}</button>
+                <button type="button" className={`${item} text-action`} onClick={() => { setMenu(null); regenerateArticle(topic.id) }}>{c.topicActions.regenerate}</button>
               )}
-              <button type="button" className={`${item} text-red-600 dark:text-red-400`} onClick={() => { setMenu(null); remove(topic.id) }}>{c.topicActions.delete}</button>
+              <button type="button" className={`${item} text-bad`} onClick={() => { setMenu(null); remove(topic.id) }}>{c.topicActions.delete}</button>
             </div>
           </>,
           document.body,

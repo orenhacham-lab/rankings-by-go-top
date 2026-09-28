@@ -35,9 +35,9 @@ type Dict = {
 }
 
 const listCls =
-  'max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1'
+  'max-h-40 overflow-y-auto rounded-control border border-line bg-surface p-2 space-y-1'
 const selectCls =
-  'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'w-full px-3 py-2 text-copy rounded-control border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-info'
 
 export default function WordPressPublishSettings({
   projectId,
@@ -142,26 +142,26 @@ export default function WordPressPublishSettings({
   const seoStatusWarn = lastExport?.seoStatus === 'written_not_verifiable'
 
   return (
-    <Card className="hover:translate-y-0" >
+    <Card  >
       <div className="flex items-center justify-between gap-2 mb-1">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={seoPlugin === 'yoast' || seoPlugin === 'rankmath' ? 'success' : 'neutral'}>
           {t.seoPluginLabel}: {seoPluginLabel(seoPlugin)}
         </Badge>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.hint}</p>
+      <p className="text-caption text-muted mb-3">{t.hint}</p>
 
       {loading ? (
-        <p className="text-xs text-slate-400 dark:text-slate-500">{t.loading}</p>
+        <p className="text-caption text-muted">{t.loading}</p>
       ) : error === 'permission' ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">{t.permissionError}</p>
+        <p className="text-caption text-warn">{t.permissionError}</p>
       ) : error === 'connection' ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">{t.connectionError}</p>
+        <p className="text-caption text-warn">{t.connectionError}</p>
       ) : (
         <div className="space-y-3" dir={dir}>
           {/* Primary category */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.primaryCategory}</label>
+            <label className="text-caption font-medium text-body">{t.primaryCategory}</label>
             <select className={selectCls} value={primary ?? ''} onChange={(e) => setPrimary(e.target.value ? Number(e.target.value) : null)}>
               <option value="">{t.primaryNone}</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -170,13 +170,13 @@ export default function WordPressPublishSettings({
 
           {/* Additional categories */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.additionalCategories}</label>
+            <label className="text-caption font-medium text-body">{t.additionalCategories}</label>
             {categories.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t.empty}</p>
+              <p className="text-caption text-muted">{t.empty}</p>
             ) : (
               <div className={listCls}>
                 {categories.filter((c) => c.id !== primary).map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
+                  <label key={c.id} className="flex items-center gap-2 text-copy text-body cursor-pointer">
                     <input type="checkbox" checked={catIds.includes(c.id)} onChange={() => setCatIds((p) => toggle(p, c.id))} />
                     <span>{c.name}</span>
                   </label>
@@ -187,13 +187,13 @@ export default function WordPressPublishSettings({
 
           {/* Tags */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.tags}</label>
+            <label className="text-caption font-medium text-body">{t.tags}</label>
             {tags.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t.empty}</p>
+              <p className="text-caption text-muted">{t.empty}</p>
             ) : (
               <div className={listCls}>
                 {tags.map((tg) => (
-                  <label key={tg.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
+                  <label key={tg.id} className="flex items-center gap-2 text-copy text-body cursor-pointer">
                     <input type="checkbox" checked={tagIds.includes(tg.id)} onChange={() => setTagIds((p) => toggle(p, tg.id))} />
                     <span>{tg.name}</span>
                   </label>
@@ -206,15 +206,15 @@ export default function WordPressPublishSettings({
 
           {/* Last export status (taxonomy + SEO meta) — never a silent success. */}
           {lastExport && (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
-              <div className="text-xs text-slate-500 dark:text-slate-400">{t.lastExportLabel}</div>
+            <div className="pt-2 border-t border-line space-y-1">
+              <div className="text-caption text-muted">{t.lastExportLabel}</div>
               {lastExport.seoStatus && (
-                <p className={`text-xs ${seoStatusOk ? 'text-green-700 dark:text-green-400' : seoStatusWarn ? 'text-amber-700 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                <p className={`text-caption ${seoStatusOk ? 'text-ok' : seoStatusWarn ? 'text-warn' : 'text-bad'}`}>
                   {seoPluginLabel(lastExport.seoPlugin || seoPlugin)} · {seoStatusLabel(lastExport.seoStatus)}
                 </p>
               )}
               {lastExport.taxonomyWarning && (
-                <p className="text-xs text-amber-700 dark:text-amber-400">{t.taxonomyWarning}</p>
+                <p className="text-caption text-warn">{t.taxonomyWarning}</p>
               )}
             </div>
           )}

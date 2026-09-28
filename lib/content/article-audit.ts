@@ -164,7 +164,92 @@ export function includesKw(haystack: string, kw: string): boolean {
   if (h.includes(k)) return true
   // token-level fallback for inflected languages: all keyword tokens present.
   const toks = k.split(/\s+/).filter((t) => t.length > 2)
-  return toks.length > 0 && toks.every((t) => h.includes(t))
+  if (toks.length === 0) return false
+  if (toks.every((t) => h.includes(t))) return true
+  // Hebrew glues ו/ה/ב/ל/מ/ש/כ onto the next word and bends a noun before
+  // another ("פתיחה" → "פתיחת"). Exact substrings miss the keyword whenever the
+  // KEYWORD carries the prefix ("בכיור" vs "הכיור") or the other form, so
+  // compare whole words through their prefix-less cores.
+  if (!HEBREW_LETTER.test(k)) return false
+  const hayWords = h.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  return toks.every((t) => {
+    const tw = t.replace(/[^\p{L}\p{N}]+/gu, '')
+    if (!tw) return true
+    if (!HEBREW_LETTER.test(tw)) return h.includes(t)
+    return hayWords.some((w) => hebrewWordMatches(w, tw))
+  })
+}
+
+const HEBREW_LETTER = /[\u05d0-\u05ea]/
+const HE_PREFIX_LETTERS = new Set(['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'])
+
+/** A word and its forms with up to three leading prefix letters removed, never below three letters. */
+function hebrewCores(word: string): { core: string; stripped: number }[] {
+  const out = [{ core: word, stripped: 0 }]
+  let t = word
+  for (let i = 1; i <= 3 && t.length > 3 && HE_PREFIX_LETTERS.has(t[0]); i++) {
+    t = t.slice(1)
+    out.push({ core: t, stripped: i })
+  }
+  return out
+}
+/** The construct state ends in ת where the free noun ends in ה ("תחזוקת" / "תחזוקה"). */
+const freeForm = (w: string) => (w.length >= 4 && w.endsWith('ת') ? `${w.slice(0, -1)}ה` : w)
+
+/**
+ * Whether one Hebrew word is the keyword word under a prefix or construct form:
+ * "בכיור" ~ "הכיור" ~ "כיור", "פתיחת" ~ "פתיחה". When BOTH sides lose letters the
+ * shared core must keep four, so "שלום" and "בלום" (core "לום") stay different.
+ */
+export function hebrewWordMatches(word: string, kwWord: string): boolean {
+  if (word === kwWord) return true
+  for (const a of hebrewCores(word)) {
+    for (const b of hebrewCores(kwWord)) {
+      const x = freeForm(a.core)
+      if (x !== freeForm(b.core)) continue
+      if (x.length >= (a.stripped && b.stripped ? 4 : 3)) return true
+    }
+  }
+  return false
+}
+
+const FAQ_HEADING = /(שאלות\s+נפוצות|שאלות\s+ותשובות|frequently\s+asked|\bfaq\b|\bq\s*&\s*a\b)/i
+
+/**
+ * FAQ written into the article body ("<h2>שאלות נפוצות</h2><h3>…?</h3><p>…</p>")
+ * rather than into the separate FAQ list. Each sub-heading under the FAQ heading
+ * is a question; without sub-headings, each paragraph ending in "?" is one. The
+ * answer is the text up to the next question.
+ */
+export function faqFromHtml(html: string): { question: string; answer: string }[] {
+  const src = html || ''
+  const headRe = /<h([2-4])[^>]*>([\s\S]*?)<\/h\1>/gi
+  let m: RegExpExecArray | null
+  while ((m = headRe.exec(src)) !== null) {
+    if (!FAQ_HEADING.test(textOf(m[2]))) continue
+    const level = Number(m[1])
+    const rest = src.slice(m.index + m[0].length)
+    const end = rest.search(new RegExp(`<h[1-${level}][\\s>]`, 'i'))
+    const section = end < 0 ? rest : rest.slice(0, end)
+    const out: { question: string; answer: string }[] = []
+    const subRe = new RegExp(`<h([${level + 1}-6])[^>]*>([\\s\\S]*?)<\\/h\\1>`, 'gi')
+    const subs = [...section.matchAll(subRe)]
+    if (subs.length > 0) {
+      subs.forEach((s, i) => {
+        const from = (s.index ?? 0) + s[0].length
+        const to = i + 1 < subs.length ? (subs[i + 1].index ?? section.length) : section.length
+        const question = textOf(s[2])
+        if (question) out.push({ question, answer: textOf(section.slice(from, to)) })
+      })
+      return out
+    }
+    const paras = paragraphs(section)
+    paras.forEach((p, i) => {
+      if (/[?؟]\s*$/.test(p)) out.push({ question: p, answer: paras[i + 1] && !/[?؟]\s*$/.test(paras[i + 1]) ? paras[i + 1] : '' })
+    })
+    return out
+  }
+  return []
 }
 
 // -- table helpers ----------------------------------------------------------
@@ -230,7 +315,10 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const h3 = countTag(html, 'h3')
   const pCount = paras.length
   const wordCount = allWords.length
-  const faqCount = input.faq.length
+  // The FAQ list wins; an article whose FAQ lives only in the body (published
+  // articles, pasted content) is still credited for it instead of reading 0.
+  const faqItems = input.faq.length > 0 ? input.faq : faqFromHtml(html)
+  const faqCount = faqItems.length
 
   // Readability metrics.
   const transitions = lang === 'he' ? TRANSITIONS_HE : TRANSITIONS_EN
@@ -352,9 +440,9 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   add('faq_present', 'geo', 'info', faqCount > 0)
   // FAQ answers should carry real value (not thin). faq_json stays ready for a
   // future FAQ schema at PUBLISH time — no JSON-LD/Yoast/Rank-Math block here.
-  add('faq_answers_have_value', 'geo', 'warning', faqCount === 0 || input.faq.every((f) => words(f.answer).length >= 12))
+  add('faq_answers_have_value', 'geo', 'warning', faqCount === 0 || faqItems.every((f) => words(f.answer).length >= 12))
   // Questions shouldn't be generic filler ("what is X?").
-  add('faq_not_generic', 'geo', 'info', faqCount === 0 || input.faq.every((f) => words(f.question).length >= 3))
+  add('faq_not_generic', 'geo', 'info', faqCount === 0 || faqItems.every((f) => words(f.question).length >= 3))
   // Important questions should also appear in the body as H2/H3, not only in FAQ.
   const bodyHeadings = [...headingTexts(html, 'h2'), ...headingTexts(html, 'h3')]
   add('questions_in_body', 'geo', 'info', bodyHeadings.some((h) => looksLikeQuestion(h, lang)))

@@ -47,7 +47,7 @@ export default function ArticleSchemaPanel({ t, failText, input, isWebhook, onNo
     <section className="space-y-2" aria-label={label}>
       <h4 className="text-copy font-semibold text-ink">{label}</h4>
       {value ? (
-        <pre dir="ltr" data-testid="schema-json" className="max-h-96 overflow-auto rounded-control bg-contrast p-3 text-left font-mono text-[12px] leading-relaxed text-contrast-ink">
+        <pre dir="ltr" data-testid="schema-json" className="max-h-96 overflow-auto rounded-control bg-contrast p-3 text-left font-mono text-caption leading-relaxed text-contrast-ink">
           {serializeJsonLd(value, true)}
         </pre>
       ) : (
@@ -57,7 +57,7 @@ export default function ArticleSchemaPanel({ t, failText, input, isWebhook, onNo
   )
 
   return (
-    <Card className="hover:translate-y-0">
+    <Card>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 max-w-3xl">
           <h3 className="text-section font-semibold text-ink">{t.title}</h3>

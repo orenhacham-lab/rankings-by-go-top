@@ -30,6 +30,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableHead, TableRow, Td, Th, EmptyRow } from '@/components/ui/Table'
 import { cn } from '@/lib/utils'
 import { formatDate, EMPTY_DATE } from '@/lib/format/date'
@@ -148,10 +149,10 @@ export default function ExistingContentScreen() {
   if (!payload) {
     return (
       <div role="status" aria-label={x.loading} className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3" aria-hidden>
-          {[0, 1, 2].map((i) => <div key={i} className="h-28 animate-pulse rounded-card border border-line bg-sunk/60" />)}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3" aria-hidden>
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 rounded-card" />)}
         </div>
-        <div className="h-64 animate-pulse rounded-card border border-line bg-sunk/60" aria-hidden />
+        <Skeleton className="h-64 rounded-card" />
       </div>
     )
   }
@@ -223,7 +224,7 @@ export default function ExistingContentScreen() {
         </Card>
       )}
 
-      <div role="group" aria-label={x.tilesLabel} className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div role="group" aria-label={x.tilesLabel} className="list-enter grid grid-cols-3 gap-2 sm:gap-3">
         {FILTERS.map((f) => {
           const active = filter === f
           return (

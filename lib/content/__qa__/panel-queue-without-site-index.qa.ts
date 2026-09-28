@@ -569,7 +569,7 @@ async function main() {
     check('7b: English label', /queueWithoutLinks: 'Add to queue without internal links'/.test(en))
     check('7c: Hebrew label', /queueWithoutLinks: 'הוסף לתור ללא קישורים פנימיים'/.test(he))
     check('7d: the notice is rendered as information, not as the red error',
-      /\{cacheNote && <p className="mt-2 text-xs text-amber-700/.test(panel))
+      /\{cacheNote && <p className="mt-2 text-caption text-warn/.test(panel) && !/\{cacheNote && <p className="[^"]*text-bad/.test(panel))
     check('7e: it no longer tells the user to refresh and try again',
       !/Site index missing — refresh the index and try again/.test(en)
       && !/אינדקס האתר חסר — רעננו את האינדקס ונסו שוב/.test(he))

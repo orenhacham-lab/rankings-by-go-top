@@ -7,7 +7,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 export default function ContentNotAvailable() {
   const { language } = useDashboardLanguage()
   return (
-    <div className="py-20 text-center text-slate-400 dark:text-slate-500 text-sm">
+    <div className="py-20 text-center text-muted text-copy">
       {getDashboardDictionary(language).common.notAvailable}
     </div>
   )

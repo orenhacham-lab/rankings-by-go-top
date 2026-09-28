@@ -87,13 +87,17 @@ export default function ProjectsPage() {
     <div>
       <Header
         title={dict.projects.title}
-        subtitle={`${dict.projects.countPrefix} ${projects.length} ${dict.projects.countSuffix}`}
+        subtitle={dict.projects.subtitle}
         actions={
           <Button onClick={() => setShowCreate(true)}>
             {dict.projects.newProject}
           </Button>
         }
-      />
+      >
+        {!loading && (
+          <p className="text-caption text-muted">{`${dict.projects.countPrefix} ${projects.length} ${dict.projects.countSuffix}`}</p>
+        )}
+      </Header>
 
       {loading ? (
         <TableSkeleton label={dict.common.loading} rows={4} />

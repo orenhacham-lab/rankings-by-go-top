@@ -493,17 +493,17 @@ export default function NewTopicsLinkPlanPanel({
   const droppedEntries = Object.entries(droppedByTopic)
   const droppedTotal = droppedEntries.reduce((n, [, a]) => n + a.length, 0)
   const droppedNote = droppedTotal > 0 || approvalShort ? (
-    <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-      {approvalShort && <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.approvalIncomplete}</p>}
-      {droppedTotal > 0 && <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.droppedWarning} ({droppedTotal})</p>}
+    <div className="mt-2 rounded-control border border-warn/30 bg-warn-soft px-3 py-2">
+      {approvalShort && <p className="text-caption font-medium text-warn">{t.approvalIncomplete}</p>}
+      {droppedTotal > 0 && <p className="text-caption font-medium text-warn">{t.droppedWarning} ({droppedTotal})</p>}
       <ul className="mt-1 space-y-0.5">
         {droppedEntries.flatMap(([tid, arr]) => arr.map((d, i) => (
-          <li key={`${tid}-dl-${i}`} className="text-[10px] text-amber-700 dark:text-amber-400">
+          <li key={`${tid}-dl-${i}`} className="text-caption text-warn">
             <span className="font-medium break-words">{d.anchorText || d.targetUrl}</span>
             {' · '}{(t.droppedReasons as Record<string, string>)[d.reason] ?? d.reason}
             {/* Phase 3G.8 — before/after diagnostics: the fresh classification. */}
             {Array.isArray(d.rejectedReasons) && d.rejectedReasons.length > 0 && (
-              <span className="text-amber-600/80 dark:text-amber-500/80"> ({d.rejectedReasons.map(revLabel).join(' · ')})</span>
+              <span className="text-warn"> ({d.rejectedReasons.map(revLabel).join(' · ')})</span>
             )}
           </li>
         )))}
@@ -521,44 +521,44 @@ export default function NewTopicsLinkPlanPanel({
   }
 
   return (
-    <Card className="mb-4 hover:translate-y-0 border-indigo-200 dark:border-indigo-500/30 ring-1 ring-indigo-100 dark:ring-indigo-500/20">
+    <Card className="mb-4 border-action/30 ring-1 ring-action/30">
       <div ref={rootRef} dir={isHebrew ? 'rtl' : 'ltr'} className="scroll-mt-4">
         <div className="flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-2">
-            <Link2 size={16} className="text-indigo-600 dark:text-indigo-400" />
-            <span className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</span>
+            <Link2 size={16} className="text-action" />
+            <span className="text-section font-semibold text-ink">{t.title}</span>
           </span>
-          <button type="button" onClick={onClose} aria-label={t.close} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={16} /></button>
+          <button type="button" onClick={onClose} aria-label={t.close} className="text-muted hover:text-body"><X size={16} /></button>
         </div>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t.intro}</p>
-        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.sessionOnlyNote} {t.alsoFromRow}</p>
+        <p className="mt-1 text-caption text-muted">{t.intro}</p>
+        <p className="mt-1 text-caption text-muted">{t.sessionOnlyNote} {t.alsoFromRow}</p>
 
-        {warnNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{warnNote}</p>}
+        {warnNote && <p className="mt-2 text-caption text-warn">{warnNote}</p>}
         {/* A confirmed missing index is INFORMATION about link suggestions, not a
             blocker: it is shown in the same amber note style as other advisories,
             never as the red error that used to stop the flow here. */}
-        {cacheNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{cacheNote}</p>}
+        {cacheNote && <p className="mt-2 text-caption text-warn">{cacheNote}</p>}
         {/* A failed saved-plan lookup fails CLOSED, but it must never look like
             an unexplained dead button: say what could not be checked and offer
             a retry. */}
         {savedStatus === 'unavailable' && (
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-red-600 dark:text-red-400">
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-caption text-bad">
             {t.savedLookupError}
             <Button size="sm" variant="outline" onClick={() => { void loadSavedPlans() }}>{t.savedLookupRetry}</Button>
           </p>
         )}
-        {mixedSavedPlans && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.mixedSavedPlans}</p>}
-        {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {mixedSavedPlans && <p className="mt-2 text-caption text-warn">{t.mixedSavedPlans}</p>}
+        {error && <p className="mt-2 text-caption text-bad">{error}</p>}
 
         {queuedOk ? (
           /* Save + enqueue success — stays ~8s (Phase 3H), dismissible, with a
              "go to queue" button. Only the button navigates — no auto-scroll. */
           <>
-            <div className="mt-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
-              <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t.queuedTitle}</div>
-              <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queuedSuccess}</p>
+            <div className="mt-3 rounded-inset border border-ok/30 bg-ok-soft motion-safe:animate-pop-in px-3 py-2.5">
+              <div className="text-copy font-semibold text-ok">{t.queuedTitle}</div>
+              <p className="mt-0.5 text-caption text-ok">{t.queuedSuccess}</p>
               {Object.values(saveStatus).some((s) => s === 'approved' || s === 'saved') && (
-                <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queuedLinksSaved}</p>
+                <p className="mt-0.5 text-caption text-ok">{t.queuedLinksSaved}</p>
               )}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {onGoToQueue && (
@@ -572,21 +572,21 @@ export default function NewTopicsLinkPlanPanel({
         ) : savedOk ? (
           /* Compact success state — panel auto-dismisses shortly after (unless links were dropped). */
           <>
-            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
-              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.savedSuccess}</span>
-              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70">{t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</span>
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-control border border-ok/30 bg-ok-soft px-3 py-2">
+              <span className="text-copy font-medium text-ok">{t.savedSuccess}</span>
+              <span className="text-caption text-ok">{t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</span>
               <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
             </div>
             {droppedNote}
           </>
         ) : loading ? (
-          <div className="py-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />{t.loading}
+          <div className="py-4 flex items-center gap-2 text-caption text-muted">
+            <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />{t.loading}
           </div>
         ) : (
           <>
             {/* Summary */}
-            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-caption text-muted">
               {t.sumTopicsChecked}: {topicIdsToSave.length} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested} · {t.sumReviewable}: {reviewableTotal}
               {plansSaved > 0 && <> · {t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</>}
             </p>
@@ -594,7 +594,7 @@ export default function NewTopicsLinkPlanPanel({
 
             {/* Calm empty state — not an error. */}
             {nothingFound && (
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.noneFound}</p>
+              <p className="mt-2 text-caption text-muted bg-sunk border border-line rounded-control px-3 py-2">{t.noneFound}</p>
             )}
 
             <div className="mt-3 space-y-2">
@@ -609,33 +609,33 @@ export default function NewTopicsLinkPlanPanel({
                 const mset = manualSel[tp.id] ?? new Set<string>()
                 const lset = linkSel[tp.id] ?? new Set<string>(links.map((l) => mkey(l)))
                 return (
-                  <div key={tp.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+                  <div key={tp.id} className="rounded-control border border-line p-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <input type="checkbox" checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} disabled={saving} className="accent-indigo-600" />
-                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100 break-words">{tp.topic}</span>
+                      <input type="checkbox" checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} disabled={saving} className="accent-action" />
+                      <span className="text-copy font-medium text-ink break-words">{tp.topic}</span>
                       {statusBadge(tp.id)}
-                      <span className="text-[11px] text-slate-400 ms-auto">{links.length ? `${links.length} ${t.suggestedLinks}` : ''}</span>
+                      <span className="text-caption text-muted ms-auto">{links.length ? `${links.length} ${t.suggestedLinks}` : ''}</span>
                     </div>
-                    {tp.primary_keyword && <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {tp.primary_keyword}</p>}
+                    {tp.primary_keyword && <p className="mt-0.5 text-caption text-muted">{t.primaryKeyword}: {tp.primary_keyword}</p>}
 
                     {/* Recommended */}
                     {links.length === 0 ? (
-                      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
+                      <p className="mt-1.5 text-caption text-muted">{t.zeroLink}</p>
                     ) : (
                       <>
-                        <div className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{t.recommendedTitle}</div>
+                        <div className="mt-1.5 text-caption font-medium text-muted">{t.recommendedTitle}</div>
                         <div className="mt-1 space-y-1.5">
                           {links.map((l, i) => {
                             const k = mkey(l)
                             return (
-                            <label key={`${l.targetUrl}-${i}`} className="flex flex-wrap items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px] cursor-pointer">
-                              <input type="checkbox" checked={lset.has(k)} onChange={() => toggleLink(tp.id, k)} disabled={saving} className="mt-0.5 accent-indigo-600" />
+                            <label key={`${l.targetUrl}-${i}`} className="flex flex-wrap items-start gap-2 rounded-control bg-sunk p-2 text-caption cursor-pointer">
+                              <input type="checkbox" checked={lset.has(k)} onChange={() => toggleLink(tp.id, k)} disabled={saving} className="mt-0.5 accent-action" />
                               <span className="flex-1 min-w-0">
                                 <span className="flex flex-wrap items-center gap-2">
-                                  <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
-                                  <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                                  <span className="font-medium text-ink break-words">{l.anchorText || '—'}</span>
+                                  <span className="text-muted">{t.confidence} {l.confidence}</span>
                                 </span>
-                                <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
+                                <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-action hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
                               </span>
                             </label>
                             )
@@ -655,22 +655,22 @@ export default function NewTopicsLinkPlanPanel({
                       const shown = showAll ? reviewable : reviewable.slice(0, CAP)
                       return (
                       <div className="mt-2">
-                        <div className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</div>
-                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.manualOptionsNote}</p>
+                        <div className="text-caption font-medium text-action">{t.reviewableTitle} ({reviewable.length})</div>
+                        <p className="mt-1 text-caption text-muted">{t.manualOptionsNote}</p>
                         <div className="mt-1.5 space-y-1.5">
                           {shown.map((l, i) => {
                             const k = mkey(l)
                             return (
-                              <label key={`${l.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
-                                <input type="checkbox" checked={mset.has(k)} onChange={() => toggleManual(tp.id, k)} disabled={saving} className="mt-0.5 accent-indigo-600" />
+                              <label key={`${l.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-control border border-action/30 p-2 text-caption cursor-pointer">
+                                <input type="checkbox" checked={mset.has(k)} onChange={() => toggleManual(tp.id, k)} disabled={saving} className="mt-0.5 accent-action" />
                                 <span className="flex-1 min-w-0">
                                   <span className="flex flex-wrap items-center gap-2">
-                                    <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
+                                    <span className="font-medium text-ink break-words">{l.anchorText || '—'}</span>
                                     <Badge variant="neutral">{t.manualBadge}</Badge>
-                                    <span className="text-amber-700 dark:text-amber-400">{l.rejectedReasons.map(revLabel).join(' · ')}</span>
-                                    <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                                    <span className="text-warn">{l.rejectedReasons.map(revLabel).join(' · ')}</span>
+                                    <span className="text-muted">{t.confidence} {l.confidence}</span>
                                   </span>
-                                  <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
+                                  <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-action hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
                                 </span>
                               </label>
                             )
@@ -678,7 +678,7 @@ export default function NewTopicsLinkPlanPanel({
                         </div>
                         {reviewable.length > CAP && (
                           <button type="button" onClick={() => setRevExpanded((prev) => { const n = new Set(prev); n.has(tp.id) ? n.delete(tp.id) : n.add(tp.id); return n })}
-                            className="mt-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                            className="mt-1 text-caption font-medium text-action hover:underline">
                             {showAll ? t.showLess : `${t.showMore} (${reviewable.length - CAP})`}
                           </button>
                         )}
@@ -689,18 +689,18 @@ export default function NewTopicsLinkPlanPanel({
                     {/* Phase 3G.7 — honest empty state: no manual alternatives passed
                         the quality filter (instead of looking broken/empty). */}
                     {reviewable.length === 0 && links.length > 0 && (
-                      <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t.noManualOptions}</p>
+                      <p className="mt-2 text-caption text-muted">{t.noManualOptions}</p>
                     )}
 
                     {/* Blocked — advanced diagnostics, not selectable */}
                     {blocked.length > 0 && (
                       <details className="mt-1.5">
-                        <summary className="cursor-pointer select-none text-[10px] text-slate-400">{t.blockedTitle} ({blocked.length})</summary>
+                        <summary className="cursor-pointer select-none text-caption text-muted">{t.blockedTitle} ({blocked.length})</summary>
                         <div className="mt-1 space-y-1">
                           {blocked.slice(0, 20).map((l, i) => (
-                            <div key={`${l.targetUrl}-b-${i}`} className="text-[10px] text-slate-400 line-through decoration-slate-300">
+                            <div key={`${l.targetUrl}-b-${i}`} className="text-caption text-muted line-through decoration-muted">
                               <span className="break-words no-underline">{l.anchorText || l.targetTitle || l.targetUrl}</span>
-                              {l.rejectedReasons?.length ? <span className="text-slate-400"> · {l.rejectedReasons.map(revLabel).join(' · ')}</span> : null}
+                              {l.rejectedReasons?.length ? <span className="text-muted"> · {l.rejectedReasons.map(revLabel).join(' · ')}</span> : null}
                             </div>
                           ))}
                         </div>
@@ -712,14 +712,14 @@ export default function NewTopicsLinkPlanPanel({
             </div>
 
             {/* Planned-vs-approved clarification (Phase 3B.3). */}
-            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.planVsApproveNote}</p>
+            <p className="mt-3 text-caption text-muted bg-sunk border border-line rounded-control px-3 py-2">{t.planVsApproveNote}</p>
 
             {/* Phase 3G.3 — clarify that this checkbox only affects plain "Save plan";
                 "Save + add to queue" always approves the checked links. */}
-            <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300">{t.approveAutoNote}</p>
+            <p className="mt-2 text-caption text-ok">{t.approveAutoNote}</p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving || queuing} className="accent-indigo-600" />
+              <label className="inline-flex items-center gap-2 text-caption text-body">
+                <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving || queuing} className="accent-action" />
                 {t.autoApprove}
               </label>
               {/* Plain save (secondary) + save-and-enqueue (primary, Part G). */}

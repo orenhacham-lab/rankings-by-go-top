@@ -136,41 +136,41 @@ export default function ShopifyPublishSettings({
     } catch { setMessage({ text: t.errors.exact_failure, ok: false }) } finally { setBusy(null) }
   }
 
-  if (loading) return <Card className="hover:translate-y-0"><p className="text-xs text-slate-400">{t.loading}</p></Card>
+  if (loading) return <Card><p className="text-caption text-muted">{t.loading}</p></Card>
 
   return (
-    <Card className="hover:translate-y-0">
+    <Card>
       <div className="flex items-center justify-between gap-2 mb-2" dir={dir}>
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={canPublish ? 'success' : 'warning'}>{canPublish ? t.canPublish : t.readOnly}</Badge>
       </div>
 
-      <div className="text-sm text-slate-700 dark:text-slate-200 mb-3" dir={dir}>{conn?.shop_domain}</div>
+      <div className="text-copy text-body mb-3" dir={dir}>{conn?.shop_domain}</div>
 
       {!canPublish ? (
         // write_content missing → clear CTA. Read-only connection stays usable.
         <div className="space-y-2" dir={dir}>
-          <p className="text-sm text-amber-700 dark:text-amber-400">{t.needWriteScope}</p>
+          <p className="text-copy text-warn">{t.needWriteScope}</p>
           <Button size="sm" onClick={authorize}>{t.authorize}</Button>
         </div>
       ) : (
         <div className="space-y-3" dir={dir}>
           {/* Target blog */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.targetBlog}</label>
+            <label className="text-caption font-medium text-body">{t.targetBlog}</label>
             {blogsError ? (
-              <p className="text-xs text-amber-700 dark:text-amber-400">{blogsError}</p>
+              <p className="text-caption text-warn">{blogsError}</p>
             ) : blogs.length === 0 ? (
-              <p className="text-xs text-amber-700 dark:text-amber-400">{t.errors.no_shopify_blog}</p>
+              <p className="text-caption text-warn">{t.errors.no_shopify_blog}</p>
             ) : blogs.length === 1 ? (
-              <div className="text-sm text-slate-700 dark:text-slate-200">{blogs[0].title}</div>
+              <div className="text-copy text-body">{blogs[0].title}</div>
             ) : (
-              <select value={blogId} onChange={(e) => { setBlogId(e.target.value); setUsingDefault(false) }} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+              <select value={blogId} onChange={(e) => { setBlogId(e.target.value); setUsingDefault(false) }} className="w-full px-3 py-2 text-copy rounded-control border border-line bg-surface text-ink">
                 <option value="">{t.selectBlog}</option>
                 {blogs.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
               </select>
             )}
-            {usingDefault && <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.usingProjectDefault}</p>}
+            {usingDefault && <p className="text-caption text-muted">{t.usingProjectDefault}</p>}
           </div>
 
           <Input label={t.tags} placeholder={t.tagsPlaceholder} value={tags} onChange={(e) => setTags(e.target.value)} />
@@ -180,7 +180,7 @@ export default function ShopifyPublishSettings({
             <Button size="sm" variant="outline" onClick={saveSelection} loading={saving} disabled={saving}>{t.saveSelection}</Button>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-line">
             {!hasArticle ? (
               <>
                 <Button size="sm" onClick={() => publish('draft')} loading={busy === 'draft'} disabled={!!busy || !blogId}>{t.sendDraft}</Button>
@@ -193,14 +193,14 @@ export default function ShopifyPublishSettings({
               </>
             )}
             {status && <Badge variant={status === 'published' ? 'success' : status === 'remote_missing' ? 'danger' : 'neutral'}>{(t.status as Record<string, string>)[status] || status}</Badge>}
-            {articleUrl && <a href={articleUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline self-center">{t.openArticle}</a>}
+            {articleUrl && <a href={articleUrl} target="_blank" rel="noopener noreferrer" className="text-copy text-action hover:underline self-center">{t.openArticle}</a>}
           </div>
 
-          {lastError && <p className="text-xs text-red-600 dark:text-red-400">{lastError}</p>}
+          {lastError && <p className="text-caption text-bad">{lastError}</p>}
         </div>
       )}
 
-      {message && <p className={`mt-2 text-xs ${message.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>}
+      {message && <p className={`mt-2 text-caption ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>}
     </Card>
   )
 }

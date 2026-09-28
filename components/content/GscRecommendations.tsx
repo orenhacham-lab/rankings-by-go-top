@@ -23,6 +23,10 @@ import { settingsGscHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import StatTile from '@/components/ui/StatTile'
+import EmptyState from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { Lightbulb } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscSetupPrompt, { GscLoadError, GscLoading } from '@/components/gsc/GscSetupPrompt'
@@ -57,6 +61,11 @@ const fmtPos = (n: number) => (n > 0 ? n.toFixed(1) : '—')
 const safeDecode = (u: string) => { try { return decodeURI(u) } catch { return u } }
 const CATEGORIES: Category[] = ['improve_ctr', 'improve_page', 'internal_links', 'page_overlap']
 const OVERLAP_INITIAL = 3
+
+/** An external link that looks like the small primary button (it opens a page, so it stays an <a>). */
+const LINK_BUTTON = 'inline-flex h-8 items-center justify-center rounded-control bg-action px-3 text-caption font-semibold text-action-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(20_24_60/0.18)] transition-colors duration-150 hover:bg-action-hover'
+/** A filter chip: quiet until chosen, then the soft accent. */
+const chip = (on: boolean) => `inline-flex h-7 items-center rounded-pill border px-3 text-caption font-semibold transition-colors duration-150 ${on ? 'border-action/30 bg-action-soft text-action' : 'border-line bg-surface text-body hover:border-line-strong hover:text-ink'}`
 
 export default function GscRecommendations({ projectId, onToast, className }: {
   projectId: string; onToast?: (kind: 'success' | 'error', text: string) => void; className?: string
@@ -131,8 +140,8 @@ export default function GscRecommendations({ projectId, onToast, className }: {
   return (
     <section data-gsc-widget="recommendations" data-gsc-state={gsc.view.state} className={className}>
       <div className="mb-4">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{w.title}</h3>
-        {gscReady && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{w.about}</p>}
+        <h3 className="text-section font-semibold text-ink">{w.title}</h3>
+        {gscReady && <p className="text-copy text-muted mt-1">{w.about}</p>}
       </div>
 
       {isGscSetupState(gsc.view.state) ? (
@@ -146,46 +155,49 @@ export default function GscRecommendations({ projectId, onToast, className }: {
       ) : (
       <>
       {/* Window toggle */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-4 inline-flex rounded-control border border-line bg-sunk p-0.5">
         {WINDOWS.map((w) => (
-          <button key={w} onClick={() => setActiveWindow(w)}
-            className={`px-3 h-8 rounded-lg text-xs font-medium transition ${activeWindow === w ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'}`}>
+          <button key={w} type="button" onClick={() => setActiveWindow(w)} aria-pressed={activeWindow === w}
+            className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${activeWindow === w ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
             {w === 28 ? t.window28 : t.window90}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <Card className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">{t.loading}</Card>
+        <div role="status" aria-busy="true" className="space-y-3">
+          <span className="sr-only">{t.loading}</span>
+          <div className="grid grid-cols-2 gap-3">{[0, 1].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}</div>
+          {[0, 1].map((i) => <Skeleton key={i} className="h-40 rounded-card" />)}
+        </div>
       ) : errored ? (
-        <Card className="p-6 text-sm text-slate-500 dark:text-slate-400">{t.genericError}</Card>
+        <Card className="p-6 text-copy text-muted">{t.genericError}</Card>
       ) : stateMessage && stateCta ? (
         <Card className="p-6">
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{stateMessage}</p>
-          <Link href={gscHref} className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{stateCta}</Link>
+          <p className="text-copy text-muted mb-3">{stateMessage}</p>
+          <Link href={gscHref} className={LINK_BUTTON}>{stateCta}</Link>
         </Card>
       ) : recommendations.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.emptyTitle}</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t.emptyBody}</p>
+        <Card padding={false}>
+          <EmptyState icon={<Lightbulb />} title={t.emptyTitle} body={t.emptyBody} />
         </Card>
       ) : (
         <>
           {/* Summary strip */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <Card className="p-3"><div className="text-xs text-slate-500 dark:text-slate-400">{t.summaryActionable}</div><div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{data?.summary?.actionable ?? recommendations.length}</div></Card>
-            <Card className="p-3"><div className="text-xs text-slate-500 dark:text-slate-400">{t.summaryPages}</div><div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{data?.summary?.affectedPages ?? 0}</div></Card>
+          <div className="list-enter mb-4 grid grid-cols-2 gap-3 sm:gap-4">
+            <StatTile label={t.summaryActionable} value={data?.summary?.actionable ?? recommendations.length} />
+            <StatTile label={t.summaryPages} value={data?.summary?.affectedPages ?? 0} />
           </div>
 
           {/* Category filter */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <button onClick={() => setCategoryFilter(null)} className={`px-3 h-7 rounded-full text-xs font-medium ${!categoryFilter ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>{t.filterAll}</button>
+            <button type="button" aria-pressed={!categoryFilter} onClick={() => setCategoryFilter(null)} className={chip(!categoryFilter)}>{t.filterAll}</button>
             {CATEGORIES.map((c) => (
-              <button key={c} onClick={() => setCategoryFilter(c)} className={`px-3 h-7 rounded-full text-xs font-medium ${categoryFilter === c ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>{t.categories[c]}</button>
+              <button key={c} type="button" aria-pressed={categoryFilter === c} onClick={() => setCategoryFilter(c)} className={chip(categoryFilter === c)}>{t.categories[c]}</button>
             ))}
           </div>
 
-          <ul className="space-y-3">
+          <ul className="list-enter space-y-3">
             {filtered.map((r) => {
               const pages = r.involvedPages ?? []
               const shown = showAllPages[r.id] ? pages : pages.slice(0, OVERLAP_INITIAL)
@@ -196,38 +208,38 @@ export default function GscRecommendations({ projectId, onToast, className }: {
                       <Badge variant="neutral">{t.categories[r.category]}</Badge>
                       <Badge variant={priorityVariant(r.priority)}>{t.priority[r.priority]}</Badge>
                     </div>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{cardTitle(r)}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{cardSummary(r)}</p>
+                    <p className="text-copy font-semibold text-ink">{cardTitle(r)}</p>
+                    <p className="text-copy text-body mt-1">{cardSummary(r)}</p>
 
                     {r.category === 'page_overlap' ? (
-                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mt-2 text-caption text-muted">
                         <div className="mb-1">{r.hasClearPrimary && r.affectedPage
-                          ? <span>{t.overlap.primaryPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-indigo-600 hover:underline">{safeDecode(r.affectedPage)}</a></span>
-                          : <span className="text-amber-600 dark:text-amber-400">{t.overlap.noPrimary}</span>}</div>
-                        <div className="font-medium text-slate-600 dark:text-slate-300">{t.overlap.involved}:</div>
+                          ? <span>{t.overlap.primaryPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-action hover:underline">{safeDecode(r.affectedPage)}</a></span>
+                          : <span className="text-warn">{t.overlap.noPrimary}</span>}</div>
+                        <div className="font-medium text-body">{t.overlap.involved}:</div>
                         <ul className="mt-1 space-y-0.5">
                           {shown.map((p) => (
                             <li key={p.url} dir="ltr" className="flex items-center justify-between gap-2">
-                              <a href={p.url} target="_blank" rel="noopener noreferrer" className={`truncate ${p.isPrimary ? 'font-semibold text-indigo-600' : 'text-slate-500'} hover:underline`}>{safeDecode(p.url)}</a>
-                              <span className="shrink-0 text-slate-400">{fmtInt(p.impressions)}</span>
+                              <a href={p.url} target="_blank" rel="noopener noreferrer" className={`truncate ${p.isPrimary ? 'font-semibold text-action' : 'text-muted'} hover:underline`}>{safeDecode(p.url)}</a>
+                              <span className="shrink-0 text-muted">{fmtInt(p.impressions)}</span>
                             </li>
                           ))}
                         </ul>
                         {pages.length > OVERLAP_INITIAL && (
-                          <button onClick={() => setShowAllPages((s) => ({ ...s, [r.id]: !s[r.id] }))} className="mt-1 text-indigo-600 hover:underline">{showAllPages[r.id] ? t.overlap.showLess : t.overlap.showAll}</button>
+                          <button onClick={() => setShowAllPages((s) => ({ ...s, [r.id]: !s[r.id] }))} className="mt-1 text-action hover:underline">{showAllPages[r.id] ? t.overlap.showLess : t.overlap.showAll}</button>
                         )}
-                        <div className="mt-1 text-amber-600 dark:text-amber-400">{t.overlap.signalOnly}</div>
+                        <div className="mt-1 text-warn">{t.overlap.signalOnly}</div>
                       </div>
                     ) : (
                       r.affectedPage && (
-                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                          {t.affectedPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-indigo-600 hover:underline">{safeDecode(r.affectedPage)}</a>
+                        <div className="mt-2 text-caption text-muted">
+                          {t.affectedPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-action hover:underline">{safeDecode(r.affectedPage)}</a>
                         </div>
                       )
                     )}
 
                     {/* Metrics */}
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted">
                       <span>{t.metricImpressions}: {fmtInt(r.metrics.impressions)}</span>
                       <span>{t.metricClicks}: {fmtInt(r.metrics.clicks)}</span>
                       {r.category === 'improve_ctr' && <span>{t.metricCtr}: {fmtCtr(r.metrics.ctr)}</span>}
@@ -235,11 +247,11 @@ export default function GscRecommendations({ projectId, onToast, className }: {
                     </div>
 
                     {/* Why (expandable) */}
-                    <button onClick={() => setExpanded((e) => ({ ...e, [r.id]: !e[r.id] }))} className="mt-2 text-xs font-medium text-indigo-600 hover:underline">
+                    <button onClick={() => setExpanded((e) => ({ ...e, [r.id]: !e[r.id] }))} className="mt-2 text-caption font-medium text-action hover:underline">
                       {t.whyLabel}
                     </button>
                     {expanded[r.id] && (
-                      <div className="mt-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2.5 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
+                      <div className="mt-1.5 space-y-1.5 rounded-inset border border-line bg-sunk/60 p-3 text-caption text-body motion-safe:animate-pop-in">
                         <ul className="list-disc ps-4 space-y-0.5">
                           {r.reasonKeys.map((k) => <li key={k}>{t.reasons[k]}</li>)}
                         </ul>
@@ -258,10 +270,10 @@ export default function GscRecommendations({ projectId, onToast, className }: {
                         above are the only way in — no arbitrary "first page" button). */}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {r.category !== 'page_overlap' && r.affectedPage && (
-                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{t.openPage}</a>
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>{t.openPage}</a>
                       )}
                       {r.category === 'page_overlap' && r.hasClearPrimary && r.affectedPage && (
-                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{t.openPrimary}</a>
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>{t.openPrimary}</a>
                       )}
                       {ACTIONS_ENABLED && (
                         <>

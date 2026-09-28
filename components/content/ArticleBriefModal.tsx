@@ -480,26 +480,26 @@ export default function ArticleBriefModal({
   }
 
   const inputCls =
-    'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+    'w-full px-3 py-2 text-copy rounded-control border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-info'
   const selectedCount = selected.size + (manualTopic.trim() ? 1 : 0)
 
   return (
     <Modal open={open} onClose={onClose} title={editing ? t.editTitle : t.newTitle} size="xl">
       <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
         {error && (
-          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+          <div className="p-3 rounded-control bg-bad-soft border border-bad/30 text-copy text-bad">
             {error}
           </div>
         )}
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.project}</label>
+          <label className="text-copy font-medium text-body">{t.project}</label>
           {/* Strict GSC mode locks the project to the one supplied by the opportunity. */}
-          <select ref={projectRef} value={projectId} disabled={gscMode} onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }} className={`${inputCls} ${errProject ? 'border-red-400 dark:border-red-500' : ''} ${gscMode ? 'opacity-70 cursor-not-allowed' : ''}`}>
+          <select ref={projectRef} value={projectId} disabled={gscMode} onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }} className={`${inputCls} ${errProject ? 'border-bad' : ''} ${gscMode ? 'opacity-70 cursor-not-allowed' : ''}`}>
             <option value="">{t.selectProject}</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          {errProject && <p className="text-xs text-red-600 dark:text-red-400">{t.projectRequired}</p>}
+          {errProject && <p className="text-caption text-bad">{t.projectRequired}</p>}
         </div>
 
         {/* Strict GSC mode keeps the primary keyword editable but WITHOUT the Gemini suggest flow. */}
@@ -520,19 +520,19 @@ export default function ArticleBriefModal({
             </div>
 
             {suggestError && (
-              <div className="text-sm text-amber-700 dark:text-amber-400">{suggestError}</div>
+              <div className="text-copy text-warn">{suggestError}</div>
             )}
 
             {suggestions.length > 0 && (
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <div className="rounded-control border border-line p-3">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.suggestionsHeading}</div>
+                  <div className="text-copy font-medium text-body">{t.suggestionsHeading}</div>
                   {source && (
                     <span
-                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                      className={`text-caption px-2 py-0.5 rounded-full font-medium ${
                         source === 'gemini'
-                          ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
-                          : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                          ? 'bg-action-soft text-action'
+                          : 'bg-warn-soft text-warn'
                       }`}
                     >
                       {source === 'gemini' ? t.sourceGemini : t.sourceFallback}
@@ -541,14 +541,14 @@ export default function ArticleBriefModal({
                 </div>
 
                 {source === 'fallback' && (
-                  <div className="mb-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-2 py-1.5">
+                  <div className="mb-2 text-caption text-warn bg-warn-soft border border-warn/30 rounded-control px-2 py-1.5">
                     {/* Only claim "check GEMINI_API_KEY" when that's actually the reason. */}
                     {fallbackReason === 'missing_gemini_api_key' ? t.fallbackWarning : t.fallbackGeneric}
                   </div>
                 )}
 
                 {keywordFit === 'unrelated' && (
-                  <div className="mb-2 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1.5">
+                  <div className="mb-2 text-caption text-body bg-sunk border border-line rounded-control px-2 py-1.5">
                     {t.keywordMismatch}
                   </div>
                 )}
@@ -557,18 +557,18 @@ export default function ArticleBriefModal({
                   {suggestions.map((s) => {
                     const angle = localizeAngle(s.angle, isHebrew ? 'he' : 'en')
                     return (
-                      <label key={s.title} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
+                      <label key={s.title} className="flex items-start gap-2 text-copy text-body cursor-pointer">
                         <input type="checkbox" className="mt-1" checked={selected.has(s.title)} onChange={() => toggleSuggestion(s.title)} />
                         <span>
                           {s.title}
-                          {angle && <span className="block text-xs text-slate-400 dark:text-slate-500">{angle}</span>}
+                          {angle && <span className="block text-caption text-muted">{angle}</span>}
                         </span>
                       </label>
                     )
                   })}
                 </div>
                 {selectedCount > 1 && (
-                  <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">{t.poolHint}</p>
+                  <p className="text-caption text-action mt-2">{t.poolHint}</p>
                 )}
               </div>
             )}
@@ -576,48 +576,48 @@ export default function ArticleBriefModal({
         )}
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label className="text-copy font-medium text-body">
             {editing ? t.topic : t.manualTopicLabel}
           </label>
-          <input ref={topicRef} type="text" value={manualTopic} onChange={(e) => { setManualTopic(e.target.value); setErrTopic(false) }} placeholder={t.topicPlaceholder} className={`${inputCls} ${errTopic ? 'border-red-400 dark:border-red-500' : ''}`} />
-          {errTopic && <p className="text-xs text-red-600 dark:text-red-400">{t.noTopicSelected}</p>}
+          <input ref={topicRef} type="text" value={manualTopic} onChange={(e) => { setManualTopic(e.target.value); setErrTopic(false) }} placeholder={t.topicPlaceholder} className={`${inputCls} ${errTopic ? 'border-bad' : ''}`} />
+          {errTopic && <p className="text-caption text-bad">{t.noTopicSelected}</p>}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.language}</label>
-            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden w-fit">
+            <label className="text-copy font-medium text-body">{t.language}</label>
+            <div className="inline-flex rounded-control border border-line overflow-hidden w-fit">
               {(['he', 'en'] as const).map((l) => (
-                <button key={l} type="button" onClick={() => setBriefLang(l)} className={`px-4 py-2 text-sm transition ${briefLang === l ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'}`}>
+                <button key={l} type="button" onClick={() => setBriefLang(l)} className={`px-4 py-2 text-copy transition ${briefLang === l ? 'bg-action text-action-ink' : 'bg-surface text-body'}`}>
                   {l === 'he' ? t.languageHe : t.languageEn}
                 </button>
               ))}
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.searchIntent}</label>
+            <label className="text-copy font-medium text-body">{t.searchIntent}</label>
             <select value={searchIntent} onChange={(e) => setSearchIntent(e.target.value as SuggestionIntent)} className={inputCls}>
               {INTENT_KEYS.map((k) => <option key={k} value={k}>{t.intents[k]}</option>)}
             </select>
           </div>
         </div>
 
-        <button type="button" onClick={() => setAdvancedOpen((v) => !v)} className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+        <button type="button" onClick={() => setAdvancedOpen((v) => !v)} className="inline-flex items-center gap-1.5 text-copy font-medium text-action hover:underline">
           {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           {t.advancedToggle}
         </button>
 
         {advancedOpen && (
-          <div className="space-y-4 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+          <div className="space-y-4 rounded-control border border-line p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.toneOfVoice}</label>
+                <label className="text-copy font-medium text-body">{t.toneOfVoice}</label>
                 <select value={tone} onChange={(e) => setTone(e.target.value)} className={inputCls}>
                   {TONE_KEYS.map((k) => <option key={k} value={k}>{t.tones[k]}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.ctaPreference}</label>
+                <label className="text-copy font-medium text-body">{t.ctaPreference}</label>
                 <select value={cta} onChange={(e) => setCta(e.target.value)} className={inputCls}>
                   {CTA_KEYS.map((k) => <option key={k} value={k}>{t.ctas[k]}</option>)}
                 </select>
@@ -625,8 +625,8 @@ export default function ArticleBriefModal({
             </div>
 
             {CTA_WITH_DETAILS.includes(cta) && (
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t.ctaDetailsHint}</p>
+              <div className="rounded-control border border-line p-3 space-y-2">
+                <p className="text-caption text-muted">{t.ctaDetailsHint}</p>
                 <Input label={t.ctaTextLabel} value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder={t.ctaTextPlaceholder} />
                 {cta === 'whatsapp' && (
                   <Input label={t.ctaWhatsappLabel} value={ctaWhatsapp} onChange={(e) => setCtaWhatsapp(e.target.value)} placeholder={t.ctaWhatsappPlaceholder} />
@@ -636,7 +636,7 @@ export default function ArticleBriefModal({
                 )}
                 <Input label={t.ctaUrlLabel} type="url" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder={t.ctaUrlPlaceholder} />
                 {(cta === 'whatsapp' || cta === 'phone' || cta === 'contact') && (
-                  <p className="text-xs text-amber-700 dark:text-amber-400">{t.ctaDetailsRequired}</p>
+                  <p className="text-caption text-warn">{t.ctaDetailsRequired}</p>
                 )}
               </div>
             )}
@@ -644,45 +644,45 @@ export default function ArticleBriefModal({
             {/* Phase 3D — article depth / length by topic type. "אוטומטי" lets the
                 system pick the range from the topic; others force a depth. */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.articleDepthLabel}</label>
+              <label className="text-copy font-medium text-body">{t.articleDepthLabel}</label>
               <div className="flex flex-wrap gap-2">
                 {ARTICLE_DEPTHS.map((d) => (
-                  <button key={d} type="button" onClick={() => setArticleDepth(d)} className={`px-3 py-1.5 text-sm rounded-lg border transition ${articleDepth === d ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+                  <button key={d} type="button" onClick={() => setArticleDepth(d)} className={`px-3 py-1.5 text-copy rounded-control border transition ${articleDepth === d ? 'bg-action text-action-ink border-action' : 'bg-surface text-body border-line'}`}>
                     {(t.articleDepths as Record<string, string>)[d]}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.articleDepthHint}</p>
+              <p className="text-caption text-muted">{t.articleDepthHint}</p>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.secondaryKeywords}</label>
+              <label className="text-copy font-medium text-body">{t.secondaryKeywords}</label>
               <textarea value={secondaryText} onChange={(e) => setSecondaryText(e.target.value)} rows={2} className={inputCls} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.secondaryHint}</p>
+              <p className="text-caption text-muted">{t.secondaryHint}</p>
             </div>
 
             <Input label={t.targetAudience} value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} />
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.articleAngle}</label>
+              <label className="text-copy font-medium text-body">{t.articleAngle}</label>
               <textarea value={articleAngle} onChange={(e) => setArticleAngle(e.target.value)} rows={2} className={inputCls} placeholder={t.articleAnglePlaceholder} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.articleAngleHelp}</p>
+              <p className="text-caption text-muted">{t.articleAngleHelp}</p>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.mustInclude}</label>
+              <label className="text-copy font-medium text-body">{t.mustInclude}</label>
               <textarea value={mustInclude} onChange={(e) => setMustInclude(e.target.value)} rows={3} className={inputCls} placeholder={t.mustIncludePlaceholder} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.mustIncludeHelp}</p>
+              <p className="text-caption text-muted">{t.mustIncludeHelp}</p>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.mustAvoid}</label>
+              <label className="text-copy font-medium text-body">{t.mustAvoid}</label>
               <textarea value={mustAvoid} onChange={(e) => setMustAvoid(e.target.value)} rows={3} className={inputCls} placeholder={t.mustAvoidPlaceholder} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.mustAvoidHelp}</p>
+              <p className="text-caption text-muted">{t.mustAvoidHelp}</p>
             </div>
 
             <div className="space-y-2">
-              <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label className="flex items-start gap-2 text-copy text-body">
                 <input
                   type="checkbox"
                   checked={includeBrandName}
@@ -698,7 +698,7 @@ export default function ArticleBriefModal({
                 />
                 <span>
                   {t.includeBrandName}
-                  <span className="block text-xs text-slate-500 dark:text-slate-400">{t.includeBrandNameHint}</span>
+                  <span className="block text-caption text-muted">{t.includeBrandNameHint}</span>
                 </span>
               </label>
               {includeBrandName && (
@@ -709,7 +709,7 @@ export default function ArticleBriefModal({
                   placeholder={t.brandNamePlaceholder}
                 />
               )}
-              <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label className="flex items-start gap-2 text-copy text-body">
                 <input
                   type="checkbox"
                   checked={includeManualToc}
@@ -718,43 +718,43 @@ export default function ArticleBriefModal({
                 />
                 <span>
                   {t.includeManualToc}
-                  <span className="block text-xs text-slate-500 dark:text-slate-400">{t.includeManualTocHint}</span>
+                  <span className="block text-caption text-muted">{t.includeManualTocHint}</span>
                 </span>
               </label>
             </div>
 
-            <div ref={anchorsRef} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div ref={anchorsRef} className="rounded-control border border-line p-3">
               <div className="flex items-center justify-between mb-1">
-                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.anchorsTitle}</h4>
+                <h4 className="text-copy font-semibold text-ink">{t.anchorsTitle}</h4>
                 <Button size="sm" variant="outline" onClick={addAnchor}>
                   <Plus size={14} /> {t.addAnchor}
                 </Button>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.anchorsHint}</p>
-              {badAnchors.size > 0 && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{t.anchorUrlInvalid}</p>}
+              <p className="text-caption text-muted mb-1">{t.anchorsHint}</p>
+              {badAnchors.size > 0 && <p className="text-caption text-bad mb-2">{t.anchorUrlInvalid}</p>}
               <div className="space-y-3">
                 {anchors.map((a, i) => (
-                  <div key={i} className={`rounded-lg border p-3 space-y-2 ${badAnchors.has(i) ? 'border-red-300 dark:border-red-600 bg-red-50/40 dark:bg-red-900/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'}`}>
+                  <div key={i} className={`rounded-control border p-3 space-y-2 ${badAnchors.has(i) ? 'border-bad/30 bg-bad-soft' : 'border-line bg-sunk/50'}`}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} placeholder={t.anchorTextPlaceholder} />
                       <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => { updateAnchor(i, { target_url: e.target.value }); if (badAnchors.has(i)) setBadAnchors((p) => { const n = new Set(p); n.delete(i); return n }) }} placeholder={t.targetUrlPlaceholder} />
                     </div>
-                    {badAnchors.has(i) && <p className="text-xs text-red-600 dark:text-red-400">{t.anchorUrlInvalid}</p>}
+                    {badAnchors.has(i) && <p className="text-caption text-bad">{t.anchorUrlInvalid}</p>}
                     <div className="flex flex-wrap items-center gap-3">
                       <select value={a.type} onChange={(e) => updateAnchor(i, { type: e.target.value as 'internal' | 'external' })} className={inputCls + ' max-w-[9rem]'}>
                         <option value="internal">{t.internal}</option>
                         <option value="external">{t.external}</option>
                       </select>
                       <input type="text" value={a.note} onChange={(e) => updateAnchor(i, { note: e.target.value })} placeholder={t.notePlaceholder} className={inputCls + ' flex-1 min-w-[8rem]'} />
-                      <button type="button" onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))} className="text-red-600 dark:text-red-400 hover:text-red-700 p-1" title={t.removeAnchor}>
+                      <button type="button" onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))} className="text-bad hover:text-bad p-1" title={t.removeAnchor}>
                         <Trash2 size={16} />
                       </button>
                     </div>
-                    <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                    <label className="flex items-start gap-2 text-copy text-body">
                       <input type="checkbox" checked={a.required} onChange={(e) => updateAnchor(i, { required: e.target.checked })} className="mt-0.5" />
                       <span>
                         {t.required}
-                        <span className="block text-xs text-slate-500 dark:text-slate-400">{t.requiredHelp}</span>
+                        <span className="block text-caption text-muted">{t.requiredHelp}</span>
                       </span>
                     </label>
                   </div>
@@ -764,11 +764,11 @@ export default function ArticleBriefModal({
 
             {/* Internal-link planning — chosen now, woven into the body at
                 generation, then validated + inserted in the editor. */}
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.planTitle}</h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.planHint}</p>
+            <div className="rounded-control border border-line p-3">
+              <h4 className="text-copy font-semibold text-ink mb-1">{t.planTitle}</h4>
+              <p className="text-caption text-muted mb-2">{t.planHint}</p>
               {linkCandidates.length === 0 ? (
-                <p className="text-xs text-slate-400">{t.planNone}</p>
+                <p className="text-caption text-muted">{t.planNone}</p>
               ) : (
                 <div className="space-y-2">
                   {(linksExpanded ? linkCandidates : linkCandidates.slice(0, 2)).map((cand) => {
@@ -780,19 +780,19 @@ export default function ArticleBriefModal({
                     const selectExtra = selectVal && !opts.some((o) => o.text === selectVal) ? [selectVal] : []
                     const isUrlTarget = cand.kind === 'internal_url'
                     return (
-                      <div key={cand.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5 space-y-1.5">
+                      <div key={cand.id} className="rounded-control border border-line p-2.5 space-y-1.5">
                         <label className="flex items-start gap-2">
-                          <input type="checkbox" checked={approved} onChange={() => toggleLink(cand)} className="mt-1 h-4 w-4 accent-indigo-600" />
+                          <input type="checkbox" checked={approved} onChange={() => toggleLink(cand)} className="mt-1 h-4 w-4 accent-action" />
                           <span className="flex-1 min-w-0">
-                            <span className="block text-sm text-slate-800 dark:text-slate-100">{cand.title || t.planInternalTargetFallback}</span>
-                            <a href={cand.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{cand.url}</a>
+                            <span className="block text-copy text-ink">{cand.title || t.planInternalTargetFallback}</span>
+                            <a href={cand.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-caption text-action hover:underline break-all">{cand.url}</a>
                             {isUrlTarget ? (
-                              <span className="inline-flex items-center rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{t.planInternalTargetBadge}</span>
+                              <span className="inline-flex items-center rounded bg-sunk px-1.5 py-0.5 text-caption text-muted mt-0.5">{t.planInternalTargetBadge}</span>
                             ) : (
-                              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planKeyword}: {cand.keyword || '—'}</span>
+                              <span className="block text-caption text-muted">{t.planKeyword}: {cand.keyword || '—'}</span>
                             )}
                             {(cand.historicalAnchors?.length ?? 0) > 0 && (
-                              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planHistory}: {cand.historicalAnchors.join(' · ')}</span>
+                              <span className="block text-caption text-muted">{t.planHistory}: {cand.historicalAnchors.join(' · ')}</span>
                             )}
                           </span>
                         </label>
@@ -816,12 +816,12 @@ export default function ArticleBriefModal({
                             className={inputCls + ' flex-1 min-w-[10rem]'}
                           />
                         </div>
-                        <p className="text-[11px] text-slate-400 pl-6">{t.planNote}</p>
+                        <p className="text-caption text-muted pl-6">{t.planNote}</p>
                       </div>
                     )
                   })}
                   {linkCandidates.length > 2 && (
-                    <button type="button" onClick={() => setLinksExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                    <button type="button" onClick={() => setLinksExpanded((v) => !v)} className="text-caption font-medium text-action hover:underline">
                       {linksExpanded ? t.planShowLess : t.planShowMore}
                     </button>
                   )}
@@ -833,7 +833,7 @@ export default function ArticleBriefModal({
 
         <div className="pt-2">
           {formError && (
-            <p className="mb-2 text-sm text-red-600 dark:text-red-400 text-end">{formError}</p>
+            <p className="mb-2 text-copy text-bad text-end">{formError}</p>
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose} disabled={saving}>{t.cancel}</Button>

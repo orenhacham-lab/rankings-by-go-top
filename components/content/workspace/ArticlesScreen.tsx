@@ -20,8 +20,12 @@ import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
 import SiteHubCard from '@/components/content/site-platforms/SiteHubCard'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { formatDate } from '@/lib/utils'
-import { ExternalLink, Pencil, Plug, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { cn, formatDate } from '@/lib/utils'
+import StatTile from '@/components/ui/StatTile'
+import SectionHeading from '@/components/ui/SectionHeading'
+import EmptyState from '@/components/ui/EmptyState'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { ChevronDown, ExternalLink, FileText, Pencil, Plug, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { resolvePublishCta } from '@/lib/content/publish-cta'
 import { CitedBadge } from '@/components/content/ArticleAiVisibilityCard'
 import RowMenu from '@/components/ui/RowMenu'
@@ -388,8 +392,8 @@ export default function ArticlesScreen() {
           {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-body">{t.manageConnection}</span>
-              <Link href={platformSetupHref(projectId)} className="text-sm font-medium text-action hover:underline">
+              <span className="text-copy text-body">{t.manageConnection}</span>
+              <Link href={platformSetupHref(projectId)} className="text-copy font-medium text-action hover:underline">
                 {t.manageConnectionCta}
               </Link>
             </div>
@@ -398,43 +402,35 @@ export default function ArticlesScreen() {
         </div>
       )}
 
-      {/* Primary action */}
-      <div className="flex justify-end mb-4">
-        <Button onClick={handleCreateTopic}>
-          <Plus size={16} /> {t.newTopicButton}
-        </Button>
-      </div>
+      {/* Stats: the same tile as every other screen, entering as a list. */}
+      {statCards.length > 0 && (
+        <div className="list-enter mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+          {statCards.map((s) => (
+            <StatTile key={s.key} label={s.label} value={s.value} />
+          ))}
+        </div>
+      )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {statCards.map((s) => (
-          <Card key={s.key} className="p-3 hover:translate-y-0">
-            <div className="text-[11px] text-muted mb-1">{s.label}</div>
-            <div className="text-2xl font-bold text-ink">{s.value}</div>
-          </Card>
-        ))}
-      </div>
-
-      {/* ── Section 1: generated articles ── */}
-      <div className="mt-2 mb-3 border-t border-line pt-5">
-        <h3 className="text-lg font-semibold text-ink">{t.articlesHeading}</h3>
-        <p className="text-xs text-muted">{t.articlesSubtitle}</p>
-      </div>
+      {/* ── Section 1: generated articles, with the screen's primary action ── */}
+      <SectionHeading
+        title={t.articlesHeading}
+        description={t.articlesSubtitle}
+        action={<Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>}
+      />
 
       {(data?.articles?.length ?? 0) === 0 ? (
-        <Card className="p-8 text-center mb-6">
-          <p className="text-sm text-body mb-3">{t.articlesEmptyTitle}</p>
-          <Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>
+        <Card padding={false} className="mb-6">
+          <EmptyState icon={<FileText />} title={t.articlesEmptyTitle} action={<Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>} />
         </Card>
       ) : (
       <>
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-3">
+      <div className="mb-3 flex flex-wrap gap-3">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label={t.filters.status}
-          className="px-3 py-2 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action"
+          className={cn(FIELD_CLASSES, 'h-10 w-auto cursor-pointer py-2')}
         >
           <option value="">{t.filters.allStatuses}</option>
           {['draft', 'ready', 'scheduled', 'publishing', 'published', 'failed'].map((s) => (
@@ -447,18 +443,18 @@ export default function ArticlesScreen() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label={t.filters.search}
-          className="flex-1 max-w-xs px-3 py-2 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action"
+          className={cn(FIELD_CLASSES, 'h-10 max-w-xs flex-1 py-2')}
         />
       </div>
 
       {/* Batch WordPress export bar — only when there are eligible articles. */}
       {selectableArticles.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-line bg-surface px-3 py-2">
-          <label className="inline-flex items-center gap-2 text-sm text-body cursor-pointer">
-            <input type="checkbox" checked={allArticlesSelected} onChange={toggleArticleSelectAll} disabled={articleBatchRunning} className="cursor-pointer" />
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-inset border border-line bg-surface px-4 py-2.5 shadow-card">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-copy font-medium text-ink">
+            <input type="checkbox" checked={allArticlesSelected} onChange={toggleArticleSelectAll} disabled={articleBatchRunning} className="size-4 cursor-pointer accent-action" />
             {t.batch.selectAll}
           </label>
-          <span className="text-sm text-body">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
+          <span className="text-copy text-muted tabular-nums">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
           <Button size="sm" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
             {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedArticles.size))}
           </Button>
@@ -470,7 +466,7 @@ export default function ArticlesScreen() {
           ) : (
             selectedArticles.size > 0 && <Button size="sm" variant="ghost" onClick={clearArticleSelection}>{t.batch.clear}</Button>
           )}
-          {selectedArticles.size > BATCH_LIMIT && <span className="text-xs text-warn">{t.batch.tooMany}</span>}
+          {selectedArticles.size > BATCH_LIMIT && <span className="text-caption text-warn">{t.batch.tooMany}</span>}
         </div>
       )}
 
@@ -478,22 +474,25 @@ export default function ArticlesScreen() {
       <div className="overflow-x-auto mb-6">
         <Table>
           <TableHead>
-            <tr>
+            <tr className="max-sm:[&>th]:px-2.5">
               <Th> </Th>
               <Th>{t.table.title}</Th>
               {/* No "project / site" column: every row is the project the top bar
                   names (UX review P1-18). */}
-              <Th>{t.table.status}</Th>
-              <Th>{t.table.created}</Th>
-              <Th>{t.table.updated}</Th>
-              <Th>{t.table.scheduledAt}</Th>
-              <Th>{t.table.publishedAt}</Th>
+              {/* PRIORITY COLUMNS: on a phone the row is checkbox, title (with its
+                  status under it) and actions; dates and publication return as
+                  the screen widens, instead of the table scrolling sideways. */}
+              <Th className="hidden sm:table-cell">{t.table.status}</Th>
+              <Th className="hidden md:table-cell">{t.table.created}</Th>
+              <Th className="hidden xl:table-cell">{t.table.updated}</Th>
+              <Th className="hidden lg:table-cell">{t.table.scheduledAt}</Th>
+              <Th className="hidden lg:table-cell">{t.table.publishedAt}</Th>
               {/* The column carries the row's PUBLICATION state, which is
                   WordPress or Shopify depending on the active platform.
                   Labelling it "WordPress" for a Shopify project was simply
                   wrong; a neutral heading is used whenever the row is not
                   WordPress. */}
-              <Th>{isSite ? t.table.publication : isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
+              <Th className="hidden md:table-cell">{isSite ? t.table.publication : isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
               <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
@@ -504,7 +503,7 @@ export default function ArticlesScreen() {
               (articlesExpanded ? filteredArticles : filteredArticles.slice(0, 3)).map((a) => {
                 const selectableArticle = !alreadyExported(a)
                 return (
-                <TableRow key={a.id}>
+                <TableRow key={a.id} className="max-sm:[&>td]:px-2.5">
                   <Td>
                     {selectableArticle && (
                       <input
@@ -512,39 +511,40 @@ export default function ArticlesScreen() {
                         checked={selectedArticles.has(a.id)}
                         disabled={articleBatchRunning}
                         onChange={() => toggleArticleSelect(a.id)}
-                        className="cursor-pointer disabled:cursor-not-allowed"
+                        className="size-4 cursor-pointer accent-action disabled:cursor-not-allowed"
                         aria-label={t.table.selectArticle(a.title)}
                       />
                     )}
                   </Td>
-                  <Td>
+                  <Td className="min-w-[9rem] sm:min-w-[12rem]">
                     <Link href={`/content/articles/${a.id}`} className="font-medium text-ink hover:text-action hover:underline">{a.title}</Link>
+                    <div className="mt-1 sm:hidden"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></div>
                     {a.status === 'published' && cited[a.id]?.length ? (
                       <div className="mt-1"><CitedBadge t={t.editor.aiVisibility} engines={cited[a.id]} /></div>
                     ) : null}
                   </Td>
-                  <Td><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
-                  <Td><span className="whitespace-nowrap text-xs text-muted">{formatDate(a.created_at, language)}</span></Td>
-                  <Td><span className="whitespace-nowrap text-xs text-muted">{formatDate(a.updated_at, language)}</span></Td>
-                  <Td><span className="whitespace-nowrap text-xs text-muted">{a.scheduled_at ? formatDate(a.scheduled_at, language) : '—'}</span></Td>
-                  <Td><span className="whitespace-nowrap text-xs text-muted">{a.published_at ? formatDate(a.published_at, language) : '—'}</span></Td>
-                  <Td>
+                  <Td className="hidden sm:table-cell"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
+                  <Td className="hidden md:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.created_at, language)}</span></Td>
+                  <Td className="hidden xl:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.updated_at, language)}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.scheduled_at ? formatDate(a.scheduled_at, language) : '—'}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.published_at ? formatDate(a.published_at, language) : '—'}</span></Td>
+                  <Td className="hidden md:table-cell">
                     {(() => {
                       // Platform-aware publication state — a Shopify project shows Shopify
                       // status/URL and never WordPress wording.
                       if (isSite) {
                         return a.status === 'published'
                           ? <Badge variant="success">{sp.publish.live}</Badge>
-                          : <span className="text-xs text-muted">{sp.publish.notSent}</span>
+                          : <span className="text-caption text-muted">{sp.publish.notSent}</span>
                       }
                       if (isShopify) {
-                        if (!a.shopify_article_id) return <span className="text-xs text-muted">{t.shopifyState.notSent}</span>
+                        if (!a.shopify_article_id) return <span className="text-caption text-muted">{t.shopifyState.notSent}</span>
                         const published = a.status === 'published' || a.shopify_status === 'published'
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant={published ? 'success' : 'neutral'}>{published ? t.shopifyState.published : t.shopifyState.exported}</Badge>
                             {a.shopify_article_url && (
-                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-sm inline-flex items-center gap-1">
+                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-copy inline-flex items-center gap-1">
                                 {t.shopifyState.open}<ExternalLink size={12} />
                               </a>
                             )}
@@ -552,13 +552,13 @@ export default function ArticlesScreen() {
                         )
                       }
                       const s = wpState(a)
-                      if (s === 'none') return <span className="text-xs text-muted">{t.wpState.notSent}</span>
+                      if (s === 'none') return <span className="text-caption text-muted">{t.wpState.notSent}</span>
                       const published = s === 'published'
                       return (
                         <span className="inline-flex items-center gap-2">
                           <Badge variant={published ? 'success' : 'neutral'}>{published ? t.wpState.published : t.wpState.exported}</Badge>
                           {a.wp_post_url && (
-                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-sm inline-flex items-center gap-1">
+                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-copy inline-flex items-center gap-1">
                               {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink size={12} />
                             </a>
                           )}
@@ -572,7 +572,7 @@ export default function ArticlesScreen() {
                       if (abs && abs.status !== 'success') {
                         if (abs.status === 'running') {
                           return (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                            <span className="inline-flex items-center gap-1.5 text-caption text-muted">
                               <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                               {articleBatchMode === 'publish' ? t.rowWp.publishing : t.rowWp.sending}
                             </span>
@@ -582,19 +582,19 @@ export default function ArticlesScreen() {
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant="danger">{t.batch.failed}</Badge>
-                            {abs.error && <span className="text-[11px] text-bad max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
+                            {abs.error && <span className="text-caption text-bad max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
                           </span>
                         )
                       }
                       return (
                         <div className="flex flex-wrap items-center gap-2">
                           {a.status !== 'published' && rowCta.kind === 'connect' && (
-                            <Link href={rowCta.href} data-cta="connect" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-surface px-3 text-caption font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+                            <Link href={rowCta.href} data-cta="connect" className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1 text-caption sm:whitespace-nowrap font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
                               <Plug size={14} aria-hidden /> {t.editor.topBar.connectToPublish}
                             </Link>
                           )}
                           {a.status !== 'published' && rowCta.kind === 'grant_scope' && (
-                            <a href={rowCta.href} data-cta="grant_scope" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-surface px-3 text-caption font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+                            <a href={rowCta.href} data-cta="grant_scope" className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1 text-caption sm:whitespace-nowrap font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
                               <ShieldCheck size={14} aria-hidden /> {t.editor.topBar.grantScope}
                             </a>
                           )}
@@ -635,16 +635,18 @@ export default function ArticlesScreen() {
           </TableBody>
         </Table>
         {filteredArticles.length === 0 && (
-          <p className="text-xs text-muted mt-2 px-1">{t.table.emptyHint}</p>
+          <p className="text-caption text-muted mt-2 px-1">{t.table.emptyHint}</p>
         )}
         {filteredArticles.length > 3 && (
           <div className="mt-3 px-1">
             <button
               type="button"
               onClick={() => setArticlesExpanded((v) => !v)}
-              className="inline-flex items-center justify-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-action hover:bg-action-soft transition-colors"
+              aria-expanded={articlesExpanded}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
             >
               {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - 3})`}
+              <ChevronDown size={14} aria-hidden className={cn('transition-transform duration-150', articlesExpanded && 'rotate-180')} />
             </button>
           </div>
         )}

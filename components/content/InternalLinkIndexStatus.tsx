@@ -157,10 +157,10 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
   const c = status?.counts ?? {}
 
   return (
-    <Card className="hover:translate-y-0 mb-4 p-4">
+    <Card className="mb-4 p-4">
       {/* Header — title + status badge + manual refresh grouped together */}
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <h3 className="text-copy font-semibold text-ink">{t.title}</h3>
         <Badge variant={tone}>{headline}</Badge>
         <Button size="sm" variant="outline" onClick={onRefresh} loading={refreshing} disabled={refreshing}>
           {refreshing ? t.refreshing : t.refresh}
@@ -169,27 +169,27 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
 
       {loading ? (
         <div className="pt-2">
-          <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
           {/* Warnings (compact, single line) */}
           {!refreshing && exists && (status?.stale || status?.versionStale) && (
-            <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+            <div className="mt-1 text-caption text-warn">
               {status?.stale ? t.stale : ''}{status?.stale && status?.versionStale ? ' · ' : ''}{status?.versionStale ? t.versionStale : ''}
             </div>
           )}
           {!refreshing && exists && scanStatus === 'failed' && status?.errorMessage && (
-            <div className="mt-1 text-[11px] text-red-600 dark:text-red-400">{t.errorPrefix}: {status.errorMessage}</div>
+            <div className="mt-1 text-caption text-bad">{t.errorPrefix}: {status.errorMessage}</div>
           )}
 
           {/* Counts + scan meta — one compact wrapping line (no big empty gaps) */}
           {exists ? (
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-              <span><b className="text-slate-700 dark:text-slate-200">{c.uniqueTargets ?? c.targetsStored ?? 0}</b> {t.cUnique}</span>
-              <span><b className="text-slate-700 dark:text-slate-200">{c.targetsEligible ?? 0}</b> {t.cEligible}</span>
-              <span><b className="text-slate-700 dark:text-slate-200">{c.targetsWithUsableAnchors ?? 0}</b> {t.cAnchors}</span>
-              {(c.contentItemsSkipped ?? 0) > 0 && <span><b className="text-slate-700 dark:text-slate-200">{c.contentItemsSkipped}</b> {t.cSkipped}</span>}
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted">
+              <span><b className="text-body">{c.uniqueTargets ?? c.targetsStored ?? 0}</b> {t.cUnique}</span>
+              <span><b className="text-body">{c.targetsEligible ?? 0}</b> {t.cEligible}</span>
+              <span><b className="text-body">{c.targetsWithUsableAnchors ?? 0}</b> {t.cAnchors}</span>
+              {(c.contentItemsSkipped ?? 0) > 0 && <span><b className="text-body">{c.contentItemsSkipped}</b> {t.cSkipped}</span>}
               {/* Phase 3I.1/3I.2 — store entity discovery outcome. The negative
                   (amber) variant is shown ONLY when the index actually contains
                   ecommerce targets — on a service/content site, missing product
@@ -198,39 +198,39 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
                 const d = status.storeEntityDiscovery!
                 const ecomTargets = (status.targetsByType?.product ?? 0) + (status.targetsByType?.category ?? 0)
                 if (d.source !== 'none') {
-                  return <span><b className="text-slate-700 dark:text-slate-200">{d.productsFound}</b> {t.cStoreProducts} · <b className="text-slate-700 dark:text-slate-200">{d.categoriesFound}</b> {t.cStoreCategories}</span>
+                  return <span><b className="text-body">{d.productsFound}</b> {t.cStoreProducts} · <b className="text-body">{d.categoriesFound}</b> {t.cStoreCategories}</span>
                 }
                 if (ecomTargets > 0) {
-                  return <span className="text-amber-700 dark:text-amber-400">{t.storeDiscoveryNone}{d.lastHttpStatus ? ` (HTTP ${d.lastHttpStatus})` : ''}</span>
+                  return <span className="text-warn">{t.storeDiscoveryNone}{d.lastHttpStatus ? ` (HTTP ${d.lastHttpStatus})` : ''}</span>
                 }
                 return null // service/content site — product discovery not relevant
               })()}
               {/* Phase 3I.2 — WHY content was skipped (rate limit is the common
                   real-world cause of "74 skipped, 1 with anchors"). */}
               {status?.contentSkipBreakdown && (status.contentSkipBreakdown.rateLimited > 0 || status.contentSkipBreakdown.abortedAfterFailures > 0) && (
-                <span className="text-amber-700 dark:text-amber-400">
+                <span className="text-warn">
                   {t.rateLimitedNote.replace('{n}', String(status.contentSkipBreakdown.rateLimited + status.contentSkipBreakdown.abortedAfterFailures))}
                 </span>
               )}
-              {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-slate-300 dark:text-slate-600">·</span>}
+              {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-muted">·</span>}
               {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt)}</span>}
               {status?.scannerVersion && <span>{t.scannerVersion} {status.scannerVersion}</span>}
-              {status?.truncated ? <span className="text-amber-700 dark:text-amber-400">{t.truncated}</span> : null}
+              {status?.truncated ? <span className="text-warn">{t.truncated}</span> : null}
             </div>
           ) : (
-            !refreshing && <p className="mt-1 text-[11px] text-slate-400">{t.notScannedHint}</p>
+            !refreshing && <p className="mt-1 text-caption text-muted">{t.notScannedHint}</p>
           )}
 
           {/* Coverage clarification (Phase 3F.1.1) — the index intentionally covers
               the most useful link destinations from posts/pages, not the full
               product catalog, so "partial" on large WooCommerce sites is expected. */}
-          {exists && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.coverageNote}</p>}
+          {exists && <p className="mt-1 text-caption text-muted">{t.coverageNote}</p>}
 
           {/* Advanced diagnostics — collapsed; 2-col grid keeps it compact + connected */}
           {exists && (
             <details className="mt-1.5">
-              <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.techDetails}</summary>
-              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <summary className="cursor-pointer select-none text-caption text-muted">{t.techDetails}</summary>
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5 text-caption text-muted">
                 {status?.siteUrl && <div dir="ltr" className="sm:col-span-2">{t.siteUrl}: <span className="font-mono">{status.siteUrl}</span></div>}
                 <div>{t.scannerVersion}: {status?.scannerVersion ?? '—'} · {t.currentVersion}: {status?.currentScannerVersion ?? '—'}</div>
                 <div>{t.ttlDays}: {status?.ttlDays ?? '—'}</div>

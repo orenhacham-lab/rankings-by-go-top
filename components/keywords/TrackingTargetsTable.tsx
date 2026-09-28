@@ -153,25 +153,27 @@ export default function TrackingTargetsTable({
     <>
       <Table>
         <TableHead>
-          <tr>
+          <tr className="max-sm:[&>th]:px-2.5">
             <Th>
               <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">{k.keyword}{sortLabel('keyword')}</button>
             </Th>
-            <Th>{k.scanType}</Th>
-            <Th>
+            {/* PRIORITY COLUMNS: a phone shows keyword, position (with its change
+                under it) and actions; the rest return as the screen widens. */}
+            <Th className="hidden md:table-cell">{k.scanType}</Th>
+            <Th className="hidden sm:table-cell">
               <button type="button" onClick={() => handleSort('volume')} className="font-semibold">{k.searchVolume}{sortLabel('volume')}</button>
             </Th>
             <Th>
               <button type="button" onClick={() => handleSort('position')} className="font-semibold">{k.position}{sortLabel('position')}</button>
             </Th>
-            <Th>{k.change}</Th>
-            <Th>
+            <Th className="hidden sm:table-cell">{k.change}</Th>
+            <Th className="hidden lg:table-cell">
               <button type="button" onClick={() => handleSort('date')} className="font-semibold">{k.lastChecked}{sortLabel('date')}</button>
             </Th>
-            <Th>
+            <Th className="hidden xl:table-cell">
               <button type="button" onClick={() => handleSort('found')} className="font-semibold">{k.found}{sortLabel('found')}</button>
             </Th>
-            <Th>{k.status}</Th>
+            <Th className="hidden md:table-cell">{k.status}</Th>
             <Th>{k.actions}</Th>
           </tr>
         </TableHead>
@@ -185,7 +187,7 @@ export default function TrackingTargetsTable({
           )}
           {targets.length === 0 && !targetsLoading && targetsError && (
             <tr>
-              <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted">
+              <td colSpan={9} className="px-4 py-8 text-center text-copy text-muted">
                 {k.keywordsLoadFailed}
                 {onRetryTargets && (
                   <button
@@ -224,34 +226,34 @@ export default function TrackingTargetsTable({
               menu.push({ key: 'delete', label: k.delete, danger: true, icon: <Trash2 size={15} aria-hidden="true" />, onSelect: () => setConfirmDeleteId(target.id) })
             }
             return (
-              <TableRow key={target.id} className="[&>td]:py-2">
-                <Td className="whitespace-nowrap">
+              <TableRow key={target.id} className="[&>td]:py-2 max-sm:[&>td]:px-2.5">
+                <Td className="min-w-[7rem] sm:whitespace-nowrap">
                   <span className="font-medium text-ink">{target.keyword}</span>
                   {target.notes && (
                     <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
                   )}
                 </Td>
-                <Td className="whitespace-nowrap">
+                <Td className="hidden whitespace-nowrap md:table-cell">
                   <EngineBadge engine={target.engine_type} device={projectDevice} />
                 </Td>
-                <Td>
+                <Td className="hidden sm:table-cell">
                   <GscVolumeCell view={gscKeywords} targetId={target.id}>
                     {target.avg_monthly_searches !== null && target.avg_monthly_searches !== undefined ? (
-                      <span className="text-sm tabular-nums text-body">
+                      <span className="text-copy tabular-nums text-body">
                         {target.avg_monthly_searches.toLocaleString(language === 'he' ? 'he-IL' : 'en-US')}
                       </span>
                     ) : volumePending ? (
                       // TRUTHFUL PENDING STATE. An em dash is indistinguishable
                       // from "this feature does not work"; a new keyword whose
                       // volume is on its way should say so.
-                      <span className="text-sm text-muted animate-pulse motion-reduce:animate-none">
+                      <span className="text-copy text-muted animate-pulse motion-reduce:animate-none">
                         {k.volumePending}
                       </span>
                     ) : volumeUnavailable && onRetryVolumes ? (
                       <button
                         type="button"
                         onClick={onRetryVolumes}
-                        className="text-start text-xs text-warn underline decoration-dotted underline-offset-2 hover:text-ink"
+                        className="text-start text-caption text-warn underline decoration-dotted underline-offset-2 hover:text-ink"
                         title={k.volumeRetry}
                       >
                         {k.volumeUnavailable} · {k.volumeRetry}
@@ -260,14 +262,14 @@ export default function TrackingTargetsTable({
                       <button
                         type="button"
                         onClick={onRetryVolumes}
-                        className="text-sm text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                        className="text-copy text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
                         title={k.volumeRetry}
                         aria-label={k.volumeRetry}
                       >
                         —
                       </button>
                     ) : (
-                      <span className="text-sm text-muted" title={k.notChecked}>
+                      <span className="text-copy text-muted" title={k.notChecked}>
                         —
                       </span>
                     )}
@@ -281,30 +283,31 @@ export default function TrackingTargetsTable({
                           #{result.position}
                         </span>
                       ) : (
-                        <span className="text-sm text-muted">{k.notFound}</span>
+                        <span className="text-copy text-muted">{k.notFound}</span>
                       )
                     ) : (
-                      <span className="text-sm text-muted">—</span>
+                      <span className="text-copy text-muted">—</span>
                     )}
+                    {result && <span className="sm:hidden"><PositionChange change={result.change_value} /></span>}
                     {competitorView && <TopCompetitorLine view={competitorView} targetId={target.id} />}
                   </div>
                 </Td>
-                <Td>
+                <Td className="hidden sm:table-cell">
                   {result ? (
                     <PositionChange change={result.change_value} />
                   ) : '—'}
                 </Td>
-                <Td className="whitespace-nowrap">
+                <Td className="hidden whitespace-nowrap lg:table-cell">
                   {result ? (
                     <div>
-                      <span className="text-xs text-muted">{formatDateTime(result.checked_at, language)}</span>
+                      <span className="text-caption text-muted">{formatDateTime(result.checked_at, language)}</span>
                       {result.result_url && (
                         <a
                           href={result.result_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           dir="ltr"
-                          className="block max-w-40 truncate text-xs text-action hover:underline"
+                          className="block max-w-40 truncate text-caption text-action hover:underline"
                         >
                           {result.result_url}
                         </a>
@@ -312,12 +315,12 @@ export default function TrackingTargetsTable({
                     </div>
                   ) : '—'}
                 </Td>
-                <Td>
+                <Td className="hidden xl:table-cell">
                   <Badge variant={result?.found ? 'success' : 'neutral'}>
                     {result ? (result.found ? k.yesFound : k.noNotFound) : '—'}
                   </Badge>
                 </Td>
-                <Td>
+                <Td className="hidden md:table-cell">
                   <ActiveBadge active={target.is_active} />
                 </Td>
                 <Td>
