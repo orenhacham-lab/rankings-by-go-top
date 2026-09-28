@@ -2301,6 +2301,10 @@ export const dashboardHe = {
     },
     loadError: 'לא הצלחנו לטעון את החלק הזה.',
   },
+  /** Shared ui/ primitives (components/ui/**). */
+  uiKit: {
+    noticeMore: 'עוד {n}',
+  },
   common: {
     close: 'סגור',
     menu: 'תפריט',
