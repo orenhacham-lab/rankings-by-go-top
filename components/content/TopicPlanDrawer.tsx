@@ -15,6 +15,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { ChevronDown, ExternalLink } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
@@ -424,18 +428,18 @@ export default function TopicPlanDrawer({
 
   const statusHe = (s: string) => (t.linkStatus as Record<string, string>)[s] ?? s
   const linkRow = (l: SavedLink) => (
-    <div key={l.id} className="rounded-control border border-line p-2.5">
+    <div key={l.id} className="rounded-inset border border-line px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-copy font-medium text-ink">{l.anchor_text || '—'}</span>
         <Badge variant={l.status === 'approved' ? 'success' : l.status === 'rejected' ? 'danger' : 'neutral'}>{statusHe(l.status)}</Badge>
-        <span className="text-caption text-muted">{t.confidence} {l.confidence ?? '—'}</span>
+        <span className="text-caption text-muted tabular-nums">{t.confidence} {l.confidence ?? '—'}</span>
         <div className="flex items-center gap-1 ms-auto">
-          <Button size="sm" variant="outline" onClick={() => setLinkStatus(l.id, 'approved')} disabled={busyLink === l.id || l.status === 'approved' || l.status === 'superseded'}>{t.approve}</Button>
+          <Button size="sm" variant="secondary" onClick={() => setLinkStatus(l.id, 'approved')} disabled={busyLink === l.id || l.status === 'approved' || l.status === 'superseded'}>{t.approve}</Button>
           <Button size="sm" variant="ghost" onClick={() => setLinkStatus(l.id, 'rejected')} disabled={busyLink === l.id || l.status === 'rejected' || l.status === 'superseded'} className="text-bad">{t.reject}</Button>
         </div>
       </div>
-      <div className="mt-1 text-caption text-muted">
-        <a href={l.target_url} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-action hover:underline">{l.target_title || l.target_url}</a>
+      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 text-caption text-muted">
+        <a href={l.target_url} target="_blank" rel="noopener noreferrer" dir="ltr" title={l.target_url} className="inline-flex max-w-64 items-center gap-1 hover:text-action hover:underline"><span className="truncate">{l.target_title || l.target_url}</span><ExternalLink aria-hidden="true" className="size-3.5 shrink-0" /></a>
         <span> · {l.target_priority}</span>
         {l.anchor_source ? <span> · {l.anchor_source}</span> : null}
       </div>
@@ -465,31 +469,31 @@ export default function TopicPlanDrawer({
     const k = dmkey(d)
     const inPlan = savedKeys.has(k)
     return (
-      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex flex-wrap items-start gap-2 rounded-control border border-ok/30 bg-ok-soft p-2 text-caption cursor-pointer">
-        <input type="checkbox" checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} className="mt-0.5 accent-action" />
+      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex cursor-pointer items-start gap-2.5 rounded-inset bg-sunk/60 px-3 py-2.5 text-caption">
+        <span className="flex h-5 items-center"><Checkbox checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} /></span>
         <span className="flex-1 min-w-0">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-ink break-words">{d.anchorText || '—'}</span>
             <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
             {inPlan ? <Badge variant="success">{t.alreadyInPlan}</Badge> : null}
-            <span className="text-muted">{t.confidence} {d.confidence}</span>
+            <span className="text-muted tabular-nums">{t.confidence} {d.confidence}</span>
           </span>
-          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-action hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={d.targetUrl} className="block max-w-64 truncate text-muted hover:text-action hover:underline">{d.targetTitle || d.targetUrl}</a>
         </span>
       </label>
     )
   }
 
   const dryItemRow = (d: DryItem, rejected: boolean) => (
-    <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-control border border-line p-2 text-caption">
+    <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-inset border border-line px-3 py-2.5 text-caption">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-ink font-medium">{d.anchorText || '—'}</span>
         <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
-        <span className="text-muted">{t.confidence} {d.confidence}</span>
+        <span className="text-muted tabular-nums">{t.confidence} {d.confidence}</span>
       </div>
-      <div className="mt-0.5 text-muted">
-        <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:underline">{d.targetTitle || d.targetUrl}</a>
-        {rejected && d.rejectedReasons?.length ? <span className="text-warn"> · {d.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
+      <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-muted">
+        <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={d.targetUrl} className="max-w-64 truncate hover:underline">{d.targetTitle || d.targetUrl}</a>
+        {rejected && d.rejectedReasons?.length ? <span> · {d.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
       </div>
     </div>
   )
@@ -497,48 +501,50 @@ export default function TopicPlanDrawer({
   return (
     <Modal open={open} onClose={onClose} title={t.drawerTitle} size="lg">
       <div dir={language === 'he' ? 'rtl' : 'ltr'}>
-        <p className="text-copy font-medium text-ink">{topic.topic}</p>
+        <p className="text-section font-semibold text-ink">{topic.topic}</p>
         {topic.primary_keyword && <p className="text-caption text-muted">{t.primaryKeyword}: {topic.primary_keyword}</p>}
 
         {/* Persistent completion state after a successful save (Phase 3F.3.3f) —
             placed at the top so it is always visible, and stays until the user
             returns / keeps editing / closes / starts a new search. */}
         {justSaved && (
-          <div className="mt-3 rounded-inset border border-ok/30 bg-ok-soft motion-safe:animate-pop-in px-3 py-3">
-            <p className="text-copy font-semibold text-ok">✓ {t.savedOk}</p>
-            <p className="mt-0.5 text-caption text-ok">{t.savedBody}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => { onReturnToQueue?.(); onClose() }}>{t.returnToQueue}</Button>
-              <Button size="sm" variant="outline" onClick={() => setJustSaved(false)}>{t.keepEditing}</Button>
-            </div>
-          </div>
+          <Notice tone="ok" className="mt-4" action={{ label: t.returnToQueue, onClick: () => { onReturnToQueue?.(); onClose() } }}>
+            <p className="font-semibold">{t.savedOk}</p>
+            <p className="text-caption">{t.savedBody}</p>
+            <button type="button" onClick={() => setJustSaved(false)} className="mt-1 rounded-control text-caption font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.keepEditing}</button>
+          </Notice>
         )}
 
         {/* Purpose + step hint (hidden once saved, to keep the completion clear). */}
         {!justSaved && (
-          <div className="mt-2 rounded-control border border-line bg-sunk/60 px-3 py-2">
-            <p className="text-caption text-body">{t.drawerIntro1}</p>
-            <p className="text-caption text-muted">{t.drawerIntro2}</p>
-            <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-caption text-muted">
-              <li>1. {t.step1}</li>
-              <li>2. {t.step2}</li>
-              <li>3. {t.step3}</li>
-              <li>4. {t.step4}</li>
-            </ol>
+          <div className="mt-3 max-w-prose">
+            <p className="text-copy text-body">{t.drawerIntro1} <span className="text-muted">{t.drawerIntro2}</span></p>
+            <details className="group mt-1">
+              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                {t.stepsTitle}
+                <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+              </summary>
+              <ol className="mt-2 list-decimal space-y-0.5 ps-5 text-caption text-muted">
+                <li>{t.step1}</li>
+                <li>{t.step2}</li>
+                <li>{t.step3}</li>
+                <li>{t.step4}</li>
+              </ol>
+            </details>
           </div>
         )}
 
         {/* Warnings */}
-        {saved?.stale && <p className="mt-2 text-caption text-warn">{t.staleWarn}{saved.staleReasons.length ? ` (${saved.staleReasons.join(', ')})` : ''}</p>}
-        {dry?.cacheState === 'missing' && <p className="mt-2 text-caption text-warn">{t.cacheMissing}</p>}
-        {dry?.warnings?.includes('cache_stale') && <p className="mt-1 text-caption text-warn">{t.cacheStale}</p>}
-        {dry?.warnings?.includes('cache_version_stale') && <p className="mt-1 text-caption text-warn">{t.versionStale}</p>}
-        {error && <p className="mt-2 text-caption text-bad">{error}</p>}
+        {saved?.stale && <Notice tone="warn" className="mt-3">{t.staleWarn}</Notice>}
+        {dry?.cacheState === 'missing' && <Notice tone="warn" className="mt-3">{t.cacheMissing}</Notice>}
+        {dry?.warnings?.includes('cache_stale') && <Notice tone="warn" className="mt-3">{t.cacheStale}</Notice>}
+        {dry?.warnings?.includes('cache_version_stale') && <Notice tone="warn" className="mt-3">{t.versionStale}</Notice>}
+        {error && <Notice tone="bad" className="mt-3">{error}</Notice>}
 
         {/* Actions — all manual */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={runPlan} loading={running} disabled={running || savingQueue}>{running ? t.running : t.runPlan}</Button>
-          <Button size="sm" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={runPlan} loading={running} disabled={running || savingQueue}>{running ? t.running : t.runPlan}</Button>
+          <Button size="sm" variant={onSaveAndQueue ? 'secondary' : 'primary'} onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
           {/* Phase 3F.3.6 (Part G) — streamlined save + enqueue in one click. */}
           {onSaveAndQueue && (
             /* The label states what the click will actually do. With no site
@@ -554,16 +560,16 @@ export default function TopicPlanDrawer({
               {savingQueue ? t.savingQueue : queueDecision.canQueue && !queueDecision.expectsLinks ? t.queueWithoutLinks : t.saveAndQueue}
             </Button>
           )}
-          {hasUnsavedChanges && <span className="text-caption font-medium text-warn">{t.unsavedChanges}</span>}
+          {hasUnsavedChanges && <span className="basis-full text-caption font-medium text-ink">{t.unsavedChanges}</span>}
         </div>
 
         {loading ? (
-          <div className="py-4"><span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" /></div>
+          <div className="mt-4 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" /></div>
         ) : (
           <>
             {/* Saved plan */}
             <div className="mt-4">
-              <div className="text-caption font-medium text-body mb-1">{t.plannedLinksTitle}</div>
+              <div className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.plannedLinksTitle}</div>
               {!saved?.exists ? (
                 <p className="text-caption text-muted">{t.noSavedPlan}</p>
               ) : saved.links.length === 0 ? (
@@ -581,7 +587,7 @@ export default function TopicPlanDrawer({
               const blocked = dry.rejected.filter((r) => r.reviewability !== 'reviewable' && r.displayBlocked !== false)
               return (
               <div className="mt-4">
-                <div className="text-caption font-medium text-body mb-1">{t.recommendedTitle}</div>
+                <div className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.recommendedTitle}</div>
                 {dry.selected.length === 0 ? (
                   <p className="text-caption text-muted">{t.zeroLink}</p>
                 ) : (
@@ -595,14 +601,14 @@ export default function TopicPlanDrawer({
                         <>
                           {money && (
                             <div className="mb-2">
-                              <div className="text-caption font-semibold text-ok mb-0.5">{t.primaryCommercialLink}</div>
+                              <div className="mb-1 text-caption font-semibold text-ink">{t.primaryCommercialLink}</div>
                               {recommendedRow(money)}
                             </div>
                           )}
-                          {!money && <p className="mb-1 text-caption text-warn">{t.noMoneyTargetNote}</p>}
+                          {!money && <p className="mb-2 text-caption text-muted">{t.noMoneyTargetNote}</p>}
                           {supporting.length > 0 && (
                             <>
-                              <div className="text-caption font-semibold text-muted mb-0.5">{t.supportingLinks}</div>
+                              <div className="mb-1 text-caption font-semibold text-muted">{t.supportingLinks}</div>
                               <div className="space-y-1.5">{supporting.map((d) => recommendedRow(d))}</div>
                             </>
                           )}
@@ -614,24 +620,26 @@ export default function TopicPlanDrawer({
 
                 {/* Reviewable — manual-override candidates */}
                 {reviewable.length > 0 && (
-                  <details className="mt-3" open={dry.selected.length === 0}>
-                    <summary className="cursor-pointer select-none text-caption font-medium text-action">{t.reviewableTitle} ({reviewable.length})</summary>
-                    <p className="mt-1 text-caption text-muted">{t.reviewableNote}</p>
-                    <p className="text-caption text-muted">{t.reviewableSelectNote}</p>
+                  <details className="group mt-4" open={dry.selected.length === 0}>
+                    <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                      {t.reviewableTitle} ({reviewable.length})
+                      <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                    </summary>
+                    <p className="mt-1 max-w-prose text-caption text-muted">{t.reviewableNote} {t.reviewableSelectNote}</p>
                     <div className="mt-1.5 space-y-1.5">
                       {reviewable.map((d, i) => {
                         const k = dmkey(d)
                         return (
-                          <label key={`${d.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-control border border-action/30 p-2 text-caption cursor-pointer">
-                            <input type="checkbox" checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} className="mt-0.5 accent-action" />
+                          <label key={`${d.targetUrl}-rv-${i}`} className="flex cursor-pointer items-start gap-2.5 rounded-inset border border-line px-3 py-2.5 text-caption">
+                            <span className="flex h-5 items-center"><Checkbox checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} /></span>
                             <span className="flex-1 min-w-0">
                               <span className="flex flex-wrap items-center gap-2">
                                 <span className="font-medium text-ink break-words">{d.anchorText || '—'}</span>
                                 <Badge variant="neutral">{t.manualBadge}</Badge>
-                                <span className="text-warn">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
-                                <span className="text-muted">{t.confidence} {d.confidence}</span>
+                                <span className="text-muted">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
+                                <span className="text-muted tabular-nums">{t.confidence} {d.confidence}</span>
                               </span>
-                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-action hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={d.targetUrl} className="block max-w-64 truncate text-muted hover:text-action hover:underline">{d.targetTitle || d.targetUrl}</a>
                             </span>
                           </label>
                         )
@@ -648,8 +656,11 @@ export default function TopicPlanDrawer({
 
                 {/* Blocked — advanced diagnostics, not selectable */}
                 {blocked.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer select-none text-caption text-muted">{t.blockedTitle} ({blocked.length})</summary>
+                  <details className="group mt-3">
+                    <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                      {t.blockedTitle} ({blocked.length})
+                      <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                    </summary>
                     <div className="mt-1.5 space-y-1.5 opacity-70">{blocked.slice(0, 30).map((d) => dryItemRow(d, true))}</div>
                   </details>
                 )}
@@ -659,9 +670,12 @@ export default function TopicPlanDrawer({
 
             {/* Advanced diagnostics */}
             {(saved?.exists || dry) && (
-              <details className="mt-3">
-                <summary className="cursor-pointer select-none text-caption text-muted">{t.techDetails}</summary>
-                <div className="mt-1 text-caption text-muted space-y-0.5">
+              <details className="group mt-4">
+                <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                  {t.techDetails}
+                  <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                </summary>
+                <div className="mt-2 space-y-0.5 rounded-inset bg-sunk/60 p-4 text-caption text-muted">
                   {saved?.batch && <div>{t.savedStatus}: {statusHe(saved.batch.status)} · {saved.batch.linkCount} · cache: {saved.batch.cacheState ?? '—'}</div>}
                   {saved?.staleReasons?.length ? <div>stale: {saved.staleReasons.join(', ')}</div> : null}
                   {dry && <div>dry-run cache: {dry.cacheState}{dry.warnings.length ? ` · ${dry.warnings.join(', ')}` : ''}</div>}

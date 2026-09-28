@@ -66,8 +66,8 @@ export function PlatformSwitchBody({
       <p className="text-copy text-muted">{t.modal.intro}</p>
 
       {view.warnAbout && (
-        <div role="alert" data-switch-warning={view.warnAbout} className="flex items-start gap-2.5 rounded-control border border-warn/25 bg-warn-soft px-3 py-2.5 text-warn">
-          <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden />
+        <div role="alert" data-switch-warning={view.warnAbout} className="flex items-start gap-2.5 rounded-inset border border-warn/20 bg-warn-soft px-4 py-3 text-warn">
+          <TriangleAlert className="size-4 mt-0.5 shrink-0" aria-hidden="true" />
           <div className="min-w-0 text-copy">
             <p className="font-semibold">{t.modal.warnTitle.replace('{platform}', t.names[view.warnAbout])}</p>
             <p className="mt-0.5 text-caption">{t.modal.warnBody}</p>
@@ -90,11 +90,11 @@ export function PlatformSwitchBody({
               disabled={disabled || isCurrent}
               onClick={() => onChoose(p)}
               className={cn(
-                'group flex items-start gap-3 rounded-card border bg-surface p-3 text-start shadow-control',
-                'transition-[border-color,box-shadow,background-color,transform] duration-150 ease-snappy',
-                'hover:border-line-strong active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-                'disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
-                selected ? 'border-action bg-action-soft/60 ring-4 ring-action/15' : 'border-line',
+                'group flex items-start gap-3 rounded-inset border bg-surface p-3 text-start shadow-control',
+                'transition-[border-color,box-shadow,background-color] duration-150 ease-snappy',
+                'hover:border-line-strong focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+                selected ? 'border-action ring-4 ring-action/15' : 'border-line',
               )}
             >
               <PlatformIcon platform={p} size="sm" className={cn(selected && 'bg-action text-action-ink ring-action/30')} />
@@ -108,11 +108,11 @@ export function PlatformSwitchBody({
               <span
                 aria-hidden
                 className={cn(
-                  'mt-1 grid size-4 shrink-0 place-items-center rounded-full border transition-colors',
+                  'mt-1 grid size-4 shrink-0 place-items-center rounded-pill border transition-colors',
                   selected ? 'border-action bg-action' : 'border-line-strong bg-surface',
                 )}
               >
-                {selected && <span className="size-1.5 rounded-full bg-action-ink" />}
+                {selected && <span className="size-1.5 rounded-pill bg-action-ink" />}
               </span>
             </button>
           )
@@ -122,13 +122,13 @@ export function PlatformSwitchBody({
       {!choice && <p className="text-caption text-muted">{t.modal.pickFirst}</p>}
       {choice && detected === choice && (
         <p data-switch-detected={detected} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-info/20 bg-info-soft px-2.5 py-1 text-caption font-medium text-info">
-          <ScanSearch size={13} className="shrink-0" aria-hidden />
+          <ScanSearch className="size-3.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0">{t.modal.detectedNote}</span>
         </p>
       )}
 
       {choice && (
-        <div key={choice} data-switch-fields={choice} className="space-y-3 rounded-card border border-line bg-sunk/40 p-4 animate-pop-in">
+        <div key={choice} data-switch-fields={choice} className="space-y-3 rounded-card border border-line bg-sunk/40 p-4 motion-safe:animate-pop-in">
           {view.nextNote === 'wordpress' && <p className="text-copy text-body">{t.modal.wordpressNext}</p>}
           {view.nextNote === 'shopify' && <p className="text-copy text-body">{t.modal.shopifyNext}</p>}
 
@@ -174,8 +174,8 @@ export function PlatformSwitchBody({
                 {test.state === 'busy' ? t.wix.testing : t.wix.test}
               </Button>
               {test.state === 'ok' && (
-                <span role="status" className="inline-flex items-center gap-1.5 text-caption font-medium text-ok animate-pop-in">
-                  <CircleCheck size={14} aria-hidden /> {t.wix.testOk}
+                <span role="status" className="inline-flex items-center gap-1.5 text-caption font-medium text-ok motion-safe:animate-pop-in">
+                  <CircleCheck aria-hidden="true" className="size-4" /> {t.wix.testOk}
                 </span>
               )}
             </div>
@@ -183,7 +183,7 @@ export function PlatformSwitchBody({
         </div>
       )}
 
-      {error && <p role="alert" className="rounded-control border border-bad/20 bg-bad-soft px-3 py-2 text-copy text-bad animate-pop-in">{error}</p>}
+      {error && <p role="alert" className="rounded-inset border border-bad/20 bg-bad-soft px-4 py-3 text-copy text-bad motion-safe:animate-pop-in">{error}</p>}
     </div>
   )
 }
@@ -191,7 +191,7 @@ export function PlatformSwitchBody({
 /** Short numbered steps: where a detail is found, in the words of the platform's own screens. */
 function GuideSteps({ title, steps }: { title: string; steps: readonly string[] }) {
   return (
-    <div className="rounded-control border border-line bg-surface px-3 py-2.5" data-switch-steps>
+    <div className="rounded-inset border border-line bg-surface px-4 py-3" data-switch-steps>
       <p className="text-caption font-semibold text-ink">{title}</p>
       <ol className="mt-1.5 list-decimal space-y-1 ps-5 text-caption text-body">
         {steps.map((step, i) => (
@@ -211,19 +211,19 @@ function GuideSteps({ title, steps }: { title: string; steps: readonly string[] 
 function HelpPath({ t, platform }: { t: T; platform: 'webhook' | 'wix' }) {
   const mailto = `mailto:?subject=${encodeURIComponent(t.help.developerSubject)}&body=${encodeURIComponent(t.help.developerBody)}`
   return (
-    <div className="rounded-control border border-info/20 bg-info-soft/60 px-3 py-2.5" data-switch-help={platform}>
+    <div className="rounded-inset bg-sunk/60 px-4 py-3" data-switch-help={platform}>
       <p className="flex items-center gap-1.5 text-caption font-semibold text-ink">
-        <LifeBuoy size={14} className="shrink-0 text-info" aria-hidden /> {t.help.title}
+        <LifeBuoy className="size-4 shrink-0 text-action" aria-hidden="true" /> {t.help.title}
       </p>
       <p className="mt-1 text-caption text-body">{platform === 'webhook' ? t.help.webhookBody : t.help.wixBody}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {platform === 'webhook' && (
-          <a href={mailto} className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 py-1.5 text-caption font-medium text-ink shadow-control hover:border-line-strong" data-help-developer>
-            <Mail size={14} aria-hidden /> {t.help.developer}
+          <a href={mailto} className="inline-flex h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-caption font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:border-line-strong focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20" data-help-developer>
+            <Mail aria-hidden="true" className="size-4" /> {t.help.developer}
           </a>
         )}
-        <a href={SUPPORT_WHATSAPP_HREF} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 py-1.5 text-caption font-medium text-ink shadow-control hover:border-line-strong" data-help-whatsapp>
-          <MessageCircle size={14} className="text-whatsapp" aria-hidden /> {t.help.whatsapp}
+        <a href={SUPPORT_WHATSAPP_HREF} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-caption font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:border-line-strong focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20" data-help-whatsapp>
+          <MessageCircle className="size-4 text-whatsapp" aria-hidden="true" /> {t.help.whatsapp}
         </a>
       </div>
     </div>
@@ -234,13 +234,13 @@ function HelpPath({ t, platform }: { t: T; platform: 'webhook' | 'wix' }) {
 function SecretReveal({ t, secret, onDone }: { t: T; secret: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className="space-y-3 animate-pop-in" data-secret-reveal>
+    <div className="space-y-3 motion-safe:animate-pop-in" data-secret-reveal>
       <p className="text-copy font-semibold text-ink">{t.modal.secretTitle}</p>
       <p className="text-copy text-muted">{t.modal.secretBody}</p>
       <div className="flex items-center gap-2">
         <code dir="ltr" className="min-w-0 flex-1 truncate rounded-control border border-line bg-sunk px-3 py-2 font-mono text-caption text-ink">{secret}</code>
         <Button size="sm" variant="secondary" onClick={() => { void navigator.clipboard?.writeText(secret).then(() => setCopied(true)) }}>
-          {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? t.modal.copied : t.modal.copy}
+          {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />} {copied ? t.modal.copied : t.modal.copy}
         </Button>
       </div>
       <div className="flex justify-end">

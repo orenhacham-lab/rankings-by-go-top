@@ -25,7 +25,8 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { Link2, ChevronDown, ChevronUp } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import { Check, ChevronDown, Circle, CircleDot, ExternalLink, Link2, Minus } from 'lucide-react'
 
 interface PreviewItem {
   linkId: string
@@ -358,11 +359,11 @@ export default function ArticleInternalLinkApplyPanel({
 
   // Compact status chip so the current state is obvious at a glance.
   const s = t.state as Record<string, string>
-  const chipTones: Record<string, string> = {
-    neutral: 'border-line text-body',
-    amber: 'border-warn/30 text-warn',
-    emerald: 'border-ok/30 text-ok',
-    indigo: 'border-action/30 text-action',
+  const chipTones: Record<string, 'neutral' | 'warning' | 'success' | 'info'> = {
+    neutral: 'neutral',
+    amber: 'warning',
+    emerald: 'success',
+    indigo: 'info',
   }
   let chip: { label: string; tone: string }
   if (!isDraft) chip = { label: s.nonDraft, tone: 'amber' }
@@ -377,38 +378,36 @@ export default function ArticleInternalLinkApplyPanel({
   } else chip = { label: s.readyToPreview, tone: 'neutral' }
 
   return (
-    <Card className="border-action/30">
+    <Card className="border-s-[3px] border-s-action p-5 sm:p-6">
       <div dir={isHebrew ? 'rtl' : 'ltr'}>
         {/* Header — distinct from the QA card; toggle does NOT fetch. */}
-        <button type="button" onClick={() => setCollapsed((v) => !v)} className="w-full flex items-center justify-between gap-3 text-start">
+        <button type="button" onClick={() => setCollapsed((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 rounded-control text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
           <span className="inline-flex items-center gap-2">
-            <Link2 size={16} className="text-action" />
+            <Link2 aria-hidden="true" className="size-4 text-action" />
             <span className="text-section font-semibold text-ink">{t.title}</span>
           </span>
           <span className="inline-flex items-center gap-2 text-muted flex-wrap justify-end">
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-caption font-medium ${chipTones[chip.tone]}`}>{chip.label}</span>
+            <Badge variant={chipTones[chip.tone]}>{chip.label}</Badge>
             {rollbackAvailable && <Badge variant="neutral">{t.rollbackAvailable}</Badge>}
-            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <ChevronDown aria-hidden="true" className={`size-4 transition-transform duration-150 ease-snappy ${open ? 'rotate-180' : ''}`} />
           </span>
         </button>
 
         {open && (
           <div className="mt-3">
-            <p className="text-caption text-muted mb-3">{t.subtitle}</p>
+            <p className="mb-4 max-w-prose text-copy text-muted">{t.subtitle}</p>
 
             {/* Non-draft guard — warning only, no controls, no calls. */}
             {!isDraft ? (
-              <p className="text-copy text-warn bg-warn-soft border border-warn/30 rounded-control px-3 py-2">
-                {t.draftOnly}
-              </p>
+              <Notice tone="warn">{t.draftOnly}</Notice>
             ) : (
               <>
-                {error && <p className="mb-2 text-caption text-bad">{error}</p>}
-                {notice && <p className="mb-2 text-caption text-body">{notice}</p>}
+                {error && <Notice tone="bad" className="mb-3">{error}</Notice>}
+                {notice && <Notice tone="info" className="mb-3">{notice}</Notice>}
 
                 {/* Manual actions */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={runPreview} loading={loadingPreview} disabled={loadingPreview || applying || rollingBack}>
+                  <Button size="sm" variant={canApply ? 'secondary' : 'primary'} onClick={runPreview} loading={loadingPreview} disabled={loadingPreview || applying || rollingBack}>
                     {loadingPreview ? t.previewing : t.runPreview}
                   </Button>
                   {canApply && (
@@ -425,60 +424,60 @@ export default function ArticleInternalLinkApplyPanel({
 
                 {/* Session-only rollback explanation (shown once rollback is available). */}
                 {rollbackAvailable && (
-                  <p className="mt-1.5 text-caption text-muted">{t.rollbackSessionOnly}</p>
+                  <p className="mt-2 max-w-prose text-caption text-muted">{t.rollbackSessionOnly}</p>
                 )}
 
                 {/* Content-edited-since-preview invalidation */}
                 {contentChanged && (
-                  <p className="mt-2 text-caption text-warn">{t.contentChangedRepreview}</p>
+                  <Notice tone="warn" className="mt-3">{t.contentChangedRepreview}</Notice>
                 )}
 
                 {/* Apply result */}
                 {applyOutcome && (
-                  <div className="mt-3 rounded-control border border-ok/30 bg-ok-soft px-3 py-2 text-caption text-ok">
+                  <Notice tone="ok" className="mt-3">
                     {/* Phase 3J — the definitive success line: inserted + already-
                         existing links both count as embedded, out of all approved. */}
                     {typeof applyOutcome.approvedTotal === 'number' && applyOutcome.approvedTotal > 0 && (
-                      <p className="mb-0.5 text-copy font-semibold">
+                      <p className="font-semibold">
                         {t.embeddedLine
                           .replace('{x}', String(applyOutcome.applied + (applyOutcome.alreadyLinked ?? 0)))
                           .replace('{y}', String(applyOutcome.approvedTotal))}
                       </p>
                     )}
-                    <span className="font-medium">{t.appliedTitle}</span>
-                    {' · '}{t.appliedCount}: {applyOutcome.applied} · {t.skippedCount}: {applyOutcome.skipped}
-                    {applyOutcome.snapshotId && <span className="text-ok"> · {t.snapshotLabel}: {applyOutcome.snapshotId.slice(0, 8)}</span>}
-                    {rollbackAvailable && <span className="font-medium"> · {t.rollbackAvailable}</span>}
-                  </div>
+                    <p className="text-caption tabular-nums">
+                      <span className="font-medium">{t.appliedTitle}</span>
+                      {' · '}{t.appliedCount}: {applyOutcome.applied} · {t.skippedCount}: {applyOutcome.skipped}
+                      {applyOutcome.snapshotId && <span> · {t.snapshotLabel}: {applyOutcome.snapshotId.slice(0, 8)}</span>}
+                      {rollbackAvailable && <span className="font-medium"> · {t.rollbackAvailable}</span>}
+                    </p>
+                  </Notice>
                 )}
 
                 {/* Preview result */}
                 {previewResult && previewResult.reason === 'no_plan_batch' && (
                   <div className="mt-3 text-copy text-muted">
                     <p>{t.noPlan}</p>
-                    <Link href={`/content?projectId=${projectId}`} className="text-caption text-action hover:underline">{t.noPlanHint}</Link>
+                    <Link href={`/content?projectId=${projectId}`} className="rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.noPlanHint}</Link>
                   </div>
                 )}
                 {previewResult && previewResult.reason === 'no_approved_links' && (
                   previewResult.plannedLinks > 0 ? (
-                    <div className="mt-3 rounded-control border border-warn/30 bg-warn-soft px-3 py-2.5">
-                      <p className="text-copy text-warn">
-                        {t.plannedAvailable.replace('{n}', String(previewResult.plannedLinks))}
-                      </p>
-                      <div className="mt-2">
+                    <Notice tone="info" className="mt-3">
+                      <span className="flex flex-wrap items-center gap-3">
+                        <span className="min-w-0 flex-1">{t.plannedAvailable.replace('{n}', String(previewResult.plannedLinks))}</span>
                         <Button size="sm" onClick={approvePlanned} loading={approvingPlanned} disabled={approvingPlanned || loadingPreview}>
                           {approvingPlanned ? t.approvingPlanned : t.approvePlanned}
                         </Button>
-                      </div>
-                    </div>
+                      </span>
+                    </Notice>
                   ) : (
                     <p className="mt-3 text-copy text-muted">{t.noApproved}</p>
                   )
                 )}
 
                 {previewResult && !previewResult.reason && (
-                  <div className="mt-3">
-                    <div className="text-caption font-medium text-body mb-1">{t.previewTitle}</div>
+                  <div className="mt-4">
+                    <div className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.previewTitle}</div>
                     {/* Phase 3J.1 — a PREVIEW is not a final count: separate the
                         three states so "ready to embed" isn't mistaken for a skip.
                         already-existing (success) · ready to embed · skipped. */}
@@ -487,7 +486,7 @@ export default function ArticleInternalLinkApplyPanel({
                       const ready = previewResult.wouldInsert
                       const skipped = Math.max(0, previewResult.approvedLinks - already - ready)
                       return (
-                        <p className="text-caption font-semibold text-body mb-1">
+                        <p className="mb-1 text-copy font-semibold text-ink tabular-nums">
                           {t.previewStatusLine
                             .replace('{a}', String(already))
                             .replace('{r}', String(ready))
@@ -495,33 +494,39 @@ export default function ArticleInternalLinkApplyPanel({
                         </p>
                       )
                     })()}
-                    <p className="text-caption text-muted mb-2">
+                    <p className="mb-3 text-caption text-muted tabular-nums">
                       {t.summaryApproved}: {previewResult.approvedLinks} · {t.summaryWouldInsert}: {previewResult.wouldInsert} · {t.summaryWouldSkip}: {previewResult.wouldSkip} · {t.contentUnchanged}
                     </p>
-                    {staleWarn && <p className="mb-2 text-caption text-warn">{staleWarn}{previewResult.planStale && previewResult.planStaleReasons.length ? ` (${previewResult.planStaleReasons.join(', ')})` : ''}</p>}
+                    {staleWarn && <Notice tone="warn" className="mb-3">{staleWarn}</Notice>}
                     <div className="space-y-2">
                       {previewResult.items.map((it) => {
                         const alreadyLinked = (it.reason || '').startsWith('target_already_linked')
                         return (
-                        <div key={it.linkId} className="rounded-control border border-line p-2.5">
+                        <div key={it.linkId} className="rounded-inset border border-line px-4 py-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-copy font-medium text-ink break-words">{it.anchorText || '—'}</span>
                             <Badge variant={it.status === 'would_insert' || alreadyLinked ? 'success' : 'neutral'}>
                               {it.status === 'would_insert' ? t.statusWouldInsert : t.statusSkipped}
                             </Badge>
-                            <span className={`text-caption ${alreadyLinked ? 'text-ok' : 'text-muted'}`}>{reasonLabel(it.reason)}</span>
+                            <span className="text-caption text-muted">{reasonLabel(it.reason)}</span>
                           </div>
-                          <a href={it.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-1 block text-caption text-action hover:underline break-all">{it.targetUrl}</a>
+                          <a href={it.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={it.targetUrl} className="mt-1 inline-flex max-w-64 items-center gap-1 text-caption text-muted hover:text-action hover:underline"><span className="truncate">{it.targetUrl}</span><ExternalLink aria-hidden="true" className="size-3.5 shrink-0" /></a>
                           {it.sentencePreview && (
                             <p className="mt-1 text-caption text-muted"><span className="text-muted">{t.sentenceLabel}:</span> “{it.sentencePreview}”</p>
                           )}
                           {it.checks && Object.keys(it.checks).length > 0 && (
-                            <details className="mt-1">
-                              <summary className="cursor-pointer select-none text-caption text-muted">{t.techDetails}</summary>
+                            <details className="group mt-2">
+                              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                                {t.techDetails}
+                                <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                              </summary>
                               <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-caption text-muted">
                                 {Object.entries(it.checks).map(([k, v]) => (
                                   <div key={k} className="flex items-center gap-1">
-                                    <span className={v ? 'text-ok' : 'text-muted'}>{v ? '✓' : '✕'}</span>
+                                    {v
+                                      ? <Check aria-hidden="true" className="size-3.5 shrink-0 text-ok" />
+                                      : <Minus aria-hidden="true" className="size-3.5 shrink-0 text-muted" />}
+                                    <span className="sr-only">{String(!!v)}</span>
                                     <span dir="ltr">{k}</span>
                                   </div>
                                 ))}
@@ -537,13 +542,13 @@ export default function ArticleInternalLinkApplyPanel({
                         anchor text is missing from the draft body. Links that place
                         normally are shown above unchanged. */}
                     {missingAnchorItems.length > 0 && (
-                      <div className="mt-3 rounded-control border border-warn/30 bg-warn-soft px-3 py-2.5">
-                        <p className="text-copy text-warn">{t.reanchorExplain}</p>
-                        <p className="mt-1 text-caption text-warn">{t.reanchorGuidance}</p>
+                      <div className="mt-4 rounded-inset border border-line bg-sunk/60 p-4">
+                        <Notice tone="warn">{t.reanchorExplain}</Notice>
+                        <p className="mt-2 max-w-prose text-caption text-muted">{t.reanchorGuidance}</p>
 
                         {!reanchorLinks && (
                           <div className="mt-2">
-                            <Button size="sm" variant="outline" onClick={findReanchors} loading={reanchorLoading} disabled={reanchorLoading || applying || rollingBack}>
+                            <Button size="sm" variant="secondary" onClick={findReanchors} loading={reanchorLoading} disabled={reanchorLoading || applying || rollingBack}>
                               {reanchorLoading ? t.reanchorFinding : t.reanchorFind}
                             </Button>
                           </div>
@@ -560,45 +565,51 @@ export default function ArticleInternalLinkApplyPanel({
                               ? <p className="text-caption text-muted">{t.reanchorSelectHint}</p>
                               : <p className="text-caption text-body">{t.reanchorNoneAll}</p>}
                             {reanchorLinks.map((link) => (
-                              <div key={link.linkId} className="rounded-control border border-line bg-surface/60 p-2">
+                              <div key={link.linkId} className="rounded-inset border border-line bg-surface p-3">
                                 <div className="flex flex-wrap items-center gap-2 text-caption text-muted">
                                   <span className="text-muted">{t.reanchorOriginalLabel}:</span>
                                   <span className="font-medium text-body break-words">{link.originalAnchor || '—'}</span>
                                   {link.originalAnchor && (
-                                    <button type="button" onClick={() => copyAnchor(link.linkId, link.originalAnchor)} className="inline-flex items-center rounded border border-line px-1.5 py-0.5 text-caption text-muted hover:text-body">
+                                    <button type="button" onClick={() => copyAnchor(link.linkId, link.originalAnchor)} className="inline-flex h-7 items-center rounded-control border border-line px-2 text-caption text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
                                       {copiedAnchor === link.linkId ? t.reanchorCopied : t.reanchorCopy}
                                     </button>
                                   )}
                                 </div>
-                                <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-0.5 block text-caption text-action hover:underline break-all">{link.targetTitle || link.targetUrl}</a>
+                                <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={link.targetUrl} className="mt-1 block max-w-64 truncate text-caption text-muted hover:text-action hover:underline">{link.targetTitle || link.targetUrl}</a>
                                 {link.suggestions.length === 0 ? (
                                   <p className="mt-1 text-caption text-muted">{t.reanchorNone}</p>
                                 ) : (
                                   <>
                                     <div className="mt-1.5 text-caption font-medium text-muted">{t.reanchorSuggestLabel}</div>
-                                    <div className="mt-1 space-y-1">
-                                      {link.suggestions.map((s, i) => (
-                                        <label key={`${link.linkId}-${i}`} className="flex flex-wrap items-start gap-2 rounded-control bg-sunk p-1.5 text-caption cursor-pointer">
-                                          <input
-                                            type="radio"
-                                            name={`reanchor-${link.linkId}`}
-                                            checked={reanchorSel[link.linkId] === s.anchorText}
-                                            onChange={() => chooseReanchor(link.linkId, s.anchorText)}
-                                            disabled={reanchorApplying}
-                                            className="mt-0.5 accent-action"
-                                          />
-                                          <span className="flex-1 min-w-0">
+                                    <div role="radiogroup" aria-label={t.reanchorSuggestLabel} className="mt-1 space-y-1">
+                                      {link.suggestions.map((s, i) => {
+                                        const on = reanchorSel[link.linkId] === s.anchorText
+                                        return (
+                                        <button
+                                          key={`${link.linkId}-${i}`}
+                                          type="button"
+                                          role="radio"
+                                          aria-checked={on}
+                                          onClick={() => chooseReanchor(link.linkId, s.anchorText)}
+                                          disabled={reanchorApplying}
+                                          className={`flex w-full items-start gap-2 rounded-control border px-3 py-2 text-start text-caption transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:cursor-not-allowed disabled:opacity-50 ${on ? 'border-action bg-action-soft' : 'border-line bg-sunk/60 hover:border-line-strong'}`}
+                                        >
+                                          {on
+                                            ? <CircleDot aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-action" />
+                                            : <Circle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />}
+                                          <span className="min-w-0 flex-1">
                                             <span className="font-medium text-ink break-words">{s.anchorText}</span>
                                             {s.sentence && <span className="mt-0.5 block text-caption text-muted">“{s.sentence}”</span>}
                                           </span>
-                                        </label>
-                                      ))}
+                                        </button>
+                                        )
+                                      })}
                                     </div>
                                   </>
                                 )}
                               </div>
                             ))}
-                            <p className="text-caption text-muted">{t.reanchorFutureNote}</p>
+                            <p className="max-w-prose text-caption text-muted">{t.reanchorFutureNote}</p>
                             {hasAnyAlternatives && (
                               <div>
                                 <Button size="sm" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>

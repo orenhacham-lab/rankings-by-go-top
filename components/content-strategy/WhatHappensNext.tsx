@@ -66,18 +66,18 @@ export default function WhatHappensNext({ counts, next, lang, dict }: {
               style={{ animationDelay: `${i * 70}ms` }}
               className={cn(
                 'relative rounded-card border p-4 motion-safe:animate-pop-in [animation-fill-mode:backwards]',
-                step.state === 'now' ? 'border-action bg-action-soft/60 shadow-card' : 'border-line bg-surface',
+                step.state === 'now' ? 'border-line border-s-[3px] border-s-action bg-surface shadow-card' : 'border-line bg-surface',
               )}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className={cn(
                   'grid size-8 place-items-center rounded-pill text-caption font-semibold',
-                  step.state === 'done' ? 'bg-ok-soft text-ok' : step.state === 'now' ? 'bg-action text-action-ink' : 'bg-sunk text-muted',
+                  step.state === 'done' ? 'bg-action-soft text-action' : step.state === 'now' ? 'bg-action text-action-ink' : 'bg-sunk text-muted',
                 )}>
-                  <Icon size={15} aria-hidden="true" />
+                  <Icon aria-hidden="true" className="size-4" />
                 </span>
                 {step.state !== 'later' && (
-                  <span className={cn('rounded-pill px-2 py-0.5 text-overline font-semibold', step.state === 'now' ? 'bg-action text-action-ink' : 'bg-ok-soft text-ok')}>
+                  <span className={cn('rounded-pill px-2 py-0.5 text-overline font-semibold', step.state === 'now' ? 'bg-action text-action-ink' : 'bg-sunk text-body')}>
                     {step.state === 'now' ? t.stepNow : t.stepDone}
                   </span>
                 )}

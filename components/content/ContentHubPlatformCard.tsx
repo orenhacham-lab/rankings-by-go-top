@@ -22,7 +22,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
-import { AlertTriangle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
@@ -123,18 +124,14 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   if (wpConnected && shopify) {
     // Unexpected dual connection — surface a conflict, delete nothing.
     return (
-      <Card className="border-warn/40">
-        <div className="flex items-start gap-2">
-          <AlertTriangle size={18} className="text-warn mt-0.5 shrink-0" />
-          <div>
-            <div className="font-semibold text-warn">{cs.conflictTitle}</div>
-            <p className="text-copy text-warn">{cs.conflictBody}</p>
-            <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-caption text-action hover:underline">
-              {cs.title} →
-            </Link>
-          </div>
-        </div>
-      </Card>
+      <Notice tone="warn">
+        <p className="font-semibold">{cs.conflictTitle}</p>
+        <p className="max-w-prose text-body">{cs.conflictBody}</p>
+        <Link href={platformSetupHref(projectId)} className="mt-1 inline-flex items-center gap-1 rounded-control text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+          {cs.title}
+          <ArrowRight aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+        </Link>
+      </Notice>
     )
   }
   if (wpConnected) return <>{children}</>
@@ -147,7 +144,7 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
         <p className="text-copy text-muted mb-3">{cs.platformChoiceHint}</p>
         <div className="flex flex-wrap gap-2">
           <Link href={platformSetupHref(projectId)}><Button size="sm">{cs.connectWordPress}</Button></Link>
-          <Link href={platformSetupHref(projectId)}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
+          <Link href={platformSetupHref(projectId)}><Button size="sm" variant="secondary">{cs.connectShopify}</Button></Link>
         </div>
       </Card>
     )
@@ -180,8 +177,11 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
       <div className="text-caption text-muted mb-2">
         {shopify.last_synced_at ? `${t.lastSync}: ${formatDateTime(shopify.last_synced_at, language)}` : t.neverSynced}
       </div>
+      {/* The store's own error text is never shown (design contract §8). */}
       {shopify.last_error && (
-        <div className={`text-caption mb-2 ${shopify.connection_status === 'failed' ? 'text-bad' : 'text-warn'}`}>{shopify.last_error}</div>
+        <Notice tone={shopify.connection_status === 'failed' ? 'bad' : 'warn'} className="mb-3">
+          {shopify.connection_status === 'failed' ? t.testFail : t.syncFail}
+        </Notice>
       )}
 
       <ShopifyDestinationSection
@@ -193,10 +193,10 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
 
       <div className="flex flex-wrap gap-2 mt-2">
         <Button size="sm" onClick={sync} loading={syncing} disabled={syncing || testing}>{t.syncNow}</Button>
-        <Button size="sm" variant="outline" onClick={test} loading={testing} disabled={testing || syncing}>{t.testConnection}</Button>
+        <Button size="sm" variant="secondary" onClick={test} loading={testing} disabled={testing || syncing}>{t.testConnection}</Button>
       </div>
 
-      {message && <p className={`mt-2 text-caption ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>}
+      {message && <Notice tone={message.ok ? 'ok' : 'bad'} className="mt-3">{message.text}</Notice>}
     </Card>
   )
 }

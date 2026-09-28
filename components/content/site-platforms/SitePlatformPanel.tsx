@@ -64,7 +64,7 @@ export default function SitePlatformPanel({
     <div data-site-panel={connection.platform}>
     <Card className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-ink">{t.names[connection.platform]}</h3>
+        <h3 className="text-section font-semibold text-ink">{t.names[connection.platform]}</h3>
         <Badge variant={tone} dot>{t.status[status]}</Badge>
       </div>
 
@@ -72,7 +72,7 @@ export default function SitePlatformPanel({
         {rows.filter(([, v]) => !!v).map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-muted">{k}</dt>
-            <dd dir="ltr" className="min-w-0 truncate text-start font-mono text-caption text-ink sm:text-copy rtl:text-end">{v}</dd>
+            <dd dir="ltr" className="min-w-0 truncate text-start text-copy text-ink rtl:text-end">{v}</dd>
           </div>
         ))}
         <dt className="text-muted">{t.panel.lastTest}</dt>
@@ -80,25 +80,25 @@ export default function SitePlatformPanel({
       </dl>
 
       {status === 'failed' && connection.last_error_code && (
-        <p className="rounded-control border border-bad/20 bg-bad-soft px-3 py-2 text-copy text-bad">{siteErrorText(t, connection.last_error_code)}</p>
+        <p role="status" className="rounded-inset border border-bad/20 bg-bad-soft px-4 py-3 text-copy text-bad">{siteErrorText(t, connection.last_error_code)}</p>
       )}
 
       {!wix && <WebhookDocs t={t.webhook.docs} />}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => void test()} loading={testing} disabled={testing || removing}>
-          {wix ? <ShieldCheck size={14} aria-hidden /> : <Send size={14} aria-hidden />}
+          {wix ? <ShieldCheck aria-hidden="true" className="size-4" /> : <Send aria-hidden="true" className="size-4" />}
           {testing ? (wix ? t.panel.testing : t.webhook.sending) : (wix ? t.panel.test : t.webhook.sendTest)}
         </Button>
         {!locked && (
-          <Button size="sm" variant="ghost" onClick={() => void disconnect()} loading={removing} disabled={testing || removing} className="text-bad hover:text-bad">
-            <Unplug size={14} aria-hidden /> {t.panel.disconnect}
+          <Button size="sm" variant="ghost" onClick={() => void disconnect()} loading={removing} disabled={testing || removing} className="text-bad hover:bg-bad-soft hover:text-bad">
+            <Unplug aria-hidden="true" className="size-4" /> {t.panel.disconnect}
           </Button>
         )}
       </div>
 
       {message && (
-        <p role="status" className={`text-caption font-medium animate-pop-in ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>
+        <p role="status" className={`text-caption font-medium motion-safe:animate-pop-in ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>
       )}
     </Card>
     </div>

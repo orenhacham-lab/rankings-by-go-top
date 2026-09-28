@@ -36,6 +36,8 @@ import { ChevronDown, Columns3, List, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import Segmented from '@/components/ui/Segmented'
+import { Skeleton } from '@/components/ui/Skeleton'
 import SectionHeading from '@/components/ui/SectionHeading'
 import AutomationScreen from '@/components/content/workspace/AutomationScreen'
 import TopicsScreen from '@/components/content/workspace/TopicsScreen'
@@ -66,30 +68,16 @@ type Dict = ReturnType<typeof getDashboardDictionary>
 
 function ViewSwitch({ view, onChange, dict }: { view: StrategyView; onChange: (v: StrategyView) => void; dict: Dict }) {
   const s = dict.contentStrategy
-  const options: { key: StrategyView; label: string; Icon: typeof List }[] = [
-    { key: 'board', label: s.views.board, Icon: Columns3 },
-    { key: 'list', label: s.views.list, Icon: List },
-  ]
   return (
-    <div role="group" aria-label={s.viewsLabel} className="inline-flex rounded-control border border-line bg-sunk p-0.5">
-      {options.map(({ key, label, Icon }) => {
-        const on = key === view
-        return (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onChange(key)}
-            className={cn(
-              'inline-flex h-8 items-center gap-1.5 rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-              on ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink',
-            )}
-          >
-            <Icon size={14} aria-hidden /> {label}
-          </button>
-        )
-      })}
-    </div>
+    <Segmented<StrategyView>
+      ariaLabel={s.viewsLabel}
+      value={view}
+      onChange={onChange}
+      options={[
+        { value: 'board', label: s.views.board, icon: Columns3 },
+        { value: 'list', label: s.views.list, icon: List },
+      ]}
+    />
   )
 }
 
@@ -143,20 +131,20 @@ function StrategyListView({ proFirst, dict, cards, lang, act, insights }: {
             aria-expanded={open}
             aria-controls="strategy-advanced"
             onClick={() => setChoice(!open)}
-            className="flex w-full items-center justify-between gap-3 rounded-card p-4 text-start transition-colors hover:bg-sunk/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+            className="flex w-full items-center justify-between gap-3 rounded-card p-5 text-start transition-colors duration-150 ease-snappy hover:bg-sunk/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:p-6"
           >
             <span className="min-w-0">
-              <span className="block text-copy font-semibold text-ink">{l.advancedTitle}</span>
+              <span className="block text-section font-semibold text-ink">{l.advancedTitle}</span>
               <span className="mt-0.5 block text-caption font-normal text-muted">{l.advancedHint}</span>
             </span>
             <span className="inline-flex shrink-0 items-center gap-1 text-caption font-semibold text-action">
               <span className="hidden sm:inline">{open ? l.advancedClose : l.advancedOpen}</span>
-              <ChevronDown size={16} aria-hidden className={cn('transition-transform duration-200 ease-snappy motion-reduce:transition-none', open && 'rotate-180')} />
+              <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform duration-150 ease-snappy motion-reduce:transition-none', open && 'rotate-180')} />
             </span>
           </button>
         </h3>
         {open && (
-          <div id="strategy-advanced" className="tab-enter border-t border-line p-4">
+          <div id="strategy-advanced" className="tab-enter border-t border-line p-5 sm:p-6">
             {automationEnabled && (
               <section id={STRATEGY_ANCHORS.ideas} className="scroll-mt-4">
                 <SectionHeading title={s.sections.ideas} />
@@ -260,14 +248,14 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
       ) : strategy.status === 'error' ? (
         <Card className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-copy text-body">{s.loadError}</p>
-          <Button size="sm" variant="secondary" onClick={strategy.reload}><RotateCw size={14} aria-hidden /> {s.retry}</Button>
+          <Button size="sm" variant="secondary" onClick={strategy.reload}><RotateCw className="size-4" aria-hidden="true" />{s.retry}</Button>
         </Card>
       ) : (
         <Card tone="ink" className="p-6 md:p-8" >
-          <div role="status" aria-label={s.loading} className="animate-pulse space-y-3">
-            <div className="h-3 w-24 rounded-pill bg-white/15" />
-            <div className="h-6 w-2/3 rounded-pill bg-white/15" />
-            <div className="h-16 w-full rounded-control bg-white/10" />
+          <div role="status" aria-busy="true" aria-label={s.loading} className="space-y-3">
+            <Skeleton className="h-3 w-24 rounded-pill opacity-20" />
+            <Skeleton className="h-6 w-2/3 rounded-pill opacity-20" />
+            <Skeleton className="h-16 w-full opacity-15" />
           </div>
         </Card>
       )}
@@ -294,8 +282,8 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
         ) : board ? (
           <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} act={act} insights={insights} />
         ) : strategy.status === 'loading' ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
-            {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 animate-pulse rounded-card border border-line bg-sunk/60" />)}
+          <div role="status" aria-busy="true" aria-label={s.loading} className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-card" />)}
           </div>
         ) : null}
       </section>

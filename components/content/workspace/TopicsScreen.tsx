@@ -21,7 +21,8 @@ import TopicsList from '@/components/content/TopicsList'
 import NewTopicsLinkPlanPanel from '@/components/content/NewTopicsLinkPlanPanel'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import GscRecommendations from '@/components/content/GscRecommendations'
-import { ChevronDown, Info, ListTodo, Plus, X } from 'lucide-react'
+import { ChevronDown, ListTodo, Plus } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
 import SectionHeading from '@/components/ui/SectionHeading'
 import EmptyState from '@/components/ui/EmptyState'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
@@ -158,25 +159,23 @@ export default function TopicsScreen() {
 
   return (
     <div className="mt-8 scroll-mt-4 space-y-4 border-t border-line pt-8">
-      <SectionHeading title={t.topicsHeading} description={`${t.topicsSubtitle} ${t.queueExplain}`} className="mb-0" />
+      <SectionHeading title={t.topicsHeading} description={t.topicsSubtitle} className="mb-0" />
 
       {/* "Review links" helper when several topics were just approved. */}
       {reviewLinksHint && (
-        <div role="status" className="flex flex-wrap items-start gap-2 rounded-inset border border-action/30 bg-action-soft px-4 py-3 motion-safe:animate-pop-in">
-          <Info size={16} aria-hidden className="mt-0.5 shrink-0 text-action" />
-          <span className="min-w-[12rem] flex-1 text-copy text-ink">{t.reviewRowsHint}</span>
-          <button type="button" onClick={() => setReviewLinksHint(false)} aria-label={t.autoIdeas.dismiss}
-            className="rounded-control p-1 text-muted transition-colors hover:bg-surface hover:text-ink"><X size={14} aria-hidden /></button>
-        </div>
+        <Notice tone="info" onDismiss={() => setReviewLinksHint(false)}>{t.reviewRowsHint}</Notice>
       )}
       {/* Workflow help — collapsed by default so it doesn't add standing
           vertical weight. Wraps ONLY the help text. */}
-      <details className="group rounded-inset border border-line bg-sunk/60 px-4 py-3">
-        <summary className="flex cursor-pointer select-none list-none items-center gap-2 text-copy font-semibold text-ink [&::-webkit-details-marker]:hidden">
-          <ChevronDown size={16} aria-hidden className="shrink-0 text-muted transition-transform duration-150 group-open:rotate-180" />
+      <details className="group">
+        <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1.5 rounded-control text-copy font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" />
           {t.topicsHelpTitle}
         </summary>
-        <p className="mt-2 max-w-prose text-copy text-muted">{t.topicsHelpText}</p>
+        <div className="mt-2 max-w-prose space-y-2 text-copy text-muted">
+          <p>{t.topicsHelpText}</p>
+          <p>{t.queueExplain}</p>
+        </div>
       </details>
 
       {/* Internal-link index status (Phase 2E.1) — flag-gated, read-only +
@@ -189,23 +188,20 @@ export default function TopicsScreen() {
         </div>
       )}
 
-      {/* Batch action bar — only when there are topics without an article. */}
-      {selectableTopics.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-inset border border-line bg-surface px-4 py-2.5 shadow-card">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-copy font-medium text-ink">
-            <input type="checkbox" checked={allSelectableSelected} onChange={toggleSelectAll} disabled={batchRunning} className="size-4 cursor-pointer accent-action" />
-            {t.batch.selectAll}
-          </label>
-          <span className="text-copy text-muted tabular-nums">{t.batch.selected.replace('{n}', String(selected.size))}</span>
+      {/* Batch action bar — only once something is selected (or a batch runs).
+          Selecting all is the table's header checkbox. */}
+      {selectableTopics.length > 0 && (selected.size > 0 || batchRunning) && (
+        <div data-bulk-bar="" className="sticky top-16 z-20 flex flex-wrap items-center gap-3 rounded-inset bg-contrast px-4 py-2.5 text-contrast-ink shadow-pop motion-safe:animate-pop-in">
+          <span className="text-copy font-semibold tabular-nums">{t.batch.selected.replace('{n}', String(selected.size))}</span>
           <Button size="sm" onClick={runBatch} loading={batchRunning} disabled={batchRunning || selected.size === 0 || selected.size > BATCH_LIMIT}>
             {batchRunning ? t.batch.running : t.batch.createSelected.replace('{n}', String(selected.size))}
           </Button>
           {batchRunning ? (
-            <Button size="sm" variant="ghost" onClick={cancelBatch}>{t.batch.cancel}</Button>
+            <Button size="sm" variant="ghost" onClick={cancelBatch} className="text-contrast-ink hover:bg-white/10 hover:text-contrast-ink">{t.batch.cancel}</Button>
           ) : (
-            selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection}>{t.batch.clear}</Button>
+            selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection} className="text-contrast-ink hover:bg-white/10 hover:text-contrast-ink">{t.batch.clear}</Button>
           )}
-          {selected.size > BATCH_LIMIT && <span className="text-caption text-warn">{t.batch.tooMany}</span>}
+          {selected.size > BATCH_LIMIT && <span className="text-caption text-contrast-ink/80">{t.batch.tooMany}</span>}
         </div>
       )}
 
@@ -235,7 +231,7 @@ export default function TopicsScreen() {
           <EmptyState
             icon={<ListTodo />}
             title={t.topicsEmptyTitle}
-            action={<Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>}
+            action={<Button onClick={handleCreateTopic}><Plus className="size-4" /> {t.newTopicButton}</Button>}
           />
         </Card>
       ) : (
@@ -250,6 +246,8 @@ export default function TopicsScreen() {
             onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
             selectedIds={selected}
             onToggleSelect={toggleSelect}
+            allSelected={allSelectableSelected}
+            onToggleAll={toggleSelectAll}
             batchState={batchState}
             batchRunning={batchRunning}
             onRetry={retryTopic}

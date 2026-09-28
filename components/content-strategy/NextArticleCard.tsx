@@ -24,7 +24,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, Check, KeyRound, ListOrdered, PenLine, Plus, Shuffle, Sparkles, X } from 'lucide-react'
+import { CalendarClock, Check, KeyRound, ListOrdered, Loader2, PenLine, Plus, Shuffle, Sparkles, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { NextArticle, StrategyOrigin } from '@/lib/content/strategy/board'
@@ -43,8 +43,8 @@ type Dict = ReturnType<typeof getDashboardDictionary>
 const GENERATE_TIMEOUT_MS = 180_000
 
 /** A quiet action on the dark card (the filled primary stays for the one main action). */
-const SPINNER = <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-const INK_ACTION = 'inline-flex h-9 items-center gap-1.5 rounded-control border border-white/15 px-4 text-sm font-semibold text-contrast-ink transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50'
+const SPINNER = <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+const INK_ACTION = 'inline-flex h-9 items-center gap-1.5 rounded-control border border-white/15 px-4 text-copy font-semibold text-contrast-ink transition-colors duration-150 ease-snappy hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50'
 
 function originOf(next: NextArticle): StrategyOrigin {
   if (next.kind === 'scan') return 'scan'
@@ -79,7 +79,7 @@ export default function NextArticleCard({
         <p className="text-caption font-semibold uppercase tracking-wide text-contrast-ink/60">{s.nextEyebrow}</p>
         <p className="mt-2 text-section font-semibold">{s.emptyNextTitle}</p>
         <p className="mt-1 max-w-xl text-copy text-contrast-ink/75">{s.emptyNextBody}</p>
-        <Button className="mt-5" onClick={onCreateTopic}><Plus size={16} /> {s.addTopic}</Button>
+        <Button className="mt-5" onClick={onCreateTopic}><Plus className="size-4" /> {s.addTopic}</Button>
       </Card>
     )
   }
@@ -141,12 +141,12 @@ export default function NextArticleCard({
           {tile ? (
             <div className="flex w-24 shrink-0 flex-col items-center rounded-control border border-white/10 bg-white/[0.06] px-2 py-3 text-center md:w-full" aria-label={next.date ?? undefined}>
               <span className="text-caption text-contrast-ink/65">{tile.weekday}</span>
-              <span className="text-[2.25rem] font-bold leading-none tabular-nums">{tile.day}</span>
+              <span className="text-metric font-bold leading-none tabular-nums">{tile.day}</span>
               <span className="mt-1 text-caption font-semibold text-contrast-ink/80">{tile.month}</span>
             </div>
           ) : (
             <div className="flex w-24 shrink-0 flex-col items-center gap-1.5 rounded-control border border-dashed border-white/20 px-2 py-3 text-center md:w-full">
-              <CalendarClock size={22} className="text-contrast-ink/60" aria-hidden />
+              <CalendarClock className="size-6 text-contrast-ink/60" aria-hidden="true" />
               <span className="text-caption text-contrast-ink/70">{s.nextNotScheduled}</span>
             </div>
           )}
@@ -156,7 +156,7 @@ export default function NextArticleCard({
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-caption font-semibold uppercase tracking-wide text-contrast-ink/60">{s.nextEyebrow}</p>
             <span className="inline-flex items-center gap-1 rounded-pill bg-white/10 px-2 py-0.5 text-caption text-contrast-ink/80">
-              {origin === 'scan' || origin === 'plan' ? <Sparkles size={12} aria-hidden /> : null}
+              {origin === 'scan' || origin === 'plan' ? <Sparkles aria-hidden="true" className="size-3.5" /> : null}
               {s.factSource[origin]}
             </span>
           </div>
@@ -164,10 +164,10 @@ export default function NextArticleCard({
 
           <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-caption text-contrast-ink/75">
             {next.keyword && (
-              <li className="inline-flex items-center gap-1.5"><KeyRound size={13} aria-hidden /> {s.factKeyword}: <span className="font-semibold text-contrast-ink">{next.keyword}</span></li>
+              <li className="inline-flex items-center gap-1.5"><KeyRound aria-hidden="true" className="size-3.5" /> {s.factKeyword}: <span className="font-semibold text-contrast-ink">{next.keyword}</span></li>
             )}
             {next.queuePosition && (
-              <li className="inline-flex items-center gap-1.5"><ListOrdered size={13} aria-hidden /> {fill(s.factQueue, { n: next.queuePosition, total: next.queueLength })}</li>
+              <li className="inline-flex items-center gap-1.5"><ListOrdered aria-hidden="true" className="size-3.5" /> {fill(s.factQueue, { n: next.queuePosition, total: next.queueLength })}</li>
             )}
           </ul>
 
@@ -181,7 +181,7 @@ export default function NextArticleCard({
             {!hasArticles && (
               <>
                 <Button onClick={writeFirst} loading={writing} disabled={writing}>
-                  {!writing && <PenLine size={16} aria-hidden />} {writing ? s.writing : s.writeFirst}
+                  {!writing && <PenLine aria-hidden="true" className="size-4" />} {writing ? s.writing : s.writeFirst}
                 </Button>
                 <span className="text-caption text-contrast-ink/60">{s.writeFirstHint}</span>
               </>
@@ -192,24 +192,24 @@ export default function NextArticleCard({
                 {hasArticles ? (
                   <Button onClick={() => void ideaActs.act.actions.approve(ideaActs.idea)} loading={busy === 'approve'} disabled={!!busy}
                     aria-label={fill(a.approveAria, { title: next.title })} data-idea-action="approve">
-                    {busy !== 'approve' && <Check size={16} aria-hidden />} {a.approve}
+                    {busy !== 'approve' && <Check aria-hidden="true" className="size-4" />} {a.approve}
                   </Button>
                 ) : (
                   <button type="button" className={INK_ACTION} onClick={() => void ideaActs.act.actions.approve(ideaActs.idea)} disabled={!!busy}
                     aria-busy={busy === 'approve' || undefined} aria-label={fill(a.approveAria, { title: next.title })} data-idea-action="approve">
-                    {busy === 'approve' ? SPINNER : <Check size={15} aria-hidden />} {a.approve}
+                    {busy === 'approve' ? SPINNER : <Check aria-hidden="true" className="size-4" />} {a.approve}
                   </button>
                 )}
                 {next.alternatives > 0 && (
                   <button type="button" className={INK_ACTION} onClick={() => ideaActs.act.actions.swap(ideaActs.idea)} disabled={!!busy}
                     aria-label={fill(a.swapAria, { title: next.title })} data-idea-action="swap">
-                    <Shuffle size={15} aria-hidden /> {a.swap}
+                    <Shuffle aria-hidden="true" className="size-4" /> {a.swap}
                   </button>
                 )}
                 {canRejectIdea(ideaActs.idea, ideaActs.act.automation) && (
                   <button type="button" className={INK_ACTION} onClick={() => void ideaActs.act.actions.reject(ideaActs.idea)} disabled={!!busy}
                     aria-busy={busy === 'reject' || undefined} aria-label={fill(a.rejectAria, { title: next.title })} data-idea-action="reject">
-                    {busy === 'reject' ? SPINNER : <X size={15} aria-hidden />} {a.reject}
+                    {busy === 'reject' ? SPINNER : <X aria-hidden="true" className="size-4" />} {a.reject}
                   </button>
                 )}
               </div>
@@ -217,7 +217,7 @@ export default function NextArticleCard({
             {secondary && (
               <Link
                 href={secondary.href}
-                className="inline-flex h-9 items-center rounded-control border border-white/15 px-4 text-sm font-semibold text-contrast-ink transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                className={INK_ACTION}
               >
                 {secondary.label}
               </Link>

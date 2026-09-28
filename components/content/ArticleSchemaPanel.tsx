@@ -64,14 +64,14 @@ export default function ArticleSchemaPanel({ t, failText, input, isWebhook, onNo
           <p className="mt-1 text-copy text-body">{t.intro}</p>
         </div>
         <Button size="sm" onClick={() => void copy()} loading={busy} disabled={busy || blocks.length === 0}>
-          {!busy && <Copy size={14} aria-hidden />} {t.copy}
+          {!busy && <Copy aria-hidden="true" className="size-4" />} {t.copy}
         </Button>
       </div>
 
       <ul className="mb-4 space-y-1.5 text-caption text-muted">
-        <li className="flex gap-2"><Info size={14} aria-hidden className="mt-0.5 shrink-0 text-info" /><span>{t.faqNote}</span></li>
-        <li className="flex gap-2"><Info size={14} aria-hidden className="mt-0.5 shrink-0 text-info" /><span>{isWebhook ? t.webhookNote : t.duplicateNote}</span></li>
-        <li className="flex gap-2"><Info size={14} aria-hidden className="mt-0.5 shrink-0 text-info" /><span>{t.liveNote}</span></li>
+        <li className="flex gap-2"><Info aria-hidden="true" className="size-4 mt-0.5 shrink-0 text-info" /><span>{t.faqNote}</span></li>
+        <li className="flex gap-2"><Info aria-hidden="true" className="size-4 mt-0.5 shrink-0 text-info" /><span>{isWebhook ? t.webhookNote : t.duplicateNote}</span></li>
+        <li className="flex gap-2"><Info aria-hidden="true" className="size-4 mt-0.5 shrink-0 text-info" /><span>{t.liveNote}</span></li>
       </ul>
 
       <div className="grid gap-4 lg:grid-cols-2">

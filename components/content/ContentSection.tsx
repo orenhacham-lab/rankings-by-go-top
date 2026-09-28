@@ -36,7 +36,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowLeftRight, ScanSearch } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, ScanSearch } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { BACK_LINK_CLASSES } from '@/components/ui/BackLink'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -121,13 +124,13 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   // K2 — when a platform is connected, explain what the Content Hub offers and link
   // to it. This is a pointer to the hub, NOT a second Content Hub inside the project.
   const connectedBanner = (
-    <Card className="hover:translate-y-0 border-action/20 bg-action-soft/50">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <div className="font-semibold text-ink">{t.connectedTitle}</div>
-          <p className="text-sm text-body mt-0.5">{t.connectedBody}</p>
+    <Card className="border-s-[3px] border-s-action p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-section font-semibold text-ink">{t.connectedTitle}</h3>
+          <p className="mt-1 max-w-prose text-copy text-body">{t.connectedBody}</p>
         </div>
-        <Button size="sm" onClick={goToContentHub} className="shrink-0">{t.goToContentHub}</Button>
+        <Button size="sm" variant="secondary" onClick={goToContentHub} className="shrink-0">{t.goToContentHub}</Button>
       </div>
     </Card>
   )
@@ -135,24 +138,16 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   const legacy = (
     <section>
       {loading ? (
-        <Card className="hover:translate-y-0">
-          <div className="flex items-center gap-2 text-sm text-muted py-3">
-            <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
-          </div>
+        <Card className="p-5 sm:p-6">
+          <Skeleton className="h-10 w-2/3" />
         </Card>
       ) : both ? (
         // Unexpected dual connection — surface a conflict, delete nothing. Both
         // panels render so the owner can disconnect one to resolve it.
         <div className="space-y-3">
-          <Card className="hover:translate-y-0 border-warn/40">
-            <div className="flex items-start gap-2">
-              <AlertTriangle size={18} className="text-warn mt-0.5 shrink-0" />
-              <div>
-                <div className="font-semibold text-warn">{t.conflictTitle}</div>
-                <p className="text-sm text-warn">{t.conflictBody}</p>
-              </div>
-            </div>
-          </Card>
+          <Notice tone="warn">
+            <span className="font-semibold">{t.conflictTitle}</span> {t.conflictBody}
+          </Notice>
           <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
           <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
@@ -168,34 +163,34 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
         </div>
       ) : choice === 'wordpress' ? (
         <div className="space-y-2">
-          <button type="button" onClick={() => setChoice(null)} className="text-xs text-action hover:underline">← {t.back}</button>
+          <button type="button" onClick={() => setChoice(null)} className={BACK_LINK_CLASSES}><ArrowLeft aria-hidden="true" className="size-4 shrink-0 rtl:-scale-x-100" />{t.back}</button>
           <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} onConnected={goToContentHub} />
         </div>
       ) : choice === 'shopify' ? (
         <div className="space-y-2">
-          <button type="button" onClick={() => setChoice(null)} className="text-xs text-action hover:underline">← {t.back}</button>
+          <button type="button" onClick={() => setChoice(null)} className={BACK_LINK_CLASSES}><ArrowLeft aria-hidden="true" className="size-4 shrink-0 rtl:-scale-x-100" />{t.back}</button>
           <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : (
         // Neither connected → platform choice (never both full panels at once).
-        <Card className="hover:translate-y-0">
-          <h3 className="text-base font-semibold text-ink mb-1">{t.platformChoiceTitle}</h3>
-          <p className="text-sm text-muted mb-3">{t.platformChoiceHint}</p>
+        <Card className="p-5 sm:p-6">
+          <h3 className="mb-1 text-section font-semibold text-ink">{t.platformChoiceTitle}</h3>
+          <p className="mb-3 max-w-prose text-copy text-muted">{t.platformChoiceHint}</p>
           {platformHint && (
-            <p data-platform-hint={platformHint.preferred ?? 'other'} className="mb-3 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-info/20 bg-info-soft px-2.5 py-1 text-caption font-medium text-info">
-              <ScanSearch size={13} className="shrink-0" aria-hidden />
+            <p data-platform-hint={platformHint.preferred ?? 'other'} className="mb-3 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-line bg-sunk px-2.5 py-1 text-caption font-medium text-body">
+              <ScanSearch className="size-4 shrink-0 text-action" aria-hidden />
               <span className="min-w-0">{platformHint.label}</span>
             </p>
           )}
           {platformHint?.preferred === 'shopify' ? (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
-              <Button size="sm" variant="outline" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
+              <Button size="sm" variant="secondary" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
-              <Button size="sm" variant="outline" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
+              <Button size="sm" variant="secondary" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
             </div>
           )}
         </Card>
@@ -216,14 +211,14 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   }
 
   const platformCard = (
-    <Card className="hover:translate-y-0" >
+    <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4" data-platform-card={conflict ? 'conflict' : current ?? 'none'}>
         <div className="flex min-w-0 items-center gap-3">
           {current && !conflict ? <PlatformIcon platform={current} /> : (
-            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl border border-dashed border-line-strong text-muted"><ArrowLeftRight size={18} /></span>
+            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action"><ArrowLeftRight className="size-5" /></span>
           )}
           <div className="min-w-0">
-            <p className="text-caption font-semibold uppercase tracking-wide text-muted">{sp.cardTitle}</p>
+            <p className="text-overline font-semibold uppercase tracking-wide text-muted">{sp.cardTitle}</p>
             {current && !conflict ? (
               <p className="flex flex-wrap items-center gap-2 text-section font-semibold text-ink">
                 {sp.names[current]}
@@ -237,13 +232,13 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
         </div>
         {!conflict && (
           <Button size="sm" variant={current ? 'secondary' : 'primary'} onClick={() => setSwitchOpen(true)} className="shrink-0" data-open-switch>
-            <ArrowLeftRight size={14} aria-hidden /> {current ? sp.change : sp.choose}
+            <ArrowLeftRight className="size-4" aria-hidden /> {current ? sp.change : sp.choose}
           </Button>
         )}
       </div>
       {!current && platformHint && (
-        <p data-platform-hint={platformHint.preferred ?? 'other'} className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-info/20 bg-info-soft px-2.5 py-1 text-caption font-medium text-info">
-          <ScanSearch size={13} className="shrink-0" aria-hidden />
+        <p data-platform-hint={platformHint.preferred ?? 'other'} className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-line bg-sunk px-2.5 py-1 text-caption font-medium text-body">
+          <ScanSearch className="size-4 shrink-0 text-action" aria-hidden />
           <span className="min-w-0">{platformHint.label}</span>
         </p>
       )}
@@ -262,7 +257,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
       ) : current === 'wordpress' || (!current && choice === 'wordpress') ? (
         // One element for "chosen" and "connected", so saving does not remount
         // the panel: its answer (a failed test, say) stays on screen.
-        <div className="space-y-3 animate-pop-in" data-wp-section>
+        <div className="space-y-3 motion-safe:animate-pop-in" data-wp-section>
           {current === 'wordpress' && connectedBanner}
           <WordPressConnectionPanel
             projectId={projectId}
@@ -282,7 +277,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
           <SitePlatformPanel projectId={projectId} connection={site} t={sp} onChanged={onPanelChanged} />
         </div>
       ) : choice === 'shopify' ? (
-        <div className="animate-pop-in">
+        <div className="motion-safe:animate-pop-in">
           <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : null}

@@ -793,6 +793,7 @@ export const dashboardEn = {
       truncated: 'Partial scan (hit the limit)',
       techDetails: 'Technical details',
       errorPrefix: 'Error',
+      failedHint: "We couldn't scan the site. Check that it is reachable and refresh again.",
       cUnique: 'targets',
       cEligible: 'eligible',
       cAnchors: 'targets with anchors',
@@ -922,6 +923,7 @@ export const dashboardEn = {
       // Phase 3F.3.3e — drawer purpose + step hint + clearer actions/completion.
       drawerIntro1: 'Here you can review, add, or remove internal links before the article is created.',
       drawerIntro2: 'Links are saved as a plan only, and will be used during article creation.',
+      stepsTitle: 'How it works',
       step1: 'Review existing links',
       step2: 'Add recommended or manual links if needed',
       step3: 'Click “Save link plan”',
@@ -1336,7 +1338,7 @@ export const dashboardEn = {
     confirmDeleteArticle: 'Delete this draft? It removes the article from the system and does not affect WordPress.',
     deleteFailed: 'Failed to delete the article. Please try again.',
     editor: {
-      back: '← Back to Content Hub',
+      back: 'Back to articles',
       loading: 'Loading article…',
       notFound: 'Article not found.',
       title: 'Title',
@@ -1667,7 +1669,7 @@ export const dashboardEn = {
       anchorTooCloseMsg: 'Links are too close to each other',
       anchorMechanical: 'A link is placed in a generic/mechanical sentence',
       anchorFirstPos: 'First link position (words)',
-      backToHub: '← Back to Content Hub',
+      backToHub: 'Back to articles',
       internal: {
         title: 'Internal links',
         hint: 'Suggestions to link from this article to other already-published articles in the project. Insertion is manual — nothing is written until you save.',
@@ -3066,6 +3068,8 @@ export const dashboardEn = {
         lastSync: 'Last sync',
         neverSynced: 'Never synced',
         window28: '28 days',
+        windowLabel: 'Period',
+        viewsLabel: 'Data view',
         window90: '90 days',
         latestAvailableDate: 'Latest available date',
         dateRange: 'Date range',
@@ -4674,6 +4678,7 @@ export const dashboardEn = {
     label: 'Free trial',
   },
   articleEditorToolbar: {
+    label: 'Text formatting',
     heading2: 'Heading 2',
     heading3: 'Heading 3',
     bold: 'Bold',

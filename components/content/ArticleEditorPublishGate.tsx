@@ -19,8 +19,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
-import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SitePublishCard } from './site-platforms/SiteHubCard'
@@ -98,8 +99,9 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
   if (loading) {
     return (
       <Card>
-        <div className="flex items-center gap-2 text-copy text-muted py-3">
-          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
+        <div role="status" aria-busy="true" className="space-y-2 py-1">
+          <Skeleton className="h-5 w-1/3" />
+          <Skeleton className="h-10 w-full" />
         </div>
       </Card>
     )
@@ -108,16 +110,13 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
   // Both GENUINELY connected → conflict; never render a publishing flow.
   if (platform === 'conflict') {
     return (
-      <Card className="border-warn/30" >
-        <div className="flex items-start gap-2" dir={dir}>
-          <AlertTriangle size={18} className="text-warn mt-0.5 shrink-0" />
-          <div>
-            <div className="font-semibold text-warn">{t.conflictTitle}</div>
-            <p className="text-copy text-warn">{t.conflictText}</p>
-            {projectId && <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-caption text-action hover:underline">{t.projectPageLink}</Link>}
-          </div>
-        </div>
-      </Card>
+      <div dir={dir}>
+        <Notice tone="warn">
+          <p className="font-semibold">{t.conflictTitle}</p>
+          <p className="max-w-prose text-body">{t.conflictText}</p>
+          {projectId && <Link href={platformSetupHref(projectId)} className="mt-1 inline-block rounded-control text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.projectPageLink}</Link>}
+        </Notice>
+      </div>
     )
   }
 
@@ -129,7 +128,7 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
   if (platform === 'shopify') {
     if (shopifyPanel) return <>{shopifyPanel}</>
     return (
-      <Card  >
+      <Card className="p-5 sm:p-6">
         <div dir={dir}>
           <h3 className="text-section font-semibold text-ink mb-1">{t.shopifyTitle}</h3>
           <p className="text-copy text-body">{t.shopifyText}</p>
@@ -146,10 +145,10 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
 
   // Neither connected → direct the user to connect on the project page.
   return (
-    <Card  >
+    <Card className="p-5 sm:p-6">
       <div dir={dir}>
-        <p className="text-copy text-body">{t.neitherText}</p>
-        {projectId && <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-caption text-action hover:underline">{t.projectPageLink}</Link>}
+        <p className="max-w-prose text-copy text-body">{t.neitherText}</p>
+        {projectId && <Link href={platformSetupHref(projectId)} className="mt-2 inline-block rounded-control text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.projectPageLink}</Link>}
       </div>
     </Card>
   )

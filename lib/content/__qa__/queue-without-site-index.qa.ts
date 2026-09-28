@@ -482,7 +482,7 @@ async function main() {
       /queueWithoutLinks: 'Add to queue without internal links'/.test(en))
     check('9c: Hebrew label likewise', /queueWithoutLinks: 'הוסף לתור ללא קישורים פנימיים'/.test(he))
     check('9d: the missing-index notice is still shown',
-      /dry\?\.cacheState === 'missing' && <p/.test(drawer))
+      /dry\?\.cacheState === 'missing' && <Notice tone="warn">\{t\.cacheMissing\}<\/Notice>/.test(drawer.replace(/ className="[^"]*"/g, '')))
     check('9e: but no longer tells the user to refresh and try again',
       !/refresh the index first/.test(en) && !/רענן את האינדקס תחילה/.test(he))
     check('9f: it now says the topic can still be queued',

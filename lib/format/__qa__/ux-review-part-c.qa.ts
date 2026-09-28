@@ -200,7 +200,8 @@ console.log('P2-2 / P2-6 wording')
 console.log('axe: names for selects and checkboxes; tokens, not raw palette colours')
 {
   guard('articles: the status filter and the search have names', 'components/content/workspace/ArticlesScreen.tsx',
-    (s) => { const sel = jsx(s, 'select'); return sel.length > 0 && sel.every(named) && /aria-label=\{t\.table\.selectArticle\(/.test(s) },
+    // ui/Select since the design pass (no raw <select> left on the screen).
+    (s) => { const sel = jsx(s, 'Select'); return sel.length > 0 && jsx(s, 'select').length === 0 && sel.every(named) && /aria-label=\{t\.table\.selectArticle\(/.test(s) },
     (raw) => raw.replace('aria-label={t.filters.status}', ''))
   guard('AI visibility: the three result filters have names', 'components/ai-visibility/AIVisibilitySection.tsx',
     (s) => ['filter_engine', 'filter_mention', 'filter_citation'].every((k) => new RegExp(`aria-label=\\{t\\(["']${k}["']\\)\\}`).test(s)),
