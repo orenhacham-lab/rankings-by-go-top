@@ -236,12 +236,17 @@ function applyState(s: A11yState) {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * The accessibility menu: a 40px button in the start corner above the contact
- * bar (bottom-24 start-4), and a panel of eighteen adjustments. Labels follow
- * the page's language (/en is English). `raised` lifts the button above the
- * privacy notice's bottom sheet on a phone while that sheet is open.
+ * The accessibility menu: a 40px button in the start corner, and a panel of
+ * eighteen adjustments. Labels follow the page's language (/en is English).
+ *
+ * Below `md` the button docks INTO the bottom strip, in the start slot that the
+ * contact bar and the privacy sheet both keep free for it, so on a phone it
+ * never floats over the page (it used to sit on the hero's buttons), and the
+ * privacy sheet, laid over the same strip, does not move it: it stays in its
+ * slot, above the sheet in the stacking order (z-60 over z-58). From `md` there
+ * is no contact bar and it floats at bottom-24.
  */
-export function AccessibilityWidget({ raised = false }: { raised?: boolean } = {}) {
+export function AccessibilityWidget() {
   const pathname = usePathname()
   const isEn = pathname === '/en' || !!pathname?.startsWith('/en/')
   const t = getPublicDictionary(isEn ? 'en' : 'he').a11y
@@ -370,7 +375,8 @@ export function AccessibilityWidget({ raised = false }: { raised?: boolean } = {
           'fixed start-4 z-[60] flex size-10 items-center justify-center rounded-pill border shadow-pop',
           'transition-[bottom,background-color,border-color] duration-150 ease-snappy',
           'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
-          raised ? 'bottom-48 sm:bottom-24' : 'bottom-24',
+          // phone: docked in the bottom strip's start slot (centred on its 40px controls); md+: floating
+          'bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-24',
           // Solid on purpose: under an invert / sepia / grayscale filter a tinted
           // button would disappear.
           anyColorFilter ? 'border-ink bg-surface text-ink' : 'border-transparent bg-action text-action-ink hover:bg-action-hover',
@@ -394,7 +400,8 @@ export function AccessibilityWidget({ raised = false }: { raised?: boolean } = {
           className={cn(
             'fixed start-4 z-[61] max-h-[calc(100dvh-8rem)] w-80 max-w-[calc(100vw-2rem)] animate-pop-in overflow-y-auto',
             'rounded-card border border-line bg-surface p-4 shadow-pop',
-            raised ? 'bottom-60 sm:bottom-36' : 'bottom-36',
+            // Opens above the bottom strip on a phone, above the button from md.
+            'bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-36',
           )}
         >
           {/* Header */}

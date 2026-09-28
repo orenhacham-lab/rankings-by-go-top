@@ -11,8 +11,12 @@
  *   C) Billing (render, both languages): the plans, prices and features the
  *      dictionary and PLAN_LIMITS give are all there, each paid plan keeps its
  *      PayPal container, and a Shopify-billed account sees the Shopify panel and
- *      nothing of PayPal, with that branch's markup unchanged. No raw slate/blue
- *      classes outside it, and no amber (commit) colour on the plan cards.
+ *      nothing of PayPal. That panel is on the primitives (R4: a Card, the two
+ *      migration states as Notices, the start-intent route still a plain GET
+ *      link, drawn as the one primary button). No raw slate/blue classes
+ *      anywhere, and no amber (commit) colour on the plan cards. Confirmations
+ *      and messages are in the page (ConfirmDialog, Notice), never a browser
+ *      alert/confirm, and never the route's or PayPal's own error text.
  *      With no stored currency the plans show at once in the language's
  *      currency (he ILS, en USD) with a visible switch and no PayPal button; the
  *      one request that persists the currency is byte-for-byte the old one.
@@ -157,20 +161,36 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
     check(`C4-MUT (${locale}) a plan card in the Shopify view fails C4`, !shopOk(shop + '<div data-plan-card="regular"></div>'))
   }
 
-  // The Shopify branch is Shopify-specific: its markup stays exactly as it was
-  // (visual consistency only where a component is shared).
+  // The Shopify panel on the primitives (R4). WHAT it links to and how is
+  // unchanged (first-party-billing-intent 2e/2f pin the plain GET link); only
+  // the drawing moved from raw slate/blue/rounded-lg/dark: to Card, Notice and
+  // the button classes.
   const src = read('app/(dashboard)/billing/BillingView.tsx')
   const shopBranch = (s: string) => (/\) : shopifyConnected \? \(([\s\S]*?)\n {6}\) : \(/.exec(s) || [])[1] ?? ''
-  const SHOPIFY_BRANCH_CLASSES = [
-    'mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg',
-    'text-xl font-bold text-slate-900 dark:text-slate-100 mb-2',
-    'inline-block px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors',
-  ]
-  const shopKept = (s: string) => SHOPIFY_BRANCH_CLASSES.every((c) => shopBranch(s).includes(`className="${c}"`))
-  check('C5: the Shopify panel markup is unchanged', shopKept(src))
-  check('C5-MUT: restyling the Shopify button fails C5', !shopKept(src.replace('bg-blue-600 text-white font-semibold hover:bg-blue-700', 'bg-action text-action-ink')))
-  const rest = strip(src.replace(shopBranch(src), ''))
-  check('C6: outside the Shopify panel, no raw palette colours', !RAW_COLOUR.test(rest), (RAW_COLOUR.exec(rest) || [])[0])
+  const shopOk = (s: string) => {
+    const b = shopBranch(s), code = strip(b)
+    return /^\s*<Card\b/.test(b)
+      && /<Notice tone="wait">\{t\.shopify\.migrationPending\}<\/Notice>/.test(code)
+      && /<Notice tone="warn">\{t\.shopify\.migrationNeedsAttention\}<\/Notice>/.test(code)
+      && /<a\s+href="\/api\/shopify\/billing\/start-intent"\s+className=\{buttonClasses\(\{ variant: 'primary' \}\)\}\s*>/.test(code)
+      && !RAW_COLOUR.test(code) && !/\bdark:|\brounded-lg\b|\btext-(?:xl|sm)\b|\bbg-white\b|\btext-white\b/.test(code)
+      && !/onClick|fetch\(|<form\b/.test(code)
+  }
+  check('C5: the Shopify panel is a Card with Notices and the start-intent GET link drawn as the primary button', shopOk(src))
+  check('C5-MUT: the old blue button fails C5', !shopOk(src.replace("className={buttonClasses({ variant: 'primary' })}", 'className="inline-block px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"')))
+  check('C5-MUT: the pending state as a hand-made blue box fails C5', !shopOk(src.replace('<Notice tone="wait">{t.shopify.migrationPending}</Notice>', '<p className="mb-4 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3">{t.shopify.migrationPending}</p>')))
+  check('C5-MUT: the link turned into a script-driven button fails C5', !shopOk(src.replace('href="/api/shopify/billing/start-intent"', 'href="/api/shopify/billing/start-intent" onClick={() => fetch(\'/x\')}')))
+  for (const locale of ['he', 'en'] as const) {
+    const t = getDashboardDictionary(locale).billing
+    const states = (h: string) => h.includes('data-notice="wait"') && h.includes(esc(t.shopify.migrationPending))
+    const pending = render(locale, { market: locale === 'en' ? 'USD' : 'ILS', shopifyConnected: true, trialActive: false, shopifyMigrationStatus: 'pending' })
+    const failed = render(locale, { market: locale === 'en' ? 'USD' : 'ILS', shopifyConnected: true, trialActive: false, shopifyMigrationStatus: 'paypal_cancel_failed' })
+    check(`C5b (${locale}) the two migration states render as Notices (wait, warn) inside the Shopify card`,
+      states(pending) && failed.includes('data-notice="warn"') && failed.includes(esc(t.shopify.migrationNeedsAttention)) && !/bg-blue-|bg-amber-/.test(pending + failed))
+    check(`C5b-MUT (${locale}) a pending view without its notice fails C5b`, !states(pending.replace('data-notice="wait"', '')))
+  }
+  const rest = strip(src)
+  check('C6: no raw palette colours anywhere on the billing view (the Shopify panel included)', !RAW_COLOUR.test(rest), (RAW_COLOUR.exec(rest) || [])[0])
   check('C6-MUT: the old plan card colours fail C6', RAW_COLOUR.test(rest + 'border-blue-500 bg-blue-50'))
   // The display currency is display only. The currency is persisted by exactly
   // the request the old prompt sent (same route, method, header and body), only
@@ -200,6 +220,21 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
   const client = strip(read('app/(dashboard)/billing/client.tsx'))
   check('C9: the PayPal notices are token cards, not cream/amber', !RAW_COLOUR.test(client), (RAW_COLOUR.exec(client) || [])[0])
   check('C9-MUT: the old amber notice fails C9', RAW_COLOUR.test(client + 'bg-amber-50 border-amber-200'))
+  // Messages and confirmations in the page, in our words (R4). Only how they
+  // are shown changed: the same question comes before the same request.
+  const inPage = (view: string, pp: string) =>
+    !/(?<![\w.])(?:window\.)?(?:alert|confirm|prompt)\(/.test(view.replace(/await confirm\(\{/g, '')) && !/\balert\(/.test(pp)
+    && /const \{ confirm, dialog: confirmDialog \} = useConfirm\(\)/.test(view) && /tone: 'danger',/.test(view) && /\{confirmDialog\}/.test(view)
+    && /const ok = await confirm\(\{[\s\S]*?\}\)\s*\n\s*if \(!ok\) return\s*\n\s*setCancelling\(true\)[\s\S]*?fetch\('\/api\/paypal\/cancel', \{ method: 'POST' \}\)/.test(view)
+  check('C10: cancelling asks through ConfirmDialog (danger) before the unchanged request; no alert/confirm on the billing screens', inPage(code, client))
+  check('C10-MUT: window.confirm back in BillingView fails C10', !inPage(code.replace('const ok = await confirm({', 'const ok = window.confirm(t.manage.confirmCancel) && await confirm({'), client))
+  check('C10-MUT: an alert() back in the PayPal client fails C10', !inPage(code, client + "\nalert('x')"))
+  const noRaw = (view: string, pp: string) =>
+    !/result\.error|errorMsg\}|\$\{errorMsg|\$\{errorDetails|\$\{planId|envVarName\}|\{cancelMessage\}/.test(view + pp.replace(/console\.(?:error|warn|log)\([^\n]*\n/g, '\n'))
+    && /t\.manage\.cancelError/.test(view) && /setMessage\(\{ tone: 'bad', text: t\.activateSubscriptionError \}\)/.test(pp)
+  check('C11: billing never shows the route\'s or PayPal\'s own error text (console only)', noRaw(code, client))
+  check('C11-MUT: the old "cancelError + result.error" line fails C11', !noRaw(code + 'setCancelMessage(`${t.manage.cancelError} ${result.error || \'\'}`)', client))
+  check('C11-MUT: PayPal\'s message in the notice fails C11', !noRaw(code, client.replace("setMessage({ tone: 'bad', text: t.createSubscriptionError })", "setMessage({ tone: 'bad', text: `${t.createSubscriptionError} ${errorMsg}` })")))
 }
 
 // ── D) Copy: one form of address, no em-dash ────────────────────────────────

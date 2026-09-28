@@ -13,8 +13,9 @@ import { WHATSAPP_HELP_URL, PHONE_TEL } from './contact'
  * Two actions on a paper strip fixed to the bottom of the viewport on small
  * screens: WhatsApp (a bordered button, the glyph in WhatsApp green) and Call
  * (the one primary). Hidden from `md` upward, where the floating WhatsApp
- * button takes over. The privacy notice, while open, is a bottom sheet laid
- * over this bar (CookieConsent).
+ * button takes over. The start slot of the strip stays free: the accessibility
+ * button docks there (AccessibilityWidget). The privacy notice, while open, is
+ * a sheet laid over this bar that keeps the same slot free (CookieConsent).
  *
  * Labels follow the active locale, inferred from the `/en` route prefix.
  */
@@ -30,7 +31,7 @@ export function MobileContactBar() {
       aria-label={t.region}
       data-mobile-contact-bar
     >
-      <div className="flex w-full items-stretch gap-2 px-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
+      <div className="flex w-full items-stretch gap-2 ps-[4.25rem] pe-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
         <a
           href={WHATSAPP_HELP_URL}
           target="_blank"

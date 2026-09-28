@@ -6,10 +6,11 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
 import type { BillingMarket } from '@/lib/paypal/checkout-plans'
-import { Check } from 'lucide-react'
+import { Check, ShoppingBag, TriangleAlert } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
+import Button, { buttonClasses } from '@/components/ui/Button'
 import Notice from '@/components/ui/Notice'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
 
@@ -82,7 +83,9 @@ export default function BillingView({
   const currencySymbol = shownMarket === 'USD' ? '$' : '₪'
 
   const [cancelling, setCancelling] = useState(false)
-  const [cancelMessage, setCancelMessage] = useState('')
+  // Shown in the page in our words; the route's own error text never reaches the merchant.
+  const [cancelResult, setCancelResult] = useState<'ok' | 'failed' | null>(null)
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [savingMarket, setSavingMarket] = useState<BillingMarket | null>(null)
   const [marketSaveFailed, setMarketSaveFailed] = useState(false)
 
@@ -116,22 +119,32 @@ export default function BillingView({
     ) : null
 
   const handleCancel = async () => {
-    if (!confirm(t.manage.confirmCancel)) return
+    // The in-app confirmation (ui/ConfirmDialog) in place of the browser's box:
+    // the same question, asked before the same request.
+    const ok = await confirm({
+      title: t.manage.confirmCancelTitle,
+      body: t.manage.confirmCancel,
+      confirmLabel: t.manage.confirmCancelAction,
+      cancelLabel: t.manage.keepRenewal,
+      tone: 'danger',
+    })
+    if (!ok) return
     setCancelling(true)
-    setCancelMessage('')
+    setCancelResult(null)
     try {
       const response = await fetch('/api/paypal/cancel', { method: 'POST' })
-      const result = await response.json()
+      await response.json()
       if (!response.ok) {
-        setCancelMessage(`${t.manage.cancelError} ${result.error || ''}`)
+        console.error('[billing] cancel renewal failed', response.status)
+        setCancelResult('failed')
         setCancelling(false)
         return
       }
-      setCancelMessage(t.manage.cancelSuccess)
+      setCancelResult('ok')
       setTimeout(() => window.location.reload(), 1500)
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      setCancelMessage(`${t.manage.cancelError} ${errorMsg}`)
+      console.error('[billing] cancel renewal failed', error)
+      setCancelResult('failed')
       setCancelling(false)
     }
   }
@@ -172,31 +185,48 @@ export default function BillingView({
       )}
 
       {billingStateUnavailable ? (
-        <Card className="mb-8 border-s-4 border-s-warn">
-          <h2 className="mb-1.5 text-section font-semibold text-ink">{t.unavailable.title}</h2>
-          <p className="text-copy text-muted">{t.unavailable.description}</p>
+        <Card className="mb-8 p-5 sm:p-6">
+          <div className="flex items-start gap-3" data-billing-unavailable>
+            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-warn-soft text-warn">
+              <TriangleAlert className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-section font-semibold text-ink">{t.unavailable.title}</h2>
+              <p className="mt-1.5 max-w-prose text-copy text-muted">{t.unavailable.description}</p>
+            </div>
+          </div>
         </Card>
       ) : shopifyConnected ? (
-        <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.shopify.title}</h2>
-          <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.shopify.description}</p>
-          {shopifyMigrationStatus === 'pending' && (
-            <p className="mb-4 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3">{t.shopify.migrationPending}</p>
-          )}
-          {shopifyMigrationStatus === 'paypal_cancel_failed' && (
-            <p className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{t.shopify.migrationNeedsAttention}</p>
-          )}
-          {/* Phase 2 (blocker fix) — never a pre-built Shopify URL: this
-              always goes through /api/shopify/billing/start-intent, which
-              authenticates the request, mints a single-use billing intent,
-              and only THEN redirects to Shopify's hosted pricing page. */}
-          <a
-            href="/api/shopify/billing/start-intent"
-            className="inline-block px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
-          >
-            {t.shopify.manageButton}
-          </a>
-        </div>
+        <Card className="mb-8 p-5 sm:p-6">
+          <div className="flex items-start gap-3" data-billing-shopify>
+            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+              <ShoppingBag className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1 space-y-4">
+              <div>
+                <h2 className="text-section font-semibold text-ink">{t.shopify.title}</h2>
+                <p className="mt-1.5 max-w-prose text-copy text-muted">{t.shopify.description}</p>
+              </div>
+              {shopifyMigrationStatus === 'pending' && (
+                <Notice tone="wait">{t.shopify.migrationPending}</Notice>
+              )}
+              {shopifyMigrationStatus === 'paypal_cancel_failed' && (
+                <Notice tone="warn">{t.shopify.migrationNeedsAttention}</Notice>
+              )}
+              {/* Phase 2 (blocker fix) — never a pre-built Shopify URL: this
+                  always goes through /api/shopify/billing/start-intent, which
+                  authenticates the request, mints a single-use billing intent,
+                  and only THEN redirects to Shopify's hosted pricing page.
+                  A plain top-level GET link, drawn as the screen's one primary button. */}
+              <a
+                href="/api/shopify/billing/start-intent"
+                className={buttonClasses({ variant: 'primary' })}
+              >
+                {t.shopify.manageButton}
+              </a>
+            </div>
+          </div>
+        </Card>
       ) : (
         <>
           {hasActiveSubscription && (
@@ -221,8 +251,10 @@ export default function BillingView({
               ) : (
                 <p className="text-copy text-body">{t.manage.contactToCancel}</p>
               )}
-              {cancelMessage && (
-                <p className="mt-3 text-copy text-body">{cancelMessage}</p>
+              {cancelResult && (
+                <Notice tone={cancelResult === 'ok' ? 'ok' : 'bad'} className="mt-4">
+                  {cancelResult === 'ok' ? t.manage.cancelSuccess : t.manage.cancelError}
+                </Notice>
               )}
             </Card>
           )}
@@ -348,6 +380,7 @@ export default function BillingView({
           </p>
         </>
       )}
+      {confirmDialog}
     </div>
   )
 }

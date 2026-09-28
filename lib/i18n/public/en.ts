@@ -149,6 +149,7 @@ export const en = {
     aria: 'Privacy notice',
     title: 'We value your privacy',
     body: 'We use cookies to improve your browsing experience. By continuing to use this site, you agree to our',
+    short: 'We use cookies. By using this site, you agree to our',
     privacy: 'Privacy Policy',
     accept: 'Accept',
   },

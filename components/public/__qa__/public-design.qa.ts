@@ -7,9 +7,15 @@
  *   B) every feature page is its metadata plus the one FeaturePage template,
  *      and every legal document uses the one LegalDoc layout;
  *   C) pricing: ONE primary button (the recommended plan), no scaled card;
- *   D) the bottom-of-screen overlays stack: the cookie notice is a bottom sheet
- *      over the contact bar, WhatsApp steps aside and the accessibility button
- *      lifts while it is open.
+ *   D) the overlays never sit on the hero: on a phone the cookie notice is a
+ *      slim sheet laid exactly over the contact bar's strip (with bottom padding
+ *      for anything it needs beyond it), and both keep the start slot free for
+ *      the accessibility button, which docks there instead of floating over the
+ *      hero's buttons; from md the notice is a corner card (WhatsApp steps
+ *      aside), and from 1400px it sits in the top end margin beside the centred
+ *      hero instead of over its product frame (final review R27).
+ *   E) the landing's five-reason grid leaves no card alone on a row: the first
+ *      is a wide lead card, so the rows fill at two and three columns (R27).
  * Each group ends with a MUTATION CONTROL: the same check run on a deliberately
  * broken copy of the source must fail.
  *
@@ -17,6 +23,8 @@
  */
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
+import { he as publicHe } from '../../../lib/i18n/public/he'
+import { en as publicEn } from '../../../lib/i18n/public/en'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -131,17 +139,26 @@ function main() {
       !pricingOk(he.replace("'relative flex flex-col", "'relative lg:scale-105 flex flex-col")))
   }
 
-  console.log('\nD) the bottom-of-screen overlays stack instead of colliding')
-  const overlaysOk = (widgets: string, cookie: string, a11y: string, whatsapp: string) => {
-    const w = strip(widgets), c = strip(cookie), a = strip(a11y), wa = strip(whatsapp)
+  console.log('\nD) the overlays never sit on the hero')
+  const SLOT = 'ps-[4.25rem]'
+  const DOCKED = "'bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-24'"
+  const overlaysOk = (widgets: string, cookie: string, a11y: string, whatsapp: string, bar: string) => {
+    const w = strip(widgets), c = strip(cookie), a = strip(a11y), wa = strip(whatsapp), b = strip(bar)
     return /<WhatsAppFloat hidden=\{cookieOpen\} \/>/.test(w)
-      && /<AccessibilityWidget raised=\{cookieOpen\} \/>/.test(w)
+      && /<AccessibilityWidget \/>/.test(w)
       && /<CookieConsent onOpenChange=\{setCookieOpen\} \/>/.test(w)
-      // phone: a bottom sheet; sm+: a card in the WhatsApp corner, above the contact bar (z-55)
-      && /inset-x-0 bottom-0 rounded-t-card/.test(c) && /sm:bottom-6 sm:end-6/.test(c) && /z-\[58\]/.test(c)
+      // phone: a slim sheet over the contact bar's strip, the start slot left for the accessibility button
+      && /inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card/.test(c) && c.includes(SLOT) && /z-\[58\]/.test(c)
+      && /md:end-6/.test(c) && /md:max-\[1399px\]:bottom-6/.test(c)
+      // 1400px+: the top end margin beside the hero, not over its product frame
+      && /min-\[1400px\]:bottom-auto min-\[1400px\]:top-24/.test(c)
+      // bottom padding while the sheet shows, for what it needs beyond the bar
+      && /body\.style\.paddingBottom = phone \? `\$\{Math\.max\(0, sheet\.offsetHeight - barH\)\}px` : ''/.test(c)
       && /onOpenChange\?\.\(/.test(c)
-      // the accessibility button: 40px, start corner, lifted over the sheet on a phone
-      && /fixed start-4 z-\[60\] flex size-10/.test(a) && /raised \? 'bottom-48 sm:bottom-24' : 'bottom-24'/.test(a)
+      // the accessibility button: 40px, start corner, docked in the strip below md, floating from md
+      && /fixed start-4 z-\[60\] flex size-10/.test(a) && a.includes(DOCKED) && !/\braised\b/.test(a)
+      // the contact bar keeps the same slot free, under the sheet
+      && b.includes(SLOT) && /z-\[55\]/.test(b) && /md:hidden/.test(b)
       && /if \(hidden\) return null/.test(wa)
   }
   {
@@ -149,14 +166,54 @@ function main() {
     const cookie = read('components/CookieConsent.tsx')
     const a11y = read('components/public/AccessibilityWidget.tsx')
     const whatsapp = read('components/public/WhatsAppFloat.tsx')
-    check('D1: cookie sheet, WhatsApp and accessibility button coordinate through one open state', overlaysOk(widgets, cookie, a11y, whatsapp))
-    check('D2: the contact bar stays under the cookie sheet (z-55 < z-58)', /z-\[55\]/.test(strip(read('components/public/MobileContactBar.tsx'))))
+    const bar = read('components/public/MobileContactBar.tsx')
+    check('D1: sheet, contact bar and accessibility button share one bottom strip; the desktop card clears the hero', overlaysOk(widgets, cookie, a11y, whatsapp, bar))
+    check('D2: the contact bar stays under the cookie sheet (z-55 < z-58)', /z-\[55\]/.test(strip(bar)))
     check('MUTATION CONTROL: WhatsApp no longer stepping aside is caught',
-      !overlaysOk(widgets.replace('<WhatsAppFloat hidden={cookieOpen} />', '<WhatsAppFloat />'), cookie, a11y, whatsapp))
-    check('MUTATION CONTROL: an accessibility button that stays under the sheet is caught',
-      !overlaysOk(widgets, cookie, a11y.replace("raised ? 'bottom-48 sm:bottom-24' : 'bottom-24'", "'bottom-24'"), whatsapp))
+      !overlaysOk(widgets.replace('<WhatsAppFloat hidden={cookieOpen} />', '<WhatsAppFloat />'), cookie, a11y, whatsapp, bar))
+    check('MUTATION CONTROL: the accessibility button floating over the hero again (bottom-48 over the sheet) is caught',
+      !overlaysOk(widgets, cookie, a11y.replace(DOCKED, "raised ? 'bottom-48 sm:bottom-24' : 'bottom-24'"), whatsapp, bar))
+    check('MUTATION CONTROL: a contact bar that no longer keeps the slot free is caught',
+      !overlaysOk(widgets, cookie, a11y, whatsapp, bar.replace(SLOT, 'px-4')))
+    check('MUTATION CONTROL: the desktop card back in the bottom corner over the hero frame is caught',
+      !overlaysOk(widgets, cookie.replace("'min-[1400px]:bottom-auto min-[1400px]:top-24',", ''), a11y, whatsapp, bar))
+    check('MUTATION CONTROL: no bottom padding while the sheet shows is caught',
+      !overlaysOk(widgets, cookie.replace("body.style.paddingBottom = phone ?", 'void (phone ?'), a11y, whatsapp, bar))
     check('MUTATION CONTROL: a full-width phone banner without the sheet shape is caught',
-      !overlaysOk(widgets, cookie.replace('rounded-t-card', 'rounded-none'), a11y, whatsapp))
+      !overlaysOk(widgets, cookie.replace('rounded-t-card', 'rounded-none'), a11y, whatsapp, bar))
+    const short = (l: 'he' | 'en') => (l === 'he' ? publicHe : publicEn).cookie.short
+    const shortOk = (h: string, e: string) => [h, e].every((x) => x.length > 0 && x.length <= 60)
+    check('D3: the phone sheet has its own short sentence (two lines beside the button), in both languages', shortOk(short('he'), short('en')), `${short('he').length}/${short('en').length}`)
+    check('MUTATION CONTROL: the long desktop sentence in the phone sheet is caught', !shortOk('אנו משתמשים בעוגיות כדי לשפר את חוויית הגלישה. המשך השימוש באתר מהווה הסכמה לשימוש בהן בהתאם ל', short('en')))
+  }
+
+  console.log('\nE) the five-reason grid leaves no card alone on a row')
+  /** Fills a CSS grid row by row (spans capped at the column count); true when the last row is full. */
+  const lastRowFull = (spans: number[], cols: number) => {
+    let used = 0
+    for (const span of spans) { const sp = Math.min(span, cols); if (used + sp > cols) used = 0; used += sp }
+    return used === cols
+  }
+  const whyOk = (landing: string, count: number) => {
+    const s = strip(landing)
+    const grid = /<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3" data-why-grid>/.test(s)
+    const lead = /className=\{i === 0 \? 'h-full sm:col-span-2' : 'h-full'\}/.test(s)
+    const spans = Array.from({ length: count }, (_, i) => (i === 0 && lead ? 2 : 1))
+    return grid && lastRowFull(spans, 2) && lastRowFull(spans, 3)
+  }
+  {
+    const landing = read('components/public/LandingPage.tsx')
+    const count = (page: string) => {
+      const why = strip(read(page)).split(/\n  why: \{/)[1]?.split(/\n  pricing: \{/)[0] ?? ''
+      return (why.match(/\{ title: /g) ?? []).length
+    }
+    const he = count('app/page.tsx'), en = count('app/(public)/en/page.tsx')
+    check(`E1: ${he} (he) and ${en} (en) reasons fill every row at two and three columns`, he === en && he > 0 && whyOk(landing, he))
+    check('MUTATION CONTROL: the old even grid (3 + 2) is caught', !whyOk(landing.replace("className={i === 0 ? 'h-full sm:col-span-2' : 'h-full'}", "className={i === 0 ? 'h-full' : 'h-full'}"), he))
+    check('MUTATION CONTROL: a sixth reason with the lead card left in is caught', !whyOk(landing, he + 1))
+    const noRail = (src: string) => !/border-s-\[?\d/.test(strip(src))
+    check('E2: no start rail bends round a landing card', noRail(landing))
+    check('MUTATION CONTROL: the old rail on the "with Go Top" card is caught', !noRail(landing.replace('rounded-card border border-line bg-surface p-6 shadow-card sm:p-8', 'rounded-card border border-line border-s-[3px] border-s-action bg-surface p-6 shadow-card sm:p-8')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

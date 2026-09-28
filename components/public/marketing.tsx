@@ -111,7 +111,7 @@ export function PageHero({
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(55%_65%_at_50%_0%,rgb(0_112_214/0.09),transparent_72%)]"
       />
-      <div className={cn(CONTAINER, 'relative', compact ? 'pt-28 pb-12 sm:pt-32 sm:pb-14' : 'pt-28 pb-16 sm:pt-36 sm:pb-20')}>
+      <div className={cn(CONTAINER, 'relative', compact ? 'pt-24 pb-12 sm:pt-32 sm:pb-14' : 'pt-24 pb-16 sm:pt-36 sm:pb-20')}>
         {before && <div className="mb-8">{before}</div>}
         <div className={cn(center ? 'mx-auto max-w-3xl text-center' : 'max-w-3xl')}>
           {eyebrow && <div className="mb-5"><Eyebrow icon={eyebrowIcon}>{eyebrow}</Eyebrow></div>}

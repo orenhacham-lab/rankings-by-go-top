@@ -17,9 +17,10 @@ import { AccessibilityWidget } from './AccessibilityWidget'
  *
  * The cookie banner is bundled here so it coordinates spacing with the mobile
  * contact bar and never overlaps form actions on the login/signup screens.
- * While it is open it owns the bottom of the screen: the WhatsApp button that
- * shares its corner steps aside, and the accessibility button lifts above the
- * phone's bottom sheet.
+ * While it is open the WhatsApp button that shares its corner steps aside. On a
+ * phone the notice, the contact bar and the accessibility button share ONE
+ * bottom strip: the sheet lies over the bar, and both keep the start slot free
+ * for the accessibility button, so none of them floats over the page.
  */
 
 // Route prefixes where the floating widgets must NOT appear. Matched as exact
@@ -78,7 +79,7 @@ export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated
 
   return (
     <>
-      <AccessibilityWidget raised={cookieOpen} />
+      <AccessibilityWidget />
       <WhatsAppFloat hidden={cookieOpen} />
       <MobileContactBar />
       <CookieConsent onOpenChange={setCookieOpen} />
