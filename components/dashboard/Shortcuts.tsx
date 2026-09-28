@@ -2,28 +2,26 @@
 
 /**
  * Widget 1, the shortcut row beside the screen's title: keyword research, the
- * publishing schedule and my articles. The two content screens are offered only
+ * content calendar and my articles. The two content screens are offered only
  * when the build has the content workspace; otherwise the keywords tab stands in.
  */
 import Link from 'next/link'
 import { CalendarClock, KeyRound, Lightbulb, Newspaper } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
-import { STRATEGY_ANCHORS, strategyHref } from '@/lib/content/strategy/view'
+import { strategyHref } from '@/lib/content/strategy/view'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-
-/** Read as literal member expressions, which is what lets Next inline them. */
-const FLAGS = {
-  NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION: process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION,
-}
 
 export function contentEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 }
 
-/** The publishing schedule is the queue section of the content strategy tab's list view, when this build has automation; its topics otherwise. */
+/**
+ * The content calendar is the content strategy board: the next article with its date,
+ * and every topic by month, where ideas are approved. Never the list view.
+ */
 export function scheduleHref(): string {
-  return strategyHref('list', FLAGS.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' ? STRATEGY_ANCHORS.queue : STRATEGY_ANCHORS.topics)
+  return strategyHref('board')
 }
 
 export default function Shortcuts({ t }: { t: DashboardDictionary['dashboardHome'] }) {

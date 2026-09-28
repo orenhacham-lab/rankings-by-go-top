@@ -43,6 +43,8 @@ export type StrategyIdea = {
   reason: string | null
   score: number | null
   createdAt: string
+  /** The engine's source for it (content_topic_ideas.source), sent back when it is approved. */
+  source?: string | null
 }
 
 /** A topic (article_topics), with the reason it was suggested when there is one. */
@@ -141,6 +143,10 @@ export type StrategyCard = {
   queued: boolean
   /** For an idea from the rankings: where the site stands on its keyword today. */
   position?: number
+  /** For an idea of the content plan: the stored idea, its score and source (what approving it sends). */
+  ideaId?: string | null
+  score?: number | null
+  source?: string | null
 }
 
 export type NextArticleKind = 'queued' | 'topic' | 'idea' | 'scan'
@@ -160,6 +166,10 @@ export type NextArticle = {
   /** 1-based place in the publishing queue, and the queue's length; null when not queued. */
   queuePosition: number | null
   queueLength: number
+  /** The board card it is, when it is an idea (so the card's own actions apply to it). */
+  cardKey: string | null
+  /** How many other ideas could take its place ("swap"); 0 for a topic or the queue. */
+  alternatives: number
 }
 
 export type StrategyBoard = {
@@ -343,6 +353,12 @@ export function buildStrategyBoard(input: {
   seed: SeedPlan
   /** Tracked keywords close to the top (rankingIdeas); none when they could not be read. */
   ranking?: readonly StrategyRanking[]
+  /**
+   * Idea cards the merchant swapped away ("swap topic"), oldest swap first. They go
+   * behind every other idea, so the next pending idea takes their place, in the
+   * column and as the next article. Nothing is rejected, so a swapped idea stays.
+   */
+  deferred?: readonly string[]
 }): StrategyBoard {
   const { data, seed } = input
   const queue = [...(input.queue ?? [])].sort((a, b) => a.position - b.position)
@@ -411,6 +427,7 @@ export function buildStrategyBoard(input: {
       key: `idea:${i.id}`, column: 'ideas', title: i.title, keyword: i.primaryKeyword,
       date: i.createdAt, dateKind: 'added', origin: 'plan', reason: i.reason,
       topicId: null, articleId: null, queued: false,
+      ideaId: i.id, score: i.score, source: i.source ?? null,
     })
   }
   // The rankings: a keyword a card above already names (as its title or its keyword) is covered.
@@ -425,31 +442,42 @@ export function buildStrategyBoard(input: {
       topicId: null, articleId: null, queued: false, position: r.position,
     })
   }
-  const scanIdeas: StrategyCard[] = []
   if (seed.state !== 'ready' && seed.state !== 'none') {
     seed.topics.forEach((title, n) => {
       const k = sameTopicKey(title)
       if (!k || taken.has(k)) return
       taken.add(k)
-      const card: StrategyCard = {
+      cards.push({
         key: `scan:${n}`, column: 'ideas', title, keyword: keywordForTopic(title, seed.keywords),
         date: seed.scannedAt, dateKind: 'scanned', origin: 'scan', reason: null,
         topicId: null, articleId: null, queued: false,
-      }
-      scanIdeas.push(card)
-      cards.push(card)
+      })
     })
   }
 
+  // Every idea card was added after every other card; the swapped ones go last.
+  const ordered = [...cards.filter((c) => c.column !== 'ideas'), ...deferLast(cards.filter((c) => c.column === 'ideas'), input.deferred ?? [])]
+
   const counts: Record<StrategyColumn, number> = { ideas: 0, planned: 0, written: 0, published: 0 }
-  for (const c of cards) counts[c.column]++
+  for (const c of ordered) counts[c.column]++
 
   return {
-    cards,
-    next: pickNextArticle({ data, pending, topicById, articleTopicIds, ideaCards: cards.filter((c) => c.origin === 'plan'), ideas, scanIdeas }),
+    cards: ordered,
+    next: pickNextArticle({
+      data, pending, topicById, articleTopicIds,
+      ideaCards: ordered.filter((c) => c.column === 'ideas' && c.origin === 'plan'),
+      scanIdeas: ordered.filter((c) => c.column === 'ideas' && c.origin === 'scan'),
+    }),
     hasArticles: data.articles.length > 0,
     counts,
   }
+}
+
+/** A stable order: the cards not swapped keep theirs, then the swapped ones, oldest swap first. */
+function deferLast(ideaCards: StrategyCard[], deferred: readonly string[]): StrategyCard[] {
+  if (deferred.length === 0) return ideaCards
+  const at = new Map(deferred.map((k, i) => [k, i]))
+  return [...ideaCards.filter((c) => !at.has(c.key)), ...ideaCards.filter((c) => at.has(c.key)).sort((a, b) => at.get(a.key)! - at.get(b.key)!)]
 }
 
 /**
@@ -465,7 +493,6 @@ function pickNextArticle(ctx: {
   topicById: Map<string, StrategyTopic>
   articleTopicIds: Set<string>
   ideaCards: StrategyCard[]
-  ideas: StrategyIdea[]
   scanIdeas: StrategyCard[]
 }): NextArticle | null {
   const { pending, topicById } = ctx
@@ -485,6 +512,8 @@ function pickNextArticle(ctx: {
       ideaId: null,
       queuePosition: 1,
       queueLength,
+      cardKey: null,
+      alternatives: 0,
     }
   }
   const waiting = ctx.data.topics
@@ -494,15 +523,15 @@ function pickNextArticle(ctx: {
     return {
       kind: 'topic', title: waiting.title, keyword: waiting.primaryKeyword, date: null,
       reason: waiting.reason, source: waiting.source, topicId: waiting.id, articleId: null,
-      ideaId: null, queuePosition: null, queueLength,
+      ideaId: null, queuePosition: null, queueLength, cardKey: null, alternatives: 0,
     }
   }
   const idea = ctx.ideaCards[0]
   if (idea) {
-    const row = ctx.ideas.find((i) => `idea:${i.id}` === idea.key)
     return {
       kind: 'idea', title: idea.title, keyword: idea.keyword, date: null, reason: idea.reason,
-      source: null, topicId: null, articleId: null, ideaId: row?.id ?? null, queuePosition: null, queueLength,
+      source: null, topicId: null, articleId: null, ideaId: idea.ideaId ?? null, queuePosition: null, queueLength,
+      cardKey: idea.key, alternatives: ctx.ideaCards.length - 1,
     }
   }
   const scan = ctx.scanIdeas[0]
@@ -510,6 +539,7 @@ function pickNextArticle(ctx: {
     return {
       kind: 'scan', title: scan.title, keyword: scan.keyword, date: null, reason: null,
       source: null, topicId: null, articleId: null, ideaId: null, queuePosition: null, queueLength,
+      cardKey: scan.key, alternatives: ctx.scanIdeas.length - 1,
     }
   }
   return null

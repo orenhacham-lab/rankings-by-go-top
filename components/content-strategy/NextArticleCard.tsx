@@ -13,12 +13,18 @@
  *     the topics list makes, where the allowance is reserved and checked;
  *   - an idea that is not a topic yet: the existing "new article topic" brief, filled
  *     in with the idea, so the merchant confirms the brief before anything is spent.
+ *
+ * When the next article is still an idea, it is acted on right here, with the board
+ * card's own actions (useIdeaActions): approve it, swap it for the next pending idea
+ * (no model call, nothing rejected), or say it is not a fit. Nothing on this card leads
+ * to the list view to approve an idea. The two links that remain lead to what only the
+ * list view has: the publishing queue, and adding a topic to it with its link review.
  */
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, KeyRound, ListOrdered, PenLine, Plus, Sparkles } from 'lucide-react'
+import { CalendarClock, Check, KeyRound, ListOrdered, PenLine, Plus, Shuffle, Sparkles, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { NextArticle, StrategyOrigin } from '@/lib/content/strategy/board'
@@ -26,11 +32,17 @@ import { STRATEGY_ANCHORS, strategyHref } from '@/lib/content/strategy/view'
 import type { Locale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { generationErrorCopy } from '@/lib/content/strategy/copy'
+import { canRejectIdea, type IdeaTarget } from '@/lib/content/strategy/ideas'
 import { dateTile, fill } from './format'
+import type { BoardIdeaActions } from './StrategyBoard'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 
 const GENERATE_TIMEOUT_MS = 180_000
+
+/** A quiet action on the dark card (the filled primary stays for the one main action). */
+const SPINNER = <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+const INK_ACTION = 'inline-flex h-9 items-center gap-1.5 rounded-control border border-white/15 px-4 text-sm font-semibold text-contrast-ink transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50'
 
 function originOf(next: NextArticle): StrategyOrigin {
   if (next.kind === 'scan') return 'scan'
@@ -39,13 +51,15 @@ function originOf(next: NextArticle): StrategyOrigin {
 }
 
 export default function NextArticleCard({
-  next, hasArticles, lang, dict, automationEnabled, onOpenBrief, onCreateTopic, onGenerated, onError,
+  next, hasArticles, lang, dict, idea = null, act = null, onOpenBrief, onCreateTopic, onGenerated, onError,
 }: {
   next: NextArticle | null
   hasArticles: boolean
   lang: Locale
   dict: Dict
-  automationEnabled: boolean
+  /** The board card the next article is, when it is an idea; with `act`, its actions show here. */
+  idea?: IdeaTarget | null
+  act?: BoardIdeaActions | null
   onOpenBrief: (prefill: { topic?: string; primaryKeyword?: string }) => void
   onCreateTopic: () => void
   onGenerated: () => void
@@ -105,13 +119,15 @@ export default function NextArticleCard({
     }
   }
 
+  // The queue and "add it to the queue" (with its link review) live only in the list view.
   const secondary = next.kind === 'queued'
     ? { href: strategyHref('list', STRATEGY_ANCHORS.queue), label: s.manageQueue }
     : next.kind === 'topic'
       ? { href: strategyHref('list', STRATEGY_ANCHORS.topics), label: s.queueIt }
-      : next.kind === 'idea' && automationEnabled
-        ? { href: strategyHref('list', STRATEGY_ANCHORS.ideas), label: s.planIt }
-        : null
+      : null
+  const a = s.ideaActions
+  const ideaActs = (next.kind === 'idea' || next.kind === 'scan') && idea && act ? { idea, act } : null
+  const busy = ideaActs ? ideaActs.act.actions.busy[ideaActs.idea.key] : undefined
 
   return (
     <Card tone="ink" className="p-5 md:p-8" >
@@ -140,7 +156,7 @@ export default function NextArticleCard({
               {s.factSource[origin]}
             </span>
           </div>
-          <h2 className="mt-2 text-section font-semibold leading-snug md:text-title [overflow-wrap:anywhere]">{next.title}</h2>
+          <h2 data-next-title className="mt-2 text-section font-semibold leading-snug md:text-title [overflow-wrap:anywhere]">{next.title}</h2>
 
           <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-caption text-contrast-ink/75">
             {next.keyword && (
@@ -164,6 +180,34 @@ export default function NextArticleCard({
                 </Button>
                 <span className="text-caption text-contrast-ink/60">{s.writeFirstHint}</span>
               </>
+            )}
+            {ideaActs && (
+              <div role="group" aria-label={fill(a.groupLabel, { title: next.title })} data-next-idea-actions className="flex flex-wrap items-center gap-2">
+                {/* Before the first article, "write" is the one filled action; after it, approving is. */}
+                {hasArticles ? (
+                  <Button onClick={() => void ideaActs.act.actions.approve(ideaActs.idea)} loading={busy === 'approve'} disabled={!!busy}
+                    aria-label={fill(a.approveAria, { title: next.title })} data-idea-action="approve">
+                    {busy !== 'approve' && <Check size={16} aria-hidden />} {a.approve}
+                  </Button>
+                ) : (
+                  <button type="button" className={INK_ACTION} onClick={() => void ideaActs.act.actions.approve(ideaActs.idea)} disabled={!!busy}
+                    aria-busy={busy === 'approve' || undefined} aria-label={fill(a.approveAria, { title: next.title })} data-idea-action="approve">
+                    {busy === 'approve' ? SPINNER : <Check size={15} aria-hidden />} {a.approve}
+                  </button>
+                )}
+                {next.alternatives > 0 && (
+                  <button type="button" className={INK_ACTION} onClick={() => ideaActs.act.actions.swap(ideaActs.idea)} disabled={!!busy}
+                    aria-label={fill(a.swapAria, { title: next.title })} data-idea-action="swap">
+                    <Shuffle size={15} aria-hidden /> {a.swap}
+                  </button>
+                )}
+                {canRejectIdea(ideaActs.idea, ideaActs.act.automation) && (
+                  <button type="button" className={INK_ACTION} onClick={() => void ideaActs.act.actions.reject(ideaActs.idea)} disabled={!!busy}
+                    aria-busy={busy === 'reject' || undefined} aria-label={fill(a.rejectAria, { title: next.title })} data-idea-action="reject">
+                    {busy === 'reject' ? SPINNER : <X size={15} aria-hidden />} {a.reject}
+                  </button>
+                )}
+              </div>
             )}
             {secondary && (
               <Link

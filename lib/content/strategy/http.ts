@@ -86,7 +86,7 @@ export async function handleStrategyGet(request: Request, deps: StrategyRouteDep
 
   try {
     const [ideaRows, approvedRows, topicRows, articleRows] = await Promise.all([
-      rows(owned('content_topic_ideas', 'id, title, primary_keyword, suggestion_reason, score, created_at').eq('status', 'pending')),
+      rows(owned('content_topic_ideas', 'id, title, primary_keyword, suggestion_reason, score, source, created_at').eq('status', 'pending')),
       // An approved idea became a topic: its reason is that topic's "why".
       rows(owned('content_topic_ideas', 'approved_topic_id, suggestion_reason').eq('status', 'approved')),
       rows(owned('article_topics', 'id, topic, primary_keyword, status, source, suggestion_reason, created_at').neq('status', 'rejected')),
@@ -104,7 +104,7 @@ export async function handleStrategyGet(request: Request, deps: StrategyRouteDep
     for (const r of ideaRows) {
       const id = str(r.id, 64), title = str(r.title), createdAt = str(r.created_at, 40)
       if (!id || !title || !createdAt) continue
-      ideas.push({ id, title, primaryKeyword: str(r.primary_keyword, 200), reason: str(r.suggestion_reason, 1_000), score: num(r.score), createdAt })
+      ideas.push({ id, title, primaryKeyword: str(r.primary_keyword, 200), reason: str(r.suggestion_reason, 1_000), score: num(r.score), source: str(r.source, 40), createdAt })
     }
 
     const topics: StrategyTopic[] = []

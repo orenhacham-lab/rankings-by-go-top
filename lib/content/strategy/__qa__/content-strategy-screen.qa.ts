@@ -62,7 +62,9 @@ function main() {
     const allSrc = Object.entries(src).filter(([f]) => f !== 'useStrategyData.ts')
     const fetches = allSrc.flatMap(([f, s]) => [...s.matchAll(/fetch\(\s*['`]([^'`]+)['`]/g)].map((m) => `${f}:${m[1]}`))
     const onlyGenerate = (list: string[]) => list.length === 1 && list[0] === 'NextArticleCard.tsx:/api/content/articles/generate'
-    check('C2: the only other call is the existing generate route, from the next-article card', onlyGenerate(fetches), fetches.join(', '))
+    // The idea actions (approve, not a fit, add a keyword) send the requests of
+    // lib/content/strategy/ideas.ts, from a click only: content-strategy-idea-actions.qa.ts U5.
+    check('C2: the only other fixed call is the existing generate route, from the next-article card', onlyGenerate(fetches), fetches.join(', '))
     check('C2-MUT: a card that runs the queue\'s generator instead fails C2',
       !onlyGenerate([...fetches.filter((x) => !/articles\/generate/.test(x)), 'NextArticleCard.tsx:/api/content/automation/run']))
     const card = src['NextArticleCard.tsx']

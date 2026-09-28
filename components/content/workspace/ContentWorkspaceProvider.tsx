@@ -29,7 +29,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { localizeShopifyPublishError } from '@/lib/i18n/dashboard/shopify-publish-error'
 import { ideasSectionFromParam, ideasSectionToParam, type IdeasSection } from '@/lib/content/content-hub-ideas-section'
-import { STRATEGY_ANCHORS, strategyHref } from '@/lib/content/strategy/view'
+import { STRATEGY_ANCHORS, strategyAddKeywordHref, strategyHref } from '@/lib/content/strategy/view'
 import type { NewTopic } from '@/components/content/NewTopicsLinkPlanPanel'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import type { ArticleTopic } from '@/lib/supabase/types'
@@ -167,18 +167,21 @@ function useWorkspaceValue() {
     params.set('section', ideasSectionToParam(section))
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [router, pathname, searchParams])
-  // The "New article topic" button leads to the automatic article ideas, in the content
-  // strategy tab's list view. It is a navigation, so the destination survives a refresh
-  // or a shared link.
+  // The automatic article ideas engine, in the content strategy tab's list view (asking
+  // for new ideas, "improve with Pro", link review before queueing). A navigation, so the
+  // destination survives a refresh or a shared link. Not the way to approve an idea:
+  // that happens on the board itself.
   const goToIdeas = useCallback(() => {
     router.push(strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }))
   }, [router])
-  // Retargeted create-topic action: to the ideas destination when automation is on;
-  // otherwise the manual brief modal directly (so manual creation always works).
+  // The create-topic action: with automation on, the content strategy board with its
+  // "add a keyword" field open (the keyword becomes an approved topic, through the
+  // server's dedupe and keyword guard), never the list view; otherwise the manual brief
+  // modal directly (so manual creation always works).
   const handleCreateTopic = useCallback(() => {
-    if (automationEnabled) goToIdeas()
+    if (automationEnabled) router.push(strategyAddKeywordHref())
     else { setEditingTopic(null); setBriefOpen(true) }
-  }, [automationEnabled, goToIdeas])
+  }, [automationEnabled, router])
   const openManualBrief = useCallback(() => { setEditingTopic(null); setBriefOpen(true) }, [])
   const openPrefilledBrief = useCallback((prefill: { topic?: string; primaryKeyword?: string }) => {
     setEditingTopic(null); setBriefPrefill(prefill); setBriefOpen(true)

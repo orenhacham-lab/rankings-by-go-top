@@ -43,6 +43,21 @@ export function strategyHref(view: StrategyView, anchor?: StrategyAnchor, extra?
   return `${CONTENT_STRATEGY_PATH}${search ? `?${search}` : ''}${anchor ? `#${anchor}` : ''}`
 }
 
+/**
+ * "New topic" from anywhere in the workspace: the board, with its "add a keyword" field
+ * open. A fixed parameter with one fixed value; the screen only compares it.
+ */
+export const STRATEGY_ADD_PARAM = 'add'
+export const STRATEGY_ADD_KEYWORD = 'keyword'
+
+export function strategyAddKeywordHref(): string {
+  return strategyHref('board', undefined, { [STRATEGY_ADD_PARAM]: STRATEGY_ADD_KEYWORD })
+}
+
+export function wantsAddKeyword(v: string | null | undefined): boolean {
+  return v === STRATEGY_ADD_KEYWORD
+}
+
 type Query = Record<string, string | string[] | undefined>
 
 function values(v: string | string[] | undefined): string[] {

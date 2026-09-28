@@ -10,18 +10,21 @@
  *   row 1  the next article, its date, and why it was chosen (NextArticleCard)
  *   row 2  the month board: ideas, planned, written, published (StrategyBoard); its
  *          ideas include the tracked keywords the site already ranks 4 to 20 for
- *          (useRankingIdeas), which need no scan
- *   row 3  the list view, which IS the two old screens, unchanged: the automatic ideas
- *          and the publishing queue with its cadence (AutomationScreen), then the
- *          topics with their link plans (TopicsScreen). Every existing control lives
- *          there, and works exactly as it did.
+ *          (useRankingIdeas), which need no scan. Ideas are approved, rejected and
+ *          swapped right on their cards and on the next-article card, and "+ add a
+ *          keyword" adds an approved topic (useIdeaActions); none of it leaves the board.
+ *   row 3  the list view, which IS the two old screens, unchanged, kept for what only
+ *          they do: asking the engine for new ideas ("improve with Pro", filters), the
+ *          publishing queue with its cadence (AutomationScreen), and the topics with
+ *          their link plans and "add to the queue" (TopicsScreen).
  *
  * The view is in the url (?view=list), so a refresh, a shared link and the old
  * screens' redirects all land where they meant to. Opening the tab reads three GET
  * routes and nothing else (useStrategyData); the list view mounts only when chosen.
+ * `?add=keyword` (the workspace's "new topic") opens the keyword field on the board.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Columns3, List, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -34,13 +37,16 @@ import { useContentWorkspace } from '@/components/content/workspace/ContentWorks
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { buildStrategyBoard } from '@/lib/content/strategy/board'
 import {
-  STRATEGY_ANCHORS, STRATEGY_VIEW_PARAM, isStrategyAnchor, strategyViewFromParam,
+  STRATEGY_ADD_PARAM, STRATEGY_ANCHORS, STRATEGY_VIEW_PARAM, isStrategyAnchor, strategyViewFromParam, wantsAddKeyword,
   type StrategyView,
 } from '@/lib/content/strategy/view'
+import { ideaTargetFromCard } from '@/lib/content/strategy/ideas'
 import { useStrategyData } from './useStrategyData'
 import { useRankingIdeas } from './useRankingIdeas'
+import { useIdeaActions } from './useIdeaActions'
 import NextArticleCard from './NextArticleCard'
-import StrategyBoard from './StrategyBoard'
+import StrategyBoard, { type BoardIdeaActions } from './StrategyBoard'
+import AddKeywordForm, { AddKeywordButton } from './AddKeywordForm'
 import SeedPlanNotice, { PlanBasis } from './SeedPlanNotice'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
@@ -131,10 +137,36 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
   const refreshKey = useMemo(() => ({ topics, data, automationRefresh }), [topics, data, automationRefresh])
   const strategy = useStrategyData(projectId, refreshKey)
   const ranking = useRankingIdeas(projectId)
+  const { reload: reloadStrategy } = strategy
+  const onChanged = useCallback(() => { reloadStrategy(); void loadTopics() }, [reloadStrategy, loadTopics])
+  const actions = useIdeaActions({ projectId, automation: automationEnabled, dict, toast, onChanged })
+  const { view: withActions, prune, deferred } = actions
+  // A fresh read retires what it already shows.
+  useEffect(() => { if (strategy.data) prune(strategy.data) }, [strategy.data, prune])
   const board = useMemo(
-    () => (strategy.data ? buildStrategyBoard({ data: strategy.data, queue: strategy.queue, seed: strategy.seed, ranking }) : null),
-    [strategy.data, strategy.queue, strategy.seed, ranking],
+    () => (strategy.data ? buildStrategyBoard({ data: withActions(strategy.data), queue: strategy.queue, seed: strategy.seed, ranking, deferred }) : null),
+    [strategy.data, strategy.queue, strategy.seed, ranking, withActions, deferred],
   )
+  const act: BoardIdeaActions = { actions, automation: automationEnabled }
+  const nextIdea = useMemo(() => {
+    const card = board?.next?.cardKey ? board.cards.find((c) => c.key === board.next!.cardKey) : undefined
+    return card ? ideaTargetFromCard(card) : null
+  }, [board])
+
+  // "+ add a keyword": opened here, or by the workspace's "new topic" (?add=keyword), which
+  // only automation has a route for; without it "new topic" opens the manual brief instead.
+  const [adding, setAdding] = useState(false)
+  const addAsked = wantsAddKeyword(searchParams.get(STRATEGY_ADD_PARAM))
+  // Asked for in the url: open it (while rendering, not in an effect), then drop the parameter.
+  if (addAsked && automationEnabled && !adding) setAdding(true)
+  useEffect(() => {
+    if (!addAsked) return
+    const params = new URLSearchParams(Array.from(searchParams.entries()))
+    params.delete(STRATEGY_ADD_PARAM)
+    const search = params.toString()
+    router.replace(`${pathname}${search ? `?${search}` : ''}`, { scroll: false })
+  }, [addAsked, searchParams, pathname, router])
+  const addOpen = automationEnabled && view === 'board' && adding
   // A project with no scan: its ideas column says the mapping will add more, when the mapping can be offered.
   const ideasNote = strategy.seed.state === 'none' && strategy.mappingAvailable ? dict.mapping.strategyMore : null
 
@@ -148,9 +180,10 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           hasArticles={board.hasArticles}
           lang={language}
           dict={dict}
-          automationEnabled={automationEnabled}
+          idea={nextIdea}
+          act={act}
           onOpenBrief={openPrefilledBrief}
-          onCreateTopic={handleCreateTopic}
+          onCreateTopic={automationEnabled ? () => { setView('board'); setAdding(true) } : handleCreateTopic}
           onGenerated={() => { void load(); void loadTopics() }}
           onError={(text) => toast.error(text)}
         />
@@ -176,13 +209,20 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
             <p className="text-caption text-muted">{s.planSubtitle}</p>
             <PlanBasis seed={strategy.seed} dict={dict} />
           </div>
-          <ViewSwitch view={view} onChange={setView} dict={dict} />
+          <div className="flex flex-wrap items-center gap-2">
+            {automationEnabled && view === 'board' && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
+            <ViewSwitch view={view} onChange={setView} dict={dict} />
+          </div>
         </div>
+
+        {addOpen && <AddKeywordForm dict={dict} onAdd={actions.addKeyword} onClose={() => setAdding(false)} />}
+        {/* What the last action did, for a screen reader (the toast says it on screen). */}
+        <p role="status" aria-live="polite" className="sr-only">{actions.announcement}</p>
 
         {view === 'list' ? (
           <StrategyListView proFirst={proFirst} dict={dict} />
         ) : board ? (
-          <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} />
+          <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} act={act} />
         ) : strategy.status === 'loading' ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
             {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 animate-pulse rounded-card border border-line bg-sunk/60" />)}
