@@ -19,7 +19,6 @@ import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { formatCount } from '@/components/gsc/format'
 import SiteIcon from '@/components/ui/SiteIcon'
 import CountUp from '@/components/ui/CountUp'
-import type { CSSProperties } from 'react'
 import { LinkButton } from './ui'
 
 export interface NextStep {

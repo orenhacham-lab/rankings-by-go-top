@@ -1,77 +1,77 @@
 {
-  "capturedFrom": "preview merge of existing + polish-c",
+  "capturedFrom": "preview after brand merge",
   "scenarios": {
     "he/initial": {
-      "sha256": "eee2f438390778b832a81ab13a89ac6b2b2c5725e6b60df0e541e4ff20fbad62",
-      "length": 4355
+      "sha256": "1b60bdee0bbf9758151014eb65c74b00e2375a43ca76b36b303cd517164a6fb5",
+      "length": 4372
     },
     "he/results": {
-      "sha256": "1d9dc12a6551fadc258e9355b05d5e41fa3b2f5874b8056cfdca88bbda544781",
-      "length": 18470
+      "sha256": "c376397244cd07a2efd8e86e387b492a3195b8a69acb69561f11a479bdea23fb",
+      "length": 18487
     },
     "he/selectedWithOpportunities": {
-      "sha256": "720715c985689883a6dee9045a7e12133fc79e6aab5c5f42bd8b979e1dffd1be",
-      "length": 24475
+      "sha256": "66eca5fbe0a1b301f38a42ac38383c9adf53b7df26a43794aa2f351c83199b6a",
+      "length": 24492
     },
     "he/added": {
-      "sha256": "f87153adb18f0707f7d445371731cf87353f214e695599e0b00ee58e6ed4f368",
-      "length": 21780
+      "sha256": "8d83159205203fcaf719a74c93d9e4a5493a1fa4d8946dbd18b8f8df825b8957",
+      "length": 21797
     },
     "he/addAndAiErrors": {
-      "sha256": "6e8667e1fafa4534e6dd631bea7ba27dd67af1b2a656bdd7687f95cbe0881d33",
-      "length": 21354
+      "sha256": "acbfb60347d49587a170b54f75ee0c4fa225d763f7097975bf1efba6316368af",
+      "length": 21371
     },
     "he/error": {
-      "sha256": "4e675bab208bf1bd4ae22b169e78823af8a65f68cd8eace910d827f54b47a41d",
-      "length": 4405
+      "sha256": "445f957b9ab0a0561d1c0308351f008a2a252d9183f3c1981b69449999b71fa4",
+      "length": 4422
     },
     "he/formKeywordUrlLoading": {
-      "sha256": "d5b48a17799b89aab263d97b5476d7858607532bf8d42a7210933b2fc93f326a",
-      "length": 5163
+      "sha256": "595d0359070cef89a1ed90c9c8ba3d93bbdf7dd38d2b3cf235ba03136c21c2bc",
+      "length": 5180
     },
     "he/fewResults": {
-      "sha256": "cffa7fa83b691a30206203571cfbae6328db3d18bea6eca7c27d0451084ed25e",
-      "length": 9475
+      "sha256": "98b57b260958cb7a1257fe72bbe768dc0e9154e4fcdbed57a5ed9e866b4d6850",
+      "length": 9492
     },
     "he/filteredSorted": {
-      "sha256": "5504869995d635d65a372fbd48b4d9437bc307674e8333033bda03987f5bf3cd",
-      "length": 18715
+      "sha256": "c9dae84c640621f9b20135e71aafb529a6759358cf34418adcdf981830ece9c0",
+      "length": 18732
     },
     "en/initial": {
-      "sha256": "d835facc045838660e29e9d11d407ec11fb3f45d9256af415ae5035699515659",
-      "length": 4399
+      "sha256": "567e36dcf3f893fbff0b12123e8a176ca9dbc459dff148bf33909e3ef14f4de6",
+      "length": 4416
     },
     "en/results": {
-      "sha256": "bbd2227679ad2e02acb13bd1aab28348be7b5e12162525faaf99bd07c4796443",
-      "length": 18535
+      "sha256": "a77922db6bbd28f855c6c181747b8ccced048264c36e9dfed2e9bd982d0b55bc",
+      "length": 18552
     },
     "en/selectedWithOpportunities": {
-      "sha256": "68a1fac0c607bc5be7e2d2c6e2bb77392b9479c2a2e4db7dd702a4a87541c7ad",
-      "length": 24497
+      "sha256": "14a0bb7cb36e84669f80c89f6956132a5b715e0edd0ddeff284b5821ca0c24e8",
+      "length": 24514
     },
     "en/added": {
-      "sha256": "5ffc099062744e1162104eb6a5a601f9447cfe58926614768fab7d9df2999d35",
-      "length": 21821
+      "sha256": "e9e6904aac7f6fc7130832f8fcbafaaef6609be228ed80a1b07ca77da04b8661",
+      "length": 21838
     },
     "en/addAndAiErrors": {
-      "sha256": "fbf2e502b602541c0d096c66870fd00db81095f923aa33fa4930e5c27aa6a73e",
-      "length": 21403
+      "sha256": "1aea538cbcb69b98283a209b0a92c085643a5954ffa044cbd9e516330d3a44c7",
+      "length": 21420
     },
     "en/error": {
-      "sha256": "0413a6c8d0cd99b247d90e432dd97da6139ed29b46ac1b645a7eb3f5da5adae7",
-      "length": 4447
+      "sha256": "6a2ff6ee7ce8779676233a0980707b2766839a19db68983201b8cc3540f9634e",
+      "length": 4464
     },
     "en/formKeywordUrlLoading": {
-      "sha256": "bb8a40d5dd589ef47769f597d3552dfe78a91822b55f339eb5b3a3dca3dfd3f9",
-      "length": 5201
+      "sha256": "dc43a53fb20695d425ed68136e3ba96963a73fd964fce39d8c7331305adaff5b",
+      "length": 5218
     },
     "en/fewResults": {
-      "sha256": "6e3573c39aabbe938c6481e08c7e554b43feffe0091b92c498db3dc2fac58eb8",
-      "length": 9593
+      "sha256": "fb58e68fe1761f279ecd81721ef42676cba68459822969463de2342fbdb9d2e5",
+      "length": 9610
     },
     "en/filteredSorted": {
-      "sha256": "62292b81f483b6fc302c523e05d6b2a37c74bffb790b232ff9a5940eb0468475",
-      "length": 18804
+      "sha256": "c881f67396697b214b9972af73d152113550aec7037dc198c760e559c1453fa9",
+      "length": 18821
     }
   }
 }
