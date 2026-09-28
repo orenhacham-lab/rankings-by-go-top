@@ -10,7 +10,8 @@ import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { keepSeedClaim } from './claim-action'
+import { keepSeedClaim, seedClaimDestination } from './claim-action'
+import { CLAIM_START_PATH } from '@/lib/onboarding/claim-start'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 
@@ -60,6 +61,7 @@ const SIGNUP_UI = {
     },
     success: {
       accountCreated: 'חשבון נוצר בהצלחה! מעביר אותך לדאשבורד...',
+      accountCreatedFromScan: 'החשבון נוצר. פותחים את הפרויקט מהבדיקה שעשיתם…',
       emailConfirmationRequired: 'החשבון נוצר. בדקו את תיבת האימייל שלכם כדי לאשר את ההרשמה.',
     },
   },
@@ -108,6 +110,7 @@ const SIGNUP_UI = {
     },
     success: {
       accountCreated: 'Account created successfully! Redirecting to dashboard...',
+      accountCreatedFromScan: 'Your account is ready. Opening the project from your check…',
       emailConfirmationRequired: 'Your account was created. Please check your email to confirm your signup.',
     },
   },
@@ -380,7 +383,13 @@ export function SignupForm() {
       // field from the session + metadata). Best-effort — never block signup on its outcome.
       try { await fetch('/api/clients/ensure-default', { method: 'POST' }) } catch { /* non-blocking */ }
 
-      setSuccess(t.success.accountCreated)
+      // Where the new account opens: with a free-check claim kept, the new-project
+      // screen that creates the project from that scan and opens it
+      // (lib/onboarding/claim-start.ts); otherwise the dashboard. Only the server
+      // can read the claim cookie, so it answers; a failed answer is the dashboard.
+      const fromScan = (await seedClaimDestination().catch(() => null)) === CLAIM_START_PATH
+      const destination = fromScan ? CLAIM_START_PATH : '/dashboard'
+      setSuccess(fromScan ? t.success.accountCreatedFromScan : t.success.accountCreated)
 
       // Send admin notification email
       try {
@@ -424,9 +433,9 @@ export function SignupForm() {
       // still override afterward, and a returning device keeps whatever was last chosen).
       try { localStorage.setItem(DASHBOARD_LANGUAGE_STORAGE_KEY, lang) } catch { /* ignore quota / privacy mode */ }
 
-      // Redirect to dashboard after a short delay
+      // Redirect after a short delay
       setTimeout(() => {
-        router.replace(withLocaleParam('/dashboard', lang))
+        router.replace(withLocaleParam(destination, lang))
         router.refresh()
       }, 1000)
     } catch (err) {

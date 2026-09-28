@@ -163,9 +163,9 @@ function main() {
     ]
     const wrong = domains.filter(([raw, want]) => competitorDomainInput(raw) !== want)
     check('competitor domains: a URL or a host becomes a bare domain; anything else is refused', wrong.length === 0, JSON.stringify(wrong))
-    check('platform hint: WordPress and WooCommerce offer WordPress, Shopify offers Shopify, others only name it, nothing is nothing',
+    check('platform hint: WordPress and WooCommerce offer WordPress, Shopify offers Shopify, Wix offers Wix, others only name it, nothing is nothing',
       platformHint('WordPress')?.connect === 'wordpress' && platformHint('woocommerce')?.connect === 'wordpress' && platformHint(' Shopify ')?.connect === 'shopify' &&
-      platformHint('Wix')?.connect === null && platformHint('Wix')?.name === 'Wix' && platformHint('  ') === null && platformHint(null) === null)
+      platformHint('Wix')?.connect === 'wix' && platformHint('Wix')?.name === 'Wix' && platformHint('Squarespace')?.connect === null && platformHint('  ') === null && platformHint(null) === null)
     const opts = [{ value: 'US', label: 'US' }]
     check('a stored market the form does not list is kept as an option, not silently replaced',
       withCurrentOption(opts, 'IL', (c) => `name ${c}`).at(-1)?.label === 'name IL' && withCurrentOption(opts, 'US', String).length === 1 && withCurrentOption(opts, null, String).length === 1)

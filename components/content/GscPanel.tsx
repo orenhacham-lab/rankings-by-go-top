@@ -10,6 +10,10 @@
  *
  * Secrets never reach this component: the server returns only sanitized connection
  * metadata (status/scope) and precomputed metrics — never a token.
+ *
+ * Drawn like the settings screen's platform card (an icon tile, the name, one
+ * line of what it is for, the one action beside it), with the design tokens;
+ * what it does is unchanged.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -192,46 +196,59 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
 
   return (
     <Card className="hover:translate-y-0">
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <div className="flex items-center gap-2">
-          <SearchIcon size={18} className="text-indigo-600 dark:text-indigo-400" />
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-4" data-gsc-card={connected ? 'connected' : 'none'}>
+        <div className="flex min-w-0 items-center gap-3">
+          <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-info-soft text-info">
+            <SearchIcon size={18} />
+          </span>
+          <div className="min-w-0">
+            <h3 className="flex flex-wrap items-center gap-2 text-section font-semibold text-ink">
+              {t.title}
+              {statusBadge()}
+            </h3>
+            <p className="mt-0.5 text-copy text-muted">{t.subtitle}</p>
+          </div>
         </div>
-        {statusBadge()}
+        {!loading && status?.oauthConfigured !== false && !connected && (
+          <Button size="sm" onClick={handleConnect} loading={connecting} disabled={connecting} className="shrink-0" data-gsc-connect>
+            {connecting ? t.connecting : t.connect}
+          </Button>
+        )}
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.subtitle}</p>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4">
-          <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center gap-2 text-sm text-muted pt-4">
+          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
         </div>
       ) : status && !status.oauthConfigured ? (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+        <div className="mt-4 rounded-lg border border-warn/25 bg-warn-soft px-3 py-2 text-sm text-warn">
           {t.notConfigured}
         </div>
       ) : !connected ? (
-        <div className="text-center py-6">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.notConnected}</p>
-          <Button size="sm" onClick={handleConnect} loading={connecting} disabled={connecting}>{connecting ? t.connecting : t.connect}</Button>
-        </div>
+        <>
+          <p className="mt-3 text-caption text-muted">{t.notConnected}</p>
+          {message && (
+            <div role="alert" className="mt-3 text-sm rounded-lg px-3 py-2 border bg-bad-soft border-bad/20 text-bad">{message.text}</div>
+          )}
+        </>
       ) : (
-        <div className="space-y-4">
+        <div className="mt-4 space-y-4">
           {/* Connection row. The GLOBAL Google-authorization revoke is intentionally
               de-emphasized (a small text link, not a primary button) — the normal
               per-project disconnect lives on the property row below. */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+          <div className="rounded-lg border border-line p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-slate-700 dark:text-slate-200">{t.connectedAccount}</span>
+              <span className="text-sm text-body">{t.connectedAccount}</span>
               {connection?.status === 'reauth_required' && (
                 <Button size="sm" className="ms-auto" onClick={handleConnect} loading={connecting} disabled={connecting}>{t.reconnect}</Button>
               )}
             </div>
             {connection?.status === 'reauth_required' && (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.reauthHint}</p>
+              <p className="mt-2 text-xs text-warn">{t.reauthHint}</p>
             )}
             <div className="mt-2">
               <button type="button" onClick={handleGlobalRevoke} disabled={revoking}
-                className="text-xs text-red-600/80 dark:text-red-400/80 hover:underline disabled:opacity-50">
+                className="text-xs text-bad/80 hover:underline disabled:opacity-50">
                 {revoking ? t.revoking : t.globalRevoke}
               </button>
             </div>
@@ -239,22 +256,22 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
 
           {/* Property assignment / picker */}
           {pickerOpen ? (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div className="rounded-lg border border-line p-3">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.selectPropertyTitle}</h4>
-                <button type="button" onClick={() => setPickerOpen(false)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">✕</button>
+                <h4 className="text-sm font-semibold text-ink">{t.selectPropertyTitle}</h4>
+                <button type="button" onClick={() => setPickerOpen(false)} className="text-xs text-action hover:underline">✕</button>
               </div>
               {loadingProps ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400 py-3">{t.loadingProperties}</div>
+                <div className="text-sm text-muted py-3">{t.loadingProperties}</div>
               ) : !properties || properties.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400 py-3">{t.noProperties}</div>
+                <div className="text-sm text-muted py-3">{t.noProperties}</div>
               ) : (
                 <ul className="space-y-2">
                   {properties.map((p) => {
                     const isUnverified = p.permissionLevel === 'siteUnverifiedUser'
                     return (
-                      <li key={p.siteUrl} className="flex flex-wrap items-center gap-2 rounded border border-slate-200 dark:border-slate-700 p-2">
-                        <span className="font-mono text-xs text-slate-800 dark:text-slate-100 truncate max-w-full min-w-0" dir="ltr">{p.siteUrl}</span>
+                      <li key={p.siteUrl} className="flex flex-wrap items-center gap-2 rounded border border-line p-2">
+                        <span className="font-mono text-xs text-ink truncate max-w-full min-w-0" dir="ltr">{p.siteUrl}</span>
                         <Badge variant="neutral">{p.kind === 'domain' ? t.propertyKindDomain : t.propertyKindUrlPrefix}</Badge>
                         {isUnverified ? (
                           <Badge variant="danger">{t.unverified}</Badge>
@@ -276,19 +293,19 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
               )}
             </div>
           ) : !property ? (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{t.noPropertyAssigned}</p>
+            <div className="rounded-lg border border-line p-3 text-center">
+              <p className="text-sm text-body mb-2">{t.noPropertyAssigned}</p>
               <Button size="sm" onClick={openPicker}>{t.selectProperty}</Button>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div className="rounded-lg border border-line p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">{t.assignedProperty}:</span>
-                <span className="font-mono text-sm text-slate-800 dark:text-slate-100 truncate max-w-full min-w-0" dir="ltr">{property.siteUrl}</span>
+                <span className="text-xs text-muted">{t.assignedProperty}:</span>
+                <span className="font-mono text-sm text-ink truncate max-w-full min-w-0" dir="ltr">{property.siteUrl}</span>
                 <div className="flex flex-wrap items-center gap-2 ms-auto">
                   <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
                   <Button size="sm" variant="outline" onClick={openPicker}>{t.changeProperty}</Button>
-                  <Button size="sm" variant="outline" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">
+                  <Button size="sm" variant="outline" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-bad border-bad/30">
                     {unassigning ? t.unassigning : t.unassignProperty}
                   </Button>
                 </div>
@@ -298,18 +315,18 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                   The weekly auto-sync is a daily dispatcher, so the shown time is the
                   EARLIEST the project becomes eligible (a lower bound), never a promise
                   of an exact run time. The manual "Sync now" button stays available. */}
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                 <span>{t.lastSyncedAt}: {lastSyncedAt ? formatDateTime(lastSyncedAt) : t.neverSyncedShort}</span>
                 {nextEligibleSyncAt && (
                   <span title={t.nextAutoSyncHint}>{t.nextAutoSyncFrom}: {formatDateTime(nextEligibleSyncAt)}</span>
                 )}
               </div>
-              {nextEligibleSyncAt && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.nextAutoSyncHint}</p>}
+              {nextEligibleSyncAt && <p className="mt-1 text-[11px] text-muted">{t.nextAutoSyncHint}</p>}
             </div>
           )}
 
           {message && (
-            <div className={`text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+            <div className={`text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-ok-soft border-ok/25 text-ok' : 'bg-bad-soft border-bad/20 text-bad'}`}>
               {message.text}
             </div>
           )}

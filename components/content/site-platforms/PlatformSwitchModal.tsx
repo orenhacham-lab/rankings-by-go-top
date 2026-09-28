@@ -15,9 +15,16 @@
  *
  * The decisions live in lib/site-platforms/switch-flow.ts (pure, QA-held);
  * PlatformSwitchBody is the presentational half, rendered by the QA suite.
+ *
+ * For a merchant who is not a developer: the platform the site scan detected
+ * is chosen when the modal opens (only while nothing is connected, and only
+ * as a choice, never as a connection); Wix says in three steps where its two
+ * details are; and the custom-built site offers a way out for whoever does not
+ * know what a webhook is: send the instructions to their developer, or write
+ * to us on WhatsApp.
  */
 import { useEffect, useId, useState } from 'react'
-import { TriangleAlert, CircleCheck, Copy, Check } from 'lucide-react'
+import { TriangleAlert, CircleCheck, Copy, Check, LifeBuoy, Mail, MessageCircle, ScanSearch } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -25,6 +32,7 @@ import Badge from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { CHOOSABLE_PLATFORMS, type ChoosablePlatform, type SanitizedSiteConnection } from '@/lib/site-platforms/types'
 import { disconnectUrl, switchSteps, switchView, type SwitchField, type SwitchValues } from '@/lib/site-platforms/switch-flow'
+import { SUPPORT_WHATSAPP_HREF } from '@/lib/onboarding/links'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import PlatformIcon from './PlatformIcon'
 import WebhookDocs from './WebhookDocs'
@@ -37,11 +45,13 @@ export function siteErrorText(t: T, code: unknown): string {
 
 /** The modal's content for one state. Pure: props in, markup out. */
 export function PlatformSwitchBody({
-  t, current, choice, values, onChoose, onChange, test, error, disabled,
+  t, current, choice, values, onChoose, onChange, test, error, disabled, detected = null,
 }: {
   t: T
   current: ChoosablePlatform | null
   choice: ChoosablePlatform | null
+  /** The platform the site scan detected, when the modal chose it for the merchant. */
+  detected?: ChoosablePlatform | null
   values: SwitchValues
   onChoose: (p: ChoosablePlatform) => void
   onChange: (f: SwitchField, v: string) => void
@@ -110,11 +120,19 @@ export function PlatformSwitchBody({
       </div>
 
       {!choice && <p className="text-caption text-muted">{t.modal.pickFirst}</p>}
+      {choice && detected === choice && (
+        <p data-switch-detected={detected} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-info/20 bg-info-soft px-2.5 py-1 text-caption font-medium text-info">
+          <ScanSearch size={13} className="shrink-0" aria-hidden />
+          <span className="min-w-0">{t.modal.detectedNote}</span>
+        </p>
+      )}
 
       {choice && (
         <div key={choice} data-switch-fields={choice} className="space-y-3 rounded-card border border-line bg-sunk/40 p-4 animate-pop-in">
           {view.nextNote === 'wordpress' && <p className="text-copy text-body">{t.modal.wordpressNext}</p>}
           {view.nextNote === 'shopify' && <p className="text-copy text-body">{t.modal.shopifyNext}</p>}
+
+          {choice === 'wix' && <GuideSteps title={t.wix.stepsTitle} steps={t.wix.steps} />}
 
           {view.fields.includes('siteUrl') && (
             <Input
@@ -148,6 +166,8 @@ export function PlatformSwitchBody({
             </>
           )}
 
+          {(choice === 'webhook' || choice === 'wix') && <HelpPath t={t} platform={choice} />}
+
           {choice === 'wix' && test && (
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="secondary" onClick={test.onRun} loading={test.state === 'busy'} disabled={disabled || !view.canTest}>
@@ -164,6 +184,48 @@ export function PlatformSwitchBody({
       )}
 
       {error && <p role="alert" className="rounded-control border border-bad/20 bg-bad-soft px-3 py-2 text-copy text-bad animate-pop-in">{error}</p>}
+    </div>
+  )
+}
+
+/** Short numbered steps: where a detail is found, in the words of the platform's own screens. */
+function GuideSteps({ title, steps }: { title: string; steps: readonly string[] }) {
+  return (
+    <div className="rounded-control border border-line bg-surface px-3 py-2.5" data-switch-steps>
+      <p className="text-caption font-semibold text-ink">{title}</p>
+      <ol className="mt-1.5 list-decimal space-y-1 ps-5 text-caption text-body">
+        {steps.map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+/**
+ * The way out for a merchant who does not know what goes in the fields: write
+ * to us on WhatsApp (a fixed address of ours), or, for a custom-built site,
+ * send the instructions to their developer by email (a mailto with our own
+ * fixed text; no address and nothing typed here is in it).
+ */
+function HelpPath({ t, platform }: { t: T; platform: 'webhook' | 'wix' }) {
+  const mailto = `mailto:?subject=${encodeURIComponent(t.help.developerSubject)}&body=${encodeURIComponent(t.help.developerBody)}`
+  return (
+    <div className="rounded-control border border-info/20 bg-info-soft/60 px-3 py-2.5" data-switch-help={platform}>
+      <p className="flex items-center gap-1.5 text-caption font-semibold text-ink">
+        <LifeBuoy size={14} className="shrink-0 text-info" aria-hidden /> {t.help.title}
+      </p>
+      <p className="mt-1 text-caption text-body">{platform === 'webhook' ? t.help.webhookBody : t.help.wixBody}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {platform === 'webhook' && (
+          <a href={mailto} className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 py-1.5 text-caption font-medium text-ink shadow-control hover:border-line-strong" data-help-developer>
+            <Mail size={14} aria-hidden /> {t.help.developer}
+          </a>
+        )}
+        <a href={SUPPORT_WHATSAPP_HREF} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 py-1.5 text-caption font-medium text-ink shadow-control hover:border-line-strong" data-help-whatsapp>
+          <MessageCircle size={14} className="text-whatsapp" aria-hidden /> {t.help.whatsapp}
+        </a>
+      </div>
     </div>
   )
 }
@@ -193,17 +255,20 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
 }
 
 export default function PlatformSwitchModal({
-  open, onClose, projectId, current, t, onSwitched,
+  open, onClose, projectId, current, t, onSwitched, preferred = null,
 }: {
   open: boolean
   onClose: () => void
   projectId: string
   current: ChoosablePlatform | null
+  /** The platform the site scan detected: chosen on opening while nothing is connected. */
+  preferred?: ChoosablePlatform | null
   t: T
   /** After a confirmed switch: which platform, and (Wix/webhook) the saved connection. */
   onSwitched: (platform: ChoosablePlatform, saved?: SanitizedSiteConnection | null) => void
 }) {
-  const [choice, setChoice] = useState<ChoosablePlatform | null>(null)
+  const detectedChoice = !current && preferred && CHOOSABLE_PLATFORMS.includes(preferred) ? preferred : null
+  const [choice, setChoice] = useState<ChoosablePlatform | null>(detectedChoice)
   const [values, setValues] = useState<SwitchValues>({})
   const [busy, setBusy] = useState(false)
   const [testState, setTestState] = useState<'idle' | 'busy' | 'ok'>('idle')
@@ -213,7 +278,9 @@ export default function PlatformSwitchModal({
 
   // Every opening starts clean.
   useEffect(() => {
-    if (open) { setChoice(null); setValues({}); setBusy(false); setTestState('idle'); setError(null); setSecret(null); setSaved(null) }
+    if (open) { setChoice(detectedChoice); setValues({}); setBusy(false); setTestState('idle'); setError(null); setSecret(null); setSaved(null) }
+    // Only on opening: a later change of the hint must not undo the merchant's pick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const view = switchView(current, choice, values)
@@ -279,7 +346,7 @@ export default function PlatformSwitchModal({
       ) : (
         <>
           <PlatformSwitchBody
-            t={t} current={current} choice={choice} values={values} disabled={busy} error={error}
+            t={t} current={current} choice={choice} values={values} disabled={busy} error={error} detected={detectedChoice}
             onChoose={(p) => { setChoice(p); setError(null); setTestState('idle') }}
             onChange={(f, v) => { setValues((s) => ({ ...s, [f]: v })); if (f !== 'siteUrl') setTestState('idle') }}
             test={{ state: testState, onRun: () => void runTest() }}

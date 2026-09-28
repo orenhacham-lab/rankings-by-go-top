@@ -158,6 +158,37 @@ async function main() {
     check('…and looking does NOT spend the token', s.tables.free_site_check_claims[0].consumed_at === null)
   }
   {
+    // Starting from the claim by itself must never create a second project for
+    // the same site: the merchant's own active project for it is handed over.
+    const token = randomBytes(32).toString('hex')
+    const scan = claimedScan()
+    const s = setup({ tables: { ...claimTables(token, scan), projects: [
+      projectRow({ id: 'p-theirs', user_id: OTHER_USER, is_active: true }),
+      projectRow({ id: 'p-other-site', target_domain: 'another-site.co.il', is_active: true }),
+      projectRow({ id: 'p-archived', is_active: false }),
+      projectRow({ id: 'p-mine', target_domain: `https://www.${HE_WP.key}/`, is_active: true }),
+    ] } })
+    const surface = (await resolveNewProjectSurface({ ...s.deps, claimCookie: token, peekClaim: s.peekClaim })) as Extract<NewProjectSurface, { kind: 'flow' }>
+    check('a usable claim and an own active project for that site → that project is handed over', surface.claimedProjectId === 'p-mine', String(surface.claimedProjectId))
+    const projectsQuery = s.userQueries.find((q) => q.table === 'projects')
+    check('…read through the merchant\'s own client, filtered by owner and active',
+      !!projectsQuery && filtersBy(s.userQueries, 'projects', 'user_id', USER) && filtersBy(s.userQueries, 'projects', 'is_active', true) && !s.adminLog.includes('projects'))
+    const s2 = setup({ tables: { ...claimTables(token, scan), projects: [
+      projectRow({ id: 'p-theirs', user_id: OTHER_USER, is_active: true }),
+      projectRow({ id: 'p-other-site', target_domain: 'another-site.co.il', is_active: true }),
+    ] } })
+    const none = (await resolveNewProjectSurface({ ...s2.deps, claimCookie: token, peekClaim: s2.peekClaim })) as Extract<NewProjectSurface, { kind: 'flow' }>
+    check('…another merchant\'s project, or one for another site, is never handed over', none.claimedDomain === HE_WP.key && none.claimedProjectId === null, String(none.claimedProjectId))
+    const s3 = setup({ tables: { ...claimTables(token, scan), projects: [projectRow({ id: 'p-mine', is_active: true })] } })
+    const noClaim = (await resolveNewProjectSurface({ ...s3.deps, claimCookie: null, peekClaim: s3.peekClaim })) as Extract<NewProjectSurface, { kind: 'flow' }>
+    check('…and without a claim there is nothing to hand over', noClaim.claimedProjectId === null && !s3.userLog.includes('projects'))
+    // MUTATION CONTROL: the owner filter is what keeps another merchant's project out.
+    const src = strip(read('lib/onboarding/surfaces.ts'))
+    const ownerFiltered = (x: string) => /\.from\('projects'\)\s*\.select\('id, user_id, target_domain'\)\s*\.eq\('user_id', userId\)/.test(x) && /p\.user_id !== userId/.test(x)
+    check('the project look-up filters by owner in the query AND on the row', ownerFiltered(src))
+    check('MUT: dropping the owner filter is caught', !ownerFiltered(src.replace(".eq('user_id', userId)\n          .eq('is_active', true)", ".eq('is_active', true)")))
+  }
+  {
     const token = randomBytes(32).toString('hex')
     const s = setup({ tables: claimTables(token, claimedScan(), { consumed_at: NOW.toISOString() }) })
     const spent = (await resolveNewProjectSurface({ ...s.deps, claimCookie: token, peekClaim: s.peekClaim })) as Extract<NewProjectSurface, { kind: 'flow' }>
@@ -221,7 +252,7 @@ async function main() {
     const layout = strip(read('app/(dashboard)/projects/new/layout.tsx'))
     check('the new-project layout hands its children through untouched when the surface is legacy', /if \(surface\.kind === 'legacy'\) return children\b/.test(layout))
     check('…and otherwise renders the one-field flow with the server\'s clients and claimed site',
-      /<NewProjectFlow clients=\{surface\.clients\} claimedDomain=\{surface\.claimedDomain\} \/>/.test(layout) && /await loadNewProjectSurface\(\)/.test(layout))
+      /<NewProjectFlow clients=\{surface\.clients\} claimedDomain=\{surface\.claimedDomain\} claimedProjectId=\{surface\.claimedProjectId\} \/>/.test(layout) && /await loadNewProjectSurface\(\)/.test(layout))
     const summary = strip(read('app/(onboarding)/projects/[id]/summary/page.tsx'))
     check('the summary page answers "not found" when the surface is null', /if \(!surface\) notFound\(\)/.test(summary))
     check('…and remounts its screen per project (the switcher can change it)', /<SeedRunScreen key=\{surface\.projectId\}/.test(summary))
@@ -244,7 +275,7 @@ async function main() {
       const children = { marker: 'the old page' }
       const legacy = await Layout({ children })
       check('flag off: the layout returns the old page itself (the same object, nothing wrapped around it)', legacy === children)
-      next = { kind: 'flow', clients: [{ id: 'c1', isDefault: true }], claimedDomain: 'shop.example.com' }
+      next = { kind: 'flow', clients: [{ id: 'c1', isDefault: true }], claimedDomain: 'shop.example.com', claimedProjectId: null }
       const flow = await Layout({ children })
       check('flag on: the layout renders the one-field flow instead, and not the old page',
         flow?.type === NewProjectFlow && flow?.props?.claimedDomain === 'shop.example.com' && flow?.props?.children === undefined)

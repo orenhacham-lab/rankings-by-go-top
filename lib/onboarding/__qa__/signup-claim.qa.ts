@@ -8,7 +8,13 @@
  *     sets no cookie at all;
  *   - the sign-up page is the only place that reads ?claim=, hands it to the
  *     action and to nothing else, takes it out of the address, and never
- *     renders it; where sign-up leads afterwards is unchanged.
+ *     renders it;
+ *   - where sign-up leads: with a claim kept, the new-project screen that
+ *     starts from it (/projects/new?start=claim), both when sign-up has a
+ *     session at once (the page asks the action) and through the email
+ *     confirmation (the auth callback reads the cookie); without one, the
+ *     dashboard as before. Only the default landing is ever replaced, only by
+ *     that one fixed path, and an outside `next` never survives.
  *
  * The action runs for real with next/headers substituted; the page is rendered
  * for real (no effects) with next/navigation substituted.
@@ -42,13 +48,17 @@ const TOKEN = randomBytes(32).toString('hex')
 type SetCall = { name: string; value: string; options: Record<string, unknown> }
 const cookieSets: SetCall[] = []
 let requestHeaders = new Headers({ 'x-forwarded-proto': 'https' })
+let requestCookies: Record<string, string> = {}
 let search = new URLSearchParams()
 const Mod: any = require('module')
 const origLoad = Mod._load
 Mod._load = function (request: string, parent: any, isMain: boolean) {
   if (request === 'next/headers') {
     return {
-      cookies: async () => ({ set: (name: string, value: string, options: Record<string, unknown>) => cookieSets.push({ name, value, options }) }),
+      cookies: async () => ({
+        set: (name: string, value: string, options: Record<string, unknown>) => cookieSets.push({ name, value, options }),
+        get: (name: string) => (requestCookies[name] === undefined ? undefined : { name, value: requestCookies[name] }),
+      }),
       headers: async () => requestHeaders,
     }
   }
@@ -133,9 +143,11 @@ async function main() {
   }
   {
     const src = strip(read('app/(auth)/signup/claim-action.ts'))
-    check("the action file is a server action module ('use server' first) exporting only keepSeedClaim",
-      /^\s*'use server'/.test(src) && (src.match(/export (async )?function|export const/g) ?? []).length === 1 && /export async function keepSeedClaim\(value: unknown\): Promise<void>/.test(src))
-    check('…it logs nothing and returns nothing', !/console\./.test(src) && !/return\s+[^\s;]/.test(src.replace(/return\s*\n/g, '')))
+    check("the action file is a server action module ('use server' first) exporting only keepSeedClaim and seedClaimDestination",
+      /^\s*'use server'/.test(src) && (src.match(/export (async )?function|export const/g) ?? []).length === 2 && /export async function keepSeedClaim\(value: unknown\): Promise<void>/.test(src)
+      && /export async function seedClaimDestination\(\): Promise<string>/.test(src))
+    const keepBody = src.slice(src.indexOf('export async function keepSeedClaim'), src.indexOf('export async function seedClaimDestination'))
+    check('…it logs nothing, and keepSeedClaim returns nothing', !/console\./.test(src) && !/return\s+[^\s;]/.test(keepBody.replace(/return\s*\n/g, '')))
     check('…and checks the flag before anything else', src.indexOf('seedScanFlagOn(process.env)') > -1 && src.indexOf('seedScanFlagOn(process.env)') < src.indexOf('readClaimToken('))
   }
 
@@ -146,9 +158,21 @@ async function main() {
     && /keepSeedClaim\(claimParam\)/.test(page) && (page.match(/claimParam/g) ?? []).length === 4, String((page.match(/claimParam/g) ?? []).length))
   check('…then takes it out of the address, keeping every other parameter', /\.filter\(\(\[key\]\) => key !== 'claim'\)/.test(page) && /router\.replace\(rest \? `\$\{pathname\}\?\$\{rest\}` : pathname, \{ scroll: false \}\)/.test(page))
   check('…and never renders it', !/\{\s*claimParam\s*\}/.test(page) && page.slice(page.indexOf('return (')).indexOf('claimParam') === -1)
-  check('where sign-up leads is unchanged: the dashboard, and the confirmation link\'s next=/dashboard',
-    // (still the dashboard; since the language pass it carries the form's ?lang, see lib/i18n/auth-href.ts)
-    /router\.replace\(withLocaleParam\('\/dashboard', lang\)\)/.test(page) &&/next=\$\{encodeURIComponent\('\/dashboard'\)\}/.test(page))
+  {
+    // Where a sign-up with a session at once leads: the page asks the server,
+    // accepts only the claim path or the dashboard, and carries the form's ?lang.
+    const leads = (x: string) => /\(await seedClaimDestination\(\)\.catch\(\(\) => null\)\) === CLAIM_START_PATH/.test(x)
+      && /const destination = fromScan \? CLAIM_START_PATH : '\/dashboard'/.test(x)
+      && /router\.replace\(withLocaleParam\(destination, lang\)\)/.test(x)
+    check('sign-up with a session opens the claim path when the server says a claim is kept, else the dashboard', leads(page))
+    check('MUT: a page that always goes to the dashboard is caught', !leads(page.replace('router.replace(withLocaleParam(destination, lang))', "router.replace(withLocaleParam('/dashboard', lang))")))
+    check('…the confirmation link still asks for next=/dashboard (the callback replaces it)', /next=\$\{encodeURIComponent\('\/dashboard'\)\}/.test(page))
+    const cb = strip(read('app/api/auth/callback/route.ts'))
+    const cbLeads = (x: string) => /const landing = afterSignupPath\(\{ next, claimCookie: cookieStore\.get\(SEED_CLAIM_COOKIE\)\?\.value, env: process\.env \}\)/.test(x)
+      && /const dest = new URL\(landing, origin\)/.test(x) && /const next = sanitizeNextPath\(searchParams\.get\('next'\)\)/.test(x)
+    check('the auth callback sends a confirmed sign-up with a kept claim to the claim path, from the sanitised next', cbLeads(cb))
+    check('MUT: a callback that ignores the claim is caught', !cbLeads(cb.replace('new URL(landing, origin)', 'new URL(next, origin)')))
+  }
   {
     const offenders: string[] = []
     const walk = (dir: string) => {
@@ -168,6 +192,42 @@ async function main() {
     search = new URLSearchParams({ claim: TOKEN, lang: 'en' })
     const html = renderToStaticMarkup(createElement(AuthLocaleProvider as never, { locale: 'en', children: createElement(SIGNUP.default as never) } as never) as never)
     check('the page renders with ?claim= in the address, and the token is nowhere in it', html.length > 1000 && !html.includes(TOKEN))
+  }
+
+  console.log('\n4) Where sign-up leads')
+  {
+    const { afterSignupPath, CLAIM_START_PATH, isClaimStart } = require(join(ROOT, 'lib/onboarding/claim-start.ts'))
+    const on = { ENABLE_SEED_SCAN: 'true' }
+    check('the claim path is one fixed internal path', CLAIM_START_PATH === '/projects/new?start=claim')
+    check('default landing + a kept claim + the scan on → the claim path',
+      afterSignupPath({ next: '/dashboard', claimCookie: TOKEN, env: on }) === CLAIM_START_PATH
+      && afterSignupPath({ next: '/dashboard?lang=he', claimCookie: TOKEN, env: on }) === CLAIM_START_PATH)
+    check('no claim, a malformed one, or the scan off → where it was going',
+      afterSignupPath({ next: '/dashboard', claimCookie: undefined, env: on }) === '/dashboard'
+      && afterSignupPath({ next: '/dashboard', claimCookie: 'nope', env: on }) === '/dashboard'
+      && afterSignupPath({ next: '/dashboard', claimCookie: TOKEN, env: {} }) === '/dashboard'
+      && afterSignupPath({ next: '/dashboard', claimCookie: TOKEN, env: { ENABLE_SEED_SCAN: 'TRUE' } }) === '/dashboard')
+    check('a specific destination is never replaced (an install, an invitation, the password reset)',
+      ['/shopify/install?shop=x', '/auth/reset-password', '/content?projectId=1', '/dashboards'].every((n) => afterSignupPath({ next: n, claimCookie: TOKEN, env: on }) === n))
+    check('the new-project screen starts by itself only for exactly ?start=claim',
+      isClaimStart(new URLSearchParams('start=claim')) && !isClaimStart(new URLSearchParams('start=Claim')) && !isClaimStart(new URLSearchParams('')) && !isClaimStart(null))
+    const { seedClaimDestination } = require(join(ROOT, 'app/(auth)/signup/claim-action.ts'))
+    const before = process.env.ENABLE_SEED_SCAN
+    process.env.ENABLE_SEED_SCAN = 'true'
+    try {
+      requestCookies = { [SEED_CLAIM_COOKIE]: TOKEN }
+      const kept = await seedClaimDestination()
+      requestCookies = {}
+      const none = await seedClaimDestination()
+      requestCookies = { [SEED_CLAIM_COOKIE]: 'x'.repeat(64) }
+      const junk = await seedClaimDestination()
+      check('the action answers the claim path when the cookie holds a claim, else the dashboard', kept === CLAIM_START_PATH && none === '/dashboard' && junk === '/dashboard', `${kept} ${none} ${junk}`)
+      check('…and never the token', !String(kept).includes(TOKEN))
+    } finally {
+      requestCookies = {}
+      if (before === undefined) delete process.env.ENABLE_SEED_SCAN
+      else process.env.ENABLE_SEED_SCAN = before
+    }
   }
 
   finish()
