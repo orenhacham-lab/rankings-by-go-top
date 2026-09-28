@@ -16,6 +16,9 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import Select from '@/components/ui/Select'
+import Notice from '@/components/ui/Notice'
+import Textarea from '@/components/ui/Textarea'
 
 type EligibleSection = { sectionId: string; title: string }
 type InlineImage = {
@@ -47,8 +50,6 @@ type Dict = {
   errors: Record<string, string>
 }
 
-const inputCls =
-  'w-full px-3 py-2 text-copy rounded-control border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-info'
 
 export default function ArticleInlineImagesPanel({
   articleId,
@@ -257,10 +258,10 @@ export default function ArticleInlineImagesPanel({
         <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant="neutral">{images.length}/{max}</Badge>
       </div>
-      <p className="text-caption text-muted mb-3">{t.hint}</p>
+      <p className="mb-4 max-w-prose text-caption text-muted">{t.hint}</p>
 
       {migrationRequired ? (
-        <p className="text-caption text-warn">{t.migrationRequired}</p>
+        <Notice tone="warn">{t.migrationRequired}</Notice>
       ) : (
         <>
           <div className="space-y-4">
@@ -289,25 +290,21 @@ export default function ArticleInlineImagesPanel({
                     <p className="text-caption text-bad break-words">{errText(img.last_error)}</p>
                   )}
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-caption font-medium text-body">{t.section}</label>
-                    <select
-                      className={inputCls}
-                      value={img.section_id}
-                      disabled={isBusy}
-                      onChange={(ev) => { if (ev.target.value !== img.section_id) move(img.id, ev.target.value) }}
-                    >
-                      {moveTargets.map((s) => <option key={s.sectionId} value={s.sectionId}>{s.title}</option>)}
-                    </select>
-                  </div>
+                  <Select
+                    id={`inline-img-section-${img.id}`}
+                    label={t.section}
+                    value={img.section_id}
+                    disabled={isBusy}
+                    onChange={(ev) => { if (ev.target.value !== img.section_id) move(img.id, ev.target.value) }}
+                    options={moveTargets.map((s) => ({ value: s.sectionId, label: s.title }))}
+                  />
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-caption font-medium text-body">{t.promptLabel}</label>
-                    <textarea
-                      rows={2} className={inputCls} placeholder={t.promptPlaceholder} value={d.prompt} disabled={isBusy}
-                      onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, prompt: ev.target.value } }))}
-                    />
-                  </div>
+                  <Textarea
+                    id={`inline-img-prompt-${img.id}`}
+                    label={t.promptLabel}
+                    rows={2} placeholder={t.promptPlaceholder} value={d.prompt} disabled={isBusy}
+                    onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, prompt: ev.target.value } }))}
+                  />
                   <Input label={t.altLabel} value={d.alt} placeholder={t.altPlaceholder} disabled={isBusy}
                     onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, alt: ev.target.value } }))} />
                   <Input label={t.captionLabel} value={d.caption} placeholder={t.captionPlaceholder} disabled={isBusy}
@@ -318,8 +315,8 @@ export default function ArticleInlineImagesPanel({
                       {isBusy ? t.generating : (url ? t.regenerate : t.generate)}
                     </Button>
                     {/* Replace = upload a chosen file; separate from AI Regenerate. */}
-                    <Button size="sm" variant="outline" onClick={() => pickReplacement(img.id)} disabled={isBusy}>{t.replace}</Button>
-                    <Button size="sm" variant="outline" onClick={() => saveDetails(img.id)} disabled={isBusy}>{t.save}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => pickReplacement(img.id)} disabled={isBusy}>{t.replace}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => saveDetails(img.id)} disabled={isBusy}>{t.save}</Button>
                     <Button size="sm" variant="ghost" onClick={() => remove(img.id)} disabled={isBusy} className="text-bad">{t.remove}</Button>
                   </div>
                 </div>
@@ -335,12 +332,16 @@ export default function ArticleInlineImagesPanel({
               <p className="text-caption text-muted">{t.noEligible}</p>
             ) : (
               <div className="flex flex-wrap items-end gap-2">
-                <div className="flex flex-col gap-1 flex-1 min-w-[12rem]">
-                  <label className="text-caption font-medium text-body">{t.section}</label>
-                  <select className={inputCls} value={addSection} disabled={busy === 'add'} onChange={(ev) => setAddSection(ev.target.value)} dir={dir}>
-                    <option value="">{t.selectSection}</option>
-                    {openSections.map((s) => <option key={s.sectionId} value={s.sectionId}>{s.title}</option>)}
-                  </select>
+                <div className="min-w-48 flex-1">
+                  <Select
+                    id="inline-img-add-section"
+                    label={t.section}
+                    value={addSection}
+                    disabled={busy === 'add'}
+                    onChange={(ev) => setAddSection(ev.target.value)}
+                    dir={dir}
+                    options={[{ value: '', label: t.selectSection }, ...openSections.map((s) => ({ value: s.sectionId, label: s.title }))]}
+                  />
                 </div>
                 <Button size="sm" onClick={addImage} loading={busy === 'add'} disabled={busy === 'add' || !addSection}>
                   {busy === 'add' ? t.adding : t.add}

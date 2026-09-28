@@ -20,6 +20,9 @@ import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { ChevronDown } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
@@ -201,25 +204,23 @@ export default function WordPressConnectionPanel({
   ) : null
 
   return (
-    <Card className="hover:translate-y-0">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h3 className="text-base font-semibold text-ink">
+    <Card className="p-5 sm:p-6">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h3 className="text-section font-semibold text-ink">
           {t.wpConnectionTitle}
         </h3>
         {statusBadge}
       </div>
-      <p className="text-sm text-muted mb-4">{t.wpConnectionHelp}</p>
+      <p className="mb-4 max-w-prose text-copy text-muted">{t.wpConnectionHelp}</p>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted py-4">
-          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
-        </div>
+        <Skeleton className="h-12 w-full rounded-inset" />
       ) : !connection && !showForm ? (
-        <div className="text-center py-6">
-          <p className="text-sm text-body mb-3">{t.notConnected}</p>
+        <div className="py-6 text-center">
+          <p className="mb-3 text-copy text-body">{t.notConnected}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button size="sm" onClick={openForm} data-wp-connect-button>{t.connectButton}</Button>
-            <Button size="sm" variant="outline" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
+            <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
           </div>
         </div>
       ) : (
@@ -228,39 +229,42 @@ export default function WordPressConnectionPanel({
             // Compact connected state: URL + actions on one row; username /
             // last-tested tucked into a collapsed "details" so a set-once
             // connection doesn't dominate the page.
-            <div className="rounded-lg border border-line p-3">
+            <div className="rounded-inset border border-line bg-sunk/60 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm text-ink truncate max-w-full min-w-0" dir="ltr">
+                <span className="min-w-0 max-w-full truncate text-copy font-medium text-ink" dir="ltr" title={connection.site_url}>
                   {connection.site_url}
                 </span>
-                <div className="flex flex-wrap items-center gap-2 ms-auto">
-                  <Button size="sm" variant="outline" onClick={handleTest} loading={testing} disabled={testing}>
+                <div className="ms-auto flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={handleTest} loading={testing} disabled={testing}>
                     {testing ? t.testing : t.testConnection}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={openForm}>
+                  <Button size="sm" variant="ghost" onClick={openForm}>
                     {t.editConnection}
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     onClick={handleDisconnect}
                     loading={disconnecting}
                     disabled={disconnecting}
-                    className="text-bad border-bad/30"
+                    className="text-bad hover:bg-bad-soft hover:text-bad"
                   >
                     {disconnecting ? t.disconnecting : t.disconnect}
                   </Button>
                 </div>
               </div>
               {(connection.wp_username || connection.last_tested_at) && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer select-none text-xs text-muted">{t.connectionDetails}</summary>
+                <details className="group mt-2">
+                  <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 text-caption font-medium text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+                    <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                    {t.connectionDetails}
+                  </summary>
                   <div className="mt-1.5 space-y-1">
-                    <div className="text-xs text-muted">
+                    <div className="text-caption text-muted">
                       {t.wpUsername}: <span className="font-medium">{connection.wp_username}</span>
                     </div>
                     {connection.last_tested_at && (
-                      <div className="text-xs text-muted">
+                      <div className="text-caption text-muted">
                         {t.lastTestedAt}: {formatDateTime(connection.last_tested_at)}
                       </div>
                     )}
@@ -271,7 +275,7 @@ export default function WordPressConnectionPanel({
           )}
 
           {showForm && (
-            <div className="space-y-3" data-wp-form>
+            <div className="space-y-4" data-wp-form>
               {!connection && <WpPasswordSteps t={t} siteUrl={siteUrl} />}
               <Input
                 label={t.wpSiteUrl}
@@ -297,7 +301,7 @@ export default function WordPressConnectionPanel({
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   onClick={handleTest}
                   loading={testing}
                   disabled={testing || !siteUrl || !username || (!appPassword && !connection)}
@@ -319,14 +323,9 @@ export default function WordPressConnectionPanel({
           )}
 
           {message && (
-            <div
-              role={message.ok ? 'status' : 'alert'}
-              className={`text-sm rounded-lg px-3 py-2 border ${
-                message.ok ? 'bg-ok-soft border-ok/25 text-ok' : 'bg-bad-soft border-bad/20 text-bad'
-              }`}
-            >
+            <Notice tone={message.ok ? 'ok' : 'bad'}>
               {message.text}
-            </div>
+            </Notice>
           )}
         </div>
       )}
@@ -334,14 +333,14 @@ export default function WordPressConnectionPanel({
       {/* Help-only modal: how to create a WordPress Application Password and
           connect. Pure guidance — no connection logic runs here. */}
       <Modal open={guideOpen} onClose={() => setGuideOpen(false)} title={t.guideTitle} size="md">
-        <ol className="list-decimal space-y-2 ps-5 text-sm text-body leading-relaxed">
+        <ol className="list-decimal space-y-2 ps-5 text-copy text-body">
           {t.guideSteps.map((step, i) => (
             <li key={i}>{step}</li>
           ))}
         </ol>
-        <div className="mt-4 rounded-lg border border-warn/25 bg-warn-soft px-3 py-2 text-xs text-warn">
+        <Notice tone="warn" className="mt-4">
           {t.guideWarning}
-        </div>
+        </Notice>
         <div className="mt-4 flex justify-end">
           <Button size="sm" onClick={() => setGuideOpen(false)}>{t.guideClose}</Button>
         </div>
@@ -373,7 +372,7 @@ export function wpProfileHref(siteUrl: string): string | null {
 function WpPasswordSteps({ t, siteUrl }: { t: { wpStepsTitle: string; wpSteps: readonly string[]; wpOpenProfile: string }; siteUrl: string }) {
   const href = wpProfileHref(siteUrl)
   return (
-    <div className="rounded-control border border-line bg-sunk/60 px-3 py-2.5" data-wp-steps>
+    <div className="rounded-inset border border-line bg-sunk/60 px-4 py-3" data-wp-steps>
       <p className="text-caption font-semibold text-ink">{t.wpStepsTitle}</p>
       <ol className="mt-1.5 list-decimal space-y-1 ps-5 text-caption text-body">
         {t.wpSteps.map((step, i) => (

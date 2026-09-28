@@ -52,7 +52,7 @@ export default function SiteHubCard({ projectId }: { projectId: string }) {
             {(conn.site_url || conn.endpoint_url) && <p dir="ltr" className="truncate text-caption text-muted rtl:text-end">{conn.site_url ?? conn.endpoint_url}</p>}
           </div>
         </div>
-        <Link href={platformSetupHref(projectId)} className="text-sm font-medium text-action hover:underline">{dict.contentHub.manageConnectionCta}</Link>
+        <Link href={platformSetupHref(projectId)} className="text-copy font-medium text-action hover:underline">{dict.contentHub.manageConnectionCta}</Link>
       </div>
       {conn.connection_status === 'failed' && conn.last_error_code && (
         <p className="mt-3 text-caption text-bad">{siteErrorText(sp, conn.last_error_code)}</p>
@@ -80,19 +80,19 @@ export function SitePublishCard({ projectId, articleId }: { projectId: string; a
 
   const name = conn ? sp.names[conn.platform] : ''
   return (
-    <Card className="hover:translate-y-0">
-      <h3 className="mb-1 text-base font-semibold text-ink">{sp.publish.cardTitle}</h3>
+    <Card className="p-5 sm:p-6">
+      <h3 className="mb-1 text-section font-semibold text-ink">{sp.publish.cardTitle}</h3>
       <p className="mb-3 text-copy text-muted">{sp.publish.cardBody.replace('{platform}', name)}</p>
       <div className="flex flex-wrap items-center gap-3">
         <Button size="sm" onClick={() => void publish()} loading={busy} disabled={busy || !conn}>
-          <Send size={14} aria-hidden /> {busy ? sp.publish.publishing : sp.publish.button}
+          <Send className="size-4" aria-hidden /> {busy ? sp.publish.publishing : sp.publish.button}
         </Button>
         {result && (
-          <span role="status" className={`inline-flex items-center gap-2 text-caption font-medium animate-pop-in ${result.ok ? 'text-ok' : 'text-bad'}`}>
+          <span role="status" className={`inline-flex items-center gap-2 text-caption font-medium motion-safe:animate-pop-in ${result.ok ? 'text-ok' : 'text-bad'}`}>
             {result.text}
             {result.url && (
               <a href={result.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-action hover:underline">
-                {sp.publish.open} <ExternalLink size={12} aria-hidden />
+                {sp.publish.open} <ExternalLink aria-hidden="true" className="size-3.5" />
               </a>
             )}
           </span>

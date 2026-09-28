@@ -89,7 +89,7 @@ export default function ArticleAiVisibilityCard({ t, language, projectId, data, 
   return (
     <Card>
       <div className="mb-2 flex items-center gap-2">
-        <Sparkles size={16} aria-hidden className="text-action" />
+        <Sparkles aria-hidden="true" className="size-4 text-action" />
         <h3 className="text-section font-semibold text-ink">{t.title}</h3>
       </div>
 
@@ -120,10 +120,10 @@ export default function ArticleAiVisibilityCard({ t, language, projectId, data, 
           <p className="mt-1 text-caption text-muted">{s.tracked ? t.trackedHint : t.suggestionHint}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {s.tracked ? (
-              <Badge variant="success"><Check size={12} aria-hidden /> {t.tracked}</Badge>
+              <Badge variant="success"><Check aria-hidden="true" className="size-3.5" /> {t.tracked}</Badge>
             ) : (
               <Button size="sm" onClick={() => void track()} loading={busy} disabled={busy || !projectId} data-testid="ai-suggestion-track">
-                {!busy && <Plus size={14} aria-hidden />} {busy ? t.tracking : t.track}
+                {!busy && <Plus aria-hidden="true" className="size-4" />} {busy ? t.tracking : t.track}
               </Button>
             )}
             {projectId && (

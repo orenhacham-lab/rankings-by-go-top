@@ -7,7 +7,6 @@
  */
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -16,6 +15,9 @@ import Textarea from '@/components/ui/Textarea'
 import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import Badge from '@/components/ui/Badge'
+import BackLink from '@/components/ui/BackLink'
+import Notice from '@/components/ui/Notice'
+import StatTile from '@/components/ui/StatTile'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
@@ -36,7 +38,7 @@ import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/li
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { AlertTriangle, Eye, FileQuestion } from 'lucide-react'
+import { Check, FileQuestion } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
 type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
@@ -453,7 +455,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   if (notFound) {
     return (
       <Card padding={false}>
-        <EmptyState icon={<FileQuestion />} title={e.notFound} action={<Link href={backHref}><Button variant="outline">{e.back}</Button></Link>} />
+        <EmptyState icon={<FileQuestion />} title={e.notFound} action={<BackLink href={backHref}>{e.back}</BackLink>} />
       </Card>
     )
   }
@@ -495,9 +497,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       />
 
       {message && (
-        <div role={message.ok ? 'status' : 'alert'} className={`mb-4 rounded-inset border px-4 py-3 text-copy motion-safe:animate-pop-in ${message.ok ? 'bg-ok-soft border-ok/30 text-ok' : 'bg-bad-soft border-bad/30 text-bad'}`}>
+        <Notice tone={message.ok ? 'ok' : 'bad'} className="mb-4" onDismiss={() => setMessage(null)}>
           {message.text}
-        </div>
+        </Notice>
       )}
 
       <div id="article-panel-schema" role="tabpanel" aria-labelledby="article-tab-schema" hidden={tab !== 'schema'} className="mb-6">
@@ -536,7 +538,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          <div className="list-enter mb-4 grid grid-cols-3 gap-2 text-center sm:grid-cols-7">
+          <div className="list-enter mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {[
               { l: e.auditWords, v: audit.counts.words },
               { l: e.auditH2, v: audit.counts.h2 },
@@ -546,18 +548,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               { l: e.auditTables, v: audit.counts.tables },
               { l: e.auditLists, v: audit.counts.lists },
             ].map((c) => (
-              <div key={c.l} className="rounded-inset border border-line bg-sunk/60 px-2 py-2.5">
-                <div className="text-section font-semibold tabular-nums text-ink">{c.v}</div>
-                <div className="text-caption text-muted">{c.l}</div>
-              </div>
+              <StatTile key={c.l} label={c.l} value={c.v} className="rounded-inset bg-sunk/60 p-3 shadow-none sm:p-4" />
             ))}
           </div>
 
-          <div className="mb-3 text-caption">
-            <span className={audit.tocReady ? 'text-ok' : 'text-muted'}>
-              {audit.tocReady ? `✓ ${e.tocReady}` : e.tocNotReady}
-            </span>
-          </div>
+          <p className={`mb-3 inline-flex items-center gap-1.5 text-caption ${audit.tocReady ? 'text-ok' : 'text-muted'}`}>
+            {audit.tocReady && <Check aria-hidden="true" className="size-4 shrink-0" />}
+            {audit.tocReady ? e.tocReady : e.tocNotReady}
+          </p>
 
           {audit.anchorQuality && audit.anchorQuality.count > 0 && (() => {
             const aq = audit.anchorQuality
@@ -578,25 +576,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           {audit.blockers.length > 0 && (
             // On a published article nothing is blocked any more: the same items
             // read as advice, in the warning tone, not as a red "must fix".
-            <div className={`mb-3 rounded-inset border px-4 py-3 ${isPublished ? 'border-warn/30 bg-warn-soft' : 'border-bad/30 bg-bad-soft'}`}>
-              <div className={`mb-1 flex items-center gap-1.5 text-copy font-semibold ${isPublished ? 'text-warn' : 'text-bad'}`}>
-                <AlertTriangle size={14} aria-hidden /> {isPublished ? e.auditBlockersPublished : e.auditBlockers}
-              </div>
-              <ul className={`list-disc space-y-0.5 ps-5 text-caption ${isPublished ? 'text-warn' : 'text-bad'}`}>
-                {audit.blockers.map((b) => <li key={b}>{auditLabel(b)}</li>)}
-              </ul>
-            </div>
+            <Notice tone={isPublished ? 'warn' : 'bad'} className="mb-3" items={audit.blockers.map((b) => auditLabel(b))}>
+              <span className="font-semibold">{isPublished ? e.auditBlockersPublished : e.auditBlockers}</span>
+            </Notice>
           )}
           {audit.warnings.length > 0 && (
-            <div className="rounded-inset border border-warn/30 bg-warn-soft px-4 py-3">
-              <div className="mb-1 text-copy font-semibold text-warn">{e.auditWarnings}</div>
-              <ul className="list-disc space-y-0.5 ps-5 text-caption text-warn">
-                {audit.warnings.map((w) => <li key={w}>{auditLabel(w)}</li>)}
-              </ul>
-            </div>
+            <Notice tone="warn" className="mb-3" items={audit.warnings.map((w) => auditLabel(w))}>
+              <span className="font-semibold">{e.auditWarnings}</span>
+            </Notice>
           )}
           {audit.blockers.length === 0 && audit.warnings.length === 0 && (
-            <div className="text-copy text-ok">{e.auditAllGood}</div>
+            <Notice tone="ok">{e.auditAllGood}</Notice>
           )}
         </Card>
       )}
@@ -618,12 +608,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           onEdit={() => setEditing(true)}
         />
       ) : (
-        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-inset border border-action/30 bg-action-soft px-4 py-3 motion-safe:animate-pop-in">
-          <p className="text-copy text-ink">{e.readView.editingNote}</p>
-          <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
-            <Eye size={15} aria-hidden /> {e.readView.done}
-          </Button>
-        </div>
+        <Notice tone="info" className="mb-4" action={{ label: e.readView.done, onClick: () => setEditing(false) }}>
+          {e.readView.editingNote}
+        </Notice>
       )}
 
       <div className="space-y-4">
@@ -651,7 +638,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         <Card>
           <div className="mb-1 flex items-center justify-between gap-3">
             <h3 className="text-section font-semibold text-ink">{e.faqTitle}</h3>
-            <Button size="sm" variant="outline" onClick={() => setFaq((p) => [...p, { question: '', answer: '' }])}>{e.addFaq}</Button>
+            <Button size="sm" variant="secondary" onClick={() => setFaq((p) => [...p, { question: '', answer: '' }])}>{e.addFaq}</Button>
           </div>
           <p className="text-caption text-muted mb-3">{e.faqSchemaReadyHint}</p>
           <div className="list-enter space-y-3">
@@ -677,7 +664,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={featuredImageUrl} alt={title} className="w-full max-h-72 object-cover rounded-control border border-line" />
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageRegenerate}</Button>
+                <Button size="sm" variant="secondary" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageRegenerate}</Button>
                 <Button size="sm" variant="ghost" onClick={removeImage} disabled={imageBusy} className="text-bad">{e.imageRemove}</Button>
               </div>
             </div>
@@ -721,7 +708,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             for a WordPress project. A Shopify project sees an info card; neither
             → connect prompt; both → conflict. Detection uses the project's
             connection state (never the WordPress post id). */}
-        <section id="publish" tabIndex={-1} aria-label={e.topBar.publish} className="scroll-mt-40 rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-action">
+        <section id="publish" tabIndex={-1} aria-label={e.topBar.publish} className="scroll-mt-40 rounded-card focus:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
         <ArticleEditorPublishGate
           projectId={projectId}
           articleId={id}
@@ -756,18 +743,18 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           {/* WordPress export — draft (safe) or publish now (confirmed). */}
           <Card>
             <h3 className="text-section font-semibold text-ink mb-2">{e.wpTitle}</h3>
-            {!featuredImageUrl && <p className="text-caption text-warn mb-2">{e.wpNoImageWarn}</p>}
+            {!featuredImageUrl && <Notice tone="warn" className="mb-3">{e.wpNoImageWarn}</Notice>}
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
                 {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
+              <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
                 {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
               </Button>
               {wpPostId && wpPostUrl && (
                 <span className="inline-flex items-center gap-2 text-copy">
                   <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>
-                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-action hover:underline">
+                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-action hover:underline">
                     {wpStatus === 'publish' ? e.wpOpenLive : e.wpOpenDraft}
                   </a>
                 </span>
@@ -785,7 +772,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <h3 className="text-section font-semibold text-ink">{e.internal.planQaTitle}</h3>
             <p className="text-caption text-muted mb-2">{e.internal.planQaHint}</p>
             {isPublished && (
-              <p className="text-caption text-warn mb-2">{e.internal.publishedNote}</p>
+              <Notice tone="warn" className="mb-3">{e.internal.publishedNote}</Notice>
             )}
             <div className="space-y-2">
               {plannedLinks.map((link) => {
@@ -800,17 +787,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                         <span className="inline-flex items-center rounded-control bg-sunk px-2 py-0.5 text-caption text-body mt-1">
                           {e.internal.anchorLabel}: {link.anchorText}
                         </span>
-                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-caption text-action hover:underline break-all">{link.targetUrl}</a>
+                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={link.targetUrl} className="mt-1 block max-w-64 truncate text-start text-caption text-muted hover:text-action hover:underline">{link.targetUrl}</a>
                       </div>
                       {st === 'linked' && <Badge variant="success">{e.internal.statusLinked}</Badge>}
                       {st === 'ready' && (
-                        <Button size="sm" variant="outline" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
+                        <Button size="sm" variant="secondary" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
                       )}
                       {st === 'missing' && (
                         <Button size="sm" variant="ghost" onClick={() => copyAnchor(link.anchorText)}>{e.internal.copy}</Button>
                       )}
                     </div>
-                    <p className={`text-caption ${st === 'missing' ? 'text-warn' : 'text-muted'}`}>
+                    <p className={`text-caption ${st === 'missing' ? 'font-medium text-ink' : 'text-muted'}`}>
                       {st === 'ready' ? e.internal.statusReady : st === 'linked' ? e.internal.statusLinked : e.internal.statusMissing}
                     </p>
                   </div>
@@ -841,15 +828,19 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           />
         )}
 
-        <div className="rounded-card border border-line bg-surface p-4 shadow-card">
+
+        </div>
+
+        {/* The save bar stays in reach while the editor scrolls. */}
+        <div hidden={!editing} data-article-save-bar="" className="sticky bottom-4 z-10 rounded-card border border-line bg-surface/95 p-4 shadow-pop backdrop-blur-md">
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
             {/* Hidden once the article is published to WordPress — "ready" must not
                 downgrade a live published article. */}
             {!isPublished && (
-              <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
+              <Button variant="secondary" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
             )}
-            <Button variant="ghost" onClick={deleteArticle} className="text-bad">{c.deleteArticle}</Button>
+            <Button variant="ghost" onClick={deleteArticle} className="ms-auto text-bad hover:bg-bad-soft hover:text-bad">{c.deleteArticle}</Button>
           </div>
           {/* Client-side neutral hint — no fetch. Nudges a manual preview before
               marking ready when the planning feature is on and nothing was applied. */}
@@ -858,13 +849,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        </div>
-
-        {/* Single, prominent return to the Content Hub for this project. */}
+        {/* Single return to the project's articles. */}
         <div className="pt-4 pb-10">
-          <Link href={backHref} className="block">
-            <Button variant="outline" className="w-full sm:w-auto">{e.backToHub}</Button>
-          </Link>
+          <BackLink href={backHref}>{e.backToHub}</BackLink>
         </div>
       </div>
       </div>

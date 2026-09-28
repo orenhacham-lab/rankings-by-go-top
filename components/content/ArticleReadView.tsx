@@ -52,7 +52,7 @@ export default function ArticleReadView({
           <p className="mt-0.5 text-caption text-muted">{t.subtitle}</p>
         </div>
         <Button onClick={onEdit} data-testid="article-edit">
-          <Pencil size={15} aria-hidden /> {t.edit}
+          <Pencil aria-hidden="true" className="size-4" /> {t.edit}
         </Button>
       </div>
 

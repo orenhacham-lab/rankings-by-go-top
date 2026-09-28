@@ -14,7 +14,7 @@ import Button from '@/components/ui/Button'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
 import AutomationSchedule from '@/components/content/AutomationSchedule'
 import { PenLine, Plus, Sparkles } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import Segmented from '@/components/ui/Segmented'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 
 export default function AutomationScreen({ proFirst = false }: { proFirst?: boolean }) {
@@ -31,28 +31,23 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
     <div className="space-y-4">
       {/* M — the ideas destination: automatic ideas (default) + a manual
           topic sub-tab. The automatic workflow below is unchanged. */}
-      <div role="tablist" aria-label={t.ideasSubTabs.label} className="inline-flex rounded-control border border-line bg-sunk p-0.5">
-        {([['auto', t.ideasSubTabs.auto, Sparkles], ['manual', t.ideasSubTabs.manual, PenLine]] as const).map(([key, label, Icon]) => {
-          const on = ideasSection === key
-          return (
-            <button key={key} type="button" role="tab" aria-selected={on} onClick={() => changeIdeasSection(key)}
-              className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-                on ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink',
-              )}>
-              <Icon size={14} aria-hidden /> {label}
-            </button>
-          )
-        })}
-      </div>
+      <Segmented<'auto' | 'manual'>
+        ariaLabel={t.ideasSubTabs.label}
+        value={ideasSection}
+        onChange={changeIdeasSection}
+        options={[
+          { value: 'auto', label: t.ideasSubTabs.auto, icon: Sparkles },
+          { value: 'manual', label: t.ideasSubTabs.manual, icon: PenLine },
+        ]}
+      />
 
       {ideasSection === 'manual' ? (
-        <Card className="motion-safe:animate-pop-in">
+        <Card className="p-5 motion-safe:animate-pop-in sm:p-6">
           <h3 className="text-section font-semibold text-ink">{t.manualTopicTitle}</h3>
-          <p className="mt-1 mb-4 max-w-prose text-copy text-muted">{t.manualTopicHint}</p>
+          <p className="mb-4 mt-1 max-w-prose text-copy text-muted">{t.manualTopicHint}</p>
           {/* Reuses the SAME ArticleBriefModal → POST /api/content/topics (source='manual');
               all duplicate/title/ownership/quota checks apply; never auto-queued. */}
-          <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
+          <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus className="size-4" aria-hidden="true" /> {t.newTopicButton}</Button>
         </Card>
       ) : (
         <>

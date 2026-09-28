@@ -43,12 +43,12 @@ export default function TopicClusters({ cards, insights, lang, dict }: {
     <section aria-labelledby="strategy-clusters-heading" data-topic-clusters="">
       <div className="mb-3">
         <h2 id="strategy-clusters-heading" className="inline-flex items-center gap-2 text-section font-semibold text-ink">
-          <span className="grid size-7 place-items-center rounded-control bg-info-soft text-info"><Layers size={15} aria-hidden="true" /></span>
+          <span className="grid size-7 place-items-center rounded-inset bg-action-soft text-action"><Layers aria-hidden="true" className="size-4" /></span>
           {t.title}
         </h2>
-        <p className="mt-1 max-w-3xl text-caption text-muted">{t.subtitle}</p>
+        <p className="mt-1 max-w-prose text-caption text-muted">{t.subtitle}</p>
       </div>
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
         {shown.map((c, i) => {
           const published = c.items.some((it) => it.column === 'published')
           const rest = c.items.length - CLUSTER_TITLES
@@ -57,12 +57,12 @@ export default function TopicClusters({ cards, insights, lang, dict }: {
               key={c.name}
               data-cluster={c.name}
               style={{ animationDelay: `${Math.min(i, 5) * 60}ms` }}
-              className="rounded-card border border-line bg-surface p-4 shadow-card motion-safe:animate-pop-in [animation-fill-mode:backwards]"
+              className="rounded-card border border-line bg-surface p-5 shadow-card motion-safe:animate-pop-in [animation-fill-mode:backwards]"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 text-copy font-semibold text-ink [overflow-wrap:anywhere]">{c.name}</p>
                 {published && (
-                  <span title={t.hasPublished} className="shrink-0 text-ok"><CheckCircle2 size={16} aria-label={t.hasPublished} /></span>
+                  <span title={t.hasPublished} className="shrink-0 text-action"><CheckCircle2 aria-label={t.hasPublished} className="size-4" /></span>
                 )}
               </div>
               <p className="mt-1 flex flex-wrap gap-x-3 text-caption text-muted tabular-nums">

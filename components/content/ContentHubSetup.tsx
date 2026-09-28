@@ -73,7 +73,7 @@ export default function ContentHubSetup({
       data-content-setup-row
       className="mb-4 flex min-h-10 flex-wrap items-center gap-x-4 gap-y-1 rounded-control border border-line bg-surface px-3 py-2 text-caption text-body"
     >
-      <Plug size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-muted" />
+      <Plug strokeWidth={2} aria-hidden="true" className="size-4 shrink-0 text-muted" />
       {platformCard && (
         <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2">
           <span className={platformCard === 'none' ? 'text-body' : 'font-medium text-warn'}>

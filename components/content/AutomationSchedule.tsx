@@ -17,7 +17,12 @@ import Badge from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { FIELD_CLASSES } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, FileText, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
+import Segmented from '@/components/ui/Segmented'
+import Select from '@/components/ui/Select'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { presentAlert } from '@/lib/content/automation/alert-presentation'
 import { alertReasonCode, type ActiveAlert } from '@/lib/content/automation/alert-read-model'
@@ -396,7 +401,7 @@ export default function AutomationSchedule({
       </div>
       <p className="mt-1 mb-4 max-w-prose text-copy text-muted">{t.intro}</p>
 
-      {message && <p className={`text-caption mb-2 ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>}
+      {message && <Notice tone={message.ok ? 'ok' : 'bad'} className="mb-3">{message.text}</Notice>}
 
       {/* Part א — schedule settings. Compact single row (cadence · publish day(s) ·
           actions); stacks on mobile. Exact time/timezone stay internal (hidden).
@@ -405,19 +410,18 @@ export default function AutomationSchedule({
       <div className="space-y-3 rounded-inset border border-line bg-sunk/60 p-4">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
           {/* Cadence */}
-          <div className="min-w-[11rem]">
-            <div className="text-caption font-medium text-body mb-1">{t.cadenceLabel}</div>
+          <div className="min-w-0 max-w-full">
+            <div className="mb-1.5 text-caption font-semibold text-ink">{t.cadenceLabel}</div>
             <div className="flex flex-wrap items-center gap-2">
-              <div role="group" aria-label={t.cadenceLabel} className="inline-flex flex-wrap rounded-control border border-line bg-surface p-0.5">
-              {([['weekly1', t.weekly1], ['weekly2', t.weekly2], ['custom', t.customLabel]] as [Preset, string][]).map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setPreset(key)} aria-pressed={preset === key}
-                  className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color] duration-150 ${preset === key ? 'bg-action-soft text-action' : 'text-muted hover:text-ink'}`}>
-                  {label}
-                </button>
-              ))}
-              </div>
+              <Segmented<Preset>
+                ariaLabel={t.cadenceLabel}
+                value={preset}
+                onChange={setPreset}
+                options={[{ value: 'weekly1', label: t.weekly1 }, { value: 'weekly2', label: t.weekly2 }, { value: 'custom', label: t.customLabel }]}
+                className="max-w-full overflow-x-auto"
+              />
               {preset === 'custom' && (
-                <label className="text-caption text-body inline-flex items-center gap-1">
+                <label className="inline-flex items-center gap-1.5 text-caption text-body">
                   {t.customDays}
                   <input type="number" min={1} max={365} value={customDays} onChange={(e) => setCustomDays(Number(e.target.value) || 1)}
                     className={cn(FIELD_CLASSES, 'h-9 w-20 py-1')} />
@@ -429,19 +433,15 @@ export default function AutomationSchedule({
           {/* Publish day(s) — only for the weekly presets */}
           {(preset === 'weekly1' || preset === 'weekly2') && (
             <div>
-              <div className="text-caption font-medium text-body mb-1">{t.weekdayLabel}</div>
+              <div className="mb-1.5 text-caption font-semibold text-ink">{t.weekdayLabel}</div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <select value={weekdays[0] ?? 0}
+                <Select value={String(weekdays[0] ?? 0)} aria-label={t.weekdayLabel}
                   onChange={(e) => setWeekdays(preset === 'weekly1' ? [Number(e.target.value)] : [Number(e.target.value), weekdays[1] ?? DEFAULT_DAYS_2[1]!])}
-                  className={cn(FIELD_CLASSES, 'h-9 w-auto cursor-pointer py-1')}>
-                  {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
-                </select>
+                  options={t.weekdays.map((d: string, i: number) => ({ value: String(i), label: d }))} className="h-9 w-auto" />
                 {preset === 'weekly2' && (
-                  <select value={weekdays[1] ?? DEFAULT_DAYS_2[1]!}
+                  <Select value={String(weekdays[1] ?? DEFAULT_DAYS_2[1]!)} aria-label={t.weekdayLabel}
                     onChange={(e) => setWeekdays([weekdays[0] ?? DEFAULT_DAYS_2[0]!, Number(e.target.value)])}
-                    className={cn(FIELD_CLASSES, 'h-9 w-auto cursor-pointer py-1')}>
-                    {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
-                  </select>
+                    options={t.weekdays.map((d: string, i: number) => ({ value: String(i), label: d }))} className="h-9 w-auto" />
                 )}
               </div>
             </div>
@@ -450,7 +450,7 @@ export default function AutomationSchedule({
           {/* Actions */}
           <div className="ms-auto flex items-center gap-2">
             <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
-            <Button size="sm" variant="outline" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
+            <Button size="sm" variant="secondary" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
           </div>
         </div>
 
@@ -466,26 +466,21 @@ export default function AutomationSchedule({
             attention (a scheduled publish/generation failed, an item is stuck, or
             the queue is overdue with nothing to publish). */}
         {health?.needsAttention && (
-          <div className="mt-2 rounded-control border border-warn/30 bg-warn-soft px-3 py-2">
-            <p className="text-caption font-medium text-warn">{t.alertNeedsAttention}</p>
-            <p className="mt-0.5 text-caption text-warn">
-              {[
-                health.failedCount > 0 ? t.alertFailed.replace('{n}', String(health.failedCount)) : null,
-                health.stuckCount > 0 ? t.alertStuck.replace('{n}', String(health.stuckCount)) : null,
-                health.overdue ? t.alertOverdue : null,
-              ].filter(Boolean).join(' · ')}
-            </p>
-            {health.latestError && <p className="mt-0.5 text-caption text-warn break-words">{reasonLabel(health.latestError)}</p>}
-            <p className="mt-1 text-caption text-warn">{t.alertHint}</p>
-          </div>
+          <Notice tone="warn" items={[
+            health.failedCount > 0 ? t.alertFailed.replace('{n}', String(health.failedCount)) : null,
+            health.stuckCount > 0 ? t.alertStuck.replace('{n}', String(health.stuckCount)) : null,
+            health.overdue ? t.alertOverdue : null,
+            health.latestError ? reasonLabel(health.latestError) : null,
+          ].filter((x): x is string => !!x)}>
+            <span className="block font-semibold">{t.alertNeedsAttention}</span>
+            <span className="block text-body">{t.alertHint}</span>
+          </Notice>
         )}
 
         {/* Safety A — the alert store is a required dependency; if its migration
             is missing, say so clearly instead of showing a healthy-looking zero. */}
         {alertsMigrationMissing && (
-          <div className="mt-2 rounded-control border border-bad/30 bg-bad-soft px-3 py-2">
-            <p className="text-caption font-semibold text-bad">{t.alertsMigrationMissing}</p>
-          </div>
+          <Notice tone="bad">{t.alertsMigrationMissing}</Notice>
         )}
 
         {/* Phase 4B.1 — persisted final-failure alerts: one per item after the
@@ -493,31 +488,20 @@ export default function AutomationSchedule({
         {alerts.length > 0 && (
           <div className="mt-2 space-y-2">
             {alerts.map((a) => (
-              <div key={a.id} className="rounded-control border border-bad/30 bg-bad-soft px-3 py-2">
-                <p className="text-caption font-semibold text-bad">
-                  {presentAlert(a, alertDict).heading}
-                </p>
-                <p className="mt-0.5 text-caption text-bad break-words">
-                  {presentAlert(a, alertDict).detail}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  {a.articleId && (
-                    <Link href={`/content/articles/${a.articleId}`} className="text-caption font-medium text-action hover:underline">
-                      {t.alertViewArticle}
-                    </Link>
-                  )}
-                  {a.poolItemId && (
-                    <button type="button" onClick={() => retryFromAlert(a.poolItemId!)} disabled={busyItem === a.poolItemId}
-                      className="text-caption font-medium text-ok hover:underline disabled:opacity-50">
-                      {t.alertRetryNow}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => dismissAlert(a.id)}
-                    className="text-caption font-medium text-muted hover:underline">
-                    {t.alertDismiss}
-                  </button>
-                </div>
-              </div>
+              <Notice
+                key={a.id}
+                tone="bad"
+                onDismiss={() => dismissAlert(a.id)}
+                action={a.poolItemId && busyItem !== a.poolItemId ? { label: t.alertRetryNow, onClick: () => retryFromAlert(a.poolItemId!) } : null}
+              >
+                <span className="block font-semibold">{presentAlert(a, alertDict).heading}</span>
+                <span className="block break-words text-body">{presentAlert(a, alertDict).detail}</span>
+                {a.articleId && (
+                  <Link href={`/content/articles/${a.articleId}`} className="mt-1 inline-flex text-caption font-semibold text-action hover:underline">
+                    {t.alertViewArticle}
+                  </Link>
+                )}
+              </Notice>
             ))}
           </div>
         )}
@@ -525,17 +509,16 @@ export default function AutomationSchedule({
 
       {/* Part ב — publishing queue (add approved topics + the queue list below).
           A thin top divider separates it from the settings panel above. */}
-      <div className="mt-5 border-t border-line pt-5">
-        <div className="mb-2 text-copy font-semibold text-ink">{t.addApprovedTitle}</div>
+      <div className="mt-6 border-t border-line pt-6">
+        <h4 className="mb-2 text-copy font-semibold text-ink">{t.addApprovedTitle}</h4>
         {approved.length === 0 ? (
           <p className="text-caption text-muted">{t.noApproved}</p>
         ) : (
           <div className="space-y-2">
             {(approvedExpanded ? approved : approved.slice(0, 3)).map((tp) => (
-              <label key={tp.id} className="flex cursor-pointer items-center gap-2.5 rounded-control px-2 py-1.5 text-copy text-body transition-colors hover:bg-sunk/60">
-                <input type="checkbox" checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} className="size-4 shrink-0 accent-action" />
-                <span className="truncate">{tp.topic}</span>
-              </label>
+              <div key={tp.id} className="rounded-control px-2 py-1.5 transition-colors hover:bg-sunk/60">
+                <Checkbox checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} label={<span className="text-copy text-body">{tp.topic}</span>} />
+              </div>
             ))}
             {approved.length > 3 && (
               <div className="pt-0.5">
@@ -556,8 +539,8 @@ export default function AutomationSchedule({
       </div>
 
       {/* Queue */}
-      <div className="mt-5">
-        <div className="mb-2 text-copy font-semibold text-ink">{t.queueTitle}</div>
+      <div className="mt-6">
+        <h4 className="mb-2 text-copy font-semibold text-ink">{t.queueTitle}</h4>
         {loading ? (
           <div role="status" aria-busy="true" className="space-y-2">
             <span className="sr-only">{t.queueTitle}</span>
@@ -571,9 +554,9 @@ export default function AutomationSchedule({
               <div key={it.id} className="flex flex-wrap items-center gap-3 rounded-inset border border-line bg-surface p-3 transition-colors hover:border-line-strong">
                 <div className="flex flex-col">
                   <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={t.moveUp}
-                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronUp size={16} aria-hidden /></button>
+                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronUp aria-hidden="true" className="size-4" /></button>
                   <button type="button" onClick={() => move(idx, 1)} disabled={idx === items.length - 1} aria-label={t.moveDown}
-                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronDown size={16} aria-hidden /></button>
+                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronDown aria-hidden="true" className="size-4" /></button>
                 </div>
                 <div className="flex-1 min-w-[10rem]">
                   <div className="truncate text-copy font-medium text-ink">{it.topicTitle}</div>
@@ -582,43 +565,27 @@ export default function AutomationSchedule({
                 <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
                 <div className="flex items-center gap-1">
                   {it.status === 'publishing' && <span className="text-caption text-muted">{t.publishingNow}</span>}
-                  {it.status === 'published' && (
-                    <>
-                      <span className="text-caption text-ok">{t.publishedDone}</span>
-                      {it.wpPostUrl && (
-                        <a href={it.wpPostUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-caption font-medium text-action hover:underline">{t.openPost}</a>
-                      )}
-                    </>
-                  )}
-                  {it.status === 'generated' && (
-                    <>
-                      {it.articleId && (
-                        <a href={`/content/articles/${it.articleId}`} className="text-caption font-medium text-action hover:underline">{t.openEditor}</a>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
-                        {busyItem === it.id ? t.publishingNow : t.publishNow}
-                      </Button>
-                    </>
-                  )}
-                  {it.status === 'failed' && it.articleId && (
-                    <Button size="sm" variant="outline" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                  {it.status === 'published' && <span className="text-caption text-ok">{t.publishedDone}</span>}
+                  {/* The row's one inline action; the rest is in the row menu. */}
+                  {(it.status === 'generated' || (it.status === 'failed' && it.articleId)) && (
+                    <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                       {busyItem === it.id ? t.publishingNow : t.publishNow}
                     </Button>
                   )}
                   {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
-                    <Button size="sm" variant="outline" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                    <Button size="sm" variant="secondary" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                       {busyItem === it.id ? t.generatingArticle : t.generateNow}
                     </Button>
                   )}
-                  {(it.status === 'skipped' || it.status === 'paused') && (
-                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'unskip')} disabled={busyItem === it.id}>{t.retry}</Button>
-                  )}
-                  {it.status === 'queued' && (
-                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'skip')} disabled={busyItem === it.id}>{t.skip}</Button>
-                  )}
-                  {it.status !== 'publishing' && (
-                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'remove')} disabled={busyItem === it.id} className="text-bad">{t.remove}</Button>
-                  )}
+                  {(() => {
+                    const menu: RowMenuItem[] = []
+                    if (it.status === 'published' && it.wpPostUrl) menu.push({ key: 'post', label: t.openPost, onSelect: () => window.open(it.wpPostUrl!, '_blank', 'noopener,noreferrer'), icon: <ExternalLink className="size-4" aria-hidden="true" /> })
+                    if (it.status === 'generated' && it.articleId) menu.push({ key: 'editor', label: t.openEditor, href: `/content/articles/${it.articleId}`, icon: <FileText className="size-4" aria-hidden="true" /> })
+                    if (it.status === 'skipped' || it.status === 'paused') menu.push({ key: 'unskip', label: t.retry, onSelect: () => itemAction(it.id, 'unskip'), disabled: busyItem === it.id, icon: <RotateCcw className="size-4" aria-hidden="true" /> })
+                    if (it.status === 'queued') menu.push({ key: 'skip', label: t.skip, onSelect: () => itemAction(it.id, 'skip'), disabled: busyItem === it.id, icon: <SkipForward className="size-4 rtl:-scale-x-100" aria-hidden="true" /> })
+                    if (it.status !== 'publishing') menu.push({ key: 'remove', label: t.remove, danger: true, onSelect: () => itemAction(it.id, 'remove'), disabled: busyItem === it.id, icon: <Trash2 className="size-4" aria-hidden="true" /> })
+                    return menu.length > 0 ? <RowMenu label={`${t.queueTitle}: ${it.topicTitle}`} items={menu} /> : null
+                  })()}
                 </div>
               </div>
             ))}
@@ -639,20 +606,23 @@ export default function AutomationSchedule({
 
       {/* Admin/QA tools — collapsed by default so normal clients aren't confused
           by the manual run action. */}
-      <details className="mt-5 border-t border-line pt-4">
-        <summary className="cursor-pointer select-none text-caption font-medium text-muted hover:text-ink">{t.advancedTitle}</summary>
+      <details className="group mt-6 border-t border-line pt-4">
+        <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1.5 rounded-control text-caption font-semibold text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" />
+          {t.advancedTitle}
+        </summary>
         {/* Distinct soft block: this acts on the EXISTING publishing queue only —
             visually separated from the "add approved topics to queue" area above. */}
         <div className="mt-3 space-y-2 rounded-inset border border-line bg-sunk/60 p-4">
           <p className="text-caption font-medium text-body">{t.runNowSectionTitle}</p>
-          <Button size="sm" variant="outline" onClick={runNow} loading={runningNow} disabled={runningNow}>
+          <Button size="sm" variant="secondary" onClick={runNow} loading={runningNow} disabled={runningNow}>
             {runningNow ? t.runNowRunning : t.runNowLabel}
           </Button>
           <p className="text-caption text-muted">{t.runNowHelper}</p>
           {runMsg && (
-            <p className={`text-caption ${runMsg.tone === 'ok' ? 'text-ok' : runMsg.tone === 'error' ? 'text-bad' : 'text-body'}`}>
+            <Notice tone={runMsg.tone === 'ok' ? 'ok' : runMsg.tone === 'error' ? 'bad' : 'info'}>
               {runMsg.text}
-            </p>
+            </Notice>
           )}
         </div>
       </details>

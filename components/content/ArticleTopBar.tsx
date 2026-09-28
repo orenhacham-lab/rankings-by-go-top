@@ -29,9 +29,9 @@ type TopBarDict = DashboardDictionary['contentHub']['editor']['topBar']
 const linkButton = (variant: 'primary' | 'secondary') => cn(
   'inline-flex h-9 select-none items-center justify-center gap-2 rounded-control px-4 text-copy font-semibold whitespace-nowrap',
   'transition-[background-color,border-color,color,box-shadow] duration-150 ease-snappy',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+  'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
   variant === 'primary'
-    ? 'bg-action text-action-ink hover:bg-action-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(20_24_60/0.18)]'
+    ? 'bg-action text-action-ink hover:bg-action-hover shadow-control'
     : 'bg-surface text-ink border border-line shadow-control hover:border-line-strong hover:bg-sunk/60',
 )
 
@@ -93,9 +93,9 @@ export default function ArticleTopBar({
           href={backHref}
           aria-label={t.back}
           title={t.back}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-control text-body hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-control text-body transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
         >
-          <ArrowLeft size={18} aria-hidden className="rtl:rotate-180" />
+          <ArrowLeft aria-hidden="true" className="size-5 rtl:-scale-x-100" />
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-section font-semibold text-ink" title={title}>{title || '—'}</h1>
@@ -107,11 +107,11 @@ export default function ArticleTopBar({
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="md" variant="secondary" onClick={onCopy} loading={copying} disabled={copying}>
-            {!copying && <Copy size={15} aria-hidden />} {t.copyArticle}
+            {!copying && <Copy aria-hidden="true" className="size-4" />} {t.copyArticle}
           </Button>
           {featuredImageUrl && (
             <Button size="md" variant="secondary" onClick={onDownloadImage} loading={downloading} disabled={downloading}>
-              {!downloading && <Download size={15} aria-hidden />} {t.downloadImage}
+              {!downloading && <Download aria-hidden="true" className="size-4" />} {t.downloadImage}
             </Button>
           )}
           {cta.kind === 'loading' && (
@@ -119,27 +119,27 @@ export default function ArticleTopBar({
           )}
           {cta.kind === 'connect' && (
             <Link href={cta.href} className={linkButton('primary')} data-cta="connect">
-              <Plug size={15} aria-hidden /> {t.connectToPublish}
+              <Plug aria-hidden="true" className="size-4" /> {t.connectToPublish}
             </Link>
           )}
           {cta.kind === 'conflict' && (
             <Link href={cta.href} className={linkButton('primary')} data-cta="conflict">
-              <AlertTriangle size={15} aria-hidden /> {t.fixConflict}
+              <AlertTriangle aria-hidden="true" className="size-4" /> {t.fixConflict}
             </Link>
           )}
           {cta.kind === 'grant_scope' && (
             <a href={cta.href} className={linkButton('primary')} data-cta="grant_scope">
-              <ShieldCheck size={15} aria-hidden /> {t.grantScope}
+              <ShieldCheck aria-hidden="true" className="size-4" /> {t.grantScope}
             </a>
           )}
           {cta.kind === 'publish' && (
             <Button size="md" onClick={onPublish} data-cta="publish">
-              <Send size={15} aria-hidden /> {t.publish}
+              <Send aria-hidden="true" className="size-4" /> {t.publish}
             </Button>
           )}
           {cta.kind === 'published' && (cta.href ? (
             <a href={cta.href} target="_blank" rel="noopener noreferrer" className={linkButton('secondary')} data-cta="published">
-              {t.viewLive} <ExternalLink size={14} aria-hidden />
+              {t.viewLive} <ExternalLink aria-hidden="true" className="size-4" />
             </a>
           ) : (
             <Badge variant="success">{t.published}</Badge>
@@ -162,7 +162,7 @@ export default function ArticleTopBar({
               onClick={() => onTabChange(x.id)}
               onKeyDown={(e) => onTabKey(e, i)}
               className={cn(
-                '-mb-px border-b-2 px-3 pb-2 pt-1 text-copy font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action rounded-t-control',
+                '-mb-px rounded-t-control border-b-2 px-3 pb-2 pt-1 text-copy font-semibold transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
                 selected ? 'border-action text-ink' : 'border-transparent text-muted hover:text-ink',
               )}
             >

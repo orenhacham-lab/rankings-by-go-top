@@ -16,6 +16,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { ChevronDown, RefreshCw } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
 
@@ -157,35 +160,39 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
   const c = status?.counts ?? {}
 
   return (
-    <Card className="mb-4 p-4">
+    <Card className="mb-4 p-5 sm:p-6">
       {/* Header — title + status badge + manual refresh grouped together */}
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-copy font-semibold text-ink">{t.title}</h3>
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={tone}>{headline}</Badge>
-        <Button size="sm" variant="outline" onClick={onRefresh} loading={refreshing} disabled={refreshing}>
+        <Button size="sm" variant="secondary" onClick={onRefresh} loading={refreshing} disabled={refreshing} className="ms-auto">
+          {!refreshing && <RefreshCw aria-hidden="true" className="size-4" />}
           {refreshing ? t.refreshing : t.refresh}
         </Button>
       </div>
 
       {loading ? (
-        <div className="pt-2">
-          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
+        <div className="mt-3 space-y-2">
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-1/3" />
         </div>
       ) : (
         <>
           {/* Warnings (compact, single line) */}
           {!refreshing && exists && (status?.stale || status?.versionStale) && (
-            <div className="mt-1 text-caption text-warn">
+            <Notice tone="warn" className="mt-3">
               {status?.stale ? t.stale : ''}{status?.stale && status?.versionStale ? ' · ' : ''}{status?.versionStale ? t.versionStale : ''}
-            </div>
+            </Notice>
           )}
+          {/* The scanner's own error text is never shown (design contract §8):
+              the merchant gets what happened and what to do about it. */}
           {!refreshing && exists && scanStatus === 'failed' && status?.errorMessage && (
-            <div className="mt-1 text-caption text-bad">{t.errorPrefix}: {status.errorMessage}</div>
+            <Notice tone="bad" className="mt-3">{t.failedHint}</Notice>
           )}
 
           {/* Counts + scan meta — one compact wrapping line (no big empty gaps) */}
           {exists ? (
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted">
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted tabular-nums">
               <span><b className="text-body">{c.uniqueTargets ?? c.targetsStored ?? 0}</b> {t.cUnique}</span>
               <span><b className="text-body">{c.targetsEligible ?? 0}</b> {t.cEligible}</span>
               <span><b className="text-body">{c.targetsWithUsableAnchors ?? 0}</b> {t.cAnchors}</span>
@@ -201,21 +208,21 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
                   return <span><b className="text-body">{d.productsFound}</b> {t.cStoreProducts} · <b className="text-body">{d.categoriesFound}</b> {t.cStoreCategories}</span>
                 }
                 if (ecomTargets > 0) {
-                  return <span className="text-warn">{t.storeDiscoveryNone}{d.lastHttpStatus ? ` (HTTP ${d.lastHttpStatus})` : ''}</span>
+                  return <span className="font-medium text-ink">{t.storeDiscoveryNone}{d.lastHttpStatus ? ` (HTTP ${d.lastHttpStatus})` : ''}</span>
                 }
                 return null // service/content site — product discovery not relevant
               })()}
               {/* Phase 3I.2 — WHY content was skipped (rate limit is the common
                   real-world cause of "74 skipped, 1 with anchors"). */}
               {status?.contentSkipBreakdown && (status.contentSkipBreakdown.rateLimited > 0 || status.contentSkipBreakdown.abortedAfterFailures > 0) && (
-                <span className="text-warn">
+                <span className="basis-full max-w-prose text-body">
                   {t.rateLimitedNote.replace('{n}', String(status.contentSkipBreakdown.rateLimited + status.contentSkipBreakdown.abortedAfterFailures))}
                 </span>
               )}
               {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-muted">·</span>}
               {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt)}</span>}
               {status?.scannerVersion && <span>{t.scannerVersion} {status.scannerVersion}</span>}
-              {status?.truncated ? <span className="text-warn">{t.truncated}</span> : null}
+              {status?.truncated ? <span className="font-medium text-ink">{t.truncated}</span> : null}
             </div>
           ) : (
             !refreshing && <p className="mt-1 text-caption text-muted">{t.notScannedHint}</p>
@@ -224,14 +231,17 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
           {/* Coverage clarification (Phase 3F.1.1) — the index intentionally covers
               the most useful link destinations from posts/pages, not the full
               product catalog, so "partial" on large WooCommerce sites is expected. */}
-          {exists && <p className="mt-1 text-caption text-muted">{t.coverageNote}</p>}
+          {exists && <p className="mt-2 max-w-prose text-caption text-muted">{t.coverageNote}</p>}
 
           {/* Advanced diagnostics — collapsed; 2-col grid keeps it compact + connected */}
           {exists && (
-            <details className="mt-1.5">
-              <summary className="cursor-pointer select-none text-caption text-muted">{t.techDetails}</summary>
-              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5 text-caption text-muted">
-                {status?.siteUrl && <div dir="ltr" className="sm:col-span-2">{t.siteUrl}: <span className="font-mono">{status.siteUrl}</span></div>}
+            <details className="group mt-2">
+              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                {t.techDetails}
+                <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+              </summary>
+              <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 rounded-inset bg-sunk/60 p-4 text-caption text-muted tabular-nums sm:grid-cols-2">
+                {status?.siteUrl && <div className="min-w-0 sm:col-span-2">{t.siteUrl}: <span dir="ltr" title={status.siteUrl} className="inline-block max-w-64 truncate align-bottom">{status.siteUrl}</span></div>}
                 <div>{t.scannerVersion}: {status?.scannerVersion ?? '—'} · {t.currentVersion}: {status?.currentScannerVersion ?? '—'}</div>
                 <div>{t.ttlDays}: {status?.ttlDays ?? '—'}</div>
                 {status?.scanStartedAt && <div>{t.startedAt}: {formatDateTime(status.scanStartedAt)}</div>}

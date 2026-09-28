@@ -35,21 +35,21 @@ function Row({ card, lang, dict, act, canSwap, insight }: {
   const date = shortDate(card.date, lang)
   const Arrow = lang === 'he' ? ArrowUpLeft : ArrowUpRight
   return (
-    <li data-strategy-row={card.key} className={cn('px-4 py-3 transition-colors hover:bg-sunk/50', ROW_GRID)}>
+    <li data-strategy-row={card.key} className={cn('px-4 py-3 transition-colors duration-150 ease-snappy hover:bg-sunk/50', ROW_GRID)}>
       <div className="min-w-0">
         <p className="text-copy font-semibold text-ink [overflow-wrap:anywhere]">{card.title}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {card.keyword && (
             <span className="inline-flex max-w-full items-center gap-1 rounded-pill bg-sunk px-2 py-0.5 text-caption text-muted">
-              <KeyRound size={11} className="shrink-0" aria-hidden />
+              <KeyRound className="size-3 shrink-0" aria-hidden="true" />
               <span className="truncate">{card.keyword}</span>
             </span>
           )}
           {card.origin === 'scan' && (
-            <span className="inline-flex items-center gap-1 rounded-pill bg-info-soft px-1.5 text-caption text-info"><Sparkles size={11} aria-hidden />{s.origins.scan}</span>
+            <span className="inline-flex items-center gap-1 rounded-pill bg-sunk px-1.5 text-caption text-body"><Sparkles aria-hidden="true" className="size-3 text-action" />{s.origins.scan}</span>
           )}
           {card.origin === 'ranking' && (
-            <span className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-1.5 text-caption text-ok"><TrendingUp size={11} aria-hidden />{s.origins.ranking}</span>
+            <span className="inline-flex items-center gap-1 rounded-pill bg-sunk px-1.5 text-caption text-body"><TrendingUp aria-hidden="true" className="size-3 text-action" />{s.origins.ranking}</span>
           )}
         </div>
         {insight && <TopicFacts insight={insight} lang={lang} dict={dict} className="mt-2" />}
@@ -61,11 +61,11 @@ function Row({ card, lang, dict, act, canSwap, insight }: {
       <div className="mt-2 text-caption text-muted md:mt-0.5">
         {date ? (
           <span className="inline-flex items-center gap-1">
-            <CalendarDays size={12} aria-hidden />
+            <CalendarDays aria-hidden="true" className="size-3.5" />
             {s.dateKinds[card.dateKind]} · <span className="tabular-nums">{date}</span>
           </span>
         ) : null}
-        {card.queued && card.column !== 'published' && <span className="ms-1 rounded-pill bg-warn-soft px-1.5 text-warn">{s.queued}</span>}
+        {card.queued && card.column !== 'published' && <span className="ms-1 rounded-pill bg-sunk px-1.5 font-medium text-body">{s.queued}</span>}
       </div>
       <div className="mt-2 md:mt-0 md:justify-self-end">
         {card.column === 'ideas' && act ? (
@@ -74,9 +74,9 @@ function Row({ card, lang, dict, act, canSwap, insight }: {
           <Link
             href={`/content/articles/${encodeURIComponent(card.articleId)}`}
             aria-label={`${s.openArticle}: ${card.title}`}
-            className="inline-flex h-8 items-center gap-1 rounded-control border border-line px-3 text-caption font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+            className="inline-flex h-8 items-center gap-1 rounded-control border border-line px-3 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
           >
-            {s.openArticle}<Arrow size={13} aria-hidden />
+            {s.openArticle}<Arrow aria-hidden="true" className="size-3.5" />
           </Link>
         ) : null}
       </div>
@@ -115,7 +115,7 @@ function Stage({ column, cards, lang, dict, act, insights }: {
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="w-full border-t border-line px-4 py-2 text-caption font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action"
+              className="w-full border-t border-line px-4 py-2 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-action/20"
             >
               {open ? s.showLess : fill(s.showMore, { n: hidden })}
             </button>

@@ -68,7 +68,7 @@ function main() {
     strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }) === '/content/strategy?view=list&section=ideas#ideas')
 
   // 2 — the ideas destination has auto + manual sub-tabs; manual reuses the SAME modal.
-  check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(automation) && /t\.ideasSubTabs\.manual/.test(automation) && /changeIdeasSection\(key\)/.test(automation))
+  check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(automation) && /t\.ideasSubTabs\.manual/.test(automation) && /onChange=\{changeIdeasSection\}/.test(automation) && /<Segmented/.test(automation))
   check("manual sub-tab reuses ArticleBriefModal (setBriefOpen) — not a new topic type",
     /ideasSection === 'manual' \?[\s\S]*?manualTopicTitle[\s\S]*?onClick=\{\(\) => \{ setEditingTopic\(null\); setBriefOpen\(true\) \}\}/.test(automation))
   check('manual create button is the ONLY direct setBriefOpen across the workspace',

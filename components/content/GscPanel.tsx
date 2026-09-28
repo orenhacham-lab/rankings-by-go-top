@@ -17,7 +17,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search as SearchIcon } from 'lucide-react'
+import { Search as SearchIcon, X } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -199,11 +201,11 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   }
 
   return (
-    <Card className="hover:translate-y-0">
+    <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4" data-gsc-card={connected ? 'connected' : 'none'}>
         <div className="flex min-w-0 items-center gap-3">
-          <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-info-soft text-info">
-            <SearchIcon size={18} />
+          <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
+            <SearchIcon className="size-5" />
           </span>
           <div className="min-w-0">
             <h3 className="flex flex-wrap items-center gap-2 text-section font-semibold text-ink">
@@ -221,18 +223,16 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted pt-4">
-          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
-        </div>
+        <Skeleton className="mt-4 h-12 w-full rounded-inset" />
       ) : status && !status.oauthConfigured ? (
-        <div className="mt-4 rounded-lg border border-warn/25 bg-warn-soft px-3 py-2 text-sm text-warn">
+        <Notice tone="warn" className="mt-4">
           {t.notConfigured}
-        </div>
+        </Notice>
       ) : !connected ? (
         <>
           <p className="mt-3 text-caption text-muted">{t.notConnected}</p>
           {message && (
-            <div role="alert" className="mt-3 text-sm rounded-lg px-3 py-2 border bg-bad-soft border-bad/20 text-bad">{message.text}</div>
+            <Notice tone="bad" className="mt-3">{message.text}</Notice>
           )}
         </>
       ) : (
@@ -240,19 +240,19 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
           {/* Connection row. The GLOBAL Google-authorization revoke is intentionally
               de-emphasized (a small text link, not a primary button) — the normal
               per-project disconnect lives on the property row below. */}
-          <div className="rounded-lg border border-line p-3">
+          <div className="rounded-inset border border-line bg-sunk/60 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-body">{t.connectedAccount}</span>
+              <span className="text-copy text-body">{t.connectedAccount}</span>
               {connection?.status === 'reauth_required' && (
                 <Button size="sm" className="ms-auto" onClick={handleConnect} loading={connecting} disabled={connecting}>{t.reconnect}</Button>
               )}
             </div>
             {connection?.status === 'reauth_required' && (
-              <p className="mt-2 text-xs text-warn">{t.reauthHint}</p>
+              <Notice tone="warn" className="mt-2">{t.reauthHint}</Notice>
             )}
             <div className="mt-2">
               <button type="button" onClick={handleGlobalRevoke} disabled={revoking}
-                className="text-xs text-bad/80 hover:underline disabled:opacity-50">
+                className="text-caption font-medium text-bad hover:underline disabled:opacity-50">
                 {revoking ? t.revoking : t.globalRevoke}
               </button>
             </div>
@@ -260,22 +260,22 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
 
           {/* Property assignment / picker */}
           {pickerOpen ? (
-            <div className="rounded-lg border border-line p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-ink">{t.selectPropertyTitle}</h4>
-                <button type="button" onClick={() => setPickerOpen(false)} className="text-xs text-action hover:underline">✕</button>
+            <div className="rounded-inset border border-line p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-copy font-semibold text-ink">{t.selectPropertyTitle}</h4>
+                <button type="button" onClick={() => setPickerOpen(false)} aria-label={getDashboardDictionary(language).common.close} className="grid size-8 place-items-center rounded-control text-muted transition-colors duration-150 hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"><X className="size-4" aria-hidden="true" /></button>
               </div>
               {loadingProps ? (
-                <div className="text-sm text-muted py-3">{t.loadingProperties}</div>
+                <div className="py-3 text-copy text-muted">{t.loadingProperties}</div>
               ) : !properties || properties.length === 0 ? (
-                <div className="text-sm text-muted py-3">{t.noProperties}</div>
+                <div className="py-3 text-copy text-muted">{t.noProperties}</div>
               ) : (
                 <ul className="space-y-2">
                   {properties.map((p) => {
                     const isUnverified = p.permissionLevel === 'siteUnverifiedUser'
                     return (
-                      <li key={p.siteUrl} className="flex flex-wrap items-center gap-2 rounded border border-line p-2">
-                        <span className="font-mono text-xs text-ink truncate max-w-full min-w-0" dir="ltr">{p.siteUrl}</span>
+                      <li key={p.siteUrl} className="flex flex-wrap items-center gap-2 rounded-control border border-line px-3 py-2">
+                        <span className="min-w-0 max-w-64 truncate text-copy text-ink" dir="ltr" title={p.siteUrl}>{p.siteUrl}</span>
                         <Badge variant="neutral">{p.kind === 'domain' ? t.propertyKindDomain : t.propertyKindUrlPrefix}</Badge>
                         {isUnverified ? (
                           <Badge variant="danger">{t.unverified}</Badge>
@@ -286,7 +286,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                         )}
                         <div className="ms-auto">
                           {/* Non-covering or unverified → visible for diagnostics but NOT assignable. */}
-                          <Button size="sm" variant="outline" disabled={isUnverified || !p.covers || assigning === p.siteUrl} loading={assigning === p.siteUrl} onClick={() => handleAssign(p)}>
+                          <Button size="sm" variant="secondary" disabled={isUnverified || !p.covers || assigning === p.siteUrl} loading={assigning === p.siteUrl} onClick={() => handleAssign(p)}>
                             {assigning === p.siteUrl ? t.assigning : t.assign}
                           </Button>
                         </div>
@@ -297,19 +297,19 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
               )}
             </div>
           ) : !property ? (
-            <div className="rounded-lg border border-line p-3 text-center">
-              <p className="text-sm text-body mb-2">{t.noPropertyAssigned}</p>
+            <div className="rounded-inset border border-line p-4 text-center">
+              <p className="mb-3 text-copy text-body">{t.noPropertyAssigned}</p>
               <Button size="sm" onClick={openPicker}>{t.selectProperty}</Button>
             </div>
           ) : (
-            <div className="rounded-lg border border-line p-3">
+            <div className="rounded-inset border border-line bg-sunk/60 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted">{t.assignedProperty}:</span>
-                <span className="font-mono text-sm text-ink truncate max-w-full min-w-0" dir="ltr">{property.siteUrl}</span>
-                <div className="flex flex-wrap items-center gap-2 ms-auto">
+                <span className="text-caption text-muted">{t.assignedProperty}:</span>
+                <span className="min-w-0 max-w-full truncate text-copy font-medium text-ink" dir="ltr" title={property.siteUrl}>{property.siteUrl}</span>
+                <div className="ms-auto flex flex-wrap items-center gap-2">
                   <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
-                  <Button size="sm" variant="outline" onClick={openPicker}>{t.changeProperty}</Button>
-                  <Button size="sm" variant="outline" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-bad border-bad/30">
+                  <Button size="sm" variant="ghost" onClick={openPicker}>{t.changeProperty}</Button>
+                  <Button size="sm" variant="ghost" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-bad hover:bg-bad-soft hover:text-bad">
                     {unassigning ? t.unassigning : t.unassignProperty}
                   </Button>
                 </div>
@@ -319,20 +319,20 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                   The weekly auto-sync is a daily dispatcher, so the shown time is the
                   EARLIEST the project becomes eligible (a lower bound), never a promise
                   of an exact run time. The manual "Sync now" button stays available. */}
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted">
                 <span>{t.lastSyncedAt}: {lastSyncedAt ? formatDateTime(lastSyncedAt) : t.neverSyncedShort}</span>
                 {nextEligibleSyncAt && (
                   <span title={t.nextAutoSyncHint}>{t.nextAutoSyncFrom}: {formatDateTime(nextEligibleSyncAt)}</span>
                 )}
               </div>
-              {nextEligibleSyncAt && <p className="mt-1 text-[11px] text-muted">{t.nextAutoSyncHint}</p>}
+              {nextEligibleSyncAt && <p className="mt-1 text-caption text-muted">{t.nextAutoSyncHint}</p>}
             </div>
           )}
 
           {message && (
-            <div className={`text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-ok-soft border-ok/25 text-ok' : 'bg-bad-soft border-bad/20 text-bad'}`}>
+            <Notice tone={message.ok ? 'ok' : 'bad'}>
               {message.text}
-            </div>
+            </Notice>
           )}
 
           {/* Diagnostics — the read-only SC data view (shared GscMetricsTable). */}

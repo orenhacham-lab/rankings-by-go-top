@@ -24,14 +24,28 @@ import { cn, formatDate } from '@/lib/utils'
 import StatTile from '@/components/ui/StatTile'
 import SectionHeading from '@/components/ui/SectionHeading'
 import EmptyState from '@/components/ui/EmptyState'
-import { FIELD_CLASSES } from '@/components/ui/Input'
-import { ChevronDown, ExternalLink, FileText, Pencil, Plug, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
+import Checkbox from '@/components/ui/Checkbox'
+import { CheckCircle2, ChevronDown, ExternalLink, FileText, Loader2, Pencil, Plug, Plus, Search, Send, ShieldCheck, Trash2, Upload, X } from 'lucide-react'
 import { resolvePublishCta } from '@/lib/content/publish-cta'
 import { CitedBadge } from '@/components/content/ArticleAiVisibilityCard'
 import RowMenu from '@/components/ui/RowMenu'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT, STATUS_TONE, type ArticleRow } from './types'
+
+/** Rows shown before "show more" (design contract §7). */
+const ARTICLES_PAGE = 25
+/** Literal column classes for the stat row, so Tailwind sees every one of them. */
+const STAT_COLS: Record<number, string> = {
+  1: 'sm:grid-cols-2 lg:grid-cols-4',
+  2: 'sm:grid-cols-2 lg:grid-cols-4',
+  3: 'sm:grid-cols-3',
+  4: 'sm:grid-cols-4',
+  5: 'sm:grid-cols-3 lg:grid-cols-5',
+  6: 'sm:grid-cols-3 lg:grid-cols-6',
+}
 
 export default function ArticlesScreen() {
   const {
@@ -46,7 +60,7 @@ export default function ArticlesScreen() {
 
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
-  const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
+  const [articlesExpanded, setArticlesExpanded] = useState(false) // show the first ARTICLES_PAGE rows by default
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
 
   // ── Batch publish/draft on the active platform (client-side, sequential) ──
@@ -363,7 +377,10 @@ export default function ArticlesScreen() {
   const wpState = (a: ArticleRow): 'published' | 'exported' | 'none' =>
     a.wp_post_id && a.status === 'published' ? 'published' : a.wp_post_id ? 'exported' : 'none'
 
-  const statCards = counts
+  // Design contract §7: a tile that says "0" says nothing. The total always
+  // shows (once there is anything at all); the per-status tiles only when they
+  // count something; and with no articles the empty state below speaks instead.
+  const statCards = counts && counts.total > 0
     ? [
         { key: 'total', label: t.stats.total, value: counts.total },
         { key: 'draft', label: t.stats.draft, value: counts.draft },
@@ -371,8 +388,11 @@ export default function ArticlesScreen() {
         { key: 'scheduled', label: t.stats.scheduled, value: counts.scheduled },
         { key: 'published', label: t.stats.published, value: counts.published },
         { key: 'failed', label: t.stats.failed, value: counts.failed },
-      ]
+      ].filter((c) => c.key === 'total' || c.value > 0)
     : []
+  const shownArticles = articlesExpanded ? filteredArticles : filteredArticles.slice(0, ARTICLES_PAGE)
+  const selectedCount = selectedArticles.size
+  const someArticlesSelected = selectedCount > 0 && !allArticlesSelected
 
 
   return (
@@ -404,7 +424,7 @@ export default function ArticlesScreen() {
 
       {/* Stats: the same tile as every other screen, entering as a list. */}
       {statCards.length > 0 && (
-        <div className="list-enter mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+        <div className={cn('list-enter mb-8 grid grid-cols-2 gap-4 sm:gap-5', STAT_COLS[statCards.length] ?? 'sm:grid-cols-3 lg:grid-cols-6')}>
           {statCards.map((s) => (
             <StatTile key={s.key} label={s.label} value={s.value} />
           ))}
@@ -415,58 +435,60 @@ export default function ArticlesScreen() {
       <SectionHeading
         title={t.articlesHeading}
         description={t.articlesSubtitle}
-        action={<Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>}
+        action={<Button onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>}
       />
 
       {(data?.articles?.length ?? 0) === 0 ? (
         <Card padding={false} className="mb-6">
-          <EmptyState icon={<FileText />} title={t.articlesEmptyTitle} action={<Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>} />
+          <EmptyState icon={<FileText />} title={t.articlesEmptyTitle} action={<Button variant="secondary" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>} />
         </Card>
       ) : (
       <>
       {/* Filters */}
-      <div className="mb-3 flex flex-wrap gap-3">
-        <select
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1 basis-56 sm:max-w-xs">
+          <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <Input
+            type="search"
+            placeholder={t.filters.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t.filters.search}
+            className="h-10 ps-9"
+          />
+        </div>
+        <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label={t.filters.status}
-          className={cn(FIELD_CLASSES, 'h-10 w-auto cursor-pointer py-2')}
-        >
-          <option value="">{t.filters.allStatuses}</option>
-          {['draft', 'ready', 'scheduled', 'publishing', 'published', 'failed'].map((s) => (
-            <option key={s} value={s}>{statusLabel(s)}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder={t.filters.search}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label={t.filters.search}
-          className={cn(FIELD_CLASSES, 'h-10 max-w-xs flex-1 py-2')}
+          className="h-10 w-auto"
+          options={[
+            { value: '', label: t.filters.allStatuses },
+            ...['draft', 'ready', 'scheduled', 'publishing', 'published', 'failed'].map((s) => ({ value: s, label: statusLabel(s) })),
+          ]}
         />
       </div>
 
-      {/* Batch WordPress export bar — only when there are eligible articles. */}
-      {selectableArticles.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-inset border border-line bg-surface px-4 py-2.5 shadow-card">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-copy font-medium text-ink">
-            <input type="checkbox" checked={allArticlesSelected} onChange={toggleArticleSelectAll} disabled={articleBatchRunning} className="size-4 cursor-pointer accent-action" />
-            {t.batch.selectAll}
-          </label>
-          <span className="text-copy text-muted tabular-nums">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
-          <Button size="sm" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
-            {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedArticles.size))}
+      {/* Bulk bar (design contract §7) — only while something is selected or a
+          batch runs: sticky, dark, three actions at most. Select-all lives in
+          the table head. */}
+      {(selectedCount > 0 || articleBatchRunning) && (
+        <div data-bulk-bar="" role="region" aria-label={t.batch.selected.replace('{n}', String(selectedCount))} className="sticky top-16 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-inset bg-contrast px-4 py-2.5 text-contrast-ink shadow-pop motion-safe:animate-pop-in">
+          <span className="me-2 text-copy font-semibold tabular-nums">{t.batch.selected.replace('{n}', String(selectedCount))}</span>
+          <Button size="sm" variant="ghost" className="text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedCount === 0 || selectedCount > BATCH_LIMIT}>
+            {!(articleBatchRunning && articleBatchMode === 'publish') && <Upload aria-hidden="true" className="size-4" />}
+            {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedCount))}
           </Button>
-          {!isSite && <Button size="sm" variant="outline" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
-            {articleBatchRunning && articleBatchMode === 'draft' ? t.rowWp.sending : t.batch.draftSelected.replace('{n}', String(selectedArticles.size))}
+          {!isSite && <Button size="sm" variant="ghost" className="text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedCount === 0 || selectedCount > BATCH_LIMIT}>
+            {!(articleBatchRunning && articleBatchMode === 'draft') && <Send aria-hidden="true" className="size-4 rtl:-scale-x-100" />}
+            {articleBatchRunning && articleBatchMode === 'draft' ? t.rowWp.sending : t.batch.draftSelected.replace('{n}', String(selectedCount))}
           </Button>}
           {articleBatchRunning ? (
-            <Button size="sm" variant="ghost" onClick={cancelArticleBatch}>{t.batch.cancel}</Button>
+            <Button size="sm" variant="ghost" className="ms-auto text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={cancelArticleBatch}>{t.batch.cancel}</Button>
           ) : (
-            selectedArticles.size > 0 && <Button size="sm" variant="ghost" onClick={clearArticleSelection}>{t.batch.clear}</Button>
+            <Button size="sm" variant="ghost" className="ms-auto text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={clearArticleSelection}><X aria-hidden="true" className="size-4" />{t.batch.clear}</Button>
           )}
-          {selectedArticles.size > BATCH_LIMIT && <span className="text-caption text-warn">{t.batch.tooMany}</span>}
+          {selectedCount > BATCH_LIMIT && <span className="basis-full text-caption">{t.batch.tooMany}</span>}
         </div>
       )}
 
@@ -475,7 +497,17 @@ export default function ArticlesScreen() {
         <Table>
           <TableHead>
             <tr className="max-sm:[&>th]:px-2.5">
-              <Th> </Th>
+              <Th className="w-10">
+                {selectableArticles.length > 0 && (
+                  <Checkbox
+                    checked={allArticlesSelected}
+                    indeterminate={someArticlesSelected}
+                    onChange={toggleArticleSelectAll}
+                    disabled={articleBatchRunning}
+                    aria-label={t.batch.selectAll}
+                  />
+                )}
+              </Th>
               <Th>{t.table.title}</Th>
               {/* No "project / site" column: every row is the project the top bar
                   names (UX review P1-18). */}
@@ -500,18 +532,16 @@ export default function ArticlesScreen() {
             {filteredArticles.length === 0 ? (
               <EmptyRow colSpan={9} message={t.table.emptyTitle} />
             ) : (
-              (articlesExpanded ? filteredArticles : filteredArticles.slice(0, 3)).map((a) => {
+              shownArticles.map((a) => {
                 const selectableArticle = !alreadyExported(a)
                 return (
-                <TableRow key={a.id} className="max-sm:[&>td]:px-2.5">
-                  <Td>
+                <TableRow key={a.id} className={cn('max-sm:[&>td]:px-2.5', selectedArticles.has(a.id) && 'bg-action-soft/60')}>
+                  <Td className="w-10">
                     {selectableArticle && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedArticles.has(a.id)}
                         disabled={articleBatchRunning}
                         onChange={() => toggleArticleSelect(a.id)}
-                        className="size-4 cursor-pointer accent-action disabled:cursor-not-allowed"
                         aria-label={t.table.selectArticle(a.title)}
                       />
                     )}
@@ -535,31 +565,31 @@ export default function ArticlesScreen() {
                       if (isSite) {
                         return a.status === 'published'
                           ? <Badge variant="success">{sp.publish.live}</Badge>
-                          : <span className="text-caption text-muted">{sp.publish.notSent}</span>
+                          : <Badge variant="neutral">{sp.publish.notSent}</Badge>
                       }
                       if (isShopify) {
-                        if (!a.shopify_article_id) return <span className="text-caption text-muted">{t.shopifyState.notSent}</span>
+                        if (!a.shopify_article_id) return <Badge variant="neutral">{t.shopifyState.notSent}</Badge>
                         const published = a.status === 'published' || a.shopify_status === 'published'
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant={published ? 'success' : 'neutral'}>{published ? t.shopifyState.published : t.shopifyState.exported}</Badge>
                             {a.shopify_article_url && (
-                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-copy inline-flex items-center gap-1">
-                                {t.shopifyState.open}<ExternalLink size={12} />
+                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+                                {t.shopifyState.open}<ExternalLink aria-hidden="true" className="size-3.5" />
                               </a>
                             )}
                           </span>
                         )
                       }
                       const s = wpState(a)
-                      if (s === 'none') return <span className="text-caption text-muted">{t.wpState.notSent}</span>
+                      if (s === 'none') return <Badge variant="neutral">{t.wpState.notSent}</Badge>
                       const published = s === 'published'
                       return (
                         <span className="inline-flex items-center gap-2">
                           <Badge variant={published ? 'success' : 'neutral'}>{published ? t.wpState.published : t.wpState.exported}</Badge>
                           {a.wp_post_url && (
-                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-copy inline-flex items-center gap-1">
-                              {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink size={12} />
+                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+                              {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink aria-hidden="true" className="size-3.5" />
                             </a>
                           )}
                         </span>
@@ -573,7 +603,7 @@ export default function ArticlesScreen() {
                         if (abs.status === 'running') {
                           return (
                             <span className="inline-flex items-center gap-1.5 text-caption text-muted">
-                              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
                               {articleBatchMode === 'publish' ? t.rowWp.publishing : t.rowWp.sending}
                             </span>
                           )
@@ -582,46 +612,59 @@ export default function ArticlesScreen() {
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant="danger">{t.batch.failed}</Badge>
-                            {abs.error && <span className="text-caption text-bad max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
+                            {abs.error && <span className="max-w-56 truncate text-caption text-muted" title={abs.error}>{abs.error}</span>}
                           </span>
                         )
                       }
+                      // Row actions (design contract §7): at most ONE inline action,
+                      // the most useful next step for this row; everything else sits
+                      // behind "⋯". Every action and every condition is the same as
+                      // before — only where it is drawn changed.
+                      const canAct = activePlatform !== 'conflict' && activePlatform !== 'none' && rowCta.kind !== 'grant_scope' && a.status !== 'published'
+                      const canPublish = canAct && (a.status === 'ready' || !!exportedIdOf(a))
+                      const canSendDraft = canAct && !isSite && a.status === 'ready' && !exportedIdOf(a)
+                      const canMarkReady = a.status === 'draft' && !exportedIdOf(a)
+                      const busyHere = rowBusy?.id === a.id
+                      const rowLocked = !!rowBusy || articleBatchRunning
+                      const publishLabel = isShopify ? t.rowShopify.publish : isSite ? sp.publish.button : t.rowWp.publish
+                      const draftLabel = isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft
+                      const INLINE = 'inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:whitespace-nowrap'
+                      const inline = a.status !== 'published' && rowCta.kind === 'connect' ? (
+                        <Link href={rowCta.href} data-cta="connect" className={INLINE}>
+                          <Plug aria-hidden="true" className="size-4" /> {t.editor.topBar.connectToPublish}
+                        </Link>
+                      ) : a.status !== 'published' && rowCta.kind === 'grant_scope' ? (
+                        <a href={rowCta.href} data-cta="grant_scope" className={INLINE}>
+                          <ShieldCheck aria-hidden="true" className="size-4" /> {t.editor.topBar.grantScope}
+                        </a>
+                      ) : canPublish ? (
+                        <Button size="sm" variant="ghost" className="text-action hover:bg-action-soft hover:text-action" onClick={() => exportRow(a, 'publish')} loading={busyHere && rowBusy?.action === 'publish'} disabled={rowLocked}>
+                          {busyHere && rowBusy?.action === 'publish' ? t.rowWp.publishing : publishLabel}
+                        </Button>
+                      ) : canMarkReady ? (
+                        <Button size="sm" variant="ghost" className="text-action hover:bg-action-soft hover:text-action" onClick={() => markReadyRow(a)} loading={busyHere && rowBusy?.action === 'ready'} disabled={rowLocked}>
+                          {t.rowWp.markReady}
+                        </Button>
+                      ) : null
+                      const inlineIsMarkReady = !canPublish && canMarkReady && rowCta.kind !== 'connect' && !(a.status !== 'published' && rowCta.kind === 'grant_scope')
+                      const menuBusy = busyHere && (rowBusy?.action === 'draft' || (rowBusy?.action === 'ready' && !inlineIsMarkReady))
                       return (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {a.status !== 'published' && rowCta.kind === 'connect' && (
-                            <Link href={rowCta.href} data-cta="connect" className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1 text-caption sm:whitespace-nowrap font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
-                              <Plug size={14} aria-hidden /> {t.editor.topBar.connectToPublish}
-                            </Link>
-                          )}
-                          {a.status !== 'published' && rowCta.kind === 'grant_scope' && (
-                            <a href={rowCta.href} data-cta="grant_scope" className="inline-flex min-h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1 text-caption sm:whitespace-nowrap font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
-                              <ShieldCheck size={14} aria-hidden /> {t.editor.topBar.grantScope}
-                            </a>
-                          )}
-                          {/* State-based publish actions — routed by the active platform
-                              (WordPress or Shopify). Hidden entirely for conflict/none. */}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && rowCta.kind !== 'grant_scope' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
-                            <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
-                              {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : isSite ? sp.publish.button : t.rowWp.publish)}
-                            </Button>
-                          )}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && rowCta.kind !== 'grant_scope' && !isSite && a.status === 'ready' && !exportedIdOf(a) && (
-                            <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
-                              {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : (isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft)}
-                            </Button>
-                          )}
-                          {a.status === 'draft' && !exportedIdOf(a) && (
-                            <Button size="sm" variant="outline" onClick={() => markReadyRow(a)} loading={rowBusy?.id === a.id && rowBusy.action === 'ready'} disabled={!!rowBusy || articleBatchRunning}>
-                              {t.rowWp.markReady}
-                            </Button>
-                          )}
+                        <div className="flex items-center justify-end gap-1">
+                          {menuBusy ? (
+                            <span className="inline-flex items-center gap-1.5 text-caption text-muted">
+                              <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+                              {rowBusy?.action === 'draft' ? t.rowWp.sending : t.rowWp.markReady}
+                            </span>
+                          ) : inline}
                           {/* Edit and delete behind "⋯" (UX review P2-3): delete opens
                               the confirmation dialog; it never deletes on the click. */}
                           <RowMenu
                             label={t.table.rowMenu(a.title)}
                             items={[
-                              { key: 'edit', label: t.actions.edit, href: `/content/articles/${a.id}`, icon: <Pencil size={15} aria-hidden="true" /> },
-                              { key: 'delete', label: t.delete, danger: true, onSelect: () => setDeleting(a), icon: <Trash2 size={15} aria-hidden="true" /> },
+                              { key: 'edit', label: t.actions.edit, href: `/content/articles/${a.id}`, icon: <Pencil className="size-4" aria-hidden="true" /> },
+                              ...(canSendDraft ? [{ key: 'draft', label: draftLabel, onSelect: () => { void exportRow(a, 'draft') }, disabled: rowLocked, icon: <Send className="size-4 rtl:-scale-x-100" aria-hidden="true" /> }] : []),
+                              ...(canMarkReady && !inlineIsMarkReady ? [{ key: 'ready', label: t.rowWp.markReady, onSelect: () => { void markReadyRow(a) }, disabled: rowLocked, icon: <CheckCircle2 className="size-4" aria-hidden="true" /> }] : []),
+                              { key: 'delete', label: t.delete, danger: true, onSelect: () => setDeleting(a), icon: <Trash2 className="size-4" aria-hidden="true" /> },
                             ]}
                           />
                         </div>
@@ -635,19 +678,19 @@ export default function ArticlesScreen() {
           </TableBody>
         </Table>
         {filteredArticles.length === 0 && (
-          <p className="text-caption text-muted mt-2 px-1">{t.table.emptyHint}</p>
+          <p className="mt-2 px-1 text-caption text-muted">{t.table.emptyHint}</p>
         )}
-        {filteredArticles.length > 3 && (
+        {filteredArticles.length > ARTICLES_PAGE && (
           <div className="mt-3 px-1">
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => setArticlesExpanded((v) => !v)}
               aria-expanded={articlesExpanded}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
             >
-              {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - 3})`}
-              <ChevronDown size={14} aria-hidden className={cn('transition-transform duration-150', articlesExpanded && 'rotate-180')} />
-            </button>
+              {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - ARTICLES_PAGE})`}
+              <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform duration-150 ease-snappy', articlesExpanded && 'rotate-180')} />
+            </Button>
           </div>
         )}
       </div>

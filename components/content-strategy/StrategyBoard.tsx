@@ -21,6 +21,7 @@ import Link from 'next/link'
 import { CalendarDays, Check, KeyRound, Sparkles, Telescope, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
+import Segmented from '@/components/ui/Segmented'
 import {
   ALL_MONTHS, STRATEGY_COLUMNS, cardsInMonth, monthChips, sameTopicKey, unscheduledCount,
   type StrategyCard, type StrategyColumn,
@@ -40,11 +41,15 @@ type Dict = ReturnType<typeof getDashboardDictionary>
 export const COLUMN_PREVIEW = 5
 
 /** One accent per column, from the app's own state tokens. */
+/**
+ * The stages as categories on the tokens (design contract §3): the further a topic
+ * has come, the stronger the action colour; counts stay neutral.
+ */
 export const ACCENT: Record<StrategyColumn, { dot: string; count: string }> = {
-  ideas: { dot: 'bg-info', count: 'bg-info-soft text-info' },
-  planned: { dot: 'bg-warn', count: 'bg-warn-soft text-warn' },
-  written: { dot: 'bg-action', count: 'bg-action-soft text-action' },
-  published: { dot: 'bg-ok', count: 'bg-ok-soft text-ok' },
+  ideas: { dot: 'bg-line-strong', count: 'bg-sunk text-body' },
+  planned: { dot: 'bg-action/35', count: 'bg-sunk text-body' },
+  written: { dot: 'bg-action/60', count: 'bg-sunk text-body' },
+  published: { dot: 'bg-action', count: 'bg-sunk text-body' },
 }
 
 /** What the board needs to act on an idea; absent, the cards only show. */
@@ -59,7 +64,7 @@ export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card
     <div role="group" aria-label={fill(a.groupLabel, { title: card.title })} className={cn('flex flex-wrap items-center gap-1', !inline && 'mt-3 border-t border-line pt-3')}>
       <Button size="sm" onClick={() => void act.actions.approve(target)} loading={busy === 'approve'} disabled={!!busy}
         aria-label={fill(a.approveAria, { title: card.title })} data-idea-action="approve">
-        {busy !== 'approve' && <Check size={14} aria-hidden />} {a.approve}
+        {busy !== 'approve' && <Check aria-hidden="true" className="size-4" />} {a.approve}
       </Button>
       {canSwap && (
         <Button size="sm" variant="ghost" className="px-2.5" onClick={() => act.actions.swap(target)} disabled={!!busy}
@@ -86,7 +91,7 @@ function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: Strategy
       <p className="line-clamp-2 text-copy font-semibold text-ink [overflow-wrap:anywhere]">{card.title}</p>
       {card.keyword && (
         <p className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-pill bg-sunk px-2 py-0.5 text-caption text-muted">
-          <KeyRound size={11} className="shrink-0" aria-hidden />
+          <KeyRound className="size-3 shrink-0" aria-hidden="true" />
           <span className="truncate">{card.keyword}</span>
         </p>
       )}
@@ -100,34 +105,34 @@ function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: Strategy
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
         {date && (
           <span className="inline-flex items-center gap-1">
-            <CalendarDays size={12} aria-hidden />
+            <CalendarDays aria-hidden="true" className="size-3.5" />
             {s.dateKinds[card.dateKind]} · <span className="tabular-nums">{date}</span>
           </span>
         )}
         {card.origin === 'scan' && (
-          <span className="inline-flex items-center gap-1 rounded-pill bg-info-soft px-1.5 text-info"><Sparkles size={11} aria-hidden />{s.origins.scan}</span>
+          <span className="inline-flex items-center gap-1 rounded-pill bg-sunk px-1.5 text-body"><Sparkles aria-hidden="true" className="size-3 text-action" />{s.origins.scan}</span>
         )}
         {card.origin === 'ranking' && (
-          <span className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-1.5 text-ok"><TrendingUp size={11} aria-hidden />{s.origins.ranking}</span>
+          <span className="inline-flex items-center gap-1 rounded-pill bg-sunk px-1.5 text-body"><TrendingUp aria-hidden="true" className="size-3 text-action" />{s.origins.ranking}</span>
         )}
         {card.queued && card.column !== 'published' && (
-          <span className="rounded-pill bg-warn-soft px-1.5 text-warn">{s.queued}</span>
+          <span className="rounded-pill bg-sunk px-1.5 font-medium text-body">{s.queued}</span>
         )}
         {approvedNow && (
-          <span data-approved-now className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-1.5 font-semibold text-ok"><Check size={11} aria-hidden />{s.ideaActions.approvedNow}</span>
+          <span data-approved-now className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-1.5 font-semibold text-ok"><Check aria-hidden="true" className="size-3" />{s.ideaActions.approvedNow}</span>
         )}
       </div>
       {card.column === 'ideas' && act && <IdeaButtons card={card} dict={dict} act={act} canSwap={canSwap} />}
     </>
   )
-  const frame = 'block rounded-control border border-line bg-surface p-3 transition-colors'
+  const frame = 'block rounded-inset border border-line bg-surface p-3 transition-colors duration-150 ease-snappy'
   if (card.articleId) {
     return (
       <Link
         href={`/content/articles/${encodeURIComponent(card.articleId)}`}
         aria-label={`${s.openArticle}: ${card.title}`}
         data-strategy-card={card.key}
-        className={cn(frame, 'hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action')}
+        className={cn(frame, 'hover:border-line-strong focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20')}
       >
         {body}
       </Link>
@@ -152,7 +157,7 @@ function Column({ column, cards, lang, dict, note, act, insights }: { column: St
       </header>
       {note && (
         <p data-strategy-note={column} className="-mt-1 mb-3 inline-flex items-center gap-1.5 px-1 text-caption font-medium text-action">
-          <Telescope size={12} aria-hidden />
+          <Telescope aria-hidden="true" className="size-3.5" />
           {note}
         </p>
       )}
@@ -168,7 +173,7 @@ function Column({ column, cards, lang, dict, note, act, insights }: { column: St
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="mt-2 rounded-control px-2 py-1.5 text-caption font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+          className="mt-2 rounded-control px-2 py-1.5 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
         >
           {open ? s.showLess : fill(s.showMore, { n: hidden })}
         </button>
@@ -208,32 +213,20 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
 
   return (
     <div>
-      <div role="group" aria-label={s.monthsLabel} className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
-        {chips.map((c) => {
-          const on = c.key === active
-          return (
-            <button
-              key={c.key}
-              type="button"
-              aria-pressed={on}
-              onClick={() => setMonth(c.key)}
-              className={cn(
-                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-pill border px-3 text-caption font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-                on ? 'border-action bg-action text-action-ink' : 'border-line bg-surface text-body hover:bg-sunk',
-              )}
-            >
-              {c.key === ALL_MONTHS ? s.allMonths : monthLabel(c.key, lang)}
-              <span className={cn('tabular-nums', on ? 'text-action-ink/80' : 'text-muted')}>{c.count}</span>
-            </button>
-          )
-        })}
+      <div className="-mx-1 mb-4 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+        <Segmented<string>
+          ariaLabel={s.monthsLabel}
+          value={active}
+          onChange={setMonth}
+          options={chips.map((c) => ({ value: c.key, label: c.key === ALL_MONTHS ? s.allMonths : monthLabel(c.key, lang), count: c.count }))}
+        />
       </div>
 
       {active !== ALL_MONTHS && unscheduled > 0 && (
         <p data-unscheduled-note="" className="-mt-2 mb-3 text-caption text-muted">{dict.strategyInsights.board.unscheduled(formatCount(unscheduled, lang))}</p>
       )}
 
-      <div key={active} className="grid animate-pop-in items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div key={active} className="grid motion-safe:animate-pop-in items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {STRATEGY_COLUMNS.map((col) => <Column key={col} column={col} cards={byColumn[col]} lang={lang} dict={dict} note={col === 'ideas' ? ideasNote : null} act={act} insights={insights} />)}
       </div>
     </div>

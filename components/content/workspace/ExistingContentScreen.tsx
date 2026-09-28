@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, ExternalLink, FileText, Layers, Library, RefreshCw, ShoppingBag } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import Notice from '@/components/ui/Notice'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import StatTile from '@/components/ui/StatTile'
@@ -50,7 +51,7 @@ const FILTER_ICONS: Record<ExistingContentFilter, React.ReactNode> = {
 }
 
 /** Eight columns fit a 1440 screen beside the sidebar with a tighter gutter. */
-const CELL = 'px-3'
+const CELL = 'px-4'
 
 /** Every page is on the same site, so the path is what tells two rows apart. */
 function displayPath(url: string): string {
@@ -149,7 +150,7 @@ export default function ExistingContentScreen() {
   if (!payload) {
     return (
       <div role="status" aria-label={x.loading} className="space-y-4">
-        <div className="grid grid-cols-3 gap-2 sm:gap-3" aria-hidden>
+        <div className="grid grid-cols-3 gap-4 sm:gap-5" aria-hidden>
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 rounded-card" />)}
         </div>
         <Skeleton className="h-64 rounded-card" />
@@ -164,7 +165,7 @@ export default function ExistingContentScreen() {
 
   const resyncButton = payload.resync ? (
     <Button variant="secondary" size="sm" onClick={() => void resync()} loading={syncing}>
-      {!syncing && <RefreshCw size={14} aria-hidden="true" />}
+      {!syncing && <RefreshCw aria-hidden="true" className="size-4" />}
       {syncing ? x.resyncing : x.resync}
     </Button>
   ) : null
@@ -212,19 +213,20 @@ export default function ExistingContentScreen() {
       </div>
 
       {payload.partial && (
-        <Card tone="sunk" className="flex flex-wrap items-start gap-3 p-4" >
-          <AlertTriangle size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-warn" />
-          <div role="note" className="min-w-0 flex-1 space-y-1">
-            <p className="text-copy font-semibold text-ink">{x.partialTitle}</p>
-            <p className="text-copy text-body">{payload.partialReason === 'crawl' ? x.partialCrawlBody : x.partialIndexBody}</p>
+        <Notice tone="warn">
+          <div className="flex flex-wrap items-start gap-3">
+            <div role="note" className="min-w-0 flex-1 basis-56 space-y-1">
+              <p className="font-semibold text-ink">{x.partialTitle}</p>
+              <p className="max-w-prose text-body">{payload.partialReason === 'crawl' ? x.partialCrawlBody : x.partialIndexBody}</p>
+            </div>
+            {payload.partialReason === 'crawl' && !siteConnected && (
+              <Link href={platformSetupHref(projectId)} className="shrink-0"><Button size="sm" variant="secondary">{x.connectSite}</Button></Link>
+            )}
           </div>
-          {payload.partialReason === 'crawl' && !siteConnected && (
-            <Link href={platformSetupHref(projectId)} className="shrink-0"><Button size="sm">{x.connectSite}</Button></Link>
-          )}
-        </Card>
+        </Notice>
       )}
 
-      <div role="group" aria-label={x.tilesLabel} className="list-enter grid grid-cols-3 gap-2 sm:gap-3">
+      <div role="group" aria-label={x.tilesLabel} className="list-enter grid grid-cols-3 gap-4 sm:gap-5">
         {FILTERS.map((f) => {
           const active = filter === f
           return (
@@ -233,14 +235,14 @@ export default function ExistingContentScreen() {
               type="button"
               aria-pressed={active}
               onClick={() => { setFilter(f); setShown(PAGE_SIZE) }}
-              className="rounded-card text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              className="rounded-card text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
             >
               <StatTile
                 label={x.tiles[f]}
                 value={num.format(payload.counts[f])}
                 source={x.tileSource[payload.source]}
                 icon={FILTER_ICONS[f]}
-                className={cn('transition-colors duration-150', active ? 'border-action ring-1 ring-action' : 'hover:border-line-strong')}
+                className={cn('transition-colors duration-150 ease-snappy', active ? 'border-action ring-1 ring-action' : 'hover:border-line-strong')}
               />
             </button>
           )
@@ -256,12 +258,12 @@ export default function ExistingContentScreen() {
             aria-pressed={onlyRisk}
             onClick={() => { setOnlyRisk((v) => !v); setShown(PAGE_SIZE) }}
             className={cn(
-              'inline-flex h-8 items-center gap-1.5 rounded-pill border px-3 text-caption font-semibold transition-colors duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
-              onlyRisk ? 'border-warn/30 bg-warn-soft text-warn' : 'border-line bg-surface text-body hover:border-line-strong',
+              'inline-flex h-8 items-center gap-1.5 rounded-pill border px-3 text-caption font-semibold transition-colors duration-150 ease-snappy',
+              'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+              onlyRisk ? 'border-action bg-action-soft text-action' : 'border-line bg-surface text-body hover:border-line-strong',
             )}
           >
-            <AlertTriangle size={14} aria-hidden="true" />
+            <AlertTriangle aria-hidden="true" className="size-4" />
             {fill(x.onlyRisk, { n: num.format(riskCount) })}
           </button>
         ) : <span />}
@@ -297,7 +299,7 @@ export default function ExistingContentScreen() {
             const planned = it.supportTopicPlanned || plannedNow.has(it.key)
             return (
               <TableRow key={it.key}>
-                <Td className={cn(CELL, 'max-w-[16rem]')}>
+                <Td className={cn(CELL, 'max-w-64')}>
                   <p className="truncate font-medium text-ink" title={it.title}>{it.title}</p>
                   <a
                     href={it.url}
@@ -307,33 +309,33 @@ export default function ExistingContentScreen() {
                     className="mt-0.5 inline-flex max-w-full items-center gap-1 text-caption text-muted hover:text-action hover:underline"
                   >
                     <span dir="ltr" className="truncate">{displayPath(it.url)}</span>
-                    <ExternalLink size={12} aria-hidden="true" className="shrink-0" />
+                    <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
                   </a>
                 </Td>
                 <Td className={cn(CELL, 'whitespace-nowrap')}>{x.types[it.type]}</Td>
                 {showUpdated && <Td className={cn(CELL, 'whitespace-nowrap text-muted')}>{day(it.updatedAt) ?? EMPTY_DATE}</Td>}
-                {gscOk && <Td className={cn(CELL, 'text-end')}>{it.metrics ? num.format(it.metrics.clicks) : EMPTY_DATE}</Td>}
-                {gscOk && <Td className={cn(CELL, 'text-end')}>{it.metrics ? num.format(it.metrics.impressions) : EMPTY_DATE}</Td>}
+                {gscOk && <Td className={cn(CELL, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.clicks) : EMPTY_DATE}</Td>}
+                {gscOk && <Td className={cn(CELL, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.impressions) : EMPTY_DATE}</Td>}
                 {gscOk && (
-                  <Td className={cn(CELL, 'max-w-[9rem]')}>
+                  <Td className={cn(CELL, 'max-w-36')}>
                     {it.metrics?.topQuery ? <span className="block truncate" title={it.metrics.topQuery}>{it.metrics.topQuery}</span> : <span className="text-muted">{EMPTY_DATE}</span>}
                   </Td>
                 )}
-                <Td className={cn(CELL, 'min-w-[9rem]')}>
+                <Td className={cn(CELL, 'min-w-36')}>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {it.group === 'content' && it.origin === 'ours' && <Badge variant="info">{x.origin.ours}</Badge>}
                     {it.group === 'content' && it.origin === 'site' && <Badge variant="neutral">{x.origin.site}</Badge>}
                     {it.cannibalization && <Badge variant="warning" dot>{x.cannibal}</Badge>}
                   </div>
                   {it.cannibalization && (
-                    <p className="mt-1 max-w-[12rem] text-caption text-muted">
+                    <p className="mt-1 max-w-48 text-caption text-muted">
                       {fill(x.cannibalDetail, { n: num.format(it.cannibalization.pages), query: it.cannibalization.query })}
                     </p>
                   )}
                 </Td>
                 <Td className={cn(CELL, 'whitespace-nowrap text-end')}>
                   {it.group === 'commerce' && (planned ? (
-                    <Link href={strategyHref('list', STRATEGY_ANCHORS.topics)} className="text-caption font-semibold text-action hover:underline">
+                    <Link href={strategyHref('list', STRATEGY_ANCHORS.topics)} className="rounded-control text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
                       {x.supportPlanned}
                     </Link>
                   ) : (
@@ -350,7 +352,7 @@ export default function ExistingContentScreen() {
 
       {visible.length > shown && (
         <div className="flex justify-center">
-          <Button variant="ghost" onClick={() => setShown((n) => n + PAGE_SIZE)}>
+          <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + PAGE_SIZE)}>
             {fill(x.showMore, { n: num.format(Math.min(PAGE_SIZE, visible.length - shown)) })}
           </Button>
         </div>

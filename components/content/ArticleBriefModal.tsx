@@ -14,9 +14,15 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Modal from '@/components/ui/Modal'
-import Input from '@/components/ui/Input'
+import Input, { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
+import Textarea from '@/components/ui/Textarea'
+import Checkbox from '@/components/ui/Checkbox'
+import Segmented from '@/components/ui/Segmented'
+import Notice from '@/components/ui/Notice'
+import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { Trash2, Plus, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trash2, Plus, Sparkles, ChevronDown } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
@@ -479,28 +485,24 @@ export default function ArticleBriefModal({
     }
   }
 
-  const inputCls =
-    'w-full px-3 py-2 text-copy rounded-control border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-info'
   const selectedCount = selected.size + (manualTopic.trim() ? 1 : 0)
 
   return (
     <Modal open={open} onClose={onClose} title={editing ? t.editTitle : t.newTitle} size="xl">
       <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-        {error && (
-          <div className="p-3 rounded-control bg-bad-soft border border-bad/30 text-copy text-bad">
-            {error}
-          </div>
-        )}
+        {error && <Notice tone="bad">{error}</Notice>}
 
-        <div className="flex flex-col gap-1">
-          <label className="text-copy font-medium text-body">{t.project}</label>
-          {/* Strict GSC mode locks the project to the one supplied by the opportunity. */}
-          <select ref={projectRef} value={projectId} disabled={gscMode} onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }} className={`${inputCls} ${errProject ? 'border-bad' : ''} ${gscMode ? 'opacity-70 cursor-not-allowed' : ''}`}>
-            <option value="">{t.selectProject}</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          {errProject && <p className="text-caption text-bad">{t.projectRequired}</p>}
-        </div>
+        {/* Strict GSC mode locks the project to the one supplied by the opportunity. */}
+        <Select
+          ref={projectRef}
+          id="brief-project"
+          label={t.project}
+          value={projectId}
+          disabled={gscMode}
+          onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }}
+          error={errProject ? t.projectRequired : undefined}
+          options={[{ value: '', label: t.selectProject }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+        />
 
         {/* Strict GSC mode keeps the primary keyword editable but WITHOUT the Gemini suggest flow. */}
         {gscMode && (
@@ -509,124 +511,109 @@ export default function ArticleBriefModal({
 
         {/* Strict GSC reviewed-topic mode hides the whole Gemini "Suggest topics" flow. */}
         {!editing && !gscMode && (
-          <div className="flex flex-col gap-2">
+          <div className="space-y-3">
             <div className="flex items-end gap-2">
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={t.primaryKeywordPlaceholder} />
               </div>
-              <Button variant="outline" onClick={handleSuggest} loading={suggesting} disabled={suggesting || !primaryKeyword.trim() || !projectId} className="shrink-0">
-                <Sparkles size={16} /> {suggesting ? t.suggesting : t.suggestTopics}
+              <Button variant="secondary" onClick={handleSuggest} loading={suggesting} disabled={suggesting || !primaryKeyword.trim() || !projectId} className="shrink-0">
+                {!suggesting && <Sparkles aria-hidden="true" className="size-4" />}
+                {suggesting ? t.suggesting : t.suggestTopics}
               </Button>
             </div>
 
-            {suggestError && (
-              <div className="text-copy text-warn">{suggestError}</div>
-            )}
+            {suggestError && <Notice tone="warn">{suggestError}</Notice>}
 
             {suggestions.length > 0 && (
-              <div className="rounded-control border border-line p-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="text-copy font-medium text-body">{t.suggestionsHeading}</div>
+              <div className="rounded-inset border border-line p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="text-copy font-semibold text-ink">{t.suggestionsHeading}</div>
                   {source && (
-                    <span
-                      className={`text-caption px-2 py-0.5 rounded-full font-medium ${
-                        source === 'gemini'
-                          ? 'bg-action-soft text-action'
-                          : 'bg-warn-soft text-warn'
-                      }`}
-                    >
+                    <Badge variant={source === 'gemini' ? 'info' : 'warning'}>
                       {source === 'gemini' ? t.sourceGemini : t.sourceFallback}
-                    </span>
+                    </Badge>
                   )}
                 </div>
 
                 {source === 'fallback' && (
-                  <div className="mb-2 text-caption text-warn bg-warn-soft border border-warn/30 rounded-control px-2 py-1.5">
+                  <Notice tone="warn" className="mb-3">
                     {/* Only claim "check GEMINI_API_KEY" when that's actually the reason. */}
                     {fallbackReason === 'missing_gemini_api_key' ? t.fallbackWarning : t.fallbackGeneric}
-                  </div>
+                  </Notice>
                 )}
 
                 {keywordFit === 'unrelated' && (
-                  <div className="mb-2 text-caption text-body bg-sunk border border-line rounded-control px-2 py-1.5">
-                    {t.keywordMismatch}
-                  </div>
+                  <Notice tone="info" className="mb-3">{t.keywordMismatch}</Notice>
                 )}
 
                 <div className="space-y-2">
                   {suggestions.map((s) => {
                     const angle = localizeAngle(s.angle, isHebrew ? 'he' : 'en')
                     return (
-                      <label key={s.title} className="flex items-start gap-2 text-copy text-body cursor-pointer">
-                        <input type="checkbox" className="mt-1" checked={selected.has(s.title)} onChange={() => toggleSuggestion(s.title)} />
-                        <span>
-                          {s.title}
-                          {angle && <span className="block text-caption text-muted">{angle}</span>}
-                        </span>
-                      </label>
+                      <Checkbox
+                        key={s.title}
+                        checked={selected.has(s.title)}
+                        onChange={() => toggleSuggestion(s.title)}
+                        label={s.title}
+                        description={angle || undefined}
+                      />
                     )
                   })}
                 </div>
                 {selectedCount > 1 && (
-                  <p className="text-caption text-action mt-2">{t.poolHint}</p>
+                  <p className="mt-3 text-caption text-muted">{t.poolHint}</p>
                 )}
               </div>
             )}
           </div>
         )}
 
-        <div className="flex flex-col gap-1">
-          <label className="text-copy font-medium text-body">
-            {editing ? t.topic : t.manualTopicLabel}
-          </label>
-          <input ref={topicRef} type="text" value={manualTopic} onChange={(e) => { setManualTopic(e.target.value); setErrTopic(false) }} placeholder={t.topicPlaceholder} className={`${inputCls} ${errTopic ? 'border-bad' : ''}`} />
-          {errTopic && <p className="text-caption text-bad">{t.noTopicSelected}</p>}
+        <Input
+          ref={topicRef}
+          id="brief-topic"
+          type="text"
+          label={editing ? t.topic : t.manualTopicLabel}
+          value={manualTopic}
+          onChange={(e) => { setManualTopic(e.target.value); setErrTopic(false) }}
+          placeholder={t.topicPlaceholder}
+          error={errTopic ? t.noTopicSelected : undefined}
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <span id="brief-lang-label" className={FIELD_LABEL_CLASSES}>{t.language}</span>
+            <Segmented<'he' | 'en'>
+              ariaLabel={t.language}
+              value={briefLang}
+              onChange={(l) => setBriefLang(l)}
+              options={[{ value: 'he', label: t.languageHe }, { value: 'en', label: t.languageEn }]}
+              className="w-fit"
+            />
+          </div>
+          <Select
+            id="brief-intent"
+            label={t.searchIntent}
+            value={searchIntent}
+            onChange={(e) => setSearchIntent(e.target.value as SuggestionIntent)}
+            options={INTENT_KEYS.map((k) => ({ value: k, label: t.intents[k] }))}
+          />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-copy font-medium text-body">{t.language}</label>
-            <div className="inline-flex rounded-control border border-line overflow-hidden w-fit">
-              {(['he', 'en'] as const).map((l) => (
-                <button key={l} type="button" onClick={() => setBriefLang(l)} className={`px-4 py-2 text-copy transition ${briefLang === l ? 'bg-action text-action-ink' : 'bg-surface text-body'}`}>
-                  {l === 'he' ? t.languageHe : t.languageEn}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-copy font-medium text-body">{t.searchIntent}</label>
-            <select value={searchIntent} onChange={(e) => setSearchIntent(e.target.value as SuggestionIntent)} className={inputCls}>
-              {INTENT_KEYS.map((k) => <option key={k} value={k}>{t.intents[k]}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <button type="button" onClick={() => setAdvancedOpen((v) => !v)} className="inline-flex items-center gap-1.5 text-copy font-medium text-action hover:underline">
-          {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        <button type="button" onClick={() => setAdvancedOpen((v) => !v)} aria-expanded={advancedOpen} className="inline-flex items-center gap-1.5 rounded-control text-copy font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+          <ChevronDown aria-hidden="true" className={`size-4 transition-transform duration-150 ease-snappy ${advancedOpen ? 'rotate-180' : ''}`} />
           {t.advancedToggle}
         </button>
 
         {advancedOpen && (
-          <div className="space-y-4 rounded-control border border-line p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-copy font-medium text-body">{t.toneOfVoice}</label>
-                <select value={tone} onChange={(e) => setTone(e.target.value)} className={inputCls}>
-                  {TONE_KEYS.map((k) => <option key={k} value={k}>{t.tones[k]}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-copy font-medium text-body">{t.ctaPreference}</label>
-                <select value={cta} onChange={(e) => setCta(e.target.value)} className={inputCls}>
-                  {CTA_KEYS.map((k) => <option key={k} value={k}>{t.ctas[k]}</option>)}
-                </select>
-              </div>
+          <div className="space-y-4 rounded-inset border border-line p-4 sm:p-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Select id="brief-tone" label={t.toneOfVoice} value={tone} onChange={(e) => setTone(e.target.value)} options={TONE_KEYS.map((k) => ({ value: k, label: t.tones[k] }))} />
+              <Select id="brief-cta" label={t.ctaPreference} value={cta} onChange={(e) => setCta(e.target.value)} options={CTA_KEYS.map((k) => ({ value: k, label: t.ctas[k] }))} />
             </div>
 
             {CTA_WITH_DETAILS.includes(cta) && (
-              <div className="rounded-control border border-line p-3 space-y-2">
-                <p className="text-caption text-muted">{t.ctaDetailsHint}</p>
+              <div className="space-y-4 rounded-inset bg-sunk/60 p-4">
+                <p className="max-w-prose text-caption text-muted">{t.ctaDetailsHint}</p>
                 <Input label={t.ctaTextLabel} value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder={t.ctaTextPlaceholder} />
                 {cta === 'whatsapp' && (
                   <Input label={t.ctaWhatsappLabel} value={ctaWhatsapp} onChange={(e) => setCtaWhatsapp(e.target.value)} placeholder={t.ctaWhatsappPlaceholder} />
@@ -636,71 +623,60 @@ export default function ArticleBriefModal({
                 )}
                 <Input label={t.ctaUrlLabel} type="url" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder={t.ctaUrlPlaceholder} />
                 {(cta === 'whatsapp' || cta === 'phone' || cta === 'contact') && (
-                  <p className="text-caption text-warn">{t.ctaDetailsRequired}</p>
+                  <p className="text-caption text-muted">{t.ctaDetailsRequired}</p>
                 )}
               </div>
             )}
 
             {/* Phase 3D — article depth / length by topic type. "אוטומטי" lets the
                 system pick the range from the topic; others force a depth. */}
-            <div className="flex flex-col gap-1">
-              <label className="text-copy font-medium text-body">{t.articleDepthLabel}</label>
-              <div className="flex flex-wrap gap-2">
-                {ARTICLE_DEPTHS.map((d) => (
-                  <button key={d} type="button" onClick={() => setArticleDepth(d)} className={`px-3 py-1.5 text-copy rounded-control border transition ${articleDepth === d ? 'bg-action text-action-ink border-action' : 'bg-surface text-body border-line'}`}>
-                    {(t.articleDepths as Record<string, string>)[d]}
-                  </button>
-                ))}
-              </div>
-              <p className="text-caption text-muted">{t.articleDepthHint}</p>
+            <div className="flex flex-col gap-1.5">
+              <span className={FIELD_LABEL_CLASSES}>{t.articleDepthLabel}</span>
+              <Segmented<ArticleDepth>
+                ariaLabel={t.articleDepthLabel}
+                value={articleDepth}
+                onChange={(d) => setArticleDepth(d)}
+                options={ARTICLE_DEPTHS.map((d) => ({ value: d, label: (t.articleDepths as Record<string, string>)[d] }))}
+                className="max-w-full overflow-x-auto"
+              />
+              <p className="max-w-prose text-caption text-muted">{t.articleDepthHint}</p>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-copy font-medium text-body">{t.secondaryKeywords}</label>
-              <textarea value={secondaryText} onChange={(e) => setSecondaryText(e.target.value)} rows={2} className={inputCls} />
+            <div className="flex flex-col gap-1.5">
+              <Textarea id="brief-secondary" label={t.secondaryKeywords} value={secondaryText} onChange={(e) => setSecondaryText(e.target.value)} rows={2} />
               <p className="text-caption text-muted">{t.secondaryHint}</p>
             </div>
 
             <Input label={t.targetAudience} value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} />
 
-            <div className="flex flex-col gap-1">
-              <label className="text-copy font-medium text-body">{t.articleAngle}</label>
-              <textarea value={articleAngle} onChange={(e) => setArticleAngle(e.target.value)} rows={2} className={inputCls} placeholder={t.articleAnglePlaceholder} />
+            <div className="flex flex-col gap-1.5">
+              <Textarea id="brief-angle" label={t.articleAngle} value={articleAngle} onChange={(e) => setArticleAngle(e.target.value)} rows={2} placeholder={t.articleAnglePlaceholder} />
               <p className="text-caption text-muted">{t.articleAngleHelp}</p>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-copy font-medium text-body">{t.mustInclude}</label>
-              <textarea value={mustInclude} onChange={(e) => setMustInclude(e.target.value)} rows={3} className={inputCls} placeholder={t.mustIncludePlaceholder} />
+            <div className="flex flex-col gap-1.5">
+              <Textarea id="brief-must-include" label={t.mustInclude} value={mustInclude} onChange={(e) => setMustInclude(e.target.value)} rows={3} placeholder={t.mustIncludePlaceholder} />
               <p className="text-caption text-muted">{t.mustIncludeHelp}</p>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-copy font-medium text-body">{t.mustAvoid}</label>
-              <textarea value={mustAvoid} onChange={(e) => setMustAvoid(e.target.value)} rows={3} className={inputCls} placeholder={t.mustAvoidPlaceholder} />
+            <div className="flex flex-col gap-1.5">
+              <Textarea id="brief-must-avoid" label={t.mustAvoid} value={mustAvoid} onChange={(e) => setMustAvoid(e.target.value)} rows={3} placeholder={t.mustAvoidPlaceholder} />
               <p className="text-caption text-muted">{t.mustAvoidHelp}</p>
             </div>
 
-            <div className="space-y-2">
-              <label className="flex items-start gap-2 text-copy text-body">
-                <input
-                  type="checkbox"
-                  checked={includeBrandName}
-                  onChange={(e) => {
-                    const checked = e.target.checked
-                    setIncludeBrandName(checked)
-                    if (checked && !brandNameToInclude.trim()) {
-                      const proj = projects.find((p) => p.id === projectId)
-                      setBrandNameToInclude((proj?.business_name || proj?.name || '').trim())
-                    }
-                  }}
-                  className="mt-0.5"
-                />
-                <span>
-                  {t.includeBrandName}
-                  <span className="block text-caption text-muted">{t.includeBrandNameHint}</span>
-                </span>
-              </label>
+            <div className="space-y-3">
+              <Checkbox
+                checked={includeBrandName}
+                onChange={(checked) => {
+                  setIncludeBrandName(checked)
+                  if (checked && !brandNameToInclude.trim()) {
+                    const proj = projects.find((p) => p.id === projectId)
+                    setBrandNameToInclude((proj?.business_name || proj?.name || '').trim())
+                  }
+                }}
+                label={t.includeBrandName}
+                description={t.includeBrandNameHint}
+              />
               {includeBrandName && (
                 <Input
                   label={t.brandNameToInclude}
@@ -709,54 +685,51 @@ export default function ArticleBriefModal({
                   placeholder={t.brandNamePlaceholder}
                 />
               )}
-              <label className="flex items-start gap-2 text-copy text-body">
-                <input
-                  type="checkbox"
-                  checked={includeManualToc}
-                  onChange={(e) => setIncludeManualToc(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  {t.includeManualToc}
-                  <span className="block text-caption text-muted">{t.includeManualTocHint}</span>
-                </span>
-              </label>
+              <Checkbox
+                checked={includeManualToc}
+                onChange={(checked) => setIncludeManualToc(checked)}
+                label={t.includeManualToc}
+                description={t.includeManualTocHint}
+              />
             </div>
 
-            <div ref={anchorsRef} className="rounded-control border border-line p-3">
-              <div className="flex items-center justify-between mb-1">
+            <div ref={anchorsRef} className="rounded-inset border border-line p-4">
+              <div className="mb-1 flex items-center justify-between gap-2">
                 <h4 className="text-copy font-semibold text-ink">{t.anchorsTitle}</h4>
-                <Button size="sm" variant="outline" onClick={addAnchor}>
-                  <Plus size={14} /> {t.addAnchor}
+                <Button size="sm" variant="secondary" onClick={addAnchor}>
+                  <Plus aria-hidden="true" className="size-4" />{t.addAnchor}
                 </Button>
               </div>
-              <p className="text-caption text-muted mb-1">{t.anchorsHint}</p>
-              {badAnchors.size > 0 && <p className="text-caption text-bad mb-2">{t.anchorUrlInvalid}</p>}
+              <p className="mb-3 max-w-prose text-caption text-muted">{t.anchorsHint}</p>
+              {badAnchors.size > 0 && <Notice tone="bad" className="mb-3">{t.anchorUrlInvalid}</Notice>}
               <div className="space-y-3">
                 {anchors.map((a, i) => (
-                  <div key={i} className={`rounded-control border p-3 space-y-2 ${badAnchors.has(i) ? 'border-bad/30 bg-bad-soft' : 'border-line bg-sunk/50'}`}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div key={i} className={`space-y-3 rounded-inset border p-4 ${badAnchors.has(i) ? 'border-bad/40' : 'border-line bg-sunk/60'}`}>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} placeholder={t.anchorTextPlaceholder} />
-                      <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => { updateAnchor(i, { target_url: e.target.value }); if (badAnchors.has(i)) setBadAnchors((p) => { const n = new Set(p); n.delete(i); return n }) }} placeholder={t.targetUrlPlaceholder} />
+                      <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => { updateAnchor(i, { target_url: e.target.value }); if (badAnchors.has(i)) setBadAnchors((p) => { const n = new Set(p); n.delete(i); return n }) }} placeholder={t.targetUrlPlaceholder} error={badAnchors.has(i) ? t.anchorUrlInvalid : undefined} />
                     </div>
-                    {badAnchors.has(i) && <p className="text-caption text-bad">{t.anchorUrlInvalid}</p>}
                     <div className="flex flex-wrap items-center gap-3">
-                      <select value={a.type} onChange={(e) => updateAnchor(i, { type: e.target.value as 'internal' | 'external' })} className={inputCls + ' max-w-[9rem]'}>
-                        <option value="internal">{t.internal}</option>
-                        <option value="external">{t.external}</option>
-                      </select>
-                      <input type="text" value={a.note} onChange={(e) => updateAnchor(i, { note: e.target.value })} placeholder={t.notePlaceholder} className={inputCls + ' flex-1 min-w-[8rem]'} />
-                      <button type="button" onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))} className="text-bad hover:text-bad p-1" title={t.removeAnchor}>
-                        <Trash2 size={16} />
-                      </button>
+                      <Select
+                        aria-label={t.anchorsTitle}
+                        value={a.type}
+                        onChange={(e) => updateAnchor(i, { type: e.target.value as 'internal' | 'external' })}
+                        className="h-10 w-36"
+                        options={[{ value: 'internal', label: t.internal }, { value: 'external', label: t.external }]}
+                      />
+                      <div className="min-w-32 flex-1">
+                        <Input type="text" aria-label={t.notePlaceholder} value={a.note} onChange={(e) => updateAnchor(i, { note: e.target.value })} placeholder={t.notePlaceholder} className="h-10" />
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))} title={t.removeAnchor} aria-label={t.removeAnchor} className="text-bad hover:bg-bad-soft hover:text-bad">
+                        <Trash2 aria-hidden="true" className="size-4" />
+                      </Button>
                     </div>
-                    <label className="flex items-start gap-2 text-copy text-body">
-                      <input type="checkbox" checked={a.required} onChange={(e) => updateAnchor(i, { required: e.target.checked })} className="mt-0.5" />
-                      <span>
-                        {t.required}
-                        <span className="block text-caption text-muted">{t.requiredHelp}</span>
-                      </span>
-                    </label>
+                    <Checkbox
+                      checked={a.required}
+                      onChange={(checked) => updateAnchor(i, { required: checked })}
+                      label={t.required}
+                      description={t.requiredHelp}
+                    />
                   </div>
                 ))}
               </div>
@@ -764,13 +737,13 @@ export default function ArticleBriefModal({
 
             {/* Internal-link planning — chosen now, woven into the body at
                 generation, then validated + inserted in the editor. */}
-            <div className="rounded-control border border-line p-3">
-              <h4 className="text-copy font-semibold text-ink mb-1">{t.planTitle}</h4>
-              <p className="text-caption text-muted mb-2">{t.planHint}</p>
+            <div className="rounded-inset border border-line p-4">
+              <h4 className="mb-1 text-copy font-semibold text-ink">{t.planTitle}</h4>
+              <p className="mb-3 max-w-prose text-caption text-muted">{t.planHint}</p>
               {linkCandidates.length === 0 ? (
                 <p className="text-caption text-muted">{t.planNone}</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(linksExpanded ? linkCandidates : linkCandidates.slice(0, 2)).map((cand) => {
                     const opts = linkOptionsFor(cand)
                     const approved = isLinkApproved(cand.id)
@@ -779,15 +752,22 @@ export default function ArticleBriefModal({
                     const selectVal = linkChoice[cand.id] ?? (defaultOpt?.text ?? '')
                     const selectExtra = selectVal && !opts.some((o) => o.text === selectVal) ? [selectVal] : []
                     const isUrlTarget = cand.kind === 'internal_url'
+                    const selectOptions = [
+                      ...selectExtra.map((txt) => ({ value: txt, label: txt })),
+                      ...opts.map((o) => ({ value: o.text, label: `${o.text} · ${o.label}` })),
+                      ...(opts.length === 0 && selectExtra.length === 0 ? [{ value: '', label: '—' }] : []),
+                    ]
                     return (
-                      <div key={cand.id} className="rounded-control border border-line p-2.5 space-y-1.5">
-                        <label className="flex items-start gap-2">
-                          <input type="checkbox" checked={approved} onChange={() => toggleLink(cand)} className="mt-1 h-4 w-4 accent-action" />
-                          <span className="flex-1 min-w-0">
+                      <div key={cand.id} className="space-y-2 rounded-inset bg-sunk/60 p-3">
+                        <div className="flex items-start gap-2.5">
+                          <span className="flex h-6 items-center">
+                            <Checkbox checked={approved} onChange={() => toggleLink(cand)} aria-label={cand.title || t.planInternalTargetFallback} />
+                          </span>
+                          <span className="min-w-0 flex-1">
                             <span className="block text-copy text-ink">{cand.title || t.planInternalTargetFallback}</span>
-                            <a href={cand.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-caption text-action hover:underline break-all">{cand.url}</a>
+                            <a href={cand.url} target="_blank" rel="noopener noreferrer" dir="ltr" title={cand.url} className="block max-w-64 truncate text-caption text-muted hover:text-action hover:underline">{cand.url}</a>
                             {isUrlTarget ? (
-                              <span className="inline-flex items-center rounded bg-sunk px-1.5 py-0.5 text-caption text-muted mt-0.5">{t.planInternalTargetBadge}</span>
+                              <Badge variant="neutral" className="mt-1">{t.planInternalTargetBadge}</Badge>
                             ) : (
                               <span className="block text-caption text-muted">{t.planKeyword}: {cand.keyword || '—'}</span>
                             )}
@@ -795,34 +775,34 @@ export default function ArticleBriefModal({
                               <span className="block text-caption text-muted">{t.planHistory}: {cand.historicalAnchors.join(' · ')}</span>
                             )}
                           </span>
-                        </label>
-                        <div className="flex flex-wrap items-center gap-2 pl-6">
-                          <select
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 ps-7">
+                          <Select
+                            aria-label={t.planTitle}
                             value={selectVal}
                             onChange={(e) => { setLinkManual((p) => ({ ...p, [cand.id]: '' })); setLinkChoice((p) => ({ ...p, [cand.id]: e.target.value })) }}
-                            className={inputCls + ' max-w-[18rem]'}
-                          >
-                            {selectExtra.map((txt) => <option key={txt} value={txt}>{txt}</option>)}
-                            {opts.map((o) => (
-                              <option key={o.text} value={o.text}>{o.text} · {o.label}</option>
-                            ))}
-                            {opts.length === 0 && selectExtra.length === 0 && <option value="">—</option>}
-                          </select>
-                          <input
-                            type="text"
-                            value={manualVal}
-                            onChange={(e) => setLinkManual((p) => ({ ...p, [cand.id]: e.target.value }))}
-                            placeholder={t.planManualPlaceholder}
-                            className={inputCls + ' flex-1 min-w-[10rem]'}
+                            className="h-10 max-w-72"
+                            options={selectOptions}
                           />
+                          <div className="min-w-40 flex-1">
+                            <Input
+                              type="text"
+                              aria-label={t.planManualPlaceholder}
+                              value={manualVal}
+                              onChange={(e) => setLinkManual((p) => ({ ...p, [cand.id]: e.target.value }))}
+                              placeholder={t.planManualPlaceholder}
+                              className="h-10"
+                            />
+                          </div>
                         </div>
-                        <p className="text-caption text-muted pl-6">{t.planNote}</p>
+                        <p className="ps-7 text-caption text-muted">{t.planNote}</p>
                       </div>
                     )
                   })}
                   {linkCandidates.length > 2 && (
-                    <button type="button" onClick={() => setLinksExpanded((v) => !v)} className="text-caption font-medium text-action hover:underline">
+                    <button type="button" onClick={() => setLinksExpanded((v) => !v)} aria-expanded={linksExpanded} className="inline-flex items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
                       {linksExpanded ? t.planShowLess : t.planShowMore}
+                      <ChevronDown aria-hidden="true" className={`size-4 transition-transform duration-150 ease-snappy ${linksExpanded ? 'rotate-180' : ''}`} />
                     </button>
                   )}
                 </div>
@@ -832,11 +812,9 @@ export default function ArticleBriefModal({
         )}
 
         <div className="pt-2">
-          {formError && (
-            <p className="mb-2 text-copy text-bad text-end">{formError}</p>
-          )}
+          {formError && <Notice tone="bad" className="mb-3">{formError}</Notice>}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={saving}>{t.cancel}</Button>
+            <Button variant="secondary" onClick={onClose} disabled={saving}>{t.cancel}</Button>
             <Button onClick={handleSave} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
           </div>
         </div>

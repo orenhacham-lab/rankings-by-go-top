@@ -8,7 +8,8 @@
  * No error code or provider text is ever shown; the states are ours.
  */
 
-import { AlertCircle, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
 import type { SeedPlan } from '@/lib/content/strategy/board'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -18,27 +19,18 @@ export default function SeedPlanNotice({ seed, dict }: { seed: SeedPlan; dict: D
   const s = dict.contentStrategy.seed
   if (seed.state === 'building') {
     return (
-      <div role="status" className="flex items-start gap-3 rounded-card border border-info/20 bg-info-soft px-4 py-3">
-        <span className="relative mt-1.5 flex h-2.5 w-2.5 shrink-0" aria-hidden>
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-pill bg-info opacity-40" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-pill bg-info" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-copy font-semibold text-ink">{s.buildingTitle}</p>
-          <p className="text-caption text-body">{s.buildingBody}</p>
-        </div>
-      </div>
+      <Notice tone="wait">
+        <p className="font-semibold text-ink">{s.buildingTitle}</p>
+        <p className="max-w-prose text-caption text-body">{s.buildingBody}</p>
+      </Notice>
     )
   }
   if (seed.state === 'failed') {
     return (
-      <div role="status" className="flex items-start gap-3 rounded-card border border-warn/20 bg-warn-soft px-4 py-3">
-        <AlertCircle size={18} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-        <div className="min-w-0">
-          <p className="text-copy font-semibold text-ink">{s.failedTitle}</p>
-          <p className="text-caption text-body">{seed.topics.length > 0 ? s.failedBody : s.failedBodyNoTopics}</p>
-        </div>
-      </div>
+      <Notice tone="warn">
+        <p className="font-semibold text-ink">{s.failedTitle}</p>
+        <p className="max-w-prose text-caption text-body">{seed.topics.length > 0 ? s.failedBody : s.failedBodyNoTopics}</p>
+      </Notice>
     )
   }
   return null
@@ -65,11 +57,11 @@ export function PlanBasis({ seed, dict }: { seed: SeedPlan; dict: Dict }) {
   if (items.length === 0) return null
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-caption">
-      <span className="inline-flex items-center gap-1 font-semibold text-info"><Sparkles size={12} aria-hidden /> {s.basisTitle}</span>
+      <span className="inline-flex items-center gap-1 font-semibold text-muted"><Sparkles className="size-3.5 text-action" aria-hidden="true" /> {s.basisTitle}</span>
       <ul className="flex flex-wrap gap-1.5">
         {items.map((it) => (
           <li key={it.value + it.label} className="inline-flex items-center gap-1 rounded-pill border border-line bg-surface px-2 py-0.5 text-muted">
-            <span className="max-w-[12rem] truncate font-semibold text-ink tabular-nums">{it.value}</span> {it.label}
+            <span className="max-w-48 truncate font-semibold text-ink tabular-nums">{it.value}</span> {it.label}
           </li>
         ))}
       </ul>

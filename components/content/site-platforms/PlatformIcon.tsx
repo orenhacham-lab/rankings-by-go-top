@@ -16,12 +16,12 @@ export default function PlatformIcon({ platform, size = 'md', className }: { pla
     <span
       aria-hidden
       className={cn(
-        'grid shrink-0 place-items-center rounded-xl bg-action-soft text-action ring-1 ring-action/15',
+        'grid shrink-0 place-items-center rounded-inset bg-action-soft text-action',
         size === 'sm' ? 'size-8' : 'size-10',
         className,
       )}
     >
-      <Icon size={size === 'sm' ? 16 : 19} strokeWidth={2} />
+      <Icon className={size === 'sm' ? 'size-4' : 'size-5'} strokeWidth={2} />
     </span>
   )
 }

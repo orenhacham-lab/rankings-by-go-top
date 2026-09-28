@@ -21,12 +21,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { settingsGscHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Lightbulb } from 'lucide-react'
+import { CheckCheck, ChevronDown, EyeOff, ExternalLink, Lightbulb } from 'lucide-react'
+import RowMenu from '@/components/ui/RowMenu'
+import Segmented from '@/components/ui/Segmented'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscSetupPrompt, { GscLoadError, GscLoading } from '@/components/gsc/GscSetupPrompt'
@@ -63,9 +64,9 @@ const CATEGORIES: Category[] = ['improve_ctr', 'improve_page', 'internal_links',
 const OVERLAP_INITIAL = 3
 
 /** An external link that looks like the small primary button (it opens a page, so it stays an <a>). */
-const LINK_BUTTON = 'inline-flex h-8 items-center justify-center rounded-control bg-action px-3 text-caption font-semibold text-action-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(20_24_60/0.18)] transition-colors duration-150 hover:bg-action-hover'
-/** A filter chip: quiet until chosen, then the soft accent. */
-const chip = (on: boolean) => `inline-flex h-7 items-center rounded-pill border px-3 text-caption font-semibold transition-colors duration-150 ${on ? 'border-action/30 bg-action-soft text-action' : 'border-line bg-surface text-body hover:border-line-strong hover:text-ink'}`
+const LINK_BUTTON = 'inline-flex h-8 items-center justify-center rounded-control bg-action px-3 text-caption font-semibold text-action-ink shadow-control transition-colors duration-150 ease-snappy hover:bg-action-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'
+/** The row's external "open the page" link, in the ghost small button's shape. */
+const LINK_GHOST = 'inline-flex h-8 items-center gap-1.5 rounded-control px-3 text-caption font-semibold text-action transition-colors duration-150 hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'
 
 export default function GscRecommendations({ projectId, onToast, className }: {
   projectId: string; onToast?: (kind: 'success' | 'error', text: string) => void; className?: string
@@ -141,40 +142,39 @@ export default function GscRecommendations({ projectId, onToast, className }: {
     <section data-gsc-widget="recommendations" data-gsc-state={gsc.view.state} className={className}>
       <div className="mb-4">
         <h3 className="text-section font-semibold text-ink">{w.title}</h3>
-        {gscReady && <p className="text-copy text-muted mt-1">{w.about}</p>}
+        {gscReady && <p className="mt-1 max-w-prose text-copy text-muted">{w.about}</p>}
       </div>
 
       {isGscSetupState(gsc.view.state) ? (
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <GscSetupPrompt state={gsc.view.state} about={w.about} projectId={projectId} />
         </Card>
       ) : gsc.view.state === 'error' ? (
-        <Card className="p-6"><GscLoadError onRetry={gsc.reload} /></Card>
+        <Card className="p-5 sm:p-6"><GscLoadError onRetry={gsc.reload} /></Card>
       ) : gsc.view.state === 'loading' ? (
-        <Card className="p-6"><GscLoading /></Card>
+        <Card className="p-5 sm:p-6"><GscLoading /></Card>
       ) : (
       <>
       {/* Window toggle */}
-      <div className="mb-4 inline-flex rounded-control border border-line bg-sunk p-0.5">
-        {WINDOWS.map((w) => (
-          <button key={w} type="button" onClick={() => setActiveWindow(w)} aria-pressed={activeWindow === w}
-            className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${activeWindow === w ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
-            {w === 28 ? t.window28 : t.window90}
-          </button>
-        ))}
-      </div>
+      <Segmented<`${WindowDays}`>
+        ariaLabel={t.window28}
+        value={`${activeWindow}`}
+        onChange={(v) => setActiveWindow(Number(v) as WindowDays)}
+        options={WINDOWS.map((d) => ({ value: `${d}` as `${WindowDays}`, label: d === 28 ? t.window28 : t.window90 }))}
+        className="mb-4"
+      />
 
       {loading ? (
         <div role="status" aria-busy="true" className="space-y-3">
           <span className="sr-only">{t.loading}</span>
-          <div className="grid grid-cols-2 gap-3">{[0, 1].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}</div>
+          <div className="grid grid-cols-2 gap-4 sm:gap-5">{[0, 1].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}</div>
           {[0, 1].map((i) => <Skeleton key={i} className="h-40 rounded-card" />)}
         </div>
       ) : errored ? (
-        <Card className="p-6 text-copy text-muted">{t.genericError}</Card>
+        <Card className="p-5 text-copy text-muted sm:p-6">{t.genericError}</Card>
       ) : stateMessage && stateCta ? (
-        <Card className="p-6">
-          <p className="text-copy text-muted mb-3">{stateMessage}</p>
+        <Card className="p-5 sm:p-6">
+          <p className="mb-3 max-w-prose text-copy text-muted">{stateMessage}</p>
           <Link href={gscHref} className={LINK_BUTTON}>{stateCta}</Link>
         </Card>
       ) : recommendations.length === 0 ? (
@@ -184,111 +184,126 @@ export default function GscRecommendations({ projectId, onToast, className }: {
       ) : (
         <>
           {/* Summary strip */}
-          <div className="list-enter mb-4 grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="list-enter mb-4 grid grid-cols-2 gap-4 sm:gap-5">
             <StatTile label={t.summaryActionable} value={data?.summary?.actionable ?? recommendations.length} />
             <StatTile label={t.summaryPages} value={data?.summary?.affectedPages ?? 0} />
           </div>
 
           {/* Category filter */}
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <button type="button" aria-pressed={!categoryFilter} onClick={() => setCategoryFilter(null)} className={chip(!categoryFilter)}>{t.filterAll}</button>
-            {CATEGORIES.map((c) => (
-              <button key={c} type="button" aria-pressed={categoryFilter === c} onClick={() => setCategoryFilter(c)} className={chip(categoryFilter === c)}>{t.categories[c]}</button>
-            ))}
-          </div>
+          <Segmented<Category | 'all'>
+            ariaLabel={t.filterAll}
+            value={categoryFilter ?? 'all'}
+            onChange={(v) => setCategoryFilter(v === 'all' ? null : v)}
+            options={[
+              { value: 'all', label: t.filterAll, count: recommendations.length },
+              ...CATEGORIES.filter((c) => recommendations.some((r) => r.category === c)).map((c) => ({ value: c, label: t.categories[c], count: recommendations.filter((r) => r.category === c).length })),
+            ]}
+            className="mb-4 max-w-full overflow-x-auto"
+          />
 
-          <ul className="list-enter space-y-3">
+          {/* One compact list: a row per recommendation, its page, its numbers, the
+              reason behind a disclosure, one inline action and the rest in the row menu. */}
+          <Card padding={false}>
+          <ul className="divide-y divide-line">
             {filtered.map((r) => {
               const pages = r.involvedPages ?? []
               const shown = showAllPages[r.id] ? pages : pages.slice(0, OVERLAP_INITIAL)
               return (
-                <li key={r.id}>
-                  <Card className="p-4">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Badge variant="neutral">{t.categories[r.category]}</Badge>
-                      <Badge variant={priorityVariant(r.priority)}>{t.priority[r.priority]}</Badge>
-                    </div>
-                    <p className="text-copy font-semibold text-ink">{cardTitle(r)}</p>
-                    <p className="text-copy text-body mt-1">{cardSummary(r)}</p>
-
-                    {r.category === 'page_overlap' ? (
-                      <div className="mt-2 text-caption text-muted">
-                        <div className="mb-1">{r.hasClearPrimary && r.affectedPage
-                          ? <span>{t.overlap.primaryPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-action hover:underline">{safeDecode(r.affectedPage)}</a></span>
-                          : <span className="text-warn">{t.overlap.noPrimary}</span>}</div>
-                        <div className="font-medium text-body">{t.overlap.involved}:</div>
-                        <ul className="mt-1 space-y-0.5">
-                          {shown.map((p) => (
-                            <li key={p.url} dir="ltr" className="flex items-center justify-between gap-2">
-                              <a href={p.url} target="_blank" rel="noopener noreferrer" className={`truncate ${p.isPrimary ? 'font-semibold text-action' : 'text-muted'} hover:underline`}>{safeDecode(p.url)}</a>
-                              <span className="shrink-0 text-muted">{fmtInt(p.impressions)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        {pages.length > OVERLAP_INITIAL && (
-                          <button onClick={() => setShowAllPages((s) => ({ ...s, [r.id]: !s[r.id] }))} className="mt-1 text-action hover:underline">{showAllPages[r.id] ? t.overlap.showLess : t.overlap.showAll}</button>
-                        )}
-                        <div className="mt-1 text-warn">{t.overlap.signalOnly}</div>
+                <li key={r.id} className="px-4 py-4 sm:px-5">
+                  <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+                    <div className="min-w-0 flex-1 basis-72">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-copy font-semibold text-ink">{cardTitle(r)}</p>
+                        <Badge variant={priorityVariant(r.priority)}>{t.priority[r.priority]}</Badge>
                       </div>
-                    ) : (
-                      r.affectedPage && (
-                        <div className="mt-2 text-caption text-muted">
-                          {t.affectedPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-action hover:underline">{safeDecode(r.affectedPage)}</a>
-                        </div>
-                      )
-                    )}
-
-                    {/* Metrics */}
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted">
-                      <span>{t.metricImpressions}: {fmtInt(r.metrics.impressions)}</span>
-                      <span>{t.metricClicks}: {fmtInt(r.metrics.clicks)}</span>
-                      {r.category === 'improve_ctr' && <span>{t.metricCtr}: {fmtCtr(r.metrics.ctr)}</span>}
-                      <span>{t.metricPosition}: {fmtPos(r.metrics.averagePosition)}</span>
+                      <p className="mt-1 text-copy text-body">{cardSummary(r)}</p>
                     </div>
-
-                    {/* Why (expandable) */}
-                    <button onClick={() => setExpanded((e) => ({ ...e, [r.id]: !e[r.id] }))} className="mt-2 text-caption font-medium text-action hover:underline">
-                      {t.whyLabel}
-                    </button>
-                    {expanded[r.id] && (
-                      <div className="mt-1.5 space-y-1.5 rounded-inset border border-line bg-sunk/60 p-3 text-caption text-body motion-safe:animate-pop-in">
-                        <ul className="list-disc ps-4 space-y-0.5">
-                          {r.reasonKeys.map((k) => <li key={k}>{t.reasons[k]}</li>)}
-                        </ul>
-                        {r.needGroups.length > 0 && (
-                          <div>
-                            <span className="font-medium">{t.needGroupsLabel}: </span>
-                            {r.needGroups.flatMap((g) => [g.representativeQuery, ...g.relatedQueries]).slice(0, 12).join(' · ')}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Actions — the primary button only ever opens an external page URL, so its
-                        label says exactly that. A/B/C open the affected page; page-overlap opens the
-                        primary page ONLY when one is clearly identified (else the involved page links
-                        above are the only way in — no arbitrary "first page" button). */}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-1">
+                      {/* The primary action only ever opens an external page URL. A/B/C open the
+                          affected page; page-overlap opens the primary page ONLY when one is
+                          clearly identified (no arbitrary "first page" button). */}
                       {r.category !== 'page_overlap' && r.affectedPage && (
-                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>{t.openPage}</a>
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className={LINK_GHOST}>
+                          {t.openPage}<ExternalLink aria-hidden="true" className="size-4" />
+                        </a>
                       )}
                       {r.category === 'page_overlap' && r.hasClearPrimary && r.affectedPage && (
-                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>{t.openPrimary}</a>
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className={LINK_GHOST}>
+                          {t.openPrimary}<ExternalLink aria-hidden="true" className="size-4" />
+                        </a>
                       )}
                       {ACTIONS_ENABLED && (
-                        <>
-                          {r.category !== 'page_overlap' && (
-                            <Button variant="secondary" onClick={() => decide(r, 'already_covered')} disabled={busyId === r.id}>{busyId === r.id ? t.busy : t.markHandled}</Button>
-                          )}
-                          <Button variant="ghost" onClick={() => decide(r, 'irrelevant')} disabled={busyId === r.id}>{busyId === r.id ? t.busy : t.hide}</Button>
-                        </>
+                        <RowMenu
+                          label={`${t.whyLabel}: ${cardTitle(r)}`}
+                          items={[
+                            ...(r.category !== 'page_overlap' ? [{ key: 'handled', label: busyId === r.id ? t.busy : t.markHandled, onSelect: () => decide(r, 'already_covered'), disabled: busyId === r.id, icon: <CheckCheck className="size-4" aria-hidden="true" /> }] : []),
+                            { key: 'hide', label: busyId === r.id ? t.busy : t.hide, onSelect: () => decide(r, 'irrelevant'), disabled: busyId === r.id, icon: <EyeOff className="size-4" aria-hidden="true" /> },
+                          ]}
+                        />
                       )}
                     </div>
-                  </Card>
+                  </div>
+
+                  {r.category === 'page_overlap' ? (
+                    <div className="mt-2 text-caption text-muted">
+                      <div className="mb-1">{r.hasClearPrimary && r.affectedPage
+                        ? <span>{t.overlap.primaryPage}: <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" title={safeDecode(r.affectedPage)} className="inline-block max-w-64 truncate align-bottom text-muted hover:text-action hover:underline">{safeDecode(r.affectedPage)}</a></span>
+                        : <span className="text-warn">{t.overlap.noPrimary}</span>}</div>
+                      <div className="font-medium text-body">{t.overlap.involved}:</div>
+                      <ul className="mt-1 space-y-0.5">
+                        {shown.map((p) => (
+                          <li key={p.url} dir="ltr" className="flex max-w-md items-center justify-between gap-2">
+                            <a href={p.url} target="_blank" rel="noopener noreferrer" title={safeDecode(p.url)} className={`truncate ${p.isPrimary ? 'font-semibold text-action' : 'text-muted'} hover:underline`}>{safeDecode(p.url)}</a>
+                            <span className="shrink-0 tabular-nums text-muted">{fmtInt(p.impressions)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {pages.length > OVERLAP_INITIAL && (
+                        <button type="button" onClick={() => setShowAllPages((s) => ({ ...s, [r.id]: !s[r.id] }))} className="mt-1 font-semibold text-action hover:underline">{showAllPages[r.id] ? t.overlap.showLess : t.overlap.showAll}</button>
+                      )}
+                      <div className="mt-1 text-warn">{t.overlap.signalOnly}</div>
+                    </div>
+                  ) : (
+                    r.affectedPage && (
+                      <div className="mt-1.5 flex min-w-0 items-center gap-1 text-caption text-muted">
+                        <span className="shrink-0">{t.affectedPage}:</span>
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" dir="ltr" title={safeDecode(r.affectedPage)} className="max-w-64 truncate hover:text-action hover:underline">{safeDecode(r.affectedPage)}</a>
+                      </div>
+                    )
+                  )}
+
+                  {/* Metrics, one quiet line */}
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted tabular-nums">
+                    <span>{t.categories[r.category]}</span>
+                    <span>{t.metricImpressions}: {fmtInt(r.metrics.impressions)}</span>
+                    <span>{t.metricClicks}: {fmtInt(r.metrics.clicks)}</span>
+                    {r.category === 'improve_ctr' && <span>{t.metricCtr}: {fmtCtr(r.metrics.ctr)}</span>}
+                    <span>{t.metricPosition}: {fmtPos(r.metrics.averagePosition)}</span>
+                  </div>
+
+                  {/* Why (disclosure) */}
+                  <button type="button" aria-expanded={!!expanded[r.id]} onClick={() => setExpanded((e) => ({ ...e, [r.id]: !e[r.id] }))} className="mt-2 inline-flex items-center gap-1 text-caption font-semibold text-action hover:underline">
+                    <ChevronDown aria-hidden="true" className={`size-4 transition-transform duration-150 ${expanded[r.id] ? 'rotate-180' : ''}`} />
+                    {t.whyLabel}
+                  </button>
+                  {expanded[r.id] && (
+                    <div className="mt-1.5 space-y-1.5 rounded-inset border border-line bg-sunk/60 p-3 text-caption text-body motion-safe:animate-pop-in">
+                      <ul className="list-disc space-y-0.5 ps-4">
+                        {r.reasonKeys.map((k) => <li key={k}>{t.reasons[k]}</li>)}
+                      </ul>
+                      {r.needGroups.length > 0 && (
+                        <div>
+                          <span className="font-medium">{t.needGroupsLabel}: </span>
+                          {r.needGroups.flatMap((g) => [g.representativeQuery, ...g.relatedQueries]).slice(0, 12).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </li>
               )
             })}
           </ul>
+          </Card>
         </>
       )}
       </>

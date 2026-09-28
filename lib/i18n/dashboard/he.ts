@@ -794,6 +794,7 @@ export const dashboardHe = {
       truncated: 'נסרק חלקית (הגעה למגבלה)',
       techDetails: 'פרטים טכניים',
       errorPrefix: 'שגיאה',
+      failedHint: 'לא הצלחנו לסרוק את האתר. בדקו שהאתר זמין ונסו לרענן שוב.',
       cUnique: 'יעדים',
       cEligible: 'כשירים',
       cAnchors: 'יעדים עם עוגנים',
@@ -926,6 +927,7 @@ export const dashboardHe = {
       // Phase 3F.3.3e — drawer purpose + step hint + clearer actions/completion.
       drawerIntro1: 'כאן אפשר לבדוק, להוסיף או להסיר קישורים פנימיים לפני יצירת המאמר.',
       drawerIntro2: 'הקישורים נשמרים כתכנון בלבד, והם ישולבו במאמר בשלב היצירה.',
+      stepsTitle: 'איך זה עובד',
       step1: 'בדוק את הקישורים הקיימים',
       step2: 'הוסף קישורים מומלצים או ידניים אם צריך',
       step3: 'לחץ על ״שמור את תכנון הקישורים״',
@@ -1339,7 +1341,7 @@ export const dashboardHe = {
     confirmDeleteArticle: 'בטוח למחוק את הטיוטה הזו? הפעולה תמחק את המאמר מהמערכת ולא תשפיע על WordPress.',
     deleteFailed: 'מחיקת המאמר נכשלה. נסו שוב.',
     editor: {
-      back: '← חזרה למרכז התוכן',
+      back: 'חזרה למאמרים',
       loading: 'טוען מאמר…',
       notFound: 'המאמר לא נמצא.',
       title: 'כותרת',
@@ -1669,7 +1671,7 @@ export const dashboardHe = {
       anchorTooCloseMsg: 'קישורים קרובים מדי אחד לשני',
       anchorMechanical: 'קישור שולב במשפט גנרי/מלאכותי',
       anchorFirstPos: 'מיקום הקישור הראשון (מילים)',
-      backToHub: '← חזרה למרכז התוכן',
+      backToHub: 'חזרה למאמרים',
       internal: {
         title: 'קישורים פנימיים',
         hint: 'הצעות לקישור מהמאמר הזה למאמרים אחרים שכבר פורסמו בפרויקט. השילוב ידני — שום דבר לא נכתב עד שמירה.',
@@ -3066,6 +3068,8 @@ export const dashboardHe = {
         neverSynced: 'טרם סונכרן',
         // חלונות זמן וכרטיסי סיכום.
         window28: '28 ימים',
+        windowLabel: 'תקופה',
+        viewsLabel: 'תצוגת הנתונים',
         window90: '90 ימים',
         latestAvailableDate: 'תאריך אחרון זמין',
         dateRange: 'טווח תאריכים',
@@ -4401,6 +4405,7 @@ export const dashboardHe = {
     label: 'תקופת הניסיון',
   },
   articleEditorToolbar: {
+    label: 'עיצוב הטקסט',
     heading2: 'כותרת 2',
     heading3: 'כותרת 3',
     bold: 'מודגש',

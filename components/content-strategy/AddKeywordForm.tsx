@@ -20,7 +20,7 @@ type Dict = ReturnType<typeof getDashboardDictionary>
 export function AddKeywordButton({ dict, open, onOpen }: { dict: Dict; open: boolean; onOpen: () => void }) {
   return (
     <Button size="sm" variant="secondary" onClick={onOpen} aria-expanded={open} data-add-keyword-toggle>
-      <Plus size={14} aria-hidden /> {dict.contentStrategy.ideaActions.addKeyword}
+      <Plus aria-hidden="true" className="size-4" /> {dict.contentStrategy.ideaActions.addKeyword}
     </Button>
   )
 }
@@ -54,7 +54,7 @@ export default function AddKeywordForm({ dict, onAdd, onClose }: {
 
   return (
     <form ref={ref} onSubmit={submit} data-add-keyword-form
-      className="mb-4 rounded-card border border-line bg-surface p-4 shadow-card"
+      className="mb-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
       onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
       <div className="flex flex-col gap-3 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">

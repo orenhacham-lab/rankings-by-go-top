@@ -497,7 +497,7 @@ async function main() {
       /mixedSavedPlans: 'Some of these topics already have a saved link plan/.test(read('lib/i18n/dashboard/en.ts'))
       && /mixedSavedPlans: 'לחלק מהנושאים/.test(read('lib/i18n/dashboard/he.ts')))
     check('5D-l: SOURCE — the mixed batch shows its own explanation',
-      /\{mixedSavedPlans && <p[^>]*>\{t\.mixedSavedPlans\}<\/p>\}/.test(panel))
+      /\{mixedSavedPlans && <Notice tone="warn"[^>]*>\{t\.mixedSavedPlans\}<\/Notice>\}/.test(panel))
     check('5D-m: the claim-without-saving label exists in both languages',
       /queueWithSavedPlan: 'Add to queue with the saved links'/.test(read('lib/i18n/dashboard/en.ts'))
       && /queueWithSavedPlan: 'הוסף לתור עם הקישורים השמורים'/.test(read('lib/i18n/dashboard/he.ts')))
@@ -569,7 +569,7 @@ async function main() {
     check('7b: English label', /queueWithoutLinks: 'Add to queue without internal links'/.test(en))
     check('7c: Hebrew label', /queueWithoutLinks: 'הוסף לתור ללא קישורים פנימיים'/.test(he))
     check('7d: the notice is rendered as information, not as the red error',
-      /\{cacheNote && <p className="mt-2 text-caption text-warn/.test(panel) && !/\{cacheNote && <p className="[^"]*text-bad/.test(panel))
+      /\{cacheNote && <Notice tone="warn"/.test(panel) && !/\{cacheNote && <(?:Notice tone="bad"|p className="[^"]*text-bad)/.test(panel))
     check('7e: it no longer tells the user to refresh and try again',
       !/Site index missing — refresh the index and try again/.test(en)
       && !/אינדקס האתר חסר — רעננו את האינדקס ונסו שוב/.test(he))
