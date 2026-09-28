@@ -41,7 +41,7 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
   const nextDate = dayMonth(body.nextReportAt, l)
 
   const missing = body.missingMonth && (
-    <div data-monthly-missing={body.missingMonth} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line border-s-[3px] border-s-action bg-surface px-5 py-4 shadow-card sm:px-6">
+    <div data-monthly-missing={body.missingMonth} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-5 py-4 shadow-card sm:px-6">
       <div className="min-w-0 max-w-2xl">
         <p className="text-copy font-semibold text-ink">{t.missingTitle(monthName(body.missingMonth, l))}</p>
         <p className="mt-0.5 max-w-prose text-copy text-muted">{t.missingBody}</p>
@@ -57,7 +57,7 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
     return (
       <div className="space-y-4">
         {missing}
-        <div data-monthly-first="" className="grid gap-4 rounded-card border border-line bg-sunk p-5 sm:p-6 md:grid-cols-[auto_minmax(0,1fr)]">
+        <div data-monthly-first="" className="grid gap-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6 md:grid-cols-[auto_minmax(0,1fr)]">
           <span aria-hidden="true" className="grid size-10 place-items-center rounded-inset bg-action-soft text-action">
             <CalendarRange className="size-5" />
           </span>

@@ -42,7 +42,8 @@ export default function GscClicksTile({ projectId, className, onlyWithData = fal
           className="h-full"
           label={t.clicks.title}
           value={formatCount(view.summary.clicks, language)}
-          source={t.source28}
+          // In the dashboard's row (five tiles at 1440) the long source wrapped to two lines.
+          source={onlyWithData ? t.source28Short : t.source28}
           icon={icon}
         />
       </div>

@@ -2695,6 +2695,8 @@ export const dashboardHe = {
     // The number first: after "Search Console" it would join the English run and
     // show on the far side of the line from the days it counts.
     source28: '28 הימים האחרונים · Search Console',
+    /** The dashboard's row of figures: short enough for one line beside four tiles. */
+    source28Short: '28 ימים אחרונים',
     actions: {
       not_connected: 'חברו את Search Console',
       reauth_required: 'חברו מחדש את Search Console',
@@ -3041,10 +3043,14 @@ export const dashboardHe = {
         // ניתוק ברמת הפרויקט (הסרת שיוך הנכס בלבד) — הפעולה הראשית.
         unassignProperty: 'ניתוק הנכס מהפרויקט',
         unassigning: 'מנתק…',
-        unassignConfirm: 'לנתק את נכס ה-Search Console מהפרויקט הזה?\n\n• נתוני העבר יישמרו.\n• חיבור ה-Google עצמו יישאר פעיל עבור פרויקטים אחרים.\n\nלהמשיך?',
+        // The confirmation dialog (ui/ConfirmDialog): a question, then what stays.
+        unassignConfirmTitle: 'לנתק את נכס ה-Search Console מהפרויקט?',
+        unassignConfirmBody: 'נתוני העבר יישמרו, וחיבור ה-Google עצמו יישאר פעיל עבור פרויקטים אחרים.',
         // ביטול הרשאה גלובלי — פעולה נפרדת ומודגשת פחות.
         globalRevoke: 'ביטול הרשאת Google לכל החשבון',
-        confirmRevoke: 'לבטל את הרשאת ה-Google לכל החשבון?\n\n• פעולה זו משפיעה על כל הפרויקטים המשתמשים בחיבור.\n• נתוני ביצועים שסונכרנו בעבר יישמרו.\n\nלהמשיך?',
+        confirmRevokeTitle: 'לבטל את הרשאת ה-Google לכל החשבון?',
+        confirmRevokeBody: 'הפעולה משפיעה על כל הפרויקטים שמשתמשים בחיבור. נתוני ביצועים שסונכרנו בעבר יישמרו.',
+        confirmRevokeAction: 'ביטול ההרשאה',
         connectionInUse: (count: number) => `לא ניתן לבטל את ההרשאה: ${count} פרויקטים עדיין משתמשים בחיבור זה. נתקו את הנכס מכל פרויקט תחילה.`,
         connectedAccount: 'חשבון Google מחובר',
         // בחירת נכס.
@@ -3702,6 +3708,8 @@ export const dashboardHe = {
     loading: 'טוען...',
     exportExcel: 'ייצוא ל-Excel',
     downloadReport: 'הורדת דוח',
+    /** Under the two downloads while the report has nothing in it (they are disabled). */
+    nothingToDownload: 'אין עדיין מה להוריד: הדוח יתמלא אחרי הבדיקה הראשונה.',
     generatedOn: 'הופק בתאריך',
     excelExportWorkInProgress: 'ייצוא ל-Excel של דוח הנראות ב-AI עוד לא זמין',
     loadAIReportFirst: 'טענו קודם את דוח הנראות ב-AI',
@@ -4572,7 +4580,9 @@ export const dashboardHe = {
       noGaps: 'כל מה שנמצא אצלם נמצא גם אצלכם.',
       visit: (domain: string) => `פתיחת ${domain} בלשונית חדשה`,
       empty: 'הסריקה עוד לא מצאה מתחרים לאתר.',
-      noOverlap: 'לא הופיע באף ביטוי של המחקר הזה. ייתכן שהוא מתחרה על חיפושים אחרים.',
+      noOverlap: 'אף ביטוי במחקר הזה לא משויך אליו. ייתכן שהוא מתחרה על חיפושים אחרים.',
+      /** A competitor seen on Google in the scan's checks, but tied to no keyword of the research list. */
+      noOverlapSeen: 'הופיע בחיפושים שבדקנו, אבל אף ביטוי ברשימת המחקר עוד לא משויך אליו.',
       summary: (n: string, searches: string) => `${n} מתחרים · ${searches} חיפושים בחודש על ביטויים שרק הם תופסים`,
     },
     audiences: {

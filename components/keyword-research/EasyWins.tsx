@@ -11,6 +11,7 @@
 import { Check, Coins, Plus, Sprout } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -85,24 +86,18 @@ export default function EasyWins({
                           <span className="min-w-0 break-words">{row.keyword}</span>
                         </p>
                         {/* Once the card is wide the columns beside it say the same, so the sentence stays
-                            only for screen readers, unless it adds what no column shows: a click price
-                            above the average, the sign of buying intent. */}
-                        <p className={cn('mt-0.5 text-copy text-muted', win.cpcAboveAverage ? '@3xl:flex @3xl:items-center @3xl:gap-1.5 @3xl:text-warn' : '@3xl:sr-only')}>
-                          {win.cpcAboveAverage && <Coins size={13} strokeWidth={2.5} aria-hidden="true" className="hidden shrink-0 @3xl:block" />}
-                          <span>{why}</span>
-                        </p>
+                            for screen readers only; its words are the competition badge's tooltip (final
+                            review R18: no orange sentence inside the row). */}
+                        <p className="mt-0.5 text-copy text-muted @3xl:sr-only">{why}</p>
                       </div>
                     </div>
                     <span className="hidden font-semibold text-copy text-body tabular-nums @3xl:block">{formatCount(win.volume, language)}</span>
-                    <span className="hidden @3xl:block">
-                      <span
-                        className={cn(
-                          'inline-flex items-center rounded-pill border px-2 py-0.5 text-caption font-semibold',
-                          win.competition === 'low' ? 'border-ok/20 bg-ok-soft text-ok' : win.competition === 'medium' ? 'border-warn/20 bg-warn-soft text-warn' : 'border-line bg-sunk text-muted',
-                        )}
-                      >
+                    <span className="hidden @3xl:block" title={why} data-easy-win-badge="">
+                      <Badge variant={win.competition === 'low' ? 'success' : win.competition === 'medium' ? 'warning' : 'danger'}>
                         {t.levels[win.competition]}
-                      </span>
+                        {/* A click price above the average (buying intent): a small mark, its sentence in the tooltip. */}
+                        {win.cpcAboveAverage && <Coins size={12} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />}
+                      </Badge>
                     </span>
                     <span className="col-span-2 flex items-center gap-2 ps-9 @3xl:col-span-1 @3xl:ps-0" role="img" aria-label={t.potentialOf(String(win.score))}>
                       <span className="h-2 w-24 overflow-hidden rounded-pill bg-sunk @3xl:w-full">

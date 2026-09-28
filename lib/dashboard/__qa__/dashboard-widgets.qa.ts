@@ -305,11 +305,14 @@ async function main() {
     check('W2: an empty widget never shows a bare zero', !/>0</.test(render(createElement(RankDistribution, { t: en, rankings: oneUnchecked, language: 'en' }))))
 
     // Hero.
-    const heroHe = render(createElement(HeroCard, { t: he, language: 'he', domain: 'bloom.example', rankings: ranked, news: null, seedPhase: 'stage_b', next: { href: '/content/topics', label: he.actions.writeFirstArticle, commit: true, note: he.actions.articleQuota } }), 'he')
+    const heroHe = render(createElement(HeroCard, { t: he, language: 'he', domain: 'bloom.example', rankings: ranked, news: null, seedPhase: 'stage_b', next: { href: '/content/topics', label: he.actions.writeFirstArticle, note: he.actions.articleQuota } }), 'he')
     check('W3: the opening card: one big number and its sentence', heroHe.includes('data-dashboard-widget="hero"') && heroHe.includes(he.hero.firstPage(1, 2)))
-    check('W4: an action that costs quota is amber, and says so', /class="[^"]*bg-commit[^"]*" href="\/content\/topics">כתוב את המאמר הראשון</.test(heroHe) && heroHe.includes(he.actions.articleQuota))
+    // Final review R2: amber (commit) is for money only; writing an article is the default primary.
+    const heroPrimary = (html: string) => /class="[^"]*bg-action text-action-ink[^"]*" href="\/content\/topics">כתוב את המאמר הראשון</.test(html) && !/bg-commit/.test(html)
+    check('W4: the article action is the default primary (never amber), and says it counts toward the allowance', heroPrimary(heroHe) && heroHe.includes(he.actions.articleQuota))
+    check('W4-MUT: the old amber hero button fails W4', !heroPrimary(heroHe.replace('bg-action text-action-ink', 'bg-commit text-commit-ink')))
     check('W5: while stage B runs, the card says the research is running', heroHe.includes('data-scan-line="stage_b"') && heroHe.includes(he.hero.scanRunning))
-    const heroNone = render(createElement(HeroCard, { t: en, language: 'en', domain: 'bloom.example', rankings: noKeywords, news: null, seedPhase: null, next: { href: '/keyword-research', label: en.actions.addKeywords, commit: false, note: null } }))
+    const heroNone = render(createElement(HeroCard, { t: en, language: 'en', domain: 'bloom.example', rankings: noKeywords, news: null, seedPhase: null, next: { href: '/keyword-research', label: en.actions.addKeywords, note: null } }))
     check('W6: no keywords: an honest sentence and an indigo "add keywords", no scan line', heroNone.includes(en.hero.noKeywords) && /bg-action/.test(heroNone) && !heroNone.includes('data-scan-line'))
 
     // Holding back.
@@ -334,8 +337,8 @@ async function main() {
     // One first-article button.
     const articlesWith = render(createElement(RecentArticles, { t: en, language: 'en', section: { state: 'ready', data: { recent: [] } }, retry: () => {}, firstArticleHref: '/content/topics' }))
     const articlesWithout = render(createElement(RecentArticles, { t: en, language: 'en', section: { state: 'ready', data: { recent: [] } }, retry: () => {}, firstArticleHref: null }))
-    check('W12: the articles card carries "Write the first article" (amber) only when the opening card does not',
-      articlesWith.includes(en.actions.writeFirstArticle) && /bg-commit/.test(articlesWith) && !articlesWithout.includes(en.actions.writeFirstArticle))
+    check('W12: the articles card carries "Write the first article" (the default primary, not amber) only when the opening card does not',
+      articlesWith.includes(en.actions.writeFirstArticle) && /bg-action text-action-ink/.test(articlesWith) && !/bg-commit/.test(articlesWith) && !articlesWithout.includes(en.actions.writeFirstArticle))
 
     // Account: display only.
     const acc = render(createElement(AccountStatus, { t: en, section: { state: 'ready', data: { plan: 'trial', trialDaysLeft: 4, articles: { used: 3, limit: 10 }, keywords: { used: 2, limit: 50 } } }, retry: () => {} }))
@@ -353,11 +356,28 @@ async function main() {
     check('W16: the checklist shows its progress and a button on every open task only',
       setupHtml.includes('role="progressbar"') && (setupHtml.match(/data-done="false"/g) ?? []).length === 2 && (setupHtml.match(/<a\b/g) ?? []).length === 2)
 
+    // Final review R3: no tinted cards or rows. The tone is on an icon (or a badge) only.
+    const doneRows = [...setupHtml.matchAll(/<li[^>]*data-done="true"[^>]*>([\s\S]*?)<\/li>/g)]
+    const setupNeutral = (html: string) => {
+      const rows = [...html.matchAll(/<li([^>]*)data-done="true"([^>]*)>([\s\S]*?)<\/li>/g)]
+      return rows.length === 2 && rows.every((r) => !/-soft/.test(r[1] + r[2]) && /<svg[^>]*lucide-check/.test(r[3]) && /text-muted/.test(r[3]))
+    }
+    check('W16b: a done setup row is the neutral row with a check icon and muted words (no green-tinted row)', setupNeutral(setupHtml), doneRows.map((r) => r[0].slice(0, 160)))
+    check('W16b-MUT: the old ok-soft done row fails W16b', !setupNeutral(setupHtml.replace(/(<li[^>]*data-done="true"[^>]*class=")/g, '$1border-ok/20 bg-ok-soft ')))
+    const holdHtml = render(createElement(HoldingBack, { t: en, model: holdingBack(run('seeded'), 'en'), scannedLabel: null, settingsHref: '/s' }))
+    const cardClass = (html: string) => /<section[^>]*data-dashboard-widget="holding-back"[^>]*class="([^"]*)"/.exec(html)?.[1] ?? /<section[^>]*class="([^"]*)"[^>]*data-dashboard-widget="holding-back"/.exec(html)?.[1] ?? ''
+    const holdNeutral = (html: string) => /\bbg-surface\b/.test(cardClass(html)) && !/-soft/.test(cardClass(html)) && /bg-warn-soft text-warn/.test(html)
+    check('W7b: "what is holding the site back" is a neutral surface card; the warn tone is on its icon only', holdNeutral(holdHtml), cardClass(holdHtml))
+    check('W7b-MUT: the old warm-tinted card fails W7b', !holdNeutral(holdHtml.replace(/(data-dashboard-widget="holding-back"[^>]*class="[^"]*)bg-surface/, '$1bg-warn-soft/60')))
+    const accTrial = (html: string) => /data-trial-days=""/.test(html) && !/bg-commit-soft/.test(html) && /<p[^>]*data-trial-days=""[^>]*class="[^"]*text-body[^"]*"[^>]*><svg[^>]*text-warn/.test(html)
+    check('W13b: the trial days are a line on the neutral card with a warn icon, not an amber strip', accTrial(acc), acc.slice(0, 400))
+    check('W13b-MUT: the old commit-soft strip fails W13b', !accTrial(acc.replace('data-trial-days="" class="', 'data-trial-days="" class="bg-commit-soft ')))
+
     // English has no Hebrew; Hebrew has Hebrew.
     process.env.NEXT_PUBLIC_ENABLE_CONTENT = 'true'
     const all = (t: typeof en, lang: 'he' | 'en') => [
       render(createElement(Shortcuts, { t }), lang),
-      render(createElement(HeroCard, { t, language: lang, domain: 'bloom.example', rankings: ranked, news: { kind: 'move', keyword: 'roses', change: 3, position: 4 }, seedPhase: 'stage_a', next: { href: '/k', label: t.actions.connectSite, commit: false, note: null } }), lang),
+      render(createElement(HeroCard, { t, language: lang, domain: 'bloom.example', rankings: ranked, news: { kind: 'move', keyword: 'roses', change: 3, position: 4 }, seedPhase: 'stage_a', next: { href: '/k', label: t.actions.connectSite, note: null } }), lang),
       render(createElement(RankDistribution, { t, rankings: ranked, language: lang }), lang),
       render(createElement(RankingChanges, { t, direction: 'up', title: t.distribution.title, moves: ranked.improvements }), lang),
       render(createElement(RecentActivity, { t, model: { state: 'ready', items: mergeFeed([{ kind: 'rank_check', at: ago(60), title: null, count: 4 }], s.lines), pending: 3 }, now: NOW, language: lang, emptyHref: '/k' }), lang),

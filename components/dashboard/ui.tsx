@@ -10,15 +10,15 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-type LinkVariant = 'primary' | 'commit' | 'secondary' | 'quiet'
+/** No commit (amber) link here: the dashboard links spend nothing (design contract: commit is money only). */
+type LinkVariant = 'primary' | 'secondary' | 'quiet'
 
-/** A link that looks like the app's Button: the same two action colours and nothing else. */
+/** A link that looks like the app's Button: the action colour and nothing else. */
 export function linkButtonClass(variant: LinkVariant = 'primary', size: 'sm' | 'md' = 'md'): string {
   return cn(
     'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
     size === 'sm' ? 'h-8 px-3 text-caption' : 'h-9 px-4 text-copy',
     variant === 'primary' && 'bg-action text-action-ink hover:bg-action-hover',
-    variant === 'commit' && 'bg-commit text-commit-ink hover:bg-commit-hover',
     variant === 'secondary' && 'border border-line bg-surface text-body hover:bg-sunk',
     variant === 'quiet' && 'px-0 text-action hover:underline',
   )
@@ -52,7 +52,11 @@ export function Widget({ id, title, subtitle, icon, action, state, tone = 'defau
   action?: ReactNode
   /** What the widget is showing: ready, empty, error, loading, or a state of its own. */
   state: string
-  /** `attention`: a warm tint for the one widget that lists what needs fixing, so it is not one more white card. */
+  /**
+   * `attention`: the one widget that lists what needs fixing. The card stays the
+   * neutral surface like every other card (never a tinted card); only its icon
+   * carries the warn tone.
+   */
   tone?: 'default' | 'attention'
   className?: string
   children: ReactNode
@@ -65,8 +69,7 @@ export function Widget({ id, title, subtitle, icon, action, state, tone = 'defau
       data-dashboard-widget={id}
       data-state={state}
       className={cn(
-        'min-w-0 overflow-hidden rounded-card border shadow-card',
-        attention ? 'border-warn/25 bg-warn-soft/60' : 'border-line bg-surface',
+        'min-w-0 overflow-hidden rounded-card border border-line bg-surface shadow-card',
         className,
       )}
     >
@@ -77,7 +80,7 @@ export function Widget({ id, title, subtitle, icon, action, state, tone = 'defau
               aria-hidden="true"
               className={cn(
                 'grid size-9 shrink-0 place-items-center rounded-inset ring-1',
-                attention ? 'bg-surface text-warn ring-warn/20' : 'bg-action-soft text-action ring-action/10',
+                attention ? 'bg-warn-soft text-warn ring-warn/15' : 'bg-action-soft text-action ring-action/10',
               )}
             >
               {icon}

@@ -70,9 +70,12 @@ console.log('\nB) Reports: surface card with a brand stripe, one date format, lo
   const noBanner = (s: string) => !/bg-(?:blue|indigo)-600/.test(s) && !RAW_COLOUR.test(s)
   check('B1: no saturated banner and no raw palette colours', noBanner(src), (RAW_COLOUR.exec(src) || [])[0])
   check('B1-MUT: the old banner fails B1', !noBanner(src + '<div className="bg-blue-600 text-white rounded-xl p-6 mb-6">'))
-  const stripe = (s: string) => /<Card className="[^"]*border-s-4 border-s-action/.test(s)
-  check('B2: the report head is a Card with a 4px brand stripe on the reading side', stripe(src))
-  check('B2-MUT: a card without the stripe fails B2', !stripe(src.replace(/border-s-4 border-s-action/g, '')))
+  // Final review G3: a rail that bends round the card's corner reads cheap. The report
+  // head is a plain surface Card; its kind is the overline in the action colour.
+  const plainHead = (s: string) => /<Card className="mb-6">\s*<div[^>]*data-report-card=""/.test(s) && !/border-s-(?:\[\d+px\]|\d)/.test(s)
+    && /<p className="text-overline font-semibold text-action">\{kind\}<\/p>/.test(s)
+  check('B2: the report head is a plain surface Card (no curved rail), its kind an action-coloured overline', plainHead(src))
+  check('B2-MUT: the old 4px stripe back on the card fails B2', !plainHead(src.replace('<Card className="mb-6">', '<Card className="mb-6 border-s-4 border-s-action">')))
   const oneDate = (s: string) => /formatDate\(language\)\.date\(/.test(s) && !/toLocaleDateString\(|toLocaleString\(|formatDateTime\(/.test(s)
   check('B3: dates come from formatDate(language), none from toLocale*/formatDateTime', oneDate(src))
   check('B3-MUT: the old "new Date().toLocaleDateString(\'en-US\')" fails B3', !oneDate(src + "{new Date().toLocaleDateString('en-US')}"))

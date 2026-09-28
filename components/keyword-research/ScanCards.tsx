@@ -18,6 +18,7 @@ import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { Skeleton } from '@/components/ui/Skeleton'
 import type { EmptyReason, ProgressStep } from '@/lib/keyword-research/scan-state'
 
 /**
@@ -32,7 +33,9 @@ import type { EmptyReason, ProgressStep } from '@/lib/keyword-research/scan-stat
 export function ScanLoadingSkeleton() {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan
-  const pulse = 'animate-pulse motion-reduce:animate-none'
+  // The shared Skeleton (final review R34): one shimmer and one radius family, never a
+  // raw animate-pulse. On the ink card it is the same shimmer, faded to read as ink.
+  const onInk = 'opacity-15'
   return (
     <section data-scan-state="loading" role="status" aria-busy="true" className="mb-8">
       <span className="sr-only">{t.pending}</span>
@@ -43,28 +46,28 @@ export function ScanLoadingSkeleton() {
         />
         <div aria-hidden="true" className="flex items-center justify-between gap-6 px-5 pb-16 pt-5 sm:px-8 sm:pb-20 sm:pt-7">
           <div className="min-w-0 flex-1">
-            <span className={cn('block h-6 w-28 rounded-pill bg-contrast-ink/10', pulse)} />
-            <span className={cn('mt-5 block h-9 w-3/4 max-w-xl rounded-control bg-contrast-ink/10', pulse)} />
-            <span className={cn('mt-3 block h-4 w-1/3 rounded-control bg-contrast-ink/10', pulse)} />
+            <Skeleton className={cn('h-6 w-28 rounded-pill', onInk)} />
+            <Skeleton className={cn('mt-5 h-9 w-3/4 max-w-xl', onInk)} />
+            <Skeleton className={cn('mt-3 h-4 w-1/3', onInk)} />
           </div>
-          <span className={cn('hidden size-32 shrink-0 rounded-pill border-[10px] border-contrast-ink/10 md:block', pulse)} />
+          <span className="hidden size-32 shrink-0 rounded-pill border-[10px] border-contrast-ink/10 md:block" />
         </div>
       </Card>
       <div aria-hidden="true" className="relative z-10 -mt-11 grid grid-cols-2 gap-3 px-2 sm:-mt-12 sm:px-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="rounded-card border border-line bg-surface p-4 shadow-pop">
-            <span className={cn('block h-3.5 w-20 rounded-pill bg-sunk', pulse)} />
-            <span className={cn('mt-4 block h-7 w-16 rounded-control bg-sunk', pulse)} />
-            <span className={cn('mt-3 block h-3 w-28 max-w-full rounded-pill bg-sunk', pulse)} />
+            <Skeleton className="h-3.5 w-20 rounded-pill" />
+            <Skeleton className="mt-4 h-7 w-16" />
+            <Skeleton className="mt-3 h-3 w-28 max-w-full rounded-pill" />
           </div>
         ))}
       </div>
       <div aria-hidden="true" className="mt-8 flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card sm:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="size-9 shrink-0 rounded-inset bg-action-soft" />
-          <span className={cn('block h-3.5 w-44 rounded-pill bg-sunk', pulse)} />
+          <Skeleton className="h-3.5 w-44 rounded-pill" />
         </div>
-        <span className={cn('h-9 w-24 shrink-0 rounded-control bg-sunk', pulse)} />
+        <Skeleton className="h-9 w-24 shrink-0" />
       </div>
     </section>
   )

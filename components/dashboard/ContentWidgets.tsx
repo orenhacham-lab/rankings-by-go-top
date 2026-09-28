@@ -102,7 +102,7 @@ export function RecentArticles({ t, language, section, retry, firstArticleHref }
         <WidgetEmpty icon={<FileText size={18} strokeWidth={2} />} title={a.emptyTitle} body={a.empty}
           action={firstArticleHref ? (
             <div className="flex flex-col items-start gap-1">
-              <LinkButton href={firstArticleHref} variant="commit" size="sm">{t.actions.writeFirstArticle}</LinkButton>
+              <LinkButton href={firstArticleHref} size="sm">{t.actions.writeFirstArticle}</LinkButton>
               <span className="text-caption text-muted">{t.actions.articleQuota}</span>
             </div>
           ) : (

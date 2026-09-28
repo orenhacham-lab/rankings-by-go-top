@@ -24,6 +24,7 @@ import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
 import ScanHistory from '@/components/scans/ScanHistory'
 import { ToastHost, useToasts } from '@/components/ui/Toast'
+import Notice from '@/components/ui/Notice'
 
 type ReportType = 'google' | 'ai'
 type ReportsCopy = ReturnType<typeof getDashboardDictionary>['reports']
@@ -96,6 +97,9 @@ function ReportsContent() {
   
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  // What an export could not do, said inline above the report in the dictionary's
+  // words (never a browser alert, never a route's own text).
+  const [exportNotice, setExportNotice] = useState<string | null>(null)
   const [sortColumn, setSortColumn] = useState<'position' | null>('position')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
@@ -257,6 +261,7 @@ function ReportsContent() {
 
   async function handleReportTypeChange(newType: ReportType) {
     setReportType(newType)
+    setExportNotice(null)
     if (selectedProjectId) {
       if (newType === 'google') {
         loadGoogleReport(selectedProjectId)
@@ -268,6 +273,7 @@ function ReportsContent() {
 
   async function handleExportExcel() {
     if (!selectedProjectId) return
+    setExportNotice(null)
     setExporting('excel')
 
     if (reportType === 'google' && googleReportData) {
@@ -282,7 +288,7 @@ function ReportsContent() {
       })
     } else if (reportType === 'ai' && aiReportData) {
       if (!aiReportData.results || aiReportData.results.length === 0) {
-        alert(t.ai.noResultsInReport)
+        setExportNotice(t.ai.noResultsInReport)
         setExporting(null)
         return
       }
@@ -311,13 +317,14 @@ function ReportsContent() {
   async function handleExportPDF() {
     if (!selectedProjectId) return
     if (reportType === 'ai' && !aiReportData) {
-      alert(t.loadAIReportFirst)
+      setExportNotice(t.loadAIReportFirst)
       return
     }
     if (reportType === 'google' && !googleReportData) {
-      alert(t.loadGoogleReportFirst)
+      setExportNotice(t.loadGoogleReportFirst)
       return
     }
+    setExportNotice(null)
 
     setExporting('pdf')
     const payload: {
@@ -414,6 +421,10 @@ function ReportsContent() {
           </div>
         </div>
 
+        {exportNotice && (
+          <Notice tone="info" onDismiss={() => setExportNotice(null)} className="mb-4">{exportNotice}</Notice>
+        )}
+
         {loading && (
           <div className="flex items-center justify-center gap-2 rounded-card border border-line bg-surface py-16 text-copy text-muted" aria-busy="true">
             <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-action border-t-transparent motion-reduce:animate-none" />
@@ -458,23 +469,26 @@ function ReportsContent() {
 
 /**
  * The head of a report built on demand: what kind of report, for which project,
- * when it was made, and its two downloads. A surface card with a 4px brand stripe
- * on the reading side (UX review P1-8), not a saturated banner: the old #155dfc
- * block sat outside the palette and its light-blue text read at 3.68:1.
+ * when it was made, and its two downloads. A plain surface card: no coloured rail
+ * bending round its corner (final review G3), the kind is the overline's colour.
+ * Both downloads are secondary (the page's one primary is the monthly report's),
+ * and with nothing in the report they are disabled, with the reason under them.
  */
-function ReportCard({ kind, project, language, exporting, onExportExcel, onExportPDF, t }: {
+function ReportCard({ kind, project, language, exporting, onExportExcel, onExportPDF, empty, t }: {
   kind: string
   project: Project & { clients?: Client }
   language: Locale
   exporting: 'excel' | 'pdf' | null
   onExportExcel: () => void
   onExportPDF: () => void
+  /** Nothing to download yet: both buttons disabled, and why. */
+  empty: boolean
   t: ReportsCopy
 }) {
   const meta = [project.clients?.name, project.target_domain].filter(Boolean) as string[]
   return (
-    <Card className="mb-6 border-s-4 border-s-action">
-      <div className="flex flex-wrap items-center justify-between gap-4" data-report-card="">
+    <Card className="mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-4" data-report-card="" data-report-empty={empty || undefined}>
         <div className="min-w-0">
           <p className="text-overline font-semibold text-action">{kind}</p>
           <h3 className="mt-1 text-section font-bold text-ink">{project.name}</h3>
@@ -489,15 +503,18 @@ function ReportCard({ kind, project, language, exporting, onExportExcel, onExpor
             {t.generatedOn} {formatDate(language).date(new Date())}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onExportExcel} loading={exporting === 'excel'}>
-            <BarChart3 size={16} strokeWidth={2} aria-hidden="true" />
-            {t.exportExcel}
-          </Button>
-          <Button onClick={onExportPDF} loading={exporting === 'pdf'}>
-            <FileText size={16} strokeWidth={2} aria-hidden="true" />
-            {t.downloadReport}
-          </Button>
+        <div className="flex flex-col items-start gap-1.5 sm:items-end">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onExportExcel} loading={exporting === 'excel'} disabled={empty} aria-describedby={empty ? 'report-download-reason' : undefined}>
+              <BarChart3 size={16} strokeWidth={2} aria-hidden="true" />
+              {t.exportExcel}
+            </Button>
+            <Button variant="secondary" onClick={onExportPDF} loading={exporting === 'pdf'} disabled={empty} aria-describedby={empty ? 'report-download-reason' : undefined}>
+              <FileText size={16} strokeWidth={2} aria-hidden="true" />
+              {t.downloadReport}
+            </Button>
+          </div>
+          {empty && <p id="report-download-reason" data-report-download-reason="" className="max-w-xs text-caption text-muted sm:text-end">{t.nothingToDownload}</p>}
         </div>
       </div>
     </Card>
@@ -547,6 +564,7 @@ function GoogleReport({
         exporting={exporting}
         onExportExcel={onExportExcel}
         onExportPDF={onExportPDF}
+        empty={total === 0}
         t={t}
       />
 
@@ -564,18 +582,21 @@ function GoogleReport({
       <>
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label={t.google.totalKeywords} value={total} />
-        <StatTile label={t.google.found} value={<span className="text-ok">{foundCount}</span>} />
-        <StatTile label={t.google.notFound} value={<span className={total - foundCount > 0 ? 'text-bad' : undefined}>{total - foundCount}</span>} />
+        <StatTile label={t.google.found} value={foundCount} />
+        <StatTile label={t.google.notFound} value={total - foundCount} />
         <StatTile label={t.google.coverage} value={total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'} />
       </div>
 
       <h3 className="mb-3 text-section font-semibold text-ink">{t.google.currentRankings} ({total})</h3>
 
+      {/* At 390 the table keeps the keyword and its position (the change under it);
+          the engine and the change column return from sm, so nothing is cut inside
+          a sideways-scrolling card. */}
       <Table>
         <TableHead>
-          <tr>
+          <tr className="max-sm:[&>th]:px-3">
             <Th>{t.google.keyword}</Th>
-            <Th>{t.google.engine}</Th>
+            <Th className="hidden sm:table-cell">{t.google.engine}</Th>
             <Th>
               <button
                 type="button"
@@ -590,18 +611,23 @@ function GoogleReport({
                 </span>
               </button>
             </Th>
-            <Th>{t.google.change}</Th>
+            <Th className="hidden sm:table-cell">{t.google.change}</Th>
           </tr>
         </TableHead>
         <TableBody>
           {getSortedTargets().map((target: any) => {
             const result = reportData.latestResults[target.id]
             return (
-              <TableRow key={target.id}>
+              <TableRow key={target.id} className="max-sm:[&>td]:px-3">
                 <Td className="font-medium text-ink">{target.keyword}</Td>
-                <Td><EngineBadge engine={target.engine_type} /></Td>
-                <Td className="tabular-nums">{result?.found ? result.position : '—'}</Td>
-                <Td>{result && <PositionChange change={result.change_value} />}</Td>
+                <Td className="hidden sm:table-cell"><EngineBadge engine={target.engine_type} /></Td>
+                <Td className="tabular-nums">
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span>{result?.found ? result.position : '—'}</span>
+                    {result && <span className="sm:hidden"><PositionChange change={result.change_value} /></span>}
+                  </div>
+                </Td>
+                <Td className="hidden sm:table-cell">{result && <PositionChange change={result.change_value} />}</Td>
               </TableRow>
             )
           })}
@@ -646,6 +672,7 @@ function AIVisibilityReport({
         exporting={exporting}
         onExportExcel={onExportExcel}
         onExportPDF={onExportPDF}
+        empty={reportData.summary.totalResults === 0}
         t={t}
       />
 

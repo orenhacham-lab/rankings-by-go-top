@@ -16,13 +16,18 @@
  * interactive element of the prompt.
  */
 import Link from 'next/link'
+import { buttonClasses } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { gscSettingsHref, type GscSetupState } from '@/lib/gsc/widget-state'
 
-export const GSC_ACTION_LINK_CLASS =
-  'inline-flex h-7 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-action px-3 text-caption font-semibold text-action-ink transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas'
+/**
+ * Connecting Search Console is never the screen's main action (the keywords scan,
+ * the monthly report, … are), so its link is the secondary small button: one
+ * primary per screen (final review R1).
+ */
+export const GSC_ACTION_LINK_CLASS = buttonClasses({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })
 
 export default function GscSetupPrompt({
   state, about, projectId, layout = 'stack', className,
