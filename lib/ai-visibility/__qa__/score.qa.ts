@@ -36,8 +36,12 @@ function mutant<T>(file: string, from: string | RegExp, to: string): T {
   const out = src.replace(from, to)
   if (out === src) throw new Error(`mutation did not apply to ${file}: ${String(from)}`)
   const dir = file.slice(0, file.lastIndexOf('/'))
-  const path = join(ROOT, dir, `.qa-mut-score-${++mutants}-${file.slice(file.lastIndexOf('/') + 1)}`)
-  writeFileSync(path, out)
+  // The copy lives in this suite's own __qa__ folder (tree-walking suites skip __qa__, so a
+  // concurrent walker never sees a file that is about to vanish); relative imports are pinned
+  // to the original folder so the copy resolves exactly what the source does.
+  const pinned = out.replace(/(from\s+|require\(|import\()(['"])(\.\.?\/[^'"]*)\2/g, (_m, pre: string, q: string, spec: string) => `${pre}${q}${join(ROOT, dir, spec)}${q}`)
+  const path = join(__dirname, `.qa-mut-score-${++mutants}-${file.slice(file.lastIndexOf('/') + 1)}`)
+  writeFileSync(path, pinned)
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require(path) as T

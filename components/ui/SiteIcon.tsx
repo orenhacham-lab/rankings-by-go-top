@@ -24,6 +24,32 @@ export const isIconSize = (w: number, h: number) => w > 1 && h > 1
 /** An SVG by its path (the query string aside). */
 export const isSvg = (src: string | null) => !!src && /\.svg$/i.test(src.split(/[?#]/)[0])
 
+/** What the mount check needs of an <img>. */
+export type MountedImage = Pick<HTMLImageElement, 'complete' | 'naturalWidth' | 'naturalHeight'> & { decode?: () => Promise<void> }
+
+/**
+ * An <img> that may have finished before React attached its load and error
+ * handlers (server-rendered markup that loaded or failed before hydration).
+ * `complete` alone does not say it failed: a complete image with no size can be
+ * one whose request never reached us, or one not decoded yet. So it is decoded
+ * first, and decode() gives the real outcome: it resolves for an image that
+ * loaded and rejects for a broken one (including one that errored before
+ * hydration). The returned cleanup cancels a pending decode, so a candidate the
+ * tile has already moved past, or an unmounted tile, can never advance it.
+ */
+export function checkMountedImage(img: MountedImage | null, on: { load: (img: MountedImage) => void; fail: () => void }): () => void {
+  let cancelled = false
+  const cancel = () => { cancelled = true }
+  if (!img || !img.complete) return cancel
+  if (img.naturalWidth > 0) { on.load(img); return cancel }
+  if (typeof img.decode !== 'function') { on.fail(); return cancel }
+  img.decode().then(
+    () => { if (!cancelled) on.load(img) },
+    () => { if (!cancelled) on.fail() },
+  )
+  return cancel
+}
+
 type Props = {
   /** The project's target_domain. */
   domain: string | null | undefined
@@ -50,25 +76,33 @@ function Tile({ candidates, fallback, className, iconClassName, imgClassName }: 
   const src = candidates[index] ?? null
   const imgRef = useRef<HTMLImageElement>(null)
 
+  // Each candidate is settled once: its load or error event and the mount
+  // check below may both report it, and only the first may advance the index.
+  const settled = useRef<string | null>(null)
   const next = () => {
-    if (src) failed.add(src)
+    if (src) {
+      if (settled.current === src) return
+      settled.current = src
+      failed.add(src)
+    }
     setLoaded(false)
     setIndex((i) => i + 1)
   }
-  const onLoad = (img: HTMLImageElement) => {
+  const onLoad = (img: MountedImage) => {
+    if (src && settled.current === src) return
     // A page served as an icon does not decode (it errors); a 1x1 answer is not
     // an icon either. An SVG icon with only a viewBox decodes with no intrinsic
     // size in some browsers (0x0): it loaded, so it is shown.
-    if (isIconSize(img.naturalWidth, img.naturalHeight) || (isSvg(src) && img.naturalWidth === 0 && img.naturalHeight === 0)) setLoaded(true)
-    else next()
+    if (isIconSize(img.naturalWidth, img.naturalHeight) || (isSvg(src) && img.naturalWidth === 0 && img.naturalHeight === 0)) {
+      settled.current = src
+      setLoaded(true)
+    } else next()
   }
 
   // The image may have finished before React attached its handlers (server-rendered markup).
   useEffect(() => {
-    const img = imgRef.current
-    if (!img || !img.complete || loaded) return
-    if (img.naturalWidth > 0) onLoad(img)
-    else next()
+    if (loaded) return
+    return checkMountedImage(imgRef.current, { load: onLoad, fail: next })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src])
 
