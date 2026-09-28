@@ -28,12 +28,14 @@ export function siteInitial(domain: string | null | undefined, name?: string | n
 
 export type SiteAvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
+// Radii and letters on the token scales only (design contract §2, §4): a small
+// tile is a control-radius squircle, a larger one an inset, the largest a card.
 const SIZE: Record<SiteAvatarSize, { box: string; letter: string; pad: string }> = {
-  xs: { box: 'size-5 rounded', letter: 'text-[0.625rem]', pad: 'p-px' },
-  sm: { box: 'size-6 rounded-md', letter: 'text-[0.6875rem]', pad: 'p-0.5' },
-  md: { box: 'size-9 rounded-lg', letter: 'text-copy', pad: 'p-1.5' },
-  lg: { box: 'size-11 rounded-xl', letter: 'text-lg', pad: 'p-2' },
-  xl: { box: 'size-14 rounded-2xl', letter: 'text-2xl', pad: 'p-2.5' },
+  xs: { box: 'size-5 rounded-control', letter: 'text-overline', pad: 'p-px' },
+  sm: { box: 'size-6 rounded-control', letter: 'text-overline', pad: 'p-0.5' },
+  md: { box: 'size-9 rounded-control', letter: 'text-copy', pad: 'p-1.5' },
+  lg: { box: 'size-11 rounded-inset', letter: 'text-section', pad: 'p-2' },
+  xl: { box: 'size-14 rounded-card', letter: 'text-title', pad: 'p-2.5' },
 }
 
 type Props = {
@@ -56,9 +58,9 @@ export default function SiteAvatar({ domain, icon, name, size = 'md', tone = 'li
   const letterTone = tentative
     ? 'border border-dashed border-line-strong bg-surface text-muted'
     : tone === 'dark'
-      ? 'bg-white/10 text-contrast-ink ring-1 ring-white/15'
+      ? 'bg-contrast-ink/10 text-contrast-ink ring-1 ring-contrast-ink/15'
       : 'bg-action-soft text-action'
-  const plateTone = tone === 'dark' ? 'bg-white ring-1 ring-white/15' : 'bg-white ring-1 ring-line'
+  const plateTone = tone === 'dark' ? 'bg-plate ring-1 ring-contrast-ink/15' : 'bg-plate ring-1 ring-line'
   return (
     <SiteIcon
       domain={domain}

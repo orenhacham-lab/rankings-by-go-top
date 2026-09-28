@@ -57,9 +57,12 @@ async function main() {
     check('A2: the mark renders as a 28px SVG in the brand fill, with its name', isMark(svg), svg.slice(0, 160))
     check('MUT: a mark without its accessible name fails A2', !isMark(svg.replace(' aria-label="Go Top"', '')))
 
-    const wordmark = (src: string) => /text-\[0\.9375rem\] font-semibold[^"]*">Rankings</.test(src) && /text-overline font-medium text-rail-tagline">by Go Top</.test(src)
-    check('A3: the wordmark: "Rankings" 15px/600, "by Go Top" 11px in the tagline blue', wordmark(sidebar))
+    // 15px is the `lead` step of the type scale (globals.css), not a bracketed size.
+    const wordmark = (src: string) => /"text-lead font-semibold[^"]*">Rankings</.test(src) && /text-overline font-medium text-rail-tagline">by Go Top</.test(src)
+      && /--text-lead: 0\.9375rem;/.test(read('app/globals.css'))
+    check('A3: the wordmark: "Rankings" 15px/600 (text-lead), "by Go Top" 11px in the tagline blue', wordmark(sidebar))
     check('MUT: a wordmark in the muted grey fails A3', !wordmark(sidebar.replace('text-rail-tagline">by Go Top', 'text-rail-muted">by Go Top')))
+    check('MUT: the bracketed 15px back fails A3', !wordmark(sidebar.replace('"text-lead font-semibold', '"text-[0.9375rem] font-semibold')))
 
     // The icon files are the same drawing: blue mark, navy ground, rounded corners.
     const probe = async (png: Buffer) => {

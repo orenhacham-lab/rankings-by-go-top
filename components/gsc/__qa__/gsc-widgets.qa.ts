@@ -476,8 +476,13 @@ async function main() {
     check('D7: ready, top pages name the home page and decode paths, with clicks in words',
       top.includes(getDashboardDictionary('he').gscWidgets.topPages.homePage) && top.includes('/נעליים') && top.includes(esc(getDashboardDictionary('he').gscWidgets.topPages.clicks('700'))))
     const perf = render('en', createElement(GscPerformance, { projectId: 'p-ready' }))
-    check('D8: ready, performance shows the three totals and the change against the previous 28 days',
-      perf.includes('1,234') && perf.includes('56,789') && perf.includes('8.4') && perf.includes(esc(en.performance.vsPrevious)) && perf.includes('▲ 23%') && perf.includes('▲ 0.7') && !/<a\b/.test(perf))
+    // The change is a lucide arrow (not a ▲ glyph) in the ok tone, then the figure.
+    const up = (html: string, figure: string) =>
+      new RegExp(`data-gsc-delta="up" class="[^"]*text-ok[^"]*"><svg[^>]*lucide-arrow-up[\\s\\S]*?</svg><span class="sr-only">\\+</span>${figure.replace('.', '\\.')}</span>`).test(html)
+    const d8 = (html: string) =>
+      html.includes('1,234') && html.includes('56,789') && html.includes('8.4') && html.includes(esc(en.performance.vsPrevious)) && up(html, '23%') && up(html, '0.7') && !/[▲▼•]/.test(text(html)) && !/<a\b/.test(html)
+    check('D8: ready, performance shows the three totals and the change against the previous 28 days', d8(perf))
+    check('MUT: the ▲ glyph back instead of the arrow fails D8', !d8(perf.replace(/<svg[^>]*lucide-arrow-up[\s\S]*?<\/svg>/, '▲ ')))
     const kw = render('en', createElement(KeywordsHarness, { projectId: 'p-ready' }))
     check('D9: ready, the keyword line shows clicks · impressions, compact, with the full figures for screen readers',
       kw.includes('data-gsc-keyword="figures"') && kw.includes('1.5K') && kw.includes('34.6K') && kw.includes(esc(en.keywords.figures('1,500', '34,567'))))

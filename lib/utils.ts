@@ -14,7 +14,7 @@ import type { Locale } from '@/lib/i18n/locales'
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ['display', 'title', 'metric', 'section', 'copy', 'caption', 'overline'],
+      text: ['display', 'title', 'metric', 'section', 'lead', 'copy', 'caption', 'overline'],
       radius: ['card', 'inset', 'control', 'pill'],
       shadow: ['card', 'control', 'pop'],
     },
@@ -43,13 +43,6 @@ export function positionChange(current: number | null, previous: number | null):
   if (current === null || previous === null) return null
   // Lower position number = better ranking, so improvement = positive change
   return previous - current
-}
-
-export function getChangeLabel(change: number | null): string {
-  if (change === null) return '—'
-  if (change > 0) return `▲ ${change}`
-  if (change < 0) return `▼ ${Math.abs(change)}`
-  return '='
 }
 
 export function getEngineLabel(engine: string): string {

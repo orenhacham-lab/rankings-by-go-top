@@ -98,7 +98,7 @@ export default function TrialBar({ state }: { state: TrialBarState }) {
     >
       {/* One line on a phone too, so the strip stays 40px instead of wrapping to two. */}
       <div className="mx-auto flex min-h-10 w-full max-w-[1280px] items-center justify-between gap-x-3 py-1.5 sm:gap-x-4">
-        <p className="flex min-w-0 items-center gap-1.5 text-caption font-medium leading-5 sm:text-[0.8125rem]">
+        <p className="flex min-w-0 items-center gap-1.5 text-caption font-medium leading-5 sm:text-copy sm:leading-5">
           <Hourglass size={15} strokeWidth={2} aria-hidden className="me-0.5 shrink-0" />
           {sentence}
         </p>

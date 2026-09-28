@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import ChangeArrow, { ChangeSign } from './ChangeArrow'
 
 /**
  * One number, said the same way everywhere.
@@ -9,7 +10,8 @@ import { cn } from '@/lib/utils'
  * optional decoration: it names the data source or the time range ("Search
  * Console · 30 days"), which is the difference between a number and evidence.
  *
- * `delta` is a change against the previous period, coloured only by direction.
+ * `delta` is a change against the previous period, coloured only by direction:
+ * a lucide arrow and the number, in ok / bad / muted (never a ▲▼ glyph).
  *
  * Layout: the label and its icon on top, the figure large and tabular, the
  * source pinned to the bottom — so a row of tiles lines up
@@ -34,7 +36,7 @@ export default function StatTile({ label, value, source, delta, icon, empty, cla
       <div className="flex items-start justify-between gap-2">
         <span className="text-caption font-medium text-muted">{label}</span>
         {icon && (
-          <span className="-mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-sunk text-muted [&_svg]:size-4" aria-hidden="true">
+          <span className="-mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-control bg-sunk text-muted [&_svg]:size-4" aria-hidden="true">
             {icon}
           </span>
         )}
@@ -51,7 +53,9 @@ export default function StatTile({ label, value, source, delta, icon, empty, cla
                 delta.direction === 'flat' && 'bg-sunk text-muted'
               )}
             >
-              {delta.direction === 'up' ? '▲' : delta.direction === 'down' ? '▼' : '•'} {delta.value}
+              <ChangeArrow direction={delta.direction} />
+              <ChangeSign direction={delta.direction} />
+              {delta.value}
             </span>
           )}
         </div>

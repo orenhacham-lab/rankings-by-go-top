@@ -14,12 +14,24 @@
  *      internal paths only;
  *   F) content/Toast is ui/Toast (one look, one timing);
  *   G) the root <body> sits on the canvas tokens;
- *   H) none of the new primitives uses a raw palette colour, a banned size,
- *      shadow, radius or transition-all, or a glyph icon.
+ *   H) no file in components/ui or components/layout uses a raw palette colour,
+ *      a raw rgb()/white/black colour, a banned or bracketed size, an arbitrary
+ *      or banned shadow, a banned radius, transition-all, animate-pulse, or a
+ *      glyph icon (review G1/G2/R10/R11);
+ *   I) ui/Modal closes with a lucide X (size-4), no ✕ glyph; its backdrop is
+ *      the `backdrop` token;
+ *   J) a change reads as a lucide ArrowUp/ArrowDown/Minus in the ok/bad/muted
+ *      tone (StatTile delta, PositionChange), never ▲ ▼ •, with a spoken sign;
+ *   K) ui/Table's phone API (R15): `hideBelow` drops a column, `stackBelowSm`
+ *      stacks rows (title line, end cell, "label value" caption line), and a
+ *      table without it is the ordinary table;
+ *   L) ui/Skeleton covers the raw animate-pulse shapes (R34): a dark-surface
+ *      tone, inline blocks, a labelled stand-alone block, a StatTile and a
+ *      context-card skeleton, the contrast shimmer only without reduced motion.
  * Every check has a mutation control: the same predicate on a broken copy fails.
  *   npx tsx components/ui/__qa__/ui-primitives.qa.ts
  */
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -28,6 +40,11 @@ import Switch from '../Switch'
 import Segmented from '../Segmented'
 import Notice, { NoticeBox, NOTICE_MAX_ITEMS } from '../Notice'
 import BackLink from '../BackLink'
+import Modal from '../Modal'
+import StatTile from '../StatTile'
+import { PositionChange } from '../StatusBadge'
+import { Table, TableHead, TableBody, TableRow, Th, Td, TableMeta } from '../Table'
+import { Skeleton, StatTileSkeleton, ContextCardSkeleton, SkeletonRegion } from '../Skeleton'
 import { DashboardLanguageProvider } from '../../../lib/i18n/dashboard/useDashboardLanguage'
 
 let pass = 0, fail = 0
@@ -194,16 +211,140 @@ const count = (s: string, re: RegExp) => (s.match(new RegExp(re.source, re.flags
   check('MUT: the old slate body fails G1', !body(layout.replace('bg-canvas text-body', 'bg-slate-50 text-slate-900')))
 }
 
-// ── H) the primitives themselves stay on the contract ─────────────────────────
+// ── H) every primitive and the shell stay on the contract ─────────────────────
 {
-  const FILES = ['Checkbox', 'Switch', 'Segmented', 'Notice', 'BackLink'].map((n) => `components/ui/${n}.tsx`)
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const name of readdirSync(join(ROOT, dir))) {
+      const rel = `${dir}/${name}`
+      if (name === '__qa__') continue
+      if (statSync(join(ROOT, rel)).isDirectory()) walk(rel, out)
+      else if (/\.tsx?$/.test(name)) out.push(rel)
+    }
+    return out
+  }
+  const FILES = [...walk('components/ui'), ...walk('components/layout')]
   const RAW = /\b(?:bg|text|border|ring|from|to|via|fill|stroke|divide|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/
-  const BANNED = /\btext-(?:xs|sm|base|lg|xl|2xl)\b|\btext-\[\d|\bshadow-(?:sm|md|lg|xl|2xl)\b|\brounded-(?:md|lg|xl|2xl|3xl)\b|\btransition-all\b|\bdark:/
-  const GLYPH = /[✓✗✕↕▸◂▾→←•▦↶↷]|\p{Extended_Pictographic}/u
+  // Banned: Tailwind's own type scale or a bracketed size (the tokens are the
+  // scale), an arbitrary or stock shadow (only card/control/pop), a radius off
+  // the four tokens, a raw white/black or rgb() colour, a dark: twin, and the
+  // motions the contract rules out. (Checkbox's rounded-[5px] is the contract's.)
+  const BANNED = /\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b|\btext-\[\d|\bshadow-(?:sm|md|lg|xl|2xl)\b|\bshadow-\[|\brounded-(?:sm|md|lg|xl|2xl|3xl)\b|\brounded(?=[\s'"`])|(?:^|[\s'"`:])(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline)-(?:white|black)\b|\brgba?\(|\btransition-all\b|\banimate-pulse\b|\bhover:scale|\bdark:/
+  const GLYPH = /[✓✗✕↕▸◂▾→←•▦↶↷▲▼]|\p{Extended_Pictographic}/u
+  const why = (s: string) => [RAW.exec(s)?.[0], BANNED.exec(s)?.[0], GLYPH.exec(s)?.[0]].filter(Boolean).join(' ')
   const clean = (s: string) => !RAW.test(s) && !BANNED.test(s) && !GLYPH.test(s)
-  for (const f of FILES) check(`H: ${f} has no raw colour, banned size/shadow/radius or glyph`, clean(strip(read(f))))
+  const dirty = FILES.filter((f) => !clean(strip(read(f))))
+  check(`H: none of the ${FILES.length} ui/layout files has a raw colour, banned size/shadow/radius or glyph`, dirty.length === 0,
+    dirty.map((f) => `${f}: ${why(strip(read(f)))}`).join('; '))
+  const modal = strip(read('components/ui/Modal.tsx'))
   check('MUT: a raw blue in a primitive fails H', !clean(strip(read(FILES[0])) + ' bg-blue-600'))
-  check('MUT: a ✕ glyph in a primitive fails H', !clean(strip(read(FILES[3])) + ' ✕'))
+  check('MUT: a ✕ glyph in a primitive fails H', !clean(modal + ' ✕'))
+  check('MUT: the ▲ glyph in a primitive fails H', !clean(strip(read('components/ui/StatTile.tsx')) + " '▲'"))
+  check('MUT: a bracketed type size fails H', !clean(strip(read('components/layout/Header.tsx')) + ' text-[0.9375rem]'))
+  check('MUT: rounded-lg fails H', !clean(strip(read('components/ui/SiteAvatar.tsx')) + " 'size-9 rounded-lg'"))
+  check('MUT: an arbitrary rgb shadow fails H', !clean(strip(read('components/ui/Button.tsx')) + " 'shadow-[inset_0_1px_0_rgb(255_255_255/0.14)]'"))
+  check('MUT: bg-white fails H', !clean(strip(read('components/ui/SiteAvatar.tsx')) + " 'bg-white ring-1'"))
+  check('MUT: animate-pulse fails H', !clean(strip(read('components/ui/Skeleton.tsx')) + " 'animate-pulse'"))
+}
+
+// ── I) Modal ──────────────────────────────────────────────────────────────────
+{
+  const html = render(h(DashboardLanguageProvider as never, { initialLocale: 'en', children: h(Modal, { open: false, onClose: () => {}, title: 'Brief', children: 'x' }) } as never))
+  const closeOk = (s: string) => /<button[^>]*aria-label="Close"[^>]*>\s*<svg[^>]*class="[^"]*lucide-x[^"]*size-4/.test(s) && !s.includes('✕')
+  check('I1: the close control is a lucide X (size-4) in the icon button, with its spoken name', closeOk(html))
+  check('MUT: the ✕ glyph back fails I1', !closeOk(html.replace(/<svg[\s\S]*?<\/svg>/, '<span aria-hidden="true">✕</span>')))
+  const backdrop = (s: string) => /backdrop:bg-backdrop\b/.test(s) && !/backdrop:bg-\[/.test(s)
+  check('I2: the backdrop is the backdrop token', backdrop(html))
+  check('MUT: the raw rgb backdrop back fails I2', !backdrop(html.replace('backdrop:bg-backdrop', 'backdrop:bg-[rgb(21_23_28/0.42)]')))
+  const css = read('app/globals.css')
+  const token = (c: string) => /--color-backdrop: rgba\(21, 23, 28, 0\.42\);/.test(c) && /\.dark \{[\s\S]*?--color-backdrop: rgba\(0, 0, 0, 0\.6\);/.test(c) && /dialog::backdrop \{\s*background: var\(--color-backdrop\);/.test(c)
+  check('I3: globals.css defines the backdrop token (dimmer in dark) and dialog::backdrop uses it', token(css))
+  check('MUT: a raw dialog::backdrop colour fails I3', !token(css.replace('background: var(--color-backdrop);', 'background: rgba(21, 23, 28, 0.42);')))
+}
+
+// ── J) change arrows ──────────────────────────────────────────────────────────
+{
+  const tile = (direction: 'up' | 'down' | 'flat') => render(h(StatTile, { label: 'Avg', value: '7', delta: { value: '3', direction } }))
+  const text = (s: string) => s.replace(/<[^>]+>/g, '')
+  const arrow = (s: string, icon: string, tone: string) =>
+    new RegExp(`class="[^"]*${tone}[^"]*"><svg[^>]*class="[^"]*lucide-${icon}[^"]*size-3`).test(s) && !/[▲▼•]/.test(text(s))
+  check('J1: a StatTile delta is a lucide arrow in the ok/bad/muted tone, no glyph',
+    arrow(tile('up'), 'arrow-up', 'text-ok') && arrow(tile('down'), 'arrow-down', 'text-bad') && arrow(tile('flat'), 'minus', 'text-muted'))
+  check('MUT: the ▲ glyph instead of the arrow fails J1', !arrow(tile('up').replace(/<svg[\s\S]*?<\/svg>/, '▲ '), 'arrow-up', 'text-ok'))
+  const pc = (change: number | null) => render(h(PositionChange, { change }))
+  check('J2: PositionChange is a lucide arrow and the places, in ok/bad; a hold is a muted Minus',
+    arrow(pc(4), 'arrow-up', 'text-ok') && text(pc(4)).endsWith('4') && arrow(pc(-2), 'arrow-down', 'text-bad') && text(pc(-2)).endsWith('2')
+      && arrow(pc(0), 'minus', 'text-muted') && text(pc(null)) === '—')
+  check('MUT: the ▼ glyph back fails J2', !arrow(pc(-2).replace(/<svg[\s\S]*?<\/svg>/, '▼ '), 'arrow-down', 'text-bad'))
+  const spoken = (s: string, sign: string) => s.includes(`<span class="sr-only">${sign}</span>`)
+  check('J3: a screen reader hears the sign (+ / −) the arrow draws', spoken(pc(4), '+') && spoken(pc(-2), '−') && spoken(tile('up'), '+') && spoken(tile('down'), '−'))
+  check('MUT: an unspoken direction fails J3', !spoken(pc(4).replace('<span class="sr-only">+</span>', ''), '+'))
+  const utils = strip(read('lib/utils.ts'))
+  check('J4: lib/utils has no ▲▼ change label left', !/[▲▼]/.test(utils))
+  check('MUT: getChangeLabel\'s ▲ back fails J4', /[▲▼]/.test(utils + "\nreturn `▲ ${change}`"))
+}
+
+// ── K) Table on a phone ───────────────────────────────────────────────────────
+{
+  const row = (cells: unknown[]) => h(TableRow, { children: cells as never })
+  const table = (stackBelowSm: boolean) => render(h(Table, { stackBelowSm, children: [
+    h(TableHead, { key: 'h', children: row([h(Th, { key: 1, children: 'Page' }), h(Th, { key: 2, children: 'Clicks' }), h(Th, { key: 3, hideBelow: 'sm', children: 'CTR' }), h(Th, { key: 4 })]) }),
+    h(TableBody, { key: 'b', children: row([
+      h(Td, { key: 1, children: ['Home', h(TableMeta, { key: 'm', children: 'CTR 3%' })] }),
+      h(Td, { key: 2, label: 'Clicks', children: '12' }),
+      h(Td, { key: 3, hideBelow: 'sm', children: '3%' }),
+      h(Td, { key: 4, stack: 'end', children: 'menu' }),
+    ]) }),
+  ] }))
+  const stacked = table(true), plain = table(false)
+  const cell = (s: string, text: string) => s.match(new RegExp(`<td[^>]*>${text}`))?.[0] ?? ''
+  const head = (s: string) => /<thead class="[^"]*max-sm:hidden/.test(s)
+  const rowFlex = (s: string) => /<tbody[^>]*max-sm:block[\s\S]*?<tr class="[^"]*max-sm:flex max-sm:flex-wrap[^"]*max-sm:after:basis-full/.test(s)
+  const title = (s: string) => /data-stack="auto"[^>]*max-sm:first:flex-1[^>]*max-sm:first:text-ink/.test(cell(s, 'Home'))
+  const meta = (s: string) => { const c = cell(s, '12'); return /data-label="Clicks"/.test(c) && /max-sm:order-2/.test(c) && /max-sm:before:content-\[attr\(data-label\)\]/.test(c) }
+  const end = (s: string) => /data-stack="end"[^>]*max-sm:ms-auto/.test(cell(s, 'menu'))
+  const hidden = (s: string) => { const c = cell(s, '3%'); return /max-sm:hidden/.test(c) && !/max-sm:block/.test(c) }
+  check('K1: stackBelowSm hides the head and makes each row a wrapping line with a break', head(stacked) && rowFlex(stacked))
+  check('MUT: a visible head fails K1', !head(stacked.replace(/(<thead class="[^"]*)max-sm:hidden/, '$1')))
+  check('K2: the first cell is the title line, a labelled cell a "label value" meta, an end cell ends the title line', title(stacked) && meta(stacked) && end(stacked))
+  check('MUT: a cell without its label fails K2', !meta(stacked.replace('data-label="Clicks"', '')))
+  check('K3: hideBelow="sm" hides the column (it wins over the stacked display)', hidden(stacked) && hidden(plain) && /<th class="[^"]*max-sm:hidden[^"]*">CTR/.test(plain))
+  check('MUT: a hidden cell the stacked block overrides fails K3', !hidden(stacked.replace(/(<td[^>]*class="[^"]*)max-sm:hidden/, '$1max-sm:block')))
+  check('K4: TableMeta is a caption line shown only below sm', /<span class="mt-0\.5 block text-caption text-muted sm:hidden">CTR 3%<\/span>/.test(plain))
+  const ordinary = (s: string) => !/max-sm:(?:block|flex|order|before)|data-stack|data-label/.test(s)
+  check('K5: without stackBelowSm the table is the ordinary one (no stacked classes or data)', ordinary(plain))
+  check('MUT: stacked markup in a plain table fails K5', !ordinary(stacked))
+}
+
+// ── L) Skeleton family ────────────────────────────────────────────────────────
+{
+  const dark = render(h(Skeleton, { tone: 'contrast', className: 'h-4' }))
+  const inline = render(h(Skeleton, { inline: true, className: 'h-7 w-12' }))
+  const labelled = render(h(Skeleton, { inline: true, label: 'Volume on its way', className: 'h-3.5 w-14' }))
+  const tone = (s: string) => /class="skeleton-contrast /.test(s) && /aria-hidden="true"/.test(s)
+  check('L1: tone="contrast" shimmers in the contrast ink (for the dark hero)', tone(dark))
+  check('MUT: a light skeleton on the dark card fails L1', !tone(dark.replace('skeleton-contrast', 'skeleton')))
+  const inl = (s: string) => /inline-block align-middle/.test(s) && !/\bblock rounded/.test(s.replace('inline-block', ''))
+  check('L2: inline sits in a line or a StatTile value', inl(inline))
+  check('MUT: a block skeleton in a line fails L2', !inl(inline.replace('inline-block align-middle', 'block')))
+  const spoken = (s: string) => /<span role="status"[^>]*><span class="sr-only">Volume on its way<\/span><span aria-hidden="true"/.test(s)
+  check('L3: a stand-alone skeleton says what is loading to a screen reader', spoken(labelled))
+  check('MUT: an unlabelled stand-alone skeleton fails L3', !spoken(labelled.replace('Volume on its way', '')))
+  const tileSk = render(h(StatTileSkeleton, {}))
+  const hero = render(h(ContextCardSkeleton, { ring: true }))
+  const shapes = (t: string, c: string) => /rounded-card border border-line bg-surface p-4 shadow-card sm:p-5/.test(t) && (t.match(/class="skeleton /g) ?? []).length === 3
+    && /rounded-card[^"]*bg-contrast/.test(c) && (c.match(/skeleton-contrast/g) ?? []).length === 3 && /size-32/.test(c)
+  check('L4: a StatTile skeleton in the tile frame; a context-card skeleton on the navy surface', shapes(tileSk, hero))
+  check('MUT: a tile skeleton with no placeholders fails L4', !shapes(tileSk.replaceAll('class="skeleton ', 'class="'), hero))
+  const region = render(h(SkeletonRegion, { label: 'Loading', children: 'x' }))
+  check('L5: SkeletonRegion is a busy live region with one spoken sentence', /role="status" aria-busy="true"/.test(region) && /sr-only">Loading</.test(region))
+  const noPulse = (s: string) => !/animate-pulse/.test(s)
+  check('L6: no skeleton pulses (the shimmer is the one loop)', [dark, inline, labelled, tileSk, hero].every(noPulse))
+  check('MUT: a pulsing skeleton fails L6', ![dark + 'animate-pulse'].every(noPulse))
+  const css = read('app/globals.css').replace(/\/\*[\s\S]*?\*\//g, '')
+  const gated = (c: string) => /@media \(prefers-reduced-motion: no-preference\) \{\n  \.skeleton \{[^}]*\}\n  \.skeleton-contrast \{ animation: shimmer 1\.2s linear infinite; \}\n\}/.test(c)
+    && !/\n\.skeleton-contrast \{[^}]*animation/.test(c)
+  check('L7: the contrast shimmer runs only without reduced motion', gated(css))
+  check('MUT: an ungated contrast shimmer fails L7', !gated(css + '\n.skeleton-contrast { animation: shimmer 1.2s linear infinite; }'))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

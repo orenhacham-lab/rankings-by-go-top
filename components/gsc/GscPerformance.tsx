@@ -21,6 +21,7 @@
 import { MousePointerClick, Eye, ListOrdered } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/Card'
+import ChangeArrow, { ChangeSign } from '@/components/ui/ChangeArrow'
 import SectionHeading from '@/components/ui/SectionHeading'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -80,8 +81,9 @@ export default function GscPerformance({ projectId, className }: { projectId: st
                   <span className="h-4 text-overline text-muted">
                     {delta && (
                       <>
-                        <span className={cn('font-semibold tabular-nums', delta.direction === 'up' && 'text-ok', delta.direction === 'down' && 'text-bad')}>
-                          {delta.direction === 'up' ? '▲' : delta.direction === 'down' ? '▼' : '•'}{' '}
+                        <span data-gsc-delta={delta.direction} className={cn('inline-flex items-center gap-0.5 font-semibold tabular-nums', delta.direction === 'up' && 'text-ok', delta.direction === 'down' && 'text-bad')}>
+                          <ChangeArrow direction={delta.direction} />
+                          <ChangeSign direction={delta.direction} />
                           {delta.percent ? formatPercent(delta.size, language) : formatPosition(delta.size, language)}
                         </span>{' '}
                         {p.vsPrevious}

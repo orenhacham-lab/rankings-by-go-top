@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
  * open with (one per screen — it stops meaning "read this first" if repeated).
  *
  * `interactive` is for a card that IS a link or a button: only then does it
- * answer the pointer, with a stronger border and a slightly deeper shadow. A card
+ * answer the pointer, with a stronger border (never a lift or a deeper shadow). A card
  * that cannot be clicked does not pretend it can.
  */
 interface CardProps {
@@ -31,8 +31,9 @@ export function Card({ children, className, padding = true, tone = 'default', in
         tone === 'sunk' && 'bg-sunk border-line',
         // The context card: deep ink with one quiet cobalt glow in its top corner,
         // drawn on the card itself so it needs no extra element.
-        tone === 'ink' && 'overflow-hidden bg-contrast text-contrast-ink border-white/5 shadow-card bg-[radial-gradient(120%_140%_at_100%_0%,rgb(0_134_245/0.20),transparent_55%)] rtl:bg-[radial-gradient(120%_140%_at_0%_0%,rgb(0_134_245/0.20),transparent_55%)]',
-        interactive && 'cursor-pointer hover:border-line-strong hover:shadow-[0_1px_2px_rgb(28_25_18/0.05),0_10px_24px_-12px_rgb(28_25_18/0.16)]',
+        tone === 'ink' && 'overflow-hidden bg-contrast text-contrast-ink border-contrast-ink/5 shadow-card bg-[radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--color-brand)_20%,transparent),transparent_55%)] rtl:bg-[radial-gradient(120%_140%_at_0%_0%,color-mix(in_srgb,var(--color-brand)_20%,transparent),transparent_55%)]',
+        // Answering the pointer is the border only (contract §4: no card lift).
+        interactive && 'cursor-pointer hover:border-line-strong',
         padding && 'p-6',
         className
       )}
