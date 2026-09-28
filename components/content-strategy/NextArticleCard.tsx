@@ -35,6 +35,8 @@ import { generationErrorCopy } from '@/lib/content/strategy/copy'
 import { canRejectIdea, type IdeaTarget } from '@/lib/content/strategy/ideas'
 import { dateTile, fill } from './format'
 import type { BoardIdeaActions } from './StrategyBoard'
+import type { TopicInsight } from '@/lib/content/strategy/insights'
+import TopicFacts from './TopicFacts'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 
@@ -51,7 +53,7 @@ function originOf(next: NextArticle): StrategyOrigin {
 }
 
 export default function NextArticleCard({
-  next, hasArticles, lang, dict, idea = null, act = null, onOpenBrief, onCreateTopic, onGenerated, onError,
+  next, hasArticles, lang, dict, idea = null, act = null, insight = null, onOpenBrief, onCreateTopic, onGenerated, onError,
 }: {
   next: NextArticle | null
   hasArticles: boolean
@@ -60,6 +62,8 @@ export default function NextArticleCard({
   /** The board card the next article is, when it is an idea; with `act`, its actions show here. */
   idea?: IdeaTarget | null
   act?: BoardIdeaActions | null
+  /** What the research knows about its keyword (searches, need, audience, competitors); none until read. */
+  insight?: TopicInsight | null
   onOpenBrief: (prefill: { topic?: string; primaryKeyword?: string }) => void
   onCreateTopic: () => void
   onGenerated: () => void
@@ -170,6 +174,7 @@ export default function NextArticleCard({
           <div className="mt-4 rounded-control border border-white/10 bg-white/[0.04] p-4">
             <p className="text-caption font-semibold text-contrast-ink/60">{s.whyTitle}</p>
             <p className="mt-1 text-copy text-contrast-ink/90 [overflow-wrap:anywhere]">{why}</p>
+            {insight && <TopicFacts insight={insight} lang={lang} dict={dict} tone="ink" className="mt-3" />}
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">

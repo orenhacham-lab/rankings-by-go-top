@@ -4,7 +4,8 @@
  *  S) the scan's plan state from the latest seed run: none, building, ready, failed,
  *     and the stage-A topics shown as ideas until b4 is ready (row 0);
  *  B) the four columns and their dates, from the four tables (row 2);
- *  M) the month chips add up to "all", in the browser's time zone;
+ *  M) the month chips: only a plan date is a month, a chip's number is exactly what it
+ *     shows, and no month hides an idea (the 5-under-all, 4-under-September bug);
  *  N) the next article, in the order the product will actually write them (row 1);
  *  D) what the plan is built on: the scan's business profile, keywords, audiences,
  *     validated competitors and pages, and the keyword a scan topic targets;
@@ -21,7 +22,7 @@
  * Run: npx tsx lib/content/strategy/__qa__/content-strategy-board.qa.ts
  */
 import {
-  ALL_MONTHS, buildStrategyBoard, cardsInMonth, keywordForTopic, monthChips, monthKey, NO_SEED_PLAN, rankingIdeas, sameTopicKey, seedPlanFromRun,
+  ALL_MONTHS, buildStrategyBoard, cardsInMonth, keywordForTopic, monthChips, monthKey, monthPlan, NO_SEED_PLAN, planMonth, unscheduledCount, rankingIdeas, sameTopicKey, seedPlanFromRun,
   type RankingResultRow, type RankingTargetRow, type SeedPlan, type SeedRunLike, type StrategyBoard, type StrategyData, type StrategyQueueItem,
 } from '../board'
 import { generationErrorCopy } from '../copy'
@@ -154,22 +155,70 @@ function main() {
   }
 
   // ── M) months ─────────────────────────────────────────────────────────────
-  console.log('\nM) month chips')
+  console.log('\nM) month chips: a chip shows exactly its number, and no month hides an idea')
   {
     const chips = monthChips(board.cards, 'UTC')
     const all = chips[0]
     check('M1: "all" first, counting every card', all.key === ALL_MONTHS && all.count === board.cards.length)
     const months = chips.slice(1)
-    check('M2: then each month that has a card, oldest first',
-      months.map((c) => c.key).join() === '2026-08,2026-09,2026-10,2026-11', months.map((c) => `${c.key}:${c.count}`).join())
-    check('M3: the months add up to "all" when every card is dated', months.reduce((n, c) => n + c.count, 0) === all.count)
-    check('M4: a month shows exactly its cards', cardsInMonth(board.cards, '2026-10', 'UTC').map((c) => c.key).sort().join() === 'article:a1,topic:t1'
+    // 2026-09 is only the day two ideas were added: not a month of the plan.
+    check('M2: then each month the plan schedules something in, oldest first (not the days ideas were added)',
+      months.map((c) => c.key).join() === '2026-08,2026-10,2026-11', months.map((c) => `${c.key}:${c.count}`).join())
+    // The old reading: every card's date is its month, whatever the date means.
+    const byAnyDate = new Set(board.cards.map((c) => monthKey(c.date, 'UTC')))
+    check('M2-MUT: months from every card\'s date (an idea\'s "added") would list September', byAnyDate.has('2026-09'))
+    const exact = (cs: typeof chips) => cs.every((c) => c.count === cardsInMonth(board.cards, c.key, 'UTC').length)
+    check('M3: THE CONTRACT: every chip\'s number is exactly the cards it shows', exact(chips), chips.map((c) => `${c.key}:${c.count}/${cardsInMonth(board.cards, c.key, 'UTC').length}`).join())
+    check('M3-MUT: a chip that counts only its scheduled cards breaks the contract',
+      !exact(chips.map((c) => (c.key === ALL_MONTHS ? c : { key: c.key, count: board.cards.filter((x) => planMonth(x, 'UTC') === c.key).length }))))
+    check('M4: a month shows its scheduled cards and every card not scheduled yet',
+      cardsInMonth(board.cards, '2026-10', 'UTC').map((c) => c.key).sort().join() === 'article:a1,idea:i1,idea:i2,topic:t1,topic:t2'
       && cardsInMonth(board.cards, ALL_MONTHS, 'UTC').length === board.cards.length)
+    check('M4b: only a plan date is a month: an idea\'s or a waiting topic\'s "added" day is none',
+      planMonth({ dateKind: 'added', date: '2026-09-10T08:00:00.000Z' }, 'UTC') === null
+      && planMonth({ dateKind: 'publishTarget', date: '2026-10-14T07:00:00.000Z' }, 'UTC') === '2026-10'
+      && unscheduledCount(board.cards, 'UTC') === 3)
+    check('M4c: the plan by month: what went live, what is scheduled',
+      JSON.stringify(monthPlan(board.cards, 'UTC')) === JSON.stringify([
+        { key: '2026-08', published: 1, scheduled: 0 }, { key: '2026-10', published: 0, scheduled: 2 }, { key: '2026-11', published: 0, scheduled: 1 },
+      ]), JSON.stringify(monthPlan(board.cards, 'UTC')))
     check('M5: the month is the one in the time zone asked for',
       monthKey('2026-09-30T22:30:00.000Z', 'Asia/Jerusalem') === '2026-10' && monthKey('2026-09-30T22:30:00.000Z', 'UTC') === '2026-09')
     check('M6: an unreadable date has no month', monthKey('not a date', 'UTC') === null && monthKey(null) === null)
     const naive = (iso: string) => iso.slice(0, 7)
     check('M-MUT: slicing the UTC string gets M5 wrong in Israel', naive('2026-09-30T22:30:00.000Z') !== monthKey('2026-09-30T22:30:00.000Z', 'Asia/Jerusalem'))
+
+    // THE REGRESSION (the owner's report): five ideas under "all", four under September.
+    // One idea was added in August; September is on the chips because an article is
+    // scheduled in it. Under September, every idea must still be there (and with more
+    // ideas than a column shows, "swap" with them).
+    const five: StrategyData = {
+      ideas: [
+        { id: 'r1', title: 'Idea one', primaryKeyword: 'kw one', reason: null, score: 0.9, createdAt: '2026-08-28T08:00:00.000Z' },
+        { id: 'r2', title: 'Idea two', primaryKeyword: 'kw two', reason: null, score: 0.8, createdAt: '2026-09-02T08:00:00.000Z' },
+        { id: 'r3', title: 'Idea three', primaryKeyword: 'kw three', reason: null, score: 0.7, createdAt: '2026-09-03T08:00:00.000Z' },
+        { id: 'r4', title: 'Idea four', primaryKeyword: 'kw four', reason: null, score: 0.6, createdAt: '2026-09-04T08:00:00.000Z' },
+        { id: 'r5', title: 'Idea five', primaryKeyword: 'kw five', reason: null, score: 0.5, createdAt: '2026-09-05T08:00:00.000Z' },
+      ],
+      topics: [],
+      articles: [{ id: 'rs', topicId: null, title: 'Scheduled in September', status: 'scheduled', scheduledAt: '2026-09-29T08:00:00.000Z', publishedAt: null, createdAt: '2026-09-01T08:00:00.000Z' }],
+    }
+    const rb = buildStrategyBoard({ data: five, queue: null, seed: NO_SEED_PLAN })
+    const ideasIn = (cards: readonly { column: string }[]) => cards.filter((c) => c.column === 'ideas').length
+    const sept = monthChips(rb.cards, 'UTC').find((c) => c.key === '2026-09')
+    check('M7: 5 ideas under "all" stay 5 under the current month, and the chip says so',
+      ideasIn(cardsInMonth(rb.cards, ALL_MONTHS, 'UTC')) === 5 && ideasIn(cardsInMonth(rb.cards, '2026-09', 'UTC')) === 5
+      && !!sept && sept.count === cardsInMonth(rb.cards, '2026-09', 'UTC').length,
+      `all=${ideasIn(cardsInMonth(rb.cards, ALL_MONTHS, 'UTC'))} sept=${ideasIn(cardsInMonth(rb.cards, '2026-09', 'UTC'))} chip=${sept?.count}`)
+    // MUT: the filter this replaced (every card by its own date, "added" included).
+    const oldCardsInMonth = (cards: typeof rb.cards, month: string) => (month === ALL_MONTHS ? [...cards] : cards.filter((c) => monthKey(c.date, 'UTC') === month))
+    check('M7-MUT: filtering ideas by the day they were added shows 4 of the 5 under September', ideasIn(oldCardsInMonth(rb.cards, '2026-09')) === 4)
+    const six: StrategyData = { ...five, ideas: [...five.ideas, { id: 'r6', title: 'Idea six', primaryKeyword: 'kw six', reason: null, score: 0.4, createdAt: '2026-08-30T08:00:00.000Z' }] }
+    const sb = buildStrategyBoard({ data: six, queue: null, seed: NO_SEED_PLAN })
+    // The board offers swap while the ideas column holds more than it shows (5).
+    check('M8: with more ideas than a column shows, a month keeps them all, so "swap" stays',
+      ideasIn(cardsInMonth(sb.cards, '2026-09', 'UTC')) === 6)
+    check('M8-MUT: the old filter leaves September 4 of the 6 ideas (fewer than a column shows, so no swap)', ideasIn(oldCardsInMonth(sb.cards, '2026-09')) === 4)
   }
 
   // ── N) the next article ───────────────────────────────────────────────────

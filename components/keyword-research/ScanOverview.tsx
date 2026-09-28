@@ -9,7 +9,7 @@
  * X searches a month". The tiles under it repeat nothing: each is one number with
  * its source line, computed from the deduplicated research on screen.
  */
-import { Coins, KeyRound, Search, Swords } from 'lucide-react'
+import { Coins, KeyRound, Search, Sprout } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import StatTile from '@/components/ui/StatTile'
 import { cn } from '@/lib/utils'
@@ -121,7 +121,7 @@ export default function ScanOverview({
           label={t.tiles.easyWins}
           value={formatCount(easyWins, language)}
           source={t.tiles.easyWinsSource}
-          icon={<Swords size={16} strokeWidth={2} />}
+          icon={<Sprout size={16} strokeWidth={2} />}
           className="shadow-pop"
         />
       </div>
