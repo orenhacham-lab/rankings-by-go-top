@@ -205,7 +205,7 @@ export default function GuideMenu({ userId, accountCreatedAt }: { userId: string
         aria-controls={open ? menuId : undefined}
         aria-label={t.label}
         className={cn(
-          'relative inline-flex size-9 shrink-0 items-center justify-center gap-1.5 rounded-pill bg-action-soft text-[0.8125rem] font-semibold text-action',
+          'relative inline-flex size-9 shrink-0 items-center justify-center gap-1.5 rounded-pill bg-action-soft text-caption font-semibold text-action',
           'sm:size-auto sm:h-8 sm:px-3',
           'transition-colors duration-150 hover:bg-action hover:text-action-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
           open && 'bg-action text-action-ink',

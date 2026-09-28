@@ -5,7 +5,7 @@ import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm'
 
 export default function ForgotPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
       <ForgotPasswordForm />
     </Suspense>
   )

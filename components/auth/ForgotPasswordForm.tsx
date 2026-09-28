@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import AuthShell from '@/components/auth/AuthShell'
+import AuthShell, { AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
+import BackLink from '@/components/ui/BackLink'
+import { NoticeBox } from '@/components/ui/Notice'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { createClient } from '@/lib/supabase/client'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
@@ -43,24 +44,28 @@ export default function ForgotPasswordForm() {
   }
 
   return (
-    <AuthShell locale={lang} logoAlt={ui.logoAlt} subtitle={ui.subtitle}>
+    <AuthShell
+      locale={lang}
+      logoAlt={ui.logoAlt}
+      subtitle={ui.subtitle}
+      footer={ui.footer}
+      below={<BackLink href={authHref('login', lang)} className="ms-0">{ui.backToLogin}</BackLink>}
+    >
       {sentTo ? (
-        <div data-reset-sent>
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">{t.sentHeading}</h2>
-          <p role="status" className="text-slate-700 text-sm leading-relaxed">{t.sent(sentTo)}</p>
-          <button type="button" onClick={() => { setSentTo(null); setEmail('') }} className="mt-4 text-sm text-blue-600 font-medium hover:underline">
+        <div data-reset-sent className="space-y-4">
+          <h1 className={AUTH_TITLE_CLASSES}>{t.sentHeading}</h1>
+          <NoticeBox tone="ok" language={lang}>{t.sent(sentTo)}</NoticeBox>
+          <Button type="button" variant="secondary" size="md" className="w-full" onClick={() => { setSentTo(null); setEmail('') }}>
             {t.sendAgain}
-          </button>
+          </Button>
         </div>
       ) : (
-        <>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">{t.heading}</h2>
-          <p className="text-slate-600 text-sm mb-6">{t.intro}</p>
-          {error && (
-            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+        <div className="space-y-6">
+          <div className="space-y-1.5">
+            <h1 className={AUTH_TITLE_CLASSES}>{t.heading}</h1>
+            <p className="text-copy text-body">{t.intro}</p>
+          </div>
+          {error && <NoticeBox tone="bad" language={lang}>{error}</NoticeBox>}
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Input
               label={t.emailLabel}
@@ -76,13 +81,8 @@ export default function ForgotPasswordForm() {
               {t.submit}
             </Button>
           </form>
-        </>
+        </div>
       )}
-      <div className="mt-6 text-center pt-6 border-t border-slate-200">
-        <Link href={authHref('login', lang)} className="text-blue-600 text-sm font-medium hover:underline">
-          {ui.backToLogin}
-        </Link>
-      </div>
     </AuthShell>
   )
 }

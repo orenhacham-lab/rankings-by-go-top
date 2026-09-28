@@ -279,7 +279,7 @@ async function main() {
     const sw = code('components/layout/WorkspaceSwitcher.tsx')
     const anchored = (src: string) => (src.match(/data-onboarding="workspace"/g) ?? []).length === 4
     check('E1: every state the switcher renders carries the tour anchor (error, loading, first project, list)', anchored(sw))
-    check('E-MUT: a state without the anchor fails E1', !anchored(sw.replace('data-onboarding="workspace" className="text-sm text-muted"', 'className="text-sm text-muted"')))
+    check('E-MUT: a state without the anchor fails E1', !anchored(sw.replace('data-onboarding="workspace" className="text-copy text-muted"', 'className="text-copy text-muted"')))
     check('E2: the menu keeps a link to the project list, where inactive projects are',
       /href="\/projects"/.test(sw) && /\{t\.manage\}/.test(sw))
     // The tour moved to the Guide pill (lib/guide/tours.ts, components/guide/GuideMenu.tsx);

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -13,6 +12,10 @@ import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboar
 import { keepSeedClaim, seedClaimDestination } from './claim-action'
 import { CLAIM_START_PATH } from '@/lib/onboarding/claim-start'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import AuthShell, { AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
+import Badge from '@/components/ui/Badge'
+import Checkbox from '@/components/ui/Checkbox'
+import { NoticeBox } from '@/components/ui/Notice'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 
 const SIGNUP_UI = {
@@ -446,186 +449,120 @@ export function SignupForm() {
   }
 
   return (
-    <main dir={isEn ? 'ltr' : 'rtl'} className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Image
-              src="/gotop-primary.png"
-              alt={t.logoAlt}
-              width={160}
-              height={64}
-              className="h-16 w-auto object-contain"
-              sizes="(max-width: 768px) 128px, 160px"
-              priority
-            />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800">Rankings by Go Top</h1>
-          <p className="text-slate-600 mt-1 text-sm">{t.subtitle}</p>
+    <AuthShell
+      locale={lang}
+      logoAlt={t.logoAlt}
+      subtitle={t.subtitle}
+      footer={t}
+      below={
+        <p>
+          {t.alreadyHaveAccount}{' '}
+          <Link href={authHref('login', lang)} className={AUTH_LINK_CLASSES}>
+            {t.signIn}
+          </Link>
+        </p>
+      }
+    >
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <Badge variant="success">{t.trialBadge}</Badge>
+          <h1 className={AUTH_TITLE_CLASSES}>{t.heading}</h1>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          {/* Trial badge */}
-          <div className="mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-green-600" />
-            {t.trialBadge}
-          </div>
+        {error && <NoticeBox tone="bad" language={lang}>{error}</NoticeBox>}
 
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">{t.heading}</h2>
+        {success && <NoticeBox tone="ok" language={lang}>{success}</NoticeBox>}
 
-          {error && (
-            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+        {/* Off unless NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED. Held while a free-check claim is still being
+            kept (it leaves the address once its cookie is set), so the claim survives the trip to Google. */}
+        <GoogleSignInButton lang={lang} nextPath="/dashboard" disabled={searchParams.has('claim')} />
 
-          {success && (
-            <div role="status" className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-              {success}
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <Input
+            label={t.fullName}
+            type="text"
+            value={formData.fullName}
+            onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+            placeholder={t.fullNamePlaceholder}
+            required
+            autoComplete="name"
+          />
 
-          {/* Off unless NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED. Held while a free-check claim is still being
-              kept (it leaves the address once its cookie is set), so the claim survives the trip to Google. */}
-          <GoogleSignInButton lang={lang} nextPath="/dashboard" disabled={searchParams.has('claim')} />
+          <Input
+            label={t.email}
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            placeholder={t.emailPlaceholder}
+            required
+            autoComplete="email"
+          />
 
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <Input
-              label={t.fullName}
-              type="text"
-              value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              placeholder={t.fullNamePlaceholder}
-              required
-              autoComplete="name"
-            />
+          <Input
+            label={t.companyName}
+            type="text"
+            value={formData.companyName}
+            onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+            placeholder={t.companyNamePlaceholder}
+            required
+            autoComplete="organization"
+          />
 
-            <Input
-              label={t.email}
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder={t.emailPlaceholder}
-              required
-              autoComplete="email"
-            />
+          <Input
+            label={t.phone}
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => handlePhoneChange(e.target.value)}
+            placeholder={t.phonePlaceholder}
+            required
+            autoComplete="tel"
+          />
 
-            <Input
-              label={t.companyName}
-              type="text"
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              placeholder={t.companyNamePlaceholder}
-              required
-              autoComplete="organization"
-            />
+          <Input
+            label={t.password}
+            type="password"
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            placeholder={t.passwordPlaceholder}
+            required
+            autoComplete="new-password"
+          />
 
-            <Input
-              label={t.phone}
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              placeholder={t.phonePlaceholder}
-              required
-              autoComplete="tel"
-            />
+          <Input
+            label={t.confirmPassword}
+            type="password"
+            value={formData.confirmPassword}
+            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+            placeholder={t.confirmPasswordPlaceholder}
+            required
+            autoComplete="new-password"
+          />
 
-            <Input
-              label={t.password}
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder={t.passwordPlaceholder}
-              required
-              autoComplete="new-password"
-            />
+          <Checkbox
+            id="terms"
+            checked={formData.termsAccepted}
+            onChange={(checked) => setFormData({ ...formData, termsAccepted: checked })}
+            label={t.termsCheckbox}
+            className="pt-1"
+          />
 
-            <Input
-              label={t.confirmPassword}
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              placeholder={t.confirmPasswordPlaceholder}
-              required
-              autoComplete="new-password"
-            />
-
-            {/* Terms checkbox */}
-            <div className="flex items-start gap-3 pt-2">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={formData.termsAccepted}
-                onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
-                className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label htmlFor="terms" className="text-sm text-slate-600 cursor-pointer flex-1">
-                {t.termsCheckbox}
-              </label>
-            </div>
-
-            <Button
-              type="submit"
-              loading={loading}
-              className="w-full mt-2"
-              size="lg"
-            >
-              {t.signupBtn}
-            </Button>
-          </form>
-        </div>
-
-        {/* Sign in link */}
-        <div className="mt-6 text-center">
-          <p className="text-slate-600 text-sm">
-            {t.alreadyHaveAccount}{' '}
-            <Link
-              href={authHref('login', lang)}
-              className="text-blue-600 font-medium hover:underline"
-            >
-              {t.signIn}
-            </Link>
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-slate-200 text-center text-slate-500 text-xs space-y-2">
-          <div className="flex items-center justify-center gap-3">
-            <Link href={t.accessibilityHref} className="hover:text-slate-700 transition-colors">
-              {t.accessibility}
-            </Link>
-            <span>•</span>
-            <Link href={t.privacyHref} className="hover:text-slate-700 transition-colors">
-              {t.privacy}
-            </Link>
-            <span>•</span>
-            <Link href={t.articlesHref} className="hover:text-slate-700 transition-colors">
-              {t.articles}
-            </Link>
-          </div>
-          <p>
-            Rankings by
-            <a
-              href="https://www.gotop.co.il"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline mx-1"
-            >
-              Go Top
-            </a>
-            &copy; {new Date().getFullYear()}
-          </p>
-        </div>
+          <Button
+            type="submit"
+            loading={loading}
+            className="w-full"
+            size="lg"
+          >
+            {t.signupBtn}
+          </Button>
+        </form>
       </div>
-    </main>
+    </AuthShell>
   )
 }
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
       <SignupForm />
     </Suspense>
   )

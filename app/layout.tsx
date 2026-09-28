@@ -155,7 +155,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
+      <body className="min-h-full bg-canvas text-body antialiased overflow-x-hidden">
         {/* Google Tag Manager (noscript) - must be first element in body */}
         <div
           suppressHydrationWarning

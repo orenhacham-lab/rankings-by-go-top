@@ -232,7 +232,9 @@ async function main() {
     check(`D1: ${SCREENS.length} auth/onboarding/dashboard files render no literal text or label (brand names aside)`, found.length === 0, found.slice(0, 8).join(' | '))
     const login = read('app/(auth)/login/page.tsx')
     check('MUTATION CONTROL: a literal "Forgot password?" on the sign-in page is caught', hardCoded(login.replace('</form>', '<p>Forgot password?</p></form>')).length === 1)
-    check('MUTATION CONTROL: the old alt="Go Top logo" is caught', hardCoded(login.replace('alt={t.logoAlt}', 'alt="Go Top logo"')).length === 1)
+    // The logo is drawn by the shared auth frame now; its alt comes from the page's dictionary.
+    const shell = read('components/auth/AuthShell.tsx')
+    check('MUTATION CONTROL: the old alt="Go Top logo" is caught', hardCoded(shell.replace('alt={logoAlt}', 'alt="Go Top logo"')).length === 1)
     check('MUTATION CONTROL: a Hebrew literal label is caught', hardCoded('<button aria-label="סגור">x</button>').length === 1)
     check('MUTATION CONTROL: the old Hebrew-only priority tooltip is caught', hardCoded('<span role="tooltip">\n  התגית מציינת עדיפות למעקב, לא ציון הסריקה.\n</span>').length === 1)
     check('…while code such as `(s) => s.rate < 60` is not text', hardCoded('xs.filter((s) => s.rate < 60)').length === 0)

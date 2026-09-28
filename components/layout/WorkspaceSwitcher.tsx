@@ -137,14 +137,14 @@ export default function WorkspaceSwitcher() {
   // a different fact and offers no way forward.
   if (isResolved && projectsError) {
     return (
-      <button type="button" data-onboarding="workspace" onClick={reloadProjects} className="text-sm text-muted hover:text-ink">
+      <button type="button" data-onboarding="workspace" onClick={reloadProjects} className="text-copy text-muted hover:text-ink">
         {t.loadError}
       </button>
     )
   }
 
   if (!isResolved) {
-    return <span data-onboarding="workspace" className="text-sm text-muted">{t.loading}</span>
+    return <span data-onboarding="workspace" className="text-copy text-muted">{t.loading}</span>
   }
 
   if (projects.length === 0) {
@@ -152,7 +152,7 @@ export default function WorkspaceSwitcher() {
       <Link
         href="/projects/new"
         data-onboarding="workspace"
-        className="inline-flex items-center gap-1.5 rounded-control bg-action px-3 py-1.5 text-sm font-semibold text-action-ink hover:bg-action-hover"
+        className="inline-flex items-center gap-1.5 rounded-control bg-action px-3 py-1.5 text-copy font-semibold text-action-ink hover:bg-action-hover"
       >
         <Plus size={15} strokeWidth={2.5} />
         {t.createFirst}
@@ -197,13 +197,13 @@ export default function WorkspaceSwitcher() {
                 aria-controls={listId}
                 aria-label={t.searchPlaceholder}
                 placeholder={t.searchPlaceholder}
-                className="w-full bg-transparent text-sm text-ink placeholder-muted focus:outline-none"
+                className="w-full bg-transparent text-copy text-ink placeholder-muted focus:outline-none"
               />
             </div>
           )}
 
           {filtered.length === 0 && (
-            <p className="px-4 py-3 text-sm text-muted">{t.noMatches}</p>
+            <p className="px-4 py-3 text-copy text-muted">{t.noMatches}</p>
           )}
           <ul id={listId} role="listbox" aria-label={t.listLabel} onKeyDown={onListKey} className="max-h-72 overflow-y-auto p-1 empty:hidden">
             {filtered.map((p, i) => {
@@ -219,7 +219,7 @@ export default function WorkspaceSwitcher() {
                     onFocus={() => setFocusIndex(i)}
                     onClick={() => { setActiveProject(p.id); setOpen(false) }}
                     className={cn(
-                      'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-start text-copy transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action',
+                      'flex w-full items-center justify-between gap-2 rounded-inset px-3 py-2 text-start text-copy transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action',
                       isCurrent ? 'bg-action-soft font-semibold text-action' : 'text-body hover:bg-sunk hover:text-ink focus-visible:bg-sunk focus-visible:text-ink'
                     )}
                   >
@@ -243,7 +243,7 @@ export default function WorkspaceSwitcher() {
                 tabIndex={0}
                 aria-disabled="true"
                 aria-describedby={limitId}
-                className="flex cursor-not-allowed items-center gap-2 text-sm font-semibold text-muted"
+                className="flex cursor-not-allowed items-center gap-2 text-copy font-semibold text-muted"
               >
                 <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
                 {t.create}
@@ -268,7 +268,7 @@ export default function WorkspaceSwitcher() {
               <Link
                 href="/projects/new"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-action hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action"
+                className="flex items-center gap-2 rounded-control px-3 py-2 text-copy font-semibold text-action hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 {t.create}
@@ -280,7 +280,7 @@ export default function WorkspaceSwitcher() {
             <Link
               href="/projects"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-1.5 rounded-control px-3 py-2 text-xs text-muted hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action"
+              className="flex items-center gap-1.5 rounded-control px-3 py-2 text-caption text-muted hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action"
             >
               <Settings2 size={14} />
               {t.manage}

@@ -2298,6 +2298,10 @@ export const dashboardEn = {
     },
     loadError: 'We could not load this part.',
   },
+  /** Shared ui/ primitives (components/ui/**). */
+  uiKit: {
+    noticeMore: '{n} more',
+  },
   common: {
     close: 'Close',
     menu: 'Menu',

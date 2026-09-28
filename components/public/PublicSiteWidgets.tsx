@@ -38,6 +38,11 @@ const NON_PUBLIC_PREFIXES = [
   '/signup',
   '/en/login',
   '/en/signup',
+  // The password-reset pages are auth screens too: nothing floats over their form.
+  '/forgot-password',
+  '/reset-password',
+  '/en/forgot-password',
+  '/en/reset-password',
 ]
 
 function isNonPublicArea(pathname: string | null): boolean {
