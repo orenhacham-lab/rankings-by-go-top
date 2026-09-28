@@ -9,7 +9,10 @@
  *      on FakeAdmin: each account resolves as in A, another user's trial never
  *      leaks, a failed read hides the bar, and nothing at all is written.
  *   C) the component renders the answer in the dashboard's language, links to
- *      the billing screen, and leaves the link out on the billing screen.
+ *      the billing screen, and leaves the link out on the billing screen. Its
+ *      look is the UX review's P1-1: navy strip, the day count in the warm
+ *      badge, "Upgrade now" in the action colour (never amber), urgent dark red
+ *      in the last three days, hideable for 24 hours unless the trial ended.
  *   D) source guards: the layout reads the bar for the session's own user, the
  *      bar module writes nothing and names no plan price or quota, and the bar
  *      uses the design tokens (logical sides, token colours).
@@ -164,23 +167,39 @@ async function main() {
       renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: locale }, createElement(TrialBar, { state })))
 
     const he = render({ kind: 'active', daysLeft: 5 }, 'he')
-    check('C1: Hebrew — "נותרו 5 ימים בתקופת הניסיון החינמית שלך" and "שדרג עכשיו"', he.includes('נותרו 5 ימים בתקופת הניסיון החינמית שלך') && he.includes('שדרג עכשיו'), he.slice(0, 300))
+    const text = (h: string) => h.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    check('C1: Hebrew — "נותרו 5 ימים לתקופת הניסיון" (the number in the badge) and "שדרגו עכשיו"',
+      text(he).includes('נותרו 5 ימים לתקופת הניסיון') && /data-trial-days=""[^>]*>5<\/span>/.test(he) && he.includes('שדרגו עכשיו'), text(he))
+    check('C1-MUT: the old singular "שדרג עכשיו" / "שלך" wording fails C1',
+      !(text(he.replace('שדרגו עכשיו', 'שדרג עכשיו')).includes('שדרגו עכשיו')))
     check('C2: the button links to the existing billing screen', /<a [^>]*href="\/billing"[^>]*data-trial-upgrade/.test(he) || /<a [^>]*data-trial-upgrade[^>]*href="\/billing"/.test(he), he)
     const en = render({ kind: 'active', daysLeft: 5 }, 'en')
-    check('C3: English — "5 days left in your free trial" and "Upgrade now", and no Hebrew', en.includes('5 days left in your free trial') && en.includes('Upgrade now') && !/[֐-׿]/.test(en), en.slice(0, 300))
-    check('C4: Hebrew two days reads "יומיים"', render({ kind: 'active', daysLeft: 2 }, 'he').includes('נותרו יומיים'))
+    check('C3: English — "5 days left in your free trial" and "Upgrade now", and no Hebrew', text(en).includes('5 days left in your free trial') && en.includes('Upgrade now') && !/[֐-׿]/.test(en), text(en))
+    check('C4: no singular form of address and no em-dash in the Hebrew bar, in any state',
+      (['active', 'last_day', 'expired'] as const).every((k) => { const h = text(render(k === 'active' ? { kind: k, daysLeft: 5 } : { kind: k }, 'he')); return !/שלך|שדרג |—/.test(h) }))
     check('C5: the last day has its own wording in both languages',
-      render({ kind: 'last_day' }, 'he').includes('זה היום האחרון בתקופת הניסיון החינמית שלך') && render({ kind: 'last_day' }, 'en').includes('This is the last day of your free trial'))
+      render({ kind: 'last_day' }, 'he').includes('זה היום האחרון של תקופת הניסיון') && render({ kind: 'last_day' }, 'en').includes('This is the last day of your free trial'))
     check('C6: an ended trial has its own wording in both languages, still with the way to upgrade',
-      render({ kind: 'expired' }, 'he').includes('תקופת הניסיון החינמית שלך הסתיימה') && render({ kind: 'expired' }, 'en').includes('Your free trial has ended') && render({ kind: 'expired' }, 'en').includes('href="/billing"'))
+      render({ kind: 'expired' }, 'he').includes('תקופת הניסיון הסתיימה') && render({ kind: 'expired' }, 'en').includes('Your free trial has ended') && render({ kind: 'expired' }, 'en').includes('href="/billing"'))
     check('C7: hidden renders nothing at all', render({ kind: 'hidden' }, 'he') === '' && render({ kind: 'hidden' }, 'en') === '')
-    check('C8: the calm state uses info tokens, the urgent ones warn tokens',
-      /data-trial-bar="active"[^>]*class="[^"]*bg-info-soft/.test(he) || /class="[^"]*bg-info-soft[^"]*"[^>]*data-trial-bar="active"/.test(he)
-      ? render({ kind: 'last_day' }, 'he').includes('bg-warn-soft') && !render({ kind: 'last_day' }, 'he').includes('bg-info-soft')
-      : false, he.slice(0, 200))
+    const cls = (h: string) => /data-trial-bar="[^"]*"[^>]*class="([^"]*)"/.exec(h)?.[1] ?? /class="([^"]*)"[^>]*data-trial-bar=/.exec(h)?.[1] ?? ''
+    const calm = cls(he), urgent3 = cls(render({ kind: 'active', daysLeft: 3 }, 'he')), last = cls(render({ kind: 'last_day' }, 'he')), ended = cls(render({ kind: 'expired' }, 'he'))
+    const stateColours = (c: string, u: string, l: string, e: string) =>
+      /(^| )bg-contrast( |$)/.test(c) && [u, l, e].every((x) => /(^| )bg-contrast-urgent( |$)/.test(x)) && [c, u, l, e].every((x) => x.includes('text-contrast-ink'))
+    check('C8: navy (contrast) with more than 3 days left; the urgent dark red for 3 days or less, the last day and an ended trial',
+      stateColours(calm, urgent3, last, ended), JSON.stringify({ calm, urgent3, last, ended }))
+    check('C8-MUT: an urgent state still in navy fails C8', !stateColours(calm, calm, last, ended))
+    const cta = /<a [^>]*data-trial-upgrade[^>]*>/.exec(he)?.[0] ?? ''
+    const ctaOk = (a: string) => /bg-action /.test(a) && /text-action-ink/.test(a) && /h-7/.test(a) && !/commit/.test(a)
+    check('C8b: "Upgrade now" is white on the action colour, 28px, never the amber commit colour (UX review P1-1)', ctaOk(cta), cta)
+    check('C8b-MUT: the old amber button fails C8b', !ctaOk(cta.replace('bg-action ', 'bg-commit ')))
+    check('C8c: the day count sits in the warm trial badge', /data-trial-days=""[^>]*class="[^"]*bg-commit[^"]*text-commit-ink/.test(he))
+    const hideOk = (active: string, expired: string) => /data-trial-hide/.test(active) && !/data-trial-hide/.test(expired)
+    check('C8d: days left can be hidden for 24 hours; an ended trial cannot', hideOk(he, render({ kind: 'expired' }, 'he')))
+    check('C8d-MUT: a hide button on the ended trial fails C8d', !hideOk(he, he))
     PATHNAME = '/billing'
     const onBilling = render({ kind: 'active', daysLeft: 5 }, 'he')
-    check('C9: on the billing screen the sentence stays and the link goes', onBilling.includes('נותרו 5 ימים') && !onBilling.includes('data-trial-upgrade'))
+    check('C9: on the billing screen the sentence stays and the link goes', text(onBilling).includes('נותרו 5 ימים') && !onBilling.includes('data-trial-upgrade'))
     PATHNAME = '/dashboard'
     Mod._load = origLoad
   }
@@ -202,8 +221,8 @@ async function main() {
     const PHYSICAL = /(?<![\w-])(?:-?m[lr]|p[lr]|-?left|-?right|border-[lr]|rounded-[lr])-[\w[]|(?<![\w-])text-(?:left|right)\b/
     const RAW_COLOUR = /(?<![\w-])(?:bg|text|border)-(?:red|blue|green|yellow|amber|orange|slate|gray|indigo)-\d{2,3}\b|#[0-9a-fA-F]{3,6}\b/
     check('D3: the bar uses logical sides and design tokens only (no raw palette or hex colours)', !PHYSICAL.test(bar) && !RAW_COLOUR.test(bar), PHYSICAL.exec(bar)?.[0] ?? RAW_COLOUR.exec(bar)?.[0])
-    check('MUTATION CONTROL: a raw amber background is caught', RAW_COLOUR.test(bar.replace('bg-warn-soft', 'bg-amber-50')))
-    check('MUTATION CONTROL: a physical margin is caught', PHYSICAL.test(bar.replace('gap-2', 'ml-2')))
+    check('MUTATION CONTROL: a raw amber background is caught', RAW_COLOUR.test(bar.replace("'bg-contrast'", "'bg-amber-50'")))
+    check('MUTATION CONTROL: a physical margin is caught', PHYSICAL.test(bar.replace('me-0.5', 'ml-0.5')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

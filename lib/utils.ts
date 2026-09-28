@@ -66,8 +66,8 @@ export function getDeviceLabel(device: string | null | undefined): string {
 
 export function getSearchTypeLabel(engine: string, device: string | null | undefined): string {
   if (engine === 'google_search') {
-    if (device === 'mobile') return 'גוגל אורגני — מובייל'
-    return 'גוגל אורגני — מחשב'
+    if (device === 'mobile') return 'גוגל אורגני · מובייל'
+    return 'גוגל אורגני · מחשב'
   }
   if (engine === 'google_maps') return 'גוגל מפות'
   return engine

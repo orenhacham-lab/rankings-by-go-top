@@ -69,7 +69,7 @@ const PAIRS: [string, string][] = [
   ['action-ink', 'action'], ['commit-ink', 'commit'], ['action', 'surface'],
   ['ok', 'surface'], ['warn', 'surface'], ['bad', 'surface'], ['info', 'surface'],
   ['ok', 'ok-soft'], ['warn', 'warn-soft'], ['bad', 'bad-soft'], ['info', 'info-soft'],
-  ['contrast-ink', 'contrast'], ['rail-ink', 'rail'], ['rail-muted', 'rail'],
+  ['contrast-ink', 'contrast'], ['contrast-ink', 'contrast-urgent'], ['rail-ink', 'rail'], ['rail-muted', 'rail'],
   // The navy rail (UX review, decision 2): group titles, the tagline under the
   // wordmark, white on the filled active tab, and the action as text on the
   // canvas and on its own soft tint.

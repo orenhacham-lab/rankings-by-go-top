@@ -107,6 +107,8 @@
      Its own token, because it must stay dark in dark mode instead of inverting. */
   --color-contrast: #0a1b3d;
   --color-contrast-ink: #f5f6f8;
+  /* The same dark strip when time is short (the trial bar's last three days). */
+  --color-contrast-urgent: #7a2e0e;
 
   /* Loading placeholders: a quiet two-stop shimmer (see .skeleton). */
   --color-skeleton: #eef1f6;
@@ -319,6 +321,7 @@
 
   --color-contrast: #0f2247;
   --color-contrast-ink: #f5f6f8;
+  --color-contrast-urgent: #7a2e0e;
 
   --color-skeleton: #1b1f28;
   --color-skeleton-shine: #252a35;
