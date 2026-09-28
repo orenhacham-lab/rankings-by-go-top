@@ -61,7 +61,7 @@ console.log('A) the full tour is the review\'s eight steps; every step is short,
   check('A3: every step has a Hebrew title of ≤ 5 words and one line', badText(dashboardHe.guide.steps).length === 0, badText(dashboardHe.guide.steps).join(','))
   check('A3: every step has an English title of ≤ 5 words and one line',
     badText(dashboardEn.guide.steps as unknown as typeof dashboardHe.guide.steps).length === 0)
-  check('A3-MUT: a six-word title fails A3', badText({ ...dashboardHe.guide.steps, switcher: { title: 'אחת שתיים שלוש ארבע חמש שש', body: 'x' } }).includes('switcher'))
+  check('A3-MUT: a six-word title fails A3', badText({ ...dashboardHe.guide.steps, switcher: { title: 'אחת שתיים שלוש ארבע חמש שש', body: 'x' } } as unknown as typeof dashboardHe.guide.steps).includes('switcher'))
   check('A4: the Hebrew steps are Hebrew and the English steps English',
     Object.values(dashboardHe.guide.steps).every((s) => /[א-ת]/.test(s.title))
     && Object.values(dashboardEn.guide.steps).every((s) => !/[א-ת]/.test(s.title + s.body)))
