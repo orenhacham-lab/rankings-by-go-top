@@ -169,7 +169,8 @@ async function main() {
     check('D8: MUT a filter that never drops would keep renovation for a plumber (the rule is load-bearing)', noRule !== src)
     const Rmut = (() => {
       const { writeFileSync, unlinkSync } = require('fs') as typeof import('fs')
-      const p = join(ROOT, 'lib/ai-visibility/.qa-mut-clarity-question-relevance.ts')
+      // In __qa__, which the tree walkers of other suites skip (a race otherwise).
+      const p = join(ROOT, 'lib/ai-visibility/__qa__/.qa-mut-clarity-question-relevance.ts')
       writeFileSync(p, noRule)
       try { return require(p) as typeof R } finally { unlinkSync(p) }
     })()
