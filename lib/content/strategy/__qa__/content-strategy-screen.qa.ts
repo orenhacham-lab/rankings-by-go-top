@@ -45,6 +45,18 @@ function main() {
     check('C1-MUT: a hook that also asks the recommendation engine fails C1',
       !readsThree(hook.replace("seed: (projectId: string) =>", "reco: (projectId: string) => `/api/content/automation/recommendations?p=${projectId}`,\n  seed: (projectId: string) =>")))
     check('C1-MUT2: a hook that POSTs fails C1', !readsThree(hook.replace("{ cache: 'no-store' }", "{ cache: 'no-store', method: 'POST' }")))
+    // The rankings' ideas: two reads through the owner's own session (row-level security), nothing else.
+    const ranking = src['useRankingIdeas.ts']
+    const readsRankings = (s: string) => JSON.stringify([...s.matchAll(/\.from\('([^']+)'\)/g)].map((m) => m[1])) === JSON.stringify(['tracking_targets', 'scan_results'])
+      && /import \{ createClient \} from '@\/lib\/supabase\/client'/.test(s) && !/createAdminClient|fetch\(|\.(insert|update|upsert|delete|rpc)\(/.test(s)
+      && /\.eq\('project_id', projectId\)/.test(s)
+    check('C1b: the rankings are read from the tracked keywords and their checks, through the owner\'s session, read-only', readsRankings(ranking))
+    check('C1b-MUT: a hook that writes, or reads with the service role, fails C1b',
+      !readsRankings(ranking + "\ndb.from('tracking_targets').update({ seen: true })") && !readsRankings(ranking.replace("from '@/lib/supabase/client'", "from '@/lib/supabase/admin'").replace('createClient()', 'createAdminClient()')))
+    const screen = src['ContentStrategyScreen.tsx']
+    const noteGated = (s: string) => /const ideasNote = strategy\.seed\.state === 'none' && strategy\.mappingAvailable \? dict\.mapping\.strategyMore : null/.test(s)
+    check('C1c: "more ideas after the mapping" only for a project with no scan, and only where the mapping can be offered', noteGated(screen))
+    check('C1c-MUT: a note for everyone fails C1c', !noteGated(screen.replace("strategy.seed.state === 'none' && strategy.mappingAvailable ?", 'true ?')))
 
     // Every other fetch in the tab's own components is the one spending call, behind a click.
     const allSrc = Object.entries(src).filter(([f]) => f !== 'useStrategyData.ts')

@@ -3,10 +3,16 @@
  * latest run (GET /api/projects/[id]/seed) and its stored research (GET
  * /api/keyword-research/scan).
  *
- *   none     no scan: the flag is off, the project predates the scan, or the run
- *            could not be read. The tab is exactly what it was before the scan.
- *   loading  the run's answer is not in yet. Also today's screen, so a merchant
- *            with no scan never sees anything else, not even for a moment.
+ *   none     no project to read (none is active yet): the form, as it always was.
+ *   loading  an answer is not in yet: the research screen's skeleton.
+ *   unseeded no scan (the flag is off, the project predates the scan, or the run
+ *            could not be read) and no research of the project's own either: the
+ *            research screen's empty start (one keyword field, and the mapping
+ *            when it can be offered). The older form is one click away, never the
+ *            screen itself (part B of the UX review: every project, old or new,
+ *            gets the same screen).
+ *   seeded   also with no scan, when the project has research of its own (a
+ *            research run before the scan existed): the same overview, from it.
  *   pending  there is a run; its research is on its way (a placeholder, in place).
  *   running  the research is still being found (stage A, or b2/b3 not finished)
  *            and nothing is stored yet: the site's seed keywords and a light poll.
@@ -51,6 +57,7 @@ type Seedish = { seedKeywords: string[]; domain: string | null; tracked: Tracked
 export type ScanView =
   | { kind: 'loading' }
   | { kind: 'none' }
+  | ({ kind: 'unseeded' } & Seedish)
   | ({ kind: 'pending' } & Seedish)
   | ({ kind: 'running'; steps: ProgressStep[] } & Seedish)
   | ({ kind: 'seeded'; research: ScanResearch; running: boolean; steps: ProgressStep[] } & Seedish)
@@ -119,8 +126,15 @@ export function readResearchAnswer(httpStatus: number, body: unknown): ResearchA
       keywords: b.keywords,
       truncated: b.truncated === true,
       tracked: b.tracked,
+      sources: readSources(b.sources),
     },
   }
+}
+
+function readSources(v: unknown): ScanResearch['sources'] {
+  if (!v || typeof v !== 'object') return undefined
+  const x = v as { scan?: unknown; manualAt?: unknown }
+  return { scan: x.scan === true, manualAt: typeof x.manualAt === 'string' && Number.isFinite(Date.parse(x.manualAt)) ? x.manualAt : null }
 }
 
 const stepStatus = (run: ScanRun, step: string): SeedStepStatus => run.steps.find((s) => s.step === step)?.status ?? 'pending'
@@ -158,7 +172,15 @@ export function emptyReason(run: ScanRun): EmptyReason {
 
 export function scanView(seed: SeedAnswer | null, research: ResearchAnswer | null, now: Date): ScanView {
   if (!seed) return { kind: 'loading' }
-  if (seed.kind === 'none') return { kind: 'none' }
+  if (seed.kind === 'none') {
+    // No scan: the project's own research, when it has some, opens the same screen.
+    if (!research) return { kind: 'loading' }
+    const own: Seedish = { seedKeywords: [], domain: null, tracked: research.kind === 'ok' ? research.research.tracked : [] }
+    if (research.kind === 'ok' && research.research.keywords.length > 0) {
+      return { kind: 'seeded', research: research.research, running: false, steps: [], ...own }
+    }
+    return { kind: 'unseeded', ...own }
+  }
   const run = seed.run
   const base: Seedish = { seedKeywords: run.seedKeywords, domain: run.domain, tracked: research?.kind === 'ok' ? research.research.tracked : [] }
   const running = researchRunning(run, now)

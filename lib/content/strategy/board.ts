@@ -11,8 +11,10 @@
  *
  * Where each card comes from:
  *   ideas      pending content_topic_ideas (the recommendation engine, which is what
- *              the scan's step b4 runs), and, until b4 is ready, the topics the scan's
- *              stage A found (its summary), marked as coming from the scan
+ *              the scan's step b4 runs); the tracked keywords the site already ranks
+ *              4 to 20 for (its last check), which need no scan, so an older project
+ *              has ideas too; and, until b4 is ready, the topics the scan's stage A
+ *              found (its summary), marked as coming from the scan
  *   planned    article_topics that have no article yet, dated by the queue when queued
  *   written    generated_articles that are not published yet
  *   published  generated_articles that are published
@@ -25,10 +27,13 @@ export type StrategyColumn = 'ideas' | 'planned' | 'written' | 'published'
 export const STRATEGY_COLUMNS: readonly StrategyColumn[] = ['ideas', 'planned', 'written', 'published']
 
 /** What the date on a card means. The screen names each kind; it never guesses. */
-export type StrategyDateKind = 'added' | 'publishTarget' | 'scheduled' | 'written' | 'published' | 'scanned'
+export type StrategyDateKind = 'added' | 'publishTarget' | 'scheduled' | 'written' | 'published' | 'scanned' | 'checked'
 
 /** Where a card's topic came from, shown as a small label on the card. */
-export type StrategyOrigin = 'scan' | 'plan' | 'manual' | 'topic'
+export type StrategyOrigin = 'scan' | 'plan' | 'manual' | 'topic' | 'ranking'
+
+/** A tracked keyword the site already ranks for, close to the top: an article can move it up. */
+export type StrategyRanking = { keyword: string; position: number; checkedAt: string }
 
 /** A pending idea, as GET /api/content/strategy returns it. */
 export type StrategyIdea = {
@@ -134,6 +139,8 @@ export type StrategyCard = {
   articleId: string | null
   /** The topic waits in the publishing queue. */
   queued: boolean
+  /** For an idea from the rankings: where the site stands on its keyword today. */
+  position?: number
 }
 
 export type NextArticleKind = 'queued' | 'topic' | 'idea' | 'scan'
@@ -251,6 +258,40 @@ export function keywordForTopic(topic: string, keywords: readonly string[]): str
   return best
 }
 
+// ── The rankings ────────────────────────────────────────────────────────────
+
+/** Close enough to the top that one article can move it: below the first three, still in the first two pages. */
+export const RANKING_IDEA_MIN = 4
+export const RANKING_IDEA_MAX = 20
+export const RANKING_IDEAS_SHOWN = 5
+
+/** The rows the tab reads for it (tracking_targets and scan_results, through the owner's own session). */
+export type RankingTargetRow = { id: string; keyword: string; is_active: boolean | null; engine_type: string | null }
+export type RankingResultRow = { tracking_target_id: string; position: number | null; found: boolean | null; checked_at: string }
+
+/**
+ * The tracked keywords whose last Google check puts the site at 4 to 20, closest to
+ * the top first, at most five. Only active Google search keywords (a Maps position
+ * is not an article's to move), each by its newest check whatever order the rows
+ * came in; a keyword not found, or with no check, is not one.
+ */
+export function rankingIdeas(targets: readonly RankingTargetRow[], results: readonly RankingResultRow[]): StrategyRanking[] {
+  const active = new Map(targets.filter((t) => t.is_active !== false && (t.engine_type ?? 'google_search') === 'google_search' && t.keyword?.trim()).map((t) => [t.id, t.keyword.trim()]))
+  const latest = new Map<string, RankingResultRow>()
+  for (const r of [...results].sort((a, b) => byTime(b.checked_at, a.checked_at))) {
+    if (active.has(r.tracking_target_id) && !latest.has(r.tracking_target_id)) latest.set(r.tracking_target_id, r)
+  }
+  const out: StrategyRanking[] = []
+  for (const [id, r] of latest) {
+    const p = r.position
+    if (r.found === false || typeof p !== 'number' || !Number.isInteger(p) || p < RANKING_IDEA_MIN || p > RANKING_IDEA_MAX) continue
+    out.push({ keyword: active.get(id)!, position: p, checkedAt: r.checked_at })
+  }
+  return out
+    .sort((a, b) => a.position - b.position || (a.keyword < b.keyword ? -1 : a.keyword > b.keyword ? 1 : 0))
+    .slice(0, RANKING_IDEAS_SHOWN)
+}
+
 // ── Months ──────────────────────────────────────────────────────────────────
 
 /** 'YYYY-MM' of an ISO time in a time zone (the browser's when omitted); null when unreadable. */
@@ -300,6 +341,8 @@ export function buildStrategyBoard(input: {
   data: StrategyData
   queue: readonly StrategyQueueItem[] | null
   seed: SeedPlan
+  /** Tracked keywords close to the top (rankingIdeas); none when they could not be read. */
+  ranking?: readonly StrategyRanking[]
 }): StrategyBoard {
   const { data, seed } = input
   const queue = [...(input.queue ?? [])].sort((a, b) => a.position - b.position)
@@ -368,6 +411,18 @@ export function buildStrategyBoard(input: {
       key: `idea:${i.id}`, column: 'ideas', title: i.title, keyword: i.primaryKeyword,
       date: i.createdAt, dateKind: 'added', origin: 'plan', reason: i.reason,
       topicId: null, articleId: null, queued: false,
+    })
+  }
+  // The rankings: a keyword a card above already names (as its title or its keyword) is covered.
+  const keywordsTaken = new Set(cards.map((c) => sameTopicKey(c.keyword)).filter(Boolean))
+  for (const r of input.ranking ?? []) {
+    const k = sameTopicKey(r.keyword)
+    if (!k || taken.has(k) || keywordsTaken.has(k)) continue
+    taken.add(k)
+    cards.push({
+      key: `ranking:${k}`, column: 'ideas', title: r.keyword, keyword: null,
+      date: r.checkedAt, dateKind: 'checked', origin: 'ranking', reason: null,
+      topicId: null, articleId: null, queued: false, position: r.position,
     })
   }
   const scanIdeas: StrategyCard[] = []

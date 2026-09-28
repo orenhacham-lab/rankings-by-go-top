@@ -15,9 +15,10 @@
  * mentions the business (AIVisibilitySection.loadAllResults). A second
  * definition on the same screen would show two different scores.
  *
- * NO SCAN, NO CHANGE. A project without a seed run (the scan's flag off, or a
- * project older than the scan) gets `kind: 'none'`, and the page renders
- * today's tool exactly as it was.
+ * NO SCAN, THE SAME SCREEN. A project without a seed run (the scan's flag off,
+ * or a project older than the scan) gets `kind: 'none'`: the page still renders
+ * every row it can from the project's own checks and questions, and only the
+ * rows the scan alone can fill (its AI readiness) wait for the mapping.
  */
 import type { SeedGeo, SeedRunView } from '@/lib/seed-scan/types'
 

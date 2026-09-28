@@ -97,7 +97,7 @@ export default function SeedProgress({
   const stateLabel = (s: Shown) => (s === 'now' ? t.state.running : t.state[s])
 
   return (
-    <section aria-labelledby="seed-progress-title" className="mx-auto w-full max-w-5xl" data-seed-screen="progress">
+    <section aria-labelledby="seed-progress-title" className="w-full max-w-5xl" data-seed-screen="progress">
       <div className="overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-pop">
         <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-5 pt-6 sm:px-8 md:px-10 md:pt-9">
           <div className="min-w-0">

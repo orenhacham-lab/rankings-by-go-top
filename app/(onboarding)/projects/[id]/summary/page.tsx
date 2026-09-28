@@ -33,7 +33,7 @@ export default async function ProjectSummaryPage({
     if (!(err instanceof SurfaceUnavailableError)) throw err
     // The project could not be read at all: an outage, said as one, with a refresh.
     return (
-      <section className="mx-auto w-full max-w-3xl pt-2 md:pt-10" data-seed-screen="error">
+      <section className="w-full max-w-[640px] pt-2 md:pt-10" data-seed-screen="error">
         <SeedNotice notice={{ key: 'failed', action: 'refresh' }} projectId={null} returnPath={summaryHref(id)} />
       </section>
     )

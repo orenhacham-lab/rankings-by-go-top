@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, KeyRound, Sparkles } from 'lucide-react'
+import { CalendarDays, KeyRound, Sparkles, Telescope, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ALL_MONTHS, STRATEGY_COLUMNS, cardsInMonth, monthChips,
@@ -50,6 +50,9 @@ function BoardCard({ card, lang, dict }: { card: StrategyCard; lang: Locale; dic
       {card.column === 'ideas' && card.reason && (
         <p className="mt-1.5 line-clamp-2 text-caption text-muted [overflow-wrap:anywhere]">{card.reason}</p>
       )}
+      {card.origin === 'ranking' && typeof card.position === 'number' && (
+        <p className="mt-1.5 text-caption text-muted">{fill(card.position <= 10 ? s.rankingReasonTop : s.rankingReason, { n: card.position })}</p>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
         {date && (
           <span className="inline-flex items-center gap-1">
@@ -59,6 +62,9 @@ function BoardCard({ card, lang, dict }: { card: StrategyCard; lang: Locale; dic
         )}
         {card.origin === 'scan' && (
           <span className="inline-flex items-center gap-1 rounded-pill bg-info-soft px-1.5 text-info"><Sparkles size={11} aria-hidden />{s.origins.scan}</span>
+        )}
+        {card.origin === 'ranking' && (
+          <span className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-1.5 text-ok"><TrendingUp size={11} aria-hidden />{s.origins.ranking}</span>
         )}
         {card.queued && card.column !== 'published' && (
           <span className="rounded-pill bg-warn-soft px-1.5 text-warn">{s.queued}</span>
@@ -81,7 +87,7 @@ function BoardCard({ card, lang, dict }: { card: StrategyCard; lang: Locale; dic
   return <div className={frame}>{body}</div>
 }
 
-function Column({ column, cards, lang, dict }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict }) {
+function Column({ column, cards, lang, dict, note }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; note?: string | null }) {
   const s = dict.contentStrategy
   const [open, setOpen] = useState(false)
   const shown = open ? cards : cards.slice(0, COLUMN_PREVIEW)
@@ -95,6 +101,12 @@ function Column({ column, cards, lang, dict }: { column: StrategyColumn; cards: 
         </h3>
         <span className={cn('min-w-6 rounded-pill px-2 text-center text-caption font-semibold tabular-nums', ACCENT[column].count)}>{cards.length}</span>
       </header>
+      {note && (
+        <p data-strategy-note={column} className="-mt-1 mb-3 inline-flex items-center gap-1.5 px-1 text-caption font-medium text-action">
+          <Telescope size={12} aria-hidden />
+          {note}
+        </p>
+      )}
       {cards.length === 0 ? (
         <p className="rounded-control border border-dashed border-line-strong/70 px-3 py-4 text-caption text-muted">{s.columnEmpty[column]}</p>
       ) : (
@@ -115,7 +127,13 @@ function Column({ column, cards, lang, dict }: { column: StrategyColumn; cards: 
   )
 }
 
-export default function StrategyBoard({ cards, lang, dict }: { cards: StrategyCard[]; lang: Locale; dict: Dict }) {
+export default function StrategyBoard({ cards, lang, dict, ideasNote = null }: {
+  cards: StrategyCard[]
+  lang: Locale
+  dict: Dict
+  /** One line under the ideas column's header (a project with no scan: the mapping will add more). */
+  ideasNote?: string | null
+}) {
   const s = dict.contentStrategy
   const chips = useMemo(() => monthChips(cards), [cards])
   const [month, setMonth] = useState<string>(ALL_MONTHS)
@@ -152,7 +170,7 @@ export default function StrategyBoard({ cards, lang, dict }: { cards: StrategyCa
       </div>
 
       <div key={active} className="grid animate-pop-in items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {STRATEGY_COLUMNS.map((col) => <Column key={col} column={col} cards={byColumn[col]} lang={lang} dict={dict} />)}
+        {STRATEGY_COLUMNS.map((col) => <Column key={col} column={col} cards={byColumn[col]} lang={lang} dict={dict} note={col === 'ideas' ? ideasNote : null} />)}
       </div>
     </div>
   )

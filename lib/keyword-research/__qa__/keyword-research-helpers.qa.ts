@@ -388,8 +388,12 @@ function main() {
       show(read))
     const research = { ok: true, market: { country: 'IL', language: 'he' }, fetchedAt: '2026-09-27T11:30:00Z', keywords: SCAN, truncated: 'yes', tracked: [] }
     const ok = readResearchAnswer(200, research)
-    check('S2: the research answer is data or an error (401, 404, 500, a malformed body), never provider text',
-      ok.kind === 'ok' && ok.research.keywords.length === 3 && ok.research.truncated === false
+    const withSources = readResearchAnswer(200, { ...research, sources: { scan: 'yes', manualAt: '2026-08-18T09:00:00Z' } })
+    const badDate = readResearchAnswer(200, { ...research, sources: { scan: true, manualAt: 'soon' } })
+    check('S2: the research answer is data or an error (401, 404, 500, a malformed body), never provider text; its sources are read strictly (a date that is not one is none)',
+      ok.kind === 'ok' && ok.research.keywords.length === 3 && ok.research.truncated === false && ok.research.sources === undefined
+      && withSources.kind === 'ok' && same(withSources.research.sources, { scan: false, manualAt: '2026-08-18T09:00:00Z' })
+      && badDate.kind === 'ok' && same(badDate.research.sources, { scan: true, manualAt: null })
       && [readResearchAnswer(500, { ok: false, code: 'internal' }), readResearchAnswer(404, research), readResearchAnswer(200, { ok: true, keywords: 'x', tracked: [] }), readResearchAnswer(0, null)]
         .every((a) => a.kind === 'error'))
     const okAnswer = { kind: 'ok' as const, research: { market: null, fetchedAt: null, keywords: SCAN, truncated: false, tracked: TRACKED } }
@@ -397,15 +401,15 @@ function main() {
     const seeded = scanView({ kind: 'run', run: run() }, okAnswer, NOW)
     const views = [
       scanView(null, null, NOW).kind,
-      scanView({ kind: 'none' }, okAnswer, NOW).kind,
+      scanView({ kind: 'none' }, emptyAnswer, NOW).kind,
       scanView({ kind: 'run', run: run({ status: 'done', steps: step('done', 'done', 'done') }) }, null, NOW).kind,
       scanView({ kind: 'run', run: run() }, null, NOW).kind,
       scanView({ kind: 'run', run: run() }, emptyAnswer, NOW).kind,
       seeded.kind,
     ]
     const reason = (r: ScanRun, a: Parameters<typeof scanView>[1]) => { const v = scanView({ kind: 'run', run: r }, a, NOW); return v.kind === 'empty' ? v.reason : v.kind }
-    check('S3: the view: loading, none, pending, running, seeded (still running or not), and empty with our own reason',
-      same(views, ['loading', 'none', 'pending', 'running', 'running', 'seeded'])
+    check('S3: the view: loading, unseeded, pending, running, seeded (still running or not), and empty with our own reason',
+      same(views, ['loading', 'unseeded', 'pending', 'running', 'running', 'seeded'])
       && seeded.kind === 'seeded' && seeded.running && same(seeded.tracked, TRACKED)
       && (scanView({ kind: 'run', run: run({ status: 'done', steps: step('done', 'done', 'done') }) }, okAnswer, NOW) as { running?: boolean }).running === false
       && reason(run({ status: 'done', steps: step('done', 'done', 'done') }), emptyAnswer) === 'nothing_found'
@@ -414,6 +418,14 @@ function main() {
       && reason(run({ status: 'done', steps: step('done', 'skipped', 'skipped', 'market_unsupported') }), emptyAnswer) === 'market_unsupported'
       && reason(run({ status: 'failed', stage: 'a', steps: [] }), emptyAnswer) === 'not_run',
       show(views))
+    // No scan: the project's own research opens the same screen; with none, the screen's empty start. Never today's form.
+    const own = scanView({ kind: 'none' }, okAnswer, NOW)
+    const noScan = [scanView({ kind: 'none' }, null, NOW), own, scanView({ kind: 'none' }, emptyAnswer, NOW), scanView({ kind: 'none' }, { kind: 'error' }, NOW)]
+    check('S3b: with no scan, the view waits for the research (loading), shows the project\'s own research as the research (seeded, not running, no steps, no seeds), or the empty start (unseeded, with the tracked keywords); never "none" for a project',
+      same(noScan.map((v) => v.kind), ['loading', 'seeded', 'unseeded', 'unseeded'])
+      && own.kind === 'seeded' && own.running === false && own.steps.length === 0 && own.seedKeywords.length === 0 && own.domain === null && same(own.research.keywords, SCAN)
+      && noScan[2].kind === 'unseeded' && same(noScan[2].tracked, TRACKED) && noScan[3].kind === 'unseeded' && same(noScan[3].tracked, []),
+      show(noScan.map((v) => v.kind)))
     const hour = 60 * 60 * 1000
     check('S4: the research is still running until b2 and b3 are over, the run ends, or a stalled run is a day old',
       researchRunning(run(), NOW) && researchRunning(run({ stage: 'a', steps: [] }), NOW)
