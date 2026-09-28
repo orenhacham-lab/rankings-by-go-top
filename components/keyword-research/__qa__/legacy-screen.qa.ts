@@ -1,19 +1,25 @@
 /**
- * NO SCAN, TODAY'S SCREEN — keyword research without a seeding scan looks exactly
- * as it did before the scan fed it.
+ * NO SCAN — keyword research for a project without a seeding scan.
  *
- * Most merchants have no scan: the flag is off, or the project predates it. For
- * them the tab must not change at all, and that is asserted here against a golden
- * capture of the page as it was before (fixtures/legacy-screen.json, captured from
- * app/(dashboard)/keyword-research/page.tsx at f44468d): the REAL page's first
- * render, in both languages, in nine states of today's screen (empty, results,
- * rows selected with the opportunities panel open, a keyword added, add and AI
- * errors, a search error, the keyword+URL form while searching, few results,
- * filtered and sorted). Each state is reached by seeding the page's own useState
- * values by name (_page-harness.ts), so the same state renders on both versions.
+ * Part B of the UX review: every project, old or new, opens on the same research
+ * screen. A project with no scan (the flag off, or it predates the scan) used to
+ * open on the older form; it now opens on the research screen's empty start (U1),
+ * or on its own research when it has some (U4). The older form is one click away
+ * (U2) and a research run from the start takes the screen like any other (U3).
  *
- *  L1) the scan hook says 'none' (no scan, flag off, a read that failed): every
- *      state is byte for byte the golden capture;
+ * The form itself is still asserted byte for byte against a golden capture
+ * (fixtures/legacy-screen.json) where it is still the screen: with no project in
+ * view (the hook's 'none'). That capture was taken again when the screen's header
+ * became the shared one (components/layout/Header, the design tokens); everything
+ * under it is the page as it was at f44468d. It is the REAL page's first render,
+ * in both languages, in nine states (empty, results, rows selected with the
+ * opportunities panel open, a keyword added, add and AI errors, a search error,
+ * the keyword+URL form while searching, few results, filtered and sorted). Each
+ * state is reached by seeding the page's own useState values by name
+ * (_page-harness.ts), so the same state renders on both versions.
+ *
+ *  L1) the scan hook says 'none' (no project in view): every state is byte for
+ *      byte the golden capture;
  *  L2) the scan hook is still 'loading', or the project list is (the first answer
  *      not in yet): the research screen's skeleton, never today's form. L2 used to
  *      require today's screen here, and that WAS the flash the owner reported: a
@@ -22,7 +28,15 @@
  *      long as the reads took). A merchant with no scan now sees the skeleton,
  *      then today's screen, exactly as L1 holds it;
  *  L3) the harness reaches every state it claims (a state name the page lost
- *      would silently render the default).
+ *      would silently render the default);
+ *  U1) no scan and no research ('unseeded'): the empty start (one keyword field),
+ *      the older form folded away, no second "new research" bar; the header is
+ *      the shared one, in the tokens (no raw slate);
+ *  U2) the start's "search by web address" opens the older form, whole;
+ *  U3) a research run from the start takes the screen: the overview of it, the
+ *      table, the form folded, the start gone;
+ *  U4) no scan, but research of the project's own: the same overview, and its
+ *      source said as it is (a manual research, and its date), not "from a scan".
  *
  * Mutation controls load a deliberately broken copy of the page in memory and show
  * the check fails; scripts that mutate the real file run separately (see the PR).
@@ -47,6 +61,21 @@ type HARNESS_Locale = 'he' | 'en'
 const sha = (s: string) => createHash('sha256').update(s).digest('hex')
 const NONE = { view: { kind: 'none' }, reloadTracked() {}, retry() {} }
 const LOADING = { view: { kind: 'loading' }, reloadTracked() {}, retry() {} }
+const UNSEEDED = { view: { kind: 'unseeded', seedKeywords: [], domain: null, tracked: [] }, reloadTracked() {}, retry() {} }
+const OWN_RESEARCH = {
+  view: {
+    kind: 'seeded', running: false, steps: [], seedKeywords: [], domain: null, tracked: [],
+    research: {
+      market: { country: 'IL', language: 'he' }, fetchedAt: '2026-08-18T09:00:00Z', truncated: false, tracked: [],
+      sources: { scan: false, manualAt: '2026-08-18T09:00:00Z' },
+      keywords: [
+        { keyword: 'רופא שיניים בחיפה', avgMonthlySearches: 880, competition: 'MEDIUM', competitionIndex: 50, lowTopOfPageBid: 2, highTopOfPageBid: 9, currency: 'ILS', origins: ['manual'], competitors: [], relevant: true },
+        { keyword: 'השתלות שיניים חיפה', avgMonthlySearches: 390, competition: 'HIGH', competitionIndex: 80, lowTopOfPageBid: 6, highTopOfPageBid: 21, currency: 'ILS', origins: ['manual'], competitors: [], relevant: true },
+      ],
+    },
+  },
+  reloadTracked() {}, retry() {},
+}
 
 type Golden = { capturedFrom: string; scenarios: Record<string, { sha256: string; length: number }> }
 
@@ -129,13 +158,51 @@ function main() {
   const lost = [...seeded].filter((n) => !names.includes(n))
   check('L3: every state a scenario seeds is still a useState of the page', lost.length === 0, lost.join(', '))
 
+  console.log('\nU) no scan: the research screen, never the older form as the screen')
+  // The older form's wrapper, folded (hidden) or open, and the screen's other parts, read from the markup.
+  const formFolded = (html: string) => /<div hidden=""[^>]*><form/.test(html)
+  const formShown = (html: string) => /<div class="[^"]*"><form/.test(html) && !formFolded(html)
+  const startShown = (html: string) => html.includes('data-research-start=""')
+  const unseeded = (source?: string, tag = 'current') => {
+    const bad: string[] = []
+    for (const locale of LOCALES) {
+      const initial = HARNESS.renderPage(locale, { state: {}, scan: UNSEEDED, tag, source })
+      const head = initial.slice(0, initial.indexOf('data-research-start'))
+      if (!startShown(initial) || !formFolded(initial) || initial.includes('data-research-form="collapsed"') || !initial.includes('text-title') || /slate-|text-3xl/.test(head)) bad.push(`${locale}/initial`)
+      const loading = HARNESS.renderPage(locale, { state: { keyword: 'נעלי ריצה', loading: true }, scan: UNSEEDED, tag, source })
+      if (!startShown(loading) || !formFolded(loading)) bad.push(`${locale}/searching`)
+      const failed = HARNESS.renderPage(locale, { state: { error: 'SEARCH FAILED' }, scan: UNSEEDED, tag, source })
+      if (!startShown(failed) || !formFolded(failed) || !failed.includes('SEARCH FAILED')) bad.push(`${locale}/error`)
+    }
+    return bad
+  }
+  const u1 = unseeded()
+  check('U1: no scan and no research: the empty start, the older form folded away (also while searching and after an error), one way in, the shared header', u1.length === 0, u1.join(', '))
+  const opened = LOCALES.filter((locale) => {
+    const html = HARNESS.renderPage(locale, { state: { formChoice: true }, scan: UNSEEDED })
+    return !(formShown(html) && !startShown(html) && html.includes('data-research-form="open"') && html.includes('name="researchType"'))
+  })
+  check('U2: asked for, the older form opens whole, with the way to fold it again, and the start steps aside', opened.length === 0, opened.join(', '))
+  const ran = LOCALES.filter((locale) => {
+    const html = HARNESS.renderPage(locale, { state: { results: HARNESS.LEGACY_RESULTS }, scan: UNSEEDED })
+    return !(html.includes('data-scan-overview="manual"') && html.includes('id="research-table"') && formFolded(html) && !startShown(html) && html.includes('data-research-form="collapsed"'))
+  })
+  check('U3: a research run from the start takes the screen: its overview, the table, the form folded behind "new research", the start gone', ran.length === 0, ran.join(', '))
+  const own = (source?: string, tag = 'current') => LOCALES.filter((locale) => {
+    const html = HARNESS.renderPage(locale, { state: {}, scan: OWN_RESEARCH, tag, source })
+    const line = locale === 'he' ? 'מקור: מחקר ידני מ-' : 'Source: manual research from '
+    return !(html.includes('data-scan-overview="scan"') && html.includes(line) && formFolded(html) && !startShown(html) && !html.includes(locale === 'he' ? 'מסריקה של' : 'from a scan'))
+  })
+  const u4 = own()
+  check('U4: no scan, but research of the project\'s own: the same overview, its source said as it is (a manual research and its date), never "from a scan"', u4.length === 0, u4.join(', '))
+
   console.log('\nMUT) broken copies of the page fail the checks')
   const page = readFileSync(HARNESS.PAGE_PATH, 'utf8')
   // A control whose anchor is gone (the page changed) fails, loudly, instead of passing or crashing.
   const mutate = (from: string, to: string): string | null => (page.includes(from) ? page.replace(from, to) : null)
   const broken = (tag: string, source: string | null) => (source === null ? null : mismatches(NONE, tag, source))
-  const header = broken('mut-header', mutate('<div className={`mb-8 ${isRTL ? \'text-right\' : \'text-left\'}`}>', '<div className={`mb-6 ${isRTL ? \'text-right\' : \'text-left\'}`}>'))
-  check('L1-MUT: a page whose header spacing changed fails L1', !!header && header.length > 0, header ? undefined : 'anchor missing')
+  const header = broken('mut-header', mutate('const header = <Header title={t.title} subtitle={t.subtitle} />', 'const header = <Header title={t.title} />'))
+  check('L1-MUT: a page whose header lost its line fails L1', !!header && header.length > 0, header ? undefined : 'anchor missing')
   const extra = broken('mut-extra', mutate('{/* Form */}', '<p>new</p>'))
   check('L1-MUT2: a page that shows one more element with no scan fails L1', !!extra && extra.length > 0, extra ? undefined : 'anchor missing')
   const column = broken('mut-column', mutate('{t.results.lowCpc}', '{null}'))
@@ -146,6 +213,16 @@ function main() {
   const listFlash = mutate('const firstAnswerPending = !projectsResolved || scanView.kind === \'loading\'', 'const firstAnswerPending = scanView.kind === \'loading\'')
   check('L2b-MUT: a page that shows today\'s form while the project list loads fails L2b',
     !!listFlash && whilePending(NONE, false, listFlash, 'mut-list-flash').length > 0, listFlash ? undefined : 'anchor missing')
+  const legacyForm = mutate('(unseeded ? false : (!(model.mode', '(false ? false : (!(model.mode')
+  check('U1-MUT: a page that opens the older form for a project with no scan (the old fallback) fails U1',
+    !!legacyForm && unseeded(legacyForm, 'mut-legacy-form').length > 0, legacyForm ? undefined : 'anchor missing')
+  const noStart = mutate('{researchStartShown && (', '{false && (')
+  check('U1-MUT2: a page without the empty start fails U1', !!noStart && unseeded(noStart, 'mut-no-start').length > 0, noStart ? undefined : 'anchor missing')
+  const oldHeader = mutate('const header = <Header title={t.title} subtitle={t.subtitle} />', 'const header = (<div className="mb-8"><h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1><p className="text-slate-600">{t.subtitle}</p></div>)')
+  check('U1-MUT3: the older header (raw slate, text-3xl) fails U1', !!oldHeader && unseeded(oldHeader, 'mut-old-header').length > 0, oldHeader ? undefined : 'anchor missing')
+  const scanLine = mutate('          sourceOverride={sourceOverride}\n', '')
+  check('U4-MUT: an overview that says "from a scan" of research the project ran by hand fails U4',
+    !!scanLine && own(scanLine, 'mut-scan-line').length > 0, scanLine ? undefined : 'anchor missing')
   check('L3-MUT: a state renamed in the page is caught by L3',
     !HARNESS.seedableSource(page.replace(/const \[opportunitiesOpen, setOpportunitiesOpen\]/, 'const [panelOpen, setOpportunitiesOpen]')).names.includes('opportunitiesOpen'))
 

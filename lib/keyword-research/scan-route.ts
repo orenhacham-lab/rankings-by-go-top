@@ -1,21 +1,24 @@
 /**
- * GET /api/keyword-research/scan?projectId=… — the seeding scan's keyword research
- * of one project, for the research tab.
+ * GET /api/keyword-research/scan?projectId=… — the keyword research of one project,
+ * for the research tab: the seeding scan's, and the project's own.
  *
  * CACHE ONLY. It reads what steps b2 and b3 stored (keyword_research_cache, the
- * `seed:` rows), the project's tracked keywords, and the site vocabulary the
- * relevance filter needs (the site's cached index). It never asks Google Ads,
- * Serper or a model: opening the tab spends nothing.
+ * `seed:` rows), every other research row of the project (a research the owner
+ * ran before the scan existed is data too: lib/keyword-research/project-research.ts),
+ * the project's tracked keywords, and the site vocabulary the relevance filter
+ * needs (the site's cached index). It never asks Google Ads, Serper or a model:
+ * opening the tab spends nothing.
  *
  * THE CONTRACT, in order (lib/keyword-research/__qa__/scan-route.qa.ts):
  *   1. signed in, or 401 `unauthorized`;
  *   2. the project is the caller's, read through their own RLS-scoped client with
  *      the owner named in the filter too, or 404 `not_found` (a malformed id is
  *      the same 404: nothing tells a stranger whether a project exists);
- *   3. the seeding scan is on (ENABLE_SEED_SCAN) or the caller is an admin, as for
- *      the scan's own route, or 404 `not_found`;
- *   4. the research and the tracked keywords, read as the owner; a failed read is
+ *   3. the research and the tracked keywords, read as the owner; a failed read is
  *      500 `internal`.
+ * It is NOT behind the scan's flag (part B of the UX review): it reads only what
+ * the owner already has, so every project, scanned or not, opens on the same
+ * research screen. Starting a scan stays behind the flag, in the seed route.
  * Every answer is a stable code or data we produced; no database or provider text
  * reaches it, and it is never cached.
  *
@@ -28,7 +31,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { tokens } from '@/lib/content/recommendations/dedupe'
 import { MIN_SITE_VOCAB_TOKENS, researchKeywordIssue } from '@/lib/content/recommendations/keyword-research'
-import { readSeedResearch, type SeedResearchRow } from '@/lib/seed-scan/research'
+import type { SeedResearchRow } from '@/lib/seed-scan/research'
+import { readProjectResearch, researchSources } from './project-research'
 import { getLatestSeedRun } from '@/lib/seed-scan/store'
 import { readSummary } from '@/lib/seed-scan/summary'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
@@ -37,10 +41,8 @@ import { mergeSeedResearch, readIdea, type ScanKeyword, type ScanResearchErrorCo
 export type ScanRouteDeps = {
   session: () => Promise<{ userId: string | null; db: SupabaseClient }>
   admin: () => ServiceRoleClient
-  isAdmin: (admin: ServiceRoleClient, userId: string) => Promise<boolean>
   /** The engine's site vocabulary (lib/content/recommendations/engine.ts buildSiteVocabulary). */
   vocabulary: (admin: ServiceRoleClient, projectId: string, extras: string[], userId: string) => Promise<Set<string>>
-  env: Record<string, string | undefined>
 }
 
 /** Tracked keywords read per project: well above any plan's keyword quota. */
@@ -97,7 +99,7 @@ async function readTracked(db: SupabaseClient, scope: Scope): Promise<TrackedKey
 }
 
 /** The run's seed keywords, as b2 stored them in its row's key (when the run itself is unreadable). */
-function seedKeywordsOf(rows: readonly SeedResearchRow[]): string[] {
+function seedKeywordsOf(rows: readonly (Omit<SeedResearchRow, 'origin'> & { origin: string })[]): string[] {
   const row = rows.find((r) => r.origin === 'seed_keywords')
   return row ? row.value.split('|').map((k) => k.trim()).filter(Boolean).slice(0, 5) : []
 }
@@ -121,19 +123,9 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
 
     let admin: ServiceRoleClient | null = null
     const adminClient = () => (admin ??= deps.admin())
-    if (deps.env.ENABLE_SEED_SCAN !== 'true') {
-      let isAdmin = false
-      try {
-        isAdmin = await deps.isAdmin(adminClient(), userId)
-      } catch {
-        isAdmin = false
-      }
-      // Off means off: the research of a scan that does not exist for this user is not there either.
-      if (!isAdmin) return refuse(404, 'not_found')
-    }
 
     const scope: Scope = { projectId: project.id, userId }
-    const rows = await readSeedResearch(session.db, scope)
+    const rows = await readProjectResearch(session.db, scope)
     if (rows === 'error') return refuse(500, 'internal')
     const tracked = await readTracked(session.db, scope)
     if (tracked === 'error') return refuse(500, 'internal')
@@ -163,6 +155,7 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
       keywords,
       truncated: merged.truncated,
       tracked,
+      sources: researchSources(rows, merged.market),
     }
     return Response.json(body, { status: 200, headers: NO_STORE })
   } catch (err) {

@@ -9,7 +9,7 @@ type Row = Record<string, unknown>
 /** Shared counter for auto-assigned ids on plain inserts (mirrors a real
  *  Postgres `DEFAULT gen_random_uuid()` id column). */
 let fakeRowIdCounter = 0
-interface Filter { kind: 'eq' | 'neq' | 'is' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'not_is' | 'like'; col: string; val: unknown }
+interface Filter { kind: 'eq' | 'neq' | 'is' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'not_is' | 'like' | 'not_like'; col: string; val: unknown }
 /** A SQL LIKE pattern as a RegExp: `%` any run of characters, `_` exactly one; case-sensitive. */
 const likePattern = (pattern: string) => new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '[\\s\\S]*').replace(/_/g, '[\\s\\S]')}$`)
 /** Per-op DB-error injectors, keyed by mutation kind, to exercise fail-closed handling. */
@@ -38,10 +38,12 @@ class FakeQuery {
   neq(col: string, val: unknown) { this.filters.push({ kind: 'neq', col, val }); return this }
   in(col: string, vals: unknown[]) { this.filters.push({ kind: 'in', col, val: vals }); return this }
   is(col: string, val: unknown) { this.filters.push({ kind: 'is', col, val }); return this }
-  /** PostgREST .not(col, op, val). Only the `is` operator is modelled — the one
-   *  callers use for NOT NULL. Distinct from `neq`, which follows JS `!==` and
-   *  therefore would NOT exclude a NULL the way SQL does. */
+  /** PostgREST .not(col, op, val). Two operators are modelled: `is` (NOT NULL;
+   *  distinct from `neq`, which follows JS `!==` and therefore would NOT exclude
+   *  a NULL the way SQL does) and `like` (NOT LIKE: as in SQL, a NULL matches
+   *  neither LIKE nor NOT LIKE, so it is left out too). */
   not(col: string, op: string, val: unknown) {
+    if (op === 'like') { this.filters.push({ kind: 'not_like', col, val }); return this }
     if (op !== 'is') throw new Error(`FakeAdmin.not: unsupported operator '${op}'`)
     this.filters.push({ kind: 'not_is', col, val }); return this
   }
@@ -72,6 +74,7 @@ class FakeQuery {
     return f.kind === 'eq' ? r[f.col] === f.val
       : f.kind === 'neq' ? r[f.col] !== f.val
         : f.kind === 'not_is' ? (f.val === null ? r[f.col] != null : r[f.col] !== f.val)
+        : f.kind === 'not_like' ? typeof r[f.col] === 'string' && !likePattern(f.val as string).test(r[f.col] as string)
         : f.kind === 'in' ? (f.val as unknown[]).includes(r[f.col])
           : f.kind === 'is' ? (f.val === null ? r[f.col] == null : r[f.col] === f.val)
             : f.kind === 'gt' ? (r[f.col] as string | number) > (f.val as string | number)

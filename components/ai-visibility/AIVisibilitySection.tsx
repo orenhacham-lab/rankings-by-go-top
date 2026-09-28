@@ -186,8 +186,9 @@ export default function AIVisibilitySection({
   /** The tab to open on, e.g. from a link that manages competitors. */
   initialTab?: TabType
   // ── W6d: the AI-visibility tab's overview around the tool. Every one of these
-  // is optional and off by default, so a caller that passes none of them (a
-  // project without a seeding scan) gets the tool exactly as it was.
+  // is optional and off by default. The AI-visibility page passes them for every
+  // project, scanned or not (part B of the UX review): a caller that passes none
+  // gets the bare tool.
   /** The page shows its own title, score and summary: leave out the tool's copies of them. */
   overviewMode?: boolean
   /** The runs this tool loaded (GET /api/ai-visibility/runs), or null when they could not be read. */

@@ -8,7 +8,8 @@
  *   /api/content/automation/pools      the publishing queue with its projected slots;
  *                                      404 when automation is off, which reads as no queue
  *   /api/projects/[id]/seed            the seeding scan; 404 when the feature is off for
- *                                      this account, which reads as "no scan"
+ *                                      this account, which reads as "no scan" (and means
+ *                                      the mapping cannot be offered here either)
  *
  * While the scan is still building the plan, only the scan is asked again, every
  * POLL_MS; the moment its plan is ready the board is read again once.
@@ -33,6 +34,8 @@ export type StrategyLoad = {
   data: StrategyData | null
   queue: StrategyQueueItem[] | null
   seed: SeedPlan
+  /** The scan's route answered: the mapping can be offered for this project (its flag, or an admin). */
+  mappingAvailable: boolean
   reload: () => void
 }
 
@@ -82,7 +85,7 @@ function readBoard(ok: boolean, body: unknown): StrategyData | null {
 export function useStrategyData(projectId: string, refreshKey: unknown): StrategyLoad {
   // Tagged with the project it belongs to: a new project reads as loading until its own
   // answer lands, so the previous project's plan is never shown under the new one.
-  const [state, setState] = useState<Omit<StrategyLoad, 'reload'> & { projectId: string }>({ projectId: '', status: 'loading', data: null, queue: null, seed: NO_SEED_PLAN })
+  const [state, setState] = useState<Omit<StrategyLoad, 'reload'> & { projectId: string }>({ projectId: '', status: 'loading', data: null, queue: null, seed: NO_SEED_PLAN, mappingAvailable: false })
   const request = useRef(0)
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
@@ -107,12 +110,13 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
           data: data ?? (prev.projectId === projectId ? prev.data : null),
           queue: queue.ok ? readQueue(queue.body) : null,
           seed: readSeed(seed.ok, seed.body),
+          mappingAvailable: seed.ok && !!seed.body && typeof seed.body === 'object' && (seed.body as { ok?: unknown }).ok === true,
         }))
       } catch {
         if (mine === request.current) {
           setState((prev) => (prev.projectId === projectId && prev.data
             ? { ...prev, status: 'ready' }
-            : { projectId, status: 'error', data: null, queue: null, seed: NO_SEED_PLAN }))
+            : { projectId, status: 'error', data: null, queue: null, seed: NO_SEED_PLAN, mappingAvailable: false }))
         }
       }
     }, 120)
@@ -135,6 +139,6 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
     return () => window.clearInterval(id)
   }, [projectId, building, reload])
 
-  if (!current) return { status: 'loading', data: null, queue: null, seed: NO_SEED_PLAN, reload }
-  return { status: state.status, data: state.data, queue: state.queue, seed: state.seed, reload }
+  if (!current) return { status: 'loading', data: null, queue: null, seed: NO_SEED_PLAN, mappingAvailable: false, reload }
+  return { status: state.status, data: state.data, queue: state.queue, seed: state.seed, mappingAvailable: state.mappingAvailable, reload }
 }

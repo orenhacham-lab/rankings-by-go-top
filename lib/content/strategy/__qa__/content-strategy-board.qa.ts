@@ -8,7 +8,11 @@
  *  N) the next article, in the order the product will actually write them (row 1);
  *  D) what the plan is built on: the scan's business profile, keywords, audiences,
  *     validated competitors and pages, and the keyword a scan topic targets;
- *  E) the "write the first article" error copy never shows text we did not write.
+ *  E) the "write the first article" error copy never shows text we did not write;
+ *  K) the rankings: tracked keywords the site ranks 4 to 20 for become ideas with no
+ *     scan at all (part B of the UX review: an older project has ideas too), each by
+ *     its newest check, Google search only, closest first, at most five, never a
+ *     second card for a keyword the board already names.
  *
  * Every check has a mutation control: the rule broken on purpose (a different
  * implementation, or the fixture changed so the rule is the only thing that decides)
@@ -17,8 +21,8 @@
  * Run: npx tsx lib/content/strategy/__qa__/content-strategy-board.qa.ts
  */
 import {
-  ALL_MONTHS, buildStrategyBoard, cardsInMonth, keywordForTopic, monthChips, monthKey, NO_SEED_PLAN, sameTopicKey, seedPlanFromRun,
-  type SeedPlan, type SeedRunLike, type StrategyBoard, type StrategyData, type StrategyQueueItem,
+  ALL_MONTHS, buildStrategyBoard, cardsInMonth, keywordForTopic, monthChips, monthKey, NO_SEED_PLAN, rankingIdeas, sameTopicKey, seedPlanFromRun,
+  type RankingResultRow, type RankingTargetRow, type SeedPlan, type SeedRunLike, type StrategyBoard, type StrategyData, type StrategyQueueItem,
 } from '../board'
 import { generationErrorCopy } from '../copy'
 import { getDashboardDictionary } from '../../../i18n/dashboard/getDashboardDictionary'
@@ -236,6 +240,51 @@ function main() {
       check(`E3 (${loc}): an inherited key is not a code`, generationErrorCopy({ reason: 'constructor' }, errs) === errs.unknown && generationErrorCopy(null, errs) === errs.unknown)
       const echo = (body: unknown) => { const r = (body as { reason?: string }).reason; return typeof r === 'string' ? (errs[r] ?? r) : errs.unknown }
       check(`E-MUT (${loc}): echoing an unknown reason would show the provider text`, /Gemini/.test(echo({ reason: 'Gemini 500: upstream said no' })))
+    }
+  }
+
+  // ── K) ideas from the rankings ────────────────────────────────────────────
+  console.log('\nK) the tracked keywords close to the top are ideas, with no scan')
+  {
+    const t = (id: string, keyword: string, engine = 'google_search', active = true): RankingTargetRow => ({ id, keyword, engine_type: engine, is_active: active })
+    const r = (id: string, position: number | null, at: string, found = true): RankingResultRow => ({ tracking_target_id: id, position, found, checked_at: at })
+    const targets = [t('a', 'dentist haifa'), t('b', 'teeth whitening'), t('c', 'dental implants'), t('d', 'root canal price'), t('e', 'maps listing', 'google_maps'),
+      t('f', 'paused keyword', 'google_search', false), t('g', 'kids dentist'), t('h', 'clear aligners'), t('i', 'crown'), t('j', 'veneers'), t('k', 'not found')]
+    const results = [
+      r('a', 7, '2026-09-20T05:00:00Z'), r('a', 14, '2026-08-20T05:00:00Z'),
+      r('b', 28, '2026-09-20T05:00:00Z'), r('b', 12, '2026-07-20T05:00:00Z'),
+      r('c', 12, '2026-09-20T05:00:00Z'), r('d', 3, '2026-09-20T05:00:00Z'), r('e', 5, '2026-09-20T05:00:00Z'), r('f', 6, '2026-09-20T05:00:00Z'),
+      r('g', 4, '2026-09-20T05:00:00Z'), r('h', 20, '2026-09-20T05:00:00Z'), r('i', 19, '2026-09-20T05:00:00Z'), r('j', 9, '2026-09-20T05:00:00Z'),
+      r('k', 8, '2026-09-20T05:00:00Z', false),
+    ]
+    const ideas = rankingIdeas(targets, results)
+    const edge = (p: number) => rankingIdeas([t('x', 'edge')], [r('x', p, '2026-09-20T05:00:00Z')]).length
+    check('K1: 4 to 20 by the newest check, Google search and active only, never "not found", closest first, at most five',
+      JSON.stringify(ideas.map((i) => [i.keyword, i.position])) === JSON.stringify([['kids dentist', 4], ['dentist haifa', 7], ['veneers', 9], ['dental implants', 12], ['crown', 19]])
+      && [3, 4, 20, 21].map(edge).join() === '0,1,1,0',
+      JSON.stringify(ideas))
+    // The rows in another order give the same answer: the newest check decides, not the read's order.
+    check('K1-MUT: the oldest check of "teeth whitening" (12) would make it one; its newest (28) does not',
+      !rankingIdeas(targets, [...results].reverse()).some((i) => i.keyword === 'teeth whitening') && rankingIdeas([t('b', 'teeth whitening')], [r('b', 12, '2026-07-20T05:00:00Z')]).length === 1)
+    const data: StrategyData = {
+      ideas: [], articles: [],
+      topics: [{ id: 't1', title: 'Best dental implants in Haifa', primaryKeyword: 'dental implants', status: 'approved', source: 'manual', reason: null, createdAt: '2026-09-01T00:00:00Z' }],
+    }
+    const board = buildStrategyBoard({ data, queue: null, seed: NO_SEED_PLAN, ranking: ideas })
+    const rankingCards = board.cards.filter((c) => c.origin === 'ranking')
+    check('K2: with no scan, the ideas column holds the rankings (each dated by its check), minus a keyword a topic already targets',
+      JSON.stringify(rankingCards.map((c) => [c.title, c.position, c.column, c.dateKind])) === JSON.stringify([
+        ['kids dentist', 4, 'ideas', 'checked'], ['dentist haifa', 7, 'ideas', 'checked'], ['veneers', 9, 'ideas', 'checked'], ['crown', 19, 'ideas', 'checked'],
+      ]) && rankingCards.every((c) => c.date === '2026-09-20T05:00:00Z' && c.keyword === null && c.reason === null) && board.counts.ideas === 4,
+      JSON.stringify(rankingCards.map((c) => [c.title, c.position])))
+    const noDedup = buildStrategyBoard({ data: { ...data, topics: [{ ...data.topics[0], primaryKeyword: null }] }, queue: null, seed: NO_SEED_PLAN, ranking: ideas })
+    check('K2-MUT: the same topic without its keyword leaves "dental implants" free, and it is an idea again', noDedup.cards.some((c) => c.origin === 'ranking' && c.title === 'dental implants'))
+    check('K3: a ranking idea is never "the next article" (the next article is what the product will write)',
+      buildStrategyBoard({ data: { ideas: [], topics: [], articles: [] }, queue: null, seed: NO_SEED_PLAN, ranking: ideas }).next === null)
+    for (const loc of ['he', 'en'] as const) {
+      const cs = getDashboardDictionary(loc).contentStrategy
+      check(`K4 (${loc}): the card's copy exists for its origin, its date and its why`,
+        !!cs.origins.ranking && !!cs.dateKinds.checked && cs.rankingReason.includes('{n}') && cs.rankingReasonTop.includes('{n}') && !!cs.factSource.ranking)
     }
   }
 

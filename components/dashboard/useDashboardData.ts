@@ -63,7 +63,8 @@ export function seedUrl(projectId: string): string {
   return `/api/projects/${encodeURIComponent(projectId)}/seed`
 }
 
-export function useSeedState(projectId: string): SeedState {
+/** `refreshKey`: bumped to read the scan again (a mapping this screen started has just finished). */
+export function useSeedState(projectId: string, refreshKey = 0): SeedState {
   const [state, setState] = useState<SeedState>({ kind: 'loading' })
   const [tick, setTick] = useState(0)
 
@@ -80,7 +81,7 @@ export function useSeedState(projectId: string): SeedState {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [projectId, tick])
+  }, [projectId, tick, refreshKey])
 
   return state
 }

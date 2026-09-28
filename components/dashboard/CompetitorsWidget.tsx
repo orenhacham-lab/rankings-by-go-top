@@ -13,6 +13,8 @@
 import { Swords, Users } from 'lucide-react'
 import type { CompetitorRow } from '@/lib/dashboard/competitors'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
+import Button from '@/components/ui/Button'
+import type { MappingControl } from '@/components/mapping/useMapping'
 import { HeaderLink, LinkButton, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
 
 export type CompetitorsModel =
@@ -25,10 +27,17 @@ export type CompetitorsModel =
 
 export const COMPETITORS_SHOWN = 3
 
-export default function CompetitorsWidget({ t, model, manageHref }: {
+export default function CompetitorsWidget({ t, model, manageHref, mapping, mappingCopy }: {
   t: DashboardDictionary['dashboardHome']
   model: CompetitorsModel
   manageHref: string
+  /**
+   * The project's mapping, when it can be offered and has not run: with no
+   * competitors at all, the empty state offers both ways to get them (add them,
+   * or let the mapping find them).
+   */
+  mapping?: MappingControl | null
+  mappingCopy?: DashboardDictionary['mapping']
 }) {
   const c = t.competitors
   return (
@@ -36,7 +45,24 @@ export default function CompetitorsWidget({ t, model, manageHref }: {
       action={model.state === 'ready' || model.state === 'scan_only' ? <HeaderLink href={manageHref}>{c.manage}</HeaderLink> : undefined}>
       {model.state === 'loading' && <WidgetLoading lines={3} label={c.title} />}
       {model.state === 'error' && <WidgetError message={t.loadError} retryLabel={t.actions.retry} onRetry={model.retry} />}
-      {model.state === 'empty' && (
+      {model.state === 'empty' && mapping && mappingCopy && (
+        <WidgetEmpty
+          icon={<Users size={18} strokeWidth={2} />}
+          title={mappingCopy.competitorsEmpty}
+          body={mappingCopy.competitorsEmptyBody}
+          action={
+            <div className="flex flex-wrap gap-2">
+              <LinkButton href={manageHref} variant="secondary" size="sm">{mappingCopy.addCompetitors}</LinkButton>
+              {mapping.mapping.available === true && mapping.mapping.state !== 'running' && (
+                <Button size="sm" onClick={() => void mapping.start()} loading={mapping.starting} data-mapping-run>
+                  {mapping.starting ? mappingCopy.starting : mappingCopy.run}
+                </Button>
+              )}
+            </div>
+          }
+        />
+      )}
+      {model.state === 'empty' && !(mapping && mappingCopy) && (
         <WidgetEmpty
           icon={<Users size={18} strokeWidth={2} />}
           title={c.emptyTitle}

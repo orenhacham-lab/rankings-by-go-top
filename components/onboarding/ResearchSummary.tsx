@@ -60,6 +60,7 @@ import {
   orderedCompetitors,
   scannedAgo,
   siteFirewalled,
+  stageBState,
   stepStatusOf,
   storefrontLocked,
   tilesView,
@@ -141,6 +142,8 @@ export default function ResearchSummary({
   const [notice, setNotice] = useState<Notice | null>(null)
 
   const a3 = stepStatusOf(run, 'a3')
+  // Stage B as it really is, for the bottom bar (P1-12); read again every 20s while it works.
+  const stageB = started ? stageBState(run, new Date()) : null
   const locked = storefrontLocked(summary)
   const firewalled = siteFirewalled(summary)
   const tiles = tilesView(summary, run)
@@ -691,11 +694,39 @@ export default function ResearchSummary({
       </div>
 
       {/* 10 ── start: a bar that stays at the bottom of the screen while the summary
-          scrolls, carrying how many keywords "Start" will track. */}
-      <section data-summary-block="start" aria-labelledby="seed-block-start" className="sticky bottom-3 z-20 mt-6 mb-4 md:bottom-5">
-        <div className="relative overflow-hidden rounded-card bg-contrast p-4 text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5">
+          scrolls, carrying how many keywords "Start" will track. Once stage B began it
+          says where stage B really is (P1-12): working (still at the bottom, and short on
+          a phone), ready, or not finished. A finished stage B is news, not a task, so
+          its line sits in the page instead of covering it. */}
+      <section
+        data-summary-block="start"
+        data-stage-b={stageB ?? 'not_started'}
+        aria-labelledby="seed-block-start"
+        className={cn('mt-6 mb-4', (!started || stageB === 'running') && 'sticky bottom-3 z-20 md:bottom-5')}
+      >
+        {stageB === 'done' || stageB === 'failed' ? (
+          <div
+            role="status"
+            className={cn(
+              'flex flex-col gap-3 rounded-card border p-4 md:flex-row md:items-center md:justify-between md:p-5',
+              stageB === 'done' ? 'border-ok/25 bg-ok-soft' : 'border-warn/25 bg-warn-soft',
+            )}
+          >
+            <div className="min-w-0">
+              <h2 id="seed-block-start" className="text-base font-bold text-ink">
+                {stageB === 'done' ? t.start.readyTitle : t.start.failedTitle}
+              </h2>
+              <p className="mt-0.5 max-w-[70ch] text-sm leading-6 text-body">{stageB === 'done' ? t.start.readyBody : t.start.failedBody}</p>
+            </div>
+            <ActionLink href={dashboardHref(projectId)} variant={stageB === 'done' ? 'primary' : 'secondary'} className="shrink-0">
+              {t.start.openDashboard}
+              <Arrow className="h-4 w-4" aria-hidden />
+            </ActionLink>
+          </div>
+        ) : (
+        <div className={cn('relative overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5', started ? 'p-3' : 'p-4')}>
           <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_140%_at_100%_50%,rgb(83_115_255/0.28),transparent_65%)]" />
-          <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className={cn('relative flex gap-4 md:flex-row md:items-center md:justify-between', started ? 'flex-row items-center justify-between' : 'flex-col')}>
             <div className="flex min-w-0 items-center gap-4">
               {!started && (
                 <span aria-hidden className="hidden h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 sm:flex">
@@ -703,16 +734,16 @@ export default function ResearchSummary({
                 </span>
               )}
               <div className="min-w-0">
-                <h2 id="seed-block-start" className="text-lg font-bold text-contrast-ink">
+                <h2 id="seed-block-start" className={cn('font-bold text-contrast-ink', started ? 'text-base md:text-lg' : 'text-lg')}>
                   {started ? t.start.runningTitle : t.start.title}
                 </h2>
-                <p className="mt-0.5 max-w-[70ch] text-sm leading-6 text-contrast-ink/75">
+                <p className={cn('mt-0.5 max-w-[70ch] text-sm leading-6 text-contrast-ink/75', started && 'hidden md:block')}>
                   {started ? t.start.runningBody : t.start.body(selected.length)}
                 </p>
               </div>
             </div>
             {started ? (
-              <ActionLink href={dashboardHref(projectId)} size="lg" variant="onInk" className="shrink-0">
+              <ActionLink href={dashboardHref(projectId)} size="lg" variant="onInk" className="shrink-0 max-md:h-10 max-md:px-4">
                 {t.start.openDashboard}
                 <Arrow className="h-4 w-4" aria-hidden />
               </ActionLink>
@@ -724,6 +755,7 @@ export default function ResearchSummary({
             )}
           </div>
         </div>
+        )}
         {notice && (
           <SeedNotice
             notice={notice}

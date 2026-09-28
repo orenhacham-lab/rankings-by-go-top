@@ -26,9 +26,9 @@
  * merchant needs first (the `order-*` classes); on a wide screen the main column
  * holds the charts and lists and the side column the short status cards.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { FileText, KeyRound, Send, Target } from 'lucide-react'
+import { FileText, KeyRound, Send, ShieldAlert, Target } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
@@ -67,6 +67,12 @@ import { PublishingBoard, RecentArticles } from '@/components/dashboard/ContentW
 import AiVisibilityBrief from '@/components/dashboard/AiVisibilityBrief'
 import AccountStatus from '@/components/dashboard/AccountStatus'
 import MonthlyReportTeaser from '@/components/reports/monthly/MonthlyReportTeaser'
+import { Widget } from '@/components/dashboard/ui'
+import { ToastHost, useToasts } from '@/components/content/Toast'
+import MappingBanner from '@/components/mapping/MappingBanner'
+import MappingPlaceholder from '@/components/mapping/MappingPlaceholder'
+import { useMapping } from '@/components/mapping/useMapping'
+import { summaryHref } from '@/lib/onboarding/links'
 
 /** A PostgREST page; far more than one scan of any project's keywords. */
 const RESULTS_READ = 1000
@@ -167,7 +173,23 @@ function ProjectDashboard({ project }: { project: Project }) {
   const [now, setNow] = useState(() => new Date())
   // Read alongside the keywords but never part of them: each is its own widgets' state.
   const { overview, reload } = useDashboardOverview(project.id)
-  const seed = useSeedState(project.id)
+  // The mapping (lib/project-mapping/state.ts): the banner above the opening card, and
+  // the areas only it can fill. When a mapping this screen started ends, the scan and
+  // the dashboard's own route are read again and the areas fill in.
+  const [seedRefresh, setSeedRefresh] = useState(0)
+  const seed = useSeedState(project.id, seedRefresh)
+  const toasts = useToasts()
+  const mappingDone = dict.mapping.finished
+  const pushToast = toasts.success
+  const onMappingFinished = useCallback(() => {
+    setSeedRefresh((n) => n + 1)
+    reload()
+  }, [reload])
+  const mapping = useMapping(project.id, language, onMappingFinished)
+  useEffect(() => {
+    if (mapping.finished === 'done') pushToast(mappingDone)
+  }, [mapping.finished, pushToast, mappingDone])
+  const mappingOffered = mapping.mapping.available === true
   const competitorView = useProjectCompetitorComparison(project.id)
 
   useEffect(() => {
@@ -251,8 +273,13 @@ function ProjectDashboard({ project }: { project: Project }) {
   const tile = t.tiles
   const pending = <span aria-hidden="true" className="inline-block h-7 w-12 animate-pulse rounded-control bg-sunk align-middle motion-reduce:animate-none" />
 
+  const siteSummary = mappingOffered && seed.kind === 'run' ? { href: summaryHref(project.id), label: dict.mapping.summaryLink } : null
+
   return (
     <div className="space-y-5">
+      <MappingBanner projectId={project.id} control={mapping} locale={language} />
+      <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
+
       <HeroCard
         t={t}
         language={language}
@@ -315,13 +342,24 @@ function ProjectDashboard({ project }: { project: Project }) {
         {/* Main column: the charts and the lists. */}
         <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-5">
           {hold && (
-            <div className="order-2 min-w-0">
+            <div className="order-2 min-w-0 animate-pop-in">
               <HoldingBack
                 t={t}
                 model={hold}
                 scannedLabel={hold.state === 'ready' && hold.scannedAt ? t.holdingBack.scannedAt(relativeTime(hold.scannedAt, now, language)) : null}
                 settingsHref={settingsHref}
+                summary={siteSummary}
               />
+            </div>
+          )}
+          {/* A project the mapping has not read yet: the same card, in the same place,
+              holding what only the mapping can find. */}
+          {!hold && mappingOffered && seed.kind !== 'loading' && (
+            <div className="order-2 min-w-0">
+              <Widget id="holding-back" state="mapping" title={t.holdingBack.title} subtitle={t.holdingBack.subtitle}
+                icon={<ShieldAlert size={16} strokeWidth={2} />}>
+                <MappingPlaceholder control={mapping} body={dict.mapping.holdingPlaceholder} locale={language} />
+              </Widget>
             </div>
           )}
           <div className="order-4 min-w-0">
@@ -356,7 +394,8 @@ function ProjectDashboard({ project }: { project: Project }) {
             <RecentActivity t={t} model={activity} now={now} language={language} emptyHref="/keyword-research" />
           </div>
           <div className="order-6 min-w-0">
-            <CompetitorsWidget t={t} model={competitors} manageHref={competitorView.manageHref ?? `${settingsHref}#competitors`} />
+            <CompetitorsWidget t={t} model={competitors} manageHref={competitorView.manageHref ?? `${settingsHref}#competitors`}
+              mapping={mappingOffered && mapping.mapping.state !== 'done' ? mapping : null} mappingCopy={dict.mapping} />
           </div>
           {/* The latest automatic monthly report, linking to it on the Reports screen. */}
           <div className="order-9 min-w-0 empty:hidden">

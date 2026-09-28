@@ -1,7 +1,8 @@
 /**
  * The AI-visibility tab (W6d, plan section 5): the overview rows around the
- * existing tool, and the rule that a project without a seeding scan keeps the
- * tool exactly as it was.
+ * existing tool, for every project: one without a seeding scan gets the same
+ * rows from its own checks, and a placeholder offering the mapping where only
+ * the scan can know (part B of the UX review, 27.09).
  *
  *   A) the seed GET, answered by the REAL handler (lib/seed-scan/http.ts) over a
  *      FakeAdmin, read into the page's state: seeded, questions still coming,
@@ -10,7 +11,7 @@
  *   C) rows 1, 2 and 4 from the tool's own runs: the tool's score, the change
  *      since the previous check, the engines, the last check, recent activity
  *   D) the rows rendered, in Hebrew and English
- *   E) source guards: no scan = today's tool; the tool's additions are off by
+ *   E) source guards: every project gets the overview; the tool's additions are off by
  *      default; opening the tab spends nothing; competitors are managed in
  *      settings; no raw error text; the copy's place in the dictionaries
  *
@@ -289,12 +290,17 @@ async function main() {
     const page = code(PAGE)
     const section = code(SECTION)
 
-    // No scan: exactly today's tool.
-    check('no scan renders the tool with today\'s props only',
-      /const overviewProps =\s*seed\.kind === 'none'\s*\?\s*\{\}\s*:/.test(page)
+    // Part B of the UX review: EVERY project gets the new tab. No scan no longer means the
+    // older tool on its own; the overview's props are passed whatever the scan says.
+    check('every project gets the overview rows: the overview props are passed unconditionally, no early return of the bare tool',
+      /const overviewProps = \{\s*overviewMode: true,/.test(page)
+      && !/seed\.kind === 'none'\s*\?\s*\{\}/.test(page)
+      && !/if \(seed\.kind === 'none'\) \{\s*return tool\s*\}/.test(page)
       && /const tool = <AIVisibilitySection \{\.\.\.toolProps\} projectKeywords=\{projectKeywords\} \{\.\.\.overviewProps\} \/>/.test(page)
-      && /if \(seed\.kind === 'none'\) \{\s*return tool\s*\}/.test(page)
       && page.split('<AIVisibilitySection').length === 2)
+    check('…and without a scan, the readiness card gives way to the mapping placeholder, offered only when the mapping can be',
+      /seed\.kind === 'none' && mapping\.mapping\.available === true/.test(page) && /<MappingPlaceholder control=\{mapping\}/.test(page)
+      && /readiness && seed\.kind !== 'none' && <ReadinessCard/.test(page))
     const propsBlock = page.match(/const toolProps = \{([\s\S]*?)\n  \}/)?.[1] ?? ''
     const keys = propsBlock.split('\n').map((l) => l.trim().split(':')[0].replace(',', '')).filter(Boolean).sort().join(',')
     // projectKeywords is passed by name (the memoized array reviewer-hardening B11 pins), so it is not in toolProps.

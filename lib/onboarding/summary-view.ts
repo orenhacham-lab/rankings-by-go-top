@@ -253,6 +253,11 @@ export const POLL_MS = 1_500
 export const STALLED_POLL_MS = 15_000
 /** After failed reads the wait doubles, up to this. */
 export const MAX_POLL_MS = 15_000
+/**
+ * While stage B works in the background the summary reads the run rarely, so its
+ * bar can say when the full research is ready, or that it did not finish.
+ */
+export const STAGE_B_POLL_MS = 20_000
 
 /**
  * When to read the run again, or null for not at all: soon while stage A
@@ -263,7 +268,30 @@ export const MAX_POLL_MS = 15_000
  */
 export function pollDelay(run: SeedRunView | null, failures: number, awaiting = false): number | null {
   const phase = runPhase(run)
+  if (!awaiting && phase === 'started' && run && stageBState(run, new Date()) === 'running') {
+    return failures > 0 ? MAX_POLL_MS * 2 : STAGE_B_POLL_MS
+  }
   if (!awaiting && phase !== 'progress' && phase !== 'stalled') return null
   if (failures > 0) return Math.min(MAX_POLL_MS, POLL_MS * 2 ** Math.min(failures, 4))
   return phase === 'stalled' && !awaiting ? STALLED_POLL_MS : POLL_MS
+}
+
+// ── Stage B, for the summary's bar ──────────────────────────────────────────
+
+/** Stage B's cron gives up on a run whose stage began this long ago (lib/seed-scan/store.ts MAX_RESUME_AGE_MS). */
+export const STAGE_B_GIVE_UP_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Where stage B really is, for the summary's bottom bar: `running` while it works
+ * (or its worker is gone and the cron still has it to resume), `done` once it
+ * finished (a partial run too: what it found is saved), `failed` when it failed or
+ * stalled past the cron's day. Null before stage B began.
+ */
+export function stageBState(run: SeedRunView, now: Date): 'running' | 'done' | 'failed' | null {
+  if (run.stage !== 'b') return null
+  if (run.status === 'failed') return 'failed'
+  if (run.status !== 'running') return 'done'
+  if (!run.stalled) return 'running'
+  const started = Date.parse(run.startedAt)
+  return Number.isFinite(started) && now.getTime() - started <= STAGE_B_GIVE_UP_MS ? 'running' : 'failed'
 }

@@ -19,7 +19,16 @@
  * the tool already loads and from GET /api/projects/[id]/seed; opening the tab
  * calls no model and spends nothing, and a check still starts only from the
  * tool's own engine buttons, through the dispatch route and its allowance.
- * A project WITHOUT a scan gets the tool exactly as before.
+ *
+ * EVERY PROJECT GETS THIS TAB (part B of the UX review). A project WITHOUT a scan
+ * (older than it, or the scan's flag off) used to get the tool exactly as it was
+ * before W6d, in its older look. It now gets the same rows: the status bar, the
+ * opening card and recent activity are computed from its own checks
+ * (ai_scan_results, through the tool's runs), its questions are its own, and
+ * competitors are shown read-only with the link to settings. Only what the scan
+ * alone can know (the four readiness checks, the questions it suggests from the
+ * business) is a placeholder that offers the mapping, and only when the mapping
+ * can be offered at all.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -34,7 +43,11 @@ import {
   buildOverview, competitorsSettingsHref, readinessView, readRuns, settingsHref, type OverviewRun,
 } from '@/components/ai-visibility/overview-model'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { createI18n } from '@/lib/ai-visibility/i18n'
+import MappingPlaceholder from '@/components/mapping/MappingPlaceholder'
+import { useMapping } from '@/components/mapping/useMapping'
+import { Telescope } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import type { Project } from '@/lib/supabase/types'
@@ -63,6 +76,8 @@ export default function AIVisibilityPage() {
 }
 
 function ProjectAIVisibility({ project }: { project: Project }) {
+  const { language } = useDashboardLanguage()
+  const mappingCopy = getDashboardDictionary(language).mapping
   const [keywords, setKeywords] = useState<string[]>([])
   // "Manage competitors" links (the keywords tab, the dashboard) open this tab
   // on the competitors. Only that value is honoured; anything else is ignored.
@@ -84,10 +99,11 @@ function ProjectAIVisibility({ project }: { project: Project }) {
   // one page load.
   const projectKeywords = useMemo(() => keywords.filter(Boolean), [keywords])
 
-  // W6d. The seeding scan decides the layout: with a scan run, the overview rows
-  // stand around the tool; without one (the scan's flag off, an older project, a
-  // read that failed) the tool renders exactly as it did before.
-  const { state: seed, questionsArrived } = useSeedPageState(project.id)
+  // The seeding scan no longer decides the layout: every project gets the overview
+  // rows around the tool. The scan only adds what it alone knows.
+  const [seedRefresh, setSeedRefresh] = useState(0)
+  const { state: seed, questionsArrived } = useSeedPageState(project.id, seedRefresh)
+  const mapping = useMapping(project.id, language, useCallback(() => setSeedRefresh((n) => n + 1), []))
   const [runs, setRuns] = useState<OverviewRun[] | 'error' | null>(null)
   const onRunsLoaded = useCallback((raw: unknown[] | null) => setRuns(raw === null ? 'error' : readRuns(raw)), [])
   const overview = useMemo<OverviewData>(() => (runs === null ? null : runs === 'error' ? 'error' : buildOverview(runs)), [runs])
@@ -116,42 +132,51 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     return <div aria-busy="true" className="min-h-[60vh]" data-ai-page="loading" />
   }
 
-  // The overview's additions to the tool; none at all without a scan.
-  const overviewProps =
-    seed.kind === 'none'
-      ? {}
-      : {
-          overviewMode: true,
-          onRunsLoaded,
-          openQueriesWhenEmpty: true,
-          suggestionsRefreshKey: questionsArrived,
-          requestedTab: tabRequest,
-          competitorsSlot: (
-            <CompetitorsReadOnly
-              projectId={project.id}
-              scanDomains={seed.scanCompetitors}
-              manageHref={competitorsSettingsHref(project.id)}
-            />
-          ),
-        }
+  // The overview's additions to the tool, for every project.
+  const overviewProps = {
+    overviewMode: true,
+    onRunsLoaded,
+    openQueriesWhenEmpty: true,
+    suggestionsRefreshKey: questionsArrived,
+    requestedTab: tabRequest,
+    competitorsSlot: (
+      <CompetitorsReadOnly
+        projectId={project.id}
+        scanDomains={seed.kind === 'none' ? [] : seed.scanCompetitors}
+        manageHref={competitorsSettingsHref(project.id)}
+      />
+    ),
+  }
   // The one place the tool is rendered. projectKeywords goes by name: it is the
   // memoized array (reviewer-hardening B11), never a new one per render.
   const tool = <AIVisibilitySection {...toolProps} projectKeywords={projectKeywords} {...overviewProps} />
 
-  // No scan: today's tool, unchanged.
-  if (seed.kind === 'none') {
-    return tool
-  }
-
   const questionsPending = seed.kind === 'questions_pending'
   const readiness = readinessView(seed)
+  // No scan yet: the readiness checks and the scan's questions are the mapping's to find.
+  const mappingCard = seed.kind === 'none' && mapping.mapping.available === true && (
+    <section
+      id="ai-readiness"
+      aria-labelledby="ai-mapping-title"
+      data-ai-readiness="mapping"
+      className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card"
+    >
+      <header className="mb-4 flex items-start gap-3">
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-action-soft text-action ring-1 ring-action/10">
+          <Telescope size={16} />
+        </span>
+        <h2 id="ai-mapping-title" className="text-section font-semibold text-ink">{mappingCopy.aiTitle}</h2>
+      </header>
+      <MappingPlaceholder control={mapping} body={mappingCopy.aiBody} locale={language} withNotice />
+    </section>
+  )
   return (
     <div className="space-y-5 sm:space-y-6" data-ai-page={seed.kind}>
       <OverviewStatusBar overview={overview} questionsPending={questionsPending} />
       <OverviewOpeningCard
         overview={overview}
         questionsPending={questionsPending}
-        questionsSuggested={seed.questionsSuggested}
+        questionsSuggested={seed.kind === 'none' ? null : seed.questionsSuggested}
         onChooseQuestions={chooseQuestions}
       />
       <div ref={toolRef} className="scroll-mt-4">
@@ -159,7 +184,8 @@ function ProjectAIVisibility({ project }: { project: Project }) {
       </div>
       <div className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
         <RecentActivity overview={overview} />
-        {readiness && <ReadinessCard view={readiness} scannedAt={seed.scannedAt} settingsHref={settingsHref(project.id)} />}
+        {readiness && seed.kind !== 'none' && <ReadinessCard view={readiness} scannedAt={seed.scannedAt} settingsHref={settingsHref(project.id)} />}
+        {mappingCard}
       </div>
     </div>
   )

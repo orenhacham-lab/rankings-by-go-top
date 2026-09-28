@@ -13,11 +13,17 @@
  */
 import type { SeedResearchOrigin, SeedResearchRow } from '@/lib/seed-scan/research'
 
-export type ScanOrigin = SeedResearchOrigin
+/**
+ * Where a keyword of the research came from: one of the scan's seeds, or
+ * `manual`, a research the project ran before (or besides) the scan — any row of
+ * the project's keyword_research_cache that is not the scan's own. An older
+ * project's research is data like any other: it is shown, never hidden.
+ */
+export type ScanOrigin = SeedResearchOrigin | 'manual'
 /** The order origins are listed in, whatever order the rows came in. */
-export const SCAN_ORIGINS: readonly ScanOrigin[] = ['seed_keywords', 'home_page', 'site', 'competitor']
-/** "From the research": what the scan found from the site itself. */
-export const RESEARCH_ORIGINS: readonly ScanOrigin[] = ['seed_keywords', 'home_page', 'site']
+export const SCAN_ORIGINS: readonly ScanOrigin[] = ['seed_keywords', 'home_page', 'site', 'competitor', 'manual']
+/** "From the research": what was found for the site itself (by the scan, or by a research the owner ran). */
+export const RESEARCH_ORIGINS: readonly ScanOrigin[] = ['seed_keywords', 'home_page', 'site', 'manual']
 
 export type Competition = 'LOW' | 'MEDIUM' | 'HIGH'
 
@@ -58,6 +64,12 @@ export interface ScanResearch {
   /** More keywords were found than MAX_SCAN_KEYWORDS; the list keeps the most searched. */
   truncated: boolean
   tracked: TrackedKeyword[]
+  /**
+   * What the keywords come from, for the overview's source line: the scan's rows,
+   * and the newest of the project's own research rows (null when there is none).
+   * Absent from an older answer, which only ever carried the scan's rows.
+   */
+  sources?: { scan: boolean; manualAt: string | null }
 }
 
 export const SCAN_RESEARCH_ERROR_CODES = ['unauthorized', 'not_found', 'invalid_request', 'internal', 'unavailable'] as const
@@ -115,7 +127,10 @@ type Entry = KeywordIdea & { origins: Set<ScanOrigin>; competitors: Set<string> 
  * its metrics win for a keyword several rows found, with a field it lacks taken
  * from an older row. Relevance is decided later, on the server.
  */
-export function mergeSeedResearch(rows: readonly SeedResearchRow[], max = MAX_SCAN_KEYWORDS): Omit<ScanResearch, 'tracked' | 'keywords'> & { keywords: Omit<ScanKeyword, 'relevant'>[] } {
+/** A research row: one of the scan's, or one of the project's own (origin `manual`). */
+export type ResearchRow = Omit<SeedResearchRow, 'origin'> & { origin: ScanOrigin }
+
+export function mergeSeedResearch(rows: readonly ResearchRow[], max = MAX_SCAN_KEYWORDS): Omit<ScanResearch, 'tracked' | 'keywords' | 'sources'> & { keywords: Omit<ScanKeyword, 'relevant'>[] } {
   const sorted = [...rows].sort((a, b) => time(b.fetchedAt) - time(a.fetchedAt))
   const newest = sorted[0]
   if (!newest) return { market: null, fetchedAt: null, keywords: [], truncated: false }

@@ -13,23 +13,26 @@ import { AlertOctagon, CheckCircle2, CircleDashed, Lock, ShieldAlert, XCircle } 
 import { cn } from '@/lib/utils'
 import type { GeoCheck, HoldingBack as HoldingBackModel } from '@/lib/dashboard/seed'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-import { LinkButton, StatusPill, Widget, WidgetEmpty, WidgetLoading } from './ui'
+import { HeaderLink, LinkButton, StatusPill, Widget, WidgetEmpty, WidgetLoading } from './ui'
 
 type Copy = DashboardDictionary['dashboardHome']
 
-export default function HoldingBack({ t, model, scannedLabel, settingsHref }: {
+export default function HoldingBack({ t, model, scannedLabel, settingsHref, summary }: {
   t: Copy
   model: HoldingBackModel
   /** "Scanned 2 hours ago", already in the merchant's language; null when unknown. */
   scannedLabel: string | null
   settingsHref: string
+  /** The research summary of the scan, when it can be opened: its link and its name. */
+  summary?: { href: string; label: string } | null
 }) {
   const h = t.holdingBack
   const icon = <ShieldAlert size={16} strokeWidth={2} />
   const subtitle = model.state === 'ready' && scannedLabel ? `${h.subtitle} · ${scannedLabel}` : h.subtitle
 
   return (
-    <Widget id="holding-back" state={model.state} title={h.title} subtitle={subtitle} icon={icon} tone={model.state === 'ready' ? 'attention' : 'default'}>
+    <Widget id="holding-back" state={model.state} title={h.title} subtitle={subtitle} icon={icon} tone={model.state === 'ready' ? 'attention' : 'default'}
+      action={summary ? <HeaderLink href={summary.href}>{summary.label}</HeaderLink> : undefined}>
       {model.state === 'pending' && (
         <div className="space-y-3">
           <p className="text-copy font-medium text-ink">{h.pendingTitle}</p>

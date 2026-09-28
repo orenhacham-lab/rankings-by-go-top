@@ -14,12 +14,13 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Globe, Search } from 'lucide-react'
+import { Globe, MessageCircle, Plug, Search, SquarePen } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { HANDOFF_NOTICE_PARAM, HANDOFF_WAIT_PARAM } from '@/lib/onboarding/handoff'
-import { settingsHref, summaryHref } from '@/lib/onboarding/links'
+import { platformSetupHref } from '@/lib/content/content-hub-setup'
+import { FAILURES_WITH_WAYS_AROUND, settingsHref, summaryHref, SUPPORT_WHATSAPP_HREF } from '@/lib/onboarding/links'
 import { OFFLINE_NOTICE, stageFailureNotice, startNotice, type Notice } from '@/lib/onboarding/notices'
 import { failureCode, runPhase } from '@/lib/onboarding/summary-view'
 import type { SummarySurface } from '@/lib/onboarding/surfaces'
@@ -136,6 +137,33 @@ export default function SeedRunScreen({
     action = (
       <SeedNotice notice={startRefusal} projectId={projectId} returnPath={returnPath} onRetry={() => void startScan()} onRefresh={refresh} busy={starting} />
     )
+  } else if (failure && (FAILURES_WITH_WAYS_AROUND as readonly string[]).includes(failure.key)) {
+    // P0-6: the site refuses automated reads, so "try again" alone is a dead end. Three
+    // ways on instead: connect its platform (the connections section of settings),
+    // continue without a scan (the project exists; its details are filled by hand),
+    // or talk to us.
+    action = (
+      <div className="flex flex-wrap items-center gap-3" data-seed-ways-around>
+        <ActionLink href={platformSetupHref(projectId)} size="lg">
+          <Plug className="h-4 w-4" aria-hidden />
+          {t.actions.connectPlatform}
+        </ActionLink>
+        <ActionLink href={settingsHref(projectId, 'business')} size="lg" variant="secondary">
+          <SquarePen className="h-4 w-4" aria-hidden />
+          {t.actions.continueWithoutScan}
+        </ActionLink>
+        <a
+          href={SUPPORT_WHATSAPP_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-way="support"
+          className="inline-flex h-12 items-center gap-2 rounded-control px-4 text-base font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+        >
+          <MessageCircle className="h-4 w-4" aria-hidden />
+          {t.actions.talkToUs}
+        </a>
+      </div>
+    )
   } else if (failure?.action === 'settings') {
     action = <ActionLink href={settingsHref(projectId)} size="lg">{t.actions.settings}</ActionLink>
   } else {
@@ -163,7 +191,8 @@ export default function SeedRunScreen({
 
 function Frame({ screen, children }: { screen: string; children: ReactNode }) {
   return (
-    <section className="mx-auto w-full max-w-3xl pt-2 md:pt-10" data-seed-screen={screen}>
+    // Start-aligned with the screen's header, at most 640px wide (P2-4).
+    <section className="w-full max-w-[640px] pt-2 md:pt-10" data-seed-screen={screen}>
       {children}
     </section>
   )

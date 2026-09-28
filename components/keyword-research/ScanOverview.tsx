@@ -20,7 +20,7 @@ import { formatMoney, formatResearchDate } from '@/lib/keyword-research/format'
 import type { ResearchTotals } from '@/lib/keyword-research/scan-research'
 
 export default function ScanOverview({
-  totals, easyWins, mode, domain, fetchedAt, running, truncated, onBackToScan,
+  totals, easyWins, mode, domain, fetchedAt, running, truncated, onBackToScan, sourceOverride,
 }: {
   totals: ResearchTotals
   easyWins: number
@@ -32,14 +32,16 @@ export default function ScanOverview({
   running: boolean
   truncated: boolean
   onBackToScan?: () => void
+  /** Where the research came from, when it is not the scan alone (the project's own research, with its date). */
+  sourceOverride?: string
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan
   const date = mode === 'scan' ? formatResearchDate(fetchedAt, language) : null
   const badge = mode === 'manual' ? t.overview.badgeManual : running ? t.overview.badgeRunning : t.overview.badgeDone
-  const source = mode === 'manual'
+  const source = sourceOverride ?? (mode === 'manual'
     ? t.overview.fromManual
-    : `${domain ? t.overview.fromScan(domain) : t.overview.fromScanSite}${date ? ` · ${t.overview.asOf(date)}` : ''}`
+    : `${domain ? t.overview.fromScan(domain) : t.overview.fromScanSite}${date ? ` · ${t.overview.asOf(date)}` : ''}`)
   const meta = [
     totals.competitors > 0 ? t.overview.competitors(formatCount(totals.competitors, language)) : null,
     t.overview.easyWins(formatCount(easyWins, language)),

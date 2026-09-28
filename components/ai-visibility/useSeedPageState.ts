@@ -33,7 +33,8 @@ async function readSeed(projectId: string): Promise<SeedPageState> {
   }
 }
 
-export function useSeedPageState(projectId: string): { state: SeedPageState; questionsArrived: number } {
+/** `refreshKey`: bumped to read the scan again (a mapping started on the page has just ended). */
+export function useSeedPageState(projectId: string, refreshKey = 0): { state: SeedPageState; questionsArrived: number } {
   const [state, setState] = useState<SeedPageState>({ kind: 'loading' })
   // Bumped each time the scan stops preparing questions, so the tool reloads them.
   const [questionsArrived, setQuestionsArrived] = useState(0)
@@ -69,7 +70,7 @@ export function useSeedPageState(projectId: string): { state: SeedPageState; que
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [projectId])
+  }, [projectId, refreshKey])
 
   return { state, questionsArrived }
 }

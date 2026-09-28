@@ -1,16 +1,19 @@
 /**
- * GET /api/keyword-research/scan — the seeding scan's research, for the research
- * tab: who may read it, what it reads, and what it never does.
+ * GET /api/keyword-research/scan — a project's keyword research (the seeding
+ * scan's and the project's own), for the research tab: who may read it, what it
+ * reads, and what it never does.
  *
  * The handler (lib/keyword-research/scan-route.ts) runs against an in-memory
  * Supabase (FakeAdmin) through recording clients, with the engine's REAL site
- * vocabulary reader and the REAL admin-role check:
+ * vocabulary reader:
  *
  *  A1-A5) signed in, else 401; the project is the caller's, else 404 (a malformed
- *         id and a stranger's project answer the same); the scan's flag or an
- *         admin, else 404; the service role is not touched before ownership;
+ *         id and a stranger's project answer the same); the service role is not
+ *         touched before ownership; the scan's flag and the caller's role are
+ *         never asked: an unscanned project reads its own research too (A5);
  *  A6-A7) every read names the owner (the session client) or the proven project
- *         (the service role's vocabulary read); nothing of another account leaks;
+ *         (the service role's vocabulary read); the project's own research is
+ *         read beside the scan's; nothing of another account leaks;
  *  A8)    relevance is the engine's own filter, with b2's vocabulary rule;
  *  A9)    the answer: the merged research, the tracked keywords, never cached;
  *  A10)   every failure is a stable code; no database text in a body or a log;
@@ -87,7 +90,7 @@ const { FakeAdmin } = require('../../__qa__/_fake-admin') as typeof import('../.
 const { handleScanResearchGet, MAX_TRACKED } = require('../scan-route') as typeof import('../scan-route')
 const { SCAN_RESEARCH_ERROR_CODES } = require('../scan-research') as typeof import('../scan-research')
 const { buildSiteVocabulary } = require('../../content/recommendations/engine') as typeof import('../../content/recommendations/engine')
-const { isAdminUser } = require('../../auth/admin-role') as typeof import('../../auth/admin-role')
+const { MAX_MANUAL_ROWS } = require('../project-research') as typeof import('../project-research')
 const { researchKeywordIssue, MIN_SITE_VOCAB_TOKENS } = require('../../content/recommendations/keyword-research') as typeof import('../../content/recommendations/keyword-research')
 const { tokens } = require('../../content/recommendations/dedupe') as typeof import('../../content/recommendations/dedupe')
 
@@ -128,8 +131,11 @@ function tables(): Record<string, Record<string, unknown>[]> {
       ]),
       cacheRow(OWNER, PROJECT, 'url', 'seed:site:runshop.co.il', '2026-09-20T08:02:00Z', [kw('איך לבחור נעלי ריצה', 320, 'LOW', 0.6, 2.2), kw('נעלי ריצה לנשים', 2800, 'MEDIUM')]),
       cacheRow(OWNER, PROJECT, 'url', 'seed:competitor:rival.co.il', '2026-09-20T08:03:00Z', [kw('נעלי שטח לנשים', 700, 'LOW', 1, 3), kw('מכונת כביסה', 5000, 'LOW', 1, 2)]),
-      // Written by the engine's own research, not the scan's: not part of it.
-      cacheRow(OWNER, PROJECT, 'url', 'https://runshop.co.il/', '2026-09-21T08:00:00Z', [kw('LEAK engine row', 999, 'LOW')]),
+      // The project's own research, not the scan's (the owner's, or the engine's demand research): read as `manual`.
+      cacheRow(OWNER, PROJECT, 'url', 'https://runshop.co.il/', '2026-09-21T08:00:00Z', [kw('נעלי ריצה במבצע', 999, 'LOW')]),
+      // …but never another account's, on this project id, or the owner's other project's.
+      cacheRow(STRANGER, PROJECT, 'keyword', 'LEAK stranger manual', '2026-09-23T08:00:00Z', [kw('LEAK stranger manual', 999, 'LOW')]),
+      cacheRow(OWNER, OWNERS_SECOND, 'keyword', 'LEAK second manual', '2026-09-23T08:00:00Z', [kw('LEAK second manual', 999, 'LOW')]),
       // Another account's rows, on this project id and on its own project.
       cacheRow(STRANGER, PROJECT, 'url', 'seed:site:stranger.co.il', '2026-09-22T08:00:00Z', [kw('LEAK stranger row', 999, 'LOW')]),
       cacheRow(STRANGER, OTHER_PROJECT, 'url', 'seed:site:other.co.il', '2026-09-22T08:00:00Z', [kw('LEAK other project', 999, 'LOW')]),
@@ -178,13 +184,13 @@ function recordingClient(db: InstanceType<typeof FakeAdmin>, client: Query['clie
 }
 
 type Run = {
-  status: number; body: any; cacheControl: string | null; log: Query[]; adminCreatedAt: number[]; isAdminAsked: number
+  status: number; body: any; cacheControl: string | null; log: Query[]; adminCreatedAt: number[]
   vocabularyCalls: { projectId: string; extras: string[]; userId: string }[]; errors: string[]
 }
 
 async function call(opts: {
-  user?: string | null; projectId?: string; env?: Record<string, string>; hooks?: Record<string, any>
-  sessionThrows?: boolean; vocabulary?: Deps['vocabulary']; isAdminThrows?: boolean; sessionFromThrows?: boolean
+  user?: string | null; projectId?: string; env?: Record<string, string | undefined>; hooks?: Record<string, any>
+  sessionThrows?: boolean; vocabulary?: Deps['vocabulary']; sessionFromThrows?: boolean
 }): Promise<Run> {
   const data = tables()
   const hooks = opts.hooks ?? {}
@@ -193,7 +199,6 @@ async function call(opts: {
   const log: Query[] = []
   const adminCreatedAt: number[] = []
   const vocabularyCalls: Run['vocabularyCalls'] = []
-  let isAdminAsked = 0
   const errors: string[] = []
   const origError = console.error
   console.error = (...args: unknown[]) => { errors.push(args.map((a) => (a instanceof Error ? `${a.name}: ${a.message}` : typeof a === 'string' ? a : JSON.stringify(a))).join(' ')) }
@@ -205,18 +210,24 @@ async function call(opts: {
       return { userId: opts.user === undefined ? OWNER : opts.user, db: session }
     },
     admin: () => { adminCreatedAt.push(++seq); return recordingClient(adminDb, 'admin', log) },
-    isAdmin: async (admin, userId) => { isAdminAsked++; if (opts.isAdminThrows) throw new Error(SECRET); return isAdminUser(admin, userId) },
     vocabulary: async (admin, projectId, extras, userId) => {
       vocabularyCalls.push({ projectId, extras, userId })
       return (opts.vocabulary ?? buildSiteVocabulary)(admin, projectId, extras, userId)
     },
-    env: opts.env ?? { ENABLE_SEED_SCAN: 'true' },
   }
+  // The scan's flag, as the process would have it: the route must not care. On unless
+  // a scenario says otherwise, so a gate put back decides A5 alone (its mutation control).
+  const savedFlag = process.env.ENABLE_SEED_SCAN
+  const flag = opts.env && 'ENABLE_SEED_SCAN' in opts.env ? opts.env.ENABLE_SEED_SCAN : 'true'
+  if (flag === undefined) delete process.env.ENABLE_SEED_SCAN
+  else process.env.ENABLE_SEED_SCAN = flag
   try {
     const res = await handleScanResearchGet(new Request(`http://localhost/api/keyword-research/scan?projectId=${encodeURIComponent(opts.projectId ?? PROJECT)}`), deps)
-    return { status: res.status, body: await res.json(), cacheControl: res.headers.get('cache-control'), log, adminCreatedAt, isAdminAsked, vocabularyCalls, errors }
+    return { status: res.status, body: await res.json(), cacheControl: res.headers.get('cache-control'), log, adminCreatedAt, vocabularyCalls, errors }
   } finally {
     console.error = origError
+    if (savedFlag === undefined) delete process.env.ENABLE_SEED_SCAN
+    else process.env.ENABLE_SEED_SCAN = savedFlag
   }
 }
 
@@ -249,24 +260,26 @@ async function main() {
     stranger.status === 404 && show(stranger.body) === show(missing.body) && show(stranger.body) === show({ ok: false, code: 'not_found' })
     && stranger.log.length === 1 && stranger.log[0].table === 'projects' && stranger.adminCreatedAt.length === 0 && missing.adminCreatedAt.length === 0,
     show({ body: stranger.body, tables: stranger.log.map((q) => q.table) }))
-  const flagOff = await run('flag off', { env: {} })
-  const flagOffAdmin = await run('flag off, admin', { env: {}, user: ADMIN, projectId: ADMIN_PROJECT })
-  const flagOffBroken = await run('flag off, role unreadable', { env: {}, isAdminThrows: true })
-  const flagOn = await call({})
+  const flagOff = await run('flag off', { env: { ENABLE_SEED_SCAN: undefined } })
+  const flagOffAdmin = await run('flag off, admin', { env: { ENABLE_SEED_SCAN: undefined }, user: ADMIN, projectId: ADMIN_PROJECT })
+  const flagOn = await call({ env: { ENABLE_SEED_SCAN: 'true' } })
   all.push(flagOn)
-  check('A5: with the scan switched off only an admin reads it (the role from profiles, read after ownership); anyone else, or an unreadable role, gets 404; with it on, the role is not asked',
-    flagOff.status === 404 && flagOff.body.code === 'not_found' && !flagOff.log.some((q) => q.table === 'keyword_research_cache')
-    && flagOffAdmin.status === 200 && flagOffAdmin.body.keywords.length === 1
-    && flagOffBroken.status === 404 && flagOn.status === 200 && flagOn.isAdminAsked === 0 && !flagOn.log.some((q) => q.table === 'profiles')
-    && flagOff.log.find((q) => q.table === 'profiles')?.client === 'admin' && eqs(flagOff.log.find((q) => q.table === 'profiles')).id === OWNER
-    && flagOff.adminCreatedAt[0] > (flagOff.log.find((q) => q.table === 'projects')?.seq ?? Infinity),
-    show({ off: flagOff.status, admin: flagOffAdmin.status, broken: flagOffBroken.status, on: flagOn.status, asked: flagOn.isAdminAsked }))
+  const routeSrc = readFileSync(join(__dirname, '..', 'scan-route.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  check('A5: every owner reads their project\'s research whether the scan is switched on or not, with the same answer; the role is never read and the route names neither the flag nor the role (an unscanned project is not a second-class one)',
+    flagOff.status === 200 && flagOn.status === 200 && show(flagOff.body) === show(flagOn.body)
+    && flagOffAdmin.status === 200 && flagOffAdmin.body.keywords?.length === 1
+    && !all.some((r) => r.log.some((q) => q.table === 'profiles'))
+    && !/ENABLE_SEED_SCAN|isAdmin|deps\.env/.test(routeSrc),
+    show({ off: flagOff.status, admin: flagOffAdmin.status, on: flagOn.status, same: show(flagOff.body) === show(flagOn.body), profiles: all.filter((r) => r.log.some((q) => q.table === 'profiles')).length }))
 
   console.log('\nB) what it reads')
   {
     const s = (t: string) => flagOn.log.find((q) => q.client === 'session' && q.table === t)
-    const project = eqs(s('projects')), research = eqs(s('keyword_research_cache')), tracked = eqs(s('tracking_targets')), runRow = eqs(s('project_seed_runs'))
-    const like = s('keyword_research_cache')?.calls.find(([m]) => m === 'like')?.[1]
+    const researchReads = flagOn.log.filter((q) => q.client === 'session' && q.table === 'keyword_research_cache')
+    const project = eqs(s('projects')), research = eqs(researchReads[0]), own = eqs(researchReads[1]), tracked = eqs(s('tracking_targets')), runRow = eqs(s('project_seed_runs'))
+    const like = researchReads[0]?.calls.find(([m]) => m === 'like')?.[1]
+    const notLike = researchReads[1]?.calls.find(([m]) => m === 'not')?.[1]
+    const ownLimit = researchReads[1]?.calls.find(([m]) => m === 'limit')?.[1]?.[0]
     const limit = s('tracking_targets')?.calls.find(([m]) => m === 'limit')?.[1]?.[0]
     const sessionTables = [...new Set(flagOn.log.filter((q) => q.client === 'session').map((q) => q.table))].sort()
     const adminQueries = flagOn.log.filter((q) => q.client === 'admin')
@@ -278,18 +291,22 @@ async function main() {
       return false
     })
     const writes = all.flatMap((r) => r.log.flatMap((q) => q.calls.filter(([m]) => WRITES.has(m)).map(([m]) => `${q.client}:${q.table}.${m}`)))
-    check('A6: every read names the owner: the project (id and owner), the research (owner, project, the scan\'s rows only), the tracked keywords and the run; the service role reads the proven project\'s site index only, after ownership; nothing is written',
+    check('A6: every read names the owner: the project (id and owner), the scan\'s research (owner, project, `seed:` rows), the project\'s own research (owner, project, every other row, 20 at most), the tracked keywords and the run; the service role reads the proven project\'s site index only, after ownership; nothing is written',
       project.id === PROJECT && project.user_id === OWNER
+      && researchReads.length === 2
       && research.project_id === PROJECT && research.user_id === OWNER && show(like) === show(['seed_value', 'seed:%'])
+      && own.project_id === PROJECT && own.user_id === OWNER && show(notLike) === show(['seed_value', 'like', 'seed:%']) && ownLimit === MAX_MANUAL_ROWS
       && tracked.project_id === PROJECT && tracked.user_id === OWNER && limit === MAX_TRACKED
       && runRow.project_id === PROJECT && runRow.user_id === OWNER
       && show(sessionTables) === show(['keyword_research_cache', 'project_seed_runs', 'projects', 'tracking_targets'])
       && adminQueries.length > 0 && adminOk && adminQueries.every((q) => q.seq > projectSeq) && flagOn.adminCreatedAt.every((t) => t > projectSeq)
       && writes.length === 0,
-      show({ project, research, like, tracked, limit, runRow, sessionTables, admin: adminQueries.map((q) => [q.table, eqs(q)]), writes }))
+      show({ project, research, like, own, notLike, ownLimit, tracked, limit, runRow, sessionTables, admin: adminQueries.map((q) => [q.table, eqs(q)]), writes }))
     const text = show(flagOn.body)
-    check('A7: nothing of another account, another project or the engine\'s own research reaches the answer',
-      flagOn.status === 200 && !text.includes('LEAK') && flagOn.body.tracked.length === 2, text.match(/LEAK[^"]*/g)?.join(', '))
+    const ownRow = flagOn.body.keywords.find((k: any) => k.keyword === 'נעלי ריצה במבצע')
+    check('A7: the project\'s own research reaches the answer, marked `manual`; nothing of another account or another project does',
+      flagOn.status === 200 && !text.includes('LEAK') && flagOn.body.tracked.length === 2 && show(ownRow?.origins) === show(['manual']),
+      show({ leaks: text.match(/LEAK[^"]*/g), own: ownRow }))
   }
 
   console.log('\nC) relevance, with the engine\'s own filter')
@@ -321,9 +338,10 @@ async function main() {
     const t2 = b.tracked.find((t: any) => t.id === 't2')
     const okHeaders = all.filter((r) => r.status === 200).every((r) => r.cacheControl === 'no-store')
     check('A9: one merged list (most searched first, every seed that found it), the market, the tracked keywords with their stored metrics; never cached',
-      show(keys) === show(['ok', 'market', 'fetchedAt', 'keywords', 'truncated', 'tracked']) && b.ok === true
-      && show(b.market) === show({ country: 'IL', language: 'he' }) && b.fetchedAt === '2026-09-20T08:03:00Z' && b.truncated === false
-      && show(b.keywords.map((k: any) => k.keyword)) === show(['נעליים', 'נעלי ריצה', 'מכונת כביסה', 'נעלי ריצה לנשים', 'run shop', 'pegasus runners', 'נעלי שטח לנשים', 'איך לבחור נעלי ריצה'])
+      show(keys) === show(['ok', 'market', 'fetchedAt', 'keywords', 'truncated', 'tracked', 'sources']) && b.ok === true
+      && show(b.market) === show({ country: 'IL', language: 'he' }) && b.fetchedAt === '2026-09-21T08:00:00Z' && b.truncated === false
+      && show(b.sources) === show({ scan: true, manualAt: '2026-09-21T08:00:00Z' })
+      && show(b.keywords.map((k: any) => k.keyword)) === show(['נעליים', 'נעלי ריצה', 'מכונת כביסה', 'נעלי ריצה לנשים', 'run shop', 'נעלי ריצה במבצע', 'pegasus runners', 'נעלי שטח לנשים', 'איך לבחור נעלי ריצה'])
       && show(shoes?.origins) === show(['seed_keywords', 'site']) && shoes?.avgMonthlySearches === 2800
       && show(b.keywords.find((k: any) => k.keyword === 'נעלי שטח לנשים')?.competitors) === show(['rival.co.il'])
       && b.tracked[0].metrics?.avgMonthlySearches === 12100 && t2?.metrics === null && okHeaders,
@@ -376,10 +394,10 @@ async function main() {
     const route = readFileSync(join(__dirname, '..', '..', '..', 'app', 'api', 'keyword-research', 'scan', 'route.ts'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
     const exported = [...route.matchAll(/export\s+(?:async\s+)?(?:function|const)\s+(\w+)/g)].map((m) => m[1]).sort()
-    check('A13: the route wires the real session (createClient + auth.getUser), the service role, isAdminUser, the engine\'s vocabulary and the environment; it exports GET only',
+    check('A13: the route wires the real session (createClient + auth.getUser), the service role and the engine\'s vocabulary, and no flag or role; it exports GET only',
       /createClient\(\)/.test(route) && /\.auth\.getUser\(\)/.test(route) && /admin:\s*\(\)\s*=>\s*createAdminClient\(\)/.test(route)
-      && /isAdminUser\(admin,\s*userId\)/.test(route) && /buildSiteVocabulary\(admin,\s*projectId,\s*extras,\s*userId\)/.test(route)
-      && /env:\s*process\.env\b/.test(route) && /handleScanResearchGet\(request,/.test(route)
+      && /buildSiteVocabulary\(admin,\s*projectId,\s*extras,\s*userId\)/.test(route)
+      && !/isAdminUser|process\.env/.test(route) && /handleScanResearchGet\(request,/.test(route)
       && show(exported) === show(['GET', 'dynamic', 'runtime']),
       show(exported))
   }

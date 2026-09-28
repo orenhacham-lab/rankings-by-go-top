@@ -14,6 +14,10 @@ import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
 import { useScanResearch } from '@/components/keyword-research/useScanResearch'
 import ScanOverview from '@/components/keyword-research/ScanOverview'
+import ResearchStart from '@/components/keyword-research/ResearchStart'
+import Header from '@/components/layout/Header'
+import { useMapping } from '@/components/mapping/useMapping'
+import { formatResearchDate } from '@/lib/keyword-research/format'
 import { ScanEmptyCard, ScanLoadingSkeleton, ScanPendingCard, ScanRunningCard } from '@/components/keyword-research/ScanCards'
 import ResearchFormBar, { ResearchFormClose } from '@/components/keyword-research/ResearchFormBar'
 import EasyWins from '@/components/keyword-research/EasyWins'
@@ -205,9 +209,11 @@ export default function KeywordResearchPage() {
   const [trendCache, setTrendCache] = useState<Map<string, TrendData>>(new Map())
   const [trendData, setTrendData] = useState<TrendData | undefined>()
 
-  // ── The seeding scan's research (components/keyword-research, lib/keyword-research) ──
-  // With no scan (the flag off, an older project, a read that failed), everything
-  // below renders exactly today's screen (components/keyword-research/__qa__/legacy-screen.qa.ts).
+  // ── The project's research (components/keyword-research, lib/keyword-research) ──
+  // Every project opens on the same research screen (part B of the UX review): the
+  // scan's research, the project's own when it has no scan, or the screen's empty
+  // start (a keyword field, and the mapping when it can be offered). The older form
+  // is one click away, never the screen (components/keyword-research/__qa__/legacy-screen.qa.ts).
   // Until the first answer is in (the project list, then the scan's two reads), the
   // screen is the research screen's skeleton, never today's form: a project WITH
   // research used to see that form, in the older look, until its research replaced
@@ -221,6 +227,9 @@ export default function KeywordResearchPage() {
   const firstAnswerPending = !projectsResolved || scanView.kind === 'loading'
   const scanKeywords = scanOn?.kind === 'seeded' ? scanOn.research.keywords : NO_SCAN_KEYWORDS
   const scanTracked = scanOn ? scanOn.tracked : NO_TRACKED
+  const unseeded = scanView.kind === 'unseeded'
+  // The mapping, offered on the empty start; its end reads the research again.
+  const mapping = useMapping(activeProjectId, language, scan.retry)
   // A research the merchant runs from the form takes the screen until they go back to the scan's.
   const [manualActive, setManualActive] = useState(false)
   const [chip, setChip] = useState<ResearchChip>('all')
@@ -244,7 +253,15 @@ export default function KeywordResearchPage() {
   )
   // The table's rows: the active chip's, with the scan's research on screen; otherwise the results, as always.
   const tableSource: KeywordIdeaResult[] = scanMode && model.mode ? model.chipRows : results
-  const formOpen = !scanMode || (formChoice ?? (!(model.mode || scanView.kind === 'pending') || loading || !!error))
+  // With no research yet (the empty start), the start's own field runs the research: the form opens only when asked.
+  const formOpen = !scanMode || (formChoice ?? (unseeded ? false : (!(model.mode || scanView.kind === 'pending') || loading || !!error)))
+  const researchStartShown = unseeded && !model.mode && !formOpen
+  // Where the research on screen came from, when the project's own research is part of it.
+  const researchSources = scanOn?.kind === 'seeded' ? scanOn.research.sources : undefined
+  const ownResearchDate = researchSources?.manualAt ? formatResearchDate(researchSources.manualAt, language) : null
+  const sourceOverride = model.mode === 'scan' && researchSources && ownResearchDate
+    ? (researchSources.scan ? dict.mapping.researchSourceBoth(ownResearchDate) : dict.mapping.researchSourceManual(ownResearchDate))
+    : undefined
 
   // Parse multiple keywords from comma/semicolon/newline separated input
   const parseKeywords = (input: string): string[] => {
@@ -916,12 +933,7 @@ export default function KeywordResearchPage() {
     <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} retry={gscKeywords.retry} />
   ) : null
 
-  const header = (
-    <div className={`mb-8 ${isRTL ? 'text-right' : 'text-left'}`}>
-      <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
-      <p className="text-slate-600 dark:text-slate-300">{t.subtitle}</p>
-    </div>
-  )
+  const header = <Header title={t.title} subtitle={t.subtitle} />
 
   // Nothing is known yet about which screen this is: its skeleton, not today's form.
   if (firstAnswerPending) {
@@ -954,12 +966,24 @@ export default function KeywordResearchPage() {
           running={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.running}
           truncated={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.research.truncated}
           onBackToScan={model.mode === 'manual' && scanKeywords.length > 0 ? backToScan : undefined}
+          sourceOverride={sourceOverride}
+        />
+      )}
+      {researchStartShown && (
+        <ResearchStart
+          locale={language}
+          keyword={keyword}
+          onKeyword={(value) => { setResearchType('keyword'); setKeyword(value) }}
+          onSubmit={submitResearch}
+          loading={loading}
+          onAdvanced={() => setFormChoice(true)}
+          mapping={mapping}
         />
       )}
 
       {/* Form */}
-      {scanMode && !formOpen && <ResearchFormBar onOpen={() => setFormChoice(true)} />}
-      {scanMode && formOpen && model.mode && <ResearchFormClose onClose={() => setFormChoice(false)} />}
+      {scanMode && !formOpen && !researchStartShown && <ResearchFormBar onOpen={() => setFormChoice(true)} />}
+      {scanMode && formOpen && (model.mode || unseeded) && <ResearchFormClose onClose={() => setFormChoice(false)} />}
       <div hidden={scanMode && !formOpen ? true : undefined} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6 mb-8">
         <form onSubmit={submitResearch} className="space-y-4">
           {/* Research type */}

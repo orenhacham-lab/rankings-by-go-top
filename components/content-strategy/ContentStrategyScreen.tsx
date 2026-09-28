@@ -8,7 +8,9 @@
  *   row 0  where the plan comes from: the seeding scan's step b4, or, until it is
  *          ready, the topics its stage A found (SeedPlanNotice, and the board's ideas)
  *   row 1  the next article, its date, and why it was chosen (NextArticleCard)
- *   row 2  the month board: ideas, planned, written, published (StrategyBoard)
+ *   row 2  the month board: ideas, planned, written, published (StrategyBoard); its
+ *          ideas include the tracked keywords the site already ranks 4 to 20 for
+ *          (useRankingIdeas), which need no scan
  *   row 3  the list view, which IS the two old screens, unchanged: the automatic ideas
  *          and the publishing queue with its cadence (AutomationScreen), then the
  *          topics with their link plans (TopicsScreen). Every existing control lives
@@ -36,6 +38,7 @@ import {
   type StrategyView,
 } from '@/lib/content/strategy/view'
 import { useStrategyData } from './useStrategyData'
+import { useRankingIdeas } from './useRankingIdeas'
 import NextArticleCard from './NextArticleCard'
 import StrategyBoard from './StrategyBoard'
 import SeedPlanNotice, { PlanBasis } from './SeedPlanNotice'
@@ -127,10 +130,13 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
   // Whatever the workspace reloads (topics, articles, the queue), the board follows.
   const refreshKey = useMemo(() => ({ topics, data, automationRefresh }), [topics, data, automationRefresh])
   const strategy = useStrategyData(projectId, refreshKey)
+  const ranking = useRankingIdeas(projectId)
   const board = useMemo(
-    () => (strategy.data ? buildStrategyBoard({ data: strategy.data, queue: strategy.queue, seed: strategy.seed }) : null),
-    [strategy.data, strategy.queue, strategy.seed],
+    () => (strategy.data ? buildStrategyBoard({ data: strategy.data, queue: strategy.queue, seed: strategy.seed, ranking }) : null),
+    [strategy.data, strategy.queue, strategy.seed, ranking],
   )
+  // A project with no scan: its ideas column says the mapping will add more, when the mapping can be offered.
+  const ideasNote = strategy.seed.state === 'none' && strategy.mappingAvailable ? dict.mapping.strategyMore : null
 
   return (
     <div className="space-y-6">
@@ -176,7 +182,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
         {view === 'list' ? (
           <StrategyListView proFirst={proFirst} dict={dict} />
         ) : board ? (
-          <StrategyBoard cards={board.cards} lang={language} dict={dict} />
+          <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} />
         ) : strategy.status === 'loading' ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
             {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 animate-pulse rounded-card border border-line bg-sunk/60" />)}

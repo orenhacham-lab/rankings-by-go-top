@@ -31,7 +31,10 @@ import {
   pollDelay,
   runPhase,
   scannedAgo,
+  STAGE_B_GIVE_UP_MS,
+  STAGE_B_POLL_MS,
   STALLED_POLL_MS,
+  stageBState,
   storefrontLocked,
   tilesView,
 } from '../summary-view'
@@ -156,8 +159,23 @@ function main() {
   console.log('\n6) Reading the run again')
   check('stage A working → every 1.5s', pollDelay(runView({ status: 'running' }), 0) === POLL_MS && POLL_MS === 1500)
   check('stalled → every 15s', pollDelay(runView({ status: 'running', stalled: true }), 0) === STALLED_POLL_MS && STALLED_POLL_MS === 15_000)
-  check('ended (summary, failed, stage B) or no run → not at all',
-    pollDelay(runView(), 0) === null && pollDelay(runView({ status: 'failed' }), 0) === null && pollDelay(runView({ stage: 'b', status: 'running' }), 0) === null && pollDelay(null, 0) === null)
+  check('ended (summary, failed, stage B finished or failed) or no run → not at all',
+    pollDelay(runView(), 0) === null && pollDelay(runView({ status: 'failed' }), 0) === null
+      && pollDelay(runView({ stage: 'b', status: 'done' }), 0) === null && pollDelay(runView({ stage: 'b', status: 'failed' }), 0) === null && pollDelay(null, 0) === null)
+  // P1-12: the summary's bar follows stage B, so it is read again, rarely, while stage B works.
+  check('stage B working → every 20s, so the bar can say when it is ready',
+    pollDelay(runView({ stage: 'b', status: 'running' }), 0) === STAGE_B_POLL_MS && STAGE_B_POLL_MS === 20_000)
+  check('stage B stalled past the cron\'s day → not read again',
+    pollDelay(runView({ stage: 'b', status: 'running', stalled: true, startedAt: new Date(Date.now() - STAGE_B_GIVE_UP_MS - 60_000).toISOString() }), 0) === null)
+
+  console.log('\n7) Stage B, as the summary\'s bar says it')
+  const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString()
+  check('stage A → no stage B state', stageBState(runView(), NOW) === null)
+  check('stage B running → running', stageBState(runView({ stage: 'b', status: 'running' }), NOW) === 'running')
+  check('stage B stalled, inside the cron\'s day → still running', stageBState(runView({ stage: 'b', status: 'running', stalled: true, startedAt: ago(3600_000) }), NOW) === 'running')
+  check('stage B stalled past the cron\'s day → failed, said honestly', stageBState(runView({ stage: 'b', status: 'running', stalled: true, startedAt: ago(24 * 3600_000 + 60_000) }), NOW) === 'failed' && STAGE_B_GIVE_UP_MS === 24 * 3600_000)
+  check('stage B done or partial → done', stageBState(runView({ stage: 'b', status: 'done' }), NOW) === 'done' && stageBState(runView({ stage: 'b', status: 'partial' }), NOW) === 'done')
+  check('stage B failed → failed', stageBState(runView({ stage: 'b', status: 'failed' }), NOW) === 'failed')
   check('a start just accepted → read soon, whatever the previous run was', pollDelay(null, 0, true) === POLL_MS && pollDelay(runView({ status: 'failed' }), 0, true) === POLL_MS)
   check('failed reads back off: 3s, 6s, 12s, then 15s at most',
     [1, 2, 3, 4, 9].map((f) => pollDelay(runView({ status: 'running' }), f)).join(',') === '3000,6000,12000,15000,15000' && MAX_POLL_MS === 15_000)

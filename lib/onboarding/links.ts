@@ -52,3 +52,14 @@ export function signInHref(path: string): string {
 export function articleHref(articleId: string): string {
   return `/content/articles/${enc(articleId)}`
 }
+
+/**
+ * Go Top's WhatsApp support line (the same number as the sidebar's support row),
+ * for "talk to us" when a scan could not read the site. The one external link
+ * here: a fixed address, never built from input.
+ */
+export const SUPPORT_WHATSAPP_HREF =
+  'https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94'
+
+/** A stage-A failure the site itself caused, where a retry alone leads nowhere: offer the ways around it. */
+export const FAILURES_WITH_WAYS_AROUND = ['siteForbidden'] as const
