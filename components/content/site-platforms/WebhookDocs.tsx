@@ -8,6 +8,7 @@ import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
  * lib/site-platforms/webhook.ts sends; the QA suite holds the two together.
  */
 export const EXAMPLE_PAYLOAD = `{
+  "payload_version": 2,
   "event": "article.published",
   "delivery_id": "art_3f9c…",
   "sent_at": "2026-09-28T07:00:00.000Z",
@@ -18,7 +19,11 @@ export const EXAMPLE_PAYLOAD = `{
     "html": "<h2>…</h2><p>…</p>",
     "excerpt": "…",
     "image_url": "https://…",
-    "meta": { "title": "…", "description": "…" }
+    "meta": { "title": "…", "description": "…" },
+    "structured_data": [
+      { "@context": "https://schema.org", "@type": "BlogPosting", "headline": "…" },
+      { "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [] }
+    ]
   }
 }`
 
@@ -43,6 +48,7 @@ export default function WebhookDocs({ t }: { t: DashboardDictionary['sitePlatfor
       <div className="space-y-3 px-3 pb-3 pt-1 text-caption text-body animate-pop-in">
         <p>{t.intro}</p>
         <pre dir="ltr" className="overflow-x-auto rounded-control bg-contrast p-3 text-left font-mono text-[11px] leading-relaxed text-contrast-ink">{EXAMPLE_PAYLOAD}</pre>
+        <p>{t.structuredData}</p>
         <p className="font-semibold text-ink">{t.headersTitle}</p>
         <ul className="list-disc space-y-1 ps-5">
           <li><code dir="ltr" className="font-mono">{SIGNATURE_HEADER}</code> — {t.signature}</li>

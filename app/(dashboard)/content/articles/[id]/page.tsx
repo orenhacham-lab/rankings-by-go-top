@@ -9,7 +9,6 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -18,7 +17,13 @@ import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
 import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
-import ArticleEditorPublishGate from '@/components/content/ArticleEditorPublishGate'
+import ArticleEditorPublishGate, { usePublishPlatform } from '@/components/content/ArticleEditorPublishGate'
+import ArticleTopBar, { type ArticleViewerTab } from '@/components/content/ArticleTopBar'
+import ArticleSchemaPanel from '@/components/content/ArticleSchemaPanel'
+import ArticleAiVisibilityCard, { CitedBadge, type ArticleVisibilityData } from '@/components/content/ArticleAiVisibilityCard'
+import { articleHtmlForCopy, browserClipboardEnv, copyHtml, featuredImageFileName } from '@/lib/content/article-export'
+import { injectInlineImages } from '@/lib/content/inline-images-compose'
+import type { StructuredDataInput } from '@/lib/content/structured-data'
 import ShopifyPublishSettings from '@/components/content/ShopifyPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
@@ -104,6 +109,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   // client-side "mark ready" guard. Never fetched automatically.
   const [ilpPreviewSummary, setIlpPreviewSummary] = useState<{ hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number } | null>(null)
 
+  // C1 / C3 / C9 — the top bar's tab, copy/download state, and the article's
+  // publication facts (live URL, dates, stored AI citations, suggested question).
+  const [tab, setTab] = useState<ArticleViewerTab>('article')
+  const [copying, setCopying] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [visibility, setVisibility] = useState<(ArticleVisibilityData & {
+    schema: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en' }
+    dates: { published: string | null; modified: string | null }
+  }) | null>(null)
+  const detected = usePublishPlatform(projectId, !!projectId)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -152,6 +168,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }, [id])
 
   useEffect(() => { if (enabled) load() }, [enabled, load])
+
+  const loadVisibility = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/content/articles/${id}/visibility`)
+      if (res.ok) setVisibility(await res.json())
+    } catch { /* optional: the viewer works without it */ }
+  }, [id])
+  useEffect(() => { if (enabled && !loading && !notFound) void loadVisibility() }, [enabled, loading, notFound, loadVisibility])
 
   // Phase 2E.3: after a successful internal-link apply/rollback the server has
   // already written content_html/internal_links_json. Re-sync ONLY content_html
@@ -357,6 +381,55 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // ---- C1: copy the article / download the featured image -----------------
+  async function copyArticle() {
+    setCopying(true)
+    try {
+      const html = articleHtmlForCopy(title, injectInlineImages(contentHtml, inlineImages, 'preview'))
+      const how = await copyHtml(html, browserClipboardEnv())
+      if (how === 'none') { setMessage({ text: e.topBar.copyFailed, ok: false }); return }
+      toast.success(e.topBar.copied)
+    } finally {
+      setCopying(false)
+    }
+  }
+
+  async function downloadImage() {
+    if (!featuredImageUrl) return
+    setDownloading(true)
+    try {
+      const res = await fetch(featuredImageUrl)
+      if (!res.ok) throw new Error('image')
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = featuredImageFileName(slug, blob.type)
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(href), 1000)
+    } catch {
+      // A storage host that refuses a cross-origin read: open the image instead.
+      window.open(featuredImageUrl, '_blank', 'noopener,noreferrer')
+      setMessage({ text: e.topBar.downloadFailed, ok: false })
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  // The top bar's "publish": the platform's own panel owns the choices (blog,
+  // draft or live, confirmation), so the bar takes the owner there.
+  function goToPublish() {
+    setTab('article')
+    requestAnimationFrame(() => {
+      const el = document.getElementById('publish')
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.focus({ preventScroll: true })
+    })
+  }
+
   if (!enabled) {
     return <div className="py-20 text-center text-slate-400 text-sm">{getDashboardDictionary(language).common.notAvailable}</div>
   }
@@ -375,17 +448,71 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const inputCls =
     'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
+  const publishedUrl = visibility?.publishedUrl ?? (isPublished ? (shopifyArticleUrl || wpPostUrl) : null)
+  const schemaInput: StructuredDataInput = {
+    headline: title,
+    description: metaDescription || excerpt,
+    imageUrl: featuredImageUrl,
+    datePublished: visibility?.dates.published ?? null,
+    dateModified: visibility?.dates.modified ?? null,
+    url: publishedUrl,
+    language: visibility?.schema.language ?? language,
+    publisher: visibility ? { name: visibility.schema.publisherName, url: visibility.schema.publisherUrl } : null,
+    faq,
+  }
+
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <Link href={backHref} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{e.back}</Link>
-        <Badge variant={status === 'ready' ? 'success' : 'neutral'}>{status === 'ready' ? e.statusReady : e.statusDraft}</Badge>
-      </div>
-      <Header title={title || '—'} />
+      <ArticleTopBar
+        t={e.topBar}
+        title={title}
+        statusLabel={isPublished ? e.topBar.published : status === 'ready' ? e.statusReady : e.statusDraft}
+        statusTone={isPublished ? 'success' : status === 'ready' ? 'info' : 'neutral'}
+        backHref={backHref}
+        projectId={projectId}
+        detected={detected}
+        isPublished={isPublished}
+        publishedUrl={publishedUrl}
+        featuredImageUrl={featuredImageUrl}
+        citedBadge={visibility ? <CitedBadge t={e.aiVisibility} engines={visibility.citations.map((x) => x.engine)} /> : null}
+        onPublish={goToPublish}
+        onCopy={() => void copyArticle()}
+        copying={copying}
+        onDownloadImage={() => void downloadImage()}
+        downloading={downloading}
+        tab={tab}
+        onTabChange={setTab}
+      />
 
       {message && (
         <div className={`mb-4 text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
           {message.text}
+        </div>
+      )}
+
+      <div id="article-panel-schema" role="tabpanel" aria-labelledby="article-tab-schema" hidden={tab !== 'schema'} className="mb-6">
+        {tab === 'schema' && (
+          <ArticleSchemaPanel
+            t={e.schema}
+            failText={e.topBar.copyFailed}
+            input={schemaInput}
+            isWebhook={detected.platform === 'webhook'}
+            onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+          />
+        )}
+      </div>
+
+      <div id="article-panel-article" role="tabpanel" aria-labelledby="article-tab-article" hidden={tab !== 'article'}>
+      {isPublished && visibility && (
+        <div className="mb-4">
+          <ArticleAiVisibilityCard
+            t={e.aiVisibility}
+            language={language}
+            projectId={projectId}
+            data={visibility}
+            onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+            onTracked={() => void loadVisibility()}
+          />
         </div>
       )}
 
@@ -561,9 +688,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             for a WordPress project. A Shopify project sees an info card; neither
             → connect prompt; both → conflict. Detection uses the project's
             connection state (never the WordPress post id). */}
+        <section id="publish" tabIndex={-1} aria-label={e.topBar.publish} className="scroll-mt-40 rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-action">
         <ArticleEditorPublishGate
           projectId={projectId}
           articleId={id}
+          detected={detected}
           shopifyPanel={projectId && (
             <ShopifyPublishSettings
               projectId={projectId}
@@ -613,6 +742,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </Card>
         </ArticleEditorPublishGate>
+        </section>
 
         {/* Planned internal links — QA/insertion only. Hidden entirely when the
             article has no planned links (no ad-hoc suggestions here anymore). */}
@@ -700,6 +830,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <Button variant="outline" className="w-full sm:w-auto">{e.backToHub}</Button>
           </Link>
         </div>
+      </div>
       </div>
 
       <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />

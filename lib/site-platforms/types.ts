@@ -93,10 +93,16 @@ export type SitePublishArticle = {
   site_post_platform?: string | null
   site_post_id?: string | null
   site_post_url?: string | null
+  /** FAQ pairs and dates, for the webhook payload's structured_data (JSON-LD). */
+  faq_json?: { question: string; answer: string }[] | null
+  published_at?: string | null
+  updated_at?: string | null
+  /** Publisher facts and language for structured_data; loaded by the orchestrator for a webhook. */
+  schema_context?: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en' } | null
 }
 
 export const SITE_ARTICLE_SELECT =
-  'id, project_id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, site_post_platform, site_post_id, site_post_url'
+  'id, project_id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, site_post_platform, site_post_id, site_post_url, faq_json, published_at, updated_at'
 
 /** What an adapter returns. `code` is a stable, merchant-safe reason (see errors.ts). */
 export type SitePublishResult =
