@@ -1,7 +1,4 @@
-import Link from 'next/link'
-import { PublicNav } from '@/components/PublicNav'
-import { Footer } from '@/components/Footer'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
   title: 'מדיניות פרטיות | Rankings by Go Top',
@@ -11,209 +8,202 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <PublicNav />
-      <div className="flex-1 pt-28 lg:pt-36 pb-12 px-4">
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <Breadcrumbs items={[{ label: 'מדיניות פרטיות', href: '/privacy' }]} />
-        <h1 className="text-4xl font-bold text-slate-900 mb-2">מדיניות פרטיות</h1>
-        <p className="text-slate-600 mb-8">מדיניות הפרטיות של Rankings by Go Top</p>
+    <LegalDoc
+      locale="he"
+      breadcrumbs={[{ label: 'מדיניות פרטיות', href: '/privacy' }]}
+      title="מדיניות פרטיות"
+      subtitle="מדיניות הפרטיות של Rankings by Go Top"
+    >
+      <section>
+        <h2>מבוא</h2>
+        <p>
+          גו טופ שיווק ופרסום דיגיטלי בע״מ (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;), המפעילה את השירות Rankings by Go Top ב-https://www.gotopseo.com (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
+        </p>
+      </section>
 
-        <div className="prose prose-sm max-w-none space-y-6 text-slate-700">
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">מבוא</h2>
-            <p>
-              גו טופ שיווק ופרסום דיגיטלי בע״מ (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;), המפעילה את השירות Rankings by Go Top ב-https://www.gotopseo.com (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
-            </p>
-          </section>
+      <section>
+        <h2>מידע שאנו אוספים</h2>
+        <p>
+          אנו אוספים סוגים שונים של מידע, כולל:
+        </p>
+        <ul>
+          <li><strong>מידע אימות:</strong> שם, כתובת דואר אלקטרוני, סיסמה (מוצפנת)</li>
+          <li><strong>מידע פרופיל:</strong> מידע על התוכנית שלך, הנוי שלך</li>
+          <li><strong>מידע עסקי:</strong> שם חברה, דומיין, מילות מפתח, נתוני דירוג</li>
+          <li><strong>מידע טכני:</strong> כתובת IP, סוג דפדפן, דף שנכנסת ממנו</li>
+          <li><strong>מידע תשלום:</strong> פרטי אמצעי התשלום אינם נשמרים אצלנו. עבור חשבונות שסמכות
+          החיוב שלהם היא Shopify — לרבות סוחרים שהתקינו את האפליקציה דרך Shopify — התשלום מעובד
+          על ידי Shopify במסגרת Shopify App Pricing, ואיננו מפנים אותם ל-PayPal. עבור לקוחות
+          שנרשמו ישירות באתר, שסמכות החיוב שלהם אינה Shopify, התשלום מעובד דרך PayPal</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">מידע שאנו אוספים</h2>
-            <p>
-              אנו אוספים סוגים שונים של מידע, כולל:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li><strong>מידע אימות:</strong> שם, כתובת דואר אלקטרוני, סיסמה (מוצפנת)</li>
-              <li><strong>מידע פרופיל:</strong> מידע על התוכנית שלך, הנוי שלך</li>
-              <li><strong>מידע עסקי:</strong> שם חברה, דומיין, מילות מפתח, נתוני דירוג</li>
-              <li><strong>מידע טכני:</strong> כתובת IP, סוג דפדפן, דף שנכנסת ממנו</li>
-              <li><strong>מידע תשלום:</strong> פרטי אמצעי התשלום אינם נשמרים אצלנו. עבור חשבונות שסמכות
-              החיוב שלהם היא Shopify — לרבות סוחרים שהתקינו את האפליקציה דרך Shopify — התשלום מעובד
-              על ידי Shopify במסגרת Shopify App Pricing, ואיננו מפנים אותם ל-PayPal. עבור לקוחות
-              שנרשמו ישירות באתר, שסמכות החיוב שלהם אינה Shopify, התשלום מעובד דרך PayPal</li>
-            </ul>
-          </section>
+      <section>
+        <h2>כיצד אנו משתמשים בנתונים שלך</h2>
+        <p>
+          אנו משתמשים במידע שלך ל:
+        </p>
+        <ul>
+          <li>מתן שירות ניטור דירוגים</li>
+          <li>אימות משתמש וניהול חשבון</li>
+          <li>עיבוד תשלומים</li>
+          <li>שליחת עדכוני שירות וחדשות</li>
+          <li>שיפור השירות שלנו</li>
+          <li>ציות לדרישות משפטיות</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">כיצד אנו משתמשים בנתונים שלך</h2>
-            <p>
-              אנו משתמשים במידע שלך ל:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li>מתן שירות ניטור דירוגים</li>
-              <li>אימות משתמש וניהול חשבון</li>
-              <li>עיבוד תשלומים</li>
-              <li>שליחת עדכוני שירות וחדשות</li>
-              <li>שיפור השירות שלנו</li>
-              <li>ציות לדרישות משפטיות</li>
-            </ul>
-          </section>
+      <section>
+        <h2>שיתוף מידע</h2>
+        <p>
+          אנו לא משתפים את המידע האישי שלך עם צדדים שלישיים, מלבד:
+        </p>
+        <ul>
+          <li><strong>Shopify:</strong> לעיבוד תשלומים עבור חשבונות המחויבים דרך Shopify App Pricing, ולפרסום תוכן לחנות המחוברת</li>
+          <li><strong>PayPal:</strong> לעיבוד תשלומים עבור לקוחות המחויבים דרך האתר בלבד</li>
+          <li><strong>Supabase:</strong> לאחסון נתונים מאובטח</li>
+          <li><strong>Serper:</strong> לביצוע חיפושים בגוגל</li>
+          <li><strong>Vercel:</strong> להנעת האתר</li>
+          <li><strong>Meta (Facebook / Instagram):</strong> לצורך פרסום ממוקד — ראה פירוט בסעיף שירותי פרסום מטא</li>
+          <li>כאשר דרוש על פי חוק</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שיתוף מידע</h2>
-            <p>
-              אנו לא משתפים את המידע האישי שלך עם צדדים שלישיים, מלבד:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li><strong>Shopify:</strong> לעיבוד תשלומים עבור חשבונות המחויבים דרך Shopify App Pricing, ולפרסום תוכן לחנות המחוברת</li>
-              <li><strong>PayPal:</strong> לעיבוד תשלומים עבור לקוחות המחויבים דרך האתר בלבד</li>
-              <li><strong>Supabase:</strong> לאחסון נתונים מאובטח</li>
-              <li><strong>Serper:</strong> לביצוע חיפושים בגוגל</li>
-              <li><strong>Vercel:</strong> להנעת האתר</li>
-              <li><strong>Meta (Facebook / Instagram):</strong> לצורך פרסום ממוקד — ראה פירוט בסעיף שירותי פרסום מטא</li>
-              <li>כאשר דרוש על פי חוק</li>
-            </ul>
-          </section>
+      <section>
+        <h2>אבטחת נתונים</h2>
+        <p>
+          אנו משתמשים בהצפנה SSL/TLS לכל התקשורת. הסיסמאות שלך מאוחסנות בצורה מוצפנת דרך Supabase Auth. אנו מקיימים סטנדרטים גבוהים של אבטחת נתונים, אך לא יכולים להבטיח 100% אבטחה.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">אבטחת נתונים</h2>
-            <p>
-              אנו משתמשים בהצפנה SSL/TLS לכל התקשורת. הסיסמאות שלך מאוחסנות בצורה מוצפנת דרך Supabase Auth. אנו מקיימים סטנדרטים גבוהים של אבטחת נתונים, אך לא יכולים להבטיח 100% אבטחה.
-            </p>
-          </section>
+      <section>
+        <h2>הזכויות שלך</h2>
+        <p>
+          בהתאם לחוק הגנת הפרטיות, בישראל, יש לך זכות:
+        </p>
+        <ul>
+          <li>לגשת לנתונים האישיים שלך</li>
+          <li>לתקן נתונים שגויים</li>
+          <li>למחוק את החשבון שלך</li>
+          <li>להתנגד לעיבוד מסוים</li>
+          <li>לבקש העברת נתונים</li>
+        </ul>
+        <p className="mt-4">
+          כדי להפעיל את הזכויות הללו, צור קשר עם:
+        </p>
+        <p className="mt-2">
+          <strong>דואר אלקטרוני:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>טלפון:</strong>{' '}
+          <a href="tel:0549489377">
+            054-9489377
+          </a>
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">הזכויות שלך</h2>
-            <p>
-              בהתאם לחוק הגנת הפרטיות, בישראל, יש לך זכות:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li>לגשת לנתונים האישיים שלך</li>
-              <li>לתקן נתונים שגויים</li>
-              <li>למחוק את החשבון שלך</li>
-              <li>להתנגד לעיבוד מסוים</li>
-              <li>לבקש העברת נתונים</li>
-            </ul>
-            <p className="mt-4">
-              כדי להפעיל את הזכויות הללו, צור קשר עם:
-            </p>
-            <p className="mt-2">
-              <strong>דואר אלקטרוני:</strong>{' '}
-              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                oren@gotop.co.il
-              </a>
-            </p>
-            <p>
-              <strong>טלפון:</strong>{' '}
-              <a href="tel:0549489377" className="text-blue-600 hover:underline">
-                054-9489377
-              </a>
-            </p>
-          </section>
+      <section>
+        <h2>עוגיות (Cookies)</h2>
+        <p>
+          אנו משתמשים בעוגיות לצרכים חיוניים:
+        </p>
+        <ul>
+          <li><strong>עוגיות סשן:</strong> לתקשורת מאובטחת עם השרת ולניהול ההתחברות</li>
+          <li><strong>עוגיות Analytics:</strong> לניתוח שימוש באתר דרך Google Analytics ו-Google Tag Manager</li>
+        </ul>
+        <p className="mt-4">
+          בהמשך השימוש באתר, אתה מסכים לשימוש בעוגיות כמפורט לעיל.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">עוגיות (Cookies)</h2>
-            <p>
-              אנו משתמשים בעוגיות לצרכים חיוניים:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li><strong>עוגיות סשן:</strong> לתקשורת מאובטחת עם השרת ולניהול ההתחברות</li>
-              <li><strong>עוגיות Analytics:</strong> לניתוח שימוש באתר דרך Google Analytics ו-Google Tag Manager</li>
-            </ul>
-            <p className="mt-4">
-              בהמשך השימוש באתר, אתה מסכים לשימוש בעוגיות כמפורט לעיל.
-            </p>
-          </section>
+      <section>
+        <h2>שירותי ניתוח וערוץ שיווק</h2>
+        <p>
+          אנו משתמשים בשירותים הבאים לניתוח התנהגות משתמשים וניהול ערוצי שיווק:
+        </p>
+        <ul>
+          <li><strong>Google Analytics:</strong> לניתוח נתוני עברות וערוצי תעבורה לאתר</li>
+          <li><strong>Google Tag Manager:</strong> לניהול תגיות וניתוח הרכב משתמשים</li>
+        </ul>
+        <p className="mt-4">
+          עוגיות אלו אינן מזהות אותך באופן אישי ומשמשות לשיפור חוויית ההשתמש והשירות.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שירותי ניתוח וערוץ שיווק</h2>
-            <p>
-              אנו משתמשים בשירותים הבאים לניתוח התנהגות משתמשים וניהול ערוצי שיווק:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li><strong>Google Analytics:</strong> לניתוח נתוני עברות וערוצי תעבורה לאתר</li>
-              <li><strong>Google Tag Manager:</strong> לניהול תגיות וניתוח הרכב משתמשים</li>
-            </ul>
-            <p className="mt-4">
-              עוגיות אלו אינן מזהות אותך באופן אישי ומשמשות לשיפור חוויית ההשתמש והשירות.
-            </p>
-          </section>
+      <section>
+        <h2>שירותי פרסום מטא (Meta / Facebook)</h2>
+        <p>
+          אנו משתמשים ב-Meta Pixel (פיקסל פייסבוק) לצורך ניהול קמפיינים פרסומיים ב-Facebook ו-Instagram. הפיקסל מאפשר לנו למדוד אירועי המרה (לדוגמה: השלמת הרשמה), לבנות קהלי פרסום מותאמים, ולהציג מודעות רלוונטיות.
+        </p>
+        <p className="mt-4">
+          המידע שעשוי להיאסף ולהישלח למטא כולל:
+        </p>
+        <ul>
+          <li>נתוני גלישה ועמודים שבוקרו באתר</li>
+          <li>אירועי המרה (כגון הרשמה לשירות)</li>
+          <li>כתובת IP ומידע טכני על הדפדפן</li>
+          <li>מידע שנאסף באמצעות עוגיות Meta</li>
+        </ul>
+        <p className="mt-4">
+          שימוש זה כפוף למדיניות הפרטיות של Meta Platforms, Inc. ניתן לעיין בה בכתובת{' '}
+          <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer">
+            facebook.com/privacy/policy
+          </a>
+          {'. '}
+          ניתן לבטל פרסום מותאם אישית באמצעות הגדרות הפרטיות של חשבון Facebook שלך.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שירותי פרסום מטא (Meta / Facebook)</h2>
-            <p>
-              אנו משתמשים ב-Meta Pixel (פיקסל פייסבוק) לצורך ניהול קמפיינים פרסומיים ב-Facebook ו-Instagram. הפיקסל מאפשר לנו למדוד אירועי המרה (לדוגמה: השלמת הרשמה), לבנות קהלי פרסום מותאמים, ולהציג מודעות רלוונטיות.
-            </p>
-            <p className="mt-4">
-              המידע שעשוי להיאסף ולהישלח למטא כולל:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li>נתוני גלישה ועמודים שבוקרו באתר</li>
-              <li>אירועי המרה (כגון הרשמה לשירות)</li>
-              <li>כתובת IP ומידע טכני על הדפדפן</li>
-              <li>מידע שנאסף באמצעות עוגיות Meta</li>
-            </ul>
-            <p className="mt-4">
-              שימוש זה כפוף למדיניות הפרטיות של Meta Platforms, Inc. ניתן לעיין בה בכתובת{' '}
-              <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                facebook.com/privacy/policy
-              </a>
-              {'. '}
-              ניתן לבטל פרסום מותאם אישית באמצעות הגדרות הפרטיות של חשבון Facebook שלך.
-            </p>
-          </section>
+      <section>
+        <h2>פנייה אלינו באמצעות WhatsApp</h2>
+        <p>
+          באתר ובשירותים שלנו עשויה להופיע אפשרות ליצור איתנו קשר באמצעות WhatsApp. כאשר משתמש בוחר לפנות אלינו באמצעות WhatsApp, אנו עשויים לקבל ולעבד את המידע שנמסר במסגרת הפנייה, לרבות שם, מספר טלפון, תוכן ההודעות, קבצים או תמונות שנשלחו אלינו מיוזמת המשתמש, ופרטי התקשרות נוספים שנמסרו במסגרת השיחה.
+        </p>
+        <p className="mt-4">
+          המידע שנמסר לנו באמצעות WhatsApp ישמש לצורך מענה לפנייה, מתן שירות ותמיכה, טיפול בבקשות, תיעוד פניות, שיפור השירות, שמירה על אבטחת המידע והגנה על זכויותינו, וכן לצורך עמידה בדרישות הדין ככל שיידרש.
+        </p>
+        <p className="mt-4">
+          השימוש ב-WhatsApp כפוף גם לתנאי השימוש ולמדיניות הפרטיות של WhatsApp ו/או Meta, ואנו ממליצים לעיין בהם לפני השימוש בערוץ זה. אין לשלוח אלינו באמצעות WhatsApp מידע רגיש שאינו נחוץ לטיפול בפנייה, לרבות סיסמאות, פרטי תשלום מלאים, מידע רפואי, תעודות מזהות או מידע אישי רגיש אחר, אלא אם התבקשתם לעשות זאת במפורש ולמטרה מוגדרת.
+        </p>
+        <p className="mt-4">
+          אנו עשויים לשמור את תיעוד ההתכתבות למשך הזמן הדרוש לצורך מתן השירות, טיפול בפניות, תיעוד, בקרה, הגנה משפטית ועמידה בדרישות הדין. משתמשים רשאים לפנות אלינו בבקשה לעיין במידע האישי שנמסר, לתקנו או לבקש את מחיקתו, בכפוף להוראות הדין ולמדיניות פרטיות זו.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">פנייה אלינו באמצעות WhatsApp</h2>
-            <p>
-              באתר ובשירותים שלנו עשויה להופיע אפשרות ליצור איתנו קשר באמצעות WhatsApp. כאשר משתמש בוחר לפנות אלינו באמצעות WhatsApp, אנו עשויים לקבל ולעבד את המידע שנמסר במסגרת הפנייה, לרבות שם, מספר טלפון, תוכן ההודעות, קבצים או תמונות שנשלחו אלינו מיוזמת המשתמש, ופרטי התקשרות נוספים שנמסרו במסגרת השיחה.
-            </p>
-            <p className="mt-4">
-              המידע שנמסר לנו באמצעות WhatsApp ישמש לצורך מענה לפנייה, מתן שירות ותמיכה, טיפול בבקשות, תיעוד פניות, שיפור השירות, שמירה על אבטחת המידע והגנה על זכויותינו, וכן לצורך עמידה בדרישות הדין ככל שיידרש.
-            </p>
-            <p className="mt-4">
-              השימוש ב-WhatsApp כפוף גם לתנאי השימוש ולמדיניות הפרטיות של WhatsApp ו/או Meta, ואנו ממליצים לעיין בהם לפני השימוש בערוץ זה. אין לשלוח אלינו באמצעות WhatsApp מידע רגיש שאינו נחוץ לטיפול בפנייה, לרבות סיסמאות, פרטי תשלום מלאים, מידע רפואי, תעודות מזהות או מידע אישי רגיש אחר, אלא אם התבקשתם לעשות זאת במפורש ולמטרה מוגדרת.
-            </p>
-            <p className="mt-4">
-              אנו עשויים לשמור את תיעוד ההתכתבות למשך הזמן הדרוש לצורך מתן השירות, טיפול בפניות, תיעוד, בקרה, הגנה משפטית ועמידה בדרישות הדין. משתמשים רשאים לפנות אלינו בבקשה לעיין במידע האישי שנמסר, לתקנו או לבקש את מחיקתו, בכפוף להוראות הדין ולמדיניות פרטיות זו.
-            </p>
-          </section>
+      <section>
+        <h2>שדרוגי מדיניות זו</h2>
+        <p>
+          אנו עשויים לעדכן מדיניות זו מעת לעת. השינויים יהיו בתוקף מיד עם פרסום. אנו מעודדים אתך לסקור מדיניות זו בתדירות קבועה.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שדרוגי מדיניות זו</h2>
-            <p>
-              אנו עשויים לעדכן מדיניות זו מעת לעת. השינויים יהיו בתוקף מיד עם פרסום. אנו מעודדים אתך לסקור מדיניות זו בתדירות קבועה.
-            </p>
-          </section>
+      <section>
+        <h2>צור קשר</h2>
+        <p>
+          אם יש לך שאלות בנוגע למדיניות פרטיות זו, אנא צור קשר:
+        </p>
+        <p className="mt-2">
+          <strong>דואר אלקטרוני:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>טלפון:</strong>{' '}
+          <a href="tel:0549489377">
+            054-9489377
+          </a>
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">צור קשר</h2>
-            <p>
-              אם יש לך שאלות בנוגע למדיניות פרטיות זו, אנא צור קשר:
-            </p>
-            <p className="mt-2">
-              <strong>דואר אלקטרוני:</strong>{' '}
-              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                oren@gotop.co.il
-              </a>
-            </p>
-            <p>
-              <strong>טלפון:</strong>{' '}
-              <a href="tel:0549489377" className="text-blue-600 hover:underline">
-                054-9489377
-              </a>
-            </p>
-          </section>
-
-          <section>
-            <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-              מדיניות זו עודכנה לאחרונה ביוני 2026
-            </p>
-          </section>
-        </div>
-      </div>
-      </div>
-      <Footer />
-    </div>
+      <section>
+        <p className={LEGAL_FOOTNOTE}>
+          מדיניות זו עודכנה לאחרונה ביוני 2026
+        </p>
+      </section>
+    </LegalDoc>
   )
 }

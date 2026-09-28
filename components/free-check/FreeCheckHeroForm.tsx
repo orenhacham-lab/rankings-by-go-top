@@ -11,6 +11,9 @@
  */
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { ArrowRight } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { Locale } from '@/lib/i18n/locales'
 
@@ -22,36 +25,36 @@ export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
 
   return (
     <form
-      className="mx-auto max-w-xl bg-white/90 backdrop-blur rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/60 p-3 sm:p-4"
+      className="mx-auto w-full max-w-xl"
       onSubmit={(e) => {
         e.preventDefault()
         const candidate = url.trim()
         router.push(candidate ? `${target}?url=${encodeURIComponent(candidate)}` : target)
       }}
     >
-      <div className="flex flex-col sm:flex-row gap-2.5">
-        <label htmlFor="hero-free-check-url" className="sr-only">
-          {copy.form.label}
-        </label>
-        <input
-          id="hero-free-check-url"
-          type="text"
-          inputMode="url"
-          autoComplete="url"
-          dir="ltr"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={copy.form.placeholder}
-          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <button
-          type="submit"
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-lg shadow-blue-600/25 hover:from-blue-700 hover:to-indigo-700 transition-all whitespace-nowrap"
-        >
+      <label htmlFor="hero-free-check-url" className="sr-only">
+        {copy.form.label}
+      </label>
+      <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-2 shadow-card sm:flex-row">
+        <div className="min-w-0 flex-1">
+          <Input
+            id="hero-free-check-url"
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            dir="ltr"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={copy.form.placeholder}
+            className="h-11 border-transparent bg-sunk/60 text-start shadow-none hover:border-line focus:bg-surface"
+          />
+        </div>
+        <Button type="submit" size="lg" className="shrink-0">
           {copy.form.submit}
-        </button>
+          <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+        </Button>
       </div>
-      <p className="mt-2.5 text-xs text-slate-500 text-center">{copy.page.badge}</p>
+      <p className="mt-2.5 text-center text-caption text-muted">{copy.page.badge}</p>
     </form>
   )
 }

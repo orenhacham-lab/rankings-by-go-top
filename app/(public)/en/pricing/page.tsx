@@ -1,9 +1,11 @@
-import Link from 'next/link'
+import { Check, Gift, Info } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
+import { ButtonLink, Callout, CtaBand, FaqList, IconSquircle, PageHero, Section, SectionIntro } from '@/components/public/marketing'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
+import { cn } from '@/lib/utils'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -73,61 +75,41 @@ export default async function EnglishPricingPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav locale="en" />
 
-      {/* Hero */}
-      <section className="relative pt-28 lg:pt-36 pb-12 lg:pb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.15),_transparent_50%)]" />
+      <main className="flex-1">
+        <PageHero
+          compact
+          eyebrow="Pricing Plans"
+          title="Plans for every"
+          accent="business size"
+          subtitle="Transparent pricing, no surprises. Start with our free trial and scale as your needs grow."
+        />
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-block text-blue-600 text-sm font-semibold mb-3">Pricing Plans</div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
-            Plans for every
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
-              business size
-            </span>
-          </h1>
-          <p className="text-lg lg:text-xl text-slate-600 leading-relaxed">
-            Transparent pricing, no surprises. Start with our free trial and scale as your needs grow.
-          </p>
-        </div>
-      </section>
-
-      {/* Free Trial CTA */}
-      {!user && (
-        <section className="pb-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-6 sm:px-8 sm:py-7 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
-                  Want to try the platform before choosing a plan?
-                </h3>
-                <p className="text-sm text-slate-600">
+        <Section className="pt-10 sm:pt-12 lg:pt-14">
+          {/* Free trial — only for visitors who are not signed in */}
+          {!user && (
+            <div className="mx-auto mb-12 flex max-w-4xl flex-col items-start gap-4 rounded-card border border-line bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:gap-5 sm:p-6">
+              <IconSquircle icon={Gift} />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-section font-semibold text-ink">Want to try the platform before choosing a plan?</h2>
+                <p className="mt-1 text-copy text-body">
                   Start a free {TRIAL_CATALOG.days}-day trial — no credit card required.
                 </p>
               </div>
-              <Link
-                href="/en/signup"
-                className="inline-block whitespace-nowrap px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md hover:bg-blue-700 transition-colors"
-              >
+              <ButtonLink href={"/en/signup"} variant="secondary" size="lg" className="w-full sm:w-auto">
                 Start free trial
-              </Link>
+              </ButtonLink>
             </div>
-          </div>
-        </section>
-      )}
+          )}
 
-      {/* Pricing Cards */}
-      <section className="pb-12 lg:pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* ONE row of four cards on a large screen, two columns on a tablet, one
               on a phone. The audience distinction is carried by a small label on
               each card rather than by full-width stacked sections, which pushed
               Premium and Agency below the fold. Static text — no toggle, no URL
-              parameter, no cookie, no client state. */}
+              parameter, no cookie, no client state. The recommended plan is the
+              only card with the action border and the one primary button. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {PLAN_ORDER.map((code) => {
               const plan = PLAN_CATALOG[code]
@@ -147,153 +129,88 @@ export default async function EnglishPricingPage() {
               return (
                 <div
                   key={code}
-                  className={`relative rounded-2xl ${
-                    highlighted
-                      ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
-                      : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
-                  } p-6 lg:p-7 flex flex-col`}
+                  className={cn(
+                    'relative flex flex-col rounded-card border bg-surface p-6 shadow-card',
+                    highlighted ? 'border-action ring-1 ring-action' : 'border-line',
+                  )}
                 >
                   {highlighted && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
+                    <div className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center rounded-pill bg-action px-3 text-caption font-semibold text-action-ink shadow-control">
                       Most Popular
                     </div>
                   )}
 
                   <div className="mb-5">
-                    <p className={`text-xs font-semibold mb-1.5 ${highlighted ? 'text-blue-100' : 'text-slate-400'}`}>
+                    <p className="mb-1.5 text-caption font-semibold text-muted">
                       {PLAN_AUDIENCE_LABEL[code]['en']}
                     </p>
-                    <h3 className={`text-xl font-bold mb-1 ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                    <h3 className="text-section font-bold text-ink">
                       {PLAN_NAME[code]}
                     </h3>
-                    <p className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                    <p className="mt-1 text-copy text-body">
                       {PLAN_AUDIENCE_DESCRIPTION[code]['en']}
                     </p>
                   </div>
 
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-4xl lg:text-5xl font-extrabold ${highlighted ? 'text-white' : 'text-slate-900'}`}>
-                        {formatUSD(plan.priceUSD)}
-                      </span>
-                      <span className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                        /month
-                      </span>
-                    </div>
+                  <div className="mb-6 flex items-baseline gap-1.5">
+                    <span className="text-display font-bold tracking-tight tabular-nums text-ink">
+                      {formatUSD(plan.priceUSD)}
+                    </span>
+                    <span className="text-copy text-muted">/month</span>
                   </div>
 
-                  <ul className="space-y-3 mb-8 flex-1">
+                  <ul className="mb-8 flex-1 space-y-3 border-t border-line pt-5">
                     {features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm">
-                        <span
-                          className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
-                            highlighted ? 'bg-white/20' : 'bg-blue-50'
-                          }`}
-                        >
-                          <svg
-                            className={`w-3 h-3 ${highlighted ? 'text-white' : 'text-blue-600'}`}
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                        <span className={highlighted ? 'text-blue-50' : 'text-slate-700'}>
-                          {feature}
-                        </span>
+                      <li key={feature} className="flex items-start gap-2.5 text-copy text-body">
+                        <Check className="mt-1 size-4 shrink-0 text-action" strokeWidth={2.5} aria-hidden="true" />
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
 
-                  <Link
+                  <ButtonLink
                     href={user ? '/dashboard' : `/en/signup?plan=${code}`}
-                    className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
-                      highlighted
-                        ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
-                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
-                    }`}
+                    variant={highlighted ? 'primary' : 'secondary'}
+                    size="lg"
+                    className="w-full"
                   >
                     Start free trial
-                  </Link>
+                  </ButtonLink>
                 </div>
               )
             })}
           </div>
 
           {/* Usage clarification */}
-          <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">
-            One AI check means running one query in one AI engine. Running the same query across multiple engines consumes one check per engine. Article allowances are shared across all projects in the account and reset each billing cycle.
+          <div className="mx-auto mt-12 max-w-4xl">
+            <Callout icon={Info}>
+              <p>One AI check means running one query in one AI engine. Running the same query across multiple engines consumes one check per engine. Article allowances are shared across all projects in the account and reset each billing cycle.</p>
+            </Callout>
           </div>
 
           {/* Comparison note */}
-          <p className="text-center text-sm text-slate-500 mt-8">
+          <p className="mx-auto mt-6 max-w-3xl text-center text-copy text-muted">
             All plans include Google Organic, Google Maps and AI visibility tracking, plus article creation and publishing. Allowances vary by plan. Cancel anytime with no penalties.
           </p>
-        </div>
-      </section>
+        </Section>
 
-      {/* FAQ Section */}
-      <section className="py-20 lg:py-24 bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-block text-blue-600 text-sm font-semibold mb-3">Frequently Asked Questions</div>
-            <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Have a question? We have answers
-            </h2>
+        {/* FAQ */}
+        <Section tone="surface">
+          <div className="mx-auto max-w-3xl">
+            <SectionIntro eyebrow="Frequently Asked Questions" title="Have a question? We have answers" />
+            <FaqList items={faqs} />
           </div>
+        </Section>
 
-          <div className="space-y-4">
-            {faqs.map((faq) => (
-              <details
-                key={faq.q}
-                className="group bg-white rounded-xl border border-slate-200 overflow-hidden transition-all hover:border-slate-300"
-              >
-                <summary className="flex items-center justify-between gap-4 px-6 py-5 cursor-pointer list-none">
-                  <h3 className="font-semibold text-slate-900 text-base">{faq.q}</h3>
-                  <svg
-                    className="shrink-0 w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </summary>
-                <div className="px-6 pb-5 text-slate-600 leading-relaxed text-sm">
-                  {faq.a}
-                </div>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 lg:py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 px-8 py-12 lg:px-16 lg:py-16 text-center shadow-2xl">
-            <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-
-            <div className="relative">
-              <h2 className="text-3xl lg:text-4xl font-extrabold text-white mb-4 tracking-tight">
-                Ready to get started?
-              </h2>
-              <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
-                Start your free {TRIAL_CATALOG.days}-day trial and test the platform yourself
-              </p>
-              <Link
-                href={user ? '/dashboard' : '/en/signup'}
-                className="inline-block px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
-              >
-                {user ? 'Go to Dashboard' : 'Start Free Trial'}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+        {/* CTA */}
+        <Section>
+          <CtaBand title="Ready to get started?" body={`Start your free ${TRIAL_CATALOG.days}-day trial and test the platform yourself`}>
+            <ButtonLink href={user ? '/dashboard' : '/en/signup'} size="lg">
+              {user ? 'Go to Dashboard' : 'Start Free Trial'}
+            </ButtonLink>
+          </CtaBand>
+        </Section>
+      </main>
 
       <Footer locale="en" />
     </div>
