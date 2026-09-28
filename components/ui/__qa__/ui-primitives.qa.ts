@@ -285,7 +285,7 @@ const count = (s: string, re: RegExp) => (s.match(new RegExp(re.source, re.flags
 
 // ── K) Table on a phone ───────────────────────────────────────────────────────
 {
-  const row = (cells: unknown[]) => h(TableRow, { children: cells })
+  const row = (cells: unknown[]) => h(TableRow, { children: cells as never })
   const table = (stackBelowSm: boolean) => render(h(Table, { stackBelowSm, children: [
     h(TableHead, { key: 'h', children: row([h(Th, { key: 1, children: 'Page' }), h(Th, { key: 2, children: 'Clicks' }), h(Th, { key: 3, hideBelow: 'sm', children: 'CTR' }), h(Th, { key: 4 })]) }),
     h(TableBody, { key: 'b', children: row([
