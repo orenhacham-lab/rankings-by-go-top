@@ -20,6 +20,7 @@ import {
   FileText,
   Sparkles,
   FileChartColumn,
+  Gauge,
   Settings2,
   CreditCard,
   Newspaper,
@@ -141,6 +142,9 @@ const navGroupKeys: readonly NavGroup[] = [
     groupKey: 'groupMonitoring',
     items: [
       ...aiVisibilityNavItems,
+      // Site health: the site's own technical state (lib/site-health). A gauge, for
+      // the score it leads with.
+      { href: '/site-health', labelKey: 'siteHealth', icon: Gauge },
       { href: '/reports', labelKey: 'reports', icon: FileChartColumn, onboarding: 'reports' },
     ],
   },

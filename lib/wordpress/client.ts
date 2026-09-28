@@ -572,6 +572,9 @@ export async function writeVerifiedSeoMeta(
   postId: number,
   seo: { metaTitle?: string | null; metaDescription?: string | null; focusKeyword?: string | null },
   knownPlugin?: SeoPlugin,
+  // Site health writes the SEO meta of a PAGE too. Posts stay the default, so every
+  // existing caller sends exactly what it sent before.
+  endpoint: WpContentEndpoint = '/posts',
 ): Promise<{ plugin: SeoPlugin; status: SeoMetaStatus; detail?: string }> {
   // ONE capability probe → plugin + whether the GO TOP SEO bridge is installed.
   const caps = knownPlugin && knownPlugin !== 'unknown'
@@ -587,10 +590,10 @@ export async function writeVerifiedSeoMeta(
   // 1) Try core REST first (works when the site registered these keys in REST).
   let coreStatus: SeoMetaStatus
   try {
-    await wpPostJson(creds, `/posts/${postId}`, { meta })
+    await wpPostJson(creds, `${endpoint}/${postId}`, { meta })
     let readback: Record<string, unknown> | null = null
     try {
-      const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `/posts/${postId}?_fields=meta`)
+      const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `${endpoint}/${postId}?_fields=meta`)
       readback = obj && typeof obj.meta === 'object' ? (obj.meta as Record<string, unknown>) : null
     } catch { readback = null }
     coreStatus = verifySeoMeta(meta, readback)
@@ -903,4 +906,89 @@ export type WpContentEndpoint = '/posts' | '/pages'
 export async function getItemContentHtml(creds: WordPressCredentials, endpoint: WpContentEndpoint, id: number): Promise<string> {
   const obj = await wpGet<any>(creds, `${endpoint}/${id}?_fields=id,content`)
   return typeof obj?.content === 'string' ? obj.content : String(obj?.content?.rendered ?? '')
+}
+
+// ── Site health: one post or page, found by its public address ─────────────
+
+/** A published post or page, as site health edits it: the RAW title and content (context=edit). */
+export interface WordPressEditableItem {
+  endpoint: WpContentEndpoint
+  id: number
+  link: string
+  title: string
+  content: string
+}
+
+const pathOf = (raw: string): string | null => {
+  try {
+    const u = new URL(raw)
+    let p = u.pathname
+    try { p = decodeURI(p) } catch { /* keep as sent */ }
+    return (p.replace(/\/+$/, '') || '/').toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Read-only: the post or page whose public address is `url`, or null. Looks the
+ * slug up in pages, then posts (published only), and accepts a match only when the
+ * item's own link has the same path, so a slug shared by two types never picks the
+ * wrong one. The home page has no slug and is never matched.
+ */
+export async function findItemByUrl(creds: WordPressCredentials, url: string): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+  const path = pathOf(url)
+  if (!path || path === '/') return null
+  const slug = path.split('/').filter(Boolean).pop() ?? ''
+  if (!slug) return null
+  for (const endpoint of ['/pages', '/posts'] as const) {
+    const rows = await wpGet<unknown[]>(creds, `${endpoint}?slug=${encodeURIComponent(slug)}&status=publish&per_page=5&_fields=id,link`)
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const row = r as { id?: unknown; link?: unknown }
+      const id = Number(row.id)
+      const link = String(row.link ?? '')
+      if (id > 0 && pathOf(link) === path) return { endpoint, id, link }
+    }
+  }
+  return null
+}
+
+/** Read-only: one item's raw title and content, as the editor holds them. */
+export async function getItemForEdit(creds: WordPressCredentials, endpoint: WpContentEndpoint, id: number): Promise<WordPressEditableItem> {
+  const obj = await wpGet<{ id?: unknown; link?: unknown; title?: { raw?: unknown }; content?: { raw?: unknown } }>(
+    creds, `${endpoint}/${id}?context=edit&_fields=id,link,title,content`)
+  const raw = (v: { raw?: unknown } | undefined) => (typeof v?.raw === 'string' ? v.raw : '')
+  if (!obj || Number(obj.id) !== id) throw new WordPressClientError('WordPress returned an invalid response.')
+  return { endpoint, id, link: String(obj.link ?? ''), title: raw(obj.title), content: raw(obj.content) }
+}
+
+/**
+ * Update ONLY the title and/or the content of one existing item. Nothing else is
+ * sent: not its status, slug, author, terms or featured image, so an approved fix
+ * can never publish a draft or move a page.
+ */
+export async function updateItemFields(
+  creds: WordPressCredentials,
+  endpoint: WpContentEndpoint,
+  id: number,
+  fields: { title?: string; content?: string },
+): Promise<void> {
+  const payload: Record<string, unknown> = {}
+  if (typeof fields.title === 'string') payload.title = fields.title
+  if (typeof fields.content === 'string') payload.content = fields.content
+  if (Object.keys(payload).length === 0) return
+  const updated = await wpPostJson<{ id?: number }>(creds, `${endpoint}/${id}`, payload)
+  if (!updated || updated.id !== id) throw new WordPressClientError('WordPress returned an invalid response.')
+}
+
+/** Read-only: up to `limit` published items whose text matches `term` (WordPress's own search). */
+export async function searchItems(creds: WordPressCredentials, endpoint: WpContentEndpoint, term: string, limit = 5): Promise<{ id: number; link: string; title: string }[]> {
+  const q = term.trim().slice(0, 80)
+  if (!q) return []
+  const n = Math.min(Math.max(limit, 1), 10)
+  const rows = await wpGet<unknown[]>(creds, `${endpoint}?search=${encodeURIComponent(q)}&status=publish&per_page=${n}&_fields=id,link,title`)
+  return (Array.isArray(rows) ? rows : [])
+    .map((r) => r as { id?: unknown; link?: unknown; title?: unknown })
+    .map((r) => ({ id: Number(r.id) || 0, link: String(r.link ?? ''), title: stripRendered(r.title) }))
+    .filter((r) => r.id > 0)
 }
