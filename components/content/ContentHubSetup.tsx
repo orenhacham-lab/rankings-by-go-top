@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plug } from 'lucide-react'
+import { useGscEnabled } from '@/components/gsc/GscFeature'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
@@ -39,7 +40,10 @@ export default function ContentHubSetup({
   // GSC readiness — read-only status (no OAuth logic here; the GscPanel owns the flow).
   const [gscStatus, setGscStatus] = useState<GscState>('none')
   const [gscHasProperty, setGscHasProperty] = useState(false)
+  const gscEnabled = useGscEnabled()
   useEffect(() => {
+    // Search Console is off on this server: the route answers 404, so do not ask.
+    if (gscEnabled === false) return
     let cancelled = false
     void (async () => {
       try {
@@ -52,7 +56,7 @@ export default function ContentHubSetup({
       } catch { /* leave defaults (treated as not-connected) */ }
     })()
     return () => { cancelled = true }
-  }, [projectId])
+  }, [projectId, gscEnabled])
 
   const { platformCard, gscCard, showSetup } = selectSetupCards({ platform, platformFailed, shopifyNeedsScope, gscStatus, gscHasProperty })
   if (!showSetup) return null

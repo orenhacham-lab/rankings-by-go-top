@@ -24,6 +24,7 @@ import Badge from '@/components/ui/Badge'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscMetricsTable from '@/components/content/GscMetricsTable'
+import { useGscEnabled } from '@/components/gsc/GscFeature'
 import { AUTO_SYNC_MIN_INTERVAL_DAYS } from '@/lib/gsc/auto-sync'
 import { formatDateTime } from '@/lib/utils'
 
@@ -63,14 +64,17 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     return (t.errors as Record<string, string>)[code] ?? t.genericError
   }, [t])
 
+  const gscEnabled = useGscEnabled()
   const loadStatus = useCallback(async () => {
+    // Search Console is off on this server: the route answers 404, so do not ask.
+    if (gscEnabled === false) { setStatus(null); setLoading(false); return }
     try {
       const res = await fetch(`/api/gsc/status?projectId=${projectId}`)
       if (res.status === 404) { setStatus(null); return }
       const data = (await res.json()) as StatusResponse
       setStatus(data)
     } catch { /* leave prior state */ } finally { setLoading(false) }
-  }, [projectId])
+  }, [projectId, gscEnabled])
 
   useEffect(() => { loadStatus() }, [loadStatus])
 

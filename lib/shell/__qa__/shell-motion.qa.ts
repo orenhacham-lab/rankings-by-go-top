@@ -169,6 +169,14 @@ function main() {
     const outside = renderToStaticMarkup(createElement(Probe))
     const off = renderToStaticMarkup(createElement(GscFeatureProvider, { enabled: false }, createElement(Probe)))
     check('D3: unknown outside the dashboard, false inside it when the server says off', outside === '<i>null</i>' && off === '<i>false</i>', `${outside} ${off}`)
+    // Every other direct caller of the route asks the same switch first.
+    const direct = ['components/content/ContentHubSetup.tsx', 'components/content/GscPanel.tsx']
+    const guarded = (src: string) => /useGscEnabled\(\)/.test(src) && /if \(gscEnabled === false\)/.test(src)
+    for (const f of direct) {
+      const src = code(f)
+      check(`D4: ${f} skips /api/gsc/status when Search Console is off`, guarded(src))
+      check(`MUT: ${f} without the skip fails D4`, !guarded(src.replace(/if \(gscEnabled === false\)[^\n]*/, '')))
+    }
   }
 
   // ── E) motion ─────────────────────────────────────────────────────────────
