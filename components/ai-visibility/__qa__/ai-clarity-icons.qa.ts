@@ -72,6 +72,8 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 }
 
 const SECTION = 'components/ai-visibility/AIVisibilitySection.tsx'
+/** The tool: the section and the parts split out of it into sections/ (one source to match). */
+const tool = () => [SECTION, ...sourceFiles('components/ai-visibility/sections')].map(code).join('\n')
 
 async function main() {
   console.log('AI tab clarity and icons')
@@ -95,7 +97,7 @@ async function main() {
     const rows = code('components/ai-visibility/OverviewRows.tsx')
     check('A5: MUT a ✓ for every checked engine fails A3\'s source rule', /\{named && \(\s*<CheckCircle2/.test(rows) && !/\{named && \(\s*<CheckCircle2/.test(rows.replace('{named && (', '{on && (')))
 
-    const s = code(SECTION)
+    const s = tool()
     const chipRule = /mentionedHere === true && <Check[\s\S]*mentionedHere === false && <Minus/
     check('A6: question chips: ✓ only where the latest answer mentioned the business, – where it did not, nothing when unchecked',
       chipRule.test(s) && /const mentionedHere = mentionedByPair\.get\(key\)/.test(s) && !/\{scanned && <span[^>]*>✓<\/span>\}/.test(s))
