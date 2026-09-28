@@ -9,10 +9,14 @@
  * rows. The change compares with the previous, non-overlapping 28 days (weekly syncs
  * overlap by three weeks), so it only appears once such a window has been synced.
  *
- * Before Search Console can give the figures, the same three tiles stand with their
- * titles and say they are waiting, and ONE card below them says what they will show
- * and offers the one step that is missing. With Search Console switched off on the
- * server there is no step to offer, and no section.
+ * Before Search Console can give the figures, the section is ONE card under its title:
+ * the sentence that says what it will show (clicks, impressions and position over 28
+ * days) and the one step that is missing. It used to add three tiles that each said
+ * "waiting for Search Console" with their own source line, so the Reports screen
+ * repeated the same placeholder four times (UX review P1-8). While loading and after a
+ * failed read the three tiles stay, so the layout does not jump when the figures
+ * arrive. With Search Console switched off on the server there is no step to offer,
+ * and no section.
  */
 import { MousePointerClick, Eye, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -54,6 +58,11 @@ export default function GscPerformance({ projectId, className }: { projectId: st
   return (
     <section data-gsc-widget="performance" data-gsc-state={state} className={className}>
       <SectionHeading title={p.title} description={state === 'ready' ? p.about : undefined} />
+      {isGscSetupState(state) ? (
+        <Card>
+          <GscSetupPrompt state={state} about={p.about} projectId={projectId} layout="inline" />
+        </Card>
+      ) : (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {tiles.map((tile) => {
           const prev = previous ? (tile.metric === 'clicks' ? previous.clicks : tile.metric === 'impressions' ? previous.impressions : previous.position) : null
@@ -101,10 +110,6 @@ export default function GscPerformance({ projectId, className }: { projectId: st
           )
         })}
       </div>
-      {isGscSetupState(state) && (
-        <Card className="mt-4">
-          <GscSetupPrompt state={state} about={p.about} projectId={projectId} layout="inline" />
-        </Card>
       )}
       {(state === 'error' || (state === 'ready' && trend.data.state === 'error')) && <GscLoadError className="mt-3" onRetry={retry} />}
     </section>
