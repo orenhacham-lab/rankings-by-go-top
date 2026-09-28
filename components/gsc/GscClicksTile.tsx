@@ -56,7 +56,7 @@ export default function GscClicksTile({ projectId, className, onlyWithData = fal
       className={cn('flex h-full flex-col gap-2 rounded-card border border-line bg-surface p-4', className)}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted">{t.clicks.title}</span>
+        <span className="text-caption font-medium text-muted">{t.clicks.title}</span>
         <span className="shrink-0 text-muted">{icon}</span>
       </div>
       {isGscSetupState(state) ? (

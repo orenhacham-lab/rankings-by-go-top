@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -14,10 +14,15 @@ import TrackingTargetForm from './TrackingTargetForm'
 import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/app/actions/tracking-targets'
 import { formatDateTime } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
-import { FileSearch, History, PauseCircle, Pencil, PlayCircle, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, FileSearch, History, KeyRound, PauseCircle, Pencil, PlayCircle, RefreshCw, Trash2 } from 'lucide-react'
+import EmptyState from '@/components/ui/EmptyState'
+import { Card } from '@/components/ui/Card'
 import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
 import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import { GscVolumeCell, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
+
+/** A sortable header: the label and its lucide arrow, keyboard-visible focus. */
+const SORT_BUTTON = 'inline-flex items-center gap-1 rounded-control font-semibold transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'
 
 interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
@@ -54,6 +59,8 @@ interface TrackingTargetsTableProps {
    *  clicks and impressions from Google over the last 28 days. While Search Console
    *  is switched off on the server there is no line, and the cell is the volume alone. */
   gscKeywords?: GscKeywordsView
+  /** The empty project's one action (the page's add-keyword button); row actions stay in the row menu. */
+  emptyAction?: ReactNode
 }
 
 export default function TrackingTargetsTable({
@@ -76,6 +83,7 @@ export default function TrackingTargetsTable({
   onActionComplete,
   competitorView,
   gscKeywords,
+  emptyAction,
 }: TrackingTargetsTableProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
@@ -132,9 +140,10 @@ export default function TrackingTargetsTable({
     return copy
   }, [targets, latestResults, sortBy, sortDir])
 
+  // Lucide sort arrows (§6), never a glyph: which column, and which way.
   function sortLabel(column: SortColumn) {
-    if (sortBy !== column) return ''
-    return sortDir === 'asc' ? ' ▲' : ' ▼'
+    const Icon = sortBy !== column ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown
+    return <Icon aria-hidden="true" className={`size-3.5 shrink-0 ${sortBy === column ? 'text-ink' : 'text-muted/70'}`} />
   }
 
   async function handleToggleActive(target: TrackingTarget) {
@@ -149,29 +158,42 @@ export default function TrackingTargetsTable({
 
   const confirmTarget = confirmDeleteId ? targets.find((t) => t.id === confirmDeleteId) ?? null : null
 
+  // A project with no keywords yet: one empty state and its one action, not an empty table.
+  if (targets.length === 0 && !targetsLoading && !targetsError) {
+    return (
+      <Card padding={false}>
+        <EmptyState
+          icon={<KeyRound />}
+          title={k.emptyState}
+          action={emptyAction}
+        />
+      </Card>
+    )
+  }
+
   return (
     <>
       <Table>
         <TableHead>
           <tr className="max-sm:[&>th]:px-2.5">
             <Th>
-              <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">{k.keyword}{sortLabel('keyword')}</button>
+              <button type="button" onClick={() => handleSort('keyword')} className={SORT_BUTTON}>{k.keyword}{sortLabel('keyword')}</button>
             </Th>
             {/* PRIORITY COLUMNS: a phone shows keyword, position (with its change
                 under it) and actions; the rest return as the screen widens. */}
             <Th className="hidden md:table-cell">{k.scanType}</Th>
             <Th className="hidden sm:table-cell">
-              <button type="button" onClick={() => handleSort('volume')} className="font-semibold">{k.searchVolume}{sortLabel('volume')}</button>
+              <button type="button" onClick={() => handleSort('volume')} className={SORT_BUTTON}>{k.searchVolume}{sortLabel('volume')}</button>
             </Th>
             <Th>
-              <button type="button" onClick={() => handleSort('position')} className="font-semibold">{k.position}{sortLabel('position')}</button>
+              <button type="button" onClick={() => handleSort('position')} className={SORT_BUTTON}>{k.position}{sortLabel('position')}</button>
             </Th>
             <Th className="hidden sm:table-cell">{k.change}</Th>
             <Th className="hidden lg:table-cell">
-              <button type="button" onClick={() => handleSort('date')} className="font-semibold">{k.lastChecked}{sortLabel('date')}</button>
+              <button type="button" onClick={() => handleSort('date')} className={SORT_BUTTON}>{k.lastChecked}{sortLabel('date')}</button>
             </Th>
             <Th className="hidden xl:table-cell">
-              <button type="button" onClick={() => handleSort('found')} className="font-semibold">{k.found}{sortLabel('found')}</button>
+              <button type="button" onClick={() => handleSort('found')} className={SORT_BUTTON}>{k.found}{sortLabel('found')}</button>
             </Th>
             <Th className="hidden md:table-cell">{k.status}</Th>
             <Th>{k.actions}</Th>
@@ -200,9 +222,6 @@ export default function TrackingTargetsTable({
                 )}
               </td>
             </tr>
-          )}
-          {targets.length === 0 && !targetsLoading && !targetsError && (
-            <EmptyRow colSpan={9} message={k.emptyState} />
           )}
           {sortedTargets.map((target) => {
             const result = latestResults[target.id]
@@ -279,7 +298,7 @@ export default function TrackingTargetsTable({
                   <div className="flex flex-col items-start gap-0.5">
                     {result ? (
                       result.found ? (
-                        <span className="text-base font-bold leading-5 text-ink">
+                        <span className="text-copy font-bold leading-5 text-ink tabular-nums">
                           #{result.position}
                         </span>
                       ) : (
@@ -307,7 +326,8 @@ export default function TrackingTargetsTable({
                           target="_blank"
                           rel="noopener noreferrer"
                           dir="ltr"
-                          className="block max-w-40 truncate text-caption text-action hover:underline"
+                          title={result.result_url}
+                          className="block max-w-40 truncate text-caption text-muted transition-colors hover:text-action hover:underline"
                         >
                           {result.result_url}
                         </a>

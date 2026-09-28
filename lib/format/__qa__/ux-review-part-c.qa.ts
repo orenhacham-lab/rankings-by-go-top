@@ -118,7 +118,7 @@ console.log('P1-4 keyword research table')
 {
   const f = 'app/(dashboard)/keyword-research/page.tsx'
   guard('P1-4: every checkbox in the research table has a name', f,
-    (s) => { const boxes = jsx(s, 'input').filter((e) => e.type === '"checkbox"'); return boxes.length >= 2 && boxes.every(named) },
+    (s) => { const boxes = [...jsx(s, 'input').filter((e) => e.type === '"checkbox"'), ...jsx(s, 'Checkbox').filter((e) => !('label' in e))]; return boxes.length >= 2 && boxes.every(named) },
     (raw) => raw.replace('aria-label={t.results.selectAllRows}', ''))
   guard('P1-4: competition is a word in the screen\'s language, the index only in its title', f,
     (s) => /competitionCell\(/.test(s) && !/\{\s*r(esult)?\.competition\s*\}/.test(s) && !/\(\{r(esult)?\.competitionIndex\}\)/.test(s),

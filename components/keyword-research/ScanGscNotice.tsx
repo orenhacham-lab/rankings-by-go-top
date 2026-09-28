@@ -42,7 +42,7 @@ export default function ScanGscNotice({
       data-gsc-state={state}
       className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-line bg-sunk/60 px-3 py-2.5', className)}
     >
-      <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+      <span className="inline-flex items-center gap-2 text-copy font-semibold text-ink">
         <MousePointerClick size={16} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
         {t.title}
       </span>
@@ -51,9 +51,9 @@ export default function ScanGscNotice({
       ) : state === 'error' ? (
         <GscLoadError onRetry={retry} className="min-w-0 flex-1 basis-80" />
       ) : state === 'ready' ? (
-        <p className="min-w-0 flex-1 basis-80 text-sm text-muted">{count > 0 ? t.legend(formatCount(count, language)) : t.noneYet}</p>
+        <p className="min-w-0 flex-1 basis-80 text-copy text-muted">{count > 0 ? t.legend(formatCount(count, language)) : t.noneYet}</p>
       ) : (
-        <p className="min-w-0 flex-1 basis-80 text-sm text-muted" aria-busy="true">{t.loading}</p>
+        <p className="min-w-0 flex-1 basis-80 text-copy text-muted" aria-busy="true">{t.loading}</p>
       )}
     </div>
   )

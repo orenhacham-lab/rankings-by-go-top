@@ -1,5 +1,6 @@
 'use client'
 
+import Segmented from '@/components/ui/Segmented'
 import { useState } from 'react'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
@@ -171,30 +172,12 @@ export default function TrackingTargetForm({
 
       {/* Bulk mode toggle — only when creating */}
       {!target && (
-        <div role="group" className="inline-flex rounded-control border border-line bg-sunk p-0.5">
-          <button
-            type="button"
-            onClick={() => setBulkMode(false)}
-            className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
-              !bulkMode
-                ? 'bg-surface text-ink shadow-card'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            {t.modeSingle}
-          </button>
-          <button
-            type="button"
-            onClick={() => setBulkMode(true)}
-            className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
-              bulkMode
-                ? 'bg-surface text-ink shadow-card'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            {t.modeBulk}
-          </button>
-        </div>
+        <Segmented
+          ariaLabel={t.modeSingle + ' / ' + t.modeBulk}
+          value={bulkMode ? 'bulk' : 'single'}
+          onChange={(v) => setBulkMode(v === 'bulk')}
+          options={[{ value: 'single', label: t.modeSingle }, { value: 'bulk', label: t.modeBulk }]}
+        />
       )}
 
       {bulkMode ? (
@@ -373,36 +356,15 @@ export default function TrackingTargetForm({
           <div className="text-copy text-body font-medium">
             {t.exactPointTitle}
           </div>
-          <div role="group" className="inline-flex rounded-control border border-line bg-sunk p-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setExactSubMode('address')
-                setValidationError('')
-              }}
-              className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
-                exactSubMode === 'address'
-                  ? 'bg-surface text-ink shadow-card'
-                  : 'text-muted hover:text-ink'
-              }`}
-            >
-              {t.exactSubModeAddress}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setExactSubMode('coords')
-                setValidationError('')
-              }}
-              className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
-                exactSubMode === 'coords'
-                  ? 'bg-surface text-ink shadow-card'
-                  : 'text-muted hover:text-ink'
-              }`}
-            >
-              {t.exactSubModeCoords}
-            </button>
-          </div>
+          <Segmented
+            ariaLabel={t.exactPointTitle}
+            value={exactSubMode}
+            onChange={(v) => {
+              setExactSubMode(v)
+              setValidationError('')
+            }}
+            options={[{ value: 'address', label: t.exactSubModeAddress }, { value: 'coords', label: t.exactSubModeCoords }]}
+          />
 
           {exactSubMode === 'address' ? (
             <Input

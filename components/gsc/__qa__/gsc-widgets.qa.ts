@@ -720,7 +720,7 @@ async function main() {
   console.log('\nI) on a phone, an inline notice wraps instead of running off the screen')
   {
     const inlineSentence = (src: string) => {
-      const m = src.match(/<p className=\{cn\('text-sm text-muted', layout === 'inline' && '([^']*)'\)\}/)
+      const m = src.match(/<p className=\{cn\('text-(?:sm|copy) text-muted', layout === 'inline' && '([^']*)'\)\}/)
       return m ? m[1] : null
     }
     const wraps = (cls: string | null) => !!cls && /\bflex-1\b/.test(cls) && /\bbasis-(?!0\b)[\w[\].]+/.test(cls)

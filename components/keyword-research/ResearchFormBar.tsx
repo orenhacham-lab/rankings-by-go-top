@@ -14,10 +14,10 @@ export default function ResearchFormBar({ onOpen }: { onOpen: () => void }) {
   return (
     <div data-research-form="collapsed" className="mb-8 flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card transition-colors hover:border-line-strong sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-action-soft text-action" aria-hidden="true">
+        <span className="grid size-9 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
           <Search size={16} strokeWidth={2} />
         </span>
-        <p className="min-w-0 truncate text-sm">
+        <p className="min-w-0 truncate text-copy">
           <span className="font-semibold text-ink">{t.title}</span>
           <span className="text-muted"> · {t.hint}</span>
         </p>
@@ -26,7 +26,7 @@ export default function ResearchFormBar({ onOpen }: { onOpen: () => void }) {
         type="button"
         onClick={onOpen}
         aria-expanded={false}
-        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-control bg-action px-3.5 text-xs font-semibold text-action-ink shadow-sm transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2"
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-control bg-action px-3.5 text-caption font-semibold text-action-ink shadow-control transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2"
       >
         {t.open}
         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
@@ -45,7 +45,7 @@ export function ResearchFormClose({ onClose }: { onClose: () => void }) {
         type="button"
         onClick={onClose}
         aria-expanded={true}
-        className="inline-flex items-center gap-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+        className="inline-flex items-center gap-1 text-caption font-semibold text-muted transition-colors hover:text-ink"
       >
         {t.close}
         <ChevronDown size={14} strokeWidth={2} className="rotate-180" aria-hidden="true" />

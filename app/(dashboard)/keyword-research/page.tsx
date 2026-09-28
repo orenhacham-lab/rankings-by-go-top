@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
-import TrendModal from '@/components/keyword-research/TrendModal'
+import TrendModal, { type TrendError } from '@/components/keyword-research/TrendModal'
 import GscOpportunities from '@/components/content/GscOpportunities'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
@@ -32,7 +32,17 @@ import { EASY_WINS_SHOWN } from '@/lib/keyword-research/easy-wins'
 import { keywordKey, type ScanKeyword, type TrackedKeyword } from '@/lib/keyword-research/scan-research'
 import type { ResearchChip } from '@/lib/keyword-research/chips'
 import type { ResearchRow } from '@/lib/keyword-research/rows'
-import { Check, Copy, Loader2, CheckCircle, Plus, Sparkles, TrendingUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy, Loader2, Plus, Search, Sparkles, TrendingUp, X } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
+import Segmented from '@/components/ui/Segmented'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import RowMenu from '@/components/ui/RowMenu'
+import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import ResearchLandscape, { LANDSCAPE_IDS } from '@/components/keyword-research/ResearchLandscape'
 import SectionNav from '@/components/keyword-research/SectionNav'
 import SiteAvatar from '@/components/ui/SiteAvatar'
@@ -51,8 +61,8 @@ interface KeywordIdeaResult {
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
 type OpportunityKey = 'high' | 'medium' | 'low'
 
-/** With the scan's research on screen: rows the table shows at once, and adds per "show more". */
-const TABLE_PAGE = 100
+/** Rows the table shows at once, and adds per "show more" (design contract §6). */
+const TABLE_PAGE = 25
 const NO_SCAN_KEYWORDS: ScanKeyword[] = []
 const NO_TRACKED: TrackedKeyword[] = []
 
@@ -154,6 +164,7 @@ export default function KeywordResearchPage() {
   const dict = getDashboardDictionary(language)
   const t = dict.keywordResearch
   const isRTL = language === 'he'
+  const router = useRouter()
 
   const [researchType, setResearchType] = useState<'keyword' | 'url' | 'keyword_url'>('keyword')
   const [keyword, setKeyword] = useState('')
@@ -216,7 +227,7 @@ export default function KeywordResearchPage() {
   const [trendModalOpen, setTrendModalOpen] = useState(false)
   const [selectedTrendKeyword, setSelectedTrendKeyword] = useState('')
   const [trendLoading, setTrendLoading] = useState(false)
-  const [trendError, setTrendError] = useState('')
+  const [trendError, setTrendError] = useState<TrendError>('')
   const [trendCache, setTrendCache] = useState<Map<string, TrendData>>(new Map())
   const [trendData, setTrendData] = useState<TrendData | undefined>()
 
@@ -335,11 +346,12 @@ export default function KeywordResearchPage() {
 
     // Check keyword limit
     if (parsedKeywords.length > 20) {
-      setError(isRTL ? 'ניתן להזין עד 20 ביטויים בכל מחקר' : 'Maximum 20 keywords per research')
+      setError(t.messages.tooMany)
       return
     }
 
     setLoading(true)
+    setShownRows(TABLE_PAGE)
 
     try {
       const response = await fetch('/api/google-ads/keyword-ideas', {
@@ -368,15 +380,16 @@ export default function KeywordResearchPage() {
           setError(t.states.errorQuota)
         } else if (data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
           // Refresh token expired or revoked — user needs to re-authenticate
-          setError(isRTL ? 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש לחשבון Google Ads.' : 'Google Ads connection expired. Please re-authenticate.')
+          setError(t.states.errorReauth)
         } else if (data.stage === 'env_check') {
           // Missing configuration (CLIENT_ID, CLIENT_SECRET, etc.)
           setError(t.states.errorEnv)
         } else if (data.stage === 'oauth') {
           // Other OAuth errors
-          setError(isRTL ? 'שגיאת הרשאה ב-Google Ads. אנא נסה שוב או פנה לתמיכה.' : 'Google Ads authentication error. Please try again or contact support.')
-        } else if (data.stage === 'validation' && data.error) {
-          setError(`${t.states.errorGeneral} (${data.error})`)
+          setError(t.messages.authFailed)
+        } else if (data.stage === 'validation') {
+          // The route's own words stay in the log: the merchant reads ours.
+          setError(data.error === 'Invalid URL' ? t.form.errorInvalidUrl : data.error === 'Keyword is required' ? t.states.empty : t.messages.invalidRequest)
         } else {
           setError(t.states.errorGeneral)
         }
@@ -458,12 +471,12 @@ export default function KeywordResearchPage() {
   const copySelected = () => {
     const keywords = Array.from(selectedKeywords).join('\n')
     navigator.clipboard.writeText(keywords).then(() => {
-      alert('Copied to clipboard!')
-    })
+      gscToast.success(t.bulk.copied(formatCount(selectedKeywords.size, language)))
+    }).catch(() => {})
   }
 
   const copyKeyword = (kw: string) => {
-    navigator.clipboard.writeText(kw)
+    navigator.clipboard.writeText(kw).then(() => gscToast.success(t.table.copied)).catch(() => {})
   }
 
   const handleOpenTrendModal = async (kw: string) => {
@@ -520,11 +533,8 @@ export default function KeywordResearchPage() {
             debug: data.debug,
           })
         }
-        if (data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
-          setTrendError(isRTL ? 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש.' : 'Google Ads connection expired. Please re-authenticate.')
-        } else {
-          setTrendError(data.error || 'Failed to fetch trend data')
-        }
+        // A code, said by the modal in its own words (never the route's error text).
+        setTrendError(data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED' ? 'reauth' : 'failed')
         setTrendData(undefined)
         return
       }
@@ -545,7 +555,7 @@ export default function KeywordResearchPage() {
       if (process.env.NODE_ENV !== 'production') {
         console.error('[trend-modal] network/runtime error', err)
       }
-      setTrendError('network_error')
+      setTrendError('failed')
       setTrendData(undefined)
     } finally {
       setTrendLoading(false)
@@ -598,13 +608,11 @@ export default function KeywordResearchPage() {
       const result = await response.json()
 
       if (!response.ok || !result.success) {
+        // Our own words only, never the route's text.
         if (response.status === 402) {
           setAddToProjectError(t.addToProject.errorQuota)
-        } else if (scanMode) {
-          // With the scan's research on screen, our own words only, never the route's text.
-          setAddToProjectError(response.status === 503 ? ts.add.unavailable : t.addToProject.errorGeneral)
         } else {
-          setAddToProjectError(result.message || t.addToProject.errorGeneral)
+          setAddToProjectError(response.status === 503 ? ts.add.unavailable : t.addToProject.errorGeneral)
         }
         return
       }
@@ -637,11 +645,7 @@ export default function KeywordResearchPage() {
 
     // Only allow exactly one keyword for generation
     if (selectedKeywords.size > 1) {
-      setAIQuestionsError(
-        language === 'he'
-          ? 'בחרו ביטוי אחד בלבד ליצירת שאלות AI.'
-          : 'Select exactly one keyword to generate AI questions.'
-      )
+      setAIQuestionsError(t.messages.aiOnlyOne)
       return
     }
 
@@ -672,23 +676,15 @@ export default function KeywordResearchPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        setAIQuestionsError(
-          errorData.message ||
-          (language === 'he'
-            ? 'שגיאה בהפקת שאלות AI'
-            : 'Error generating AI questions')
-        )
+        // Our words for what happened, never the route's message.
+        setAIQuestionsError(response.status === 403 ? t.messages.aiNotAvailable : response.status === 503 ? t.messages.aiUnavailable : t.messages.aiFailed)
         return
       }
 
       const result = await response.json()
 
       if (!result.questions || result.questions.length === 0) {
-        const emptyMessage = result.message || (language === 'he'
-          ? 'לא נמצאו שאלות AI איכותיות לביטוי זה. נסו ביטוי אחר.'
-          : 'No high-quality AI questions found for this keyword. Try a different keyword.')
-        setAIQuestionsError(emptyMessage)
+        setAIQuestionsError(t.messages.aiNone)
         return
       }
 
@@ -699,11 +695,7 @@ export default function KeywordResearchPage() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       console.error('Error generating AI questions:', errorMsg)
-      setAIQuestionsError(
-        language === 'he'
-          ? 'שגיאה בהפקת שאלות AI. נסו שוב.'
-          : 'Error generating AI questions. Please try again.'
-      )
+      setAIQuestionsError(t.messages.aiFailed)
     } finally {
       setGeneratingAIQuestions(false)
     }
@@ -750,22 +742,15 @@ export default function KeywordResearchPage() {
       }
 
       if (added > 0) {
-        const msgKey = language === 'he'
-          ? `נוספו ${added} שאלות AI לפרויקט${skipped > 0 ? `. ${skipped} שאלות כבר היו קיימות ודולגו.` : '.'}`
-          : `${added} AI questions were added to the project${skipped > 0 ? `. ${skipped} existing questions were skipped.` : '.'}`
-        setAIQuestionsMessage(msgKey)
+        setAIQuestionsMessage(t.messages.aiAdded(added, skipped))
         setGeneratedAIQuestions([])
         setTimeout(() => setAIQuestionsOpen(false), 1500)
       } else if (skipped > 0) {
-        const msgKey = language === 'he'
-          ? `${skipped} שאלות כבר היו קיימות ודולגו.`
-          : `${skipped} questions already existed and were skipped.`
-        setAIQuestionsMessage(msgKey)
+        setAIQuestionsMessage(t.messages.aiSkipped(skipped))
         setTimeout(() => setAIQuestionsOpen(false), 1500)
       }
     } catch (err) {
-      const errMsg = language === 'he' ? 'שגיאה בהוספת השאלות' : 'Error adding questions'
-      setAIQuestionsError(errMsg)
+      setAIQuestionsError(t.messages.aiAddFailed)
       console.error('Error adding AI questions:', err)
     } finally {
       setAddingAIQuestions(false)
@@ -826,9 +811,10 @@ export default function KeywordResearchPage() {
     return copy
   }, [tableSource, sortBy, sortDir])
 
+  // Lucide sort arrows (§6), never a glyph: the column sorted, and which way.
   const sortIndicator = (key: SortKey) => {
-    if (sortBy !== key) return ' ↕'
-    return sortDir === 'asc' ? ' ▲' : ' ▼'
+    const Icon = sortBy !== key ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown
+    return <Icon aria-hidden="true" className={`size-3.5 shrink-0 ${sortBy === key ? 'text-action' : 'text-muted/70'}`} />
   }
 
   // Top opportunities computed from existing results — no extra API calls.
@@ -1014,57 +1000,37 @@ export default function KeywordResearchPage() {
       {/* Form */}
       {scanMode && !formOpen && !researchStartShown && <ResearchFormBar onOpen={() => setFormChoice(true)} />}
       {scanMode && formOpen && (model.mode || unseeded) && <ResearchFormClose onClose={() => setFormChoice(false)} />}
-      <div hidden={scanMode && !formOpen ? true : undefined} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6 mb-8">
+      <div hidden={scanMode && !formOpen ? true : undefined} className="mb-8 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
         <form onSubmit={submitResearch} className="space-y-4">
-          {/* Research type */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              {t.form.researchType}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  { value: 'keyword', label: t.form.researchTypeKeyword },
-                  { value: 'url', label: t.form.researchTypeUrl },
-                  { value: 'keyword_url', label: t.form.researchTypeKeywordUrl },
-                ] as const
-              ).map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                    researchType === opt.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-400'
-                      : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="researchType"
-                    value={opt.value}
-                    checked={researchType === opt.value}
-                    onChange={() => setResearchType(opt.value)}
-                    className="sr-only"
-                    disabled={loading}
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
+          {/* Research type: one segmented control; the form still carries its value by name. */}
+          <div className="flex flex-col gap-1.5">
+            <span id="research-type-label" className={FIELD_LABEL_CLASSES}>{t.form.researchType}</span>
+            <input type="hidden" name="researchType" value={researchType} />
+            <Segmented
+              ariaLabel={t.form.researchType}
+              value={researchType}
+              onChange={(v) => setResearchType(v)}
+              className="max-w-full self-start overflow-x-auto"
+              options={[
+                { value: 'keyword', label: t.form.researchTypeKeyword, disabled: loading },
+                { value: 'url', label: t.form.researchTypeUrl, disabled: loading },
+                { value: 'keyword_url', label: t.form.researchTypeKeywordUrl, disabled: loading },
+              ]}
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Keyword — shown when keyword or keyword_url */}
             {(researchType === 'keyword' || researchType === 'keyword_url') && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t.form.keyword} *
-                </label>
-                <input
+                <Input
+                  id="research-keyword"
+                  label={t.form.keyword}
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder={t.form.keywordPlaceholder}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  aria-required="true"
                   disabled={loading}
                 />
               </div>
@@ -1073,132 +1039,85 @@ export default function KeywordResearchPage() {
             {/* URL — shown when url or keyword_url */}
             {(researchType === 'url' || researchType === 'keyword_url') && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t.form.url} *
-                </label>
-                <input
+                <Input
+                  id="research-url"
+                  label={t.form.url}
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder={t.form.urlPlaceholder}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  aria-required="true"
                   disabled={loading}
                 />
               </div>
             )}
 
-            {/* Country */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.country}
-              </label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              >
-                {SUPPORTED_COUNTRIES.map((cc) => (
-                  <option key={cc} value={cc}>
-                    {t.countries[cc as keyof typeof t.countries]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Language */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.language}
-              </label>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              >
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {t.languages[lang as keyof typeof t.languages]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Minimum Monthly Searches */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.minMonthlySearches}
-              </label>
-              <input
-                type="number"
-                value={minMonthlySearches}
-                onChange={(e) => setMinMonthlySearches(Math.max(0, parseInt(e.target.value) || 0))}
-                min="0"
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              />
-            </div>
-
-            {/* Results Limit */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.resultsToShow}
-              </label>
-              <select
-                value={resultsLimit}
-                onChange={(e) => {
-                  const v = Number(e.target.value)
-                  if (v === 100 || v === 250) {
-                    setResultsLimit(v)
-                  }
-                }}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              >
-                <option value={100}>100</option>
-                <option value={250}>250</option>
-              </select>
-            </div>
+            <Select
+              id="research-country"
+              label={t.form.country}
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              disabled={loading}
+              options={SUPPORTED_COUNTRIES.map((cc) => ({ value: cc, label: t.countries[cc as keyof typeof t.countries] }))}
+            />
+            <Select
+              id="research-language"
+              label={t.form.language}
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              disabled={loading}
+              options={SUPPORTED_LANGUAGES.map((lang) => ({ value: lang, label: t.languages[lang as keyof typeof t.languages] }))}
+            />
+            <Input
+              id="research-min-searches"
+              label={t.form.minMonthlySearches}
+              type="number"
+              value={minMonthlySearches}
+              onChange={(e) => setMinMonthlySearches(Math.max(0, parseInt(e.target.value) || 0))}
+              min="0"
+              disabled={loading}
+            />
+            <Select
+              id="research-limit"
+              label={t.form.resultsToShow}
+              value={String(resultsLimit)}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                if (v === 100 || v === 250) {
+                  setResultsLimit(v)
+                }
+              }}
+              disabled={loading}
+              options={[{ value: '100', label: formatCount(100, language) }, { value: '250', label: formatCount(250, language) }]}
+            />
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={
-              loading ||
-              (researchType === 'keyword' && !keyword.trim()) ||
+          {/* Submit: the form's one primary action; while it cannot run, the line beside it says why. */}
+          {(() => {
+            const missing = (researchType === 'keyword' && !keyword.trim()) ||
               (researchType === 'url' && !url.trim()) ||
               (researchType === 'keyword_url' && (!keyword.trim() || !url.trim()))
-            }
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 size={18} className="animate-spin" />}
-            {loading ? t.form.searching : t.form.search}
-          </button>
+            return (
+              <div className="flex flex-col-reverse items-stretch gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-caption text-muted">{missing && !loading ? t.messages.needInput : ''}</p>
+                <Button type="submit" loading={loading} disabled={loading || missing} className="sm:min-w-44">
+                  {!loading && <Search aria-hidden="true" className="size-4" />}
+                  {loading ? t.form.searching : t.form.search}
+                </Button>
+              </div>
+            )
+          })()}
         </form>
       </div>
 
       {/* Error State */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-8">
-          <p className="text-red-800 dark:text-red-300">{error}</p>
-        </div>
-      )}
+      {error && <Notice tone="bad" className="mb-6">{error}</Notice>}
 
       {/* Few Results Warning */}
-      {fewResultsWarning && results.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-          <p className="text-amber-800 dark:text-amber-300 text-sm">{t.states.fewResults}</p>
-        </div>
-      )}
+      {fewResultsWarning && results.length > 0 && <Notice tone="warn" className="mb-4">{t.states.fewResults}</Notice>}
 
       {/* Filtered Out Warning */}
-      {filteredOutWarning && !fewResultsWarning && results.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
-          <p className="text-blue-800 dark:text-blue-300 text-sm">{t.states.filteredOut}</p>
-        </div>
-      )}
+      {filteredOutWarning && !fewResultsWarning && results.length > 0 && <Notice tone="info" className="mb-4">{t.states.filteredOut}</Notice>}
 
       {/* Easy battles to win: the best keywords of the research on screen. */}
       {scanMode && model.mode && (
@@ -1223,7 +1142,7 @@ export default function KeywordResearchPage() {
 
       {/* Results */}
       {tableVisible && (
-        <div id={scanMode ? 'research-table' : undefined} className={`rounded-card border border-line bg-surface p-6 shadow-card${scanMode ? ' scroll-mt-20' : ''}`}>
+        <div id={scanMode ? 'research-table' : undefined} className={`rounded-card border border-line bg-surface p-5 shadow-card sm:p-6${scanMode ? ' scroll-mt-20' : ''}`}>
           {/* The chips of the scan's research, and Search Console's source under them. */}
           {scanMode && (
             <div className="mb-4 space-y-3 scroll-mt-4">
@@ -1231,255 +1150,67 @@ export default function KeywordResearchPage() {
               {gscNotice}
             </div>
           )}
-          {/* Results Toolbar */}
-          <div className={`flex flex-col sm:flex-row gap-2 mb-4 justify-between items-start sm:items-center`}>
-            <div className={`text-sm font-medium text-body`}>
-              {t.results.resultsCount}: <span className="font-bold text-ink">{tableSource.length}</span>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {!scanMode && topOpportunities.length > 0 && (
-                <button
-                  onClick={() => setOpportunitiesOpen((v) => !v)}
-                  className="text-xs px-3 py-1 rounded border border-warn/40 bg-warn-soft text-warn hover:border-warn/70 transition-colors flex items-center gap-1"
-                  aria-expanded={opportunitiesOpen}
-                >
-                  <Sparkles size={14} />
-                  {opportunitiesOpen ? t.opportunities.hide : t.opportunities.show}
-                </button>
-              )}
-              <button
-                onClick={selectAll}
-                className="text-xs px-3 py-1 rounded-control border border-line text-body hover:bg-sunk transition-colors"
-              >
-                {t.results.selectAll}
-              </button>
-              <button
-                onClick={deselectAll}
-                className="text-xs px-3 py-1 rounded-control border border-line text-body hover:bg-sunk transition-colors"
-              >
-                {t.results.deselectAll}
-              </button>
-              {selectedKeywords.size > 0 && (
-                <>
-                  <button
-                    onClick={copySelected}
-                    className="text-xs px-3 py-1 rounded-control bg-action text-action-ink hover:bg-action-hover transition-colors flex items-center gap-1"
-                  >
-                    <Copy size={14} />
-                    {t.results.copySelected}
-                  </button>
-                  <button
-                    onClick={handleGenerateAIQuestions}
-                    disabled={!activeProject || generatingAIQuestions}
-                    className="text-xs px-3 py-1 rounded-control border border-action text-action hover:bg-action-soft disabled:opacity-50 transition-colors flex items-center gap-1"
-                    title={!selectedProject ? t.addToProject.errorSelectProject : ''}
-                  >
-                    {generatingAIQuestions ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={14} />
-                    )}
-                    {language === 'he' ? 'יצירת שאלות AI' : 'Create AI questions'}
-                  </button>
-                </>
-              )}
-            </div>
+          {/* Results Toolbar: how many, and (for a research of its own) its suggestions. */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-caption text-muted">
+              {t.results.resultsCount}: <span className="font-semibold text-ink tabular-nums">{formatCount(tableSource.length, language)}</span>
+            </p>
+            {!scanMode && topOpportunities.length > 0 && (
+              <Button type="button" size="sm" variant="secondary" onClick={() => setOpportunitiesOpen((v) => !v)} aria-expanded={opportunitiesOpen}>
+                <Sparkles aria-hidden="true" className="size-4 text-action" />
+                {opportunitiesOpen ? t.opportunities.hide : t.opportunities.show}
+              </Button>
+            )}
           </div>
-
-          {/* AI Questions feedback — mismatch / empty state (neutral info, not error) */}
-          {aiQuestionsError && (
-            <div className={`flex items-start justify-between gap-3 mb-4 p-3 bg-sunk border border-line rounded-control text-sm text-body ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-              <span>{aiQuestionsError}</span>
-              <button
-                type="button"
-                onClick={() => setAIQuestionsError('')}
-                className="shrink-0 text-muted hover:text-ink"
-                aria-label={language === 'he' ? 'סגירה' : 'Dismiss'}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Add to Project Section — visible whenever at least one keyword is selected,
-              OR a success/error message is still showing from the last action. */}
-          {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError) && (
-            <div className="mb-6 p-4 bg-action-soft rounded-card border border-action/30">
-              <div className={`mb-3 font-semibold text-ink flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                <span>
-                  {t.addToProject.sectionTitle} ({selectedKeywords.size})
-                </span>
-                {(addToProjectMessage || addToProjectError) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddToProjectMessage('')
-                      setAddToProjectError('')
-                      setLastAddedProjectId('')
-                    }}
-                    className="text-xs font-normal text-muted hover:text-ink underline"
-                  >
-                    {language === 'he' ? 'סגירה' : 'Dismiss'}
-                  </button>
-                )}
-              </div>
-
-              {selectedKeywords.size > 0 && projects.length === 0 && !projectsLoading && (
-                <div className="text-sm text-body p-3 bg-surface rounded-control">
-                  {t.addToProject.noProjects}
-                </div>
-              )}
-
-              {selectedKeywords.size > 0 && projectsLoading && (
-                <div className="text-sm text-muted flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin" />
-                  {t.addToProject.projectsLoading}
-                </div>
-              )}
-
-              {selectedKeywords.size > 0 && projects.length > 0 && !projectsLoading && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      {/* The project is the one the top bar names; switching it
-                          there changes where these keywords go. */}
-                      <span className={`block text-sm font-medium text-body mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t.addToProject.projectLabel}
-                      </span>
-                      <p className="w-full truncate px-4 py-2 rounded-lg border border-line bg-sunk text-ink">
-                        {activeProjectName}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium text-body mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t.addToProject.engineLabel}
-                      </label>
-                      <select
-                        value={engineType}
-                        onChange={(e) => setEngineType(e.target.value as 'google_search' | 'google_maps')}
-                        className="w-full px-4 py-2 rounded-lg border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action"
-                        disabled={addingToProject}
-                      >
-                        <option value="google_search">{t.addToProject.engineGoogleOrganic}</option>
-                        <option value="google_maps">{t.addToProject.engineGoogleMaps}</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        onClick={handleAddToProject}
-                        disabled={!selectedProject || addingToProject}
-                        className="w-full bg-action hover:bg-action-hover disabled:bg-sunk disabled:text-muted text-action-ink font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                      >
-                        {addingToProject && <Loader2 size={18} className="animate-spin" />}
-                        {addingToProject
-                          ? language === 'he'
-                            ? 'מוסיף ביטויים לפרויקט...'
-                            : 'Adding keywords to project...'
-                          : t.addToProject.addButton}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {addToProjectError && (
-                <div className={`text-sm text-bad mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                  {addToProjectError}
-                </div>
-              )}
-              {addToProjectMessage && (
-                <div className={`flex flex-col sm:flex-row sm:items-center gap-3 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
-                  <div className={`text-sm text-ok flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <CheckCircle size={16} />
-                    <span>{addToProjectMessage}</span>
-                  </div>
-                  {lastAddedProjectId && (
-                    <Link
-                      href={`/keywords?projectId=${encodeURIComponent(lastAddedProjectId)}`}
-                      className="inline-flex items-center justify-center bg-action hover:bg-action-hover text-action-ink font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                    >
-                      {t.addToProject.goToProject}
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Opportunities Panel — opt-in, compact, no extra API calls */}
           {!scanMode && opportunitiesOpen && topOpportunities.length > 0 && (
-            <div className="mb-4 p-3 bg-warn-soft border border-warn/25 rounded-control">
-              <div className={`mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                <h3 className="text-sm font-semibold text-ink">
-                  {t.opportunities.title}
-                </h3>
-                <p className="text-xs text-muted">
-                  {t.opportunities.subtitle}
-                </p>
-              </div>
-              <ul className="divide-y divide-warn/15">
+            <section data-opportunities="" className="mb-4 rounded-inset border border-line border-s-[3px] border-s-action bg-surface p-4">
+              <h3 className="text-copy font-semibold text-ink">{t.opportunities.title}</h3>
+              <p className="text-caption text-muted">{t.opportunities.subtitle}</p>
+              <ul className="mt-2 divide-y divide-line">
                 {topOpportunities.map((r, i) => {
                   const isSelected = selectedKeywords.has(r.keyword)
                   const badge = t.opportunities.badges[getBadgeKey(r)]
+                  const c = competitionCell(r, t.results.competitionLevel, t.results.competitionIndex)
                   return (
-                    <li
-                      key={r.keyword}
-                      className={`flex items-center flex-wrap gap-x-3 gap-y-1 py-1.5 text-xs ${isRTL ? 'flex-row-reverse text-right' : ''}`}
-                    >
-                      <span className="text-muted font-mono w-5 shrink-0">
-                        {i + 1}.
+                    <li key={r.keyword} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-caption">
+                      <span className="w-5 shrink-0 text-muted tabular-nums">{formatCount(i + 1, language)}</span>
+                      <span className="min-w-0 flex-1 truncate text-copy font-medium text-ink" title={r.keyword}>{r.keyword}</span>
+                      <span className="whitespace-nowrap text-muted tabular-nums">
+                        {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined ? formatCount(r.avgMonthlySearches, language) : '—'} {t.opportunities.searches}
                       </span>
-                      <span className="font-medium text-ink truncate min-w-0 flex-1">
-                        {r.keyword}
-                      </span>
-                      <span className="text-muted whitespace-nowrap">
-                        {r.avgMonthlySearches?.toLocaleString() ?? '—'} {t.opportunities.searches}
-                      </span>
-                      {(() => {
-                        const c = competitionCell(r, t.results.competitionLevel, t.results.competitionIndex)
-                        return <span className={`whitespace-nowrap ${c.tone}`} title={c.title}>{c.label}</span>
-                      })()}
+                      <span className={`whitespace-nowrap font-semibold ${c.tone}`} title={c.title}>{c.label}</span>
                       {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
-                        <span className="text-muted whitespace-nowrap">
-                          CPC {formatMoney(r.highTopOfPageBid, r.currency, language)}
-                        </span>
+                        <span className="whitespace-nowrap text-muted tabular-nums">CPC {formatMoney(r.highTopOfPageBid, r.currency, language)}</span>
                       )}
-                      <span className="px-2 py-0.5 rounded-full bg-warn-soft text-warn ring-1 ring-warn/25 whitespace-nowrap text-[10px] font-medium">
-                        {badge}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => selectKeywordFromOpportunity(r.keyword)}
-                        disabled={isSelected}
-                        className="px-2 py-0.5 rounded bg-action hover:bg-action-hover disabled:bg-sunk disabled:text-muted text-action-ink text-[11px] font-medium transition-colors whitespace-nowrap"
-                      >
+                      <Badge variant="neutral">{badge}</Badge>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => selectKeywordFromOpportunity(r.keyword)} disabled={isSelected}>
+                        {isSelected && <Check aria-hidden="true" className="size-4" />}
                         {isSelected ? t.opportunities.selected : t.opportunities.select}
-                      </button>
+                      </Button>
                     </li>
                   )
                 })}
               </ul>
-            </div>
+            </section>
           )}
 
-          {/* Results Table — in the design tokens, with the difficulty in words, one
-              money format (the hero's), and a name on every checkbox (UX review P1-4). */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          {/* Results Table (§6): a named checkbox per row, the difficulty in words, one
+              money format, figures end-aligned, the row's secondary actions behind "⋯". */}
+          <div className="relative -mx-5 overflow-x-auto sm:-mx-6">
+            <table className="w-full text-copy">
               <thead>
-                <tr className="border-b border-line">
-                  <th className="px-4 py-3 text-start font-semibold text-ink w-6">
-                    <input
-                      type="checkbox"
+                <tr className="h-10 border-y border-line bg-sunk/70 text-caption text-muted">
+                  <th className="w-10 ps-5 pe-2 text-start sm:ps-6">
+                    <Checkbox
                       checked={selectedKeywords.size === tableSource.length && tableSource.length > 0}
-                      onChange={(e) => (e.target.checked ? selectAll() : deselectAll())}
+                      indeterminate={selectedKeywords.size > 0 && selectedKeywords.size < tableSource.length}
+                      onChange={(on) => (on ? selectAll() : deselectAll())}
                       aria-label={t.results.selectAllRows}
-                      className="rounded accent-action"
                     />
                   </th>
-                  <th className="px-4 py-3 text-start font-semibold text-ink">
+                  <th className="px-4 text-start font-semibold">
                     {t.results.keyword}
                   </th>
                   {([
@@ -1488,82 +1219,69 @@ export default function KeywordResearchPage() {
                     ['competition', t.results.competition, ''],
                     ['lowCpc', t.results.lowCpc, ''],
                     ['highCpc', t.results.highCpc, ''],
-                  ] as const).map(([key, label, cls]) => (
-                    <th key={key} className={`px-4 py-3 text-start font-semibold text-ink ${cls}`} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
-                      <button
-                        type="button"
-                        onClick={() => handleSort(key)}
-                        title={key === 'opportunity' ? t.results.opportunityTooltip : undefined}
-                        className={`inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-action ${sortBy === key ? 'text-action' : ''}`}
-                      >
-                        {label}
-                        <span className="text-xs">{sortIndicator(key)}</span>
-                      </button>
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-start font-semibold text-ink">
-                    {t.results.action}
+                  ] as const).map(([key, label, cls]) => {
+                    const numeric = key === 'monthlySearches' || key === 'lowCpc' || key === 'highCpc'
+                    return (
+                      <th key={key} className={`px-4 font-semibold ${numeric ? 'text-end' : 'text-start'} ${cls}`} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                        <button
+                          type="button"
+                          onClick={() => handleSort(key)}
+                          title={key === 'opportunity' ? t.results.opportunityTooltip : undefined}
+                          aria-label={t.table.sortBy(label)}
+                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-control transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${sortBy === key ? 'text-ink' : ''}`}
+                        >
+                          {label}
+                          {sortIndicator(key)}
+                        </button>
+                      </th>
+                    )
+                  })}
+                  <th className="px-4 pe-5 text-end font-semibold sm:pe-6">
+                    <span className="sr-only">{t.results.action}</span>
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {(scanMode ? sortedResults.slice(0, shownRows) : sortedResults).map((result, idx) => {
+              <tbody className="divide-y divide-line">
+                {sortedResults.slice(0, shownRows).map((result, idx) => {
                   const badge = getOpportunityBadgeInfo(result, t.results.potentialLevel)
                   const competition = competitionCell(result, t.results.competitionLevel, t.results.competitionIndex)
+                  const selected = selectedKeywords.has(result.keyword)
                   return (
-                  <tr key={idx} className="border-b border-line transition-colors hover:bg-sunk/50">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedKeywords.has(result.keyword)}
+                  <tr key={idx} data-selected={selected || undefined} className={`h-14 transition-colors duration-150 ease-snappy ${selected ? 'bg-action-soft' : 'hover:bg-sunk/60'}`}>
+                    <td className="w-10 ps-5 pe-2 sm:ps-6">
+                      <Checkbox
+                        checked={selected}
                         onChange={() => toggleKeyword(result.keyword)}
                         aria-label={t.results.selectKeyword(result.keyword)}
-                        className="rounded accent-action"
                       />
                     </td>
-                    <td className="px-4 py-3 text-start text-ink">
-                      {result.keyword}
+                    <td className="max-w-72 px-4 py-3 text-start">
+                      <span className="block truncate font-medium text-ink" title={result.keyword}>{result.keyword}</span>
                       {scanMode && sourceLineFor(result.keyword)}
                     </td>
-                    <td className="px-4 py-3 text-start tabular-nums text-body">
+                    <td className="px-4 py-3 text-end tabular-nums text-body">
                       {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? formatCount(result.avgMonthlySearches, language) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-start hidden sm:table-cell">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${badge.colorClass}`}>
+                    <td className="hidden px-4 py-3 text-start sm:table-cell">
+                      <span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-0.5 text-caption font-semibold ${badge.colorClass}`}>
                         {badge.label}
                       </span>
                     </td>
-                    <td className={`px-4 py-3 text-start whitespace-nowrap font-medium ${competition.tone}`} title={competition.title}>
+                    <td className={`whitespace-nowrap px-4 py-3 text-start font-medium ${competition.tone}`} title={competition.title}>
                       {competition.label}
                     </td>
-                    <td className="px-4 py-3 text-start tabular-nums whitespace-nowrap text-body">
+                    <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-body">
                       {result.lowTopOfPageBid ? formatMoney(result.lowTopOfPageBid, result.currency, language) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-start tabular-nums whitespace-nowrap text-body">
+                    <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-body">
                       {result.highTopOfPageBid ? formatMoney(result.highTopOfPageBid, result.currency, language) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-start">
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => copyKeyword(result.keyword)}
-                          className="flex items-center gap-1 text-action transition-colors hover:text-action-hover"
-                        >
-                          <Copy size={16} aria-hidden="true" />
-                          <span className="text-xs">{t.results.copy}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenTrendModal(result.keyword)}
-                          className="flex items-center gap-1 text-action transition-colors hover:text-action-hover"
-                        >
-                          <TrendingUp size={16} aria-hidden="true" />
-                          <span className="text-xs">{t.trend.button}</span>
-                        </button>
+                    <td className="px-4 py-3 pe-5 sm:pe-6">
+                      <div className="flex items-center justify-end gap-1">
                         {/* One click to track this keyword: the same request and quota check as "easy wins". */}
                         {scanMode && ((result as ResearchRow).tracked ? (
-                          <span data-row-tracked="" className="inline-flex h-7 items-center gap-1 rounded-pill border border-ok/20 bg-ok-soft px-2.5 text-xs font-semibold text-ok">
-                            <Check size={12} strokeWidth={3} aria-hidden="true" />{ti.tracked}
+                          <span data-row-tracked="" className="inline-flex h-8 items-center gap-1 whitespace-nowrap px-3 text-caption font-semibold text-ok">
+                            <Check aria-hidden="true" className="size-4" />{ti.tracked}
                           </span>
                         ) : (
                           <button
@@ -1572,12 +1290,19 @@ export default function KeywordResearchPage() {
                             onClick={() => trackKeyword(result as ResearchRow)}
                             disabled={trackingKeys.has(keywordKey(result.keyword))}
                             aria-label={ti.trackAria(result.keyword)}
-                            className="inline-flex h-7 items-center gap-1 rounded-pill border border-line bg-surface px-2.5 text-xs font-semibold text-ink transition-colors hover:border-action/40 hover:bg-action-soft hover:text-action disabled:opacity-60"
+                            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50"
                           >
-                            {trackingKeys.has(keywordKey(result.keyword)) ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Plus size={12} strokeWidth={2.5} aria-hidden="true" />}
+                            {trackingKeys.has(keywordKey(result.keyword)) ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Plus aria-hidden="true" className="size-4" />}
                             {trackingKeys.has(keywordKey(result.keyword)) ? ti.tracking : ti.track}
                           </button>
                         ))}
+                        <RowMenu
+                          label={t.table.rowMenu(result.keyword)}
+                          items={[
+                            { key: 'trend', label: t.trend.title, icon: <TrendingUp aria-hidden="true" className="size-4" />, onSelect: () => handleOpenTrendModal(result.keyword) },
+                            { key: 'copy', label: t.results.copy, icon: <Copy aria-hidden="true" className="size-4" />, onSelect: () => copyKeyword(result.keyword) },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -1587,20 +1312,105 @@ export default function KeywordResearchPage() {
             </table>
           </div>
           {scanMode && sortedResults.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted">{ts.chips.empty}</p>
+            <p className="py-8 text-center text-copy text-muted">{ts.chips.empty}</p>
           )}
-          {scanMode && sortedResults.length > shownRows && (
+          {sortedResults.length > shownRows && (
             <div className="mt-4 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShownRows((n) => n + TABLE_PAGE)}
-                className="inline-flex h-9 items-center rounded-control border border-line bg-surface px-4 text-sm font-semibold text-body transition-colors hover:bg-sunk"
-              >
+              <Button type="button" variant="secondary" onClick={() => setShownRows((n) => n + TABLE_PAGE)}>
                 {ts.table.showMore(
                   formatCount(Math.min(TABLE_PAGE, sortedResults.length - shownRows), language),
                   formatCount(sortedResults.length - shownRows, language),
                 )}
-              </button>
+              </Button>
+            </div>
+          )}
+
+          {/* The selection's actions (§6): only while something is selected (or its
+              last result is still being said), pinned to the bottom of the view, at
+              most three actions; what they came to is said right above them. */}
+          {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError || aiQuestionsError) && (
+            <div data-bulk-bar="" className="sticky bottom-4 z-20 mt-4 space-y-2">
+              {aiQuestionsError && (
+                <Notice tone="info" onDismiss={() => setAIQuestionsError('')}>{aiQuestionsError}</Notice>
+              )}
+              {addToProjectError && (
+                <Notice tone="bad" onDismiss={() => setAddToProjectError('')}>{addToProjectError}</Notice>
+              )}
+              {addToProjectMessage && (
+                <Notice
+                  tone="ok"
+                  onDismiss={() => { setAddToProjectMessage(''); setLastAddedProjectId('') }}
+                  action={lastAddedProjectId ? { label: t.addToProject.goToProject, onClick: () => router.push(`/keywords?projectId=${encodeURIComponent(lastAddedProjectId)}`) } : null}
+                >
+                  {addToProjectMessage}
+                </Notice>
+              )}
+              {selectedKeywords.size > 0 && (
+                <div role="region" aria-label={t.bulk.label} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-inset bg-contrast px-4 py-3 text-contrast-ink shadow-pop">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={deselectAll}
+                      aria-label={t.bulk.clear}
+                      title={t.bulk.clear}
+                      className="grid size-8 shrink-0 place-items-center rounded-control text-contrast-ink/80 transition-colors duration-150 ease-snappy hover:bg-contrast-ink/10 hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/40"
+                    >
+                      <X aria-hidden="true" className="size-4" />
+                    </button>
+                    <div className="min-w-0">
+                      <p className="text-copy font-semibold tabular-nums">{t.bulk.selected(formatCount(selectedKeywords.size, language))}</p>
+                      {activeProjectName && <p className="truncate text-caption text-contrast-ink/70">{t.bulk.project(activeProjectName)}</p>}
+                    </div>
+                  </div>
+
+                  {projects.length === 0 && !projectsLoading ? (
+                    <p className="text-caption text-contrast-ink/80">{t.addToProject.noProjects}</p>
+                  ) : projectsLoading ? (
+                    <p className="inline-flex items-center gap-2 text-caption text-contrast-ink/80">
+                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                      {t.addToProject.projectsLoading}
+                    </p>
+                  ) : (
+                    <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                      <Segmented
+                        ariaLabel={t.addToProject.engineLabel}
+                        value={engineType}
+                        onChange={(v) => setEngineType(v)}
+                        options={[
+                          { value: 'google_search', label: t.addToProject.engineGoogleOrganic, disabled: addingToProject },
+                          { value: 'google_maps', label: t.addToProject.engineGoogleMaps, disabled: addingToProject },
+                        ]}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={copySelected}
+                        className="text-contrast-ink hover:bg-contrast-ink/10 hover:text-contrast-ink"
+                      >
+                        <Copy aria-hidden="true" className="size-4" />
+                        {t.bulk.copy}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleGenerateAIQuestions}
+                        disabled={!activeProject || generatingAIQuestions}
+                        title={selectedKeywords.size > 1 ? t.bulk.aiQuestionsHint : undefined}
+                        className="text-contrast-ink hover:bg-contrast-ink/10 hover:text-contrast-ink"
+                      >
+                        {generatingAIQuestions ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}
+                        {t.bulk.aiQuestions}
+                      </Button>
+                      <Button type="button" size="sm" onClick={handleAddToProject} loading={addingToProject} disabled={!selectedProject || addingToProject}>
+                        {!addingToProject && <Plus aria-hidden="true" className="size-4" />}
+                        {addingToProject ? t.bulk.adding : t.addToProject.addButton}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1608,9 +1418,7 @@ export default function KeywordResearchPage() {
 
       {/* Empty State */}
       {!scanMode && !loading && results.length === 0 && !error && (
-        <div className={`text-center py-12 text-slate-500 dark:text-slate-400`}>
-          <p>{t.states.empty}</p>
-        </div>
+        <EmptyState icon={<Search />} title={t.states.empty} />
       )}
 
       {/* Internal/dev-only raw Search Console opportunity browser (Stage E2A/E2B) —

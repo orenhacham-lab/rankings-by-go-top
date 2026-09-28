@@ -39,20 +39,20 @@ export default function EasyWins({
   return (
     <section data-easy-wins="" className="@container mb-6">
       <Card padding={false}>
-        <header className="flex items-start gap-3.5 border-b border-line bg-gradient-to-b from-ok-soft/70 to-surface px-4 py-5 sm:px-6">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ok text-canvas shadow-sm" aria-hidden="true">
-            <Sprout size={19} strokeWidth={2} />
+        <header className="flex items-start gap-3.5 border-b border-line px-4 py-5 sm:px-6">
+          <span className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+            <Sprout size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold leading-6 text-ink">{t.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-muted text-pretty">{t.subtitle}</p>
+            <h2 className="text-section font-semibold text-ink">{t.title}</h2>
+            <p className="mt-1 max-w-3xl text-copy text-muted text-pretty">{t.subtitle}</p>
           </div>
         </header>
         {wins.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted sm:px-6">{t.none}</p>
+          <p className="px-4 py-6 text-copy text-muted sm:px-6">{t.none}</p>
         ) : (
           <>
-            <div className={cn('hidden gap-x-4 border-b border-line bg-sunk/60 px-6 py-2 text-xs font-semibold text-muted @3xl:grid', GRID)} aria-hidden="true">
+            <div className={cn('hidden gap-x-4 border-b border-line bg-sunk/60 px-6 py-2 text-caption font-semibold text-muted @3xl:grid', GRID)} aria-hidden="true">
               <span>{t.keyword}</span>
               <span>{t.searches}</span>
               <span>{t.competition}</span>
@@ -73,31 +73,31 @@ export default function EasyWins({
                     <div className="flex min-w-0 items-start gap-3 @3xl:items-center">
                       <span
                         className={cn(
-                          'grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums',
-                          i < 3 ? 'bg-ok text-canvas' : 'bg-sunk text-muted',
+                          'grid size-6 shrink-0 place-items-center rounded-pill text-caption font-bold tabular-nums',
+                          i < 3 ? 'bg-action-soft text-action' : 'bg-sunk text-muted',
                         )}
                         aria-hidden="true"
                       >
                         {i + 1}
                       </span>
                       <div className="min-w-0">
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.9375rem] font-semibold leading-6 text-ink">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-copy font-semibold leading-6 text-ink">
                           <span className="min-w-0 break-words">{row.keyword}</span>
                         </p>
                         {/* Once the card is wide the columns beside it say the same, so the sentence stays
                             only for screen readers, unless it adds what no column shows: a click price
                             above the average, the sign of buying intent. */}
-                        <p className={cn('mt-0.5 text-sm text-muted', win.cpcAboveAverage ? '@3xl:flex @3xl:items-center @3xl:gap-1.5 @3xl:text-warn' : '@3xl:sr-only')}>
+                        <p className={cn('mt-0.5 text-copy text-muted', win.cpcAboveAverage ? '@3xl:flex @3xl:items-center @3xl:gap-1.5 @3xl:text-warn' : '@3xl:sr-only')}>
                           {win.cpcAboveAverage && <Coins size={13} strokeWidth={2.5} aria-hidden="true" className="hidden shrink-0 @3xl:block" />}
                           <span>{why}</span>
                         </p>
                       </div>
                     </div>
-                    <span className="hidden font-semibold text-sm text-body tabular-nums @3xl:block">{formatCount(win.volume, language)}</span>
+                    <span className="hidden font-semibold text-copy text-body tabular-nums @3xl:block">{formatCount(win.volume, language)}</span>
                     <span className="hidden @3xl:block">
                       <span
                         className={cn(
-                          'inline-flex items-center rounded-pill border px-2 py-0.5 text-xs font-semibold',
+                          'inline-flex items-center rounded-pill border px-2 py-0.5 text-caption font-semibold',
                           win.competition === 'low' ? 'border-ok/20 bg-ok-soft text-ok' : win.competition === 'medium' ? 'border-warn/20 bg-warn-soft text-warn' : 'border-line bg-sunk text-muted',
                         )}
                       >
@@ -106,13 +106,13 @@ export default function EasyWins({
                     </span>
                     <span className="col-span-2 flex items-center gap-2 ps-9 @3xl:col-span-1 @3xl:ps-0" role="img" aria-label={t.potentialOf(String(win.score))}>
                       <span className="h-2 w-24 overflow-hidden rounded-pill bg-sunk @3xl:w-full">
-                        <span className="block h-full rounded-pill bg-gradient-to-r from-action/70 to-action rtl:bg-gradient-to-l" style={{ width: `${win.score}%` }} />
+                        <span className="block h-full rounded-pill bg-action" style={{ width: `${win.score}%` }} />
                       </span>
-                      <span className="w-7 shrink-0 text-sm font-bold text-ink tabular-nums">{win.score}</span>
+                      <span className="w-7 shrink-0 text-copy font-bold text-ink tabular-nums">{win.score}</span>
                     </span>
                     <span className="col-start-2 row-start-1 justify-self-end @3xl:col-start-auto @3xl:row-start-auto">
                       {row.tracked ? (
-                        <span className="inline-flex h-7 items-center gap-1 rounded-pill border border-ok/20 bg-ok-soft px-2.5 text-xs font-semibold text-ok">
+                        <span className="inline-flex h-7 items-center gap-1 rounded-pill border border-ok/20 bg-ok-soft px-2.5 text-caption font-semibold text-ok">
                           <Check size={12} strokeWidth={3} aria-hidden="true" />
                           {t.tracked}
                         </span>
@@ -127,7 +127,7 @@ export default function EasyWins({
                 )
               })}
             </ol>
-            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-sunk/40 px-4 py-3 text-sm sm:px-6">
+            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-sunk/40 px-4 py-3 text-copy sm:px-6">
               <span className="text-muted tabular-nums">{t.showing(formatCount(wins.length, language), formatCount(total, language))}</span>
               {onShowAll && (
                 <button type="button" onClick={onShowAll} className="font-semibold text-action transition-colors hover:text-action-hover">

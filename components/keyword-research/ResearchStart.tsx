@@ -38,12 +38,12 @@ export default function ResearchStart({
     <section data-research-start="" className="mb-8">
       <Card>
         <div className="flex items-start gap-4">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-action-soft text-action" aria-hidden="true">
+          <span className="grid size-11 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
             <Search size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold leading-6 text-ink">{m.researchEmptyTitle}</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted">{m.researchEmptyBody}</p>
+            <h2 className="text-section font-semibold text-ink">{m.researchEmptyTitle}</h2>
+            <p className="mt-1 max-w-2xl text-copy text-muted">{m.researchEmptyBody}</p>
             <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <label htmlFor="research-start-keyword" className={FIELD_LABEL_CLASSES}>{m.researchInputLabel}</label>
@@ -64,7 +64,7 @@ export default function ResearchStart({
             <button
               type="button"
               onClick={onAdvanced}
-              className="mt-3 text-xs font-semibold text-action underline decoration-dotted underline-offset-4 hover:text-action-hover"
+              className="mt-3 text-caption font-semibold text-action underline decoration-dotted underline-offset-4 hover:text-action-hover"
             >
               {m.researchAdvanced}
             </button>
@@ -75,7 +75,7 @@ export default function ResearchStart({
                 ) : (
                   <div className="flex flex-wrap items-center gap-3">
                     <Telescope size={16} className="shrink-0 text-action" aria-hidden />
-                    <p className="min-w-0 flex-1 basis-56 text-sm text-body">{m.researchOrMap}</p>
+                    <p className="min-w-0 flex-1 basis-56 text-copy text-body">{m.researchOrMap}</p>
                     <Button variant="secondary" size="sm" onClick={() => void offered.start()} loading={offered.starting} data-mapping-run>
                       {offered.starting ? m.starting : m.run}
                     </Button>

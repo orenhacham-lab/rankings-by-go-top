@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Search, FileText } from 'lucide-react'
+import { FileText, Plus, RefreshCw, Search, SearchX } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -21,6 +21,11 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import { formatDateTime } from '@/lib/utils'
 import Button from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import EmptyState from '@/components/ui/EmptyState'
+import Segmented from '@/components/ui/Segmented'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { useToasts, ToastHost } from '@/components/ui/Toast'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
@@ -47,8 +52,8 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const [showAddTarget, setShowAddTarget] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanningTargets, setScanningTargets] = useState<Set<string>>(new Set())
-  const [scanMessage, setScanMessage] = useState('')
-  const [scanError, setScanError] = useState(false)
+  // What a scan or a volume refresh came to: the app's one toast (§8), not a hand-made popup.
+  const toasts = useToasts()
   const [updatingVolumes, setUpdatingVolumes] = useState(false)
   // A NEW KEYWORD HAS NO SEARCH VOLUME UNTIL SOMETHING FETCHES ONE. The direct
   // "+ Add keyword" path never scheduled that (only the keyword-research path
@@ -165,16 +170,14 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   }
 
   function showScanResult(message: string, isError: boolean) {
-    setScanMessage(message)
-    setScanError(isError)
-    setTimeout(() => setScanMessage(''), 5000)
+    if (isError) toasts.error(message)
+    else toasts.success(message)
   }
 
   async function handleScanAll() {
     if (scanAllInFlight.current) return
     scanAllInFlight.current = true
     setScanning(true)
-    setScanMessage('')
     try {
       const response = await fetch('/api/scan', {
         method: 'POST',
@@ -202,7 +205,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     if (volumeRequestInFlight.current) return
     volumeRequestInFlight.current = true
     setUpdatingVolumes(true)
-    setScanMessage('')
     try {
       const response = await fetch('/api/google-ads/keyword-metrics', {
         method: 'POST',
@@ -257,7 +259,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     if (targetScansInFlight.current.has(targetId)) return
     targetScansInFlight.current.add(targetId)
     setScanningTargets((prev) => new Set([...prev, targetId]))
-    setScanMessage('')
     try {
       const response = await fetch('/api/scan', {
         method: 'POST',
@@ -313,35 +314,10 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
 
   return (
     <div>
-      {scanMessage && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md sm:w-auto z-[100] motion-safe:animate-pop-in"
-        >
-          <div
-            className={`p-3 pr-2 rounded-control text-copy flex items-center gap-2 shadow-pop border ${
-              scanError ? 'bg-bad-soft border-bad/20 text-bad' : 'bg-ok-soft border-ok/20 text-ok'
-            }`}
-          >
-            <span>{scanError ? '✗' : '✓'}</span>
-            <span className="flex-1">{scanMessage}</span>
-            <button
-              type="button"
-              onClick={() => setScanMessage('')}
-              aria-label={dict.common.close}
-              className="shrink-0 w-6 h-6 inline-flex items-center justify-center rounded hover:bg-black/5"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* What every scan of this project is measured against: the facts that used
           to be the project page's summary row. */}
       <dl className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line lg:grid-cols-4">
-        <Fact label={k.summary.domain}><span dir="ltr" className="font-mono">{project.target_domain}</span></Fact>
+        <Fact label={k.summary.domain}><span dir="ltr">{project.target_domain}</span></Fact>
         <Fact label={k.summary.lastScan}>{project.last_scan_at ? formatDateTime(project.last_scan_at, language) : '—'}</Fact>
         <Fact label={k.summary.frequency}>
           <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>{facts.frequency}</Badge>
@@ -354,41 +330,47 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
       <CompetitorSummary view={competitorView} variant="full" className="mb-6" />
 
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 gap-2">
-          <input
-            type="search"
-            placeholder={kp.searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full max-w-xs rounded-control border border-line bg-surface px-3 py-2 text-copy text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-action"
+        {/* Narrowing the table: a search field and the engine as one segmented control. */}
+        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-xs">
+            <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              placeholder={kp.searchPlaceholder}
+              aria-label={kp.searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={`${FIELD_CLASSES} h-9 ps-9`}
+            />
+          </div>
+          <Segmented
+            ariaLabel={k.table.scanType}
+            value={engineFilter as '' | 'google_search' | 'google_maps'}
+            onChange={(v) => setEngineFilter(v)}
+            className="max-w-full self-start overflow-x-auto sm:self-auto"
+            options={[
+              { value: '', label: kp.allEngines },
+              { value: 'google_search', label: kp.engineGoogleSearch },
+              { value: 'google_maps', label: kp.engineGoogleMaps },
+            ]}
           />
-          <select
-            value={engineFilter}
-            onChange={(e) => setEngineFilter(e.target.value)}
-            aria-label={k.table.scanType}
-            className="rounded-control border border-line bg-surface px-3 py-2 text-copy text-ink focus:outline-none focus:ring-2 focus:ring-action"
-          >
-            <option value="">{kp.allEngines}</option>
-            <option value="google_search">{kp.engineGoogleSearch}</option>
-            <option value="google_maps">{kp.engineGoogleMaps}</option>
-          </select>
         </div>
+        {/* One primary (check every keyword now); the rest are quiet. */}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handleScanAll} loading={scanning} disabled={activeTargets.length === 0} size="sm" className="gap-2">
-            <Search size={16} strokeWidth={2} />
+          <Button onClick={handleScanAll} loading={scanning} disabled={activeTargets.length === 0} size="sm">
+            {!scanning && <RefreshCw aria-hidden="true" className="size-4" />}
             {scanning ? k.keywordsSection.scanning : k.keywordsSection.scanAllButton}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setShowAddTarget(true)}>
+            <Plus aria-hidden="true" className="size-4" />
             {k.keywordsSection.addKeywordButton}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleUpdateVolumes} loading={updatingVolumes} disabled={targets.length === 0}>
+          <Button variant="secondary" size="sm" onClick={handleUpdateVolumes} loading={updatingVolumes} disabled={targets.length === 0}>
             {updatingVolumes ? k.keywordsSection.updatingVolumes : k.keywordsSection.updateVolumesButton}
           </Button>
-          <Link href="/reports">
-            <Button variant="ghost" size="sm" className="gap-1.5">
-              <FileText size={16} strokeWidth={2} />
-              {k.keywordsSection.reportButton}
-            </Button>
+          <Link href="/reports" className="inline-flex h-8 items-center gap-1.5 rounded-control px-3 text-caption font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+            <FileText aria-hidden="true" className="size-4" />
+            {k.keywordsSection.reportButton}
           </Link>
         </div>
       </div>
@@ -398,7 +380,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
       <GscKeywordsNotice projectId={id} view={gscKeywords} className="mb-3" />
 
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
-        <p className="rounded-card border border-line bg-surface px-4 py-10 text-center text-copy text-muted">{kp.noMatches}</p>
+        <Card padding={false}><EmptyState icon={<SearchX />} title={kp.noMatches} /></Card>
       ) : (
         <TrackingTargetsTable
           targets={visibleTargets}
@@ -420,6 +402,12 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           onActionComplete={loadTargets}
           competitorView={competitorView}
           gscKeywords={gscKeywords}
+          emptyAction={(
+            <Button onClick={() => setShowAddTarget(true)}>
+              <Plus aria-hidden="true" className="size-4" />
+              {k.keywordsSection.addKeywordButton}
+            </Button>
+          )}
         />
       )}
 
@@ -440,6 +428,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           onCancel={() => setShowAddTarget(false)}
         />
       </Modal>
+      <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
     </div>
   )
 }

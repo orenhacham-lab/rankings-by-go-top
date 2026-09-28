@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { TrendingDown, TrendingUp } from 'lucide-react'
 import type { RankingMove } from '@/lib/dashboard/rankings'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-import { EngineBadge } from '@/components/ui/StatusBadge'
+import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import { LinkButton, Widget, WidgetEmpty } from './ui'
 
 export default function RankingChanges({ t, direction, title, moves }: {
@@ -41,9 +41,7 @@ export default function RankingChanges({ t, direction, title, moves }: {
                     <EngineBadge engine={m.engine} />
                   </span>
                 </span>
-                <span className={`shrink-0 text-copy font-semibold tabular-nums ${up ? 'text-ok' : 'text-bad'}`}>
-                  {up ? '▲' : '▼'} {Math.abs(m.change)}
-                </span>
+                <span className="shrink-0"><PositionChange change={m.change} /></span>
               </Link>
             </li>
           ))}
