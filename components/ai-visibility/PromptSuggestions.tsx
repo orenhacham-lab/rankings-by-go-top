@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
+import { dropOffTopicSuggestions } from '@/lib/ai-visibility/question-relevance'
 import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -146,8 +147,15 @@ export default function PromptSuggestions({
   // Marker-safe commit: the insufficient-context notice is never a question and
   // must never be rendered as a selectable card. Replaces (never appends) the
   // displayed pool so a stale marker can't survive a regenerate.
+  // …and a suggestion about another trade than the project's is not shown
+  // either (lib/ai-visibility/question-relevance.ts).
   function commitSuggestions(list: PromptSuggestion[]) {
-    setSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)))
+    setSuggestions(dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), {
+      keywords: keywords ?? [],
+      offerings: manualProfile?.mode === 'manual' ? [manualProfile.primaryCategory, ...manualProfile.secondaryCategories] : [],
+      businessName,
+      domain,
+    }))
   }
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)

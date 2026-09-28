@@ -8,7 +8,7 @@
  *
  * The ranking is lib/keyword-research/easy-wins.ts; this only draws it.
  */
-import { Check, Coins, Plus, Swords } from 'lucide-react'
+import { Check, Coins, Plus, Sprout } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -41,7 +41,7 @@ export default function EasyWins({
       <Card padding={false}>
         <header className="flex items-start gap-3.5 border-b border-line bg-gradient-to-b from-ok-soft/70 to-surface px-4 py-5 sm:px-6">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ok text-canvas shadow-sm" aria-hidden="true">
-            <Swords size={19} strokeWidth={2} />
+            <Sprout size={19} strokeWidth={2} />
           </span>
           <div className="min-w-0">
             <h2 className="text-lg font-bold leading-6 text-ink">{t.title}</h2>

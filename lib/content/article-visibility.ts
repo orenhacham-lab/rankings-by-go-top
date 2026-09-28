@@ -8,12 +8,15 @@
  *
  * Nothing here spends anything: no AI check, no provider call, no usage
  * reservation, no write. The suggested question is a template
- * (ai-query-suggestion.ts); tracking it is a separate click on the existing
- * prompt route.
+ * (ai-query-suggestion.ts). Generating the article already tracks it
+ * (lib/ai-visibility/article-question.ts), and the card then says so; when it
+ * could not (no AI visibility, the automatic cap), tracking it is a click on the
+ * existing prompt route.
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { matchArticleCitations, publishedUrlOf, citedArticles, type CitationMatch, type StoredCitation } from './citation-match'
 import { suggestAiQuery } from './ai-query-suggestion'
+import { sameQuestion } from '@/lib/ai-visibility/article-question'
 import { siteUrlFromDomain } from './structured-data'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -139,18 +142,21 @@ export async function loadArticleVisibility(admin: Admin, article: VisibilityArt
     }
   }
 
+  // The article's question (lib/ai-visibility/article-question.ts adds it, tracked,
+  // when the article is generated): shown as "tracked" once the project has it,
+  // draft or not; otherwise offered with one click once the article is live.
   let suggestion: ArticleVisibility['suggestion'] = null
-  if (publishedUrl || article.status === 'published') {
-    const brandTerms = [project?.business_name, project?.name, project?.target_domain]
-    const prompt = suggestAiQuery({ keyword: topic?.primary_keyword, title: article.title, language: schema.language, brandTerms })
-    if (prompt) {
-      let tracked = false
-      if (opts.aiVisibilityEnabled) {
-        try {
-          const { data } = await admin.from('ai_prompts').select('id').eq('project_id', projectId).eq('prompt', prompt).limit(1)
-          tracked = Array.isArray(data) && data.length > 0
-        } catch { tracked = false }
-      }
+  const brandTerms = [project?.business_name, project?.name, project?.target_domain]
+  const prompt = suggestAiQuery({ keyword: topic?.primary_keyword, title: article.title, language: schema.language, brandTerms })
+  if (prompt) {
+    let tracked = false
+    if (opts.aiVisibilityEnabled) {
+      try {
+        const { data } = await admin.from('ai_prompts').select('prompt').eq('project_id', projectId).limit(1000)
+        tracked = Array.isArray(data) && (data as { prompt: string | null }[]).some((r) => sameQuestion(r.prompt, prompt))
+      } catch { tracked = false }
+    }
+    if (tracked || publishedUrl || article.status === 'published') {
       suggestion = {
         prompt,
         tracked,

@@ -95,15 +95,16 @@ function world(): Record<string, Record<string, unknown>[]> {
     ],
     ai_scan_results: [
       // r1: 4 scored answers, 3 mentions → 75; an excluded and a failed answer do not count.
-      { id: 'r1a', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 2, excluded_from_score: false },
-      { id: 'r1b', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 1, excluded_from_score: false },
-      { id: 'r1c', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
-      { id: 'r1d', run_id: 'r1', project_id: P, status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
-      { id: 'r1e', run_id: 'r1', project_id: P, status: 'success', mentioned: true, citation_count: 9, excluded_from_score: true },
-      { id: 'r1f', run_id: 'r1', project_id: P, status: 'failed', mentioned: true, citation_count: 9, excluded_from_score: false },
-      // r0: 2 answers, 1 mention → 50.
-      { run_id: 'r0', project_id: P, status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
-      { run_id: 'r0', project_id: P, status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
+      { id: 'r1a', run_id: 'r1', project_id: P, prompt_id: 'p1', engine: 'chatgpt', status: 'success', mentioned: true, citation_count: 2, excluded_from_score: false },
+      { id: 'r1b', run_id: 'r1', project_id: P, prompt_id: 'p2', engine: 'chatgpt', status: 'success', mentioned: true, citation_count: 1, excluded_from_score: false },
+      { id: 'r1c', run_id: 'r1', project_id: P, prompt_id: 'p3', engine: 'chatgpt', status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
+      { id: 'r1d', run_id: 'r1', project_id: P, prompt_id: 'p4', engine: 'chatgpt', status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
+      { id: 'r1e', run_id: 'r1', project_id: P, prompt_id: 'p5', engine: 'chatgpt', status: 'success', mentioned: true, citation_count: 9, excluded_from_score: true },
+      { id: 'r1f', run_id: 'r1', project_id: P, prompt_id: 'p6', engine: 'chatgpt', status: 'failed', mentioned: true, citation_count: 9, excluded_from_score: false },
+      // r0: the same two questions on the same engine, 1 mention of 2 → 50;
+      // r1 checked them again, so its answers replace these in the score.
+      { id: 'r0a', run_id: 'r0', project_id: P, prompt_id: 'p1', engine: 'chatgpt', status: 'success', mentioned: true, citation_count: 0, excluded_from_score: false },
+      { id: 'r0b', run_id: 'r0', project_id: P, prompt_id: 'p2', engine: 'chatgpt', status: 'success', mentioned: false, citation_count: 0, excluded_from_score: false },
     ],
     // r1a lists the site among its 2 sources; r1b lists 1 other site; the
     // excluded r1e and the failed r1f cite the site but are not scored.
@@ -239,8 +240,9 @@ async function main() {
     check('B4: the service role reads only the AI-visibility tables (billing goes through the injected entitlement)',
       JSON.stringify(adminTables) === JSON.stringify(['ai_citations', 'ai_scan_results', 'ai_scan_runs']), adminTables)
     const cites = rest.filter((q) => q.table === 'ai_citations')
-    check('B5b: sources are read only for this project\'s scored answers of those runs',
-      cites.length > 0 && cites.every((q) => q.calls.some((c) => c.op === 'in' && c.args[0] === 'result_id' && JSON.stringify(c.args[1]) === JSON.stringify(['r1a', 'r1b', 'r1c', 'r1d']))),
+    // The counted answers now (r1's four) and in the picture before the newest check (r0's two).
+    check('B5b: sources are read only for this project\'s counted answers of those runs',
+      cites.length > 0 && cites.every((q) => q.calls.some((c) => c.op === 'in' && c.args[0] === 'result_id' && JSON.stringify([...(c.args[1] as string[])].sort()) === JSON.stringify(['r0a', 'r0b', 'r1a', 'r1b', 'r1c', 'r1d']))),
       cites.map((q) => q.calls))
     const aiResults = rest.filter((q) => q.table === 'ai_scan_results')
     check('B5: AI answers are read only for this owner\'s runs of this project',
@@ -274,7 +276,7 @@ async function main() {
     const ai = ready<AiData>(r.body.ai)
     check('D1: the score is the share of scored answers that mention the business (3 of 4)', ai?.score === 75, ai)
     check('D2: mentions exclude excluded and failed answers; citations are the scored answers that cite the site (1), not the sum of their sources (3)', ai?.mentions === 3 && ai.citations === 1 && ai.answers === 4, ai)
-    check('D3: the change is against this owner\'s previous run of this project (+25)', ai?.change === 25)
+    check('D3: the change is against the same picture without the newest check (+25)', ai?.change === 25)
     check('D4: the last check time is the run\'s own', ai?.lastCheckAt === ago(1))
     const none = await call(P, { tables: (t) => { t.ai_scan_runs = [] } })
     const n = ready<AiData>(none.body.ai)
@@ -290,13 +292,13 @@ async function main() {
     const other = ['petalhouse.co.il', 'roselane.com', 'wikipedia.org', 'yelp.com', 'flowers.net', 'easy.co.il', 'zap.co.il', 'b144.co.il']
     const answers = [
       // Stored as "mentioned" at scan time, but the answer names only others; 8 sources, none the site.
-      { id: 'a1', run_id: 'r2', project_id: P, status: 'success', excluded_from_score: false, mentioned: true, target_cited: false, citation_count: 8,
+      { id: 'a1', run_id: 'r2', project_id: P, prompt_id: 'q1', engine: 'chatgpt', status: 'success', excluded_from_score: false, mentioned: true, target_cited: false, citation_count: 8,
         response_text: 'The best florists in Tel Aviv are Petal House and Rose Lane.' },
       // Names the business in the answer and cites the site among 2 sources.
-      { id: 'a2', run_id: 'r2', project_id: P, status: 'success', excluded_from_score: false, mentioned: false, target_cited: false, citation_count: 2,
+      { id: 'a2', run_id: 'r2', project_id: P, prompt_id: 'q2', engine: 'chatgpt', status: 'success', excluded_from_score: false, mentioned: false, target_cited: false, citation_count: 2,
         response_text: 'For wedding flowers, Bloom Florist on Dizengoff is a good choice.' },
       // Stored as "mentioned", names no one; 3 sources, none the site.
-      { id: 'a3', run_id: 'r2', project_id: P, status: 'success', excluded_from_score: false, mentioned: true, target_cited: false, citation_count: 3,
+      { id: 'a3', run_id: 'r2', project_id: P, prompt_id: 'q3', engine: 'chatgpt', status: 'success', excluded_from_score: false, mentioned: true, target_cited: false, citation_count: 3,
         response_text: 'Flower prices depend on the season.' },
     ]
     const allCitations = [...citing('a1', other), ...citing('a2', ['bloom.co.il', 'roselane.com']), ...citing('a3', other.slice(0, 3))]
@@ -323,6 +325,23 @@ async function main() {
       own?.citations === 1 && own.citations === tabCited, { own, tabCited })
     check('D8: the score is the AI tab\'s share: answers naming the business out of scored answers (33)',
       own?.score === Math.round((tabMentions / 3) * 100) && own?.score === 33, own)
+
+    // One definition of the score (lib/ai-visibility/score.ts): the latest answer per question x engine.
+    const rechecked = ready<AiData>((await call(P, { tables: (t) => {
+      t.ai_scan_runs = [
+        { id: 'n2', project_id: P, user_id: USER, status: 'completed', completed_at: ago(0.2), created_at: ago(0.2) },
+        { id: 'n1', project_id: P, user_id: USER, status: 'completed', completed_at: ago(3), created_at: ago(3) },
+      ]
+      t.ai_scan_results = [
+        { id: 'n2a', run_id: 'n2', project_id: P, prompt_id: 'p1', engine: 'gemini', status: 'success', mentioned: true, excluded_from_score: false },
+        { id: 'n1a', run_id: 'n1', project_id: P, prompt_id: 'p1', engine: 'gemini', status: 'success', mentioned: false, excluded_from_score: false },
+        { id: 'n1b', run_id: 'n1', project_id: P, prompt_id: 'p1', engine: 'google_ai_overview', status: 'success', mentioned: true, excluded_from_score: false },
+      ]
+      t.ai_citations = []
+    } })).body.ai)
+    check('D9: checking a question again replaces its answer (1 answer, 100), and the change is against the answer it replaced (+100)',
+      rechecked?.answers === 1 && rechecked.score === 100 && rechecked.change === 100, rechecked)
+    check('D10: a retired engine\'s answer never counts toward the score', rechecked?.mentions === 1, rechecked)
   }
 
   // ── E) setup and activity ───────────────────────────────────────────────

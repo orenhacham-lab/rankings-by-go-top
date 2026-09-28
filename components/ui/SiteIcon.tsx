@@ -19,6 +19,11 @@ import { cn } from '@/lib/utils'
 /** URLs that did not load in this tab: never asked for twice. */
 const failed = new Set<string>()
 
+/** A real icon has some size: a 1x1 answer is a tracking pixel or a placeholder. */
+export const isIconSize = (w: number, h: number) => w > 1 && h > 1
+/** An SVG by its path (the query string aside). */
+export const isSvg = (src: string | null) => !!src && /\.svg$/i.test(src.split(/[?#]/)[0])
+
 type Props = {
   /** The project's target_domain. */
   domain: string | null | undefined
@@ -51,8 +56,10 @@ function Tile({ candidates, fallback, className, iconClassName, imgClassName }: 
     setIndex((i) => i + 1)
   }
   const onLoad = (img: HTMLImageElement) => {
-    // A page served as an icon does not decode; a 1x1 answer is not an icon either.
-    if (img.naturalWidth > 1 && img.naturalHeight > 1) setLoaded(true)
+    // A page served as an icon does not decode (it errors); a 1x1 answer is not
+    // an icon either. An SVG icon with only a viewBox decodes with no intrinsic
+    // size in some browsers (0x0): it loaded, so it is shown.
+    if (isIconSize(img.naturalWidth, img.naturalHeight) || (isSvg(src) && img.naturalWidth === 0 && img.naturalHeight === 0)) setLoaded(true)
     else next()
   }
 

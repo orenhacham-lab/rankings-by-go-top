@@ -129,6 +129,8 @@ export type SeedSummary = {
    * owner's browser ever loads it (lib/site-icon.ts).
    */
   siteIcon?: string
+  /** When the icon was last looked for again after the scan (lib/seed-scan/site-icon-refresh.ts). */
+  siteIconCheckedAt?: string
 }
 
 /** Stable codes a step or a run may end with. The UI maps each to copy. */

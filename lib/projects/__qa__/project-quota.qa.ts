@@ -109,7 +109,10 @@ console.log('\nC) the switcher')
   check('C7: only the listbox holds options (the search box and the footer are outside it)',
     /<ul id=\{listId\} role="listbox"/.test(sw) && !/<div\s+role="listbox"/.test(sw))
   check('C8: the site icon with its letter fallback is kept, in the button and in every row',
-    /<SiteIcon[\s\S]*?domain=\{current\?\.target_domain\}[\s\S]*?fallback=/.test(sw) && /<SiteIcon[\s\S]*?domain=\{p\.target_domain\}[\s\S]*?fallback=/.test(sw))
+    // SiteAvatar (components/ui/SiteAvatar.tsx) is SiteIcon with the shared letter fallback.
+    /<SiteAvatar[^>]*domain=\{current\?\.target_domain\}[^>]*name=/.test(sw) && /<SiteAvatar[^>]*domain=\{p\.target_domain\}[^>]*name=/.test(sw)
+    && /<SiteIcon[\s\S]*?fallback=\{siteInitial\(/.test(code('components/ui/SiteAvatar.tsx')))
+  check('C8-MUT: a switcher row back to a bare initial fails C8', !/<SiteAvatar[^>]*domain=\{p\.target_domain\}[^>]*name=/.test(sw.replace(/<SiteAvatar domain=\{p\.target_domain\}[^>]*\/>/, '<span>{p.name.charAt(0)}</span>')))
   check('C9: an unread limit leaves the entry on (the fetch failure is "unknown")',
     /\.catch\(\(\) => \{ if \(!cancelled\) setQuota\(\{ state: 'unknown' \}\) \}\)/.test(sw))
 }

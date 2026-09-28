@@ -165,6 +165,7 @@ export function readSummary(raw: unknown): SeedSummary | null {
     sitemapTruncated: bool(r.sitemapTruncated),
     // Checked again on every read (https, on this site, bounded), never trusted because stored.
     ...siteIconField(safeSiteIcon(r.siteIcon, domain)),
+    ...(str(r.siteIconCheckedAt, 40) ? { siteIconCheckedAt: str(r.siteIconCheckedAt, 40) as string } : {}),
   })
 }
 

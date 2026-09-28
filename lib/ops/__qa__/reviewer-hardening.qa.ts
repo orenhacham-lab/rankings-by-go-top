@@ -124,7 +124,9 @@ async function main() {
     check('A1b: which posts one check to the real dispatch route',
       /scanEngine[\s\S]{0,2400}fetch\('\/api\/ai-visibility\/runs', \{[\s\S]{0,200}method: 'POST'/.test(src))
     check('A1c: six engines, so a reviewer has a choice of which to run',
-      /SUPPORTED_ENGINES = \['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'\]/.test(src))
+      // The list lives in the shared score (lib/ai-visibility/score.ts) since the score was unified.
+      /SUPPORTED_ENGINES = SCORED_ENGINES\b/.test(src)
+      && /SCORED_ENGINES = \['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'\]/.test(read('lib/ai-visibility/score.ts')))
     // The fix: an instruction, and an accessible name that states the ACTION.
     check('A1d: the section now tells the reader the chips are the run control',
       /t\('run_a_check_hint'\)/.test(src))

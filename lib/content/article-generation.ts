@@ -14,6 +14,7 @@
  * only the admin (service-role) client, so it is fully headless-safe.
  */
 
+import { trackArticleQuestion } from '@/lib/ai-visibility/article-question'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
@@ -362,6 +363,17 @@ export async function generateArticleForTopic(
   try {
     await admin.from('article_topics').update({ status: 'used', updated_at: new Date().toISOString() }).eq('id', topicId)
   } catch { /* non-fatal */ }
+
+  // One tracked AI-visibility question for the article, from its primary keyword
+  // (lib/ai-visibility/article-question.ts). Adds a row only: no check runs and
+  // nothing is spent. Best-effort; never fails generation.
+  const aiQuestion = await trackArticleQuestion(admin, {
+    projectId,
+    userId,
+    title: article.title ?? null,
+    topic: { primary_keyword: (t.primary_keyword as string) ?? null, language: (t.language as string) ?? null },
+  })
+  if (aiQuestion.outcome === 'failed') console.warn('[content-article-generation] ai question skipped', { articleId: inserted.id })
 
   console.log('[content-article-generation] created', { articleId: inserted.id, projectId, score: gen.audit.score, warnings: gen.audit.warnings.length })
 

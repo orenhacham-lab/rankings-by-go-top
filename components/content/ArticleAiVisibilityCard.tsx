@@ -6,9 +6,11 @@
  *   1. "Cited in ChatGPT": shown ONLY for a citation row the project's own AI
  *      checks stored whose URL is this article's live URL. With none, the card
  *      says so plainly ("not found yet"), it never guesses.
- *   2. A suggested question from a template: nothing is created until the owner
- *      clicks "track", which posts to the EXISTING prompt route. Running a check
- *      on it stays the existing, quota-checked action on the AI visibility screen.
+ *   2. The article's question, from a template. Generating the article already
+ *      tracks it (lib/ai-visibility/article-question.ts), so the card usually says
+ *      "tracked"; when it is not tracked, "track" posts to the EXISTING prompt
+ *      route. Running a check on it stays the existing, quota-checked action on
+ *      the AI visibility screen.
  */
 import { useState } from 'react'
 import Link from 'next/link'
@@ -113,9 +115,9 @@ export default function ArticleAiVisibilityCard({ t, language, projectId, data, 
 
       {s && data.aiVisibilityEnabled && (
         <div className="mt-4 rounded-inset border border-line bg-surface p-3">
-          <p className="text-caption font-semibold uppercase tracking-wide text-muted">{t.suggestionTitle}</p>
+          <p className="text-caption font-semibold uppercase tracking-wide text-muted">{s.tracked ? t.trackedTitle : t.suggestionTitle}</p>
           <p className="mt-1 text-copy font-semibold text-ink" data-testid="ai-suggestion">{s.prompt}</p>
-          <p className="mt-1 text-caption text-muted">{t.suggestionHint}</p>
+          <p className="mt-1 text-caption text-muted">{s.tracked ? t.trackedHint : t.suggestionHint}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {s.tracked ? (
               <Badge variant="success"><Check size={12} aria-hidden /> {t.tracked}</Badge>
