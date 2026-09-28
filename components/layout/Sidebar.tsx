@@ -25,6 +25,7 @@ import {
   Plug,
   ClipboardList,
   LogOut,
+  Library,
   Menu,
   X,
 } from 'lucide-react'
@@ -70,6 +71,7 @@ const CONTENT_FLAGS = {
 const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
   strategy: CalendarRange,
   articles: FileText,
+  existing: Library,
 }
 
 /**

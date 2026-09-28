@@ -27,7 +27,7 @@
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
-  CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH,
+  CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH, CONTENT_EXISTING_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH,
   activeContentScreen, isContentScreenEnabled, type ContentScreen,
 } from '../../../../lib/content/content-workspace-nav'
 import { getDashboardDictionary } from '../../../../lib/i18n/dashboard/getDashboardDictionary'
@@ -50,12 +50,13 @@ const NOT_IN: Record<string, readonly string[]> = {
   'ArticlesScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'TopicsList', 'NewTopicsLinkPlanPanel', 'GscRecommendations', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
   'TopicsScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
   'AutomationScreen.tsx': ['TopicsList', 'NewTopicsLinkPlanPanel', 'GscRecommendations', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
+  'ExistingContentScreen.tsx': ['AutomationIdeas', 'AutomationSchedule', 'TopicsList', 'NewTopicsLinkPlanPanel', 'GscRecommendations', 'GscMetricsTable', 'GscOpportunities', 'GscPanel'],
 }
 
 /** The workspace's screens, and nothing else: neither Search Console nor the two
  *  screens the content strategy merged is one of them. Strategy first: what will be
- *  written comes before what was. */
-const SCREEN_KEYS = ['strategy', 'articles']
+ *  written comes before what was; then what was already on the site before us. */
+const SCREEN_KEYS = ['strategy', 'articles', 'existing']
 const isTheScreens = (keys: readonly string[]) => JSON.stringify(keys) === JSON.stringify(SCREEN_KEYS)
 
 const screenFiles = Object.keys(NOT_IN)
@@ -112,7 +113,7 @@ function main() {
   for (const s of CONTENT_SCREENS) {
     check(`screen "${s.key}" has a page at ${s.href}`, routeFileFor(s.href) !== null)
   }
-  check('the screens are the content strategy and the articles — Search Console, topics and automation are not screens',
+  check('the screens are the content strategy, the articles and the existing content — Search Console, topics and automation are not screens',
     isTheScreens(CONTENT_SCREENS.map((s) => s.key)), CONTENT_SCREENS.map((s) => s.key).join(', '))
   check('MUT: a screen list that still declares Search Console fails that check',
     !isTheScreens([...CONTENT_SCREENS.map((s) => s.key), 'searchConsole']))
@@ -207,6 +208,8 @@ function main() {
 
   // ── 9. The pure nav helpers. ──
   check('the root path resolves to the articles screen', activeContentScreen(CONTENT_ROOT_PATH) === 'articles')
+  check('the existing-content path resolves to its own screen, not the root',
+    activeContentScreen(CONTENT_EXISTING_PATH) === 'existing')
   check('a nested path resolves to its own screen, not the root',
     activeContentScreen(CONTENT_STRATEGY_PATH) === 'strategy')
   check('a deeper path still belongs to its screen', activeContentScreen(`${CONTENT_STRATEGY_PATH}/anything`) === 'strategy')

@@ -678,12 +678,14 @@ export const dashboardHe = {
     screens: {
       strategy: 'אסטרטגיית תוכן',
       articles: 'מאמרים',
+      existing: 'תוכן קיים',
     },
     // One line of context per screen, shown under its heading. Each screen is its
     // own sidebar entry now, so it has to say what it is without a tab bar around it.
     screenSubtitles: {
       articles: 'כל המאמרים של הפרויקט, מהטיוטה ועד הפרסום',
       strategy: 'מה ייכתב, מתי, ולמה דווקא זה',
+      existing: 'מה כבר יש באתר, מה מביא תנועה ואיפה עמודים מתחרים זה בזה',
     },
     tabs: {
       articles: 'מאמרים',
@@ -2379,6 +2381,72 @@ export const dashboardHe = {
   // keywords table, "my progress", keyword research and topics. Each has its title and
   // one sentence on what it shows and why that is worth having; before Search Console
   // is set up, that sentence stands next to the widget's one button.
+  // The existing-content screen (/content/existing, lib/content/existing-content):
+  // what is already on the site, read-only.
+  existingContent: {
+    tilesLabel: 'סינון לפי סוג',
+    tiles: { all: 'הכל', content: 'מאמרים ועמודים', commerce: 'מוצרים וקולקציות' },
+    tileSource: { shopify: 'מהחנות בשופיפיי', wordpress: 'מאתר הוורדפרס', crawl: 'מסריקת האתר', none: '' },
+    onlyRisk: 'רק סיכון קניבליזציה ({n})',
+    sourceLine: {
+      shopify: 'מקור: החנות בשופיפיי, כפי שסונכרנה',
+      wordpress: 'מקור: אינדקס אתר הוורדפרס',
+      crawl: 'מקור: סריקת האתר',
+      none: '',
+    },
+    indexedAt: 'נסרק ב-{date}',
+    partialTitle: 'זו רשימה חלקית',
+    partialCrawlBody: 'סריקת האתר קוראת עד 25 עמודים מרכזיים, לא את כל האתר. חברו את האתר כדי לראות את כל התוכן שלו.',
+    partialIndexBody: 'הסריקה האחרונה של האתר לא הושלמה עד הסוף, ולכן ייתכן שחסרים כאן עמודים.',
+    truncatedNote: 'מוצגים {n} הפריטים הראשונים מהחנות.',
+    connectSite: 'חיבור האתר',
+    resync: 'סנכרון מחדש',
+    resyncing: 'מסנכרן…',
+    resyncDone: 'הרשימה עודכנה',
+    resyncRunning: 'סנכרון כבר רץ. הרשימה תתעדכן כשיסתיים.',
+    resyncFailed: 'הסנכרון לא הושלם. נסו שוב בעוד כמה דקות.',
+    tableLabel: 'התוכן הקיים באתר',
+    columns: {
+      title: 'כותרת', type: 'סוג', updated: 'עודכן', clicks: 'קליקים', impressions: 'חשיפות',
+      topQuery: 'השאילתה המובילה', flags: 'סימונים', action: 'פעולה',
+    },
+    types: { article: 'מאמר', page: 'עמוד', blog: 'בלוג', product: 'מוצר', collection: 'קולקציה' },
+    origin: { ours: 'מאמר שלנו', site: 'היה באתר' },
+    cannibal: 'סיכון קניבליזציה',
+    cannibalDetail: '{n} עמודים שלכם מקבלים חשיפות על "{query}"',
+    writeSupport: 'כתיבת מאמר תומך',
+    supportPlanned: 'יש נושא מתוכנן',
+    supportCreated: 'הנושא נוסף לאסטרטגיית התוכן',
+    supportFailed: 'לא הצלחנו להוסיף את הנושא. נסו שוב.',
+    viewStrategy: 'לאסטרטגיית התוכן',
+    // The new topic is written in the PROJECT's language, so this pair is read from
+    // the dictionary of that language, not of the dashboard.
+    supportTopic: {
+      topic: 'מדריך: {title}',
+      notes: 'מאמר תומך לעמוד "{title}" ({url}). המאמר צריך לקשר לעמוד הזה.',
+    },
+    gscNote: {
+      not_connected: 'אחרי שמגדירים את Search Console לפרויקט, יופיעו כאן לכל עמוד הקליקים, החשיפות והשאילתה המובילה.',
+      not_synced: 'Search Console מחובר. הנתונים יופיעו כאן אחרי הסנכרון הראשון.',
+      unavailable: 'נתוני Search Console לא זמינים כרגע.',
+    },
+    gscBrand: 'Search Console',
+    gscWindow: '28 ימים, {start} עד {end}',
+    gscRowsNote: 'סכום שורות השאילתות. גוגל משמיט שאילתות אנונימיות, לכן הסכום יכול להיות נמוך מהסך של העמוד.',
+    empty: {
+      noConnectionTitle: 'התוכן של האתר יופיע כאן',
+      noConnectionBody: 'חברו את האתר, והעמודים, המאמרים והמוצרים שלו יופיעו כאן.',
+      noDataTitle: 'התוכן יגיע עם הסנכרון',
+      noDataBody: 'האתר מחובר, אבל עוד לא נשמר ממנו תוכן. סנכרון מחדש יביא אותו.',
+      noDataBodyNoResync: 'האתר מחובר, והתוכן שלו יופיע כאן אחרי הסריקה הבאה.',
+      filterEmpty: 'אין כאן פריטים מהסוג הזה.',
+    },
+    loading: 'טוען את התוכן הקיים…',
+    loadError: 'לא הצלחנו לטעון את התוכן הקיים.',
+    retry: 'נסו שוב',
+    openPage: 'פתיחת {title} בכרטיסייה חדשה',
+    showMore: 'הצגת עוד {n}',
+  },
   gscWidgets: {
     // The number first: after "Search Console" it would join the English run and
     // show on the far side of the line from the days it counts.
