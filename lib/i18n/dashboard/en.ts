@@ -145,7 +145,6 @@ export const dashboardEn = {
     saved: 'Saved',
     connectionsTitle: 'Connections',
     connectionsBody: 'The site platform articles publish to, and Search Console for real search data.',
-    moreConnectionsSoon: 'Google Analytics 4 is not available as a project connection yet. It will be built separately and appear here only once it really works.',
     // The sections the site scan fills (W5): each card saves on its own, a
     // field the scan filled carries a "from the scan" chip until the owner
     // edits it, and "detect again with AI" only ever suggests.
@@ -291,13 +290,8 @@ export const dashboardEn = {
       scanNote: 'New competitors are found and verified against real search results every time the site is scanned.',
       scanLink: 'Go to the site scan',
     },
-    googleAds: {
-      title: 'Google Ads',
-      body: 'Google Ads is not available as a project connection yet.',
-      note: 'Search volumes in keyword research and keywords come from Go Top’s own data source, so no connection is needed.',
-    },
     platformDetected: 'We detected {platform} on your site',
-    platformDetectedOther: 'We detected {platform} on your site. Articles publish to WordPress or Shopify.',
+    platformDetectedOther: 'We detected {platform} on your site. Articles publish to WordPress, Shopify, Wix or a custom-built site.',
     danger: {
       title: 'Deactivate or delete',
       body: 'Actions on the whole project.',
@@ -2729,6 +2723,29 @@ export const dashboardEn = {
       connectButton: 'Connect WordPress site',
       guideButton: 'Connection guide',
       guideTitle: 'How do you connect a WordPress site?',
+      wpErrors: {
+        authFailed: 'WordPress did not accept the username or the application password. Check both and try again.',
+        notWordPress: 'We could not find WordPress at this address. Check that it is the site\'s main address.',
+        siteError: 'The site returned an error. Try again in a few minutes.',
+        invalidUrl: 'That address is not valid. Enter the full site address, for example https://www.example.com',
+        notHttps: 'The address needs to start with https://',
+        notPublic: 'We need the site\'s public address, the one you see in the browser.',
+        unreachable: 'We could not reach a site at this address. Check the address and try again.',
+        timeout: 'The site did not answer in time. Try again in a moment.',
+        redirect: 'This address redirects somewhere else. Enter the site\'s final address.',
+        badResponse: 'The site answered in a way we could not read. Make sure it is a WordPress site and try again.',
+        missingFields: 'Fill in the site address and the username.',
+        missingPassword: 'Enter the application password.',
+        otherSite: 'To test a different address, enter the application password again.',
+        reenterPassword: 'Enter the application password again and save.',
+      },
+      wpStepsTitle: 'Where to create an application password',
+      wpSteps: [
+        'In your WordPress dashboard: Users → Profile.',
+        'Scroll to "Application Passwords", type a name such as Go Top and click "Add New Application Password".',
+        'Copy the password it shows and paste it here, with your WordPress username.',
+      ],
+      wpOpenProfile: 'Open the profile page on your site',
       guideSteps: [
         'Open your WordPress dashboard.',
         'Go to Users → Profile.',
@@ -3484,6 +3501,8 @@ export const dashboardEn = {
       promise: 'About a minute. You can keep working meanwhile',
       noConnection: 'No Search Console, no site connection',
       fromFreeCheck: (domain: string) => `Continuing from your free check of ${domain}`,
+      fromScanTitle: (domain: string) => `Setting up your project for ${domain}`,
+      fromScanBody: 'We are creating the project from the check you ran, with what we learned about the business, its keywords and its topics, and opening it. This takes a few seconds.',
       errorEmpty: 'Enter the site\'s address',
       errorInvalid: 'That doesn\'t look like a website address. For example: example.com',
       planTitle: 'What happens now',
@@ -4093,6 +4112,7 @@ export const dashboardEn = {
       warnBody: 'The current connection details are removed as soon as you confirm. Articles already on your site stay there.',
       currentBadge: 'In use',
       pickFirst: 'Pick a platform to continue.',
+      detectedNote: 'Chosen from what the scan found on your site. You can pick another.',
       wordpressNext: 'After you confirm, the WordPress connection form opens: site address, username and application password.',
       shopifyNext: 'After you confirm, enter your store’s myshopify.com address and approve the connection inside Shopify.',
       cancel: 'Cancel',
@@ -4105,6 +4125,15 @@ export const dashboardEn = {
       copied: 'Copied',
       done: 'Done',
     },
+    help: {
+      title: 'Not sure what goes here?',
+      webhookBody: 'This is a connection your site\'s developer sets up once. Send them the instructions, or write to us and we will help you choose.',
+      wixBody: 'Write to us and we will go through it with you in a few minutes.',
+      whatsapp: 'Message us on WhatsApp',
+      developer: 'Send the instructions to my developer',
+      developerSubject: 'Connecting our site to Go Top',
+      developerBody: 'Hi, I would like articles from Go Top to be published on our site automatically. It needs a public https address on the site that accepts POST requests with the article as JSON, signed with HMAC-SHA256. The address goes into the project settings in Go Top under "Connections → Custom-built site", where the full technical details are listed too. Thanks!',
+    },
     wix: {
       siteUrl: 'Site address',
       siteUrlHint: 'Optional. Shown on the card so you recognise the site.',
@@ -4116,6 +4145,12 @@ export const dashboardEn = {
       test: 'Test connection',
       testing: 'Testing…',
       testOk: 'Connection works. We found the blog on your site.',
+      stepsTitle: 'Where to find the two details',
+      steps: [
+        'Site ID: open your site\'s dashboard in Wix and copy the long code right after /dashboard/ in the address.',
+        'API key: in your Wix account go to Account Settings → API Keys → "Generate API Key", and allow Wix Blog.',
+        'Paste both here and click "Test connection".',
+      ],
     },
     webhook: {
       url: 'Webhook address',

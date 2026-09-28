@@ -143,7 +143,6 @@ export const dashboardHe = {
     saved: 'נשמר',
     connectionsTitle: 'חיבורים',
     connectionsBody: 'פלטפורמת האתר לפרסום מאמרים, ו-Search Console לנתוני חיפוש אמיתיים.',
-    moreConnectionsSoon: 'Google Analytics 4 עוד לא זמין כחיבור לפרויקט. הוא ייבנה בנפרד ויופיע כאן רק כשיעבוד באמת.',
     // The sections the site scan fills (W5): each card saves on its own, a
     // field the scan filled carries a "from the scan" chip until the owner
     // edits it, and "detect again with AI" only ever suggests.
@@ -289,13 +288,8 @@ export const dashboardHe = {
       scanNote: 'מתחרים חדשים נמצאים ומאומתים בחיפוש אמיתי בכל סריקה של האתר.',
       scanLink: 'לסריקת האתר',
     },
-    googleAds: {
-      title: 'Google Ads',
-      body: 'Google Ads עוד לא זמין כחיבור לפרויקט.',
-      note: 'נפחי החיפוש במחקר הביטויים ובמילות המפתח מגיעים ממקור הנתונים של Go Top עצמה, ולכן אין צורך בחיבור.',
-    },
     platformDetected: 'זיהינו {platform} באתר שלכם',
-    platformDetectedOther: 'זיהינו {platform} באתר שלכם. פרסום מאמרים עובד עם WordPress או Shopify.',
+    platformDetectedOther: 'זיהינו {platform} באתר שלכם. מאמרים עולים ל-WordPress, ל-Shopify, ל-Wix או לאתר בפיתוח עצמאי.',
     danger: {
       title: 'השבתה ומחיקה',
       body: 'פעולות על הפרויקט כולו.',
@@ -2734,6 +2728,29 @@ export const dashboardHe = {
       connectButton: 'חבר אתר WordPress',
       guideButton: 'מדריך לחיבור',
       guideTitle: 'איך מחברים אתר WordPress?',
+      wpErrors: {
+        authFailed: 'WordPress לא אישר את שם המשתמש או את סיסמת האפליקציה. בדקו את שניהם ונסו שוב.',
+        notWordPress: 'לא מצאנו WordPress בכתובת הזאת. בדקו שזו הכתובת הראשית של האתר.',
+        siteError: 'האתר החזיר שגיאה. נסו שוב בעוד כמה דקות.',
+        invalidUrl: 'הכתובת לא תקינה. הזינו את כתובת האתר המלאה, לדוגמה https://www.example.co.il',
+        notHttps: 'הכתובת צריכה להתחיל ב-https://',
+        notPublic: 'צריך את הכתובת הציבורית של האתר, זו שמופיעה בדפדפן.',
+        unreachable: 'לא הצלחנו להגיע לאתר בכתובת הזאת. בדקו את הכתובת ונסו שוב.',
+        timeout: 'האתר לא ענה בזמן. נסו שוב בעוד רגע.',
+        redirect: 'הכתובת מפנה לכתובת אחרת. הזינו את הכתובת הסופית של האתר.',
+        badResponse: 'האתר ענה בצורה שלא הצלחנו לקרוא. ודאו שזה אתר WordPress ונסו שוב.',
+        missingFields: 'מלאו את כתובת האתר ואת שם המשתמש.',
+        missingPassword: 'הזינו את סיסמת האפליקציה.',
+        otherSite: 'כדי לבדוק כתובת אחרת, הזינו שוב את סיסמת האפליקציה.',
+        reenterPassword: 'הזינו שוב את סיסמת האפליקציה ושמרו.',
+      },
+      wpStepsTitle: 'איפה יוצרים סיסמת אפליקציה',
+      wpSteps: [
+        'בלוח הבקרה של WordPress: משתמשים ← פרופיל.',
+        'גוללים ל"סיסמאות אפליקציה", כותבים שם כמו Go Top ולוחצים "הוספת סיסמת אפליקציה".',
+        'מעתיקים את הסיסמה שמופיעה ומדביקים אותה כאן, יחד עם שם המשתמש שלכם ב-WordPress.',
+      ],
+      wpOpenProfile: 'פתיחת עמוד הפרופיל באתר שלכם',
       guideSteps: [
         'נכנסים ללוח הבקרה של WordPress.',
         'עוברים אל משתמשים ← פרופיל.',
@@ -3500,6 +3517,8 @@ export const dashboardHe = {
       promise: 'כדקה. אפשר להמשיך לעבוד בינתיים',
       noConnection: 'בלי Search Console ובלי חיבור לאתר',
       fromFreeCheck: (domain: string) => `ממשיכים מהבדיקה החינמית של ${domain}`,
+      fromScanTitle: (domain: string) => `מכינים את הפרויקט של ${domain}`,
+      fromScanBody: 'יוצרים את הפרויקט מהבדיקה שעשיתם, עם מה שלמדנו על העסק, מילות המפתח והנושאים, ופותחים אותו. זה לוקח כמה שניות.',
       errorEmpty: 'הזינו את כתובת האתר',
       errorInvalid: 'זו לא נראית כתובת של אתר. לדוגמה: example.co.il',
       planTitle: 'מה יקרה עכשיו',
@@ -4110,6 +4129,7 @@ export const dashboardHe = {
       warnBody: 'פרטי החיבור הנוכחיים יימחקו מיד עם האישור. מאמרים שכבר עלו לאתר יישארו שם.',
       currentBadge: 'בשימוש',
       pickFirst: 'בחרו פלטפורמה כדי להמשיך.',
+      detectedNote: 'בחרנו לפי מה שהסריקה זיהתה באתר. אפשר לבחור אחרת.',
       wordpressNext: 'אחרי האישור יופיע טופס החיבור של WordPress: כתובת האתר, שם משתמש וסיסמת אפליקציה.',
       shopifyNext: 'אחרי האישור תזינו את כתובת ה-myshopify.com של החנות ותאשרו את החיבור בתוך Shopify.',
       cancel: 'ביטול',
@@ -4122,6 +4142,15 @@ export const dashboardHe = {
       copied: 'הועתק',
       done: 'סיימתי',
     },
+    help: {
+      title: 'לא בטוחים מה צריך כאן?',
+      webhookBody: 'זה חיבור שמתכנת האתר מגדיר פעם אחת. אפשר לשלוח לו את ההוראות, או לכתוב לנו ונעזור לכם לבחור.',
+      wixBody: 'אפשר לכתוב לנו, ונעבור על זה יחד בכמה דקות.',
+      whatsapp: 'כתבו לנו בוואטסאפ',
+      developer: 'שליחת ההוראות למתכנת',
+      developerSubject: 'חיבור האתר ל-Go Top',
+      developerBody: 'היי, אני רוצה שהמאמרים מ-Go Top יעלו לאתר שלנו אוטומטית. צריך כתובת https ציבורית באתר שמקבלת בקשות POST עם המאמר בפורמט JSON, חתומות ב-HMAC-SHA256. את הכתובת מזינים בהגדרות הפרויקט ב-Go Top תחת "חיבורים ← אתר בפיתוח עצמאי", ושם מופיע גם כל הפירוט הטכני. תודה!',
+    },
     wix: {
       siteUrl: 'כתובת האתר',
       siteUrlHint: 'לא חובה. תוצג בכרטיס כדי שתזהו את האתר.',
@@ -4133,6 +4162,12 @@ export const dashboardHe = {
       test: 'בדיקת חיבור',
       testing: 'בודקים…',
       testOk: 'החיבור תקין. מצאנו את הבלוג באתר.',
+      stepsTitle: 'איפה מוצאים את שני הפרטים',
+      steps: [
+        'מזהה האתר: פותחים את לוח הבקרה של האתר ב-Wix ומעתיקים מהכתובת את הקוד הארוך שמיד אחרי ‎/dashboard/‎.',
+        'מפתח API: בחשבון Wix עוברים להגדרות החשבון ← מפתחות API ← "יצירת מפתח API", ומסמנים הרשאה ל-Wix Blog.',
+        'מדביקים את שניהם כאן ולוחצים "בדיקת חיבור".',
+      ],
     },
     webhook: {
       url: 'כתובת ה-Webhook',

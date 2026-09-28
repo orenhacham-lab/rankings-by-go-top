@@ -24,14 +24,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plug } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
-import { Card } from '@/components/ui/Card'
 import ContentSection from '@/components/content/ContentSection'
 import GscPanel from '@/components/content/GscPanel'
 import AudienceCard from '@/components/settings/AudienceCard'
 import BusinessCard from '@/components/settings/BusinessCard'
 import CompetitorsCard from '@/components/settings/CompetitorsCard'
 import DangerZone from '@/components/settings/DangerZone'
-import GoogleAdsCard from '@/components/settings/GoogleAdsCard'
 import Notice from '@/components/settings/Notice'
 import ProfileCard from '@/components/settings/ProfileCard'
 import WeeklyEmailCard from '@/components/reports/monthly/WeeklyEmailCard'
@@ -225,12 +223,9 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
                 <GscPanel projectId={project.id} />
               </div>
 
-              <GoogleAdsCard t={t} />
-
-              <Card tone="sunk" className="flex items-start gap-3">
-                <Plug size={16} className="mt-0.5 shrink-0 text-muted" />
-                <p className="text-sm text-muted">{t.moreConnectionsSoon}</p>
-              </Card>
+              {/* Only what the merchant can act on. Google Ads (Go Top's own key for
+                  search volumes, not a project connection) and "Google Analytics 4
+                  is not available yet" were cards that led nowhere; they are gone. */}
             </section>
 
             {/* Monthly report: the weekly-email switch (off by default; nothing sends yet). */}

@@ -476,6 +476,32 @@ async function main() {
     check(`${locale}: …without one, nothing is claimed`, !has(html, t.fromFreeCheck('shop.example.com').replace('shop.example.com', '').trim()))
     check(`${locale}: …its labels letter-spaced in English only`, locale === 'he' ? !html.includes('tracking-[0.14em]') : html.includes('uppercase tracking-[0.14em]'))
     if (locale === 'en') check('en: no Hebrew anywhere on the English new-project screen', !HEBREW.test(html) && !HEBREW.test(claimed))
+
+    // Sign-up with a claim ends here with ?start=claim: the screen submits by itself.
+    const saved = search
+    search = new URLSearchParams({ start: 'claim' })
+    try {
+      const auto = render(locale, NewProjectFlow, { clients: [{ id: 'c1', isDefault: true }], claimedDomain: 'shop.example.com', claimedProjectId: null })
+      check(`${locale}: ?start=claim with a usable claim → "${t.fromScanTitle('shop.example.com')}", and no form at all`,
+        /data-claim-start/.test(auto) && has(auto, t.fromScanTitle('shop.example.com')) && has(auto, t.fromScanBody) && count(auto, /<input/g) === 0 && count(auto, /<form/g) === 0)
+      check(`${locale}: …announced politely as busy`, /role="status"[^>]*aria-live="polite"[^>]*aria-busy="true"/.test(auto))
+      const noClaim = render(locale, NewProjectFlow, { clients: [{ id: 'c1', isDefault: true }], claimedDomain: null })
+      check(`${locale}: ?start=claim without a usable claim → the usual form, nothing starts`, !/data-claim-start/.test(noClaim) && count(noClaim, /<input/g) === 1)
+      if (locale === 'en') check('en: no Hebrew on the setting-up screen', !HEBREW.test(auto))
+      if (locale === 'he') check('he: the setting-up screen is Hebrew', HEBREW.test(textOf(auto)))
+    } finally {
+      search = saved
+    }
+  }
+  {
+    const flow = strip(read('components/onboarding/NewProjectFlow.tsx'))
+    const autoOnce = (x: string) => /const autoStart = isClaimStart\(searchParams\) && !!claimedDomain/.test(x)
+      && /if \(!autoStart \|\| autoFired\.current\) return\s*autoFired\.current = true\s*void submit\(\)/.test(x)
+    check('the screen submits by itself once, only for ?start=claim with a usable claim', autoOnce(flow))
+    check('MUT: an effect that fires without the guard is caught', !autoOnce(flow.replace('if (!autoStart || autoFired.current) return', 'if (autoFired.current) return')))
+    const reuse = (x: string) => /autoStart && claimedProjectId && claimedDomain \? \{ id: claimedProjectId, domain: claimedDomain \} : null/.test(x)
+    check('…and seeds the merchant\'s own project for that site instead of creating a second', reuse(flow))
+    check('MUT: always creating a new project is caught', !reuse(flow.replace('autoStart && claimedProjectId && claimedDomain ?', 'false ?')))
   }
 
   finish()

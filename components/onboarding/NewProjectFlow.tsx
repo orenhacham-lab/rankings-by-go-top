@@ -12,13 +12,23 @@
  * Every answer is one notice with at most one action; the create route's own
  * message text is never shown. Once the project exists it is not created
  * again: a failed start is shown on the project's own screen.
+ *
+ * FROM THE CLAIM, BY ITSELF. Sign-up with a free-check claim ends here with
+ * ?start=claim (lib/onboarding/claim-start.ts). Then, when the kept claim is
+ * usable, the screen submits the checked site on its own as soon as it mounts
+ * and shows only "setting up your project" until the project's research screen
+ * opens: the merchant never sees the form. If they already own a project for
+ * that site, that one is seeded instead of creating a second. Any refusal
+ * before the project exists (a plan limit, no client, offline) shows the usual
+ * screen with its notice, the address already filled in.
  */
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Clock, Sparkles, Unplug } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, Loader2, Sparkles, Unplug } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { isClaimStart } from '@/lib/onboarding/claim-start'
 import { summaryAfterStartHref } from '@/lib/onboarding/handoff'
 import { NEW_PROJECT_HREF } from '@/lib/onboarding/links'
 import { createNotice, OFFLINE_NOTICE, startNotice, type Notice } from '@/lib/onboarding/notices'
@@ -41,9 +51,11 @@ export function chooseClient(clients: ClientChoice[] | null, requested: string |
 export default function NewProjectFlow({
   clients,
   claimedDomain,
+  claimedProjectId = null,
 }: {
   clients: ClientChoice[] | null
   claimedDomain: string | null
+  claimedProjectId?: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -57,8 +69,16 @@ export default function NewProjectFlow({
   const [phase, setPhase] = useState<Phase>('idle')
   const [createdId, setCreatedId] = useState<string | null>(null)
   const busy = useRef(false)
-  /** The project this screen already created, so a retry never creates a second one. */
-  const created = useRef<{ id: string; domain: string } | null>(null)
+  /** Sign-up with a usable claim: submit the checked site without being asked. */
+  const autoStart = isClaimStart(searchParams) && !!claimedDomain
+  const autoFired = useRef(false)
+  /**
+   * The project this screen already created, so a retry never creates a second
+   * one; when starting from the claim, the merchant's own project for that site.
+   */
+  const created = useRef<{ id: string; domain: string } | null>(
+    autoStart && claimedProjectId && claimedDomain ? { id: claimedProjectId, domain: claimedDomain } : null,
+  )
 
   async function submit(e?: FormEvent) {
     e?.preventDefault()
@@ -124,8 +144,38 @@ export default function NewProjectFlow({
     router.push(summaryAfterStartHref(projectId, refusal))
   }
 
+  useEffect(() => {
+    if (!autoStart || autoFired.current) return
+    autoFired.current = true
+    void submit()
+    // Once, on mount: submit reads the address the claim filled in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart])
+
   const working = phase !== 'idle'
   const buttonLabel = phase === 'creating' ? t.newProject.creating : phase === 'starting' ? t.newProject.starting : t.newProject.submit
+
+  // Starting from the claim: nothing to fill in, so no form, until an answer
+  // needs the merchant (a notice), and then the usual screen with that notice.
+  if (autoStart && claimedDomain && !notice) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-2xl items-center" data-claim-start>
+        <section role="status" aria-live="polite" aria-busy="true" className="w-full rounded-card border border-line bg-surface p-8 shadow-card md:p-10">
+          <Eyebrow className="text-action">{t.newProject.eyebrow}</Eyebrow>
+          <h1 className="mt-3 flex items-center gap-3 text-balance text-2xl font-bold leading-tight tracking-tight text-ink md:text-3xl">
+            <Loader2 className="h-6 w-6 shrink-0 animate-spin text-action" aria-hidden />
+            <span className="min-w-0">{t.newProject.fromScanTitle(claimedDomain)}</span>
+          </h1>
+          <p className="mt-4 max-w-[52ch] text-base leading-7 text-body">{t.newProject.fromScanBody}</p>
+          <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-action/20 bg-action-soft px-3 py-1.5 text-sm font-medium text-action">
+            <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="truncate">{t.newProject.fromFreeCheck(claimedDomain)}</span>
+          </p>
+          <p className="mt-6 text-sm text-muted">{phase === 'starting' ? t.newProject.starting : t.newProject.creating}</p>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto w-full max-w-6xl">

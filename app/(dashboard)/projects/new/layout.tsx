@@ -25,5 +25,5 @@ export default async function NewProjectLayout({ children }: { children: ReactNo
     return children
   }
   if (surface.kind === 'legacy') return children
-  return <NewProjectFlow clients={surface.clients} claimedDomain={surface.claimedDomain} />
+  return <NewProjectFlow clients={surface.clients} claimedDomain={surface.claimedDomain} claimedProjectId={surface.claimedProjectId} />
 }

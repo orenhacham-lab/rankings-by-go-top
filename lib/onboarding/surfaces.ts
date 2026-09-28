@@ -16,7 +16,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { projectSiteKey } from '@/lib/seed-scan/claim'
+import { claimMatchesProject, projectSiteKey } from '@/lib/seed-scan/claim'
 import { seedRunView } from '@/lib/seed-scan/http'
 import { getLatestSeedRun, listSeedSteps } from '@/lib/seed-scan/store'
 import type { SeedRunView } from '@/lib/seed-scan/types'
@@ -45,6 +45,14 @@ export type NewProjectSurface =
       clients: ClientChoice[] | null
       /** The site the kept free-check token scanned, to fill the address in; null without one. */
       claimedDomain: string | null
+      /**
+       * The merchant's own active project for that site, if they already have
+       * one (read through their RLS-scoped client, filtered by owner). When the
+       * screen starts from the claim by itself, it seeds THIS project instead of
+       * creating a second one for the same site: a reload, or a start that
+       * failed after the create, never duplicates the project.
+       */
+      claimedProjectId: string | null
     }
 
 function available(deps: SurfaceDeps, userId: string, admin: () => ServiceRoleClient): Promise<boolean> {
@@ -71,15 +79,32 @@ export async function resolveNewProjectSurface(
     : null
 
   let claimedDomain: string | null = null
+  let claimedProjectId: string | null = null
   const token = readClaimToken(deps.claimCookie)
   if (token) {
     const peek = await deps.peekClaim(admin(), token, deps.now)
     if (peek.state === 'usable') {
       const site = readSiteInput(peek.domain)
       claimedDomain = site.ok ? site.domain : null
+      if (claimedDomain) {
+        const own = await deps.db
+          .from('projects')
+          .select('id, user_id, target_domain')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+        const match = own.error
+          ? null
+          : ((own.data as { id: unknown; user_id: unknown; target_domain: unknown }[] | null) ?? []).find((p) => {
+              if (typeof p.id !== 'string' || p.user_id !== userId || typeof p.target_domain !== 'string') return false
+              const key = projectSiteKey(p.target_domain)
+              return !!key && claimMatchesProject({ url: peek.url, domain: peek.domain }, key)
+            })
+        claimedProjectId = match ? (match.id as string) : null
+      }
     }
   }
-  return { kind: 'flow', clients, claimedDomain }
+  return { kind: 'flow', clients, claimedDomain, claimedProjectId }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

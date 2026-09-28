@@ -21,6 +21,17 @@
  * through their own panels below, unchanged. A merchant who came from the
  * Shopify App Store is never offered the switch: for them this section renders
  * exactly what it rendered before (`legacy` below).
+ *
+ * THE CHOICE SURVIVES THE RE-READ. Confirming WordPress (or Shopify) in the
+ * modal sets `choice` and re-reads the connections. That re-read used to reset
+ * `choice` whenever nothing was connected, which is exactly the state right
+ * after choosing a platform, so the WordPress panel mounted and vanished and
+ * the form the modal had promised never appeared. The reset now happens only
+ * when a re-read follows a disconnect (a panel's onChanged); a confirmed choice
+ * re-reads with keepChoice. The chosen WordPress panel opens with its form out.
+ *
+ * The platform the site scan detected is preselected in the modal while
+ * nothing is connected; nothing is shown as connected that is not.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -44,7 +55,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
  * it is one of the two this connects. A hint only: it orders the two buttons
  * and nothing else; each still opens the same panel as before.
  */
-export type PlatformHint = { label: string; preferred: 'wordpress' | 'shopify' | null }
+export type PlatformHint = { label: string; preferred: 'wordpress' | 'shopify' | 'wix' | null }
 
 export default function ContentSection({ projectId, platformHint }: { projectId: string; platformHint?: PlatformHint | null }) {
   const router = useRouter()
@@ -69,7 +80,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   // When neither platform is connected, which one the user chose to connect.
   const [choice, setChoice] = useState<'wordpress' | 'shopify' | null>(null)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts?: { keepChoice?: boolean }) => {
     try {
       const [wpRes, shRes, siteRes] = await Promise.all([
         fetch(`/api/wordpress/connection?projectId=${projectId}`),
@@ -85,8 +96,9 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
       setShopifyConnected(shc)
       setSite((st.connection ?? null) as SanitizedSiteConnection | null)
       setSwitchLocked(st.switchLocked === true)
-      // Returning to the neither-connected state resets to the platform choice.
-      if (!wpc && !shc) setChoice(null)
+      // Returning to the neither-connected state (a disconnect) resets to the
+      // platform choice; a choice the merchant just confirmed is kept.
+      if (!wpc && !shc && !opts?.keepChoice) setChoice(null)
     } catch {
       /* leave as-is; panels still render on demand */
     } finally {
@@ -94,7 +106,8 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
     }
   }, [projectId])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { void refresh() }, [refresh])
+  const onPanelChanged = useCallback(() => { void refresh() }, [refresh])
 
   // Returning from a Shopify OAuth attempt (?shopify=connected|warning|error)
   // opens the Shopify view so its panel shows the result + a re-entry field
@@ -108,11 +121,11 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   // K2 — when a platform is connected, explain what the Content Hub offers and link
   // to it. This is a pointer to the hub, NOT a second Content Hub inside the project.
   const connectedBanner = (
-    <Card className="hover:translate-y-0 border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-900/10">
+    <Card className="hover:translate-y-0 border-action/20 bg-action-soft/50">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <div className="font-semibold text-slate-800 dark:text-slate-100">{t.connectedTitle}</div>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{t.connectedBody}</p>
+          <div className="font-semibold text-ink">{t.connectedTitle}</div>
+          <p className="text-sm text-body mt-0.5">{t.connectedBody}</p>
         </div>
         <Button size="sm" onClick={goToContentHub} className="shrink-0">{t.goToContentHub}</Button>
       </div>
@@ -123,51 +136,51 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
     <section>
       {loading ? (
         <Card className="hover:translate-y-0">
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-3">
-            <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center gap-2 text-sm text-muted py-3">
+            <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
           </div>
         </Card>
       ) : both ? (
         // Unexpected dual connection — surface a conflict, delete nothing. Both
         // panels render so the owner can disconnect one to resolve it.
         <div className="space-y-3">
-          <Card className="hover:translate-y-0 border-amber-300 dark:border-amber-700">
+          <Card className="hover:translate-y-0 border-warn/40">
             <div className="flex items-start gap-2">
-              <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <AlertTriangle size={18} className="text-warn mt-0.5 shrink-0" />
               <div>
-                <div className="font-semibold text-amber-800 dark:text-amber-300">{t.conflictTitle}</div>
-                <p className="text-sm text-amber-800/90 dark:text-amber-300/90">{t.conflictBody}</p>
+                <div className="font-semibold text-warn">{t.conflictTitle}</div>
+                <p className="text-sm text-warn">{t.conflictBody}</p>
               </div>
             </div>
           </Card>
-          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
-          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
+          <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : wpConnected ? (
         <div className="space-y-3">
           {connectedBanner}
-          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : shopifyConnected ? (
         <div className="space-y-3">
           {connectedBanner}
-          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+          <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : choice === 'wordpress' ? (
         <div className="space-y-2">
-          <button type="button" onClick={() => setChoice(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">← {t.back}</button>
-          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} onConnected={goToContentHub} />
+          <button type="button" onClick={() => setChoice(null)} className="text-xs text-action hover:underline">← {t.back}</button>
+          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} onConnected={goToContentHub} />
         </div>
       ) : choice === 'shopify' ? (
         <div className="space-y-2">
-          <button type="button" onClick={() => setChoice(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">← {t.back}</button>
-          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+          <button type="button" onClick={() => setChoice(null)} className="text-xs text-action hover:underline">← {t.back}</button>
+          <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : (
         // Neither connected → platform choice (never both full panels at once).
         <Card className="hover:translate-y-0">
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.platformChoiceTitle}</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{t.platformChoiceHint}</p>
+          <h3 className="text-base font-semibold text-ink mb-1">{t.platformChoiceTitle}</h3>
+          <p className="text-sm text-muted mb-3">{t.platformChoiceHint}</p>
           {platformHint && (
             <p data-platform-hint={platformHint.preferred ?? 'other'} className="mb-3 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-info/20 bg-info-soft px-2.5 py-1 text-caption font-medium text-info">
               <ScanSearch size={13} className="shrink-0" aria-hidden />
@@ -199,7 +212,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   const onSwitched = (p: ChoosablePlatform, saved?: SanitizedSiteConnection | null) => {
     if (p === 'wordpress' || p === 'shopify') { setWpConnected(false); setShopifyConnected(false); setSite(null); setChoice(p) }
     else setSite(saved ?? null)
-    void refresh()
+    void refresh({ keepChoice: true })
   }
 
   const platformCard = (
@@ -242,32 +255,35 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
       {platformCard}
       {conflict ? (
         <div className="space-y-3">
-          {wpConnected && <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />}
-          {shopifyConnected && <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />}
-          {site && <SitePlatformPanel projectId={projectId} connection={site} t={sp} onChanged={refresh} />}
+          {wpConnected && <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} />}
+          {shopifyConnected && <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />}
+          {site && <SitePlatformPanel projectId={projectId} connection={site} t={sp} onChanged={onPanelChanged} />}
         </div>
-      ) : current === 'wordpress' ? (
-        <div className="space-y-3">
-          {connectedBanner}
-          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+      ) : current === 'wordpress' || (!current && choice === 'wordpress') ? (
+        // One element for "chosen" and "connected", so saving does not remount
+        // the panel: its answer (a failed test, say) stays on screen.
+        <div className="space-y-3 animate-pop-in" data-wp-section>
+          {current === 'wordpress' && connectedBanner}
+          <WordPressConnectionPanel
+            projectId={projectId}
+            onChanged={onPanelChanged}
+            onConnected={current === 'wordpress' ? undefined : goToContentHub}
+            startWithForm={current !== 'wordpress'}
+          />
         </div>
       ) : current === 'shopify' ? (
         <div className="space-y-3">
           {connectedBanner}
-          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+          <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : site ? (
         <div className="space-y-3">
           {site.connection_status === 'connected' && connectedBanner}
-          <SitePlatformPanel projectId={projectId} connection={site} t={sp} onChanged={refresh} />
-        </div>
-      ) : choice === 'wordpress' ? (
-        <div className="animate-pop-in">
-          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} onConnected={goToContentHub} />
+          <SitePlatformPanel projectId={projectId} connection={site} t={sp} onChanged={onPanelChanged} />
         </div>
       ) : choice === 'shopify' ? (
         <div className="animate-pop-in">
-          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+          <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
       ) : null}
       <PlatformSwitchModal
@@ -275,6 +291,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
         onClose={() => setSwitchOpen(false)}
         projectId={projectId}
         current={current}
+        preferred={current ? null : platformHint?.preferred ?? null}
         t={sp}
         onSwitched={onSwitched}
       />

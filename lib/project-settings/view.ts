@@ -303,12 +303,12 @@ export function isCommerceType(v: unknown): v is CommerceType {
 
 // ── The detected platform, as a hint on the connection card ────────────────
 
-export type PlatformHint = { name: string; connect: 'wordpress' | 'shopify' | null }
+export type PlatformHint = { name: string; connect: 'wordpress' | 'shopify' | 'wix' | null }
 
 /**
  * What the scan read off the site, as the connection card's hint. WooCommerce
- * runs on WordPress, so it points at the WordPress connection. Anything else
- * is named honestly with no connection to suggest.
+ * runs on WordPress, so it points at the WordPress connection; Wix has its own
+ * connection too. Anything else is named honestly with no connection to suggest.
  */
 export function platformHint(detected: string | null | undefined): PlatformHint | null {
   const name = (detected ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
@@ -316,6 +316,7 @@ export function platformHint(detected: string | null | undefined): PlatformHint 
   const key = name.toLowerCase()
   if (key === 'wordpress' || key === 'woocommerce') return { name, connect: 'wordpress' }
   if (key === 'shopify') return { name, connect: 'shopify' }
+  if (key === 'wix') return { name, connect: 'wix' }
   return { name, connect: null }
 }
 

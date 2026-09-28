@@ -6,6 +6,8 @@ import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { sendSignupNotification } from '@/lib/notifications/signup-email'
 import { RESET_PASSWORD_PATH, recoveryFailureUrl } from '@/lib/auth/password-reset'
+import { SEED_CLAIM_COOKIE } from '@/lib/onboarding/claim-cookie'
+import { afterSignupPath } from '@/lib/onboarding/claim-start'
 
 /**
  * Supabase auth callback (email confirmation and Supabase-hosted OAuth, PKCE).
@@ -69,7 +71,13 @@ export async function GET(request: NextRequest) {
       // hop. The durable source is auth metadata (seeds the dashboard provider); this
       // just keeps the choice on the redirect URL so the param is never lost.
       const lang = searchParams.get('lang')
-      const dest = new URL(next, origin)
+      // A sign-up that carried a free-check claim opens the project made from
+      // that scan instead of an empty dashboard (lib/onboarding/claim-start.ts).
+      // The claim cookie arrives with the confirmation link's navigation, in any
+      // tab of this browser. Only the default landing is replaced, and only by
+      // one fixed internal path; any other `next` is kept as it was.
+      const landing = afterSignupPath({ next, claimCookie: cookieStore.get(SEED_CLAIM_COOKIE)?.value, env: process.env })
+      const dest = new URL(landing, origin)
       if (lang === 'en' || lang === 'he') dest.searchParams.set('lang', lang)
       return NextResponse.redirect(dest.toString())
     }
