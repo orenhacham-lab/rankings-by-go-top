@@ -163,7 +163,8 @@ export default function NewTopicsLinkPlanPanel({
       try {
         const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(ids)}`)
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
+        // A missing index answers 200 { ok: false, cacheState: 'missing' }; a failure is a non-2xx.
+        if (!res.ok || data.ok === false) {
           // A CONFIRMED missing site index is not a failure of this panel — the
           // index feeds internal-link SUGGESTIONS, and an article can be written
           // and queued without any. This used to set a blocking error and return

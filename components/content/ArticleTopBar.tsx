@@ -3,12 +3,16 @@
 /**
  * The article viewer's sticky top bar (content review C1).
  *
- * One primary action, always phrased as an invitation (lib/content/publish-cta.ts):
+ * One primary action for the whole page (final review R1), always phrased as an invitation (lib/content/publish-cta.ts):
  * "connect your site to publish" with no platform, "publish" with one, the
  * existing Shopify scope-upgrade flow when the store is connected without
  * write_content, "view on your site" once published. Beside it, two actions that
  * are useful with no site connected at all: copy the article, download the
  * featured image. Under it, the viewer's tabs (article / schema).
+ *
+ * While the article is being edited, saving is what moves the owner forward, so the
+ * save bar holds the page's one filled button and this call to action steps back to
+ * a bordered one (`quiet`).
  *
  * It sits under the dashboard's own sticky bar (h-14), in the page's tokens.
  */
@@ -38,7 +42,7 @@ const linkButton = (variant: 'primary' | 'secondary') => cn(
 export default function ArticleTopBar({
   t, title, statusLabel, statusTone, backHref, projectId, detected,
   isPublished, publishedUrl, featuredImageUrl, citedBadge,
-  onPublish, onCopy, copying, onDownloadImage, downloading, tab, onTabChange,
+  onPublish, onCopy, copying, onDownloadImage, downloading, tab, onTabChange, quiet = false,
 }: {
   t: TopBarDict
   title: string
@@ -58,7 +62,10 @@ export default function ArticleTopBar({
   downloading?: boolean
   tab: ArticleViewerTab
   onTabChange: (tab: ArticleViewerTab) => void
+  /** Another region holds the page's primary (the editor's save bar): draw the CTA bordered. */
+  quiet?: boolean
 }) {
+  const ctaVariant = quiet ? 'secondary' : 'primary'
   const cta = resolvePublishCta({
     projectId,
     loading: detected.loading,
@@ -115,25 +122,25 @@ export default function ArticleTopBar({
             </Button>
           )}
           {cta.kind === 'loading' && (
-            <Button size="md" disabled aria-live="polite">{t.checking}</Button>
+            <Button size="md" variant={ctaVariant} disabled aria-live="polite">{t.checking}</Button>
           )}
           {cta.kind === 'connect' && (
-            <Link href={cta.href} className={linkButton('primary')} data-cta="connect">
+            <Link href={cta.href} className={linkButton(ctaVariant)} data-cta="connect">
               <Plug aria-hidden="true" className="size-4" /> {t.connectToPublish}
             </Link>
           )}
           {cta.kind === 'conflict' && (
-            <Link href={cta.href} className={linkButton('primary')} data-cta="conflict">
+            <Link href={cta.href} className={linkButton(ctaVariant)} data-cta="conflict">
               <AlertTriangle aria-hidden="true" className="size-4" /> {t.fixConflict}
             </Link>
           )}
           {cta.kind === 'grant_scope' && (
-            <a href={cta.href} className={linkButton('primary')} data-cta="grant_scope">
+            <a href={cta.href} className={linkButton(ctaVariant)} data-cta="grant_scope">
               <ShieldCheck aria-hidden="true" className="size-4" /> {t.grantScope}
             </a>
           )}
           {cta.kind === 'publish' && (
-            <Button size="md" onClick={onPublish} data-cta="publish">
+            <Button size="md" variant={ctaVariant} onClick={onPublish} data-cta="publish">
               <Send aria-hidden="true" className="size-4" /> {t.publish}
             </Button>
           )}

@@ -202,7 +202,7 @@ export default function WordPressPublishSettings({
             )}
           </div>
 
-          <Button size="sm" onClick={save} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+          <Button size="sm" variant="secondary" onClick={save} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
 
           {/* Last export status (taxonomy + SEO meta) — never a silent success. */}
           {lastExport && (

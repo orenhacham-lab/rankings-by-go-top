@@ -52,6 +52,15 @@ const FILTER_ICONS: Record<ExistingContentFilter, React.ReactNode> = {
 
 /** Eight columns fit a 1440 screen beside the sidebar with a tighter gutter. */
 const CELL = 'px-4'
+/**
+ * On a phone the table reads as stacked rows (final review R15): the title with a
+ * meta line under it (type, clicks, the one flag that matters) and the row's action.
+ * The secondary columns return as the screen widens, instead of the last ones being
+ * cut off inside the card.
+ */
+const FROM_SM = 'hidden sm:table-cell'
+const FROM_MD = 'hidden md:table-cell'
+const FROM_LG = 'hidden lg:table-cell'
 
 /** Every page is on the same site, so the path is what tells two rows apart. */
 function displayPath(url: string): string {
@@ -283,12 +292,12 @@ export default function ExistingContentScreen() {
         <TableHead>
           <tr>
             <Th className={CELL}>{x.columns.title}</Th>
-            <Th className={CELL}>{x.columns.type}</Th>
-            {showUpdated && <Th className={CELL}>{x.columns.updated}</Th>}
-            {gscOk && <Th className={cn(CELL, 'text-end')}>{x.columns.clicks}</Th>}
-            {gscOk && <Th className={cn(CELL, 'text-end')}>{x.columns.impressions}</Th>}
-            {gscOk && <Th className={CELL}>{x.columns.topQuery}</Th>}
-            <Th className={CELL}>{x.columns.flags}</Th>
+            <Th className={cn(CELL, FROM_MD)}>{x.columns.type}</Th>
+            {showUpdated && <Th className={cn(CELL, FROM_LG)}>{x.columns.updated}</Th>}
+            {gscOk && <Th className={cn(CELL, FROM_SM, 'text-end')}>{x.columns.clicks}</Th>}
+            {gscOk && <Th className={cn(CELL, FROM_MD, 'text-end')}>{x.columns.impressions}</Th>}
+            {gscOk && <Th className={cn(CELL, FROM_LG)}>{x.columns.topQuery}</Th>}
+            <Th className={cn(CELL, FROM_SM)}>{x.columns.flags}</Th>
             <Th className={CELL}><span className="sr-only">{x.columns.action}</span></Th>
           </tr>
         </TableHead>
@@ -297,9 +306,18 @@ export default function ExistingContentScreen() {
             <EmptyRow colSpan={colCount} message={x.empty.filterEmpty} />
           ) : page.map((it) => {
             const planned = it.supportTopicPlanned || plannedNow.has(it.key)
+            // Only the exceptions carry a badge (final review R24): an article WE wrote,
+            // and a cannibalization risk. "Was on the site" is every other page's normal
+            // state, so it is not stamped on each row.
+            const flags = (it.group === 'content' && it.origin === 'ours') || it.cannibalization ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {it.group === 'content' && it.origin === 'ours' && <Badge variant="info">{x.origin.ours}</Badge>}
+                {it.cannibalization && <Badge variant="warning" dot>{x.cannibal}</Badge>}
+              </div>
+            ) : null
             return (
               <TableRow key={it.key}>
-                <Td className={cn(CELL, 'max-w-64')}>
+                <Td className={cn(CELL, 'max-w-40 sm:max-w-64')}>
                   <p className="truncate font-medium text-ink" title={it.title}>{it.title}</p>
                   <a
                     href={it.url}
@@ -311,22 +329,24 @@ export default function ExistingContentScreen() {
                     <span dir="ltr" className="truncate">{displayPath(it.url)}</span>
                     <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
                   </a>
+                  {/* The phone's meta line: what the hidden columns would have said. */}
+                  <p data-existing-meta="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted md:hidden">
+                    <span>{x.types[it.type]}</span>
+                    {gscOk && it.metrics && <span className="tabular-nums sm:hidden">· {num.format(it.metrics.clicks)} {x.columns.clicks}</span>}
+                  </p>
+                  {flags && <div className="mt-1.5 sm:hidden">{flags}</div>}
                 </Td>
-                <Td className={cn(CELL, 'whitespace-nowrap')}>{x.types[it.type]}</Td>
-                {showUpdated && <Td className={cn(CELL, 'whitespace-nowrap text-muted')}>{day(it.updatedAt) ?? EMPTY_DATE}</Td>}
-                {gscOk && <Td className={cn(CELL, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.clicks) : EMPTY_DATE}</Td>}
-                {gscOk && <Td className={cn(CELL, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.impressions) : EMPTY_DATE}</Td>}
+                <Td className={cn(CELL, FROM_MD, 'whitespace-nowrap')}>{x.types[it.type]}</Td>
+                {showUpdated && <Td className={cn(CELL, FROM_LG, 'whitespace-nowrap text-muted')}>{day(it.updatedAt) ?? EMPTY_DATE}</Td>}
+                {gscOk && <Td className={cn(CELL, FROM_SM, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.clicks) : EMPTY_DATE}</Td>}
+                {gscOk && <Td className={cn(CELL, FROM_MD, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.impressions) : EMPTY_DATE}</Td>}
                 {gscOk && (
-                  <Td className={cn(CELL, 'max-w-36')}>
+                  <Td className={cn(CELL, FROM_LG, 'max-w-36')}>
                     {it.metrics?.topQuery ? <span className="block truncate" title={it.metrics.topQuery}>{it.metrics.topQuery}</span> : <span className="text-muted">{EMPTY_DATE}</span>}
                   </Td>
                 )}
-                <Td className={cn(CELL, 'min-w-36')}>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {it.group === 'content' && it.origin === 'ours' && <Badge variant="info">{x.origin.ours}</Badge>}
-                    {it.group === 'content' && it.origin === 'site' && <Badge variant="neutral">{x.origin.site}</Badge>}
-                    {it.cannibalization && <Badge variant="warning" dot>{x.cannibal}</Badge>}
-                  </div>
+                <Td className={cn(CELL, FROM_SM, 'min-w-36')}>
+                  {flags}
                   {it.cannibalization && (
                     <p className="mt-1 max-w-48 text-caption text-muted">
                       {fill(x.cannibalDetail, { n: num.format(it.cannibalization.pages), query: it.cannibalization.query })}

@@ -51,7 +51,8 @@ export default function ArticleReadView({
           <h2 id="article-read-title" className="text-section font-semibold text-ink">{t.title}</h2>
           <p className="mt-0.5 text-caption text-muted">{t.subtitle}</p>
         </div>
-        <Button onClick={onEdit} data-testid="article-edit">
+        {/* Bordered: the page's one primary is the top bar's publish / connect call. */}
+        <Button variant="secondary" onClick={onEdit} data-testid="article-edit">
           <Pencil aria-hidden="true" className="size-4" /> {t.edit}
         </Button>
       </div>

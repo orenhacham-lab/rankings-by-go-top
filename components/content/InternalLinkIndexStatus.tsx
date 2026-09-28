@@ -13,7 +13,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Notice from '@/components/ui/Notice'
@@ -160,7 +159,8 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
   const c = status?.counts ?? {}
 
   return (
-    <Card className="mb-4 p-5 sm:p-6">
+    // Flat inside the strategy's "advanced" card (final review R14): a section, not a card.
+    <div data-link-index-status="" className="mb-4">
       {/* Header — title + status badge + manual refresh grouped together */}
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-section font-semibold text-ink">{t.title}</h3>
@@ -240,7 +240,7 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
                 {t.techDetails}
                 <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
               </summary>
-              <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 rounded-inset bg-sunk/60 p-4 text-caption text-muted tabular-nums sm:grid-cols-2">
+              <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 border-s-2 border-line ps-3 text-caption text-muted tabular-nums sm:grid-cols-2">
                 {status?.siteUrl && <div className="min-w-0 sm:col-span-2">{t.siteUrl}: <span dir="ltr" title={status.siteUrl} className="inline-block max-w-64 truncate align-bottom">{status.siteUrl}</span></div>}
                 <div>{t.scannerVersion}: {status?.scannerVersion ?? '—'} · {t.currentVersion}: {status?.currentScannerVersion ?? '—'}</div>
                 <div>{t.ttlDays}: {status?.ttlDays ?? '—'}</div>
@@ -260,6 +260,6 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
           )}
         </>
       )}
-    </Card>
+    </div>
   )
 }

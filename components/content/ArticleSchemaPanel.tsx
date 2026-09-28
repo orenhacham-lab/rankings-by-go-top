@@ -63,7 +63,7 @@ export default function ArticleSchemaPanel({ t, failText, input, isWebhook, onNo
           <h3 className="text-section font-semibold text-ink">{t.title}</h3>
           <p className="mt-1 text-copy text-body">{t.intro}</p>
         </div>
-        <Button size="sm" onClick={() => void copy()} loading={busy} disabled={busy || blocks.length === 0}>
+        <Button size="sm" variant="secondary" onClick={() => void copy()} loading={busy} disabled={busy || blocks.length === 0}>
           {!busy && <Copy aria-hidden="true" className="size-4" />} {t.copy}
         </Button>
       </div>

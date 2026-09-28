@@ -62,7 +62,9 @@ export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card
   const busy = act.actions.busy[card.key]
   return (
     <div role="group" aria-label={fill(a.groupLabel, { title: card.title })} className={cn('flex flex-wrap items-center gap-1', !inline && 'mt-3 border-t border-line pt-3')}>
-      <Button size="sm" onClick={() => void act.actions.approve(target)} loading={busy === 'approve'} disabled={!!busy}
+      {/* A row action, never the page's call to action: every card has one, so it is
+          the quiet bordered button (one primary per region: the next-article card's). */}
+      <Button size="sm" variant="secondary" onClick={() => void act.actions.approve(target)} loading={busy === 'approve'} disabled={!!busy}
         aria-label={fill(a.approveAria, { title: card.title })} data-idea-action="approve">
         {busy !== 'approve' && <Check aria-hidden="true" className="size-4" />} {a.approve}
       </Button>

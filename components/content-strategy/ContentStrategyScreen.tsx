@@ -30,15 +30,16 @@
  * `?add=keyword` (the workspace's "new topic") opens the keyword field on the board.
  */
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Columns3, List, RotateCw } from 'lucide-react'
+import { CalendarPlus, ChevronDown, Columns3, List, Plus, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Segmented from '@/components/ui/Segmented'
 import { Skeleton } from '@/components/ui/Skeleton'
 import SectionHeading from '@/components/ui/SectionHeading'
+import EmptyState from '@/components/ui/EmptyState'
 import AutomationScreen from '@/components/content/workspace/AutomationScreen'
 import TopicsScreen from '@/components/content/workspace/TopicsScreen'
 import { useContentWorkspace } from '@/components/content/workspace/ContentWorkspaceProvider'
@@ -81,6 +82,27 @@ function ViewSwitch({ view, onChange, dict }: { view: StrategyView; onChange: (v
   )
 }
 
+/**
+ * A plan with nothing in it yet: one empty state with the one way in, instead of four
+ * empty columns (or rows) that each say the same thing (final review R28).
+ */
+function StrategyEmpty({ dict, note, onCreate }: { dict: Dict; note?: string | null; onCreate: () => void }) {
+  const s = dict.contentStrategy
+  return (
+    <Card padding={false} className="motion-safe:animate-pop-in">
+      <div data-strategy-empty="">
+        <EmptyState
+          icon={<CalendarPlus />}
+          title={s.emptyPlanTitle}
+          body={s.emptyPlanBody}
+          action={<Button onClick={onCreate}><Plus aria-hidden="true" className="size-4" /> {s.emptyPlanAction}</Button>}
+          secondary={note ?? undefined}
+        />
+      </div>
+    </Card>
+  )
+}
+
 /** The page's anchor, read without an effect (empty on the server), and followed when it changes. */
 function subscribeHash(onChange: () => void) {
   window.addEventListener('hashchange', onChange)
@@ -94,8 +116,10 @@ const noHash = () => ''
  * screens this tab replaced, as they were. They mount only when unfolded, and a link to
  * one of their sections unfolds them.
  */
-function StrategyListView({ proFirst, dict, cards, lang, act, insights }: {
+function StrategyListView({ proFirst, dict, cards, lang, act, insights, empty = null }: {
   proFirst: boolean
+  /** The plan has no card yet: its empty state stands where the rows would. */
+  empty?: ReactNode
   dict: Dict
   cards: readonly StrategyCard[] | null
   lang: Locale
@@ -123,7 +147,7 @@ function StrategyListView({ proFirst, dict, cards, lang, act, insights }: {
 
   return (
     <div className="space-y-6">
-      {cards && <StrategyList cards={cards} lang={lang} dict={dict} act={act} insights={insights} />}
+      {empty ?? (cards && <StrategyList cards={cards} lang={lang} dict={dict} act={act} insights={insights} />)}
       <section data-strategy-advanced="" className="rounded-card border border-line bg-surface">
         <h3>
           <button
@@ -226,12 +250,17 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
   const addOpen = automationEnabled && view === 'board' && adding
   // A project with no scan: its ideas column says the mapping will add more, when the mapping can be offered.
   const ideasNote = strategy.seed.state === 'none' && strategy.mappingAvailable ? dict.mapping.strategyMore : null
+  const createTopic = automationEnabled ? () => { setView('board'); setAdding(true) } : handleCreateTopic
+  // Nothing planned at all: one empty state carries the one action (the dark "next
+  // article" card would only repeat it, so it waits for the first topic).
+  const planEmpty = !!board && board.cards.length === 0 && !board.next
+  const emptyState = planEmpty ? <StrategyEmpty dict={dict} note={ideasNote} onCreate={createTopic} /> : null
 
   return (
     <div className="space-y-6">
       <SeedPlanNotice seed={strategy.seed} dict={dict} />
 
-      {board ? (
+      {planEmpty ? null : board ? (
         <NextArticleCard
           next={board.next}
           hasArticles={board.hasArticles}
@@ -241,7 +270,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           act={act}
           insight={nextInsight}
           onOpenBrief={openPrefilledBrief}
-          onCreateTopic={automationEnabled ? () => { setView('board'); setAdding(true) } : handleCreateTopic}
+          onCreateTopic={createTopic}
           onGenerated={() => { void load(); void loadTopics() }}
           onError={(text) => toast.error(text)}
         />
@@ -268,7 +297,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
             <PlanBasis seed={strategy.seed} dict={dict} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {automationEnabled && view === 'board' && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
+            {automationEnabled && view === 'board' && !planEmpty && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
             <ViewSwitch view={view} onChange={setView} dict={dict} />
           </div>
         </div>
@@ -278,7 +307,9 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
         <p role="status" aria-live="polite" className="sr-only">{actions.announcement}</p>
 
         {view === 'list' ? (
-          <StrategyListView proFirst={proFirst} dict={dict} cards={board?.cards ?? null} lang={language} act={act} insights={insights} />
+          <StrategyListView proFirst={proFirst} dict={dict} cards={board?.cards ?? null} lang={language} act={act} insights={insights} empty={emptyState} />
+        ) : planEmpty ? (
+          emptyState
         ) : board ? (
           <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} act={act} insights={insights} />
         ) : strategy.status === 'loading' ? (

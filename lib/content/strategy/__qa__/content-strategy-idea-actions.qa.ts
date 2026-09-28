@@ -272,7 +272,10 @@ async function main() {
       && /params\.delete\(STRATEGY_ADD_PARAM\)/.test(s) && /onAdd=\{actions\.addKeyword\}/.test(s)
     check('N4: the board opens its keyword field when asked, then drops the parameter', opens(screen))
     check('N4-MUT: a board that ignores the parameter fails N4', !opens(screen.replace('if (addAsked && automationEnabled && !adding) setAdding(true)', '')))
-    const emptyCard = (s: string) => /onCreateTopic=\{automationEnabled \? \(\) => \{ setView\('board'\); setAdding\(true\) \} : handleCreateTopic\}/.test(s)
+    // The same handler now also feeds the empty-plan state (final review R28), so it is
+    // named once and passed to both; the behaviour pinned here is unchanged.
+    const emptyCard = (s: string) => /const createTopic = automationEnabled \? \(\) => \{ setView\('board'\); setAdding\(true\) \} : handleCreateTopic\b/.test(s)
+      && /onCreateTopic=\{createTopic\}/.test(s)
     check('N5: the next-article card\'s "new topic" opens the same field, in place', emptyCard(screen))
     check('N5-MUT: navigating to the list from it fails N5', !emptyCard(screen.replace("() => { setView('board'); setAdding(true) }", "() => { setView('list') }")))
   }

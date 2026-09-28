@@ -99,6 +99,7 @@ export default function ArticleBriefModal({
   onSaved,
   onToast,
   onTopicsCreated,
+  exampleTerm,
 }: {
   open: boolean
   onClose: () => void
@@ -122,6 +123,10 @@ export default function ArticleBriefModal({
   // an internal-link planning step. Never fires when editing. May be async (the GSC flow
   // persists a created_topic decision here) — handleSave awaits it before closing.
   onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void | Promise<void>
+  // R29 — a term from the project itself (e.g. the keyword of an existing topic) used in
+  // the example placeholders. Without it the placeholders stay neutral examples, so a
+  // project never sees another business's niche as its example.
+  exampleTerm?: string | null
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).contentHub.brief
@@ -130,6 +135,11 @@ export default function ArticleBriefModal({
   const gscMode = mode === 'gsc_reviewed_topic'
 
   const [projectId, setProjectId] = useState(defaultProjectId)
+  const depthOptions = ARTICLE_DEPTHS.map((d) => ({ value: d, label: (t.articleDepths as Record<string, string>)[d] }))
+  // The term belongs to the workspace's project: another project picked here gets the neutral example.
+  const term = projectId === defaultProjectId ? (exampleTerm ?? '').trim().slice(0, 60) : ''
+  const topicPlaceholder = term ? t.topicPlaceholderWithTerm.replace('{term}', term) : t.topicPlaceholder
+  const keywordPlaceholder = term ? t.keywordPlaceholderWithTerm.replace('{term}', term) : t.primaryKeywordPlaceholder
   const [primaryKeyword, setPrimaryKeyword] = useState('')
   const [suggestions, setSuggestions] = useState<GeminiTopicSuggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -506,7 +516,7 @@ export default function ArticleBriefModal({
 
         {/* Strict GSC mode keeps the primary keyword editable but WITHOUT the Gemini suggest flow. */}
         {gscMode && (
-          <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={t.primaryKeywordPlaceholder} />
+          <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={keywordPlaceholder} />
         )}
 
         {/* Strict GSC reviewed-topic mode hides the whole Gemini "Suggest topics" flow. */}
@@ -514,7 +524,7 @@ export default function ArticleBriefModal({
           <div className="space-y-3">
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1">
-                <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={t.primaryKeywordPlaceholder} />
+                <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={keywordPlaceholder} />
               </div>
               <Button variant="secondary" onClick={handleSuggest} loading={suggesting} disabled={suggesting || !primaryKeyword.trim() || !projectId} className="shrink-0">
                 {!suggesting && <Sparkles aria-hidden="true" className="size-4" />}
@@ -575,7 +585,7 @@ export default function ArticleBriefModal({
           label={editing ? t.topic : t.manualTopicLabel}
           value={manualTopic}
           onChange={(e) => { setManualTopic(e.target.value); setErrTopic(false) }}
-          placeholder={t.topicPlaceholder}
+          placeholder={topicPlaceholder}
           error={errTopic ? t.noTopicSelected : undefined}
         />
 
@@ -631,14 +641,27 @@ export default function ArticleBriefModal({
             {/* Phase 3D — article depth / length by topic type. "אוטומטי" lets the
                 system pick the range from the topic; others force a depth. */}
             <div className="flex flex-col gap-1.5">
-              <span className={FIELD_LABEL_CLASSES}>{t.articleDepthLabel}</span>
-              <Segmented<ArticleDepth>
-                ariaLabel={t.articleDepthLabel}
-                value={articleDepth}
-                onChange={(d) => setArticleDepth(d)}
-                options={ARTICLE_DEPTHS.map((d) => ({ value: d, label: (t.articleDepths as Record<string, string>)[d] }))}
-                className="max-w-full overflow-x-auto"
-              />
+              {/* R29 — five options do not fit a phone: below sm the same choice is a
+                  Select (full width), from sm up the Segmented. Same state, same values. */}
+              <span id="brief-depth-label" className={FIELD_LABEL_CLASSES}>{t.articleDepthLabel}</span>
+              <div className="sm:hidden" data-depth-select="">
+                <Select
+                  id="brief-depth"
+                  aria-labelledby="brief-depth-label"
+                  value={articleDepth}
+                  onChange={(e) => setArticleDepth(e.target.value as ArticleDepth)}
+                  options={depthOptions}
+                />
+              </div>
+              <div className="hidden sm:block" data-depth-segmented="">
+                <Segmented<ArticleDepth>
+                  ariaLabel={t.articleDepthLabel}
+                  value={articleDepth}
+                  onChange={(d) => setArticleDepth(d)}
+                  options={depthOptions}
+                  className="max-w-full"
+                />
+              </div>
               <p className="max-w-prose text-caption text-muted">{t.articleDepthHint}</p>
             </div>
 
@@ -706,7 +729,7 @@ export default function ArticleBriefModal({
                 {anchors.map((a, i) => (
                   <div key={i} className={`space-y-3 rounded-inset border p-4 ${badAnchors.has(i) ? 'border-bad/40' : 'border-line bg-sunk/60'}`}>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} placeholder={t.anchorTextPlaceholder} />
+                      <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} placeholder={term ? keywordPlaceholder : t.anchorTextPlaceholder} />
                       <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => { updateAnchor(i, { target_url: e.target.value }); if (badAnchors.has(i)) setBadAnchors((p) => { const n = new Set(p); n.delete(i); return n }) }} placeholder={t.targetUrlPlaceholder} error={badAnchors.has(i) ? t.anchorUrlInvalid : undefined} />
                     </div>
                     <div className="flex flex-wrap items-center gap-3">

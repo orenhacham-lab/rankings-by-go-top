@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import TopicsList from '@/components/content/TopicsList'
 import NewTopicsLinkPlanPanel from '@/components/content/NewTopicsLinkPlanPanel'
@@ -227,13 +226,13 @@ export default function TopicsScreen() {
         />
       )}
       {selectableTopics.length === 0 ? (
-        <Card padding={false}>
-          <EmptyState
-            icon={<ListTodo />}
-            title={t.topicsEmptyTitle}
-            action={<Button onClick={handleCreateTopic}><Plus className="size-4" /> {t.newTopicButton}</Button>}
-          />
-        </Card>
+        // Flat inside the strategy's "advanced" card; the page's call to action is above.
+        <EmptyState
+          icon={<ListTodo />}
+          title={t.topicsEmptyTitle}
+          action={<Button variant="secondary" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" /> {t.newTopicButton}</Button>}
+          className="border-y border-line"
+        />
       ) : (
         <>
           <TopicsList

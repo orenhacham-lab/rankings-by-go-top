@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import Select from '@/components/ui/Select'
 import Notice from '@/components/ui/Notice'
 import Textarea from '@/components/ui/Textarea'
@@ -66,6 +67,7 @@ export default function ArticleInlineImagesPanel({
   onImagesChange?: (images: InlineImage[]) => void
 }) {
   const t = dict
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [migrationRequired, setMigrationRequired] = useState(false)
   const [images, setImages] = useState<InlineImage[]>([])
@@ -225,7 +227,7 @@ export default function ArticleInlineImagesPanel({
   }
 
   async function remove(id: string) {
-    if (!window.confirm(t.removeConfirm)) return
+    if (!(await confirm({ title: t.removeConfirm, confirmLabel: t.remove, tone: 'danger' }))) return
     setBusy(id)
     try {
       const res = await fetch(`/api/content/articles/${articleId}/inline-images/${id}`, { method: 'DELETE' })
@@ -311,7 +313,7 @@ export default function ArticleInlineImagesPanel({
                     onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, caption: ev.target.value } }))} />
 
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button size="sm" onClick={() => generate(img.id)} loading={isBusy} disabled={isBusy}>
+                    <Button size="sm" variant="secondary" onClick={() => generate(img.id)} loading={isBusy} disabled={isBusy}>
                       {isBusy ? t.generating : (url ? t.regenerate : t.generate)}
                     </Button>
                     {/* Replace = upload a chosen file; separate from AI Regenerate. */}
@@ -343,7 +345,7 @@ export default function ArticleInlineImagesPanel({
                     options={[{ value: '', label: t.selectSection }, ...openSections.map((s) => ({ value: s.sectionId, label: s.title }))]}
                   />
                 </div>
-                <Button size="sm" onClick={addImage} loading={busy === 'add'} disabled={busy === 'add' || !addSection}>
+                <Button size="sm" variant="secondary" onClick={addImage} loading={busy === 'add'} disabled={busy === 'add' || !addSection}>
                   {busy === 'add' ? t.adding : t.add}
                 </Button>
               </div>
@@ -351,6 +353,7 @@ export default function ArticleInlineImagesPanel({
           </div>
         </>
       )}
+      {confirmDialog}
     </Card>
   )
 }
