@@ -58,6 +58,13 @@ function EnvRow({ label, ok }: { label: string; ok: boolean }) {
   )
 }
 
+/** The service icon's squircle carries the check's tone (ok stays the calm action blue). */
+const ICON_TONE: Record<SetupTone, string> = {
+  ok: 'bg-action-soft text-action',
+  warn: 'bg-warn-soft text-warn',
+  bad: 'bg-bad-soft text-bad',
+}
+
 function CardTitle({ icon: Icon, children }: { icon: typeof Database; children: React.ReactNode }) {
   return (
     <div className="mb-5 flex items-center gap-3">
@@ -134,9 +141,10 @@ function StatusTab() {
         {connections.map(({ key, data, icon: Icon, title }) => {
           const copy = serviceCopy(key, data)
           return (
-            <Card key={key} className={cn('p-5 sm:p-6', copy.tone !== 'ok' && 'border-s-[3px]', copy.tone === 'bad' && 'border-s-bad', copy.tone === 'warn' && 'border-s-warn')}>
-              <div className="flex items-start gap-3">
-                <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+            // The state is on the icon and the badge; no start rail bending round the card's corner (G3).
+            <Card key={key} className="p-5 sm:p-6">
+              <div className="flex items-start gap-3" data-setup-service={key} data-tone={copy.tone}>
+                <span aria-hidden className={cn('flex size-10 shrink-0 items-center justify-center rounded-inset', ICON_TONE[copy.tone])}>
                   <Icon className="size-5" />
                 </span>
                 <div className="min-w-0 flex-1">

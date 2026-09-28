@@ -20,7 +20,7 @@ import { Footer } from '@/components/Footer'
 import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
 import type { Locale } from '@/lib/i18n/locales'
 import {
-  ButtonLink, CheckList, CrossList, CtaBand, FeatureCard, PageHero, ProductFrame, Section, SectionIntro, StepCard,
+  ButtonLink, CheckList, CrossList, CtaBand, FeatureCard, IconSquircle, PageHero, ProductFrame, Section, SectionIntro, StepCard,
 } from './marketing'
 
 type Item = { title: string; desc: string }
@@ -133,7 +133,7 @@ export function LandingPage({
               <h3 className="mb-5 text-section font-semibold text-ink">{copy.problem.withoutTitle}</h3>
               <CrossList items={copy.problem.without} />
             </div>
-            <div className="rounded-card border border-line border-s-[3px] border-s-action bg-surface p-6 shadow-card sm:p-8">
+            <div className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-8">
               <h3 className="mb-5 text-section font-semibold text-ink">{copy.problem.withTitle}</h3>
               <CheckList items={copy.problem.with} />
             </div>
@@ -200,15 +200,20 @@ export function LandingPage({
           </div>
         </Section>
 
-        {/* Why subscribe */}
+        {/* Why subscribe: five reasons as two rows, the first a wide lead card
+            (2 + 1 over 3 from lg, 2 + 2 + 2 on a tablet), so no card is left alone on a row. */}
         <Section tone="surface">
           <SectionIntro eyebrow={copy.why.eyebrow} title={copy.why.title} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3" data-why-grid>
             {copy.why.items.map((why, i) => (
-              <Reveal key={why.title} index={i} className="h-full">
-                <FeatureCard icon={WHY_ICONS[i] ?? Check} title={why.title}>
-                  <p>{why.desc}</p>
-                </FeatureCard>
+              <Reveal key={why.title} index={i} className={i === 0 ? 'h-full sm:col-span-2' : 'h-full'}>
+                {i === 0 ? (
+                  <LeadCard icon={WHY_ICONS[0] ?? Check} title={why.title}>{why.desc}</LeadCard>
+                ) : (
+                  <FeatureCard icon={WHY_ICONS[i] ?? Check} title={why.title}>
+                    <p>{why.desc}</p>
+                  </FeatureCard>
+                )}
               </Reveal>
             ))}
           </div>
@@ -239,3 +244,19 @@ export function LandingPage({
   )
 }
 
+/**
+ * The lead card of a row that would otherwise leave one card alone: the same
+ * surface as a FeatureCard, laid out wide (icon beside the words) so the extra
+ * width reads as emphasis rather than empty space.
+ */
+function LeadCard({ icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex h-full flex-col gap-3 rounded-card border border-line bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:gap-5 sm:p-8">
+      <IconSquircle icon={icon} />
+      <div className="min-w-0 space-y-2">
+        <h3 className="text-section font-semibold text-ink sm:text-title sm:font-bold sm:tracking-tight">{title}</h3>
+        <p className="max-w-prose text-copy text-body sm:text-section sm:font-normal">{children}</p>
+      </div>
+    </div>
+  )
+}

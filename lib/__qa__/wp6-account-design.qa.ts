@@ -7,10 +7,10 @@
  *      card is the one allowed native control), no legacy text sizes or arbitrary
  *      pixel sizes, only the radius and shadow tokens, no emoji or arrow glyphs in
  *      the markup, no monospace, no bouncy motion. Comments are stripped first.
- *      Three pinned pieces are allowed and nothing else: the Shopify billing panel
- *      (its markup is pinned byte-for-byte by reports-billing-screens C5), the
- *      new-project page (hash-pinned by onboarding-surfaces), and the link class
- *      the article editor writes INTO saved article HTML (content, not UI).
+ *      One pinned file is allowed and nothing else: the new-project page
+ *      (hash-pinned by onboarding-surfaces). The Shopify billing panel and the
+ *      link class the article editor writes into saved HTML used to be exempt;
+ *      both are on the tokens now (R4, R12) and are scanned like the rest.
  *   B) /setup never prints a provider's reply: the status route puts Serper's
  *      response body (for example an egress proxy's "Host not in allowlist ...")
  *      or a thrown message into `detail`, and the page showed it as is. The page
@@ -23,6 +23,14 @@
  *      and the trial row no longer shares the popular plan's ring, client rows
  *      act through a RowMenu, settings/Notice is the ui Notice, and the dead
  *      RichTextEditor is gone.
+ *   E) Admin articles and setup (final review R5, R6, R12, R31, G3): no browser
+ *      alert/confirm/prompt (the delete asks through ConfirmDialog, danger; the
+ *      editor asks for a link in a row under its toolbar and refuses a
+ *      javascript: link in a Notice); a failed save/upload shows our words, not
+ *      the route's `error`; the publish date reads the Hebrew way instead of the
+ *      browser's mm/dd/yyyy field; the author defaults to the admin's own name,
+ *      never an email; and the setup service cards carry their state on the icon
+ *      and badge, with no start rail bending round the card's corner.
  * Every guard has a MUTATION CONTROL: the same check on a broken copy fails.
  *
  * Run: npx tsx lib/__qa__/wp6-account-design.qa.ts
@@ -71,19 +79,11 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
 }
 
-/** What each file is checked as: comments out, and the pinned pieces cut away. */
+/** What each file is checked as: comments out. */
 function scanned(file: string, src: string): string {
-  let s = stripComments(src)
-  if (file.endsWith('billing/BillingView.tsx')) {
-    // The Shopify-billed branch, pinned by reports-billing-screens C5.
-    const start = s.indexOf(') : shopifyConnected ? (')
-    const end = start >= 0 ? s.indexOf(') : (', start + 10) : -1
-    if (start >= 0 && end > start) s = s.slice(0, start) + s.slice(end)
-  }
-  if (file.endsWith('components/admin/ArticleEditor.tsx')) {
-    // The class tiptap writes into the saved article HTML: content, not this screen's UI.
-    s = s.replace(/HTMLAttributes:\s*\{[\s\S]*?\}/, '')
-  }
+  const s = stripComments(src)
+  // BillingView's Shopify panel and the editor's link class used to be cut out
+  // here; both are on the tokens now (R4, R12), so every line is scanned.
   return s
 }
 
@@ -159,6 +159,9 @@ console.log('A) WP6 files are on the design tokens and primitives')
   const billing = 'app/(dashboard)/billing/BillingView.tsx'
   const bsrc = read(billing)
   check('MUTATION CONTROL: a raw colour OUTSIDE the Shopify panel of BillingView is caught', violations(billing, bsrc.replace('data-plan-card', 'data-x="1" className="bg-blue-50" data-plan-card')).some((v) => v.includes('raw palette')))
+  check('MUTATION CONTROL: the old Shopify panel classes are caught too (no longer exempt)', violations(billing, bsrc.replace('<Card className="mb-8 p-5 sm:p-6">\n          <div className="flex items-start gap-3" data-billing-shopify>', '<div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 rounded-lg">\n          <div data-billing-shopify>')).some((v) => v.includes('raw palette')))
+  const editor = 'components/admin/ArticleEditor.tsx'
+  check('MUTATION CONTROL: the old raw link class written by the editor is caught', violations(editor, read(editor).replace('text-action underline underline-offset-2 hover:text-action-hover', 'text-blue-600 underline hover:text-blue-700')).some((v) => v.includes('raw palette')))
 }
 
 // ── B) /setup says what failed in our words ──────────────────────────────────
@@ -243,6 +246,58 @@ console.log('\nC) screen specifics')
   check('C8: the dead RichTextEditor is gone and nothing imports it',
     !existsSync(join(ROOT, 'components/RichTextEditor.tsx'))
     && !walk('components').concat(walk('app')).filter((f) => /\.tsx?$/.test(f)).some((f) => /from ['"]@\/components\/RichTextEditor['"]/.test(read(f))))
+}
+
+// ── E) admin articles and setup ─────────────────────────────────────────────
+console.log('\nE) admin articles and setup: in-page questions, our words, Hebrew dates, no rail')
+{
+  const formRaw = read('components/admin/ArticleForm.tsx'), editorRaw = read('components/admin/ArticleEditor.tsx')
+  const newPageRaw = read('app/(dashboard)/admin/articles/new/page.tsx'), setupRaw = read('app/(setup)/setup/page.tsx')
+  const native = (s: string) => /(?<![\w.])(?:window\.)?(?:alert|confirm|prompt)\(/.test(stripComments(s).replace(/await confirm\(\{/g, ''))
+  const deleteAsks = (s: string) => {
+    const c = stripComments(s)
+    return !native(c) && /const \{ confirm, dialog: confirmDialog \} = useConfirm\(\)/.test(c) && /\{confirmDialog\}/.test(c)
+      && /const ok = await confirm\(\{[\s\S]*?tone: 'danger',[\s\S]*?\}\)\s*\n\s*if \(!ok\) return[\s\S]*?method: 'DELETE'/.test(c)
+  }
+  check('E1: deleting an article asks through ConfirmDialog (danger) before the DELETE; no window.confirm', deleteAsks(formRaw))
+  check('MUTATION CONTROL: window.confirm back in the form fails E1', !deleteAsks(formRaw.replace('const ok = await confirm({', "const ok = window.confirm('x') && await confirm({")))
+  const editorOk = (s: string) => {
+    const c = stripComments(s)
+    return !native(c) && /data-link-editor/.test(c) && /<NoticeBox tone="bad"[^>]*>קישור מסוג javascript:/.test(c)
+      && /setLink\(\{ href: trimmed \}\)/.test(c) && /\/\^\\s\*javascript:\/i\.test\(trimmed\)/.test(c)
+  }
+  check('E2: the editor asks for a link in the page and refuses javascript: in a Notice (no prompt/alert)', editorOk(editorRaw))
+  check('MUTATION CONTROL: window.prompt back in the editor fails E2', !editorOk(editorRaw.replace('setLinkDraft(prev || \'https://\')', "setLinkDraft(window.prompt('url', prev) ?? '')")))
+  check('MUTATION CONTROL: the alert for a javascript: link fails E2', !editorOk(editorRaw.replace('setLinkRefused(true)', "window.alert('no')")))
+  const ourWords = (s: string) => {
+    const c = stripComments(s)
+    return !/\.error\s*\?\?|\{json\.error\}|\{data\.error\}|setError\(data\.error|setUploadError\(json\.error/.test(c)
+      && /setError\(saveErrorCopy\(res\.status\)\)/.test(c) && /setUploadError\(uploadErrorCopy\(res\.status\)\)/.test(c)
+  }
+  check('E3: a failed save or upload shows our sentence for its status, never the route\'s error text', ourWords(formRaw))
+  check('MUTATION CONTROL: showing data.error again fails E3', !ourWords(formRaw.replace('setError(saveErrorCopy(res.status))', "setError(data.error ?? 'x')")))
+  const dateOk = (s: string) => {
+    const c = stripComments(s)
+    return /new Intl\.DateTimeFormat\('he-IL', \{ dateStyle: 'long', timeStyle: 'short' \}\)/.test(c) && /<DateTimeField\b/.test(c)
+      && /data-datetime-display/.test(c) && /showPicker\(\)/.test(c)
+      && !/<Input\b[^>]*type="datetime-local"/.test(c)
+  }
+  check('E4: the publish date is shown the Hebrew way (Intl he-IL), not as the browser\'s mm/dd/yyyy field', dateOk(formRaw))
+  check('MUTATION CONTROL: the old native datetime-local Input fails E4', !dateOk(formRaw.replace(/<DateTimeField\b[^\n]*\/>/, '<Input id="d" type="datetime-local" value="" dir="ltr" />')))
+  const authorOk = (form: string, page: string) => {
+    const f = stripComments(form), pg = stripComments(page)
+    return !/@[\w-]+\.[a-z]{2,}/i.test(f + pg) && /author: initial\?\.author \?\? defaultAuthor,/.test(f)
+      && /\.from\('profiles'\)\.select\('full_name'\)\.eq\('id', user\.id\)/.test(pg) && /<ArticleForm defaultAuthor=\{defaultAuthor\} \/>/.test(pg)
+      && !/createAdminClient/.test(pg)
+  }
+  check('E5: a new article\'s author is the admin\'s own profile name (own session), never a hard-coded email', authorOk(formRaw, newPageRaw))
+  check('MUTATION CONTROL: the hard-coded email default fails E5', !authorOk(formRaw.replace('author: initial?.author ?? defaultAuthor,', "author: initial?.author ?? 'someone@example.com',"), newPageRaw))
+  const noRail = (s: string) => {
+    const c = stripComments(s)
+    return !/border-s-\[?\d/.test(c) && /ICON_TONE\[copy\.tone\]/.test(c) && /bad: 'bg-bad-soft text-bad'/.test(c)
+  }
+  check('E6: the setup service cards carry their state on the icon and badge, with no start rail', noRail(setupRaw))
+  check('MUTATION CONTROL: the curved rail back on the Serper card fails E6', !noRail(setupRaw.replace('<Card key={key} className="p-5 sm:p-6">', "<Card key={key} className={cn('p-5 sm:p-6', copy.tone !== 'ok' && 'border-s-[3px] border-s-bad')}>")))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

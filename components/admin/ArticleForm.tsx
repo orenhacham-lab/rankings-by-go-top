@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { RotateCcw, Upload } from 'lucide-react'
+import { CalendarClock, RotateCcw, Upload, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import Input, { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Switch from '@/components/ui/Switch'
 import { NoticeBox } from '@/components/ui/Notice'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { FIELD_CLASSES } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 
 const ArticleEditor = dynamic(() => import('./ArticleEditor'), { ssr: false })
@@ -31,7 +33,27 @@ interface ArticleData {
 
 interface Props {
   initial?: Partial<ArticleData>
+  /** A new article's author: the signed-in admin's own name, never an email. */
+  defaultAuthor?: string
 }
+
+/** Our words for a failed save; the route's own `error` text is never shown. */
+function saveErrorCopy(status: number): string {
+  if (status === 409) return 'הכתובת הזו כבר בשימוש במאמר אחר. בחרו כתובת אחרת.'
+  if (status === 400) return 'חסרים כותרת, כתובת או תוכן. מלאו אותם ונסו שוב.'
+  if (status === 401) return 'פג תוקף ההתחברות. היכנסו מחדש ונסו שוב.'
+  return 'לא הצלחנו לשמור את המאמר. נסו שוב בעוד רגע.'
+}
+
+/** Our words for a failed upload (the upload route checks type and size). */
+function uploadErrorCopy(status: number): string {
+  if (status === 400) return 'אפשר להעלות תמונת JPG, PNG או WEBP עד 5MB.'
+  if (status === 401) return 'פג תוקף ההתחברות. היכנסו מחדש ונסו שוב.'
+  return 'לא הצלחנו להעלות את התמונה. נסו שוב.'
+}
+
+/** "28 בספטמבר 2026, 14:30": the Hebrew way to read a date and time. */
+const DATE_TIME_HE = new Intl.DateTimeFormat('he-IL', { dateStyle: 'long', timeStyle: 'short' })
 
 function slugify(str: string) {
   return str
@@ -42,7 +64,7 @@ function slugify(str: string) {
     .replace(/^-+|-+$/g, '')
 }
 
-export default function ArticleForm({ initial }: Props) {
+export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
   const router = useRouter()
   const isEdit = !!initial?.id
 
@@ -52,7 +74,7 @@ export default function ArticleForm({ initial }: Props) {
     slug: initial?.slug ?? '',
     excerpt: initial?.excerpt ?? '',
     content: initial?.content ?? '',
-    author: initial?.author ?? 'orenhacham@gmail.com',
+    author: initial?.author ?? defaultAuthor,
     is_published: initial?.is_published ?? false,
     published_at: initial?.published_at ? initial.published_at.slice(0, 16) : '',
     featured_image_url: initial?.featured_image_url ?? '',
@@ -66,6 +88,8 @@ export default function ArticleForm({ initial }: Props) {
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [deleteFailed, setDeleteFailed] = useState(false)
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -80,12 +104,12 @@ export default function ArticleForm({ initial }: Props) {
       const res = await fetch('/api/articles/upload', { method: 'POST', body: data })
       const json = await res.json()
       if (!res.ok) {
-        setUploadError(json.error ?? 'שגיאה בהעלאת התמונה')
+        setUploadError(uploadErrorCopy(res.status))
         return
       }
       set('featured_image_url', json.url)
     } catch {
-      setUploadError('שגיאה בהעלאת התמונה')
+      setUploadError(uploadErrorCopy(0))
     } finally {
       setUploading(false)
     }
@@ -123,25 +147,36 @@ export default function ArticleForm({ initial }: Props) {
       router.push('/admin/articles')
       router.refresh()
     } else {
-      const data = await res.json()
-      setError(data.error ?? 'שגיאה לא ידועה')
+      await res.json().catch(() => null)
+      setError(saveErrorCopy(res.status))
       setSaving(false)
     }
   }
 
   const handleDelete = async () => {
     if (!form.id) return
-    if (!window.confirm('למחוק את המאמר? פעולה זו אינה הפיכה.')) return
+    const ok = await confirm({
+      title: 'למחוק את המאמר?',
+      body: 'המאמר יוסר מהאתר ומהרשימה. אי אפשר לבטל את המחיקה.',
+      confirmLabel: 'מחיקת המאמר',
+      cancelLabel: 'ביטול',
+      tone: 'danger',
+    })
+    if (!ok) return
+    setDeleteFailed(false)
     const res = await fetch(`/api/articles/${form.id}`, { method: 'DELETE' })
     if (res.ok) {
       router.push('/admin/articles')
       router.refresh()
+    } else {
+      setDeleteFailed(true)
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl space-y-8" dir="rtl">
       {error && <NoticeBox tone="bad" language="he">{error}</NoticeBox>}
+      {deleteFailed && <NoticeBox tone="bad" language="he" onDismiss={() => setDeleteFailed(false)}>לא הצלחנו למחוק את המאמר. נסו שוב בעוד רגע.</NoticeBox>}
 
       <Card className="space-y-5 p-5 sm:p-6">
         <Input id="article-title" label="כותרת המאמר" value={form.title} onChange={e => set('title', e.target.value)} required placeholder="כותרת המאמר" />
@@ -223,8 +258,8 @@ export default function ArticleForm({ initial }: Props) {
       <Card className="space-y-5 p-5 sm:p-6">
         <h2 className="text-section font-semibold text-ink">פרסום</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-          <Input id="article-author" label="כותב/ת" value={form.author} onChange={e => set('author', e.target.value)} dir="ltr" />
-          <Input id="article-published-at" type="datetime-local" label="תאריך פרסום" value={form.published_at} onChange={e => set('published_at', e.target.value)} dir="ltr" />
+          <Input id="article-author" label="כותב/ת" value={form.author} onChange={e => set('author', e.target.value)} required placeholder="שם הכותב/ת" />
+          <DateTimeField id="article-published-at" label="תאריך ושעת פרסום" value={form.published_at} onChange={v => set('published_at', v)} />
         </div>
         <Switch checked={form.is_published} onChange={(next) => set('is_published', next)} label="פרסום המאמר" description="מאמר מפורסם מופיע באתר הציבורי" />
       </Card>
@@ -242,6 +277,68 @@ export default function ArticleForm({ initial }: Props) {
           </Button>
         )}
       </div>
+      {confirmDialog}
     </form>
+  )
+}
+
+/**
+ * The publish date and time, read the Hebrew way ("28 בספטמבר 2026, 14:30")
+ * instead of the browser's own "mm/dd/yyyy, --:-- --" pattern. The field shows
+ * the formatted value; choosing opens the browser's date-and-time picker from
+ * a native input kept under it (so the value is still a datetime-local string).
+ * Where a browser cannot open that picker on request, the native field itself
+ * is shown instead.
+ */
+function DateTimeField({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (v: string) => void }) {
+  const nativeRef = useRef<HTMLInputElement>(null)
+  // Every current browser can open the picker on request; an older one gets the native field.
+  const [canPick, setCanPick] = useState(() => typeof HTMLInputElement === 'undefined' || 'showPicker' in HTMLInputElement.prototype)
+
+  const date = value ? new Date(value) : null
+  const shown = date && !Number.isNaN(date.getTime()) ? DATE_TIME_HE.format(date) : ''
+  const open = () => {
+    try { nativeRef.current?.showPicker() } catch { setCanPick(false) }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={FIELD_LABEL_CLASSES}>{label}</label>
+      <div className="relative">
+        {canPick ? (
+          <button
+            id={id}
+            type="button"
+            onClick={open}
+            aria-haspopup="dialog"
+            data-datetime-display
+            className={cn(FIELD_CLASSES, 'flex h-10 items-center gap-2 pe-10 text-start', !shown && 'text-muted')}
+          >
+            <CalendarClock aria-hidden className="size-4 shrink-0 text-muted" />
+            <span className="min-w-0 truncate">{shown || 'בחירת תאריך ושעה'}</span>
+          </button>
+        ) : null}
+        <input
+          ref={nativeRef}
+          id={canPick ? undefined : id}
+          type="datetime-local"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          tabIndex={canPick ? -1 : undefined}
+          aria-hidden={canPick || undefined}
+          className={canPick ? 'pointer-events-none absolute inset-0 h-full w-full opacity-0' : cn(FIELD_CLASSES, 'h-10')}
+        />
+        {canPick && value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="absolute inset-y-0 end-1 my-auto inline-flex size-8 items-center justify-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+          >
+            <X aria-hidden className="size-4" />
+            <span className="sr-only">ניקוי התאריך</span>
+          </button>
+        )}
+      </div>
+    </div>
   )
 }

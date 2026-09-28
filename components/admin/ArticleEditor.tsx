@@ -3,8 +3,11 @@
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Bold, Heading2, Heading3, Italic, Link2, List, ListOrdered, RemoveFormatting, Unlink } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { NoticeBox } from '@/components/ui/Notice'
 import { cn } from '@/lib/utils'
 
 interface ArticleEditorProps {
@@ -22,7 +25,8 @@ export default function ArticleEditor({ value, onChange }: ArticleEditorProps) {
         autolink: true,
         defaultProtocol: 'https',
         HTMLAttributes: {
-          class: 'text-blue-600 underline hover:text-blue-700',
+          // Written into the saved article HTML: the site's link colour tokens.
+          class: 'text-action underline underline-offset-2 hover:text-action-hover',
           target: '_blank',
           rel: 'noopener noreferrer',
         },
@@ -54,24 +58,40 @@ export default function ArticleEditor({ value, onChange }: ArticleEditorProps) {
     }
   }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setLink = useCallback(() => {
+  // The link's address is asked for in a row under the toolbar, not in the
+  // browser's prompt box; a refused address is said there too, not in an alert.
+  const [linkDraft, setLinkDraft] = useState<string | null>(null)
+  const [linkRefused, setLinkRefused] = useState(false)
+
+  const openLink = useCallback(() => {
     if (!editor) return
     const prev = (editor.getAttributes('link').href as string | undefined) ?? ''
-    const url = window.prompt('כתובת הקישור (URL):', prev || 'https://')
-    if (url === null) return // cancelled
+    setLinkRefused(false)
+    setLinkDraft(prev || 'https://')
+  }, [editor])
 
-    const trimmed = url.trim()
-    if (trimmed === '') {
+  const closeLink = useCallback(() => {
+    setLinkDraft(null)
+    setLinkRefused(false)
+    editor?.commands.focus()
+  }, [editor])
+
+  const applyLink = useCallback(() => {
+    if (!editor || linkDraft === null) return
+    const trimmed = linkDraft.trim()
+    if (trimmed === '' || trimmed === 'https://') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
+      closeLink()
       return
     }
     // Block dangerous schemes on the client (server sanitization blocks them too)
     if (/^\s*javascript:/i.test(trimmed)) {
-      window.alert('קישור מסוג javascript: אינו מותר')
+      setLinkRefused(true)
       return
     }
     editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run()
-  }, [editor])
+    closeLink()
+  }, [editor, linkDraft, closeLink])
 
   const removeLink = useCallback(() => {
     editor?.chain().focus().extendMarkRange('link').unsetLink().run()
@@ -98,13 +118,38 @@ export default function ArticleEditor({ value, onChange }: ArticleEditorProps) {
         <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(state?.isBullet ?? false)} aria-pressed={state?.isBullet ?? false}><List aria-hidden className="size-4" />רשימה</button>
         <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(state?.isOrdered ?? false)} aria-pressed={state?.isOrdered ?? false}><ListOrdered aria-hidden className="size-4" />רשימה ממוספרת</button>
         {sep}
-        <button type="button" onClick={setLink} className={btn(state?.isLink ?? false)} title="הוספה או עריכה של קישור"><Link2 aria-hidden className="size-4" />קישור</button>
+        <button type="button" onClick={openLink} className={btn((state?.isLink ?? false) || linkDraft !== null)} aria-expanded={linkDraft !== null} title="הוספה או עריכה של קישור"><Link2 aria-hidden className="size-4" />קישור</button>
         {state?.isLink && (
           <button type="button" onClick={removeLink} className={cn(btn(false), 'text-bad hover:bg-bad-soft hover:text-bad')} title="הסרת הקישור"><Unlink aria-hidden className="size-4" />הסרה</button>
         )}
         {sep}
         <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} className={btn(false)}><RemoveFormatting aria-hidden className="size-4" />ניקוי עיצוב</button>
       </div>
+      {linkDraft !== null && (
+        <div className="space-y-2 border-b border-line bg-surface p-3" data-link-editor>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="article-link-url" className="sr-only">כתובת הקישור</label>
+            <input
+              id="article-link-url"
+              type="url"
+              dir="ltr"
+              autoFocus
+              value={linkDraft}
+              onChange={(e) => { setLinkDraft(e.target.value); setLinkRefused(false) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); applyLink() }
+                if (e.key === 'Escape') { e.preventDefault(); closeLink() }
+              }}
+              placeholder="https://"
+              aria-invalid={linkRefused || undefined}
+              className={cn(FIELD_CLASSES, 'h-8 min-w-0 flex-1 basis-56 text-left')}
+            />
+            <Button type="button" size="sm" onClick={applyLink}>החלה</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={closeLink}>ביטול</Button>
+          </div>
+          {linkRefused && <NoticeBox tone="bad" language="he">קישור מסוג javascript: אינו מותר. הזינו כתובת שמתחילה ב-<bdi dir="ltr">https://</bdi></NoticeBox>}
+        </div>
+      )}
       <EditorContent
         editor={editor}
         className="article-editor-content min-h-[420px] max-w-none p-5 text-copy leading-relaxed text-body focus:outline-none [&_.ProseMirror]:min-h-[400px] [&_.ProseMirror]:outline-none [&_h2]:mb-3 [&_h2]:mt-6 [&_h2]:text-title [&_h2]:font-bold [&_h2]:text-ink [&_h3]:mb-2 [&_h3]:mt-5 [&_h3]:text-section [&_h3]:font-bold [&_h3]:text-ink [&_p]:mb-4 [&_p]:leading-relaxed [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pe-0 [&_ul]:ps-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:ps-6 [&_a]:text-action [&_a]:underline [&_blockquote]:my-4 [&_blockquote]:border-s-4 [&_blockquote]:border-line-strong [&_blockquote]:ps-4 [&_blockquote]:text-muted"
