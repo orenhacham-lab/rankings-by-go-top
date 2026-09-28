@@ -6,14 +6,15 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
-import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
+import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import TrackingTargetForm from './TrackingTargetForm'
 import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/app/actions/tracking-targets'
 import { formatDateTime } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
-import Link from 'next/link'
+import { FileSearch, History, PauseCircle, Pencil, PlayCircle, RefreshCw, Trash2 } from 'lucide-react'
 import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
 import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import { GscVolumeCell, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
@@ -82,7 +83,6 @@ export default function TrackingTargetsTable({
 
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   type SortColumn = 'position' | 'keyword' | 'date' | 'found' | 'volume'
   const [sortBy, setSortBy] = useState<SortColumn>('position')
@@ -147,16 +147,7 @@ export default function TrackingTargetsTable({
     }
   }
 
-  async function handleDelete(targetId: string) {
-    setDeletingId(targetId)
-    try {
-      await deleteTrackingTargetAction(targetId, projectId)
-      onActionComplete?.()
-    } finally {
-      setDeletingId(null)
-      setConfirmDeleteId(null)
-    }
-  }
+  const confirmTarget = confirmDeleteId ? targets.find((t) => t.id === confirmDeleteId) ?? null : null
 
   return (
     <>
@@ -194,13 +185,13 @@ export default function TrackingTargetsTable({
           )}
           {targets.length === 0 && !targetsLoading && targetsError && (
             <tr>
-              <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted">
                 {k.keywordsLoadFailed}
                 {onRetryTargets && (
                   <button
                     type="button"
                     onClick={onRetryTargets}
-                    className="ms-2 underline decoration-dotted underline-offset-2 hover:text-slate-700 dark:hover:text-slate-200"
+                    className="ms-2 underline decoration-dotted underline-offset-2 hover:text-ink"
                   >
                     {k.volumeRetry}
                   </button>
@@ -214,37 +205,53 @@ export default function TrackingTargetsTable({
           {sortedTargets.map((target) => {
             const result = latestResults[target.id]
             const isScanning = scanningTargets.has(target.id)
+            // One row, about 56px on a desktop (UX review P1-17): the position check
+            // stays in view as an icon, everything else is the same actions behind "⋯".
+            const menu: RowMenuItem[] = [
+              { key: 'edit', label: k.edit, icon: <Pencil size={15} aria-hidden="true" />, onSelect: () => setEditingTarget(target) },
+              {
+                key: 'toggle', label: target.is_active ? k.deactivate : k.activate, disabled: togglingId === target.id,
+                icon: target.is_active ? <PauseCircle size={15} aria-hidden="true" /> : <PlayCircle size={15} aria-hidden="true" />,
+                onSelect: () => { void handleToggleActive(target) },
+              },
+              { key: 'history', label: k.history, icon: <History size={15} aria-hidden="true" />, href: `/keywords/${target.id}/history` },
+            ]
+            if (result && result.audit_request != null) {
+              menu.push({ key: 'details', label: k.details, icon: <FileSearch size={15} aria-hidden="true" />, href: `/scans/${result.scan_id}/details?resultId=${result.id}` })
+            }
+            // Deleting stays for a deactivated keyword only, and still asks first.
+            if (!target.is_active) {
+              menu.push({ key: 'delete', label: k.delete, danger: true, icon: <Trash2 size={15} aria-hidden="true" />, onSelect: () => setConfirmDeleteId(target.id) })
+            }
             return (
-              <TableRow key={target.id}>
-                <Td>
-                  <div>
-                    <span className="font-medium text-slate-800 dark:text-slate-100">{target.keyword}</span>
-                    {target.notes && (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{target.notes}</p>
-                    )}
-                  </div>
+              <TableRow key={target.id} className="[&>td]:py-2">
+                <Td className="whitespace-nowrap">
+                  <span className="font-medium text-ink">{target.keyword}</span>
+                  {target.notes && (
+                    <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
+                  )}
                 </Td>
-                <Td>
+                <Td className="whitespace-nowrap">
                   <EngineBadge engine={target.engine_type} device={projectDevice} />
                 </Td>
                 <Td>
                   <GscVolumeCell view={gscKeywords} targetId={target.id}>
                     {target.avg_monthly_searches !== null && target.avg_monthly_searches !== undefined ? (
-                      <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
-                        {target.avg_monthly_searches.toLocaleString()}
+                      <span className="text-sm tabular-nums text-body">
+                        {target.avg_monthly_searches.toLocaleString(language === 'he' ? 'he-IL' : 'en-US')}
                       </span>
                     ) : volumePending ? (
                       // TRUTHFUL PENDING STATE. An em dash is indistinguishable
                       // from "this feature does not work"; a new keyword whose
                       // volume is on its way should say so.
-                      <span className="text-slate-400 dark:text-slate-500 text-sm animate-pulse">
+                      <span className="text-sm text-muted animate-pulse motion-reduce:animate-none">
                         {k.volumePending}
                       </span>
                     ) : volumeUnavailable && onRetryVolumes ? (
                       <button
                         type="button"
                         onClick={onRetryVolumes}
-                        className="text-amber-600 dark:text-amber-400 text-xs underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 text-start"
+                        className="text-start text-xs text-warn underline decoration-dotted underline-offset-2 hover:text-ink"
                         title={k.volumeRetry}
                       >
                         {k.volumeUnavailable} · {k.volumeRetry}
@@ -253,33 +260,31 @@ export default function TrackingTargetsTable({
                       <button
                         type="button"
                         onClick={onRetryVolumes}
-                        className="text-slate-400 dark:text-slate-500 text-sm underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300"
+                        className="text-sm text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
                         title={k.volumeRetry}
+                        aria-label={k.volumeRetry}
                       >
                         —
                       </button>
                     ) : (
-                      <span
-                        className="text-slate-400 dark:text-slate-500 text-sm"
-                        title={k.notChecked}
-                      >
+                      <span className="text-sm text-muted" title={k.notChecked}>
                         —
                       </span>
                     )}
                   </GscVolumeCell>
                 </Td>
                 <Td>
-                  <div className="flex flex-col items-start gap-1">
+                  <div className="flex flex-col items-start gap-0.5">
                     {result ? (
                       result.found ? (
-                        <span className="font-bold text-slate-800 dark:text-slate-100 text-base">
+                        <span className="text-base font-bold leading-5 text-ink">
                           #{result.position}
                         </span>
                       ) : (
-                        <span className="text-slate-400 dark:text-slate-500 text-sm">{k.notFound}</span>
+                        <span className="text-sm text-muted">{k.notFound}</span>
                       )
                     ) : (
-                      <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>
+                      <span className="text-sm text-muted">—</span>
                     )}
                     {competitorView && <TopCompetitorLine view={competitorView} targetId={target.id} />}
                   </div>
@@ -289,16 +294,17 @@ export default function TrackingTargetsTable({
                     <PositionChange change={result.change_value} />
                   ) : '—'}
                 </Td>
-                <Td>
+                <Td className="whitespace-nowrap">
                   {result ? (
                     <div>
-                      <span className="text-xs text-slate-500">{formatDateTime(result.checked_at)}</span>
+                      <span className="text-xs text-muted">{formatDateTime(result.checked_at, language)}</span>
                       {result.result_url && (
                         <a
                           href={result.result_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-xs text-blue-500 hover:underline truncate max-w-40 mt-0.5"
+                          dir="ltr"
+                          className="block max-w-40 truncate text-xs text-action hover:underline"
                         >
                           {result.result_url}
                         </a>
@@ -315,75 +321,21 @@ export default function TrackingTargetsTable({
                   <ActiveBadge active={target.is_active} />
                 </Td>
                 <Td>
-                  <div className="flex gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1">
                     {onScanTarget && target.is_active && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        loading={isScanning}
+                      <button
+                        type="button"
                         onClick={() => onScanTarget(target.id)}
+                        disabled={isScanning}
+                        aria-busy={isScanning || undefined}
+                        aria-label={k.scanNow(target.keyword)}
+                        title={k.scan}
+                        className="grid size-8 place-items-center rounded-control text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:cursor-wait disabled:opacity-60"
                       >
-                        {k.scan}
-                      </Button>
+                        <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={isScanning ? 'animate-spin motion-reduce:animate-none' : undefined} />
+                      </button>
                     )}
-                    {result && result.audit_request != null && (
-                      <Link href={`/scans/${result.scan_id}/details?resultId=${result.id}`}>
-                        <Button size="sm" variant="ghost">
-                          {k.details}
-                        </Button>
-                      </Link>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingTarget(target)}
-                    >
-                      {k.edit}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      loading={togglingId === target.id}
-                      onClick={() => handleToggleActive(target)}
-                    >
-                      {target.is_active ? k.deactivate : k.activate}
-                    </Button>
-                    <Link href={`/keywords/${target.id}/history`}>
-                      <Button size="sm" variant="ghost">
-                        {k.history}
-                      </Button>
-                    </Link>
-                    {!target.is_active && (
-                      confirmDeleteId === target.id ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            loading={deletingId === target.id}
-                            onClick={() => handleDelete(target.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            {k.confirmDelete}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setConfirmDeleteId(null)}
-                          >
-                            {k.cancel}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setConfirmDeleteId(target.id)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          {k.delete}
-                        </Button>
-                      )
-                    )}
+                    <RowMenu label={k.moreActions(target.keyword)} items={menu} />
                   </div>
                 </Td>
               </TableRow>
@@ -391,6 +343,19 @@ export default function TrackingTargetsTable({
           })}
         </TableBody>
       </Table>
+
+      <DeleteConfirmDialog
+        open={confirmTarget !== null}
+        name={confirmTarget?.keyword ?? ''}
+        labels={{ title: k.deleteTitle, body: k.deleteBody, confirm: k.confirmDelete, cancel: k.cancel, deleting: k.deleting, error: k.deleteFailed }}
+        onConfirm={async () => {
+          if (!confirmTarget) return { ok: false }
+          await deleteTrackingTargetAction(confirmTarget.id, projectId)
+          return { ok: true }
+        }}
+        onClose={() => setConfirmDeleteId(null)}
+        onDeleted={() => onActionComplete?.()}
+      />
 
       {editingTarget && (
         <Modal

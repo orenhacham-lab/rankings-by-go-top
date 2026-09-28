@@ -26,6 +26,7 @@ import ScanGscNotice from '@/components/keyword-research/ScanGscNotice'
 import KeywordSourceLine from '@/components/keyword-research/KeywordSourceLine'
 import { useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
 import { formatCount } from '@/components/gsc/format'
+import { formatMoney } from '@/lib/keyword-research/format'
 import { researchModel } from '@/lib/keyword-research/model'
 import { EASY_WINS_SHOWN } from '@/lib/keyword-research/easy-wins'
 import { keywordKey, type ScanKeyword, type TrackedKeyword } from '@/lib/keyword-research/scan-research'
@@ -109,32 +110,38 @@ interface OpportunityBadgeInfo {
   colorClass: string
 }
 
-function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): OpportunityBadgeInfo {
+/** The SEO potential's pill, in the design tokens (its words come from the dictionary). */
+function getOpportunityBadgeInfo(r: KeywordIdeaResult, labels: Record<OpportunityKey, string>): OpportunityBadgeInfo {
   const key = getSeoPotentialBadge(r)
 
-  const labels = {
-    he: {
-      high: 'גבוה',
-      medium: 'בינוני',
-      low: 'נמוך',
-    },
-    en: {
-      high: 'High',
-      medium: 'Medium',
-      low: 'Low',
-    },
-  }
-
-  const colorClasses = {
-    high: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-    medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
-    low: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+  const colorClasses: Record<OpportunityKey, string> = {
+    high: 'bg-ok-soft text-ok',
+    medium: 'bg-warn-soft text-warn',
+    low: 'bg-sunk text-muted',
   }
 
   return {
     key,
-    label: labels[language][key],
+    label: labels[key],
     colorClass: colorClasses[key],
+  }
+}
+
+/**
+ * Google Ads' competition level in the screen's words and a token colour (UX review
+ * P1-4): "בינונית", never "MEDIUM (55)". The 0–100 index is the cell's tooltip.
+ */
+const COMPETITION_TONE: Record<'LOW' | 'MEDIUM' | 'HIGH', string> = { LOW: 'text-ok', MEDIUM: 'text-warn', HIGH: 'text-bad' }
+function competitionCell(
+  r: Pick<KeywordIdeaResult, 'competition' | 'competitionIndex'>,
+  levels: Record<'LOW' | 'MEDIUM' | 'HIGH', string>,
+  indexLabel: (n: number) => string,
+): { label: string; tone: string; title: string | undefined } {
+  if (!r.competition) return { label: '—', tone: 'text-muted', title: undefined }
+  return {
+    label: levels[r.competition],
+    tone: COMPETITION_TONE[r.competition],
+    title: typeof r.competitionIndex === 'number' ? indexLabel(r.competitionIndex) : undefined,
   }
 }
 
@@ -836,19 +843,6 @@ export default function KeywordResearchPage() {
     clearAddToProjectSuccess()
   }
 
-  const competitionColor = (competition: string | null) => {
-    switch (competition) {
-      case 'LOW':
-        return 'text-green-600 dark:text-green-400'
-      case 'MEDIUM':
-        return 'text-yellow-600 dark:text-yellow-400'
-      case 'HIGH':
-        return 'text-red-600 dark:text-red-400'
-      default:
-        return 'text-gray-600 dark:text-gray-400'
-    }
-  }
-
   // ── With the scan's research on screen: chips, pages of rows, one-click tracking ──
   const tableVisible = scanMode ? model.mode !== null : results.length > 0
 
@@ -1186,7 +1180,7 @@ export default function KeywordResearchPage() {
 
       {/* Results */}
       {tableVisible && (
-        <div id={scanMode ? 'research-table' : undefined} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+        <div id={scanMode ? 'research-table' : undefined} className="rounded-card border border-line bg-surface p-6 shadow-card">
           {/* The chips of the scan's research, and Search Console's source under them. */}
           {scanMode && (
             <div className="mb-4 space-y-3 scroll-mt-4">
@@ -1196,14 +1190,14 @@ export default function KeywordResearchPage() {
           )}
           {/* Results Toolbar */}
           <div className={`flex flex-col sm:flex-row gap-2 mb-4 justify-between items-start sm:items-center`}>
-            <div className={`text-sm font-medium text-slate-700 dark:text-slate-200`}>
-              {t.results.resultsCount}: <span className="font-bold text-slate-900 dark:text-slate-100">{tableSource.length}</span>
+            <div className={`text-sm font-medium text-body`}>
+              {t.results.resultsCount}: <span className="font-bold text-ink">{tableSource.length}</span>
             </div>
             <div className="flex gap-2 flex-wrap">
               {!scanMode && topOpportunities.length > 0 && (
                 <button
                   onClick={() => setOpportunitiesOpen((v) => !v)}
-                  className="text-xs px-3 py-1 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors flex items-center gap-1"
+                  className="text-xs px-3 py-1 rounded border border-warn/40 bg-warn-soft text-warn hover:border-warn/70 transition-colors flex items-center gap-1"
                   aria-expanded={opportunitiesOpen}
                 >
                   <Sparkles size={14} />
@@ -1212,13 +1206,13 @@ export default function KeywordResearchPage() {
               )}
               <button
                 onClick={selectAll}
-                className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                className="text-xs px-3 py-1 rounded-control border border-line text-body hover:bg-sunk transition-colors"
               >
                 {t.results.selectAll}
               </button>
               <button
                 onClick={deselectAll}
-                className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                className="text-xs px-3 py-1 rounded-control border border-line text-body hover:bg-sunk transition-colors"
               >
                 {t.results.deselectAll}
               </button>
@@ -1226,7 +1220,7 @@ export default function KeywordResearchPage() {
                 <>
                   <button
                     onClick={copySelected}
-                    className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
+                    className="text-xs px-3 py-1 rounded-control bg-action text-action-ink hover:bg-action-hover transition-colors flex items-center gap-1"
                   >
                     <Copy size={14} />
                     {t.results.copySelected}
@@ -1234,7 +1228,7 @@ export default function KeywordResearchPage() {
                   <button
                     onClick={handleGenerateAIQuestions}
                     disabled={!activeProject || generatingAIQuestions}
-                    className="text-xs px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors flex items-center gap-1"
+                    className="text-xs px-3 py-1 rounded-control border border-action text-action hover:bg-action-soft disabled:opacity-50 transition-colors flex items-center gap-1"
                     title={!selectedProject ? t.addToProject.errorSelectProject : ''}
                   >
                     {generatingAIQuestions ? (
@@ -1251,12 +1245,12 @@ export default function KeywordResearchPage() {
 
           {/* AI Questions feedback — mismatch / empty state (neutral info, not error) */}
           {aiQuestionsError && (
-            <div className={`flex items-start justify-between gap-3 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+            <div className={`flex items-start justify-between gap-3 mb-4 p-3 bg-sunk border border-line rounded-control text-sm text-body ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
               <span>{aiQuestionsError}</span>
               <button
                 type="button"
                 onClick={() => setAIQuestionsError('')}
-                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="shrink-0 text-muted hover:text-ink"
                 aria-label={language === 'he' ? 'סגירה' : 'Dismiss'}
               >
                 ✕
@@ -1267,8 +1261,8 @@ export default function KeywordResearchPage() {
           {/* Add to Project Section — visible whenever at least one keyword is selected,
               OR a success/error message is still showing from the last action. */}
           {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError) && (
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
-              <div className={`mb-3 font-semibold text-blue-900 dark:text-blue-100 flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+            <div className="mb-6 p-4 bg-action-soft rounded-card border border-action/30">
+              <div className={`mb-3 font-semibold text-ink flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
                 <span>
                   {t.addToProject.sectionTitle} ({selectedKeywords.size})
                 </span>
@@ -1280,7 +1274,7 @@ export default function KeywordResearchPage() {
                       setAddToProjectError('')
                       setLastAddedProjectId('')
                     }}
-                    className="text-xs font-normal text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline"
+                    className="text-xs font-normal text-muted hover:text-ink underline"
                   >
                     {language === 'he' ? 'סגירה' : 'Dismiss'}
                   </button>
@@ -1288,13 +1282,13 @@ export default function KeywordResearchPage() {
               </div>
 
               {selectedKeywords.size > 0 && projects.length === 0 && !projectsLoading && (
-                <div className="text-sm text-slate-700 dark:text-slate-300 p-3 bg-white dark:bg-slate-800 rounded">
+                <div className="text-sm text-body p-3 bg-surface rounded-control">
                   {t.addToProject.noProjects}
                 </div>
               )}
 
               {selectedKeywords.size > 0 && projectsLoading && (
-                <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                <div className="text-sm text-muted flex items-center gap-2">
                   <Loader2 size={14} className="animate-spin" />
                   {t.addToProject.projectsLoading}
                 </div>
@@ -1306,7 +1300,7 @@ export default function KeywordResearchPage() {
                     <div>
                       {/* The project is the one the top bar names; switching it
                           there changes where these keywords go. */}
-                      <span className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                      <span className={`block text-sm font-medium text-body mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
                         {t.addToProject.projectLabel}
                       </span>
                       <p className="w-full truncate px-4 py-2 rounded-lg border border-line bg-sunk text-ink">
@@ -1315,13 +1309,13 @@ export default function KeywordResearchPage() {
                     </div>
 
                     <div>
-                      <label className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                      <label className={`block text-sm font-medium text-body mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
                         {t.addToProject.engineLabel}
                       </label>
                       <select
                         value={engineType}
                         onChange={(e) => setEngineType(e.target.value as 'google_search' | 'google_maps')}
-                        className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        className="w-full px-4 py-2 rounded-lg border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action"
                         disabled={addingToProject}
                       >
                         <option value="google_search">{t.addToProject.engineGoogleOrganic}</option>
@@ -1333,7 +1327,7 @@ export default function KeywordResearchPage() {
                       <button
                         onClick={handleAddToProject}
                         disabled={!selectedProject || addingToProject}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-action hover:bg-action-hover disabled:bg-sunk disabled:text-muted text-action-ink font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                       >
                         {addingToProject && <Loader2 size={18} className="animate-spin" />}
                         {addingToProject
@@ -1348,20 +1342,20 @@ export default function KeywordResearchPage() {
               )}
 
               {addToProjectError && (
-                <div className={`text-sm text-red-600 dark:text-red-400 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <div className={`text-sm text-bad mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
                   {addToProjectError}
                 </div>
               )}
               {addToProjectMessage && (
                 <div className={`flex flex-col sm:flex-row sm:items-center gap-3 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
-                  <div className={`text-sm text-green-700 dark:text-green-400 flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                  <div className={`text-sm text-ok flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                     <CheckCircle size={16} />
                     <span>{addToProjectMessage}</span>
                   </div>
                   {lastAddedProjectId && (
                     <Link
                       href={`/keywords?projectId=${encodeURIComponent(lastAddedProjectId)}`}
-                      className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                      className="inline-flex items-center justify-center bg-action hover:bg-action-hover text-action-ink font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                     >
                       {t.addToProject.goToProject}
                     </Link>
@@ -1373,16 +1367,16 @@ export default function KeywordResearchPage() {
 
           {/* Opportunities Panel — opt-in, compact, no extra API calls */}
           {!scanMode && opportunitiesOpen && topOpportunities.length > 0 && (
-            <div className="mb-4 p-3 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
+            <div className="mb-4 p-3 bg-warn-soft border border-warn/25 rounded-control">
               <div className={`mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                <h3 className="text-sm font-semibold text-ink">
                   {t.opportunities.title}
                 </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-muted">
                   {t.opportunities.subtitle}
                 </p>
               </div>
-              <ul className="divide-y divide-amber-100 dark:divide-amber-900/30">
+              <ul className="divide-y divide-warn/15">
                 {topOpportunities.map((r, i) => {
                   const isSelected = selectedKeywords.has(r.keyword)
                   const badge = t.opportunities.badges[getBadgeKey(r)]
@@ -1391,31 +1385,32 @@ export default function KeywordResearchPage() {
                       key={r.keyword}
                       className={`flex items-center flex-wrap gap-x-3 gap-y-1 py-1.5 text-xs ${isRTL ? 'flex-row-reverse text-right' : ''}`}
                     >
-                      <span className="text-slate-500 dark:text-slate-400 font-mono w-5 shrink-0">
+                      <span className="text-muted font-mono w-5 shrink-0">
                         {i + 1}.
                       </span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100 truncate min-w-0 flex-1">
+                      <span className="font-medium text-ink truncate min-w-0 flex-1">
                         {r.keyword}
                       </span>
-                      <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      <span className="text-muted whitespace-nowrap">
                         {r.avgMonthlySearches?.toLocaleString() ?? '—'} {t.opportunities.searches}
                       </span>
-                      <span className={`whitespace-nowrap ${competitionColor(r.competition)}`}>
-                        {r.competition ?? '—'}
-                      </span>
+                      {(() => {
+                        const c = competitionCell(r, t.results.competitionLevel, t.results.competitionIndex)
+                        return <span className={`whitespace-nowrap ${c.tone}`} title={c.title}>{c.label}</span>
+                      })()}
                       {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
-                        <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                          CPC {r.highTopOfPageBid.toFixed(2)} {r.currency}
+                        <span className="text-muted whitespace-nowrap">
+                          CPC {formatMoney(r.highTopOfPageBid, r.currency, language)}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 whitespace-nowrap text-[10px] font-medium">
+                      <span className="px-2 py-0.5 rounded-full bg-warn-soft text-warn ring-1 ring-warn/25 whitespace-nowrap text-[10px] font-medium">
                         {badge}
                       </span>
                       <button
                         type="button"
                         onClick={() => selectKeywordFromOpportunity(r.keyword)}
                         disabled={isSelected}
-                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white text-[11px] font-medium transition-colors whitespace-nowrap"
+                        className="px-2 py-0.5 rounded bg-action hover:bg-action-hover disabled:bg-sunk disabled:text-muted text-action-ink text-[11px] font-medium transition-colors whitespace-nowrap"
                       >
                         {isSelected ? t.opportunities.selected : t.opportunities.select}
                       </button>
@@ -1426,136 +1421,107 @@ export default function KeywordResearchPage() {
             </div>
           )}
 
-          {/* Results Table */}
+          {/* Results Table — in the design tokens, with the difficulty in words, one
+              money format (the hero's), and a name on every checkbox (UX review P1-4). */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100 w-6">
+                <tr className="border-b border-line">
+                  <th className="px-4 py-3 text-start font-semibold text-ink w-6">
                     <input
                       type="checkbox"
                       checked={selectedKeywords.size === tableSource.length && tableSource.length > 0}
                       onChange={(e) => (e.target.checked ? selectAll() : deselectAll())}
-                      className="rounded"
+                      aria-label={t.results.selectAllRows}
+                      className="rounded accent-action"
                     />
                   </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
+                  <th className="px-4 py-3 text-start font-semibold text-ink">
                     {t.results.keyword}
                   </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('monthlySearches')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'monthlySearches' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.monthlySearches}
-                      <span className="text-xs">{sortIndicator('monthlySearches')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100 hidden sm:table-cell`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('opportunity')}
-                      title={t.results.opportunityTooltip}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'opportunity' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.opportunity}
-                      <span className="text-xs">{sortIndicator('opportunity')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('competition')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'competition' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.competition}
-                      <span className="text-xs">{sortIndicator('competition')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('lowCpc')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'lowCpc' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.lowCpc}
-                      <span className="text-xs">{sortIndicator('lowCpc')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('highCpc')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'highCpc' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.highCpc}
-                      <span className="text-xs">{sortIndicator('highCpc')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
+                  {([
+                    ['monthlySearches', t.results.monthlySearches, ''],
+                    ['opportunity', t.results.opportunity, 'hidden sm:table-cell'],
+                    ['competition', t.results.competition, ''],
+                    ['lowCpc', t.results.lowCpc, ''],
+                    ['highCpc', t.results.highCpc, ''],
+                  ] as const).map(([key, label, cls]) => (
+                    <th key={key} className={`px-4 py-3 text-start font-semibold text-ink ${cls}`} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        title={key === 'opportunity' ? t.results.opportunityTooltip : undefined}
+                        className={`inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-action ${sortBy === key ? 'text-action' : ''}`}
+                      >
+                        {label}
+                        <span className="text-xs">{sortIndicator(key)}</span>
+                      </button>
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-start font-semibold text-ink">
                     {t.results.action}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {(scanMode ? sortedResults.slice(0, shownRows) : sortedResults).map((result, idx) => (
-                  <tr key={idx} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                {(scanMode ? sortedResults.slice(0, shownRows) : sortedResults).map((result, idx) => {
+                  const badge = getOpportunityBadgeInfo(result, t.results.potentialLevel)
+                  const competition = competitionCell(result, t.results.competitionLevel, t.results.competitionIndex)
+                  return (
+                  <tr key={idx} className="border-b border-line transition-colors hover:bg-sunk/50">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selectedKeywords.has(result.keyword)}
                         onChange={() => toggleKeyword(result.keyword)}
-                        className="rounded"
+                        aria-label={t.results.selectKeyword(result.keyword)}
+                        className="rounded accent-action"
                       />
                     </td>
-                    <td className={`px-4 py-3 text-slate-900 dark:text-slate-100 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <td className="px-4 py-3 text-start text-ink">
                       {result.keyword}
                       {scanMode && sourceLineFor(result.keyword)}
                     </td>
-                    <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.avgMonthlySearches?.toLocaleString() ?? '—'}
+                    <td className="px-4 py-3 text-start tabular-nums text-body">
+                      {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? formatCount(result.avgMonthlySearches, language) : '—'}
                     </td>
-                    <td className={`px-4 py-3 hidden sm:table-cell ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {(() => {
-                        const badge = getOpportunityBadgeInfo(result, language as 'he' | 'en')
-                        return (
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${badge.colorClass}`}>
-                            {badge.label}
-                          </span>
-                        )
-                      })()}
+                    <td className="px-4 py-3 text-start hidden sm:table-cell">
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${badge.colorClass}`}>
+                        {badge.label}
+                      </span>
                     </td>
-                    <td className={`px-4 py-3 ${competitionColor(result.competition)} ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.competition ?? '—'}
-                      {result.competitionIndex && <span className="text-xs ml-1">({result.competitionIndex})</span>}
+                    <td className={`px-4 py-3 text-start whitespace-nowrap font-medium ${competition.tone}`} title={competition.title}>
+                      {competition.label}
                     </td>
-                    <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.lowTopOfPageBid ? `${result.lowTopOfPageBid.toFixed(2)} ${result.currency}` : '—'}
+                    <td className="px-4 py-3 text-start tabular-nums whitespace-nowrap text-body">
+                      {result.lowTopOfPageBid ? formatMoney(result.lowTopOfPageBid, result.currency, language) : '—'}
                     </td>
-                    <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.highTopOfPageBid ? `${result.highTopOfPageBid.toFixed(2)} ${result.currency}` : '—'}
+                    <td className="px-4 py-3 text-start tabular-nums whitespace-nowrap text-body">
+                      {result.highTopOfPageBid ? formatMoney(result.highTopOfPageBid, result.currency, language) : '—'}
                     </td>
-                    <td className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <td className="px-4 py-3 text-start">
+                      <div className="flex items-center gap-3">
                         <button
+                          type="button"
                           onClick={() => copyKeyword(result.keyword)}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
+                          className="flex items-center gap-1 text-action transition-colors hover:text-action-hover"
                         >
-                          <Copy size={16} />
+                          <Copy size={16} aria-hidden="true" />
                           <span className="text-xs">{t.results.copy}</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleOpenTrendModal(result.keyword)}
-                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 flex items-center gap-1 transition-colors"
+                          className="flex items-center gap-1 text-action transition-colors hover:text-action-hover"
                         >
-                          <TrendingUp size={16} />
+                          <TrendingUp size={16} aria-hidden="true" />
                           <span className="text-xs">{t.trend.button}</span>
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

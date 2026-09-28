@@ -254,6 +254,14 @@ export const dashboardHe = {
       gscReauthTitle: 'חדשו את החיבור ל-Google Search Console',
       gscReauthBody: 'הגישה ל-Search Console פגה. התחברו מחדש כדי להמשיך להשתמש בנתונים (אופציונלי — לא נדרש ליצירת נושאים).',
       gscReconnect: 'התחברו מחדש',
+      // UX review P1-18: one 40px line on the content screens; the setup itself lives in settings.
+      rowLabel: 'חיבורים חסרים',
+      rowPlatformNone: 'האתר עוד לא מחובר לפרסום',
+      rowPlatformFailed: 'החיבור לאתר דורש טיפול',
+      rowGscNone: 'Search Console לא מחובר (אופציונלי)',
+      rowGscNoProperty: 'לא נבחר נכס Search Console (אופציונלי)',
+      rowGscReauth: 'החיבור ל-Search Console פג (אופציונלי)',
+      connectInSettings: 'לחיבור בהגדרות',
     },
     autoIdeas: {
       title: 'רעיונות אוטומטיים למאמרים',
@@ -626,6 +634,17 @@ export const dashboardHe = {
       emptyTitle: 'אין עדיין מאמרים לפרויקט הזה',
       emptyHint: 'יצירת מאמרי SEO/GEO תתווסף בשלב הבא. בינתיים אפשר לחבר את אתר ה-WordPress.',
       openInWordpress: 'פתח ב-WordPress',
+      rowMenu: (title: string) => `פעולות נוספות למאמר "${title}"`,
+      selectArticle: (title: string) => `בחירת המאמר "${title}"`,
+    },
+    // P2-3: deleting an article asks first, in a dialog, from the row's "⋯" menu.
+    deleteDialog: {
+      title: 'מחיקת מאמר',
+      body: 'למחוק את "{name}"? המאמר יימחק מהמערכת בלבד. מה שכבר פורסם באתר נשאר באתר.',
+      confirm: 'מחיקה',
+      cancel: 'ביטול',
+      deleting: 'מוחק…',
+      error: 'מחיקת המאמר נכשלה. נסו שוב.',
     },
     actions: {
       edit: 'עריכה',
@@ -1791,6 +1810,9 @@ export const dashboardHe = {
   // and when it has nothing yet it says in one sentence what will appear, with one action.
   dashboardHome: {
     shortcutsLabel: 'קיצורי דרך',
+    /** On a phone the dashboard shows its first cards and folds the rest behind one button (UX review P1-16). */
+    moreCards: 'עוד בלוח הבקרה',
+    fewerCards: 'הצגת פחות',
     shortcuts: {
       research: 'מחקר ביטויים',
       schedule: 'יומן תוכן',
@@ -2786,6 +2808,8 @@ export const dashboardHe = {
       lastScan: 'סריקה אחרונה',
       frequency: 'תדירות',
       scanParameters: 'פרמטרים לסריקה',
+      // The market in words, not Google's hl/gl codes (UX review P2-6): "גוגל ישראל".
+      market: (country: string) => `גוגל ${country}`,
     },
     keywordsSection: {
       title: 'מילות מפתח',
@@ -2844,6 +2868,13 @@ export const dashboardHe = {
       confirmDelete: 'אשר מחיקה',
       cancel: 'ביטול',
       editKeywordTitle: 'עריכת מילת מפתח',
+      // The row's "⋯" menu (UX review P1-17): the same actions, one button.
+      moreActions: (keyword: string) => `פעולות נוספות ל"${keyword}"`,
+      scanNow: (keyword: string) => `בדיקת מיקום עכשיו ל"${keyword}"`,
+      deleteTitle: 'מחיקת מילת מפתח',
+      deleteBody: 'למחוק את "{name}" ממעקב? אי אפשר לבטל את זה.',
+      deleting: 'מוחק…',
+      deleteFailed: 'המחיקה לא הצליחה. נסו שוב.',
     },
     modals: {
       editProjectTitle: 'עריכת פרויקט',
@@ -3459,6 +3490,12 @@ export const dashboardHe = {
       copySelected: 'העתקת ביטויים נבחרים',
       selectAll: 'בחירת הכל',
       deselectAll: 'ביטול בחירה',
+      // UX review P1-4: the difficulty in words, never Google's "MEDIUM (55)".
+      competitionLevel: { LOW: 'נמוכה', MEDIUM: 'בינונית', HIGH: 'גבוהה' },
+      competitionIndex: (n: number) => `מדד תחרות ${n} מתוך 100 (Google Ads)`,
+      potentialLevel: { high: 'גבוה', medium: 'בינוני', low: 'נמוך' },
+      selectAllRows: 'בחירת כל הביטויים בטבלה',
+      selectKeyword: (keyword: string) => `בחירת הביטוי "${keyword}"`,
     },
     opportunities: {
       show: 'הצג הזדמנויות מומלצות',

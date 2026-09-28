@@ -21,13 +21,15 @@ import SiteHubCard from '@/components/content/site-platforms/SiteHubCard'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink, Plus } from 'lucide-react'
+import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import RowMenu from '@/components/ui/RowMenu'
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT, STATUS_TONE, type ArticleRow } from './types'
 
 export default function ArticlesScreen() {
   const {
-    t, projectId, data, counts, toast, selectedProject,
+    t, projectId, data, counts, toast,
     activePlatform, isShopify, isSite, exportedIdOf, load, loadTopics, patchArticle, shopifyPublishError,
     handleCreateTopic,
   } = useContentWorkspace()
@@ -50,14 +52,14 @@ export default function ArticlesScreen() {
   const articleBatchRef = useRef(false)
   const cancelArticleRef = useRef(false)
 
-  async function deleteArticle(id: string) {
-    if (!window.confirm(t.confirmDeleteArticle)) return
+  // The article whose deletion is being confirmed (the "⋯" menu opens the dialog).
+  const [deleting, setDeleting] = useState<ArticleRow | null>(null)
+  async function deleteArticle(id: string): Promise<{ ok: boolean }> {
     try {
       const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
-      if (res.ok) { load(); loadTopics(); toast.success(t.toasts.articleDeleted) }
-      else toast.error(t.deleteFailed)
+      return { ok: res.ok }
     } catch {
-      toast.error(t.deleteFailed)
+      return { ok: false }
     }
   }
 
@@ -361,8 +363,8 @@ export default function ArticlesScreen() {
           {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-slate-600 dark:text-slate-300">{t.manageConnection}</span>
-              <Link href={platformSetupHref(projectId)} className="text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:underline">
+              <span className="text-sm text-body">{t.manageConnection}</span>
+              <Link href={platformSetupHref(projectId)} className="text-sm font-medium text-action hover:underline">
                 {t.manageConnectionCta}
               </Link>
             </div>
@@ -382,21 +384,21 @@ export default function ArticlesScreen() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {statCards.map((s) => (
           <Card key={s.key} className="p-3 hover:translate-y-0">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">{s.label}</div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{s.value}</div>
+            <div className="text-[11px] text-muted mb-1">{s.label}</div>
+            <div className="text-2xl font-bold text-ink">{s.value}</div>
           </Card>
         ))}
       </div>
 
       {/* ── Section 1: generated articles ── */}
-      <div className="mt-2 mb-3 border-t border-slate-200 dark:border-slate-800 pt-5">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.articlesHeading}</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t.articlesSubtitle}</p>
+      <div className="mt-2 mb-3 border-t border-line pt-5">
+        <h3 className="text-lg font-semibold text-ink">{t.articlesHeading}</h3>
+        <p className="text-xs text-muted">{t.articlesSubtitle}</p>
       </div>
 
       {(data?.articles?.length ?? 0) === 0 ? (
         <Card className="p-8 text-center mb-6">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.articlesEmptyTitle}</p>
+          <p className="text-sm text-body mb-3">{t.articlesEmptyTitle}</p>
           <Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>
         </Card>
       ) : (
@@ -406,7 +408,8 @@ export default function ArticlesScreen() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={t.filters.status}
+          className="px-3 py-2 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action"
         >
           <option value="">{t.filters.allStatuses}</option>
           {['draft', 'ready', 'scheduled', 'publishing', 'published', 'failed'].map((s) => (
@@ -418,18 +421,19 @@ export default function ArticlesScreen() {
           placeholder={t.filters.search}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 max-w-xs px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={t.filters.search}
+          className="flex-1 max-w-xs px-3 py-2 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action"
         />
       </div>
 
       {/* Batch WordPress export bar — only when there are eligible articles. */}
       {selectableArticles.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+        <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-line bg-surface px-3 py-2">
+          <label className="inline-flex items-center gap-2 text-sm text-body cursor-pointer">
             <input type="checkbox" checked={allArticlesSelected} onChange={toggleArticleSelectAll} disabled={articleBatchRunning} className="cursor-pointer" />
             {t.batch.selectAll}
           </label>
-          <span className="text-sm text-slate-600 dark:text-slate-300">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
+          <span className="text-sm text-body">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
           <Button size="sm" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
             {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedArticles.size))}
           </Button>
@@ -441,7 +445,7 @@ export default function ArticlesScreen() {
           ) : (
             selectedArticles.size > 0 && <Button size="sm" variant="ghost" onClick={clearArticleSelection}>{t.batch.clear}</Button>
           )}
-          {selectedArticles.size > BATCH_LIMIT && <span className="text-xs text-amber-600 dark:text-amber-400">{t.batch.tooMany}</span>}
+          {selectedArticles.size > BATCH_LIMIT && <span className="text-xs text-warn">{t.batch.tooMany}</span>}
         </div>
       )}
 
@@ -452,7 +456,8 @@ export default function ArticlesScreen() {
             <tr>
               <Th> </Th>
               <Th>{t.table.title}</Th>
-              <Th>{t.table.project}</Th>
+              {/* No "project / site" column: every row is the project the top bar
+                  names (UX review P1-18). */}
               <Th>{t.table.status}</Th>
               <Th>{t.table.created}</Th>
               <Th>{t.table.updated}</Th>
@@ -469,7 +474,7 @@ export default function ArticlesScreen() {
           </TableHead>
           <TableBody>
             {filteredArticles.length === 0 ? (
-              <EmptyRow colSpan={10} message={t.table.emptyTitle} />
+              <EmptyRow colSpan={9} message={t.table.emptyTitle} />
             ) : (
               (articlesExpanded ? filteredArticles : filteredArticles.slice(0, 3)).map((a) => {
                 const selectableArticle = !alreadyExported(a)
@@ -483,17 +488,18 @@ export default function ArticlesScreen() {
                         disabled={articleBatchRunning}
                         onChange={() => toggleArticleSelect(a.id)}
                         className="cursor-pointer disabled:cursor-not-allowed"
-                        aria-label={t.table.title}
+                        aria-label={t.table.selectArticle(a.title)}
                       />
                     )}
                   </Td>
-                  <Td><span className="font-medium">{a.title}</span></Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{selectedProject?.name ?? '—'}</span></Td>
+                  <Td>
+                    <Link href={`/content/articles/${a.id}`} className="font-medium text-ink hover:text-action hover:underline">{a.title}</Link>
+                  </Td>
                   <Td><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
-                  <Td><span className="text-xs text-slate-500">{formatDate(a.created_at)}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{formatDate(a.updated_at)}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{a.scheduled_at ? formatDate(a.scheduled_at) : '—'}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{a.published_at ? formatDate(a.published_at) : '—'}</span></Td>
+                  <Td><span className="whitespace-nowrap text-xs text-muted">{formatDate(a.created_at, language)}</span></Td>
+                  <Td><span className="whitespace-nowrap text-xs text-muted">{formatDate(a.updated_at, language)}</span></Td>
+                  <Td><span className="whitespace-nowrap text-xs text-muted">{a.scheduled_at ? formatDate(a.scheduled_at, language) : '—'}</span></Td>
+                  <Td><span className="whitespace-nowrap text-xs text-muted">{a.published_at ? formatDate(a.published_at, language) : '—'}</span></Td>
                   <Td>
                     {(() => {
                       // Platform-aware publication state — a Shopify project shows Shopify
@@ -501,16 +507,16 @@ export default function ArticlesScreen() {
                       if (isSite) {
                         return a.status === 'published'
                           ? <Badge variant="success">{sp.publish.live}</Badge>
-                          : <span className="text-xs text-slate-400 dark:text-slate-500">{sp.publish.notSent}</span>
+                          : <span className="text-xs text-muted">{sp.publish.notSent}</span>
                       }
                       if (isShopify) {
-                        if (!a.shopify_article_id) return <span className="text-xs text-slate-400 dark:text-slate-500">{t.shopifyState.notSent}</span>
+                        if (!a.shopify_article_id) return <span className="text-xs text-muted">{t.shopifyState.notSent}</span>
                         const published = a.status === 'published' || a.shopify_status === 'published'
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant={published ? 'success' : 'neutral'}>{published ? t.shopifyState.published : t.shopifyState.exported}</Badge>
                             {a.shopify_article_url && (
-                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-sm inline-flex items-center gap-1">
                                 {t.shopifyState.open}<ExternalLink size={12} />
                               </a>
                             )}
@@ -518,13 +524,13 @@ export default function ArticlesScreen() {
                         )
                       }
                       const s = wpState(a)
-                      if (s === 'none') return <span className="text-xs text-slate-400 dark:text-slate-500">{t.wpState.notSent}</span>
+                      if (s === 'none') return <span className="text-xs text-muted">{t.wpState.notSent}</span>
                       const published = s === 'published'
                       return (
                         <span className="inline-flex items-center gap-2">
                           <Badge variant={published ? 'success' : 'neutral'}>{published ? t.wpState.published : t.wpState.exported}</Badge>
                           {a.wp_post_url && (
-                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-action hover:underline text-sm inline-flex items-center gap-1">
                               {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink size={12} />
                             </a>
                           )}
@@ -538,7 +544,7 @@ export default function ArticlesScreen() {
                       if (abs && abs.status !== 'success') {
                         if (abs.status === 'running') {
                           return (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center gap-1.5 text-xs text-muted">
                               <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                               {articleBatchMode === 'publish' ? t.rowWp.publishing : t.rowWp.sending}
                             </span>
@@ -548,7 +554,7 @@ export default function ArticlesScreen() {
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant="danger">{t.batch.failed}</Badge>
-                            {abs.error && <span className="text-[11px] text-red-600 dark:text-red-400 max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
+                            {abs.error && <span className="text-[11px] text-bad max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
                           </span>
                         )
                       }
@@ -571,12 +577,15 @@ export default function ArticlesScreen() {
                               {t.rowWp.markReady}
                             </Button>
                           )}
-                          <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-                            {t.actions.edit}
-                          </Link>
-                          <button type="button" onClick={() => deleteArticle(a.id)} className="text-sm text-red-600 dark:text-red-400 hover:underline">
-                            {t.delete}
-                          </button>
+                          {/* Edit and delete behind "⋯" (UX review P2-3): delete opens
+                              the confirmation dialog; it never deletes on the click. */}
+                          <RowMenu
+                            label={t.table.rowMenu(a.title)}
+                            items={[
+                              { key: 'edit', label: t.actions.edit, href: `/content/articles/${a.id}`, icon: <Pencil size={15} aria-hidden="true" /> },
+                              { key: 'delete', label: t.delete, danger: true, onSelect: () => setDeleting(a), icon: <Trash2 size={15} aria-hidden="true" /> },
+                            ]}
+                          />
                         </div>
                       )
                     })()}
@@ -588,14 +597,14 @@ export default function ArticlesScreen() {
           </TableBody>
         </Table>
         {filteredArticles.length === 0 && (
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">{t.table.emptyHint}</p>
+          <p className="text-xs text-muted mt-2 px-1">{t.table.emptyHint}</p>
         )}
         {filteredArticles.length > 3 && (
           <div className="mt-3 px-1">
             <button
               type="button"
               onClick={() => setArticlesExpanded((v) => !v)}
-              className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+              className="inline-flex items-center justify-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-action hover:bg-action-soft transition-colors"
             >
               {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - 3})`}
             </button>
@@ -604,6 +613,15 @@ export default function ArticlesScreen() {
       </div>
       </>
       )}
+
+      <DeleteConfirmDialog
+        open={deleting !== null}
+        name={deleting?.title ?? ''}
+        labels={t.deleteDialog}
+        onConfirm={() => (deleting ? deleteArticle(deleting.id) : Promise.resolve({ ok: false }))}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => { load(); loadTopics(); toast.success(t.toasts.articleDeleted) }}
+      />
     </>
   )
 }

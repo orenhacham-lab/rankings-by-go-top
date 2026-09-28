@@ -17,7 +17,7 @@ import {
 import { fill, profileSuggestionItems } from '@/lib/project-settings/view'
 import { cn } from '@/lib/utils'
 import { RedetectButton, RedetectNoticeView, SuggestionsPanel, type SuggestionRow } from './AiControls'
-import SaveBar, { type SaveState } from './SaveBar'
+import SaveBar, { showSaveBar, type SaveState } from './SaveBar'
 import SettingsCard, { FieldLabel, fieldClass } from './SettingsCard'
 import SourceChip from './SourceChip'
 import { bidiField } from './copy'
@@ -160,7 +160,7 @@ export default function ProfileCard({
       title={t.profile.title}
       description={t.profile.body}
       actions={seedFeatures ? <RedetectButton working={redetect.working} busyScan={scanBusy} onClick={detect} t={t} /> : undefined}
-      footer={
+      footer={showSaveBar(dirty, state) ? (
         <SaveBar
           dirty={dirty}
           state={state}
@@ -173,7 +173,7 @@ export default function ProfileCard({
           }}
           t={t}
         />
-      }
+      ) : undefined}
     >
       <div className="space-y-5">
         {seedFeatures && redetect.notice && (

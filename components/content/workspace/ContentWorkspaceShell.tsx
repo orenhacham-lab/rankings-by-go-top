@@ -57,18 +57,18 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
           no projects", which is a different fact and offers no way forward. */}
       {projectsResolved && projectsError ? (
         <Card className="p-10 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.projectsLoadError}</p>
+          <p className="text-sm text-body mb-4">{t.projectsLoadError}</p>
           <Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>
         </Card>
       ) : !projectsResolved ? (
         /* Still resolving — do NOT flash an empty state at a user who has projects. */
         <Card className="p-10 text-center">
-          <p className="text-sm text-slate-400 dark:text-slate-500">{t.projectsLoading}</p>
+          <p className="text-sm text-muted">{t.projectsLoading}</p>
         </Card>
       ) : /* No projects → empty state */
       !loading && projects.length === 0 ? (
         <Card className="p-10 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.noProjectsTitle}</p>
+          <p className="text-sm text-body mb-4">{t.noProjectsTitle}</p>
           <Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>
         </Card>
       ) : (
@@ -80,7 +80,7 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
 
           {/* No project selected yet (multi-project) */}
           {!projectId ? (
-            <Card className="p-10 text-center text-slate-500 dark:text-slate-400">
+            <Card className="p-10 text-center text-muted">
               {t.selectProjectMessage}
             </Card>
           ) : (

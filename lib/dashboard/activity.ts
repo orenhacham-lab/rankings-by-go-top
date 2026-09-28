@@ -6,6 +6,7 @@
  * newest first, each with the time it happened. The copy for each line lives in
  * the dictionary; this module decides only WHICH lines and in what order.
  */
+import { formatDate } from '@/lib/format/date'
 import type { ActivityEvent } from './overview'
 import type { SeedFeedLine } from './seed'
 
@@ -34,16 +35,9 @@ export function mergeFeed(events: readonly ActivityEvent[], seedLines: readonly 
  * (a clock a little ahead) read as "now", never as "in 2 minutes".
  */
 export function relativeTime(at: string, now: Date, locale: 'he' | 'en'): string {
-  const diffSec = Math.round((Date.parse(at) - now.getTime()) / 1000)
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
-  const past = Math.min(0, diffSec)
-  const abs = Math.abs(past)
-  if (abs < 45) return rtf.format(0, 'second')
-  if (abs < 45 * 60) return rtf.format(Math.round(past / 60), 'minute')
-  if (abs < 22 * 3600) return rtf.format(Math.round(past / 3600), 'hour')
-  if (abs < 26 * 86400) return rtf.format(Math.round(past / 86400), 'day')
-  if (abs < 320 * 86400) return rtf.format(Math.round(past / (30 * 86400)), 'month')
-  return rtf.format(Math.round(past / (365 * 86400)), 'year')
+  // The one date formatter (lib/format/date.ts), with the future clamped to now.
+  const ms = Date.parse(at)
+  return formatDate(Number.isFinite(ms) ? Math.min(ms, now.getTime()) : null, locale, 'relative', now)
 }
 
 // ── Setup completion ────────────────────────────────────────────────────────

@@ -1753,7 +1753,7 @@ export default function AIVisibilitySection({
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{t('ai_visibility')}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0">{t('monitor_engines')}</p>
+            <p className="text-xs text-muted mt-0">{t('monitor_engines')}</p>
           </div>
         </div>
       </div>
@@ -1793,7 +1793,7 @@ export default function AIVisibilitySection({
             className={`px-4 py-3 text-base font-semibold border-b-2 transition whitespace-nowrap ${
               currentTab === tab
                 ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                : 'border-transparent text-body hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
             {tab === 'results' && t('tab_results')}
@@ -1825,9 +1825,10 @@ export default function AIVisibilitySection({
               className="flex-1 min-w-[200px]"
             />
             <select
+              aria-label={t('filter_engine')}
               value={filterEngine || ''}
               onChange={(e) => setFilterEngine(e.target.value || null)}
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
+              className="text-sm border border-line bg-surface text-ink rounded-control px-2 py-1.5"
             >
               <option value="">{t('all_engines')}</option>
               {SUPPORTED_ENGINES.map((e) => (
@@ -1837,22 +1838,24 @@ export default function AIVisibilitySection({
               ))}
             </select>
             <select
+              aria-label={t('filter_mention')}
               value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
               onChange={(e) =>
                 setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
               }
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
+              className="text-sm border border-line bg-surface text-ink rounded-control px-2 py-1.5"
             >
               <option value="">{t('all_mention')}</option>
               <option value="yes">{t('mentioned')}</option>
               <option value="no">{t('not_mentioned')}</option>
             </select>
             <select
+              aria-label={t('filter_citation')}
               value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
               onChange={(e) =>
                 setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
               }
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
+              className="text-sm border border-line bg-surface text-ink rounded-control px-2 py-1.5"
             >
               <option value="">{t('all_citations')}</option>
               <option value="yes">{t('target_cited')}</option>
@@ -1873,7 +1876,7 @@ export default function AIVisibilitySection({
           </div>
 
           {archivedResults.length > 0 && (
-            <div className="text-xs text-slate-500 dark:text-slate-400 italic">
+            <div className="text-xs text-muted italic">
               {isHebrew ? 'תוצאות בארכיון אינן נכללות בחישוב הציון.' : 'Archived results are not included in score calculations.'}
             </div>
           )}
@@ -2014,8 +2017,8 @@ export default function AIVisibilitySection({
                   The allowance beside it comes from the usage ledger, so it can
                   never disagree with what the dispatcher enforces. */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
-                <span className="text-slate-500 dark:text-slate-400">{t('run_a_check_hint')}</span>
-                <span className="text-slate-500 dark:text-slate-400 tabular-nums" data-testid="ai-allowance">
+                <span className="text-muted">{t('run_a_check_hint')}</span>
+                <span className="text-muted tabular-nums" data-testid="ai-allowance">
                   {allowance == null ? null
                     : allowance.state === 'unmetered' ? t('ai_allowance_unmetered')
                     : allowance.state === 'unknown' ? t('ai_allowance_unknown')
@@ -2035,7 +2038,7 @@ export default function AIVisibilitySection({
                       <p className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 line-clamp-2">{p.prompt}</p>
                       <button
                         onClick={() => setDeletePromptId(p.id)}
-                        className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                        className="shrink-0 p-1.5 rounded-md text-muted hover:text-red-600 hover:bg-red-50 transition"
                         title={t('delete')}
                         aria-label={t('delete')}
                       >
@@ -2086,7 +2089,7 @@ export default function AIVisibilitySection({
                                 aria-label={actionLabel}
                                 className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
                                   scanning
-                                    ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
+                                    ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-body cursor-wait'
                                     : scanned
                                     ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 cursor-pointer'
                                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
@@ -2113,7 +2116,7 @@ export default function AIVisibilitySection({
                               </span>
                             </div>
                             {scanned && scannedAt && (
-                              <div className="text-[10px] leading-tight text-slate-500 dark:text-slate-400 mt-0.5 text-center whitespace-nowrap">
+                              <div className="text-[10px] leading-tight text-muted mt-0.5 text-center whitespace-nowrap">
                                 {t('scanned_at')}: {formatDate(scannedAt)}
                               </div>
                             )}
@@ -2216,7 +2219,8 @@ export default function AIVisibilitySection({
                       {t('smart_questions_title')}
                       <span className="relative group inline-flex items-center">
                         <span
-                          className="cursor-help text-indigo-400 dark:text-indigo-500 flex-shrink-0"
+                          className="cursor-help text-action flex-shrink-0"
+                          role="img"
                           tabIndex={0}
                           aria-label={t('priority_tag_help_label')}
                         >
@@ -2233,7 +2237,7 @@ export default function AIVisibilitySection({
                         </span>
                       </span>
                     </h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                    <p className="text-xs text-body">
                       {t('smart_questions_subtitle')}
                     </p>
                   </div>
@@ -2276,7 +2280,7 @@ export default function AIVisibilitySection({
                 {refreshingSuggestions && availableSuggestions.length === 0 && (
                   <div className="flex flex-col items-center gap-3 py-6">
                     <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                    <span className="text-sm text-body">
                       {isHebrew ? 'יוצר שאלות מומלצות...' : 'Generating recommended questions...'}
                     </span>
                   </div>
@@ -2296,7 +2300,7 @@ export default function AIVisibilitySection({
                   <>
                     {/* Inline loading indicator — shown above the grid when adding more */}
                     {refreshingSuggestions && (
-                      <div className="flex items-center gap-2 mb-3 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-2 mb-3 text-xs text-muted">
                         <span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                         <span>{t('generating_more')}</span>
                       </div>
@@ -2358,7 +2362,7 @@ export default function AIVisibilitySection({
                       </div>
                     )}
                     {noNewSuggestionsFound && (
-                      <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
+                      <div className="mt-4 text-center text-xs text-body italic">
                         {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
                       </div>
                     )}
@@ -2514,13 +2518,13 @@ function AIVisibilityScoreCard({
               {badgeText}
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug" title={t('score_help')}>
+          <p className="text-xs text-muted mt-1 leading-snug" title={t('score_help')}>
             {t('score_subtext')}
           </p>
         </div>
         <div className="shrink-0" dir="ltr">
           <span className={`text-3xl sm:text-4xl font-bold tabular-nums ${scoreColor}`}>{safeScore}</span>
-          <span className="text-sm sm:text-base font-semibold text-slate-400 dark:text-slate-500 ml-0.5">/100</span>
+          <span className="text-sm sm:text-base font-semibold text-muted ml-0.5">/100</span>
         </div>
       </div>
       {/* Progress bar */}
@@ -2547,7 +2551,7 @@ function OverviewSummaryStrip({
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6">
       <div className="grid grid-cols-3 gap-3 sm:gap-6">
         <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted mb-1 sm:mb-2 truncate">
             {t('total_mentions')}
           </div>
           <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalMentions}</div>
@@ -2556,7 +2560,7 @@ function OverviewSummaryStrip({
           </div>
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate" title={t('engines_coverage_help')}>
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted mb-1 sm:mb-2 truncate" title={t('engines_coverage_help')}>
             {t('engine_coverage')}
           </div>
           <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">
@@ -2567,7 +2571,7 @@ function OverviewSummaryStrip({
           </div>
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted mb-1 sm:mb-2 truncate">
             {t('target_cited')}
           </div>
           <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
@@ -2639,7 +2643,7 @@ function RecommendationsCard({
       <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
         {t('recommendations_title')}
       </h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('recommendations_desc')}</p>
+      <p className="text-xs text-muted mb-3">{t('recommendations_desc')}</p>
       <div className="space-y-2">
         {recommendations.map((rec) => (
           <RecommendationItem key={rec.id} rec={rec} t={t} isRTL={isRTL} />
@@ -2689,7 +2693,7 @@ function RecommendationItem({
           {severityLabel}
         </span>
       </div>
-      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-2 sm:mt-2.5 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
+      <p className={`text-xs text-body mt-2 sm:mt-2.5 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
         {bodyText}
       </p>
     </div>
@@ -2707,7 +2711,7 @@ function PromptInsightRow({
 }) {
   if (!insight) {
     return (
-      <div className={`text-xs text-slate-500 dark:text-slate-400 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+      <div className={`text-xs text-muted mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
         {t('prompt_not_scanned_yet')}
       </div>
     )
@@ -2728,16 +2732,16 @@ function PromptInsightRow({
 
   return (
     <div
-      className={`mb-2 text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 ${
+      className={`mb-2 text-[11px] sm:text-xs text-body ${
         isRTL ? 'text-right' : 'text-left'
       }`}
     >
       <span className="font-semibold text-slate-700 dark:text-slate-200">{t('prompt_mentions')}:</span>
       <span> {mentionsText} </span>
-      <span className="text-slate-400 dark:text-slate-500">|</span>
+      <span className="text-muted">|</span>
       <span> {t('prompt_site_cited')}:</span>
       <span className="font-semibold text-slate-700 dark:text-slate-200"> {citedText} </span>
-      <span className="text-slate-400 dark:text-slate-500">|</span>
+      <span className="text-muted">|</span>
       <span> {t('prompt_status')}:</span>
       <span className="font-semibold text-slate-700 dark:text-slate-200"> {statusText}</span>
     </div>
@@ -2769,7 +2773,7 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
               <div className="hidden sm:block text-xs text-slate-600 dark:text-slate-300 mt-2">
                 {t('out_of_results').replace('{count}', String(em.scans))}
               </div>
-              {em.scans > 0 && <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1">({percent}%)</div>}
+              {em.scans > 0 && <div className="text-[10px] sm:text-xs text-muted mt-0.5 sm:mt-1">({percent}%)</div>}
             </div>
           )
         })}
@@ -3020,14 +3024,14 @@ function ResultRowCard({
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Row 1: query text */}
-          <p className={`text-sm font-medium line-clamp-2 ${result.excludedFromScore ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-slate-100'}`}>
+          <p className={`text-sm font-medium line-clamp-2 ${result.excludedFromScore ? 'text-muted' : 'text-slate-900 dark:text-slate-100'}`}>
             {result.promptText}
           </p>
 
           {/* Row 2: engine + status badges + scan time + archive label */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {meta && <meta.Icon size={16} className={meta.accent} />}
-            <span className={`text-xs font-medium ${result.excludedFromScore ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
+            <span className={`text-xs font-medium ${result.excludedFromScore ? 'text-muted' : 'text-slate-600 dark:text-slate-300'}`}>
               {meta?.name || result.engine}
             </span>
 
@@ -3062,7 +3066,7 @@ function ResultRowCard({
             )}
 
             {scannedAtStr && (
-              <span className={`text-[11px] ${result.excludedFromScore ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
+              <span className={`text-[11px] ${result.excludedFromScore ? 'text-muted' : 'text-muted'}`}>
                 · {t('scanned_at')} {scannedAtStr}
               </span>
             )}
@@ -3111,12 +3115,12 @@ function ResultRowCard({
             className={`px-2 py-1 rounded text-xs font-medium transition ${
               result.excludedFromScore
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                : 'text-muted hover:text-slate-600 dark:hover:text-slate-300'
             } ${isTogglingArchive ? 'opacity-50 cursor-wait' : ''}`}
           >
             {result.excludedFromScore ? (isHebrew ? 'שחזר' : 'Restore') : (isHebrew ? 'ארכיון' : 'Archive')}
           </button>
-          <ExternalLinkIcon size={16} className={`${result.excludedFromScore ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500'}`} />
+          <ExternalLinkIcon size={16} className={`${result.excludedFromScore ? 'text-slate-300 dark:text-slate-600' : 'text-muted'}`} />
         </div>
       </div>
     </div>
@@ -3226,7 +3230,7 @@ function SmartQuestionCard({
           </div>
         )}
         {question.reason && (
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1">
+          <p className="text-[10px] text-muted line-clamp-1">
             {question.reason}
           </p>
         )}
@@ -3313,9 +3317,9 @@ function ResultDetailDrawer({
         <div className="sticky top-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">{result.promptText}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{engineMeta?.name || result.engine}</p>
+            <p className="text-sm text-muted">{engineMeta?.name || result.engine}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-2xl leading-none">
+          <button onClick={onClose} className="text-muted hover:text-slate-600 dark:hover:text-slate-300 text-2xl leading-none">
             ×
           </button>
         </div>
@@ -3326,13 +3330,13 @@ function ResultDetailDrawer({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-xs text-slate-600 dark:text-slate-300">{t('mentioned_in_answer')}</div>
-                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted'}`}>
                   {reMentioned ? '✓' : '—'}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-blue-600 dark:text-blue-400">{t('appeared_as_source')}</div>
-                <div className={`text-lg font-bold ${reCited ? 'text-blue-700 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                <div className={`text-lg font-bold ${reCited ? 'text-blue-700 dark:text-blue-400' : 'text-muted'}`}>
                   {reCited ? '✓' : '—'}
                 </div>
               </div>
@@ -3585,7 +3589,7 @@ function AIVisibilitySummarySection({
           <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             {t('ai_summary_title')}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             {t('ai_summary_subtitle')}
           </p>
         </div>
@@ -3597,7 +3601,7 @@ function AIVisibilitySummarySection({
               <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
             )}
             <div className={`flex gap-1.5 ${b.isAction ? 'pt-1.5' : ''}`}>
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span className="text-muted flex-shrink-0">•</span>
               <span
                 className={
                   b.isFirst
@@ -3919,11 +3923,11 @@ function GeoOpportunityMappingSection({
           <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             {t('geo_opp_title')}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             {t('geo_opp_subtitle')}
           </p>
         </div>
-        <span className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+        <span className="text-[11px] text-muted whitespace-nowrap">
           {mapping.totalSuccess}/{mapping.totalResults}
         </span>
       </div>
@@ -3938,7 +3942,7 @@ function GeoOpportunityMappingSection({
       )}
 
       {cards.length === 0 ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{fallbackText}</p>
+        <p className="text-xs text-muted italic">{fallbackText}</p>
       ) : (
         <div className={`grid grid-cols-1 ${cards.length > 1 ? 'md:grid-cols-2' : ''} gap-3`}>
           {cards.map((card, i) => (
@@ -3998,7 +4002,7 @@ function OpportunityCard({
         <ul className="space-y-1.5 text-xs leading-relaxed">
           {sentences.map((item, i) => (
             <li key={i} className="flex gap-1.5">
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span className="text-muted flex-shrink-0">•</span>
               <span className={item.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : 'text-slate-700 dark:text-slate-300'}>
                 {item.text}
               </span>
@@ -4006,7 +4010,7 @@ function OpportunityCard({
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
+        <p className="text-xs text-muted italic">{emptyText}</p>
       )}
     </div>
   )
@@ -4400,7 +4404,7 @@ function GeoCompetitorIntelligenceSection({
           <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             {t('geo_comp_title')}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             {t('geo_comp_subtitle')}
           </p>
         </div>
@@ -4484,7 +4488,7 @@ function IntelligenceCard({
       ? 'text-teal-600 dark:text-teal-400'
       : tone === 'rose'
       ? 'text-rose-600 dark:text-rose-400'
-      : 'text-slate-600 dark:text-slate-400'
+      : 'text-body'
 
   return (
     <div className={`rounded-xl border ${accent} p-4 space-y-3`}>
@@ -4496,7 +4500,7 @@ function IntelligenceCard({
         <ul className="space-y-1.5 text-xs leading-relaxed">
           {lines.map((line, i) => (
             <li key={i} className="flex gap-1.5">
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span className="text-muted flex-shrink-0">•</span>
               <span
                 className={
                   line.isFirst
@@ -4510,12 +4514,12 @@ function IntelligenceCard({
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
+        <p className="text-xs text-muted italic">{emptyText}</p>
       )}
       {pills.length > 0 && (
         <div className="pt-1 space-y-1.5">
           {pillsLabel && (
-            <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            <div className="text-[10px] font-medium text-muted uppercase tracking-wide">
               {pillsLabel}
             </div>
           )}
@@ -4523,7 +4527,7 @@ function IntelligenceCard({
             {pills.map((domain) => (
               <span
                 key={domain}
-                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-muted bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
               >
                 {domain}
               </span>
@@ -4579,7 +4583,7 @@ function GeoExplanationSection({
       <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
         {explanation.bullets.map((bullet, i) => (
           <li key={i} className="flex gap-2">
-            <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+            <span className="text-muted flex-shrink-0">•</span>
             <span>{bullet}</span>
           </li>
         ))}
@@ -4726,9 +4730,9 @@ function GeoInsightsCollapsible({
     <details className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 group">
       <summary className="cursor-pointer list-none p-3 flex items-center justify-between gap-2 select-none hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg">
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-          {t('geo_insights_title')} <span className="text-slate-400 dark:text-slate-500">· {t('geo_technical_details')}</span>
+          {t('geo_insights_title')} <span className="text-muted">· {t('geo_technical_details')}</span>
         </span>
-        <span className="text-slate-400 dark:text-slate-500 text-xs group-open:rotate-180 transition-transform">▾</span>
+        <span className="text-muted text-xs group-open:rotate-180 transition-transform">▾</span>
       </summary>
       <div className="p-4 pt-0 space-y-3 border-t border-slate-200 dark:border-slate-700 mt-0">
         {data.queryIntents.length > 0 && (
@@ -4779,7 +4783,7 @@ function GeoChipRow({
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+      <span className="text-[11px] text-muted font-medium">
         {label}:
       </span>
       {chips.map((c, i) => (

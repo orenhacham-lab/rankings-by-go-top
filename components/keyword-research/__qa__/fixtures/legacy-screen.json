@@ -1,25 +1,25 @@
 {
-  "capturedFrom": "app/(dashboard)/keyword-research/page.tsx at f44468d, with the shared Header (components/layout/Header) in place of its own",
+  "capturedFrom": "preview merge of existing + polish-c",
   "scenarios": {
     "he/initial": {
       "sha256": "eee2f438390778b832a81ab13a89ac6b2b2c5725e6b60df0e541e4ff20fbad62",
       "length": 4355
     },
     "he/results": {
-      "sha256": "1d909ec17d5cce0e19d4948e7aca22773d3cee96f2721cf8d73016fb1d6d2d53",
-      "length": 19619
+      "sha256": "1d9dc12a6551fadc258e9355b05d5e41fa3b2f5874b8056cfdca88bbda544781",
+      "length": 18470
     },
     "he/selectedWithOpportunities": {
-      "sha256": "80359298323543fc6c97028944e92da56d9b4cd738ecb4f9e583a3023b27d9e7",
-      "length": 26397
+      "sha256": "720715c985689883a6dee9045a7e12133fc79e6aab5c5f42bd8b979e1dffd1be",
+      "length": 24475
     },
     "he/added": {
-      "sha256": "6b2d1a9ca0c2f172043800b086925a239a529b8b01a41c32a92c1645943345af",
-      "length": 23195
+      "sha256": "f87153adb18f0707f7d445371731cf87353f214e695599e0b00ee58e6ed4f368",
+      "length": 21780
     },
     "he/addAndAiErrors": {
-      "sha256": "156dc6cebda5e6cda35bfdab21703ccae0bd065ea4c537ce518e3be389c8fc12",
-      "length": 22879
+      "sha256": "6e8667e1fafa4534e6dd631bea7ba27dd67af1b2a656bdd7687f95cbe0881d33",
+      "length": 21354
     },
     "he/error": {
       "sha256": "4e675bab208bf1bd4ae22b169e78823af8a65f68cd8eace910d827f54b47a41d",
@@ -30,32 +30,32 @@
       "length": 5163
     },
     "he/fewResults": {
-      "sha256": "8dd2aad813e6562bb01cd319a85cf017a8da4e11537796013e18e12be1a6630c",
-      "length": 9955
+      "sha256": "cffa7fa83b691a30206203571cfbae6328db3d18bea6eca7c27d0451084ed25e",
+      "length": 9475
     },
     "he/filteredSorted": {
-      "sha256": "bd782d6cdb64677a39c2662ba42ff5a3153e9f3aa17863e01515ff367bbab949",
-      "length": 19865
+      "sha256": "5504869995d635d65a372fbd48b4d9437bc307674e8333033bda03987f5bf3cd",
+      "length": 18715
     },
     "en/initial": {
       "sha256": "d835facc045838660e29e9d11d407ec11fb3f45d9256af415ae5035699515659",
       "length": 4399
     },
     "en/results": {
-      "sha256": "7655a5bdcc36be7b9c14cb0c1a48aa524e84e9dfe151b35d205a60bdc1ce2ed4",
-      "length": 19569
+      "sha256": "bbd2227679ad2e02acb13bd1aab28348be7b5e12162525faaf99bd07c4796443",
+      "length": 18535
     },
     "en/selectedWithOpportunities": {
-      "sha256": "bd97841f054250bc92a701799c18b54a4aaef9b89408828ebfa869c8a2eaa6dc",
-      "length": 26298
+      "sha256": "68a1fac0c607bc5be7e2d2c6e2bb77392b9479c2a2e4db7dd702a4a87541c7ad",
+      "length": 24497
     },
     "en/added": {
-      "sha256": "f7ba8228a899f84ab15a16cdef5adb0dccf2fcc76261c992dd536ebd86b2bb13",
-      "length": 23121
+      "sha256": "5ffc099062744e1162104eb6a5a601f9447cfe58926614768fab7d9df2999d35",
+      "length": 21821
     },
     "en/addAndAiErrors": {
-      "sha256": "f031435871fdde66515414f0658d46865afa19a96bd4e4efb94386991f785661",
-      "length": 22813
+      "sha256": "fbf2e502b602541c0d096c66870fd00db81095f923aa33fa4930e5c27aa6a73e",
+      "length": 21403
     },
     "en/error": {
       "sha256": "0413a6c8d0cd99b247d90e432dd97da6139ed29b46ac1b645a7eb3f5da5adae7",
@@ -66,12 +66,12 @@
       "length": 5201
     },
     "en/fewResults": {
-      "sha256": "cd39c443fdcd2cbce011e6d13220de18f6a7b2089cff98450d6e3fe7b4cd4eec",
-      "length": 10040
+      "sha256": "6e3573c39aabbe938c6481e08c7e554b43feffe0091b92c498db3dc2fac58eb8",
+      "length": 9593
     },
     "en/filteredSorted": {
-      "sha256": "136dfef6494afadef56849671e2ba110398b7db06eb5e62c3041c0b50facc57f",
-      "length": 19839
+      "sha256": "62292b81f483b6fc302c523e05d6b2a37c74bffb790b232ff9a5940eb0468475",
+      "length": 18804
     }
   }
 }

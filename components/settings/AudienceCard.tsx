@@ -20,7 +20,7 @@ import {
 import { audienceSuggestionItems, fill, newAudienceSuggestions } from '@/lib/project-settings/view'
 import { cn } from '@/lib/utils'
 import { RedetectButton, RedetectNoticeView, SuggestionsPanel, type SuggestionRow } from './AiControls'
-import SaveBar, { type SaveState } from './SaveBar'
+import SaveBar, { showSaveBar, type SaveState } from './SaveBar'
 import SettingsCard, { FieldLabel, fieldClass } from './SettingsCard'
 import SourceChip from './SourceChip'
 import { bidiField } from './copy'
@@ -192,7 +192,7 @@ export default function AudienceCard({
       title={t.audience.title}
       description={t.audience.body}
       actions={seedFeatures ? <RedetectButton working={redetect.working} busyScan={scanBusy} onClick={detect} t={t} /> : undefined}
-      footer={
+      footer={showSaveBar(dirty, state) ? (
         <SaveBar
           dirty={dirty}
           state={state}
@@ -205,7 +205,7 @@ export default function AudienceCard({
           }}
           t={t}
         />
-      }
+      ) : undefined}
     >
       <div className="space-y-6">
         {seedFeatures && redetect.notice && (

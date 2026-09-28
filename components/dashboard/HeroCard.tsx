@@ -5,6 +5,9 @@
  * (keywords on Google's first page), one human sentence about it, one line of
  * news (the latest article, or the biggest ranking move) and the next step.
  *
+ * ONE NUMBER (UX review P1-16): there used to be a ring beside it, "57%", which
+ * said "4 of 7" a second time; the number and its sentence say it once.
+ *
  * While the seeding scan works, the card says so in a line of its own, so a
  * merchant who just started a project sees that the waiting is work.
  */
@@ -51,7 +54,6 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
   const scanLine = seedPhase === 'stage_b' ? h.scanRunning : seedPhase === 'stage_a' ? h.scanReading : null
 
   const initial = domain.replace(/^www\./, '').slice(0, 1).toUpperCase()
-  const share = checked && rankings.checked > 0 ? Math.min(1, rankings.firstPage / rankings.checked) : null
 
   return (
     <section
@@ -109,7 +111,6 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
           )}
         </div>
         <div className="flex flex-col items-start gap-5 md:items-end">
-          {share !== null && <FirstPageRing share={share} />}
           {next && (
             <div className="flex flex-col items-start gap-1.5 md:items-end">
               <LinkButton href={next.href} variant={next.commit ? 'commit' : 'primary'} className={cn('h-11 px-5 shadow-pop')}>
@@ -121,27 +122,5 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
         </div>
       </div>
     </section>
-  )
-}
-
-/**
- * The share of the checked keywords that are on Google's first page, as a ring. The
- * sentence beside it says the same in words, so it is hidden from screen readers.
- */
-function FirstPageRing({ share }: { share: number }) {
-  const r = 44
-  const c = 2 * Math.PI * r
-  return (
-    <div aria-hidden="true" className="relative grid size-28 place-items-center">
-      <svg viewBox="0 0 100 100" className="absolute inset-0 size-full -rotate-90 rtl:scale-y-[-1]">
-        <circle cx="50" cy="50" r={r} fill="none" stroke="rgb(255 255 255 / 0.1)" strokeWidth="9" />
-        <circle
-          cx="50" cy="50" r={r} fill="none" stroke="#9db4ff" strokeWidth="9" strokeLinecap="round"
-          strokeDasharray={`${c * share} ${c}`}
-          className="transition-[stroke-dasharray] duration-700 ease-out motion-reduce:transition-none"
-        />
-      </svg>
-      <span className="text-2xl font-bold tabular-nums">{Math.round(share * 100)}%</span>
-    </div>
   )
 }

@@ -1,21 +1,22 @@
 'use client'
 
 /**
- * K5 — Content Hub "missing connections" onboarding. Two INDEPENDENT setup cards:
+ * K5 — Content Hub "missing connections": ONE compact line (UX review P1-18; it
+ * used to be two large cards repeated on every content screen), with two
+ * INDEPENDENT parts:
  *   - Platform (publishing): connect / fix — publishing is NEVER implied without one.
  *   - Search Console (OPTIONAL evidence): connect / choose property / reconnect —
- *     always labelled optional; topic generation works without it.
- * Each card hides when its dimension is ready; the whole block hides when both are.
+ *     topic generation works without it.
+ * Each part hides when its dimension is ready; the whole line hides when both are.
  *
- * The buttons REUSE the existing K3 (WP/Shopify) and K4 (GscPanel) flows by LINKING to
+ * The links REUSE the existing K3 (WP/Shopify) and K4 (GscPanel) flows by LINKING to
  * the settings section that owns each one — no duplicated OAuth/token logic here. They
  * used to scroll to panels further down the same page, which stopped meaning anything
  * once the content workspace became one screen per concern.
  */
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Card } from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
+import { Plug } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
@@ -34,7 +35,6 @@ export default function ContentHubSetup({
   const { language } = useDashboardLanguage()
   const dict = useMemo(() => getDashboardDictionary(language), [language])
   const s = dict.contentHub.setup
-  const cs = dict.projectDetail.contentSection // reuse existing connect-button labels
 
   // GSC readiness — read-only status (no OAuth logic here; the GscPanel owns the flow).
   const [gscStatus, setGscStatus] = useState<GscState>('none')
@@ -57,47 +57,41 @@ export default function ContentHubSetup({
   const { platformCard, gscCard, showSetup } = selectSetupCards({ platform, platformFailed, shopifyNeedsScope, gscStatus, gscHasProperty })
   if (!showSetup) return null
 
+  // ONE LINE, NOT TWO CARDS (UX review P1-18). The two large cards used to repeat
+  // on every content screen; the connections are set up in one place, the
+  // project's settings, and here a 40px line only says what is missing and links
+  // to the exact section that sets it up.
+  const linkClass = 'inline-flex shrink-0 items-center gap-1 rounded-control font-semibold text-action hover:underline'
   return (
-    <div className="mb-4 space-y-2">
-      <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{s.title}</div>
-
+    <div
+      role="note"
+      aria-label={s.rowLabel}
+      data-content-setup-row
+      className="mb-4 flex min-h-10 flex-wrap items-center gap-x-4 gap-y-1 rounded-control border border-line bg-surface px-3 py-2 text-caption text-body"
+    >
+      <Plug size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-muted" />
       {platformCard && (
-        <Card className="hover:translate-y-0 border-amber-200 dark:border-amber-800/60">
-          <div className="font-semibold text-slate-800 dark:text-slate-100">
-            {platformCard === 'none' ? s.platformNoneTitle : s.platformFailedTitle}
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
-            {platformCard === 'none' ? s.platformNoneBody : platformCard === 'failed_scope' ? s.platformScopeBody : s.platformFailedBody}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {platformCard === 'none' ? (
-              <>
-                <Link href={platformSetupHref(projectId)}><Button size="sm">{cs.connectWordPress}</Button></Link>
-                <Link href={platformSetupHref(projectId)}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
-              </>
-            ) : (
-              <Link href={platformSetupHref(projectId)}><Button size="sm">{s.fixConnection}</Button></Link>
-            )}
-          </div>
-        </Card>
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2">
+          <span className={platformCard === 'none' ? 'text-body' : 'font-medium text-warn'}>
+            {platformCard === 'none' ? s.rowPlatformNone : s.rowPlatformFailed}
+          </span>
+          <Link href={platformSetupHref(projectId)} className={linkClass}>
+            {platformCard === 'none' ? s.connectInSettings : s.fixConnection}
+          </Link>
+        </span>
       )}
-
+      {platformCard && gscCard && <span aria-hidden="true" className="text-muted">·</span>}
       {gscCard && (
-        <Card className="hover:translate-y-0 border-indigo-200 dark:border-indigo-800/60">
-          <div className="font-semibold text-slate-800 dark:text-slate-100">
-            {gscCard === 'no_property' ? s.gscNoPropertyTitle : gscCard === 'reauth' ? s.gscReauthTitle : s.gscNoneTitle}
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
-            {gscCard === 'no_property' ? s.gscNoPropertyBody : gscCard === 'reauth' ? s.gscReauthBody : s.gscNoneBody}
-          </p>
-          <div className="mt-2">
-            <Link href={settingsGscHref(projectId)}>
-              <Button size="sm" variant="outline">
-                {gscCard === 'no_property' ? s.gscChooseProperty : gscCard === 'reauth' ? s.gscReconnect : s.gscConnect}
-              </Button>
-            </Link>
-          </div>
-        </Card>
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2">
+          <span className="text-body">
+            {gscCard === 'no_property' ? s.rowGscNoProperty : gscCard === 'reauth' ? s.rowGscReauth : s.rowGscNone}
+          </span>
+          <Link href={settingsGscHref(projectId)}>
+            <span className={linkClass}>
+              {gscCard === 'no_property' ? s.gscChooseProperty : gscCard === 'reauth' ? s.gscReconnect : s.gscConnect}
+            </span>
+          </Link>
+        </span>
       )}
     </div>
   )
