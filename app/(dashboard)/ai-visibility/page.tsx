@@ -105,6 +105,9 @@ function ProjectAIVisibility({ project }: { project: Project }) {
   const { state: seed, questionsArrived } = useSeedPageState(project.id, seedRefresh)
   const mapping = useMapping(project.id, language, useCallback(() => setSeedRefresh((n) => n + 1), []))
   const [runs, setRuns] = useState<OverviewRun[] | 'error' | null>(null)
+  // How many questions the project tracks, from the tool's own list: the opening
+  // card's next step is "check one" with questions, "pick one" without.
+  const [questionsCount, setQuestionsCount] = useState<number | null>(null)
   const onRunsLoaded = useCallback((raw: unknown[] | null) => setRuns(raw === null ? 'error' : readRuns(raw)), [])
   const overview = useMemo<OverviewData>(() => (runs === null ? null : runs === 'error' ? 'error' : buildOverview(runs)), [runs])
   const [tabRequest, setTabRequest] = useState<{ tab: AIVisibilityTab; seq: number } | undefined>(undefined)
@@ -136,6 +139,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
   const overviewProps = {
     overviewMode: true,
     onRunsLoaded,
+    onQuestionsCount: setQuestionsCount,
     openQueriesWhenEmpty: true,
     suggestionsRefreshKey: questionsArrived,
     requestedTab: tabRequest,
@@ -177,6 +181,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
         overview={overview}
         questionsPending={questionsPending}
         questionsSuggested={seed.kind === 'none' ? null : seed.questionsSuggested}
+        questionsCount={questionsCount}
         onChooseQuestions={chooseQuestions}
       />
       <div ref={toolRef} className="scroll-mt-4">

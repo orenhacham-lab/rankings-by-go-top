@@ -164,4 +164,12 @@ export const ENGINE_META: Record<
     accent: 'text-indigo-600',
     bg: 'from-indigo-50 to-purple-50/40',
   },
+  // The retired engine code of older answers (Google's AI overview, now
+  // google_ai_mode). Named here so its code never reaches the screen.
+  google_ai_overview: {
+    name: 'Google AI',
+    Icon: GoogleAIIcon,
+    accent: 'text-indigo-600',
+    bg: 'from-indigo-50 to-purple-50/40',
+  },
 }

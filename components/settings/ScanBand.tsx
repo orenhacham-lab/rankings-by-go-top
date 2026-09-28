@@ -2,6 +2,7 @@
 
 import { RefreshCw, ScanSearch } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
 import type { RescanView } from '@/lib/project-settings/types'
@@ -91,7 +92,6 @@ export default function ScanBand({
 
   const notice = scan.notice ? rescanCopy(scan.notice, t, locale) : null
   const blocked = running || stalled || wait !== null
-  const initial = domain.replace(/^www\./, '').slice(0, 1).toUpperCase()
   return (
     <section id={SITE_SCAN_ANCHOR} aria-labelledby={`${SITE_SCAN_ANCHOR}-title`} className="scroll-mt-20" data-scan-band>
       <div className="overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-pop ring-1 ring-black/5">
@@ -106,8 +106,10 @@ export default function ScanBand({
             className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
           />
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 py-5 sm:px-7 sm:py-6">
-            <span aria-hidden className="relative grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-2xl font-bold ring-1 ring-white/15">
-              {initial || <ScanSearch size={22} />}
+            <span aria-hidden className="relative shrink-0">
+              {domain.trim() ? <SiteAvatar domain={domain} size="xl" tone="dark" /> : (
+                <span className="grid size-14 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15"><ScanSearch size={22} /></span>
+              )}
               <span
                 className={cn(
                   'absolute -bottom-1.5 -end-1.5 grid size-6 place-items-center rounded-full ring-2 ring-contrast transition-colors',

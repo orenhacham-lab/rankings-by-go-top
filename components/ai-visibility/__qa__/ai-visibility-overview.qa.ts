@@ -196,11 +196,16 @@ async function main() {
       aiRun('legacy', 200, [res('google_ai_overview', true)]),
     ])
     const o = M.buildOverview(runs)
-    // The tool: every successful, non-archived answer counts (4); mentions only
-    // from its engines: perplexity + chatgpt = 2; 2/4 = 50.
-    check('the score is the tool\'s: supported mentions over every successful, non-archived answer',
-      o.answers === 4 && o.mentions === 2 && o.citations === 1 && o.score === 50, JSON.stringify({ a: o.answers, m: o.mentions, c: o.citations, s: o.score }))
-    // Before the newest counted check (perplexity): chatgpt 1 of 3 = 33 → +17.
+    // The shared score (lib/ai-visibility/score.ts): the latest successful,
+    // non-archived answer per question x engine, on the tool's engines. One
+    // question here, so chatgpt (mid), perplexity and gemini count: 2 of 3 = 67.
+    check('the score is the shared one: mentions over the latest answer per question x engine actually checked',
+      o.answers === 3 && o.mentions === 2 && o.citations === 1 && o.score === 67, JSON.stringify({ a: o.answers, m: o.mentions, c: o.citations, s: o.score }))
+    const recheck = M.buildOverview(M.readRuns([aiRun('again', 2, [res('chatgpt', true)]), aiRun('first', 20, [res('chatgpt', false)])]))
+    check('checking the same question again replaces its answer (100, one answer), never adds one', recheck.answers === 1 && recheck.score === 100, JSON.stringify({ a: recheck.answers, s: recheck.score }))
+    const twoQuestions = M.buildOverview(M.readRuns([aiRun('q2', 2, [res('chatgpt', true, false, { promptId: 'p2' })]), aiRun('q1', 20, [res('chatgpt', false)])]))
+    check('…while another question on the same engine is its own answer (1 of 2 = 50)', twoQuestions.answers === 2 && twoQuestions.score === 50, JSON.stringify({ a: twoQuestions.answers, s: twoQuestions.score }))
+    // Before the newest counted check (perplexity): chatgpt yes, gemini no = 50 → +17.
     check('the change is against the score before the newest counted check (+17 points)', o.change?.points === 17, JSON.stringify(o.change))
     check('…named by the check before it (a failed check in between is skipped)', o.change?.since === ago(60), String(o.change?.since))
     check('engines checked: those with a successful answer, in the tool\'s order, legacy engines left out',
@@ -210,8 +215,9 @@ async function main() {
     check('…each with its outcome: cited, failed, mentioned, not mentioned',
       o.recent.slice(0, 4).map((r) => r.outcome).join(',') === 'cited,failed,mentioned,not_mentioned', o.recent.map((r) => r.outcome).join(','))
     check('…and its question and engine', o.recent[0].question === 'best running shoes in tel aviv?' && o.recent[0].engine === 'perplexity')
-    check('the trend is the score after each counted check, oldest first, ending at the score (0, 0, 33, 50)',
-      o.trend.map((p) => p.score).join(',') === '0,0,33,50' && o.trend[3].at === ago(5), o.trend.map((p) => p.score).join(','))
+    // The legacy engine's check counts nothing, so it adds no point.
+    check('the trend is the score after each counted check, oldest first, ending at the score (0, 50, 67)',
+      o.trend.map((p) => p.score).join(',') === '0,50,67' && o.trend[2].at === ago(5), o.trend.map((p) => p.score).join(','))
     const many = M.buildOverview(M.readRuns(Array.from({ length: 15 }, (_, i) => aiRun(`r${i}`, 100 - i, [res('chatgpt', i % 2 === 0)]))))
     check('…at most the last twelve checks', many.trend.length === M.TREND_POINTS && many.trend[11].score === many.score)
 
@@ -312,7 +318,9 @@ async function main() {
     check('the tool keeps loading results for the project alone (the callback rides a ref)',
       /onRunsLoadedRef\.current\?\.\(/.test(section) && /\}, \[projectId\]\)\s*useEffect\(\(\) => \{\s*let cancelled = false\s*fetch\(`\/api\/projects\/\$\{projectId\}\/ai-profile`\)/.test(section))
     check('the tool\'s engines and the overview\'s are the same list',
-      section.includes(`const SUPPORTED_ENGINES = ${JSON.stringify(M.OVERVIEW_ENGINES).replace(/"/g, '\'').replace(/,/g, ', ')} as const`))
+      // Both are the shared score's list now (lib/ai-visibility/score.ts SCORED_ENGINES).
+      /const SUPPORTED_ENGINES = SCORED_ENGINES\b/.test(section) && /export const OVERVIEW_ENGINES = SCORED_ENGINES\b/.test(code('components/ai-visibility/overview-model.ts'))
+      && JSON.stringify(M.OVERVIEW_ENGINES) === '["chatgpt","perplexity","gemini","copilot","grok","google_ai_mode"]')
 
     // Opening the tab spends nothing: the new code only reads.
     const NEW = [PAGE, 'components/ai-visibility/OverviewRows.tsx', 'components/ai-visibility/ReadinessCard.tsx', 'components/ai-visibility/CompetitorsReadOnly.tsx', 'components/ai-visibility/useSeedPageState.ts', 'components/ai-visibility/overview-model.ts']

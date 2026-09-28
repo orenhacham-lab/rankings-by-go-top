@@ -29,7 +29,7 @@ import { Check, ChevronDown, Plus, Search, Settings2 } from 'lucide-react'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import SiteIcon from '@/components/ui/SiteIcon'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { cn } from '@/lib/utils'
 import { newProjectBlocked, parseProjectQuota, type ProjectQuota } from '@/lib/projects/project-quota'
 
@@ -176,13 +176,7 @@ export default function WorkspaceSwitcher() {
       >
         {/* The site's own icon, or the project's initial on a small accent tile: the
             one thing on the bar that says "this site", readable before the name is. */}
-        <SiteIcon
-          domain={current?.target_domain}
-          icon={current?.site_icon}
-          fallback={(current?.name ?? t.unnamed).trim().charAt(0) || '·'}
-          className="flex size-6 shrink-0 items-center justify-center rounded-md bg-action text-[0.6875rem] font-bold uppercase text-action-ink"
-          iconClassName="flex size-6 shrink-0 items-center justify-center rounded-md bg-white p-0.5 ring-1 ring-line"
-        />
+        <SiteAvatar domain={current?.target_domain} icon={current?.site_icon} name={current?.name ?? t.unnamed} size="sm" />
         <span className="hidden sm:inline text-caption text-muted shrink-0">{t.label}</span>
         <span className="truncate font-semibold text-ink">{current?.name ?? t.unnamed}</span>
         <ChevronDown size={15} className={cn('shrink-0 text-muted transition-transform duration-200 ease-snappy', open && 'rotate-180')} />
@@ -230,13 +224,7 @@ export default function WorkspaceSwitcher() {
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <SiteIcon
-                        domain={p.target_domain}
-                        icon={p.site_icon}
-                        fallback={(p.name ?? t.unnamed).trim().charAt(0) || '·'}
-                        className="flex size-5 shrink-0 items-center justify-center rounded bg-sunk text-[0.625rem] font-bold uppercase text-muted ring-1 ring-line"
-                        iconClassName="flex size-5 shrink-0 items-center justify-center rounded bg-white p-px ring-1 ring-line"
-                      />
+                      <SiteAvatar domain={p.target_domain} icon={p.site_icon} name={p.name ?? t.unnamed} size="xs" />
                       <span className="truncate">{p.name ?? t.unnamed}</span>
                     </span>
                     {isCurrent && <Check size={15} className="shrink-0" />}

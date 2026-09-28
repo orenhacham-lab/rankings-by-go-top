@@ -10,10 +10,11 @@
  *   row 4  recent activity  the latest checks and what came of each
  *   row 5  AI readiness     the scan's four checks (SeedGeo)
  *
- * THE SAME NUMBERS AS THE TOOL. The score is the tool's own: the share of
- * successful answers, archived ones left out, whose display classification
- * mentions the business (AIVisibilitySection.loadAllResults). A second
- * definition on the same screen would show two different scores.
+ * ONE SCORE EVERYWHERE (lib/ai-visibility/score.ts): the latest successful
+ * answer of each question on each engine counts, archived ones never; the
+ * denominator is the pairs actually checked; a mention is the answer's display
+ * classification. The tool, the dashboard and the competitor comparison count
+ * the same way, so the owner never sees two scores for one question.
  *
  * NO SCAN, THE SAME SCREEN. A project without a seed run (the scan's flag off,
  * or a project older than the scan) gets `kind: 'none'`: the page still renders
@@ -21,9 +22,10 @@
  * rows the scan alone can fill (its AI readiness) wait for the mapping.
  */
 import type { SeedGeo, SeedRunView } from '@/lib/seed-scan/types'
+import { SCORED_ENGINES, engineScores, visibilityScore, type ScoredAnswer } from '@/lib/ai-visibility/score'
 
-/** The engines the tool checks, in its order (AIVisibilitySection SUPPORTED_ENGINES). */
-export const OVERVIEW_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
+/** The engines the tool checks, in its order: the shared score's list. */
+export const OVERVIEW_ENGINES = SCORED_ENGINES
 
 /** The four readiness checks, in the scan's order (lib/free-check buildGeoSignals). */
 export const READINESS_CHECK_IDS = ['schema', 'faq', 'robots', 'llms'] as const
@@ -136,6 +138,7 @@ export function readinessView(state: SeedPageState): ReadinessView | null {
 
 export type OverviewResult = {
   engine: string
+  promptId: string | null
   status: string | null
   displayMentioned: boolean
   displayCited: boolean
@@ -166,6 +169,7 @@ export function readRuns(raw: unknown): OverviewRun[] {
       completedAt: str(r.completedAt),
       results: results.filter(isRecord).map((x) => ({
         engine: str(x.engine) ?? '',
+        promptId: str(x.promptId),
         status: str(x.status),
         // The display classification, exactly as the tool counts it; the raw DB
         // flag only for an older payload without it.
@@ -187,6 +191,8 @@ export type RecentItem = { id: string; at: string | null; engine: string | null;
 export type AiOverview = {
   /** Engines with at least one successful answer, in the tool's order. */
   enginesChecked: string[]
+  /** Engines whose latest answer to at least one question mentioned the business (the ✓). */
+  enginesMentioned: string[]
   lastCheckAt: string | null
   /** A check was dispatched and has not finished. */
   running: boolean
@@ -209,25 +215,25 @@ export type AiOverview = {
 /** How many checks the score trend shows. */
 export const TREND_POINTS = 12
 
-type Tally = { answers: number; mentions: number; citations: number }
+type Tally = { answers: number; mentions: number; citations: number; score: number | null }
 
-function tally(runs: OverviewRun[]): Tally {
-  const t: Tally = { answers: 0, mentions: 0, citations: 0 }
+/** The answers of these runs as the shared score reads them (the engines the tool supports). */
+function answersOf(runs: OverviewRun[]): ScoredAnswer[] {
+  const out: ScoredAnswer[] = []
   for (const run of runs) {
     for (const r of run.results) {
-      if (r.status !== 'success' || r.excludedFromScore) continue
-      // As the tool counts: every successful answer is in the denominator, and
-      // mentions and citations come from the engines it supports.
-      t.answers++
-      if (!(OVERVIEW_ENGINES as readonly string[]).includes(r.engine)) continue
-      if (r.displayMentioned) t.mentions++
-      if (r.displayCited) t.citations++
+      out.push({ promptId: r.promptId, engine: r.engine, at: run.completedAt ?? run.createdAt, status: r.status,
+        excluded: r.excludedFromScore, mentioned: r.displayMentioned, cited: r.displayCited, id: `${run.id}:${out.length}` })
     }
   }
-  return t
+  return out
 }
 
-const scoreOf = (t: Tally) => (t.answers > 0 ? Math.round((t.mentions / t.answers) * 100) : null)
+/** The current picture after these runs (lib/ai-visibility/score.ts). */
+function tally(runs: OverviewRun[]): Tally {
+  const v = visibilityScore(answersOf(runs))
+  return { answers: v.answers, mentions: v.mentions, citations: v.citations, score: v.score }
+}
 
 function outcomeOf(run: OverviewRun): RecentOutcome {
   if (run.status === 'pending' || run.status === 'running') return 'running'
@@ -240,40 +246,40 @@ function outcomeOf(run: OverviewRun): RecentOutcome {
 
 export function buildOverview(runs: OverviewRun[]): AiOverview {
   const newest = [...runs].sort((a, b) => runTime(b) - runTime(a))
-  const engines = new Set<string>()
-  for (const run of runs) for (const r of run.results) if (r.status === 'success') engines.add(r.engine)
-
   const now = tally(newest)
-  const score = scoreOf(now)
+  const score = now.score
+  const engines = new Set(visibilityScore(answersOf(newest)).engines)
+  const perEngine = engineScores(answersOf(newest))
 
-  // The previous check: the score without the newest check that produced a
-  // counted answer. With nothing before it there is no change to show.
+  // The previous picture: the same score without the newest check that produced
+  // a counted answer. With nothing before it there is no change to show.
   let change: AiOverview['change'] = null
-  const latestCountedIndex = newest.findIndex((run) => tally([run]).answers > 0)
+  const counts = (run: OverviewRun) => tally([run]).answers > 0
+  const latestCountedIndex = newest.findIndex(counts)
   if (latestCountedIndex >= 0 && score !== null) {
     const before = newest.slice(latestCountedIndex + 1)
-    const beforeScore = scoreOf(tally(before))
+    const beforeScore = tally(before).score
     if (beforeScore !== null) {
-      const previous = before.find((run) => tally([run]).answers > 0) ?? null
+      const previous = before.find(counts) ?? null
       change = { points: score - beforeScore, since: previous ? previous.completedAt ?? previous.createdAt : null }
     }
   }
 
+  // The score as it stood after each check, oldest first.
   const trend: AiOverview['trend'] = []
-  const running: Tally = { answers: 0, mentions: 0, citations: 0 }
-  for (const run of [...newest].reverse()) {
-    const t = tally([run])
-    if (t.answers === 0) continue
-    running.answers += t.answers
-    running.mentions += t.mentions
-    running.citations += t.citations
-    trend.push({ at: run.completedAt ?? run.createdAt, score: scoreOf(running) ?? 0 })
+  const oldestFirst = [...newest].reverse()
+  for (let i = 0; i < oldestFirst.length; i++) {
+    const run = oldestFirst[i]
+    if (!counts(run)) continue
+    const t = tally(oldestFirst.slice(0, i + 1))
+    trend.push({ at: run.completedAt ?? run.createdAt, score: t.score ?? 0 })
   }
 
   const finished = newest.find((r) => r.status !== 'pending' && r.status !== 'running') ?? null
   return {
     trend: trend.slice(-TREND_POINTS),
     enginesChecked: OVERVIEW_ENGINES.filter((e) => engines.has(e)),
+    enginesMentioned: OVERVIEW_ENGINES.filter((e) => (perEngine.get(e)?.mentions ?? 0) > 0),
     lastCheckAt: finished ? finished.completedAt ?? finished.createdAt : null,
     running: newest.some((r) => r.status === 'pending' || r.status === 'running'),
     answers: now.answers,

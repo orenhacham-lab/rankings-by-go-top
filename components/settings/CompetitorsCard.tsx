@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useId, useState } from 'react'
-import { Plus, ScanSearch, Swords, X } from 'lucide-react'
+import { Plus, ScanSearch, X } from 'lucide-react'
+import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import Button from '@/components/ui/Button'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { MAX_ACTIVE_COMPETITORS } from '@/lib/seed-scan/settings'
@@ -163,7 +165,7 @@ export default function CompetitorsCard({
   return (
     <SettingsCard
       id={SECTION.competitors}
-      icon={Swords}
+      icon={CompetitorIcon}
       title={c.title}
       description={c.body}
       actions={
@@ -213,9 +215,7 @@ export default function CompetitorsCard({
                         removing === item.id && 'opacity-50',
                       )}
                     >
-                      <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-action-soft text-copy font-bold uppercase text-action">
-                        {shown.replace(/^www\./, '').slice(0, 1)}
-                      </span>
+                      <SiteAvatar domain={item.domain} name={item.name} size="md" />
                       <span className="min-w-0 flex-1">
                         <Ltr className="block truncate text-copy font-medium text-ink">{shown}</Ltr>
                         {named && <span className="block truncate text-caption text-muted">{named}</span>}

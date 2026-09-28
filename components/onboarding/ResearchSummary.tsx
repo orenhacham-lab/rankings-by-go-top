@@ -47,12 +47,12 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Swords,
   TriangleAlert,
   UserRound,
   Users,
   X,
 } from 'lucide-react'
+import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import Button from '@/components/ui/Button'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -75,7 +75,7 @@ import {
   type Tone,
 } from '@/lib/onboarding/summary-view'
 import { MAX_CONTINUE_KEYWORDS, type SeedRunView, type SeedSummary } from '@/lib/seed-scan/types'
-import SiteIcon from '@/components/ui/SiteIcon'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { cn } from '@/lib/utils'
 import FirstArticleButton from './FirstArticleButton'
 import { ActionLink, BlockNote, isolate, StatusDot, SummaryBlock } from './parts'
@@ -254,7 +254,6 @@ export default function ResearchSummary({
   const severityCounts = findings.kind === 'list'
     ? (['blocker', 'warning', 'info'] as const).map((sev) => ({ sev, n: findings.findings.filter((f) => f.severity === sev).length })).filter((x) => x.n > 0)
     : []
-  const initial = (domain.replace(/^www\./, '').trim().charAt(0) || '·').toUpperCase()
 
   return (
     <div className="mx-auto w-full max-w-6xl" data-seed-screen={preview ? 'preview' : started ? 'started' : 'summary'}>
@@ -272,13 +271,7 @@ export default function ResearchSummary({
         <header data-summary-block="intro" className="relative grid gap-8 px-6 pt-7 pb-20 md:px-10 md:pt-10 md:pb-24 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <SiteIcon
-                domain={domain}
-                icon={summary.siteIcon}
-                fallback={initial}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg font-bold text-contrast-ink ring-1 ring-white/15"
-                iconClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-2 ring-1 ring-white/15"
-              />
+              <SiteAvatar domain={domain} icon={summary.siteIcon} size="lg" tone="dark" />
               <span className="min-w-0 truncate text-sm font-medium text-contrast-ink/80" dir="ltr">{domain}</span>
               <span className="inline-flex items-center gap-1.5 rounded-pill bg-white/10 px-3 py-1 text-caption font-semibold text-contrast-ink ring-1 ring-white/15">
                 <Sparkles className="h-3.5 w-3.5 text-[#9db4ff]" aria-hidden />
@@ -449,14 +442,12 @@ export default function ResearchSummary({
         </SummaryBlock>
 
         {/* 5 ── competitors: how often each one showed up, as a bar you can compare */}
-        <SummaryBlock id="competitors" index={3} icon={<Swords />} title={t.competitors.title} action={editLink('competitors', t.competitors.title)} className="lg:col-span-5">
+        <SummaryBlock id="competitors" index={3} icon={<CompetitorIcon />} title={t.competitors.title} action={editLink('competitors', t.competitors.title)} className="lg:col-span-5">
           {competitors.length > 0 ? (
             <ul className="space-y-4">
               {competitors.map((c) => (
                 <li key={c.domain} className="flex items-center gap-3">
-                  <span aria-hidden className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] text-sm font-bold', c.validated ? 'bg-ink text-canvas' : 'border border-dashed border-line-strong text-muted')}>
-                    {c.domain.charAt(0).toUpperCase()}
-                  </span>
+                  <SiteAvatar domain={c.domain} size="md" tentative={!c.validated} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="truncate font-semibold text-ink" dir="ltr">{c.domain}</p>

@@ -5,7 +5,8 @@
  * where the research found it (the site, a competitor), and what Google reports
  * for it. Nothing at all for a keyword with none of these.
  */
-import { ScanSearch, Swords, TrendingUp } from 'lucide-react'
+import { ScanSearch, TrendingUp } from 'lucide-react'
+import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCompact, formatCount } from '@/components/gsc/format'
@@ -29,7 +30,7 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
   // One small icon per source, so the line reads at a glance: the research's own mark
   // is the same on almost every row, so it is only an icon (its words stay for screen
   // readers and on hover); a competitor and Google keep their words, which differ per row.
-  const ICONS = { research: ScanSearch, competitor: Swords, google: TrendingUp } as const
+  const ICONS = { research: ScanSearch, competitor: CompetitorIcon, google: TrendingUp } as const
   const researchMark = (key: string, text: string) => (
     <span key={key} title={text} className="inline-grid size-5 place-items-center rounded-full bg-action-soft text-action">
       <ScanSearch size={11} strokeWidth={2.5} aria-hidden="true" />
