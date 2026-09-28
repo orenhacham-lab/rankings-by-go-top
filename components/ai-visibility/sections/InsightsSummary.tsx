@@ -2,6 +2,7 @@
 
 import { Sparkles } from 'lucide-react'
 import { ENGINE_META } from '../EngineIcon'
+import { InsightBullets } from './InsightCard'
 import type { ContentSignalKey, GeoOpportunityMapping } from '@/lib/ai-visibility/geo-opportunity-mapping'
 import type { EngineMetrics, GlobalMetrics, T } from './types'
 
@@ -108,16 +109,8 @@ export function AIVisibilitySummarySection({
       .map((em) => engineDisplayName(em.engine))
     if (strong.length > 0) {
       const score = metrics.mentionRate || 0
-      let text: string
-      if (isHebrew) {
-        text = score < 40
-          ? `העסק הופיע בעיקר ב־${joinNames(strong)}.`
-          : `הנראות חזקה בעיקר ב־${joinNames(strong)}.`
-      } else {
-        text = score < 40
-          ? `The business did appear mainly on ${joinNames(strong)}.`
-          : `Visibility is strong mainly on ${joinNames(strong)}.`
-      }
+      const text = (score < 40 ? t('ai_summary_strong_low') : t('ai_summary_strong_high'))
+        .replace('{names}', joinNames(strong))
       bullets.push({ text })
     }
 
@@ -128,9 +121,7 @@ export function AIVisibilitySummarySection({
       .slice(0, 2)
       .map((em) => engineDisplayName(em.engine))
     if (weakEngines.length > 0) {
-      const text = isHebrew
-        ? `החולשה המרכזית היא ב־${joinNames(weakEngines)}.`
-        : `The main weakness is on ${joinNames(weakEngines)}.`
+      const text = t('ai_summary_weak').replace('{names}', joinNames(weakEngines))
       bullets.push({ text })
     }
 
@@ -138,42 +129,24 @@ export function AIVisibilitySummarySection({
     bullets.push({ text: t('ai_summary_action_label') + pickAction(), isAction: true })
   }
 
+  const lines = bullets.filter((b) => !b.isAction)
+  const action = bullets.find((b) => b.isAction)
+
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-3 shadow-sm">
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {t('ai_summary_title')}
-          </h3>
-          <p className="text-xs text-muted mt-0.5">
-            {t('ai_summary_subtitle')}
-          </p>
+    <section className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+      <div className="mb-4 flex items-start gap-3">
+        <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+          <Sparkles className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-section font-semibold text-ink">{t('ai_summary_title')}</h3>
+          <p className="mt-0.5 text-caption text-muted">{t('ai_summary_subtitle')}</p>
         </div>
       </div>
-      <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
-        {bullets.map((b, i) => (
-          <div key={i}>
-            {b.isAction && i > 0 && (
-              <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
-            )}
-            <div className={`flex gap-1.5 ${b.isAction ? 'pt-1.5' : ''}`}>
-              <span className="text-muted flex-shrink-0">•</span>
-              <span
-                className={
-                  b.isFirst
-                    ? 'font-medium text-slate-800 dark:text-slate-200'
-                    : b.isAction
-                    ? 'font-semibold text-indigo-700 dark:text-indigo-300'
-                    : 'text-slate-700 dark:text-slate-300'
-                }
-              >
-                {b.text}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      <InsightBullets lines={lines} t={t} />
+      {action && (
+        <p className="mt-4 border-t border-line pt-4 text-copy font-medium text-ink">{action.text}</p>
+      )}
+    </section>
   )
 }

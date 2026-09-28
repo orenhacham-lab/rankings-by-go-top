@@ -1,6 +1,8 @@
 'use client'
 
+import { Check, Plus } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
 import type { PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
 import type { I18nKey, PromptRow, T } from './types'
 
@@ -56,7 +58,10 @@ export function SmartQuestionCard({
       case 'medium': return t('confidence_medium')
       case 'opportunity': return t('confidence_opportunity')
       case 'experimental': return t('confidence_experimental')
-      default: return tier
+      case 'starter': return t('starter_questions')
+      // A tier with no words of its own (e.g. insufficient_context) shows no badge,
+      // never the raw English identifier.
+      default: return ''
     }
   }
 
@@ -76,55 +81,41 @@ export function SmartQuestionCard({
   }
 
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:shadow-sm transition">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-900 dark:text-slate-100 font-medium line-clamp-2 mb-1.5">{question.prompt}</p>
-        <div className="flex items-center gap-1.5 mb-1">
-          <Badge variant={intentTone[question.intent] || 'neutral'} className="!text-[9px]">
-            {label}
-          </Badge>
-          {'confidenceTier' in question && (
-            <Badge variant={confidenceTierColor(question.confidenceTier)} className="!text-[9px]">
+    <div className="flex items-start gap-3 rounded-inset border border-line bg-surface p-4">
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="line-clamp-2 text-copy font-medium text-ink">{question.prompt}</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={intentTone[question.intent] || 'neutral'}>{label}</Badge>
+          {'confidenceTier' in question && confidenceTierLabel(question.confidenceTier) && (
+            <Badge variant={confidenceTierColor(question.confidenceTier)}>
               {confidenceTierLabel(question.confidenceTier)}
             </Badge>
           )}
         </div>
         {'valueReason' in question && question.valueReason && (
-          <p className="text-[12px] font-medium text-indigo-700 dark:text-indigo-300 mb-1.5">
-            {question.valueReason}
-          </p>
+          <p className="text-caption font-medium text-body">{question.valueReason}</p>
         )}
         {'chips' in question && question.chips && question.chips.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            {question.chips.map((chip) => (
-              <span
-                key={chip}
-                className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-              >
-                {chipLabel(chip)}
-              </span>
-            ))}
-          </div>
+          <p className="text-caption text-muted">{question.chips.map(chipLabel).join(' · ')}</p>
         )}
-        {question.reason && (
-          <p className="text-[10px] text-muted line-clamp-1">
-            {question.reason}
-          </p>
-        )}
+        {question.reason && <p className="line-clamp-1 text-caption text-muted">{question.reason}</p>}
       </div>
       {isAlreadyTracked ? (
-        <div className="shrink-0 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-[9px] font-medium text-emerald-700 dark:text-emerald-300 whitespace-nowrap flex items-center">
+        <Badge variant="success" className="shrink-0">
+          <Check aria-hidden="true" className="size-3.5" />
           {t('already_tracked')}
-        </div>
+        </Badge>
       ) : (
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onAdd}
-          className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
+          className="size-8 shrink-0 px-0"
           aria-label={t('add_question_label')}
           title={t('add_question_label')}
         >
-          +
-        </button>
+          <Plus aria-hidden="true" className="size-4" />
+        </Button>
       )}
     </div>
   )

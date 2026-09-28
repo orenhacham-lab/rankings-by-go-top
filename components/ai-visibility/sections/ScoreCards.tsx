@@ -2,12 +2,14 @@
 
 import { ENGINE_META } from '../EngineIcon'
 import { SCORED_ENGINES as SUPPORTED_ENGINES } from '@/lib/ai-visibility/score'
+import Badge from '@/components/ui/Badge'
+import StatTile from '@/components/ui/StatTile'
 import type { EngineMetrics, GlobalMetrics, T } from './types'
 
+/** The bare tool's own score card (a caller without the page's overview). */
 export function AIVisibilityScoreCard({
   score,
   t,
-  isRTL,
 }: {
   score: number
   t: T
@@ -16,60 +18,30 @@ export function AIVisibilityScoreCard({
   const safeScore = Math.max(0, Math.min(100, Math.round(score || 0)))
   const level = safeScore <= 30 ? 'low' : safeScore <= 70 ? 'medium' : 'high'
   const badgeText = level === 'low' ? t('score_low') : level === 'medium' ? t('score_medium') : t('score_high')
-  const badgeClass =
-    level === 'low'
-      ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800'
-      : level === 'medium'
-      ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
-      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800'
-  const scoreColor =
-    level === 'low'
-      ? 'text-orange-600 dark:text-orange-400'
-      : level === 'medium'
-      ? 'text-yellow-600 dark:text-yellow-400'
-      : 'text-emerald-600 dark:text-emerald-400'
-  const barColor =
-    level === 'low'
-      ? 'bg-orange-400 dark:bg-orange-500'
-      : level === 'medium'
-      ? 'bg-yellow-400 dark:bg-yellow-500'
-      : 'bg-emerald-400 dark:bg-emerald-500'
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-white to-indigo-50/40 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-5">
-      <div className={`flex items-center justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-        <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
-          <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              {t('ai_visibility_score')}
-            </h3>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeClass}`}
-              title={t('score_help')}
-            >
-              {badgeText}
-            </span>
+    <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-section font-semibold text-ink">{t('ai_visibility_score')}</h3>
+            <Badge variant={level === 'high' ? 'success' : 'warning'}>{badgeText}</Badge>
           </div>
-          <p className="text-xs text-muted mt-1 leading-snug" title={t('score_help')}>
-            {t('score_subtext')}
-          </p>
+          <p className="mt-1 text-caption text-muted" title={t('score_help')}>{t('score_subtext')}</p>
         </div>
-        <div className="shrink-0" dir="ltr">
-          <span className={`text-3xl sm:text-4xl font-bold tabular-nums ${scoreColor}`}>{safeScore}</span>
-          <span className="text-sm sm:text-base font-semibold text-muted ml-0.5">/100</span>
-        </div>
+        <p className="shrink-0" dir="ltr">
+          <span className="text-metric font-bold tabular-nums text-ink">{safeScore}</span>
+          <span className="ms-0.5 text-copy font-semibold text-muted">/100</span>
+        </p>
       </div>
-      {/* Progress bar */}
-      <div className="mt-3 w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" dir="ltr">
-        <div
-          className={`h-full ${barColor} transition-all`}
-          style={{ width: `${safeScore}%` }}
-        />
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-pill bg-sunk" dir="ltr">
+        <div className="h-full rounded-pill bg-action" style={{ width: `${safeScore}%` }} />
       </div>
     </div>
   )
 }
 
+/** The bare tool's totals (a caller without the page's overview). */
 export function OverviewSummaryStrip({
   metrics,
   totalResults,
@@ -80,36 +52,10 @@ export function OverviewSummaryStrip({
   t: T
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6">
-      <div className="grid grid-cols-3 gap-3 sm:gap-6">
-        <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted mb-1 sm:mb-2 truncate">
-            {t('total_mentions')}
-          </div>
-          <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalMentions}</div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">
-            {t('out_of_results').replace('{count}', String(totalResults))}
-          </div>
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted mb-1 sm:mb-2 truncate" title={t('engines_coverage_help')}>
-            {t('engine_coverage')}
-          </div>
-          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">
-            {metrics.enginesWithMentions}/{metrics.enginesCovered}
-          </div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">
-            {t('ai_engines')}
-          </div>
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted mb-1 sm:mb-2 truncate">
-            {t('target_cited')}
-          </div>
-          <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('citations')}</div>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+      <StatTile label={t('total_mentions')} value={metrics.totalMentions} source={t('out_of_results').replace('{count}', String(totalResults))} />
+      <StatTile label={t('engine_coverage')} value={`${metrics.enginesWithMentions}/${metrics.enginesCovered}`} source={t('ai_engines')} />
+      <StatTile label={t('target_cited')} value={metrics.totalCitations} source={t('citations')} />
     </div>
   )
 }
@@ -120,38 +66,39 @@ export function EngineMentionCards({ metrics, t }: { metrics: Map<string, Engine
   ).sort((a, b) => b.mentions - a.mentions || b.scans - a.scans)
 
   return (
-    <div>
-      <h3 className="text-sm font-bold text-ink mb-4">
+    <section aria-labelledby="ai-engine-cards-title">
+      <h3 id="ai-engine-cards-title" className="mb-4 text-section font-semibold text-ink">
         {t('mentions_by_engine')}
       </h3>
-      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
         {engineList.map((em) => {
           const meta = ENGINE_META[em.engine as keyof typeof ENGINE_META]
           // An engine nobody checked has no number: "not checked yet", never a green 0.
           const checked = em.scans > 0
           return (
-            <div
+            <li
               key={em.engine}
               data-engine-card={checked ? 'checked' : 'not_checked'}
-              className="rounded-lg border border-line bg-surface p-2.5 sm:p-4 flex flex-col items-center text-center"
+              className="flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-card"
             >
-              {meta && <meta.Icon size={32} className={`${meta.accent} mb-2 sm:mb-1 ${checked ? '' : 'opacity-50'}`} />}
-              <div className="font-semibold text-ink mt-1 sm:mt-2 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
+              <div className="flex min-w-0 items-center gap-2">
+                {meta && <meta.Icon size={20} className={checked ? '' : 'opacity-50 grayscale'} />}
+                <span className="truncate text-copy font-semibold text-ink">{meta?.name || em.engine}</span>
+              </div>
               {checked ? (
                 <>
-                  <div className={`text-xl sm:text-3xl font-bold mt-1 sm:mt-2 ${em.mentions > 0 ? 'text-ok' : 'text-ink'}`}>{em.mentions}</div>
-                  <div className="hidden sm:block text-xs text-body mt-2">
-                    {t('out_of_results').replace('{count}', String(em.scans))}
-                  </div>
-                  <div className="text-[10px] sm:text-xs text-muted mt-0.5 sm:mt-1">({em.rate}%)</div>
+                  <p className="mt-3 text-metric font-bold tabular-nums text-ink">{em.mentions}</p>
+                  <p className="mt-0.5 text-caption text-muted">
+                    {t('out_of_results').replace('{count}', String(em.scans))} · <span className="tabular-nums">{em.rate}%</span>
+                  </p>
                 </>
               ) : (
-                <div className="text-xs text-muted mt-2 sm:mt-3">{t('chip_not_checked')}</div>
+                <p className="mt-3 text-caption text-muted">{t('chip_not_checked')}</p>
               )}
-            </div>
+            </li>
           )
         })}
-      </div>
-    </div>
+      </ul>
+    </section>
   )
 }

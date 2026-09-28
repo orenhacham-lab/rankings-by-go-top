@@ -3,6 +3,7 @@
 import React from 'react'
 import { Globe, Layers, Cpu, TrendingDown } from 'lucide-react'
 import { ENGINE_META } from '../EngineIcon'
+import { InsightCard } from './InsightCard'
 import type { GeoCompetitorIntelligence, CompetitorCategory } from '@/lib/ai-visibility/geo-competitor-intelligence'
 import type { BusinessMentionIntelligence } from '@/lib/ai-visibility/geo-business-mentions'
 import type { ResultRow, T } from './types'
@@ -388,144 +389,56 @@ export function GeoCompetitorIntelligenceSection({
     return { lines, pills }
   })()
 
+  const pillsFooter = (pills: string[], label?: string) =>
+    pills.length > 0 ? (
+      <p className="text-caption text-muted">
+        {label && <span className="font-medium">{label}: </span>}
+        <span className="text-body">{pills.join(' · ')}</span>
+      </p>
+    ) : undefined
+
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {t('geo_comp_title')}
-          </h3>
-          <p className="text-xs text-muted mt-0.5">
-            {t('geo_comp_subtitle')}
-          </p>
-        </div>
+    <section className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+      <div>
+        <h3 className="text-section font-semibold text-ink">{t('geo_comp_title')}</h3>
+        <p className="mt-0.5 text-caption text-muted">{t('geo_comp_subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <IntelligenceCard
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InsightCard
           title={t('geo_comp_card_sources')}
-          tone="violet"
-          icon={<Globe className="w-5 h-5" />}
+          icon={<Globe />}
           lines={trustedSourcesCard.lines}
-          pills={trustedSourcesCard.pills}
-          pillsLabel={t('geo_comp_pills_label')}
+          footer={pillsFooter(trustedSourcesCard.pills, t('geo_comp_pills_label'))}
           emptyText={t('geo_comp_no_data_sources')}
+          t={t}
         />
-        <IntelligenceCard
+        <InsightCard
           title={t('geo_comp_card_content')}
-          tone="teal"
-          icon={<Layers className="w-5 h-5" />}
+          icon={<Layers />}
           lines={contentStructureCard.lines}
-          pills={contentStructureCard.pills}
+          footer={pillsFooter(contentStructureCard.pills)}
           emptyText={t('geo_comp_no_data_content')}
+          t={t}
         />
-        <IntelligenceCard
+        <InsightCard
           title={t('geo_comp_card_engines')}
-          tone="slate"
-          icon={<Cpu className="w-5 h-5" />}
+          icon={<Cpu />}
           lines={enginePatternsCard.lines}
-          pills={enginePatternsCard.pills}
+          footer={pillsFooter(enginePatternsCard.pills)}
           emptyText={t('geo_comp_no_data_engines')}
+          t={t}
         />
-        <IntelligenceCard
+        <InsightCard
           title={t('geo_comp_card_loss')}
-          tone="rose"
-          icon={<TrendingDown className="w-5 h-5" />}
+          icon={<TrendingDown />}
           lines={visibilityLossCard.lines}
-          pills={visibilityLossCard.pills}
-          pillsLabel={t('geo_comp_pills_label_competitors')}
+          badge={visibilityLossCard.lines.length > 0 ? t('geo_comp_loss_badge') : undefined}
+          footer={pillsFooter(visibilityLossCard.pills, t('geo_comp_pills_label_competitors'))}
           emptyText={t('geo_comp_no_data_loss')}
+          t={t}
         />
       </div>
-    </div>
-  )
-}
-
-/**
- * IntelligenceCard — premium card for Competitor Intelligence section.
- * Same visual language as OpportunityCard, plus subtle domain pills as
- * concrete grounding (max 3, never ranked, secondary to the insight).
- */
-function IntelligenceCard({
-  title,
-  tone,
-  icon,
-  lines,
-  pills,
-  pillsLabel,
-  emptyText,
-}: {
-  title: string
-  tone: 'violet' | 'teal' | 'slate' | 'rose'
-  icon: React.ReactNode
-  lines: Array<{ text: string; isFirst?: boolean }>
-  pills: string[]
-  pillsLabel?: string
-  emptyText: string
-}) {
-  const accent =
-    tone === 'violet'
-      ? 'border-violet-200 dark:border-violet-800/60 bg-violet-50/40 dark:bg-violet-900/10'
-      : tone === 'teal'
-      ? 'border-teal-200 dark:border-teal-800/60 bg-teal-50/40 dark:bg-teal-900/10'
-      : tone === 'rose'
-      ? 'border-rose-200 dark:border-rose-800/60 bg-rose-50/40 dark:bg-rose-900/10'
-      : 'border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/10'
-
-  const iconTone =
-    tone === 'violet'
-      ? 'text-violet-600 dark:text-violet-400'
-      : tone === 'teal'
-      ? 'text-teal-600 dark:text-teal-400'
-      : tone === 'rose'
-      ? 'text-rose-600 dark:text-rose-400'
-      : 'text-body'
-
-  return (
-    <div className={`rounded-xl border ${accent} p-4 space-y-3`}>
-      <div className="flex items-center gap-2">
-        <div className={iconTone} aria-hidden="true">{icon}</div>
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
-      </div>
-      {lines.length > 0 ? (
-        <ul className="space-y-1.5 text-xs leading-relaxed">
-          {lines.map((line, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className="text-muted flex-shrink-0">•</span>
-              <span
-                className={
-                  line.isFirst
-                    ? 'font-medium text-slate-800 dark:text-slate-200'
-                    : 'text-slate-700 dark:text-slate-300'
-                }
-              >
-                {line.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-muted italic">{emptyText}</p>
-      )}
-      {pills.length > 0 && (
-        <div className="pt-1 space-y-1.5">
-          {pillsLabel && (
-            <div className="text-[10px] font-medium text-muted uppercase tracking-wide">
-              {pillsLabel}
-            </div>
-          )}
-          <div className="flex flex-wrap gap-1.5">
-            {pills.map((domain) => (
-              <span
-                key={domain}
-                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-muted bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-              >
-                {domain}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </section>
   )
 }

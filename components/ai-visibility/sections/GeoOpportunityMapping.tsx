@@ -1,8 +1,11 @@
 'use client'
 
 import React from 'react'
-import { BarChart3, AlertTriangle, Cpu, TrendingDown, SearchX } from 'lucide-react'
+import { BarChart3, Cpu, TrendingDown, SearchX } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import { cn } from '@/lib/utils'
 import { ENGINE_META } from '../EngineIcon'
+import { InsightCard, type InsightLine } from './InsightCard'
 import type { ContentSignalKey, GeoOpportunityMapping } from '@/lib/ai-visibility/geo-opportunity-mapping'
 import type { ResultRow, T } from './types'
 
@@ -257,146 +260,44 @@ export function GeoOpportunityMappingSection({
   // Build the visible card list. Only cards with real opportunities
   // are rendered; otherwise the section shows a single fallback.
   // ─────────────────────────────────────────────────────────────────────
-  type CardSpec = {
-    title: string
-    tone: 'emerald' | 'blue' | 'indigo' | 'amber'
-    icon: React.ReactNode
-    sentences: Array<{ text: string; isFirst?: boolean }>
-  }
+  type CardSpec = { title: string; icon: React.ReactNode; lines: InsightLine[] }
   const cards: CardSpec[] = []
   if (contentStrengthCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'תוכן שכדאי לחזק' : 'Content to strengthen',
-      tone: 'emerald',
-      icon: <BarChart3 className="w-5 h-5" />,
-      sentences: contentStrengthCard,
-    })
+    cards.push({ title: t('geo_card_content'), icon: <BarChart3 />, lines: contentStrengthCard })
   }
   if (weakPromptsCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'שאלות שבהן העסק לא הופיע' : 'Questions where the business is weak',
-      tone: 'blue',
-      icon: <TrendingDown className="w-5 h-5" />,
-      sentences: weakPromptsCard,
-    })
+    cards.push({ title: t('geo_card_questions'), icon: <TrendingDown />, lines: weakPromptsCard })
   }
   if (weakEnginesCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'מנועים שכדאי לחזק' : 'Engines worth strengthening',
-      tone: 'indigo',
-      icon: <Cpu className="w-5 h-5" />,
-      sentences: weakEnginesCard,
-    })
+    cards.push({ title: t('geo_card_engines'), icon: <Cpu />, lines: weakEnginesCard })
   }
   if (missingGapsCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'מה חסר כשהעסק לא מופיע' : 'What is missing when the business does not appear',
-      tone: 'amber',
-      icon: <SearchX className="w-5 h-5" />,
-      sentences: missingGapsCard,
-    })
+    cards.push({ title: t('geo_card_missing'), icon: <SearchX />, lines: missingGapsCard })
   }
 
-  const fallbackText = isHebrew
-    ? 'כרגע לא זוהתה חולשה ברורה. כדי לקבל המלצות מדויקות יותר, מומלץ להריץ עוד שאלות ומנועים.'
-    : 'No clear weakness detected at the moment. To get more accurate recommendations, it is recommended to run more questions and engines.'
-
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {t('geo_opp_title')}
-          </h3>
-          <p className="text-xs text-muted mt-0.5">
-            {t('geo_opp_subtitle')}
-          </p>
-        </div>
-        <span className="text-[11px] text-muted whitespace-nowrap">
-          {mapping.totalSuccess}/{mapping.totalResults}
-        </span>
+    <section className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+      <div>
+        <h3 className="text-section font-semibold text-ink">{t('geo_opp_title')}</h3>
+        <p className="mt-0.5 text-caption text-muted">{t('geo_opp_subtitle')}</p>
+        <p className="mt-1 text-caption text-muted tabular-nums">
+          {t('geo_opp_based_on')
+            .replace('{success}', String(mapping.totalSuccess))
+            .replace('{total}', String(mapping.totalResults))}
+        </p>
       </div>
 
-      {mapping.totalResults < 20 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex gap-3">
-          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-900 dark:text-amber-200">
-            {t('geo_opp_small_sample_warning')}
-          </p>
-        </div>
-      )}
+      {mapping.totalResults < 20 && <Notice tone="warn">{t('geo_opp_small_sample_warning')}</Notice>}
 
       {cards.length === 0 ? (
-        <p className="text-xs text-muted italic">{fallbackText}</p>
+        <p className="text-copy text-muted">{t('geo_opp_fallback')}</p>
       ) : (
-        <div className={`grid grid-cols-1 ${cards.length > 1 ? 'md:grid-cols-2' : ''} gap-3`}>
+        <div className={cn('grid grid-cols-1 gap-4', cards.length > 1 && 'md:grid-cols-2')}>
           {cards.map((card, i) => (
-            <OpportunityCard
-              key={i}
-              title={card.title}
-              tone={card.tone}
-              icon={card.icon}
-              sentences={card.sentences}
-              emptyText=""
-            />
+            <InsightCard key={i} title={card.title} icon={card.icon} lines={card.lines} t={t} />
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-function OpportunityCard({
-  title,
-  tone,
-  icon,
-  sentences,
-  emptyText,
-}: {
-  title: string
-  tone: 'emerald' | 'blue' | 'indigo' | 'amber'
-  icon: React.ReactNode
-  sentences: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }>
-  emptyText: string
-}) {
-  const accent =
-    tone === 'emerald'
-      ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-900/10'
-      : tone === 'blue'
-      ? 'border-blue-200 dark:border-blue-800/60 bg-blue-50/40 dark:bg-blue-900/10'
-      : tone === 'indigo'
-      ? 'border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-900/10'
-      : 'border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-900/10'
-
-  const iconTone =
-    tone === 'emerald'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : tone === 'blue'
-      ? 'text-blue-600 dark:text-blue-400'
-      : tone === 'indigo'
-      ? 'text-indigo-600 dark:text-indigo-400'
-      : 'text-amber-600 dark:text-amber-400'
-
-  return (
-    <div className={`rounded-xl border ${accent} p-4 space-y-2`}>
-      <div className="flex items-center gap-2">
-        <div className={`${iconTone}`} aria-hidden="true">{icon}</div>
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
-      </div>
-      {sentences.length > 0 ? (
-        <ul className="space-y-1.5 text-xs leading-relaxed">
-          {sentences.map((item, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className="text-muted flex-shrink-0">•</span>
-              <span className={item.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : 'text-slate-700 dark:text-slate-300'}>
-                {item.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-muted italic">{emptyText}</p>
-      )}
-    </div>
+    </section>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import Badge from '@/components/ui/Badge'
 import type { CompetitorAnalysisData, I18nKey, T } from './types'
 
 interface Recommendation {
@@ -15,7 +16,6 @@ interface Recommendation {
 export function RecommendationsCard({
   competitorAnalysis,
   t,
-  isRTL,
 }: {
   competitorAnalysis: CompetitorAnalysisData | null
   t: T
@@ -59,41 +59,20 @@ export function RecommendationsCard({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 mt-6">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-        {t('recommendations_title')}
-      </h3>
-      <p className="text-xs text-muted mb-3">{t('recommendations_desc')}</p>
-      <div className="space-y-2">
+    <section className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+      <h3 className="text-section font-semibold text-ink">{t('recommendations_title')}</h3>
+      <p className="mt-0.5 text-caption text-muted">{t('recommendations_desc')}</p>
+      <ul className="mt-4 space-y-3">
         {recommendations.map((rec) => (
-          <RecommendationItem key={rec.id} rec={rec} t={t} isRTL={isRTL} />
+          <RecommendationItem key={rec.id} rec={rec} t={t} />
         ))}
-      </div>
-    </div>
+      </ul>
+    </section>
   )
 }
 
-function RecommendationItem({
-  rec,
-  t,
-  isRTL,
-}: {
-  rec: Recommendation
-  t: T
-  isRTL: boolean
-}) {
-  const borderClass = {
-    high: 'border-rose-200 dark:border-rose-800',
-    medium: 'border-amber-200 dark:border-amber-800',
-    low: 'border-slate-200 dark:border-slate-700',
-  }[rec.severity]
-
-  const badgeClass = {
-    high: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-    medium: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-  }[rec.severity]
-
+function RecommendationItem({ rec, t }: { rec: Recommendation; t: T }) {
+  const variant = rec.severity === 'high' ? 'danger' : rec.severity === 'medium' ? 'warning' : 'neutral'
   const severityLabel =
     rec.severity === 'high'
       ? t('rec_severity_high')
@@ -104,18 +83,12 @@ function RecommendationItem({
   const bodyText = rec.body || t(rec.bodyKey)
 
   return (
-    <div className={`rounded-md border bg-white dark:bg-slate-900 px-3 py-2.5 sm:px-4 sm:py-3 ${borderClass}`}>
-      <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse justify-end' : ''}`}>
-        <h4 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
-          {t(rec.titleKey)}
-        </h4>
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${badgeClass}`}>
-          {severityLabel}
-        </span>
+    <li className="rounded-inset border border-line p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-copy font-semibold text-ink">{t(rec.titleKey)}</h4>
+        <Badge variant={variant}>{severityLabel}</Badge>
       </div>
-      <p className={`text-xs text-body mt-2 sm:mt-2.5 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
-        {bodyText}
-      </p>
-    </div>
+      <p className="mt-2 whitespace-pre-line text-copy text-body">{bodyText}</p>
+    </li>
   )
 }

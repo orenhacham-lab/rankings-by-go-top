@@ -60,7 +60,7 @@ export default function AIVisibilityPage() {
     return (
       <div>
         <Header title={t('ai_visibility')} />
-        <p className="py-20 text-center text-sm text-muted">{t('not_available')}</p>
+        <p className="py-20 text-center text-copy text-muted">{t('not_available')}</p>
       </div>
     )
   }
@@ -163,11 +163,11 @@ function ProjectAIVisibility({ project }: { project: Project }) {
       id="ai-readiness"
       aria-labelledby="ai-mapping-title"
       data-ai-readiness="mapping"
-      className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card"
+      className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
     >
       <header className="mb-4 flex items-start gap-3">
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-action-soft text-action ring-1 ring-action/10">
-          <Telescope size={16} />
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
+          <Telescope className="size-5" />
         </span>
         <h2 id="ai-mapping-title" className="text-section font-semibold text-ink">{mappingCopy.aiTitle}</h2>
       </header>
@@ -175,7 +175,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     </section>
   )
   return (
-    <div className="space-y-5 sm:space-y-6" data-ai-page={seed.kind}>
+    <div className="space-y-8" data-ai-page={seed.kind}>
       <OverviewStatusBar overview={overview} questionsPending={questionsPending} />
       <OverviewOpeningCard
         overview={overview}
@@ -187,7 +187,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
       <div ref={toolRef} className="scroll-mt-4">
         {tool}
       </div>
-      <div className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
+      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
         <RecentActivity overview={overview} />
         {readiness && seed.kind !== 'none' && <ReadinessCard view={readiness} scannedAt={seed.scannedAt} settingsHref={settingsHref(project.id)} />}
         {mappingCard}

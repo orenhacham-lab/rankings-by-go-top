@@ -154,7 +154,7 @@ export function OverviewOpeningCard({
       className="relative overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-card"
     >
       {/* One quiet accent: a soft glow behind the score, never a gradient on the text. */}
-      <div aria-hidden="true" className="pointer-events-none absolute -top-24 end-[-6rem] h-64 w-64 rounded-full bg-action/30 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -top-24 end-[-6rem] h-64 w-64 rounded-pill bg-action/30 blur-3xl" />
       <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-10 lg:p-8">
         <div className="min-w-0">
           <h2 id="ai-opening-title" className="text-title font-semibold tracking-tight">{c.heroTitle}</h2>

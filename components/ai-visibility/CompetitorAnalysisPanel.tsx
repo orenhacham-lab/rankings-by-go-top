@@ -13,8 +13,12 @@
  */
 
 import SiteAvatar from '@/components/ui/SiteAvatar'
+import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { TrendingUp, ChevronDown, ChevronUp, Info, BarChart3 } from 'lucide-react'
+import { TrendingUp, ChevronDown, BarChart3 } from 'lucide-react'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { ENGINE_META } from './EngineIcon'
@@ -93,7 +97,6 @@ type AnalysisResponse = {
 export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: { projectId: string; refreshKey?: number }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => createI18n(language), [language])
-  const isRTL = language === 'he'
 
   const [data, setData] = useState<AnalysisResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,8 +109,8 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
     try {
       const res = await fetch(`/api/projects/${projectId}/ai-visibility/competitor-analysis`)
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.error || t('competitor_analysis_failed'))
+        // The route's own text is not the merchant's to read; ours is.
+        setError(t('competitor_analysis_failed'))
         setData(null)
         return
       }
@@ -125,43 +128,35 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
     load()
   }, [load, refreshKey])
 
-  // Empty states
+  // Loading, failure and the empty cases each say one thing, in our words.
   if (loading) {
     return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-        <p className="text-sm text-slate-500 dark:text-slate-400">{t('competitor_analysis_loading')}</p>
+      <div role="status" aria-busy="true" className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6" data-skeleton="">
+        <span className="sr-only">{t('competitor_analysis_loading')}</span>
+        <Skeleton className="h-5 w-1/2" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-1.5 w-full rounded-pill" />
+          </div>
+        ))}
       </div>
     )
   }
 
   if (error) {
-    return (
-      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-700 dark:text-red-400">
-        {error}
-      </div>
-    )
+    return <Notice tone="bad" action={{ label: t('retry_check'), onClick: () => void load() }}>{error}</Notice>
   }
 
-  if (!data?.success || data.meta?.emptyState === 'no_competitors') {
+  const emptyText =
+    !data?.success || data.meta?.emptyState === 'no_competitors' ? t('competitor_analysis_no_competitors')
+      : data.meta?.emptyState === 'no_completed_scan' ? t('competitor_analysis_no_scan')
+      : !data.project || data.competitors.length === 0 ? t('competitor_analysis_no_mentions')
+      : null
+  if (emptyText || !data?.project) {
     return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-4">
-        <p className="text-sm text-slate-600 dark:text-slate-300">{t('competitor_analysis_no_competitors')}</p>
-      </div>
-    )
-  }
-
-  if (data.meta?.emptyState === 'no_completed_scan') {
-    return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-4">
-        <p className="text-sm text-slate-600 dark:text-slate-300">{t('competitor_analysis_no_scan')}</p>
-      </div>
-    )
-  }
-
-  if (!data.project || data.competitors.length === 0) {
-    return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-4">
-        <p className="text-sm text-slate-600 dark:text-slate-300">{t('competitor_analysis_no_mentions')}</p>
+      <div className="rounded-card border border-line bg-surface shadow-card">
+        <EmptyState icon={<BarChart3 />} title={t('competitor_analysis_title')} body={emptyText ?? undefined} />
       </div>
     )
   }
@@ -173,177 +168,177 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
     }))
   }
 
-  // Format "X of Y results" naturally per language.
-  const formatResultsText = (mentions: number, total: number): string => {
-    return language === 'he'
-      ? `${mentions} מתוך ${total} תוצאות`
-      : `${mentions} of ${total} results`
-  }
+  // "X of Y answers": each number is AI answers, the same unit on every line.
+  const formatResultsText = (mentions: number, total: number): string =>
+    t('competitor_results_of').replace('{mentions}', String(mentions)).replace('{total}', String(total))
 
   const businessDisplayName = data.project.name || t('competitor_your_business')
   const totalResults = data.project.totalResults
   const showSmallSampleWarning = totalResults > 0 && totalResults < SMALL_SAMPLE_THRESHOLD
 
-  const smallSampleMessage =
-    language === 'he'
-      ? 'ההשוואה מבוססת על מעט תוצאות. לתמונה מדויקת יותר, הוסיפו שאלות AI והריצו סריקה רחבה יותר.'
-      : 'This comparison is based on limited results. Add more AI questions or run a broader scan for better accuracy.'
-
   const sov = data?.shareOfVoice
-  const sovMentionsLabel = t('share_of_voice_mentions')
+  const updatedAt = data.meta?.scanCompletedAt
+    ? new Date(data.meta.scanCompletedAt).toLocaleDateString(language === 'he' ? 'he-IL' : 'en-US')
+    : null
 
-  return (
-    <div className="space-y-3">
-    {/* AI Share of Voice card */}
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-3">
-      <div className={isRTL ? 'text-right' : 'text-left'}>
-        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <BarChart3 size={18} className="text-indigo-600 dark:text-indigo-400" />
-          {t('share_of_voice_title')}
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('share_of_voice_help')}</p>
-      </div>
-
-      {!sov || sov.totalMentions === 0 ? (
-        <div className={`flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-3 py-2 ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
-          <Info size={14} className="text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('share_of_voice_empty')}</p>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {sov.entities.map((entity) => {
-            const key = entity.type === 'project' ? '__project__' : entity.competitorId || entity.name
-            const isProject = entity.type === 'project'
-            const barColor = isProject ? 'bg-indigo-500 dark:bg-indigo-400' : 'bg-slate-400 dark:bg-slate-500'
-            return (
-              <li key={key} className="space-y-1">
-                <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <span className={`text-sm font-medium truncate ${isProject ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>
-                    {entity.name || (isProject ? t('competitor_your_business') : '')}
-                  </span>
-                  <span className={`text-xs text-slate-500 dark:text-slate-400 shrink-0 ${isRTL ? 'text-left' : 'text-right'}`}>
-                    <span className={`font-semibold ${isProject ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
-                      {entity.sharePercent}%
-                    </span>
-                    {' · '}
-                    {entity.mentionsCount} {sovMentionsLabel}
-                  </span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div
-                    className={`h-full ${barColor} transition-all`}
-                    style={{ width: `${Math.max(entity.sharePercent, entity.mentionsCount > 0 ? 2 : 0)}%` }}
-                  />
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
-
-    {/* Competitor Comparison card */}
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-4">
-      {/* Header */}
-      <div className={isRTL ? 'text-right' : 'text-left'}>
-        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <TrendingUp size={18} className="text-indigo-600 dark:text-indigo-400" />
-          {t('competitor_analysis_title')}
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('competitor_analysis_help')}</p>
-      </div>
-
-      {/* Small sample warning */}
-      {showSmallSampleWarning && (
-        <div className={`flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
-          <Info size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{smallSampleMessage}</p>
-        </div>
-      )}
-
-      {/* Project mention card */}
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-indigo-900/20 dark:to-indigo-800/10 p-3">
-        <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div className={`flex min-w-0 items-center gap-2.5 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-            <SiteAvatar domain={data.project.domain} name={businessDisplayName} size="md" />
+  // One row of the comparison: the business first (with the one accent), then each competitor.
+  const comparisonRow = (row: {
+    key: string
+    isProject: boolean
+    name: string
+    domain: string | null | undefined
+    mentions: number
+    total: number
+    rate: number
+    byEngine: Record<string, EngineStats>
+  }) => {
+    const open = !!expandedEngines[row.key]
+    const engines = Object.entries(row.byEngine)
+    return (
+      <li
+        key={row.key}
+        className={`rounded-inset border border-line p-4 ${row.isProject ? 'border-s-[3px] border-s-action' : ''}`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <SiteAvatar domain={row.domain ?? null} name={row.name} size="md" />
             <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{businessDisplayName}</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              {formatResultsText(data.project.mentionsCount, data.project.totalResults)}
-            </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-copy font-semibold text-ink">{row.name}</p>
+                {row.isProject && <Badge variant="info">{t('competitor_your_business')}</Badge>}
+              </div>
+              <p className="mt-0.5 text-caption text-muted tabular-nums">{formatResultsText(row.mentions, row.total)}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.project.mentionRate}%</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{t('competitor_visibility')}</p>
-          </div>
+          <p className="shrink-0 text-end">
+            <span className="block text-section font-bold tabular-nums text-ink">{row.rate}%</span>
+            <span className="block text-caption text-muted">{t('competitor_visibility')}</span>
+          </p>
         </div>
-      </div>
-
-      {/* Competitors */}
-      <div className="space-y-2">
-        {data.competitors.map((competitor) => (
+        <div className="mt-3 h-1.5 overflow-hidden rounded-pill bg-sunk">
           <div
-            key={competitor.id}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 p-3"
-          >
-            {/* Row */}
-            <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className={`flex min-w-0 flex-1 items-center gap-2.5 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                <SiteAvatar domain={competitor.domain} name={competitor.name} size="md" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{competitor.name}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {formatResultsText(competitor.mentionsCount, competitor.totalResults)}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{competitor.mentionRate}%</p>
-              </div>
-            </div>
+            className={`h-full rounded-pill ${row.isProject ? 'bg-action' : 'bg-line-strong'}`}
+            style={{ width: `${Math.max(row.rate, row.mentions > 0 ? 2 : 0)}%` }}
+          />
+        </div>
 
-            {/* Breakdown by engine */}
-            {Object.keys(competitor.byEngine).length > 0 && (
-              <button
-                onClick={() => toggleEngine(competitor.id)}
-                className={`mt-2 w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition ${
-                  isRTL ? 'flex-row-reverse' : ''
-                }`}
-              >
-                <span>{t('competitor_by_engine')}</span>
-                {expandedEngines[competitor.id] ? (
-                  <ChevronUp size={14} />
-                ) : (
-                  <ChevronDown size={14} />
-                )}
-              </button>
-            )}
-
-            {/* Engine details (collapsed by default) */}
-            {expandedEngines[competitor.id] && (
-              <div className="mt-2 space-y-1 pt-2 border-t border-slate-200 dark:border-slate-700">
-                {Object.entries(competitor.byEngine).map(([engine, stats]) => (
-                  <div key={engine} className={`flex items-center justify-between gap-2 px-2 py-1 text-xs ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <span className="text-slate-700 dark:text-slate-300 font-medium">{formatEngineLabel(engine)}</span>
-                    <span className="text-slate-600 dark:text-slate-400">
-                      {formatResultsText(stats.mentions, stats.total)} — {stats.rate}%
-                    </span>
+        {engines.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => toggleEngine(row.key)}
+              aria-expanded={open}
+              className="mt-3 inline-flex items-center gap-1 rounded-control text-caption font-semibold text-body transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+            >
+              {t('competitor_by_engine')}
+              <ChevronDown aria-hidden="true" className={`size-4 transition-transform duration-150 ease-snappy ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+              <dl className="mt-2 divide-y divide-line border-t border-line">
+                {engines.map(([engine, stats]) => (
+                  <div key={engine} className="flex items-center justify-between gap-2 py-1.5 text-caption">
+                    <dt className="font-medium text-body">{formatEngineLabel(engine)}</dt>
+                    <dd className="tabular-nums text-muted">
+                      {formatResultsText(stats.mentions, stats.total)} · {stats.rate}%
+                    </dd>
                   </div>
                 ))}
-              </div>
+              </dl>
             )}
-          </div>
-        ))}
-      </div>
+          </>
+        )}
+      </li>
+    )
+  }
 
-      {/* Meta info */}
-      {data.meta?.scanCompletedAt && (
-        <p className={`text-xs text-slate-400 dark:text-slate-500 ${isRTL ? 'text-right' : 'text-left'}`}>
-          {new Date(data.meta.scanCompletedAt).toLocaleDateString(language === 'he' ? 'he-IL' : 'en-US')}
-        </p>
-      )}
-    </div>
+  return (
+    <div className="space-y-6">
+      {/* Share of all mentions: every entity's slice of the same total, so the slices sum to 100%. */}
+      <section aria-labelledby="ai-sov-title" className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+        <div className="flex items-start gap-3">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+            <BarChart3 className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 id="ai-sov-title" className="text-section font-semibold text-ink">{t('share_of_voice_title')}</h3>
+            <p className="mt-0.5 text-caption text-muted">{t('share_of_voice_help')}</p>
+          </div>
+        </div>
+
+        {!sov || sov.totalMentions === 0 ? (
+          <p className="text-copy text-muted">{t('share_of_voice_empty')}</p>
+        ) : (
+          <ul className="space-y-3">
+            {sov.entities.map((entity) => {
+              const key = entity.type === 'project' ? '__project__' : entity.competitorId || entity.name
+              const isProject = entity.type === 'project'
+              return (
+                <li key={key} className="space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className={`min-w-0 truncate text-copy ${isProject ? 'font-semibold text-ink' : 'font-medium text-body'}`}>
+                      {entity.name || (isProject ? t('competitor_your_business') : '')}
+                    </span>
+                    <span className="shrink-0 text-caption text-muted tabular-nums">
+                      <span className="text-copy font-semibold text-ink">{entity.sharePercent}%</span>{' '}
+                      {t('share_of_voice_of_all')} · {t('share_of_voice_answers').replace('{count}', String(entity.mentionsCount))}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-pill bg-sunk">
+                    <div
+                      className={`h-full rounded-pill ${isProject ? 'bg-action' : 'bg-line-strong'}`}
+                      style={{ width: `${Math.max(entity.sharePercent, entity.mentionsCount > 0 ? 2 : 0)}%` }}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Per-business rate: each one against ALL answers, so several can reach 100%. */}
+      <section aria-labelledby="ai-comparison-title" className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+        <div className="flex items-start gap-3">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+            <TrendingUp className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 id="ai-comparison-title" className="text-section font-semibold text-ink">{t('competitor_analysis_title')}</h3>
+            <p className="mt-0.5 text-caption text-muted">{t('competitor_analysis_help')}</p>
+          </div>
+        </div>
+
+        {showSmallSampleWarning && <Notice tone="warn">{t('competitor_small_sample')}</Notice>}
+
+        <ul className="space-y-3">
+          {comparisonRow({
+            key: '__project__',
+            isProject: true,
+            name: businessDisplayName,
+            domain: data.project.domain,
+            mentions: data.project.mentionsCount,
+            total: data.project.totalResults,
+            rate: data.project.mentionRate,
+            byEngine: data.project.byEngine ?? {},
+          })}
+          {data.competitors.map((competitor) =>
+            comparisonRow({
+              key: competitor.id,
+              isProject: false,
+              name: competitor.name,
+              domain: competitor.domain,
+              mentions: competitor.mentionsCount,
+              total: competitor.totalResults,
+              rate: competitor.mentionRate,
+              byEngine: competitor.byEngine,
+            })
+          )}
+        </ul>
+
+        {updatedAt && (
+          <p className="text-caption text-muted">{t('competitor_updated').replace('{date}', updatedAt)}</p>
+        )}
+      </section>
     </div>
   )
 }

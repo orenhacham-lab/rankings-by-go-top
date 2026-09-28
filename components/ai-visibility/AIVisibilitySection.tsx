@@ -19,16 +19,20 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Minus } from 'lucide-react'
+import { Archive, Check, ChevronDown, Info, Loader2, MessageSquareText, Minus, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
 import NextLink from 'next/link'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import Notice from '@/components/ui/Notice'
+import RowMenu from '@/components/ui/RowMenu'
+import Select from '@/components/ui/Select'
+import { Skeleton } from '@/components/ui/Skeleton'
 import {
   ENGINE_META,
   SparkleIcon,
-  TrashIcon,
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
@@ -38,6 +42,7 @@ import { createI18n } from '@/lib/ai-visibility/i18n'
 import { SCORED_ENGINES, engineScores, latestAnswers, visibilityScore } from '@/lib/ai-visibility/score'
 import { dropOffTopicSuggestions, type ProjectVocabulary } from '@/lib/ai-visibility/question-relevance'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { UserFacingError, apiErrorText, isUserFacingError } from '@/lib/i18n/user-facing-error'
 import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
@@ -64,6 +69,9 @@ const MAX_SUGGESTIONS = 40
 
 /** The engines the tool checks: the shared score's list (lib/ai-visibility/score.ts). */
 const SUPPORTED_ENGINES = SCORED_ENGINES
+
+/** The error state's value for "something failed that is not the merchant's to read": shown as our own words. */
+const GENERIC_ERROR = '__generic__'
 
 /** The tool's own tabs, for a page that asks it to open one (W6d). */
 export type AIVisibilityTab = TabType
@@ -383,7 +391,7 @@ export default function AIVisibilitySection({
       setEngineMetrics(engineMap)
     } catch (e) {
       onRunsLoadedRef.current?.(null)
-      setError(e instanceof Error ? e.message : 'Failed to load results')
+      setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
     } finally {
       setLoading(false)
     }
@@ -882,7 +890,11 @@ export default function AIVisibilitySection({
         if (!res.ok) {
           clearInterval(progressInterval)
           const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || `HTTP ${res.status}`)
+          // Only a refusal written for the merchant (it carries errorEn: quota,
+          // already running, try again) is shown as it is; anything else is ours.
+          throw typeof body.errorEn === 'string' && body.errorEn
+            ? new UserFacingError(apiErrorText(body, isHebrew ? 'he' : 'en', body.errorEn))
+            : new Error(body.error || `HTTP ${res.status}`)
         }
         const body = await res.json()
         clearInterval(progressInterval)
@@ -901,7 +913,7 @@ export default function AIVisibilitySection({
         }, 250)
       } catch (e) {
         clearInterval(progressInterval)
-        setError(e instanceof Error ? e.message : 'Scan failed')
+        setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
         setScanStatus(null)
       } finally {
         // The allowance moved (or did not) — re-read it either way, so what the
@@ -916,7 +928,7 @@ export default function AIVisibilitySection({
         }, 500)
       }
     },
-    [projectId, loadAllResults, allResults, openResultDrawer, t, loadAllowance]
+    [projectId, loadAllResults, allResults, openResultDrawer, t, loadAllowance, isHebrew]
   )
 
   // When allResults updates after a scan, if there's a highlighted id we haven't
@@ -946,7 +958,7 @@ export default function AIVisibilitySection({
       await loadAllResults()
     } catch (e) {
       setAllPrompts(prev)
-      setError(e instanceof Error ? e.message : 'Failed to delete question')
+      setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
     } finally {
       setDeleting(false)
       setDeletePromptId(null)
@@ -1520,10 +1532,10 @@ export default function AIVisibilitySection({
           console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
           console.log('[ai-question-suggestions] state updated')
         } else {
-          setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+          setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
         }
       } else {
-        setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+        setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
       }
     } finally {
       setRefreshingSuggestions(false)
@@ -1598,7 +1610,7 @@ export default function AIVisibilitySection({
         if (!res.ok) {
           const errorBody = await res.json().catch(() => ({}))
           setExclusionToast({
-            message: isHebrew ? 'שגיאה בעדכון סטטוס הארכיון' : 'Failed to update archive status',
+            message: t('archive_update_failed'),
             type: 'error',
           })
           setTimeout(() => setExclusionToast(null), 3000)
@@ -1611,39 +1623,35 @@ export default function AIVisibilitySection({
         )
 
         // Show success message
-        const message = newExcludedState
-          ? (isHebrew ? 'הסריקה הועברה לארכיון ולא תשפיע על ציון הנראות.' : 'Result archived and excluded from score.')
-          : (isHebrew ? 'הסריקה שוחזרה וחזרה לחישוב ציון הנראות.' : 'Result restored and included in score.')
+        const message = newExcludedState ? t('archived_toast') : t('restored_toast')
 
         setExclusionToast({ message, type: 'success' })
         setTimeout(() => setExclusionToast(null), 3000)
 
-        // Optionally show archive view after archiving (but don't force it)
-        if (newExcludedState && !showArchive) {
-          // Just show toast, let user choose to view archive if they want
-        }
       } catch (err) {
         console.error('Error updating archive status:', err)
         setExclusionToast({
-          message: isHebrew ? 'שגיאה בעדכון סטטוס הארכיון' : 'Failed to update archive status',
+          message: t('archive_update_failed'),
           type: 'error',
         })
         setTimeout(() => setExclusionToast(null), 3000)
       }
     },
-    [isHebrew]
+    [t]
   )
 
   if (loading) {
     return (
-      <section id="ai-visibility" className="space-y-6 mb-10">
-        <div className="space-y-4">
+      <section id="ai-visibility" className="space-y-6">
+        <div role="status" aria-busy="true" className="space-y-4" data-skeleton="">
+          <span className="sr-only">{t('loading')}</span>
+          <Skeleton className="h-11 w-full max-w-md" />
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 animate-pulse">
-              <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div key={i} className="rounded-card border border-line bg-surface p-5 shadow-card">
+              <Skeleton className="mb-3 h-4 w-2/3" />
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 {[0, 1, 2, 3].map((j) => (
-                  <div key={j} className="h-12 bg-slate-100 dark:bg-slate-800 rounded" />
+                  <Skeleton key={j} className="h-10" />
                 ))}
               </div>
             </div>
@@ -1654,57 +1662,65 @@ export default function AIVisibilitySection({
   }
 
   return (
-    <section id="ai-visibility" className="space-y-6 mb-10" dir={isHebrew ? 'rtl' : 'ltr'}>
+    <section id="ai-visibility" className="space-y-6" dir={isHebrew ? 'rtl' : 'ltr'}>
       {/* HEADER — the page carries its own in overview mode (W6d) */}
       {!overviewMode && (
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-500/30">
-            <SparkleIcon size={20} className="text-white" />
-          </div>
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+            <SparkleIcon size={20} />
+          </span>
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{t('ai_visibility')}</h2>
-            <p className="text-xs text-muted mt-0">{t('monitor_engines')}</p>
+            <h2 className="text-section font-semibold text-ink">{t('ai_visibility')}</h2>
+            <p className="text-caption text-muted">{t('monitor_engines')}</p>
           </div>
         </div>
       </div>
       )}
 
+      {/* Only our own words reach the merchant: a raw server or provider error
+          is stored as GENERIC_ERROR and read out as "something went wrong". */}
       {error && (
-        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0">✕</span>
-          <span>{error}</span>
-        </div>
+        <Notice tone="bad" onDismiss={() => setError(null)}>
+          {error === GENERIC_ERROR ? t('something_went_wrong') : error}
+        </Notice>
       )}
 
-      {scanStatus && (
-        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-700 flex items-start gap-2">
-          <span className="shrink-0 animate-pulse">…</span>
-          <span>{scanStatus}</span>
-        </div>
-      )}
+      {scanStatus && <Notice tone="wait">{scanStatus}</Notice>}
 
       {exclusionToast && (
-        <div className={`p-3 rounded-xl border text-sm flex items-start gap-2 ${
-          exclusionToast.type === 'success'
-            ? 'bg-green-50 border-green-200 text-green-700'
-            : 'bg-red-50 border-red-200 text-red-700'
-        }`}>
-          <span className="shrink-0">{exclusionToast.type === 'success' ? '✓' : '✕'}</span>
-          <span>{exclusionToast.message}</span>
-        </div>
+        <Notice tone={exclusionToast.type === 'success' ? 'ok' : 'bad'}>{exclusionToast.message}</Notice>
       )}
 
       {/* TAB BAR */}
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+      <div
+        role="tablist"
+        aria-label={t('ai_visibility')}
+        className="-mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0"
+        onKeyDown={(e) => {
+          // Arrow keys move between the tabs (and select), as a tab list should.
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+          const order = ['results', 'queries', 'insights', 'competitors'] as const
+          const forward = (e.key === 'ArrowLeft') === isHebrew
+          const next = order[(order.indexOf(currentTab as (typeof order)[number]) + (forward ? 1 : order.length - 1)) % order.length]
+          e.preventDefault()
+          setCurrentTab(next)
+          e.currentTarget.querySelector<HTMLElement>(`[data-ai-tab="${next}"]`)?.focus()
+        }}
+      >
         {(['results', 'queries', 'insights', 'competitors'] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
+            role="tab"
+            data-ai-tab={tab}
+            aria-selected={currentTab === tab}
+            tabIndex={currentTab === tab ? 0 : -1}
             onClick={() => setCurrentTab(tab)}
-            className={`px-4 py-3 text-base font-semibold border-b-2 transition whitespace-nowrap ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-copy font-semibold transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${
               currentTab === tab
-                ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
-                : 'border-transparent text-body hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'border-action text-ink'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             {tab === 'results' && t('tab_results')}
@@ -1728,77 +1744,73 @@ export default function AIVisibilitySection({
           <EngineMentionCards metrics={engineMetrics} t={t} />
 
           {/* FILTER BAR */}
-          <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
-            <Input
-              placeholder={t('search')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 min-w-[200px]"
-            />
-            <select
-              aria-label={t('filter_engine')}
-              value={filterEngine || ''}
-              onChange={(e) => setFilterEngine(e.target.value || null)}
-              className="text-sm border border-line bg-surface text-ink rounded-control px-2 py-1.5"
-            >
-              <option value="">{t('all_engines')}</option>
-              {SUPPORTED_ENGINES.map((e) => (
-                <option key={e} value={e}>
-                  {ENGINE_META[e as keyof typeof ENGINE_META]?.name || e}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label={t('filter_mention')}
-              value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
-              onChange={(e) =>
-                setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
-              }
-              className="text-sm border border-line bg-surface text-ink rounded-control px-2 py-1.5"
-            >
-              <option value="">{t('all_mention')}</option>
-              <option value="yes">{t('mentioned')}</option>
-              <option value="no">{t('not_mentioned')}</option>
-            </select>
-            <select
-              aria-label={t('filter_citation')}
-              value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
-              onChange={(e) =>
-                setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
-              }
-              className="text-sm border border-line bg-surface text-ink rounded-control px-2 py-1.5"
-            >
-              <option value="">{t('all_citations')}</option>
-              <option value="yes">{t('target_cited')}</option>
-              <option value="no">{t('not_cited')}</option>
-            </select>
-            {archivedResults.length > 0 && (
-              <button
-                onClick={() => setShowArchive(!showArchive)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  showArchive
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
-                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                {isHebrew ? `הצג ארכיון (${archivedResults.length})` : `Show archive (${archivedResults.length})`}
-              </button>
-            )}
-          </div>
-
-          {archivedResults.length > 0 && (
-            <div className="text-xs text-muted italic">
-              {isHebrew ? 'תוצאות בארכיון אינן נכללות בחישוב הציון.' : 'Archived results are not included in score calculations.'}
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] lg:items-center">
+              <div className="relative sm:col-span-2 lg:col-span-1">
+                <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                <Input
+                  type="search"
+                  aria-label={t('search')}
+                  placeholder={t('search')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ps-9"
+                />
+              </div>
+              <Select
+                aria-label={t('filter_engine')}
+                value={filterEngine || ''}
+                onChange={(e) => setFilterEngine(e.target.value || null)}
+                options={[
+                  { value: '', label: t('all_engines') },
+                  ...SUPPORTED_ENGINES.map((e) => ({ value: e, label: ENGINE_META[e as keyof typeof ENGINE_META]?.name || e })),
+                ]}
+              />
+              <Select
+                aria-label={t('filter_mention')}
+                value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
+                onChange={(e) =>
+                  setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
+                }
+                options={[
+                  { value: '', label: t('all_mention') },
+                  { value: 'yes', label: t('mentioned') },
+                  { value: 'no', label: t('not_mentioned') },
+                ]}
+              />
+              <Select
+                aria-label={t('filter_citation')}
+                value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
+                onChange={(e) =>
+                  setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
+                }
+                options={[
+                  { value: '', label: t('all_citations') },
+                  { value: 'yes', label: t('target_cited') },
+                  { value: 'no', label: t('not_cited') },
+                ]}
+              />
+              {archivedResults.length > 0 && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowArchive(!showArchive)}
+                  aria-pressed={showArchive}
+                  className={showArchive ? 'border-action bg-action-soft text-action hover:border-action hover:bg-action-soft' : undefined}
+                >
+                  <Archive aria-hidden="true" className="size-4" />
+                  {t('show_archive').replace('{count}', String(archivedResults.length))}
+                </Button>
+              )}
             </div>
-          )}
-
-          <div className="text-sm text-slate-600 dark:text-slate-300">
-            {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
+            <p className="text-caption text-muted">
+              {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
+              {archivedResults.length > 0 && <> · {t('archive_note')}</>}
+            </p>
           </div>
 
           {filteredResults.length > 0 ? (
             <>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {filteredResults.slice(0, showAllResults ? undefined : 3).map((r) => (
                   <ResultRowCard
                     key={r.id}
@@ -1816,9 +1828,9 @@ export default function AIVisibilitySection({
                 ))}
               </div>
               {filteredResults.length > 3 && (
-                <div className="text-center mt-4">
+                <div className="flex justify-center">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setShowAllResults(!showAllResults)}
                   >
@@ -1828,9 +1840,17 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_scans')}</p>
-            </div>
+            <EmptyState
+              icon={<MessageSquareText />}
+              title={t('no_scans')}
+              body={t('no_scans_help')}
+              action={
+                <Button size="sm" variant="secondary" onClick={() => setCurrentTab('queries')}>
+                  {t('tab_queries')}
+                </Button>
+              }
+              className="rounded-card border border-line bg-surface"
+            />
           )}
 
         </>
@@ -1903,24 +1923,38 @@ export default function AIVisibilitySection({
               commitSuggestedQuestions(refreshed)
             }}
           />
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                {t('ai_queries')}
-              </h3>
-              <Badge variant="neutral" className="!text-xs">{allPrompts.length}</Badge>
+              <h3 className="text-section font-semibold text-ink">{t('ai_queries')}</h3>
+              <Badge variant="neutral">{allPrompts.length}</Badge>
             </div>
-            <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }} className="w-full sm:w-auto">
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
+                <Sparkles aria-hidden="true" className="size-4" />
                 {t('recommend_questions')}
               </Button>
-              <Button size="sm" onClick={() => setShowNewPrompt(true)} className="w-full sm:w-auto">
+              <Button onClick={() => setShowNewPrompt(true)}>
+                <Plus aria-hidden="true" className="size-4" />
                 {t('new_query')}
               </Button>
             </div>
           </div>
 
-          <p data-ai-questions-explainer="" className="-mt-2 mb-4 max-w-[80ch] text-caption text-muted">{t('queries_explainer')}</p>
+          {/* How it works: the long explanations fold away; the one line that
+              says what to do (and the allowance) stays in view. */}
+          <details className="group rounded-inset border border-line bg-surface">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-inset px-4 py-3 text-copy font-semibold text-ink transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-2">
+                <Info aria-hidden="true" className="size-4 text-muted" />
+                {t('how_it_works')}
+              </span>
+              <ChevronDown aria-hidden="true" className="size-4 text-muted transition-transform duration-150 ease-snappy group-open:rotate-180" />
+            </summary>
+            <div className="space-y-2 border-t border-line px-4 py-3">
+              <p data-ai-questions-explainer="" className="max-w-[80ch] text-copy text-body">{t('queries_explainer')}</p>
+              <p className="text-caption text-muted" data-ai-chip-legend="">{t('chip_legend')}</p>
+            </div>
+          </details>
           {allPrompts.length > 0 ? (
             <>
               {/* THE CONTROL EXISTS — say so. The engine chips below dispatch a
@@ -1928,8 +1962,8 @@ export default function AIVisibilitySection({
                   which is why a reviewer could not find any way to start one.
                   The allowance beside it comes from the usage ledger, so it can
                   never disagree with what the dispatcher enforces. */}
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
-                <span className="text-muted">{t('run_a_check_hint')}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-caption">
+                <span className="text-body">{t('run_a_check_hint')}</span>
                 <span className="text-muted tabular-nums" data-testid="ai-allowance">
                   {allowance == null ? null
                     : allowance.state === 'unmetered' ? t('ai_allowance_unmetered')
@@ -1938,34 +1972,35 @@ export default function AIVisibilitySection({
                     : `${t('ai_allowance')}: ${allowance.used}/${allowance.limit}`}
                 </span>
               </div>
-              <p className="mb-2 text-xs text-muted" data-ai-chip-legend="">{t('chip_legend')}</p>
               {/* Nothing left to check with: say which case it is (a plan without
                   AI checks is not "used them all") and where to get more. The
                   link only opens the billing page; nothing here changes a plan. */}
               {allowance != null && allowance.state === 'known' && allowance.remaining === 0 && (
-                <p className="mb-2 text-xs text-warn" data-ai-allowance-out="">
-                  {allowance.limit === 0 ? t('ai_allowance_none_body') : t('ai_allowance_exhausted')}{' '}
-                  <NextLink href="/billing" className="font-semibold text-action underline underline-offset-2 hover:text-action-hover">
-                    {t('ai_allowance_upgrade')}
-                  </NextLink>
-                </p>
+                <Notice tone="warn">
+                  <span data-ai-allowance-out="">
+                    {allowance.limit === 0 ? t('ai_allowance_none_body') : t('ai_allowance_exhausted')}{' '}
+                    <NextLink href="/billing" className="font-semibold text-action underline underline-offset-2 hover:text-action-hover">
+                      {t('ai_allowance_upgrade')}
+                    </NextLink>
+                  </span>
+                </Notice>
               )}
-              <div className="space-y-2">
+              <ul className="space-y-3">
                 {allPrompts.slice(0, showAllPrompts ? undefined : 3).map((p) => (
-                  <div
+                  <li
                     key={p.id}
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:shadow-sm transition"
+                    data-ai-question=""
+                    className="space-y-3 rounded-inset border border-line bg-surface p-4"
                   >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 line-clamp-2">{p.prompt}</p>
-                      <button
-                        onClick={() => setDeletePromptId(p.id)}
-                        className="shrink-0 p-1.5 rounded-md text-muted hover:text-red-600 hover:bg-red-50 transition"
-                        title={t('delete')}
-                        aria-label={t('delete')}
-                      >
-                        <TrashIcon size={16} />
-                      </button>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="line-clamp-2 flex-1 text-copy font-medium text-ink">{p.prompt}</p>
+                      <RowMenu
+                        label={t('question_more_actions')}
+                        className="-me-1.5 -mt-1 shrink-0"
+                        items={[
+                          { key: 'delete', label: t('delete'), danger: true, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => setDeletePromptId(p.id) },
+                        ]}
+                      />
                     </div>
                     <PromptInsightRow insight={promptInsights.get(p.id) ?? null} t={t} isRTL={isHebrew} />
                     <div className="flex flex-wrap gap-1.5">
@@ -1990,7 +2025,7 @@ export default function AIVisibilitySection({
                         const tooltip = scanning
                           ? t('scanning')
                           : scanned
-                          ? `${mentionedHere === true ? t('chip_mentioned') : t('chip_not_mentioned')} · ${t('rescan')}`
+                          ? `${mentionedHere === true ? t('chip_mentioned') : t('chip_not_mentioned')}${scannedAt ? ` · ${t('scanned_at')}: ${formatDate(scannedAt)}` : ''} · ${t('rescan')}`
                           : t('scan_this_engine')
                         // The ACCESSIBLE NAME says what the click does and to
                         // which engine. "ChatGPT ✓" named a status; "Run an AI
@@ -2003,35 +2038,33 @@ export default function AIVisibilitySection({
                           ? t('scanning')
                           : `${scanned ? t('rerun_check_on') : t('run_check_on')}${meta?.name || engine} (${outcomeLabel})`
                         return (
-                          <div
-                            key={engine}
-                            className="inline-flex flex-col items-center min-w-0"
-                          >
-                            <div className="relative group">
+                          <div key={engine} className="group relative min-w-0">
                               <button
+                                type="button"
                                 onClick={() => !scanning && scanEngine(p.id, engine)}
                                 disabled={scanning}
                                 title={actionLabel}
                                 aria-label={actionLabel}
-                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
+                                className={`relative inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-control border px-2.5 text-caption font-medium transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${
                                   scanning
-                                    ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-body cursor-wait'
+                                    ? 'cursor-wait border-line bg-sunk text-body'
                                     : mentionedHere === true
-                                    ? 'bg-ok-soft border-ok/40 text-ink hover:border-ok cursor-pointer'
+                                    ? 'cursor-pointer border-ok/40 bg-ok-soft text-ink hover:border-ok'
                                     : mentionedHere === false
-                                    ? 'bg-sunk border-line text-body hover:border-line-strong cursor-pointer'
-                                    : 'bg-surface border-line text-body hover:border-action hover:bg-action-soft cursor-pointer'
+                                    ? 'cursor-pointer border-line bg-sunk text-body hover:border-line-strong'
+                                    : 'cursor-pointer border-line bg-surface text-body hover:border-action hover:bg-action-soft'
                                 }`}
                                 data-chip-outcome={mentionedHere === true ? 'mentioned' : mentionedHere === false ? 'not_mentioned' : 'not_checked'}
                               >
                                 {scanning && (
-                                  <div
-                                    className="absolute inset-0 bg-indigo-200 dark:bg-indigo-700/40 transition-all"
+                                  <span
+                                    aria-hidden="true"
+                                    className="absolute inset-y-0 start-0 bg-action/20 transition-[width] duration-150 ease-snappy"
                                     style={{ width: `${scanProgress}%` }}
                                   />
                                 )}
                                 <span className="relative z-10">
-                                  {meta && <meta.Icon size={14} className={meta.accent} />}
+                                  {meta && <meta.Icon size={14} />}
                                 </span>
                                 <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
                                 {!scanning && mentionedHere === true && <Check aria-hidden size={13} strokeWidth={3} className="relative z-10 text-ok" />}
@@ -2040,27 +2073,21 @@ export default function AIVisibilitySection({
                               {/* Custom CSS tooltip — appears instantly on hover/focus, not delayed like native title */}
                               <span
                                 role="tooltip"
-                                className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-900 dark:bg-slate-700 text-white text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md"
+                                className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 whitespace-nowrap rounded-control bg-contrast px-2 py-1 text-caption font-medium text-contrast-ink opacity-0 shadow-pop transition-opacity duration-150 ease-snappy group-focus-within:opacity-100 group-hover:opacity-100"
                               >
                                 {tooltip}
                               </span>
-                            </div>
-                            {scanned && scannedAt && (
-                              <div className="text-[10px] leading-tight text-muted mt-0.5 text-center whitespace-nowrap">
-                                {t('scanned_at')}: {formatDate(scannedAt)}
-                              </div>
-                            )}
                           </div>
                         )
                       })}
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
               {allPrompts.length > 3 && (
-                <div className="text-center mt-4">
+                <div className="flex justify-center">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setShowAllPrompts(!showAllPrompts)}
                   >
@@ -2070,13 +2097,22 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div data-ai-questions-empty="" className="rounded-card border border-dashed border-line bg-sunk px-5 py-8 text-center sm:px-8">
-              <p className="text-section font-semibold text-ink">{t('no_queries_title')}</p>
-              <p className="mx-auto mt-1 max-w-[60ch] text-copy text-body">{t('no_queries_body')}</p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <Button size="sm" onClick={() => setShowSuggestions(true)}>{t('no_queries_pick')}</Button>
-                <Button size="sm" variant="outline" onClick={() => setShowNewPrompt(true)}>{t('no_queries_write')}</Button>
-              </div>
+            <div data-ai-questions-empty="" className="rounded-card border border-line bg-surface">
+              <EmptyState
+                icon={<MessageSquareText />}
+                title={t('no_queries_title')}
+                body={t('no_queries_body')}
+                action={<Button onClick={() => setShowSuggestions(true)}>{t('no_queries_pick')}</Button>}
+                secondary={
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPrompt(true)}
+                    className="rounded-control font-semibold text-action underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                  >
+                    {t('no_queries_write')}
+                  </button>
+                }
+              />
             </div>
           )}
 
@@ -2147,37 +2183,34 @@ export default function AIVisibilitySection({
             // in the background (useEffect at line 437) will populate them.
             // If truly empty, show empty state with button to manually generate.
             return (
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
+              <section aria-labelledby="ai-smart-questions-title" className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1 flex items-center gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <h3 id="ai-smart-questions-title" className="flex items-center gap-1.5 text-section font-semibold text-ink">
                       {t('smart_questions_title')}
-                      <span className="relative group inline-flex items-center">
+                      <span className="group relative inline-flex items-center">
                         <span
-                          className="cursor-help text-action flex-shrink-0"
+                          className="cursor-help text-action inline-flex rounded-pill focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
                           role="img"
                           tabIndex={0}
                           aria-label={t('priority_tag_help_label')}
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 16v-4M12 8h.01"/>
-                          </svg>
+                          <Info aria-hidden="true" className="size-4" />
                         </span>
                         <span
                           role="tooltip"
-                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1.5 rounded bg-slate-900 dark:bg-slate-700 text-white text-[10px] font-medium normal-case tracking-normal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md w-max max-w-[200px] text-center"
+                          className="pointer-events-none absolute bottom-full start-1/2 z-50 mb-1.5 w-max max-w-[200px] -translate-x-1/2 rounded-control bg-contrast px-2 py-1.5 text-center text-caption font-medium text-contrast-ink opacity-0 shadow-pop transition-opacity duration-150 ease-snappy group-focus-within:opacity-100 group-hover:opacity-100 rtl:translate-x-1/2"
                         >
                           {t('priority_tag_help')}
                         </span>
                       </span>
                     </h3>
-                    <p className="text-xs text-body">
+                    <p className="mt-0.5 text-caption text-muted">
                       {t('smart_questions_subtitle')}
                     </p>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => refreshSuggestions('inner')}
                     loading={refreshingSuggestions}
@@ -2186,48 +2219,37 @@ export default function AIVisibilitySection({
                     title={t('generate_more_suggestions')}
                     aria-label={t('generate_more_suggestions')}
                   >
+                    {!refreshingSuggestions && <RefreshCw aria-hidden="true" className="size-4" />}
                     <span className="hidden sm:inline">{t('generate_more_suggestions')}</span>
-                    <span className="sm:hidden">
-                      {isHebrew ? 'עוד שאלות' : 'More questions'}
-                    </span>
+                    <span className="sm:hidden">{t('more_questions_short')}</span>
                   </Button>
                 </div>
 
                 {/* EMPTY STATE: Show when no suggestions available and not refreshing */}
                 {availableSuggestions.length === 0 && !refreshingSuggestions && (
-                  <div className="rounded-lg border border-dashed border-indigo-200 dark:border-indigo-800 bg-indigo-50/30 dark:bg-indigo-900/10 p-6 text-center">
-                    <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">
-                      {isHebrew
-                        ? 'עדיין אין שאלות מומלצות לפרויקט הזה'
-                        : 'No recommended questions yet for this project'}
-                    </p>
-                    <Button
-                      size="sm"
-                      onClick={() => refreshSuggestions('inner')}
-                      disabled={refreshingSuggestions}
-                    >
-                      {isHebrew ? 'צור שאלות מומלצות' : 'Generate recommended questions'}
-                    </Button>
-                  </div>
+                  <EmptyState
+                    icon={<Sparkles />}
+                    title={t('no_recommended_yet')}
+                    action={
+                      <Button size="sm" onClick={() => refreshSuggestions('inner')} disabled={refreshingSuggestions}>
+                        {t('generate_recommended')}
+                      </Button>
+                    }
+                    className="py-8"
+                  />
                 )}
 
                 {/* LOADING INDICATOR: Show while generating */}
                 {refreshingSuggestions && availableSuggestions.length === 0 && (
-                  <div className="flex flex-col items-center gap-3 py-6">
-                    <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span className="text-sm text-body">
-                      {isHebrew ? 'יוצר שאלות מומלצות...' : 'Generating recommended questions...'}
-                    </span>
+                  <div role="status" className="flex flex-col items-center gap-3 py-8">
+                    <Loader2 aria-hidden="true" className="size-5 animate-spin text-action" />
+                    <span className="text-copy text-body">{t('generating_recommended')}</span>
                   </div>
                 )}
 
                 {/* FALLBACK NOTICE: shown when AI was unavailable and we seeded basics */}
                 {usedFallbackQuestions && availableSuggestions.length > 0 && !refreshingSuggestions && (
-                  <div className="mb-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                    {isHebrew
-                      ? 'לא הצלחנו ליצור שאלות דרך AI כרגע, הצגנו שאלות בסיסיות להתחלה.'
-                      : "We couldn't generate AI questions right now, so we've shown basic starter questions."}
-                  </div>
+                  <Notice tone="warn" className="mb-4">{t('fallback_questions_notice')}</Notice>
                 )}
 
                 {/* SUGGESTIONS GRID: Show when there are available suggestions */}
@@ -2235,12 +2257,12 @@ export default function AIVisibilitySection({
                   <>
                     {/* Inline loading indicator — shown above the grid when adding more */}
                     {refreshingSuggestions && (
-                      <div className="flex items-center gap-2 mb-3 text-xs text-muted">
-                        <span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      <div role="status" className="mb-3 flex items-center gap-2 text-caption text-muted">
+                        <Loader2 aria-hidden="true" className="size-4 animate-spin text-action" />
                         <span>{t('generating_more')}</span>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       {visibleSliced.map((q) => (
                         <SmartQuestionCard
                           key={q.id}
@@ -2264,7 +2286,7 @@ export default function AIVisibilitySection({
                               if (!res.ok) throw new Error('Failed to add')
                               loadAllResults()
                             } catch (e) {
-                              setError(e instanceof Error ? e.message : 'Failed to add question')
+                              setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
                             }
                           }}
                           t={t}
@@ -2272,9 +2294,9 @@ export default function AIVisibilitySection({
                       ))}
                     </div>
                     {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && (
-                      <div className="text-center mt-4">
+                      <div className="mt-4 flex justify-center">
                         <Button
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           onClick={() => {
                             const newExpandedState = !showAllSmartQuestions
@@ -2297,13 +2319,13 @@ export default function AIVisibilitySection({
                       </div>
                     )}
                     {noNewSuggestionsFound && (
-                      <div className="mt-4 text-center text-xs text-body italic">
+                      <p className="mt-4 text-center text-caption text-muted">
                         {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
-                      </div>
+                      </p>
                     )}
                   </>
                 )}
-              </div>
+              </section>
             )
           })()}
         </>
@@ -2350,20 +2372,19 @@ export default function AIVisibilitySection({
           size="md"
         >
           <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-            <p className="text-sm text-slate-700 dark:text-slate-200">{t('delete_question_body')}</p>
-            <div className="flex gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
+            <p className="text-copy text-body">{t('delete_question_body')}</p>
+            <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setDeletePromptId(null)}
                 disabled={deleting}
-                className="flex-1"
               >
                 {t('cancel')}
               </Button>
               <Button
+                variant="danger"
                 onClick={() => deletePrompt(deletePromptId)}
                 loading={deleting}
-                className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white"
               >
                 {t('delete_permanently')}
               </Button>

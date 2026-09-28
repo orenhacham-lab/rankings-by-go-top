@@ -1,7 +1,10 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+import { ExternalLink, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
 import { ENGINE_META } from '../EngineIcon'
 import { cleanDisplayDomain, findMatchedLabels, highlightMatches, isTargetCitation } from './result-helpers'
 import { GeoExplanationSection, GeoInsightsCollapsible, GeoRecommendationsSection } from './ResultInsights'
@@ -26,6 +29,24 @@ export function ResultDetailDrawer({
   onClose: () => void
   t: T
 }) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose })
+
+  // A dialog: Escape closes it, and focus moves into it when it opens and
+  // back to whatever opened it (the result row) when it closes.
+  useEffect(() => {
+    if (!open) return
+    const opener = document.activeElement as HTMLElement | null
+    closeRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current() }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      opener?.focus?.()
+    }
+  }, [open])
+
   if (!open) return null
 
   const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
@@ -62,65 +83,59 @@ export function ResultDetailDrawer({
       .trim()
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-end" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-slate-900 w-full max-w-2xl h-full overflow-y-auto shadow-xl animate-in slide-in-from-right"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">{result.promptText}</h2>
-            <p className="text-sm text-muted">{engineMeta?.name || result.engine}</p>
-          </div>
-          <button onClick={onClose} className="text-muted hover:text-slate-600 dark:hover:text-slate-300 text-2xl leading-none">
-            ×
-          </button>
-        </div>
+  const summaryTone = reMentioned && reCited ? 'ok' : reMentioned || reCited ? 'info' : 'warn'
+  const summaryKey = reMentioned && reCited
+    ? 'drawer_summary_both'
+    : reMentioned
+      ? 'drawer_summary_mentioned'
+      : reCited
+        ? 'drawer_summary_cited'
+        : 'drawer_summary_none'
 
-        <div className="space-y-6 p-6">
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('scan_activity')}</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs text-slate-600 dark:text-slate-300">{t('mentioned_in_answer')}</div>
-                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted'}`}>
-                  {reMentioned ? '✓' : '—'}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-blue-600 dark:text-blue-400">{t('appeared_as_source')}</div>
-                <div className={`text-lg font-bold ${reCited ? 'text-blue-700 dark:text-blue-400' : 'text-muted'}`}>
-                  {reCited ? '✓' : '—'}
-                </div>
-              </div>
-            </div>
-            {(brandLabels.length > 0 || reDomainInSource) && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3">
-                {brandLabels.length > 0 && (
-                  <div className="inline-flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">{t('what_was_mentioned')}:</span>
-                    {brandLabels.map((label) => (
-                      <span
-                        key={label}
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {reDomainInSource && (
-                  <div className="inline-flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_appeared_as_source')}:</span>
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      {reDomainInSource}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+  return (
+    <div className="fixed inset-0 z-50">
+      <div aria-hidden="true" className="scrim-in absolute inset-0 bg-scrim" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-result-drawer-title"
+        className="absolute inset-y-0 end-0 flex w-full max-w-xl flex-col bg-surface shadow-pop"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <p className="text-overline font-semibold uppercase tracking-wide text-muted">{engineMeta?.name || result.engine}</p>
+            <h2 id="ai-result-drawer-title" className="mt-1 text-section font-semibold text-ink">{result.promptText}</h2>
           </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label={t('close')}
+            className="grid size-9 shrink-0 place-items-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+          >
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        </header>
+
+        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
+          <Notice tone={summaryTone}>{t(summaryKey)}</Notice>
+
+          {(brandLabels.length > 0 || reDomainInSource) && (
+            <dl className="space-y-1.5 text-copy">
+              {brandLabels.length > 0 && (
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="text-muted">{t('what_was_mentioned')}:</dt>
+                  <dd className="font-medium text-ink">{brandLabels.join(', ')}</dd>
+                </div>
+              )}
+              {reDomainInSource && (
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="text-muted">{t('what_appeared_as_source')}:</dt>
+                  <dd className="font-medium text-ink" dir="ltr">{reDomainInSource}</dd>
+                </div>
+              )}
+            </dl>
+          )}
 
           <GeoExplanationSection
             geoInsights={result.geoInsights}
@@ -140,63 +155,60 @@ export function ResultDetailDrawer({
             t={t}
           />
 
-          <GeoInsightsCollapsible insights={result.geoInsights} t={t} />
-
           {result.citations.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {t('sources')} ({result.citations.length})
+            <section className="space-y-2">
+              <h3 className="text-copy font-semibold text-ink">
+                {t('sources')} <span className="font-normal text-muted tabular-nums">({result.citations.length})</span>
               </h3>
-              <div className="space-y-2">
+              <ul className="divide-y divide-line rounded-inset border border-line">
                 {result.citations.map((c, i) => {
                   // Fall back to client-side www-tolerant match when backend
                   // is_target_domain wasn't set on legacy rows.
                   const isTarget = c.is_target_domain || isTargetCitation(c.domain, targetDomain)
                   const displayDomain = cleanDisplayDomain(c.domain) || c.domain
                   return (
-                    <a
-                      key={i}
-                      href={c.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition"
-                    >
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className={`font-medium ${isTarget ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                          {displayDomain}
-                        </span>
-                        {isTarget && (
-                          <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>
-                        )}
-                      </div>
-                    </a>
+                    <li key={i}>
+                      <a
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={t('open_source')}
+                        className="flex items-center gap-2 px-3 py-2.5 text-copy transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                      >
+                        <span className="min-w-0 flex-1 truncate font-medium text-ink" dir="ltr">{displayDomain}</span>
+                        {isTarget && <Badge variant="success">{t('your_domain')}</Badge>}
+                        <ExternalLink aria-hidden="true" className="size-4 shrink-0 text-muted" />
+                      </a>
+                    </li>
                   )
                 })}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
           {result.responseText && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('ai_answer')}</h3>
-              <div className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
+            <section className="space-y-2">
+              <h3 className="text-copy font-semibold text-ink">{t('ai_answer')}</h3>
+              <div className="space-y-2 rounded-inset bg-sunk p-4 text-copy text-body">
                 {cleanResponseText(result.responseText)
                   .split('\n')
                   .map((line, i) => (
-                    <p key={i} className="leading-relaxed">
+                    <p key={i}>
                       {line ? highlightMatches(line, brandVariants, targetDomain) : <br />}
                     </p>
                   ))}
               </div>
-            </div>
+            </section>
           )}
+
+          <GeoInsightsCollapsible insights={result.geoInsights} t={t} />
         </div>
 
-        <div className="sticky bottom-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
-          <Button variant="outline" onClick={onClose} className="w-full">
+        <footer className="border-t border-line px-5 py-4 sm:px-6">
+          <Button variant="secondary" onClick={onClose} className="w-full">
             {t('close')}
           </Button>
-        </div>
+        </footer>
       </div>
     </div>
   )

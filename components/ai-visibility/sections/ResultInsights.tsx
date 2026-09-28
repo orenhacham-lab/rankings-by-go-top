@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronDown } from 'lucide-react'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
 import { generateGeoExplanation } from '@/lib/ai-visibility/geo-explanations'
 import { generateGeoRecommendations } from '@/lib/ai-visibility/geo-recommendations'
@@ -42,19 +43,14 @@ export function GeoExplanationSection({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 p-4 space-y-2">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-        {t('geo_explanation_title')}
-      </h3>
-      <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+    <section className="space-y-2">
+      <h3 className="text-copy font-semibold text-ink">{t('geo_explanation_title')}</h3>
+      <ul className="list-disc space-y-1.5 ps-5 text-copy text-body marker:text-line-strong">
         {explanation.bullets.map((bullet, i) => (
-          <li key={i} className="flex gap-2">
-            <span className="text-muted flex-shrink-0">•</span>
-            <span>{bullet}</span>
-          </li>
+          <li key={i}>{bullet}</li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }
 
@@ -91,14 +87,10 @@ export function GeoRecommendationsSection({
   if (recs.length === 0) {
     if (displayMentioned && displayCited) {
       // Positive reinforcement: business is appearing well
-      fallbackText = isHebrew
-        ? 'שמרו על תוכן ברור עם מחירים, ביקורות והמלצות כדי לחזק את הופעתכם בתוצאות דומות.'
-        : 'Keep your content clear with pricing, reviews, and recommendations to strengthen your visibility in similar queries.'
+      fallbackText = t('drawer_keep_going')
     } else {
       // Generic: no clear improvements detected
-      fallbackText = isHebrew
-        ? 'לא זוהו פעולות שיפור ברורות בתוצאה הזו.'
-        : 'No clear improvements were detected in this result.'
+      fallbackText = t('drawer_no_improvements')
     }
   }
 
@@ -106,25 +98,18 @@ export function GeoRecommendationsSection({
   if (recs.length === 0 && !fallbackText) return null
 
   return (
-    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-2">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-        {t('geo_recommendations_title')}
-      </h3>
+    <section className="space-y-2">
+      <h3 className="text-copy font-semibold text-ink">{t('geo_recommendations_title')}</h3>
       {recs.length > 0 ? (
-        <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+        <ul className="list-disc space-y-1.5 ps-5 text-copy text-body marker:text-line-strong">
           {recs.map((r) => (
-            <li key={r.key} className="flex gap-2">
-              <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">→</span>
-              <span>{r.text}</span>
-            </li>
+            <li key={r.key}>{r.text}</li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          {fallbackText}
-        </p>
+        <p className="text-copy text-muted">{fallbackText}</p>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -193,73 +178,39 @@ export function GeoInsightsCollapsible({
   }
 
   return (
-    <details className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 group">
-      <summary className="cursor-pointer list-none p-3 flex items-center justify-between gap-2 select-none hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg">
-        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-          {t('geo_insights_title')} <span className="text-muted">· {t('geo_technical_details')}</span>
+    <details className="group rounded-inset border border-line">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-inset px-4 py-3 select-none transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+        <span className="text-caption font-semibold text-body">
+          {t('geo_insights_title')} <span className="font-normal text-muted">· {t('geo_technical_details')}</span>
         </span>
-        <span className="text-muted text-xs group-open:rotate-180 transition-transform">▾</span>
+        <ChevronDown aria-hidden="true" className="size-4 text-muted transition-transform duration-150 ease-snappy group-open:rotate-180" />
       </summary>
-      <div className="p-4 pt-0 space-y-3 border-t border-slate-200 dark:border-slate-700 mt-0">
+      <dl className="space-y-2 border-t border-line px-4 py-3">
         {data.queryIntents.length > 0 && (
-          <div className="pt-3">
-            <GeoChipRow
-              label={t('geo_query_intent')}
-              chips={data.queryIntents.map((i) => intentLabel(i))}
-              tone="indigo"
-            />
-          </div>
+          <GeoChipRow label={t('geo_query_intent')} chips={data.queryIntents.map((i) => intentLabel(i))} />
         )}
 
         {data.citationTypes.filter((c) => c !== 'unknown').length > 0 && (
           <GeoChipRow
             label={t('geo_citation_types')}
             chips={data.citationTypes.filter((c) => c !== 'unknown').map((c) => citationLabel(c))}
-            tone="slate"
           />
         )}
 
         {activeSignals.length > 0 && (
-          <GeoChipRow
-            label={t('geo_content_signals')}
-            chips={activeSignals.map((s) => s.label)}
-            tone="emerald"
-          />
+          <GeoChipRow label={t('geo_content_signals')} chips={activeSignals.map((s) => s.label)} />
         )}
-      </div>
+      </dl>
     </details>
   )
 }
 
-function GeoChipRow({
-  label,
-  chips,
-  tone,
-}: {
-  label: string
-  chips: string[]
-  tone: 'indigo' | 'slate' | 'emerald'
-}) {
-  const toneClasses =
-    tone === 'indigo'
-      ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-      : tone === 'emerald'
-      ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600'
-
+/** One line of the technical details: a caption label and its values, as plain text. */
+function GeoChipRow({ label, chips }: { label: string; chips: string[] }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="text-[11px] text-muted font-medium">
-        {label}:
-      </span>
-      {chips.map((c, i) => (
-        <span
-          key={`${c}-${i}`}
-          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${toneClasses}`}
-        >
-          {c}
-        </span>
-      ))}
+    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-caption">
+      <dt className="font-medium text-muted">{label}:</dt>
+      <dd className="text-body">{chips.join(' · ')}</dd>
     </div>
   )
 }

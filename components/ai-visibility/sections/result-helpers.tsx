@@ -42,7 +42,7 @@ export function highlightMatches(
       return (
         <span
           key={i}
-          className="font-bold text-emerald-700 bg-emerald-50 px-1 rounded"
+          className="font-bold text-ok bg-ok-soft px-1 rounded-control"
         >
           {part}
         </span>
