@@ -11,10 +11,12 @@
  *
  * Renders nothing while the report tables are not installed.
  */
-import { CalendarRange, Loader2, Plus } from 'lucide-react'
+import { CalendarRange, Plus } from 'lucide-react'
 import type { Locale } from '@/lib/i18n/locales'
 import type { MonthlyGetResponse } from '@/lib/reports/monthly/http'
 import Button from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { PositionChange } from '@/components/ui/StatusBadge'
 import { WidgetError } from '@/components/dashboard/ui'
 import { cn } from '@/lib/utils'
 import { count, dayMonth, monthName, monthlyCopy } from './copy'
@@ -39,14 +41,14 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
   const nextDate = dayMonth(body.nextReportAt, l)
 
   const missing = body.missingMonth && (
-    <div data-monthly-missing={body.missingMonth} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-action/20 bg-action-soft/60 px-5 py-4">
+    <div data-monthly-missing={body.missingMonth} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line border-s-[3px] border-s-action bg-surface px-5 py-4 shadow-card sm:px-6">
       <div className="min-w-0 max-w-2xl">
         <p className="text-copy font-semibold text-ink">{t.missingTitle(monthName(body.missingMonth, l))}</p>
-        <p className="mt-0.5 text-caption text-muted">{t.missingBody}</p>
+        <p className="mt-0.5 max-w-prose text-copy text-muted">{t.missingBody}</p>
         {generating === 'failed' && <p role="alert" className="mt-1 text-caption font-medium text-bad">{t.missingFailed}</p>}
       </div>
       <Button size="sm" onClick={onGenerate} loading={generating === 'busy'}>
-        <Plus size={14} aria-hidden="true" /> {t.missingAction(monthName(body.missingMonth, l))}
+        <Plus aria-hidden="true" className="size-4" /> {t.missingAction(monthName(body.missingMonth, l))}
       </Button>
     </div>
   )
@@ -55,15 +57,15 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
     return (
       <div className="space-y-4">
         {missing}
-        <div data-monthly-first="" className="grid gap-5 rounded-card border border-dashed border-line-strong bg-surface p-6 md:grid-cols-[auto_minmax(0,1fr)]">
-          <span aria-hidden="true" className="grid size-12 place-items-center rounded-2xl bg-action-soft text-action ring-1 ring-action/10">
-            <CalendarRange size={22} />
+        <div data-monthly-first="" className="grid gap-4 rounded-card border border-line bg-sunk p-5 sm:p-6 md:grid-cols-[auto_minmax(0,1fr)]">
+          <span aria-hidden="true" className="grid size-10 place-items-center rounded-inset bg-action-soft text-action">
+            <CalendarRange className="size-5" />
           </span>
           <div className="min-w-0">
             {/* With last month missing, the banner above is the action; this card only
                 says what a report holds and that the next one needs no click. */}
-            <h3 className="text-section font-bold text-ink">{body.missingMonth ? t.insideTitle : t.firstTitle(nextDate)}</h3>
-            <p className="mt-1 max-w-2xl text-copy text-muted">
+            <h3 className="text-section font-semibold text-ink">{body.missingMonth ? t.insideTitle : t.firstTitle(nextDate)}</h3>
+            <p className="mt-1 max-w-prose text-copy text-muted">
               {body.missingMonth ? t.insideBody(nextDate) : t.firstBody(monthName(prevMonthKey(body.nextReportAt), l))}
             </p>
             <ul className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
@@ -85,7 +87,7 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
       {missing}
       <div className="grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start">
         <nav aria-label={t.monthsLabel} className="lg:sticky lg:top-20">
-          <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-muted">{t.monthsLabel}</p>
+          <p className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.monthsLabel}</p>
           <ul className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
             {body.months.map((m) => {
               const active = m.month === current
@@ -94,15 +96,15 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
                   <button type="button" onClick={() => onSelect(m.month)} aria-current={active ? 'true' : undefined}
                     data-month={m.month}
                     className={cn(
-                      'flex w-full min-w-[10rem] flex-col items-start rounded-xl border px-3.5 py-2.5 text-start transition-[background-color,border-color,box-shadow] duration-150',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-                      active ? 'border-action/30 bg-action-soft shadow-card' : 'border-line bg-surface hover:border-line-strong hover:bg-sunk/60',
+                      'flex w-full min-w-[10rem] flex-col items-start rounded-inset border px-3.5 py-2.5 text-start transition-[background-color,border-color,box-shadow] duration-150 ease-snappy',
+                      'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+                      active ? 'border-action bg-surface shadow-control' : 'border-line bg-surface hover:border-line-strong',
                     )}>
                     <span className={cn('text-copy font-semibold', active ? 'text-action' : 'text-ink')}>{monthName(m.month, l)}</span>
-                    <span className="mt-0.5 text-caption tabular-nums text-muted">
-                      {t.tiles.firstPage}: {count(m.firstPageEnd, l)}
-                      {m.improvedCount > 0 && <span className="text-ok"> · ▲{count(m.improvedCount, l)}</span>}
-                      {m.droppedCount > 0 && <span className="text-bad"> · ▼{count(m.droppedCount, l)}</span>}
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-caption tabular-nums text-muted [&>span]:text-caption">
+                      <span>{t.tiles.firstPage}: {count(m.firstPageEnd, l)}</span>
+                      {m.improvedCount > 0 && <PositionChange change={m.improvedCount} />}
+                      {m.droppedCount > 0 && <PositionChange change={-m.droppedCount} />}
                     </span>
                   </button>
                 </li>
@@ -147,21 +149,24 @@ export default function MonthlyReports({ projectId, projectLabel, language, toas
   return (
     <section id={MONTHLY_REPORTS_ANCHOR} aria-labelledby="monthly-reports-title" data-monthly-reports={load.status} className="mb-8 scroll-mt-20">
       <div className="mb-4 flex items-start gap-3">
-        <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-action text-action-ink shadow-sm ring-1 ring-action/20">
-          <CalendarRange size={19} strokeWidth={2} />
+        <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
+          <CalendarRange strokeWidth={2} className="size-5" />
         </span>
         <div className="min-w-0">
-          <h2 id="monthly-reports-title" className="text-section font-bold text-ink">{t.title}</h2>
-          <p className="mt-0.5 max-w-3xl text-copy text-muted">{t.subtitle}</p>
+          <h2 id="monthly-reports-title" className="text-section font-semibold text-ink">{t.title}</h2>
+          <p className="mt-0.5 max-w-prose text-copy text-muted">{t.subtitle}</p>
         </div>
       </div>
       {load.status === 'loading' && (
-        <div className="flex items-center gap-2 rounded-card border border-line bg-surface px-5 py-8 text-copy text-muted" aria-busy="true">
-          <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> {t.loading}
+        <div className="space-y-3 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6" role="status" aria-busy="true">
+          <span className="sr-only">{t.loading}</span>
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-full max-w-prose" />
+          <Skeleton className="h-4 w-2/3 max-w-prose" />
         </div>
       )}
       {load.status === 'error' && (
-        <div className="rounded-card border border-line bg-surface px-5 py-5">
+        <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
           <WidgetError message={t.loadError} retryLabel={t.retry} onRetry={reload} />
         </div>
       )}

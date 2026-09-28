@@ -92,12 +92,12 @@ export default function SeedNotice({
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface', tone === 'info' ? 'text-info' : 'text-warn')}>
+        <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-surface', tone === 'info' ? 'text-info' : 'text-warn')}>
           <Icon className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink">{title}</p>
-          <p className="mt-0.5 text-sm leading-6 text-body">{body}</p>
+          <p className="text-copy font-semibold text-ink">{title}</p>
+          <p className="mt-0.5 text-copy text-body">{body}</p>
         </div>
       </div>
       {action && <div className="shrink-0">{action}</div>}

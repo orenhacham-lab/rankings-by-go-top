@@ -80,7 +80,7 @@ export default function FirstArticleButton({
     <div className="mt-5 rounded-control border border-dashed border-line-strong p-4 sm:p-5" data-first-article={state.kind}>
       {state.kind === 'idle' && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted">{t.hint}</p>
+          <p className="text-copy text-muted">{t.hint}</p>
           <Button variant="secondary" onClick={() => setOpen(true)} className="shrink-0">
             <PenLine className="h-4 w-4" aria-hidden />
             {t.button}
@@ -92,15 +92,15 @@ export default function FirstArticleButton({
         <div className="flex items-start gap-3" role="status">
           <LoaderCircle className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-action motion-reduce:animate-none" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-ink">{t.writing}</p>
-            <p className="mt-0.5 text-sm text-muted">{t.writingHint}</p>
+            <p className="text-copy font-semibold text-ink">{t.writing}</p>
+            <p className="mt-0.5 text-copy text-muted">{t.writingHint}</p>
           </div>
         </div>
       )}
 
       {state.kind === 'ready' && (
         <div className="animate-pop-in flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" role="status">
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-ok">
+          <p className="inline-flex items-center gap-2 text-copy font-semibold text-ok">
             <Check className="h-4 w-4" strokeWidth={3} aria-hidden />
             {t.ready}
           </p>
@@ -112,7 +112,7 @@ export default function FirstArticleButton({
 
       {state.kind === 'error' && (
         <div className="animate-pop-in flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" role="alert" data-article-error={state.error}>
-          <p className="text-sm leading-6 text-body">{t.errors[state.error]}</p>
+          <p className="text-copy text-body">{t.errors[state.error]}</p>
           {retryable && topicId && (
             <Button variant="secondary" onClick={() => void generate(topicId)} className="shrink-0">
               {t.retry}

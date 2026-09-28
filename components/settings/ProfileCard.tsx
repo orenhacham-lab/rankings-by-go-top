@@ -225,9 +225,9 @@ export default function ProfileCard({
                   key={type}
                   data-commerce={type}
                   className={cn(
-                    'relative flex cursor-pointer flex-col gap-1 rounded-xl border p-3.5 transition-[border-color,background-color,box-shadow,transform] duration-150 active:scale-[0.99]',
-                    'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-action',
-                    on ? 'border-action bg-action-soft shadow-[inset_0_0_0_1px_var(--color-action)]' : 'border-line bg-surface hover:border-line-strong hover:bg-sunk/60',
+                    'relative flex cursor-pointer flex-col gap-1 rounded-inset border p-3.5 transition-[border-color,background-color,box-shadow] duration-150 ease-snappy',
+                    'has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-action/20',
+                    on ? 'border-action bg-surface ring-1 ring-action' : 'border-line bg-surface hover:border-line-strong',
                   )}
                 >
                   <input
@@ -242,15 +242,15 @@ export default function ProfileCard({
                     <span
                       aria-hidden
                       className={cn(
-                        'grid size-9 place-items-center rounded-lg transition-colors duration-150',
-                        on ? 'bg-action text-action-ink' : 'bg-sunk text-muted',
+                        'grid size-10 place-items-center rounded-inset transition-colors duration-150 ease-snappy',
+                        on ? 'bg-action-soft text-action' : 'bg-sunk text-muted',
                       )}
                     >
-                      <Icon size={18} />
+                      <Icon className="size-5" />
                     </span>
                     {on && (
-                      <span aria-hidden className="grid size-5 place-items-center rounded-full bg-action text-action-ink animate-pop-in">
-                        <Check size={12} strokeWidth={3} />
+                      <span aria-hidden className="grid size-5 place-items-center rounded-pill bg-action text-action-ink motion-safe:animate-pop-in">
+                        <Check className="size-3" strokeWidth={3} />
                       </span>
                     )}
                   </span>

@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from 'react'
 import { Globe, MapPin, Plus, Trash2, Users } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Segmented from '@/components/ui/Segmented'
 import { saveProjectSettingsAction } from '@/app/(dashboard)/settings/actions'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
@@ -242,38 +243,22 @@ export default function AudienceCard({
             />
           </div>
 
-          <div role="radiogroup" aria-labelledby={`${ids}-local-label`}>
+          <div>
             <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
               <span id={`${ids}-local-label`} className="text-copy font-semibold text-ink">{t.audience.localLabel}</span>
               {fieldChip('is_local', localChanged)}
             </div>
-            <div className="grid grid-cols-1 gap-1 rounded-control border border-line bg-sunk p-1 sm:grid-cols-2">
-              {localOptions.map((option) => {
-                const on = draft.is_local === option.value
-                const Icon = option.icon
-                return (
-                  <label
-                    key={String(option.value)}
-                    data-local={String(option.value)}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-2 rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-copy transition-[background-color,color,box-shadow] duration-150',
-                      'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-action',
-                      on ? 'bg-surface font-semibold text-ink shadow-card' : 'text-muted hover:text-body',
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name={`${ids}-local`}
-                      checked={on}
-                      onChange={() => edit((d) => ({ ...d, is_local: option.value }))}
-                      className="sr-only"
-                    />
-                    <Icon size={15} aria-hidden className={on ? 'text-action' : undefined} />
-                    <span className="min-w-0">{option.label}</span>
-                  </label>
-                )
-              })}
-            </div>
+            <Segmented
+              ariaLabel={t.audience.localLabel}
+              fill
+              value={draft.is_local === null ? '' : draft.is_local ? 'yes' : 'no'}
+              onChange={(v) => edit((d) => ({ ...d, is_local: v === 'yes' }))}
+              options={localOptions.map((option) => ({
+                value: option.value ? 'yes' : 'no',
+                icon: option.icon,
+                label: <span data-local={String(option.value)}>{option.label}</span>,
+              }))}
+            />
           </div>
         </div>
 
@@ -285,7 +270,7 @@ export default function AudienceCard({
             </span>
           </div>
           {draft.rows.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line-strong bg-sunk/40 px-4 py-6 text-center text-copy text-muted">{t.audience.empty}</p>
+            <p className="rounded-inset bg-sunk px-4 py-6 text-center text-copy text-muted">{t.audience.empty}</p>
           ) : (
             <ol aria-labelledby={`${ids}-audiences`} className="space-y-2">
               {draft.rows.map((row, i) => {
@@ -317,9 +302,9 @@ export default function AudienceCard({
                       onClick={() => edit((d) => ({ ...d, rows: d.rows.filter((r) => r.key !== row.key) }))}
                       aria-label={`${t.audience.remove} ${i + 1}`}
                       title={t.audience.remove}
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-control text-muted transition-colors hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
                     >
-                      <Trash2 size={16} aria-hidden />
+                      <Trash2 aria-hidden className="size-4" />
                     </button>
                   </li>
                 )
@@ -336,7 +321,7 @@ export default function AudienceCard({
                   edit((d) => ({ ...d, rows: [...d.rows, row] }))
                 }}
               >
-                <Plus size={14} aria-hidden />
+                <Plus aria-hidden className="size-4" />
                 {t.audience.add}
               </Button>
             ) : (

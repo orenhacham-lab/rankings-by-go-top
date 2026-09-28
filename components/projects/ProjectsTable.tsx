@@ -69,7 +69,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
   return (
     <>
       <div className="relative mb-4 w-full max-w-sm">
-        <Search size={16} aria-hidden className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted" />
+        <Search aria-hidden className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
         <input
           type="search"
           placeholder={dict.projects.searchPlaceholder}
@@ -103,14 +103,14 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
             // The same three actions as before, behind "⋯" like every other table:
             // delete only opens the confirmation dialog.
             const menu: RowMenuItem[] = [
-              { key: 'edit', label: dict.projects.actions.edit, icon: <Pencil size={15} aria-hidden="true" />, onSelect: () => setEditingProject(project) },
+              { key: 'edit', label: dict.projects.actions.edit, icon: <Pencil aria-hidden="true" className="size-4" />, onSelect: () => setEditingProject(project) },
               {
                 key: 'toggle', label: project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate,
                 disabled: togglingId === project.id,
-                icon: project.is_active ? <PauseCircle size={15} aria-hidden="true" /> : <PlayCircle size={15} aria-hidden="true" />,
+                icon: project.is_active ? <PauseCircle aria-hidden="true" className="size-4" /> : <PlayCircle aria-hidden="true" className="size-4" />,
                 onSelect: () => { void handleToggleActive(project) },
               },
-              { key: 'delete', label: dict.projects.actions.delete, danger: true, icon: <Trash2 size={15} aria-hidden="true" />, onSelect: () => setDeletingProject(project) },
+              { key: 'delete', label: dict.projects.actions.delete, danger: true, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => setDeletingProject(project) },
             ]
             return (
             <TableRow key={project.id} className="max-sm:[&>td]:px-2.5">
@@ -138,7 +138,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
                   ) : <span className="text-muted">—</span>}
                 </Td>
               )}
-              <Td className="hidden md:table-cell"><span dir="ltr" className="font-mono text-caption text-body">{project.target_domain}</span></Td>
+              <Td className="hidden md:table-cell"><span dir="ltr" title={project.target_domain} className="block max-w-64 truncate text-caption text-muted">{project.target_domain}</span></Td>
               <Td className="hidden lg:table-cell">
                 <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
                   {localizedFrequency(project.scan_frequency)}

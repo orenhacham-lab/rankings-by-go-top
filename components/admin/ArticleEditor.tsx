@@ -4,6 +4,8 @@ import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import { useCallback, useEffect } from 'react'
+import { Bold, Heading2, Heading3, Italic, Link2, List, ListOrdered, RemoveFormatting, Unlink } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface ArticleEditorProps {
   value: string
@@ -78,34 +80,34 @@ export default function ArticleEditor({ value, onChange }: ArticleEditorProps) {
   if (!editor) return null
 
   const btn = (active: boolean) =>
-    `px-2.5 py-1.5 rounded text-sm font-medium border transition-colors ${
-      active
-        ? 'bg-indigo-50 text-indigo-700 border-indigo-400'
-        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-    }`
+    cn(
+      'inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-caption font-semibold transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+      active ? 'bg-action-soft text-action' : 'text-body hover:bg-surface hover:text-ink',
+    )
+  const sep = <span aria-hidden className="mx-1 w-px self-stretch bg-line" />
 
   return (
-    <div className="border border-slate-300 rounded-lg overflow-hidden">
-      <div className="flex flex-wrap gap-1 p-2 border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
-        <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(state?.isBold ?? false)} title="מודגש"><strong>B</strong></button>
-        <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(state?.isItalic ?? false)} title="נטוי"><em>I</em></button>
-        <span className="w-px bg-slate-300 mx-1 self-stretch" />
-        <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(state?.isH2 ?? false)}>H2</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btn(state?.isH3 ?? false)}>H3</button>
-        <span className="w-px bg-slate-300 mx-1 self-stretch" />
-        <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(state?.isBullet ?? false)}>• רשימה</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(state?.isOrdered ?? false)}>1. רשימה</button>
-        <span className="w-px bg-slate-300 mx-1 self-stretch" />
-        <button type="button" onClick={setLink} className={btn(state?.isLink ?? false)} title="הוסף/ערוך קישור">🔗 קישור</button>
+    <div className="overflow-hidden rounded-inset border border-line bg-surface shadow-control">
+      <div role="toolbar" aria-label="עיצוב טקסט" className="sticky top-0 z-10 flex flex-wrap gap-1 border-b border-line bg-sunk p-1.5">
+        <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(state?.isBold ?? false)} aria-pressed={state?.isBold ?? false} aria-label="מודגש" title="מודגש"><Bold aria-hidden className="size-4" /></button>
+        <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(state?.isItalic ?? false)} aria-pressed={state?.isItalic ?? false} aria-label="נטוי" title="נטוי"><Italic aria-hidden className="size-4" /></button>
+        {sep}
+        <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(state?.isH2 ?? false)} aria-pressed={state?.isH2 ?? false} aria-label="כותרת משנה" title="כותרת משנה"><Heading2 aria-hidden className="size-4" /></button>
+        <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btn(state?.isH3 ?? false)} aria-pressed={state?.isH3 ?? false} aria-label="כותרת קטנה" title="כותרת קטנה"><Heading3 aria-hidden className="size-4" /></button>
+        {sep}
+        <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(state?.isBullet ?? false)} aria-pressed={state?.isBullet ?? false}><List aria-hidden className="size-4" />רשימה</button>
+        <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(state?.isOrdered ?? false)} aria-pressed={state?.isOrdered ?? false}><ListOrdered aria-hidden className="size-4" />רשימה ממוספרת</button>
+        {sep}
+        <button type="button" onClick={setLink} className={btn(state?.isLink ?? false)} title="הוספה או עריכה של קישור"><Link2 aria-hidden className="size-4" />קישור</button>
         {state?.isLink && (
-          <button type="button" onClick={removeLink} className="px-2.5 py-1.5 rounded text-sm font-medium border border-red-300 bg-white text-red-600 hover:bg-red-50 transition-colors" title="הסר קישור">❌ הסר</button>
+          <button type="button" onClick={removeLink} className={cn(btn(false), 'text-bad hover:bg-bad-soft hover:text-bad')} title="הסרת הקישור"><Unlink aria-hidden className="size-4" />הסרה</button>
         )}
-        <span className="w-px bg-slate-300 mx-1 self-stretch" />
-        <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} className={btn(false)}>✕ נקה</button>
+        {sep}
+        <button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} className={btn(false)}><RemoveFormatting aria-hidden className="size-4" />ניקוי עיצוב</button>
       </div>
       <EditorContent
         editor={editor}
-        className="article-editor-content max-w-none p-5 min-h-[420px] text-slate-700 leading-relaxed focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[400px] [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-6 [&_h2]:mb-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-5 [&_h3]:mb-2 [&_p]:mb-4 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pr-6 [&_ul]:mb-4 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pr-6 [&_ol]:mb-4 [&_ol]:space-y-1 [&_a]:text-blue-600 [&_a]:underline [&_blockquote]:border-r-4 [&_blockquote]:border-slate-300 [&_blockquote]:pr-4 [&_blockquote]:text-slate-600 [&_blockquote]:my-4"
+        className="article-editor-content min-h-[420px] max-w-none p-5 text-copy leading-relaxed text-body focus:outline-none [&_.ProseMirror]:min-h-[400px] [&_.ProseMirror]:outline-none [&_h2]:mb-3 [&_h2]:mt-6 [&_h2]:text-title [&_h2]:font-bold [&_h2]:text-ink [&_h3]:mb-2 [&_h3]:mt-5 [&_h3]:text-section [&_h3]:font-bold [&_h3]:text-ink [&_p]:mb-4 [&_p]:leading-relaxed [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pe-0 [&_ul]:ps-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:ps-6 [&_a]:text-action [&_a]:underline [&_blockquote]:my-4 [&_blockquote]:border-s-4 [&_blockquote]:border-line-strong [&_blockquote]:ps-4 [&_blockquote]:text-muted"
       />
     </div>
   )

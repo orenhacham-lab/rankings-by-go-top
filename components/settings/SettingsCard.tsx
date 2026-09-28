@@ -37,25 +37,21 @@ export default function SettingsCard({
     <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20">
       {/* overflow-clip, not overflow-hidden: it rounds the corners the same way but is not a
           scroll container, so the footer below can stick to the bottom of the screen. */}
-      <Card padding={false} className={cn('overflow-clip', danger && 'border-bad/30')}>
-        <header
-          className={cn(
-            'flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b px-5 py-4 sm:px-6 sm:py-5',
-            danger ? 'border-bad/15 bg-bad-soft/70' : 'border-line bg-gradient-to-b from-sunk/70 to-surface',
-          )}
-        >
+      <Card padding={false} className={cn('overflow-clip', danger && 'border-s-[3px] border-s-bad')}>
+        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-line px-5 py-4 sm:px-6 sm:py-5">
           <div className="flex min-w-0 flex-1 items-start gap-3.5">
+            {/* One accent per card: the icon squircle, or for the danger zone its start border. */}
             <span
               aria-hidden
               className={cn(
-                'grid size-10 shrink-0 place-items-center rounded-xl shadow-sm ring-1',
-                danger ? 'bg-surface text-bad ring-bad/25' : 'bg-action text-action-ink ring-action/20',
+                'grid size-10 shrink-0 place-items-center rounded-inset [&_svg]:size-5',
+                danger ? 'bg-bad-soft text-bad' : 'bg-action-soft text-action',
               )}
             >
-              <Icon size={19} strokeWidth={2} />
+              <Icon strokeWidth={2} />
             </span>
             <div className="min-w-0 pt-0.5">
-              <h2 id={`${id}-title`} className={cn('text-section font-bold', danger ? 'text-bad' : 'text-ink')}>{title}</h2>
+              <h2 id={`${id}-title`} className="text-section font-semibold text-ink">{title}</h2>
               {description && <p className="mt-0.5 max-w-prose text-copy text-muted text-pretty">{description}</p>}
             </div>
           </div>
@@ -66,9 +62,9 @@ export default function SettingsCard({
           <footer
             className={cn(
               'sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface/90 px-5 py-3 backdrop-blur-md sm:px-6',
-              'transition-colors duration-200',
-              // SaveBar marks itself while there is something unsaved: the footer warms to say so.
-              'has-[[data-dirty]]:border-commit/40 has-[[data-dirty]]:bg-commit-soft/95',
+              'transition-colors duration-150 ease-snappy',
+              // SaveBar marks itself while there is something unsaved: the footer's rule takes the action colour.
+              'has-[[data-dirty]]:border-action/40',
             )}
           >
             {footer}
@@ -91,6 +87,6 @@ export function FieldLabel({ htmlFor, children, aside }: { htmlFor?: string; chi
 
 /** The settings screen's own text field and area: the app's tokens, full width. */
 export const fieldClass =
-  'w-full rounded-control border border-line bg-surface px-3 py-2 text-copy text-ink shadow-sm placeholder:text-muted ' +
-  'transition-[border-color,box-shadow] duration-150 hover:border-line-strong ' +
+  'w-full rounded-control border border-line bg-surface px-3 py-2 text-copy text-ink shadow-control placeholder:text-muted ' +
+  'transition-[border-color,box-shadow] duration-150 ease-snappy hover:border-line-strong ' +
   'focus:border-action focus:outline-none focus:ring-4 focus:ring-action/20 disabled:cursor-not-allowed disabled:bg-sunk disabled:text-muted'

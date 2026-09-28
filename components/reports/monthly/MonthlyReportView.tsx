@@ -18,6 +18,7 @@ import {
 import type { Locale } from '@/lib/i18n/locales'
 import type { KeywordMove, MonthlyReportData } from '@/lib/reports/monthly/types'
 import { LinkButton, StatusPill, WidgetEmpty } from '@/components/dashboard/ui'
+import { PositionChange } from '@/components/ui/StatusBadge'
 import { SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
 import { strategyHref } from '@/lib/content/strategy/view'
 import { cn } from '@/lib/utils'
@@ -44,26 +45,33 @@ function Section({ id, title, subtitle, icon, children, className }: {
   return (
     <section data-monthly-section={id} aria-labelledby={`monthly-${id}-title`}
       className={cn('min-w-0 rounded-card border border-line bg-surface shadow-card', className)}>
-      <header className="flex items-start gap-3 px-5 pt-5">
-        <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-xl bg-action-soft text-action ring-1 ring-action/10">
+      <header className="flex items-start gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
+        <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action [&_svg]:size-5">
           {icon}
         </span>
         <div className="min-w-0">
-          <h3 id={`monthly-${id}-title`} className="text-section font-bold text-ink">{title}</h3>
+          <h3 id={`monthly-${id}-title`} className="text-section font-semibold text-ink">{title}</h3>
           {subtitle && <p className="mt-0.5 text-caption text-muted">{subtitle}</p>}
         </div>
       </header>
-      <div className="px-5 pb-5 pt-4">{children}</div>
+      <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">{children}</div>
     </section>
   )
 }
 
 function Figure({ label, value, note, tone }: { label: string; value: string; note?: string; tone?: 'up' | 'down' }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-white/10">
+    <div className="flex min-w-0 flex-col rounded-inset bg-white/[0.06] px-4 py-3 ring-1 ring-white/10">
       <span className="text-caption font-medium text-contrast-ink/75">{label}</span>
-      <span className={cn('mt-1 text-metric font-semibold tabular-nums',
-        tone === 'up' && 'text-[#86efac]', tone === 'down' && 'text-[#fca5a5]')}>{value}</span>
+      <span className="mt-1 flex items-center gap-2">
+        <span className="text-metric font-bold tabular-nums">{value}</span>
+        {/* Up or down in ok / bad, on a surface chip so it reads on the navy band in both themes. */}
+        {tone && (
+          <span data-figure-tone={tone} className={cn('grid size-6 place-items-center rounded-pill bg-surface', tone === 'up' ? 'text-ok' : 'text-bad')}>
+            {tone === 'up' ? <TrendingUp aria-hidden="true" className="size-3.5" /> : <TrendingDown aria-hidden="true" className="size-3.5" />}
+          </span>
+        )}
+      </span>
       {note && <span className="mt-1 text-caption text-contrast-ink/70">{note}</span>}
     </div>
   )
@@ -79,11 +87,9 @@ function MoveRow({ move, t, direction }: { move: KeywordMove; t: MonthlyCopy; di
       </span>
       <span className="flex shrink-0 items-center gap-2 text-caption tabular-nums text-muted">
         <span>{pos(move.from)}</span>
-        <ArrowRight size={13} aria-hidden="true" className="rtl:-scale-x-100" />
+        <ArrowRight aria-hidden="true" className="size-3.5 rtl:-scale-x-100" />
         <span className="font-semibold text-ink">{pos(move.to)}</span>
-        <StatusPill tone={direction === 'up' ? 'ok' : 'bad'}>
-          {direction === 'up' ? '▲' : '▼'} {Math.abs(move.change)}
-        </StatusPill>
+        <PositionChange change={direction === 'up' ? Math.abs(move.change) : -Math.abs(move.change)} />
       </span>
     </li>
   )
@@ -139,8 +145,8 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
   }
 
   return (
-    <article data-monthly-report={data.month} data-empty-month={empty ? 'true' : 'false'} className="animate-pop-in space-y-5">
-      <div className="relative isolate overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-pop sm:p-7">
+    <article data-monthly-report={data.month} data-empty-month={empty ? 'true' : 'false'} className="motion-safe:animate-pop-in space-y-5">
+      <div className="relative isolate overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-card sm:p-6">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(36rem_16rem_at_85%_-20%,rgb(99_130_246/0.35),transparent_70%)] rtl:bg-[radial-gradient(36rem_16rem_at_15%_-20%,rgb(99_130_246/0.35),transparent_70%)]" />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -148,12 +154,12 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
               {generatedBy === 'owner' ? t.generatedOwner(dayMonth(generatedAt, l)) : t.generatedAuto(dayMonth(generatedAt, l))}
             </p>
             <h3 className="mt-1 text-title font-bold">{month}</h3>
-            <p data-headline="" className="mt-2 max-w-2xl text-[0.9375rem] leading-6 text-contrast-ink/85">{headline(data, l)}</p>
+            <p data-headline="" className="mt-2 max-w-prose text-copy text-contrast-ink/85">{headline(data, l)}</p>
             {data.coversFrom && <p className="mt-2 text-caption text-contrast-ink/70">{t.coversFrom(dayMonth(data.coversFrom, l))}</p>}
           </div>
           <button type="button" onClick={copySummary}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-control bg-white/10 px-3 text-caption font-semibold text-contrast-ink ring-1 ring-white/15 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
-            {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-control bg-white/10 px-3 text-caption font-semibold text-contrast-ink ring-1 ring-white/15 transition-colors duration-150 ease-snappy hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">
+            {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
             <span aria-live="polite">{copied ? t.copied : t.copy}</span>
           </button>
         </div>
@@ -217,7 +223,7 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
                   [t.aiMentions, `${count(data.ai.mentions, l)}${data.ai.mentionRate !== null ? ` · ${decimal(data.ai.mentionRate, l)}%` : ''}`],
                   [t.aiCitations, count(data.ai.citations, l)],
                 ].map(([label, value]) => (
-                  <div key={label} className="min-w-0 rounded-xl bg-sunk px-3 py-2.5">
+                  <div key={label} className="min-w-0 rounded-inset bg-sunk px-3 py-2.5">
                     <dt className="text-caption text-muted">{label}</dt>
                     <dd className="mt-0.5 text-section font-semibold tabular-nums text-ink">{value}</dd>
                   </div>
@@ -240,12 +246,12 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
                     [t.gscClicks, data.gsc.current!.clicks, data.gsc.previous?.clicks],
                     [t.gscImpressions, data.gsc.current!.impressions, data.gsc.previous?.impressions],
                   ] as const).map(([label, value, before]) => (
-                    <div key={label} className="min-w-0 rounded-xl bg-sunk px-3 py-2.5">
+                    <div key={label} className="min-w-0 rounded-inset bg-sunk px-3 py-2.5">
                       <dt className="text-caption text-muted">{label}</dt>
                       <dd className="mt-0.5 flex flex-wrap items-baseline gap-2">
                         <span className="text-section font-semibold tabular-nums text-ink">{count(value, l)}</span>
                         {typeof before === 'number' && before !== value && (
-                          <StatusPill tone={value > before ? 'ok' : 'bad'}>{value > before ? '▲' : '▼'} {count(Math.abs(value - before), l)}</StatusPill>
+                          <PositionChange change={value - before} />
                         )}
                       </dd>
                     </div>
@@ -286,7 +292,7 @@ function PlanList({ title, items, extra }: { title: string; items: { title: stri
   const lines = extra.filter((x): x is string => !!x)
   return (
     <div className="min-w-0">
-      <h4 className="text-caption font-semibold uppercase tracking-wide text-muted">{title}</h4>
+      <h4 className="text-overline font-semibold uppercase tracking-wide text-muted">{title}</h4>
       {items.length === 0 && lines.length === 0 ? (
         <p className="mt-2 text-copy text-muted">—</p>
       ) : (

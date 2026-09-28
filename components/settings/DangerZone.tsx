@@ -74,18 +74,19 @@ export default function DangerZone({
             <p className="text-copy font-semibold text-ink">{t.danger.deactivateTitle}</p>
             <p className="mt-0.5 text-copy text-muted">{t.danger.deactivateBody}</p>
           </div>
-          <Button variant="secondary" onClick={() => setConfirm('deactivate')} className="shrink-0 self-start sm:self-auto">
-            <Power size={15} aria-hidden />
+          <Button variant="secondary" size="sm" onClick={() => setConfirm('deactivate')} className="shrink-0 self-start sm:self-auto">
+            <Power aria-hidden className="size-4" />
             {t.danger.deactivate}
           </Button>
         </div>
         <div className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
           <div className="min-w-0">
-            <p className="text-copy font-semibold text-bad">{t.danger.deleteTitle}</p>
+            <p className="text-copy font-semibold text-ink">{t.danger.deleteTitle}</p>
             <p className="mt-0.5 text-copy text-muted">{t.danger.deleteBody}</p>
           </div>
-          <Button variant="danger" onClick={() => setConfirm('delete')} className="shrink-0 self-start sm:self-auto">
-            <Trash2 size={15} aria-hidden />
+          {/* A ghost in the bad tone: the filled red button belongs to the confirmation dialog, not the page. */}
+          <Button variant="ghost" size="sm" onClick={() => setConfirm('delete')} className="shrink-0 self-start text-bad hover:bg-bad-soft hover:text-bad sm:self-auto">
+            <Trash2 aria-hidden className="size-4" />
             {t.danger.delete}
           </Button>
         </div>

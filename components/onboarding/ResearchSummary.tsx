@@ -54,6 +54,7 @@ import {
 } from 'lucide-react'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import Button from '@/components/ui/Button'
+import Checkbox from '@/components/ui/Checkbox'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -259,7 +260,7 @@ export default function ResearchSummary({
     <div className="mx-auto w-full max-w-6xl" data-seed-screen={preview ? 'preview' : started ? 'started' : 'summary'}>
       {/* 1 ── who and when: the one dark surface of the screen, with the site's
           readiness for AI answers as its single visual. */}
-      <div className="relative overflow-hidden rounded-[1.25rem] bg-contrast text-contrast-ink shadow-card">
+      <div className="relative overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-card">
         <span
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_120%_at_85%_0%,rgb(83_115_255/0.32),transparent_60%),radial-gradient(50%_80%_at_0%_100%,rgb(157_180_255/0.10),transparent_60%)]"
@@ -272,16 +273,16 @@ export default function ResearchSummary({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <SiteAvatar domain={domain} icon={summary.siteIcon} size="lg" tone="dark" />
-              <span className="min-w-0 truncate text-sm font-medium text-contrast-ink/80" dir="ltr">{domain}</span>
+              <span className="min-w-0 truncate text-copy font-medium text-contrast-ink/80" dir="ltr">{domain}</span>
               <span className="inline-flex items-center gap-1.5 rounded-pill bg-white/10 px-3 py-1 text-caption font-semibold text-contrast-ink ring-1 ring-white/15">
-                <Sparkles className="h-3.5 w-3.5 text-[#9db4ff]" aria-hidden />
+                <Sparkles className="h-3.5 w-3.5 text-contrast-ink/70" aria-hidden />
                 {t.badge}
               </span>
             </div>
-            <h1 className="mt-6 max-w-[24ch] text-balance text-[2rem] font-bold leading-[1.15] text-contrast-ink md:text-[2.75rem] md:leading-[1.1]">
+            <h1 className="mt-6 max-w-[24ch] text-balance text-title font-bold tracking-tight text-contrast-ink md:text-display">
               {t.title(isolate(name))}
             </h1>
-            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-contrast-ink/70">
+            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-copy text-contrast-ink/70">
               {scannedLine && <span>{scannedLine}</span>}
               {summary.source === 'claim' && (
                 <span className="inline-flex items-center gap-1.5 rounded-pill bg-white/10 px-2.5 py-0.5 text-caption font-medium text-contrast-ink">
@@ -299,11 +300,11 @@ export default function ResearchSummary({
                 arcClass={HERO_ARC[geoTile.tone]}
                 trackClass="stroke-white/12"
               >
-                <span className={cn('font-bold tabular-nums text-contrast-ink', geoTile.state === 'value' ? 'text-[2rem] leading-none' : 'px-3 text-sm leading-5')}>
+                <span className={cn('font-bold tabular-nums text-contrast-ink', geoTile.state === 'value' ? 'text-metric leading-none' : 'px-3 text-copy')}>
                   {tileValue(geoTile)}
                 </span>
               </Ring>
-              <p className="max-w-[12rem] text-sm font-medium leading-5 text-contrast-ink/75">{tileLabel(geoTile)}</p>
+              <p className="max-w-[12rem] text-copy font-medium leading-5 text-contrast-ink/75">{tileLabel(geoTile)}</p>
             </div>
           )}
         </header>
@@ -324,25 +325,25 @@ export default function ResearchSummary({
               data-tile-state={tile.state}
               className={cn(
                 'flex flex-col rounded-card border bg-surface p-4 md:p-5',
-                primary ? 'border-line-strong shadow-[0_1px_2px_rgb(28_25_18/0.05),0_14px_32px_-14px_rgb(28_25_18/0.28)]' : 'border-line shadow-card',
+                primary ? 'border-line-strong shadow-pop' : 'border-line shadow-card',
               )}
             >
-              <p className="order-1 flex items-start gap-2 text-sm leading-5 text-muted">
+              <p className="order-1 flex items-start gap-2 text-copy text-muted">
                 <StatusDot tone={tile.tone} className="mt-1.5" />
                 <span className="min-w-0">{tileLabel(tile)}</span>
               </p>
               <span className="order-3 mt-3 block" aria-hidden>
                 {tile.id === 'fixes' && severityCounts.length > 0 ? (
                   <>
-                    <span className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full">
+                    <span className="flex h-2 w-full gap-0.5 overflow-hidden rounded-pill">
                       {severityCounts.map((x) => (
-                        <span key={x.sev} className={cn('h-full rounded-full', SEVERITY_BAR[x.sev])} style={{ flexGrow: x.n }} />
+                        <span key={x.sev} className={cn('h-full rounded-pill', SEVERITY_BAR[x.sev])} style={{ flexGrow: x.n }} />
                       ))}
                     </span>
                     <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-caption text-muted">
                       {severityCounts.map((x) => (
                         <span key={x.sev} className="inline-flex items-center gap-1.5">
-                          <span className={cn('h-1.5 w-1.5 rounded-full', SEVERITY_BAR[x.sev])} />
+                          <span className={cn('h-1.5 w-1.5 rounded-pill', SEVERITY_BAR[x.sev])} />
                           <span className="tabular-nums">{x.n}</span> {t.findings.severity[x.sev]}
                         </span>
                       ))}
@@ -359,7 +360,7 @@ export default function ResearchSummary({
               <p
                 className={cn(
                   'order-2 mt-3 font-semibold tabular-nums text-ink',
-                  tile.state === 'value' ? (primary ? 'text-[2.5rem] leading-none tracking-tight' : 'text-[2rem] leading-none tracking-tight') : 'text-base text-muted',
+                  tile.state === 'value' ? (primary ? 'text-metric leading-none tracking-tight' : 'text-metric leading-none tracking-tight') : 'text-copy text-muted',
                 )}
               >
                 {tileValue(tile)}
@@ -373,14 +374,14 @@ export default function ResearchSummary({
         <div
           data-summary-block="firewall"
           role="note"
-          className="mt-8 flex items-start gap-3 rounded-card border border-warn/25 bg-warn-soft px-4 py-4 md:px-5"
+          className="mt-8 flex items-start gap-3 rounded-card border border-line border-s-[3px] border-s-warn bg-surface p-5 shadow-card sm:p-6"
         >
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-warn">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-warn-soft text-warn">
             <ShieldAlert className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0">
             <p className="font-semibold text-ink">{t.firewall.title}</p>
-            <p className="mt-1 max-w-[80ch] text-sm leading-6 text-body">{t.firewall.body}</p>
+            <p className="mt-1 max-w-[80ch] text-copy text-body">{t.firewall.body}</p>
           </div>
         </div>
       )}
@@ -391,11 +392,11 @@ export default function ResearchSummary({
           {business ? (
             <>
               {business.description && (
-                <p className="max-w-[62ch] text-[1.0625rem] leading-8 text-ink" {...snapshotText}>
+                <p className="max-w-[62ch] text-section text-ink" {...snapshotText}>
                   {business.description}
                 </p>
               )}
-              <ul className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-[0.75rem] border border-line bg-line', business.description && 'mt-5')}>
+              <ul className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-inset border border-line bg-line', business.description && 'mt-5')}>
                 {business.niche && (
                   <li className="bg-sunk/60 px-4 py-3">
                     <span className="block text-caption text-muted">{t.business.niche}</span>
@@ -428,8 +429,8 @@ export default function ResearchSummary({
           {summary.audiences.length > 0 ? (
             <ul className="space-y-2">
               {summary.audiences.map((audience) => (
-                <li key={audience} className="flex items-center gap-3 rounded-[0.75rem] border border-line bg-surface px-3 py-2.5 text-base leading-6 text-ink">
-                  <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sunk text-muted">
+                <li key={audience} className="flex items-center gap-3 rounded-inset border border-line bg-surface px-3 py-2.5 text-copy text-ink">
+                  <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-sunk text-muted">
                     <UserRound className="h-4 w-4" />
                   </span>
                   <span className="min-w-0" {...snapshotText}>{audience}</span>
@@ -453,11 +454,11 @@ export default function ResearchSummary({
                       <p className="truncate font-semibold text-ink" dir="ltr">{c.domain}</p>
                     </div>
                     {c.validated && (
-                      <span aria-hidden className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-sunk">
-                        <span className="block h-full rounded-full bg-action" style={{ width: `${Math.max(8, Math.min(1, c.seenIn / COMPETITOR_SCALE) * 100)}%` }} />
+                      <span aria-hidden className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-pill bg-sunk">
+                        <span className="block h-full rounded-pill bg-action" style={{ width: `${Math.max(8, Math.min(1, c.seenIn / COMPETITOR_SCALE) * 100)}%` }} />
                       </span>
                     )}
-                    <p className="mt-1 text-sm text-muted">{c.validated ? t.competitors.seenIn(c.seenIn) : t.competitors.suggested}</p>
+                    <p className="mt-1 text-copy text-muted">{c.validated ? t.competitors.seenIn(c.seenIn) : t.competitors.suggested}</p>
                   </div>
                 </li>
               ))}
@@ -476,23 +477,23 @@ export default function ResearchSummary({
                 {findings.findings.map((f) => {
                   const copy = checks.findings[f.id]
                   return (
-                    <li key={f.id} className={cn('rounded-[0.75rem] border border-line border-s-4 bg-surface p-4 shadow-card', SEVERITY_EDGE[f.severity] ?? SEVERITY_EDGE.info)}>
+                    <li key={f.id} className={cn('rounded-inset border border-line border-s-[3px] bg-surface p-4', SEVERITY_EDGE[f.severity] ?? SEVERITY_EDGE.info)}>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={cn('rounded-pill border px-2 py-0.5 text-caption font-semibold', SEVERITY_STYLE[f.severity] ?? SEVERITY_STYLE.info)}>
                           {t.findings.severity[f.severity] ?? t.findings.severity.info}
                         </span>
                         <p className="min-w-0 font-semibold text-ink" {...(copy ? {} : snapshotText)}>{copy?.title ?? f.title}</p>
                       </div>
-                      <p className="mt-1.5 text-sm leading-6 text-body" {...(copy ? {} : snapshotText)}>{copy?.detail ?? f.detail}</p>
-                      {f.evidence && sameLanguage && <p className="mt-2 inline-block rounded-md bg-sunk px-2 py-0.5 font-mono text-xs text-muted">{f.evidence}</p>}
+                      <p className="mt-1.5 text-copy text-body" {...(copy ? {} : snapshotText)}>{copy?.detail ?? f.detail}</p>
+                      {f.evidence && sameLanguage && <p className="mt-2 inline-block rounded-control bg-sunk px-2 py-0.5 text-caption text-muted">{f.evidence}</p>}
                     </li>
                   )
                 })}
               </ul>
-              {findings.omitted > 0 && <p className="mt-3 text-sm text-muted">{t.findings.omitted(findings.omitted)}</p>}
+              {findings.omitted > 0 && <p className="mt-3 text-copy text-muted">{t.findings.omitted(findings.omitted)}</p>}
             </>
           ) : findings.kind === 'clean' ? (
-            <div className="flex items-center gap-3 rounded-control bg-ok-soft px-4 py-3 text-sm font-medium text-ok">
+            <div className="flex items-center gap-3 rounded-control bg-ok-soft px-4 py-3 text-copy font-medium text-ok">
               <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden />
               {t.findings.clean}
             </div>
@@ -539,7 +540,7 @@ export default function ResearchSummary({
           {summary.seedKeywords.length === 0 ? (
             <BlockNote>{t.keywords.empty}</BlockNote>
           ) : preview ? (
-            <ul className="divide-y divide-line overflow-hidden rounded-[0.75rem] border border-line">
+            <ul className="divide-y divide-line overflow-hidden rounded-inset border border-line">
               {summary.seedKeywords.map((keyword, i) => {
                 const reason = reasonOf(keyword)
                 const repeat = i > 0 && reasonOf(summary.seedKeywords[i - 1]) === reason
@@ -561,7 +562,7 @@ export default function ResearchSummary({
             </ul>
           ) : started ? (
             <>
-              <ul className="divide-y divide-line overflow-hidden rounded-[0.75rem] border border-line">
+              <ul className="divide-y divide-line overflow-hidden rounded-inset border border-line">
                 {summary.seedKeywords.map((keyword, i) => {
                   const reason = reasonOf(keyword)
                   const repeat = i > 0 && reasonOf(summary.seedKeywords[i - 1]) === reason
@@ -573,11 +574,11 @@ export default function ResearchSummary({
                   )
                 })}
               </ul>
-              <p className="mt-3 text-sm text-muted">{t.keywords.tracked}</p>
+              <p className="mt-3 text-copy text-muted">{t.keywords.tracked}</p>
             </>
           ) : (
             <>
-              <ul className="divide-y divide-line overflow-hidden rounded-[0.75rem] border border-line">
+              <ul className="divide-y divide-line overflow-hidden rounded-inset border border-line">
                 {summary.seedKeywords.map((keyword, i) => {
                   const checked = selected.includes(keyword)
                   const disabled = !checked && atLimit
@@ -589,28 +590,12 @@ export default function ResearchSummary({
                       <label
                         htmlFor={inputId}
                         className={cn(
-                          'flex items-center gap-3 px-4 py-3 transition-colors duration-150',
-                          checked ? 'bg-action-soft/50' : 'bg-surface',
-                          disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-sunk/70',
+                          'flex items-center gap-3 px-4 py-3 transition-colors duration-150 ease-snappy',
+                          checked ? 'bg-action-soft' : 'bg-surface',
+                          disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-sunk/60',
                         )}
                       >
-                        <input
-                          id={inputId}
-                          type="checkbox"
-                          className="peer sr-only"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={() => toggle(keyword)}
-                        />
-                        <span
-                          aria-hidden
-                          className={cn(
-                            'flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border transition-[background-color,border-color,transform] duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-action peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-canvas',
-                            checked ? 'scale-100 border-action bg-action text-action-ink' : 'border-line-strong bg-surface',
-                          )}
-                        >
-                          {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                        </span>
+                        <Checkbox id={inputId} checked={checked} disabled={disabled} onChange={() => toggle(keyword)} />
                         <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-1">
                           <span className="font-semibold text-ink" {...snapshotText}>{keyword}</span>
                           <span className={repeat ? 'sr-only' : 'rounded-pill bg-sunk px-2.5 py-0.5 text-caption text-muted'}>{t.keywords.reasons[reason]}</span>
@@ -621,7 +606,7 @@ export default function ResearchSummary({
                 })}
               </ul>
               {atLimit && summary.seedKeywords.length > MAX_CONTINUE_KEYWORDS && (
-                <p className="mt-3 text-sm text-muted">{t.keywords.limit(MAX_CONTINUE_KEYWORDS)}</p>
+                <p className="mt-3 text-copy text-muted">{t.keywords.limit(MAX_CONTINUE_KEYWORDS)}</p>
               )}
             </>
           )}
@@ -634,7 +619,7 @@ export default function ResearchSummary({
           icon={<Bot />}
           title={t.geo.title}
           description={geo.kind === 'measured' ? t.geo.intro : undefined}
-          action={geo.kind === 'measured' ? <p className="rounded-pill bg-sunk px-2.5 py-1 text-sm font-semibold tabular-nums text-ink">{t.geo.score(geo.passed, geo.total)}</p> : null}
+          action={geo.kind === 'measured' ? <p className="rounded-pill bg-sunk px-2.5 py-1 text-copy font-semibold tabular-nums text-ink">{t.geo.score(geo.passed, geo.total)}</p> : null}
           className="lg:col-span-5"
         >
           {geo.kind === 'measured' ? (
@@ -642,10 +627,10 @@ export default function ResearchSummary({
               {geo.signals.map((s) => {
                 const copy = checks.geo[s.id]?.[s.ok ? 'pass' : 'fail']
                 return (
-                  <li key={s.id} className={cn('flex items-start gap-3 rounded-[0.75rem] p-2.5', !s.ok && 'bg-bad-soft/70')}>
+                  <li key={s.id} className={cn('flex items-start gap-3 rounded-inset p-2.5', !s.ok && 'bg-bad-soft/70')}>
                     <span
                       className={cn(
-                        'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+                        'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-pill',
                         s.ok ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad ring-1 ring-bad/30',
                       )}
                     >
@@ -656,7 +641,7 @@ export default function ResearchSummary({
                         <span className="sr-only">{s.ok ? t.geo.pass : t.geo.fail}: </span>
                         <span {...(copy ? {} : snapshotText)}>{copy?.title ?? s.title}</span>
                       </p>
-                      <p className="mt-0.5 text-sm leading-6 text-muted" {...(copy ? {} : snapshotText)}>{copy?.detail ?? s.detail}</p>
+                      <p className="mt-0.5 text-copy text-muted" {...(copy ? {} : snapshotText)}>{copy?.detail ?? s.detail}</p>
                     </div>
                   </li>
                 )
@@ -664,7 +649,7 @@ export default function ResearchSummary({
             </ul>
           ) : (
             <div className="flex items-start gap-3 rounded-control border border-line bg-sunk px-4 py-4" data-geo-state={geo.kind}>
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-surface text-muted">
                 {geo.kind === 'locked' ? (
                   <Lock className="h-4 w-4" aria-hidden />
                 ) : geo.kind === 'firewall' ? (
@@ -686,7 +671,7 @@ export default function ResearchSummary({
                           : t.geo.notChecked}
                 </p>
                 {geo.kind !== 'failed' && (
-                  <p className="mt-0.5 text-sm leading-6 text-muted">
+                  <p className="mt-0.5 text-copy text-muted">
                     {geo.kind === 'locked'
                       ? t.geo.lockedBody
                       : geo.kind === 'firewall'
@@ -707,11 +692,11 @@ export default function ResearchSummary({
             <>
               <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {summary.topics.map((topic, i) => (
-                  <li key={topic} className="group flex items-start gap-3 rounded-[0.75rem] border border-line bg-surface p-4 transition-[border-color,box-shadow] duration-200 hover:border-line-strong hover:shadow-card">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] bg-sunk font-mono text-xs font-semibold tabular-nums text-muted">
+                  <li key={topic} className="group flex items-start gap-3 rounded-inset border border-line bg-surface p-4 transition-[border-color] duration-150 ease-snappy hover:border-line-strong">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sunk text-caption font-semibold tabular-nums text-muted">
                       {String(i + 1).padStart(2, '0')}
                     </span>
-                    <span className="min-w-0 pt-1.5 text-base font-medium leading-6 text-ink" {...snapshotText}>{topic}</span>
+                    <span className="min-w-0 pt-1.5 text-copy font-medium leading-6 text-ink" {...snapshotText}>{topic}</span>
                   </li>
                 ))}
               </ol>
@@ -737,16 +722,16 @@ export default function ResearchSummary({
       {preview && (
         <>
           <section data-summary-block="cta" aria-labelledby="seed-block-cta" className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 mb-4 md:bottom-5">
-            <div className="relative overflow-hidden rounded-card bg-contrast p-4 text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5">
+            <div className="relative overflow-hidden rounded-card bg-contrast p-4 text-contrast-ink shadow-pop ring-1 ring-white/10 md:p-5">
               <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_140%_at_100%_50%,rgb(83_115_255/0.28),transparent_65%)]" />
               <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
-                  <span aria-hidden className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 sm:flex">
+                  <span aria-hidden className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-inset bg-white/10 ring-1 ring-white/15 sm:flex">
                     <Lock className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <h2 id="seed-block-cta" className="text-lg font-bold text-contrast-ink">{p.ctaTitle}</h2>
-                    <p className="mt-0.5 hidden max-w-[70ch] text-sm leading-6 text-contrast-ink/75 sm:block">{p.ctaBody}</p>
+                    <h2 id="seed-block-cta" className="text-section font-bold text-contrast-ink">{p.ctaTitle}</h2>
+                    <p className="mt-0.5 hidden max-w-[70ch] text-copy text-contrast-ink/75 sm:block">{p.ctaBody}</p>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 md:items-end">
@@ -759,7 +744,7 @@ export default function ResearchSummary({
               </div>
             </div>
           </section>
-          <div className="mb-10 flex flex-col items-center gap-3 text-sm text-muted">
+          <div className="mb-10 flex flex-col items-center gap-3 text-copy text-muted">
             <p>
               {p.haveAccount}{' '}
               <a href={preview.loginHref} className="font-medium text-action underline-offset-4 hover:underline">
@@ -788,14 +773,14 @@ export default function ResearchSummary({
             role="status"
             className={cn(
               'flex flex-col gap-3 rounded-card border p-4 md:flex-row md:items-center md:justify-between md:p-5',
-              stageB === 'done' ? 'border-ok/25 bg-ok-soft' : 'border-warn/25 bg-warn-soft',
+              'border-line border-s-[3px] bg-surface shadow-pop', stageB === 'done' ? 'border-s-ok' : 'border-s-warn',
             )}
           >
             <div className="min-w-0">
-              <h2 id="seed-block-start" className="text-base font-bold text-ink">
+              <h2 id="seed-block-start" className="text-copy font-bold text-ink">
                 {stageB === 'done' ? t.start.readyTitle : t.start.failedTitle}
               </h2>
-              <p className="mt-0.5 max-w-[70ch] text-sm leading-6 text-body">{stageB === 'done' ? t.start.readyBody : t.start.failedBody}</p>
+              <p className="mt-0.5 max-w-[70ch] text-copy text-body">{stageB === 'done' ? t.start.readyBody : t.start.failedBody}</p>
             </div>
             <ActionLink href={dashboardHref(projectId)} variant={stageB === 'done' ? 'primary' : 'secondary'} className="shrink-0">
               {t.start.openDashboard}
@@ -803,20 +788,20 @@ export default function ResearchSummary({
             </ActionLink>
           </div>
         ) : (
-        <div className={cn('relative overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5', started ? 'p-3' : 'p-4')}>
+        <div className={cn('relative overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-pop ring-1 ring-white/10 md:p-5', started ? 'p-3' : 'p-4')}>
           <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_140%_at_100%_50%,rgb(83_115_255/0.28),transparent_65%)]" />
           <div className={cn('relative flex gap-4 md:flex-row md:items-center md:justify-between', started ? 'flex-row items-center justify-between' : 'flex-col')}>
             <div className="flex min-w-0 items-center gap-4">
               {!started && (
-                <span aria-hidden className="hidden h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 sm:flex">
-                  <span className="text-xl font-bold leading-none tabular-nums">{selected.length}</span>
+                <span aria-hidden className="hidden h-12 w-12 shrink-0 flex-col items-center justify-center rounded-inset bg-white/10 ring-1 ring-white/15 sm:flex">
+                  <span className="text-section font-bold leading-none tabular-nums">{selected.length}</span>
                 </span>
               )}
               <div className="min-w-0">
-                <h2 id="seed-block-start" className={cn('font-bold text-contrast-ink', started ? 'text-base md:text-lg' : 'text-lg')}>
+                <h2 id="seed-block-start" className={cn('font-bold text-contrast-ink', started ? 'text-copy md:text-section' : 'text-section')}>
                   {started ? t.start.runningTitle : t.start.title}
                 </h2>
-                <p className={cn('mt-0.5 max-w-[70ch] text-sm leading-6 text-contrast-ink/75', started && 'hidden md:block')}>
+                <p className={cn('mt-0.5 max-w-[70ch] text-copy text-contrast-ink/75', started && 'hidden md:block')}>
                   {started ? t.start.runningBody : t.start.body(selected.length)}
                 </p>
               </div>
@@ -827,7 +812,7 @@ export default function ResearchSummary({
                 <Arrow className="h-4 w-4" aria-hidden />
               </ActionLink>
             ) : (
-              <Button size="lg" onClick={() => void start()} loading={continuing} className="h-12 shrink-0 px-8 text-base" data-seed-start>
+              <Button size="lg" onClick={() => void start()} loading={continuing} className="h-12 shrink-0 px-8 text-copy" data-seed-start>
                 {continuing ? t.start.starting : t.start.button}
                 {!continuing && <Arrow className="h-4 w-4" aria-hidden />}
               </Button>
@@ -854,8 +839,8 @@ export default function ResearchSummary({
 /** "+N more in the full research": what the account opens, counted, never listed. */
 function LockedRow({ children, className, ...rest }: { children: ReactNode; className?: string; 'data-locked': string }) {
   return (
-    <li className={cn('flex items-center gap-2 text-sm font-medium text-muted', className)} {...rest}>
-      <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong">
+    <li className={cn('flex items-center gap-2 text-copy font-medium text-muted', className)} {...rest}>
+      <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-dashed border-line-strong">
         <Lock className="h-3.5 w-3.5" />
       </span>
       {children}
@@ -891,7 +876,7 @@ function Segments({ total, filled, fillClass }: { total: number; filled: number;
   return (
     <span className="flex h-2 w-full gap-1">
       {Array.from({ length: Math.max(1, total) }, (_, i) => (
-        <span key={i} className={cn('h-full flex-1 rounded-full', i < filled ? fillClass : 'bg-sunk')} />
+        <span key={i} className={cn('h-full flex-1 rounded-pill', i < filled ? fillClass : 'bg-sunk')} />
       ))}
     </span>
   )

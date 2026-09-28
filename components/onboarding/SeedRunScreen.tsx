@@ -157,7 +157,7 @@ export default function SeedRunScreen({
           target="_blank"
           rel="noopener noreferrer"
           data-way="support"
-          className="inline-flex h-12 items-center gap-2 rounded-control px-4 text-base font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+          className="inline-flex h-12 items-center gap-2 rounded-control px-4 text-copy font-semibold text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
         >
           <MessageCircle className="h-4 w-4" aria-hidden />
           {t.actions.talkToUs}
@@ -168,7 +168,7 @@ export default function SeedRunScreen({
     action = <ActionLink href={settingsHref(projectId)} size="lg">{t.actions.settings}</ActionLink>
   } else {
     action = (
-      <Button size="lg" onClick={() => void startScan()} loading={starting} className="h-12 px-7 text-base" data-seed-scan>
+      <Button size="lg" onClick={() => void startScan()} loading={starting} className="h-12 px-7 text-copy" data-seed-scan>
         {!starting && <Search className="h-4 w-4" aria-hidden />}
         {failure ? t.actions.retry : t.noRun.action}
       </Button>
@@ -178,9 +178,9 @@ export default function SeedRunScreen({
   return (
     <Frame screen={failure ? 'failed' : 'none'}>
       <Eyebrow className="text-action">{t.progress.eyebrow}</Eyebrow>
-      <h1 className="mt-3 text-balance text-3xl font-bold leading-tight tracking-tight text-ink md:text-[2.5rem] md:leading-[1.1]">{heading.title}</h1>
-      <p className="mt-4 max-w-[55ch] text-base leading-7 text-body">{heading.body}</p>
-      <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink">
+      <h1 className="mt-3 text-balance text-title font-bold tracking-tight text-ink md:text-display">{heading.title}</h1>
+      <p className="mt-4 max-w-[55ch] text-copy text-body">{heading.body}</p>
+      <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-line bg-surface px-3 py-1.5 text-copy font-medium text-ink">
         <Globe className="h-4 w-4 shrink-0 text-muted" aria-hidden />
         <span className="truncate">{isolate(domain)}</span>
       </p>

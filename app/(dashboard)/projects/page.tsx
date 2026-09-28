@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Button from '@/components/ui/Button'
+import { Plus } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import ProjectForm from '@/components/projects/ProjectForm'
 import ProjectsTable from '@/components/projects/ProjectsTable'
@@ -90,6 +91,7 @@ export default function ProjectsPage() {
         subtitle={dict.projects.subtitle}
         actions={
           <Button onClick={() => setShowCreate(true)}>
+            <Plus aria-hidden="true" className="size-4" />
             {dict.projects.newProject}
           </Button>
         }

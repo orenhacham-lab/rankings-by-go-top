@@ -162,16 +162,16 @@ export default function NewProjectFlow({
       <div className="mx-auto flex min-h-[60vh] w-full max-w-2xl items-center" data-claim-start>
         <section role="status" aria-live="polite" aria-busy="true" className="w-full rounded-card border border-line bg-surface p-8 shadow-card md:p-10">
           <Eyebrow className="text-action">{t.newProject.eyebrow}</Eyebrow>
-          <h1 className="mt-3 flex items-center gap-3 text-balance text-2xl font-bold leading-tight tracking-tight text-ink md:text-3xl">
+          <h1 className="mt-3 flex items-center gap-3 text-balance text-title font-bold tracking-tight text-ink">
             <Loader2 className="h-6 w-6 shrink-0 animate-spin text-action" aria-hidden />
             <span className="min-w-0">{t.newProject.fromScanTitle(claimedDomain)}</span>
           </h1>
-          <p className="mt-4 max-w-[52ch] text-base leading-7 text-body">{t.newProject.fromScanBody}</p>
-          <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-action/20 bg-action-soft px-3 py-1.5 text-sm font-medium text-action">
+          <p className="mt-4 max-w-[52ch] text-copy text-body">{t.newProject.fromScanBody}</p>
+          <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-action/20 bg-action-soft px-3 py-1.5 text-copy font-medium text-action">
             <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
             <span className="truncate">{t.newProject.fromFreeCheck(claimedDomain)}</span>
           </p>
-          <p className="mt-6 text-sm text-muted">{phase === 'starting' ? t.newProject.starting : t.newProject.creating}</p>
+          <p className="mt-6 text-copy text-muted">{phase === 'starting' ? t.newProject.starting : t.newProject.creating}</p>
         </section>
       </div>
     )
@@ -182,25 +182,25 @@ export default function NewProjectFlow({
       <div className="grid gap-10 pt-2 md:pt-6 lg:grid-cols-12 lg:gap-14">
         <section className="min-w-0 lg:col-span-7">
           <Eyebrow className="text-action">{t.newProject.eyebrow}</Eyebrow>
-          <h1 className="mt-3 text-balance text-3xl font-bold leading-tight tracking-tight text-ink md:text-[2.5rem] md:leading-[1.1]">
+          <h1 className="mt-3 text-balance text-title font-bold tracking-tight text-ink md:text-display">
             {t.newProject.title}
           </h1>
-          <p className="mt-4 max-w-[52ch] text-base leading-7 text-body">{t.newProject.subtitle}</p>
+          <p className="mt-4 max-w-[52ch] text-copy text-body">{t.newProject.subtitle}</p>
 
           {claimedDomain && (
-            <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-action/20 bg-action-soft px-3 py-1.5 text-sm font-medium text-action">
+            <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-pill border border-action/20 bg-action-soft px-3 py-1.5 text-copy font-medium text-action">
               <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate">{t.newProject.fromFreeCheck(claimedDomain)}</span>
             </p>
           )}
 
           <form onSubmit={submit} noValidate className="mt-8" aria-busy={working}>
-            <label htmlFor="seed-site-address" className="text-sm font-medium text-ink">
+            <label htmlFor="seed-site-address" className="text-copy font-medium text-ink">
               {t.newProject.urlLabel}
             </label>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row">
               <div className="relative min-w-0 flex-1" dir="ltr">
-                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-4 flex items-center font-mono text-sm text-muted">
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-copy text-muted">
                   https://
                 </span>
                 <input
@@ -224,7 +224,7 @@ export default function NewProjectFlow({
                     if (fieldError) setFieldError(null)
                   }}
                   className={cn(
-                    'h-14 w-full rounded-control border bg-surface pl-[5.25rem] pr-4 text-left text-lg text-ink shadow-card transition-[border-color,box-shadow] placeholder:text-muted/70',
+                    'h-14 w-full rounded-control border bg-surface pl-[5.25rem] pr-4 text-left text-section text-ink shadow-card transition-[border-color,box-shadow] placeholder:text-muted/70',
                     'focus:border-transparent focus:outline-none focus:ring-2 focus:ring-action disabled:opacity-60',
                     fieldError ? 'border-bad focus:ring-bad' : 'border-line-strong',
                   )}
@@ -236,11 +236,11 @@ export default function NewProjectFlow({
               </Button>
             </div>
             {fieldError && (
-              <p id="seed-site-address-error" role="alert" className="mt-2 text-sm text-bad">
+              <p id="seed-site-address-error" role="alert" className="mt-2 text-copy text-bad">
                 {fieldError}
               </p>
             )}
-            <ul id="seed-site-address-facts" className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
+            <ul id="seed-site-address-facts" className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-copy text-muted">
               <li className="inline-flex items-center gap-2">
                 <Clock className="h-4 w-4" aria-hidden />
                 {t.newProject.promise}
@@ -270,19 +270,19 @@ export default function NewProjectFlow({
             <ol className="mt-5 space-y-4">
               {STAGE_A_STEPS.map((step, i) => (
                 <li key={step} className="flex items-start gap-4">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line-strong bg-surface font-mono text-xs tabular-nums text-ink">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-line-strong bg-surface text-caption tabular-nums text-ink">
                     {i + 1}
                   </span>
                   <div className="min-w-0 pt-0.5">
-                    <p className="text-sm font-semibold text-ink">{t.progress.steps[step].title}</p>
-                    <p className="mt-0.5 text-sm text-muted">{t.progress.steps[step].lines[0]}</p>
+                    <p className="text-copy font-semibold text-ink">{t.progress.steps[step].title}</p>
+                    <p className="mt-0.5 text-copy text-muted">{t.progress.steps[step].lines[0]}</p>
                   </div>
                 </li>
               ))}
             </ol>
             <div className="mt-6 border-t border-line pt-5">
-              <p className="text-sm font-semibold text-ink">{t.newProject.afterTitle}</p>
-              <p className="mt-1 text-sm leading-6 text-muted">{t.newProject.afterBody}</p>
+              <p className="text-copy font-semibold text-ink">{t.newProject.afterTitle}</p>
+              <p className="mt-1 text-copy text-muted">{t.newProject.afterBody}</p>
             </div>
           </div>
         </aside>

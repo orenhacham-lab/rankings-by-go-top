@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
+import Notice from '@/components/ui/Notice'
 import { Client } from '@/lib/supabase/types'
 import { saveClientAction } from '@/app/actions/clients'
 import { apiErrorText } from '@/lib/i18n/user-facing-error'
@@ -65,11 +66,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="bad">{error}</Notice>}
 
       <Input
         label={f.nameLabel}
