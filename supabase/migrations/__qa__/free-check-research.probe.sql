@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20260928000000_free_check_research.sql (research before
+-- EXECUTED PROBE — 20260928000200_free_check_research.sql (research before
 -- sign-up: run reservations and report-by-email requests).
 --
 -- Builds, in a DISPOSABLE PostgreSQL cluster, the Supabase roles and the
@@ -28,8 +28,8 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 
 \i supabase/migrations/20260926000000_free_site_check.sql
-\i supabase/migrations/20260928000000_free_check_research.sql
-\i supabase/migrations/20260928000000_free_check_research.sql
+\i supabase/migrations/20260928000200_free_check_research.sql
+\i supabase/migrations/20260928000200_free_check_research.sql
 
 CREATE TEMP TABLE probe(n int, name text, ok boolean);
 GRANT ALL ON probe TO anon, authenticated, service_role;
