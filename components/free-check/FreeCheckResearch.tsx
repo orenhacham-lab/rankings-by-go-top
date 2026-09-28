@@ -21,6 +21,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import ResearchSummary from '@/components/onboarding/ResearchSummary'
 import SeedProgress from '@/components/onboarding/SeedProgress'
 import Button from '@/components/ui/Button'
+import Checkbox from '@/components/ui/Checkbox'
+import Input from '@/components/ui/Input'
+import { NoticeBox } from '@/components/ui/Notice'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import { authHref } from '@/lib/i18n/auth-href'
 import { FixedDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -113,9 +116,11 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
   if (phase === 'fallback') {
     return (
       <div dir={dir} data-research-state="fallback">
-        <div role="status" className="mx-auto mt-8 max-w-3xl rounded-card border border-line bg-surface px-5 py-4 text-start">
-          <p className="font-semibold text-ink">{screen.unavailableTitle}</p>
-          <p className="mt-1 text-sm text-body">{screen.unavailableBody}</p>
+        <div className="mx-auto mt-8 max-w-3xl px-4 text-start sm:px-6">
+          <NoticeBox tone="info" language={locale}>
+            <p className="font-semibold">{screen.unavailableTitle}</p>
+            <p className="mt-0.5 text-body">{screen.unavailableBody}</p>
+          </NoticeBox>
         </div>
         <FreeCheckExperience locale={locale} initialUrl={url} />
       </div>
@@ -130,6 +135,7 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
       {phase === 'form' && (
         <FormState
           copy={copy}
+          locale={locale}
           url={url}
           onUrl={setUrl}
           error={null}
@@ -214,56 +220,53 @@ function ReportRequest({ locale, token }: { locale: Locale; token: string }) {
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="text-sm font-medium text-muted underline underline-offset-4 hover:text-ink" data-report-link>
+      <button type="button" onClick={() => setOpen(true)} className="rounded-control text-copy font-medium text-muted underline underline-offset-4 transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20" data-report-link>
         {t.link}
       </button>
     )
   }
   if (saved) {
     return (
-      <p role="status" className="rounded-control bg-ok-soft px-4 py-3 text-sm font-medium text-ok" data-report-saved>
-        {t.saved}
-      </p>
+      <div data-report-saved>
+        <NoticeBox tone="ok" language={locale}>{t.saved}</NoticeBox>
+      </div>
     )
   }
   return (
-    <form onSubmit={submit} noValidate className="w-full max-w-md rounded-card border border-line bg-surface p-5 text-start shadow-card" data-report-form>
-      <p className="font-semibold text-ink">{t.title}</p>
-      <p className="mt-1 text-sm text-muted">{t.body}</p>
-      <label htmlFor="report-email" className="mt-4 block text-sm font-medium text-ink">
-        {t.emailLabel}
-      </label>
-      <input
+    <form onSubmit={submit} noValidate className="w-full max-w-md space-y-4 rounded-card border border-line bg-surface p-5 text-start shadow-card sm:p-6" data-report-form>
+      <div>
+        <p className="text-section font-semibold text-ink">{t.title}</p>
+        <p className="mt-1 text-copy text-muted">{t.body}</p>
+      </div>
+      <Input
         id="report-email"
+        label={t.emailLabel}
         type="email"
-        dir="ltr"
         autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder={t.emailPlaceholder}
-        className="mt-1.5 h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-ink focus:border-transparent focus:outline-none focus:ring-2 focus:ring-action"
+        className="h-11"
       />
-      <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-6 text-body">
-        <input
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          className="mt-1 h-4 w-4 shrink-0 rounded border-line-strong accent-action"
-          data-report-consent
-        />
-        <span>
-          {t.consent}{' '}
-          <a href={privacyHref} className="text-action underline underline-offset-4" target="_blank" rel="noopener">
-            {t.privacy}
-          </a>
-        </span>
-      </label>
+      <Checkbox
+        checked={consent}
+        onChange={(next) => setConsent(next)}
+        data-report-consent
+        label={
+          <>
+            {t.consent}{' '}
+            <a href={privacyHref} className="text-action underline underline-offset-4" target="_blank" rel="noopener">
+              {t.privacy}
+            </a>
+          </>
+        }
+      />
       {error && (
-        <p role="alert" className="mt-3 text-sm text-bad">
-          {error}
-        </p>
+        <div role="alert">
+          <NoticeBox tone="bad" language={locale}>{error}</NoticeBox>
+        </div>
       )}
-      <Button type="submit" loading={busy} className="mt-4 w-full">
+      <Button type="submit" size="lg" loading={busy} className="w-full">
         {busy ? t.sending : t.submit}
       </Button>
     </form>

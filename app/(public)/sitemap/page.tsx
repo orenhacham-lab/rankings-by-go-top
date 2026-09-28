@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Footer } from '@/components/Footer'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { PublicNav } from '@/components/PublicNav'
+import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { createClient } from '@/lib/supabase/client'
 import { authHref } from '@/lib/i18n/auth-href'
 
@@ -14,11 +12,7 @@ interface Article {
   title: string
 }
 
-interface SitemapSection {
-  title: string
-  description?: string
-  links: Array<{ label: string; href: string }>
-}
+type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
 
 export default function SitemapPage() {
   const [articles, setArticles] = useState<Article[]>([])
@@ -73,78 +67,26 @@ export default function SitemapPage() {
     },
   ]
 
+  const articleSection: SitemapSection[] = !loading && articles.length > 0
+    ? [{ title: 'מאמרים באתר', links: articles.map((article) => ({ label: article.title, href: `/articles/${article.slug}` })) }]
+    : []
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <PublicNav />
-      <main className="flex-1 pt-28 pb-12 px-4">
-        <div className="max-w-3xl mx-auto">
-          <Breadcrumbs items={[{ label: 'מפת אתר', href: '/sitemap' }]} />
+    <LegalFrame locale="he" breadcrumbs={[{ label: 'מפת אתר', href: '/sitemap' }]}>
+      <LegalHeader title="מפת אתר" subtitle="כאן תמצאו את כל העמודים והקטגוריות ב-Rankings by Go Top" />
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <h1 className="text-4xl font-bold text-slate-900 mb-4">מפת אתר</h1>
-            <p className="text-slate-600 mb-8">
-              כאן תמצאו את כל העמודים והקטגוריות ב-Rankings by Go Top
-            </p>
+      <SitemapGroups groups={[...sections, ...articleSection]} />
 
-            <div className="space-y-12">
-              {sections.map((section, index) => (
-                <section key={index}>
-                  <h2 className="text-2xl font-bold text-slate-900 mb-4">{section.title}</h2>
-                  {section.description && (
-                    <p className="text-sm text-slate-600 mb-4">{section.description}</p>
-                  )}
-                  <ul className="space-y-3">
-                    {section.links.map((link) => (
-                      <li key={link.href}>
-                        <Link
-                          href={link.href}
-                          className="text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-2"
-                        >
-                          <span>→</span>
-                          <span>{link.label}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-
-              {!loading && articles.length > 0 && (
-                <section>
-                  <h2 className="text-2xl font-bold text-slate-900 mb-4">מאמרים באתר</h2>
-                  <ul className="space-y-3">
-                    {articles.map((article) => (
-                      <li key={article.id}>
-                        <Link
-                          href={`/articles/${article.slug}`}
-                          className="text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-2"
-                        >
-                          <span>→</span>
-                          <span>{article.title}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </div>
-
-            <div className="mt-8 pt-8 border-t border-slate-200">
-              <p className="text-slate-600 text-sm">
-                לקבלת מידע נוסף, בקרו ב
-                <Link href="/about" className="text-blue-600 hover:underline mx-1">
-                  עמוד אודות
-                </Link>
-                או{' '}
-                <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                  צרו קשר
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
+      <p className={`mt-10 ${LEGAL_FOOTNOTE}`}>
+        לקבלת מידע נוסף, בקרו ב
+        <Link href="/about" className={`${LEGAL_LINK} mx-1`}>
+          עמוד אודות
+        </Link>
+        או{' '}
+        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+          צרו קשר
+        </a>
+      </p>
+    </LegalFrame>
   )
 }

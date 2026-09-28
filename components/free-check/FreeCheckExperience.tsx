@@ -13,12 +13,20 @@
  * completing on its own. And an error takes the visitor back to the form with a
  * merchant-safe message, never to a half-built results screen.
  *
- * Styling is local Tailwind on purpose. The dashboard redesign owns the shared
- * primitives and design tokens; this screen stays self-contained so it can be
- * switched over to them in one pass without touching behaviour.
+ * It is drawn with the app's own primitives and tokens (ui/Input, ui/Button,
+ * ui/StatTile, ui/Badge, ui/NoticeBox): the first screen a prospective customer
+ * sees is the same product they will sign in to.
  */
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, CircleAlert, CircleCheck, Lock, RotateCcw } from 'lucide-react'
+import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
+import StatTile from '@/components/ui/StatTile'
+import { NoticeBox } from '@/components/ui/Notice'
+import { buttonClasses, CheckList, Eyebrow } from '@/components/public/marketing'
+import { cn } from '@/lib/utils'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { FreeCheckErrorCode, FreeCheckResponse, FreeCheckResult } from '@/lib/free-check/types'
 import type { Locale } from '@/lib/i18n/locales'
@@ -29,10 +37,11 @@ type Phase = 'form' | 'scanning' | 'results'
 /** How long each progress step is shown before the next one starts. */
 const STEP_MS = 3_500
 
-const SEVERITY_STYLES: Record<string, { dot: string; chip: string; label: { he: string; en: string } }> = {
-  blocker: { dot: 'bg-red-500', chip: 'bg-red-50 text-red-700 border-red-100', label: { he: 'קריטי', en: 'Critical' } },
-  warning: { dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 border-amber-100', label: { he: 'אזהרה', en: 'Warning' } },
-  info: { dot: 'bg-slate-400', chip: 'bg-slate-50 text-slate-600 border-slate-200', label: { he: 'המלצה', en: 'Tip' } },
+/** A finding's tone: the start border and the badge. Never a tinted card. */
+const SEVERITY_STYLES: Record<string, { border: string; badge: 'danger' | 'warning' | 'neutral'; label: { he: string; en: string } }> = {
+  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical' } },
+  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning' } },
+  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip' } },
 }
 
 export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Locale; initialUrl?: string }) {
@@ -106,6 +115,7 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
       {phase === 'form' && (
         <FormState
           copy={copy}
+          locale={locale}
           url={url}
           onUrl={setUrl}
           error={error}
@@ -137,6 +147,7 @@ type Copy = ReturnType<typeof freeCheckCopy>
 /** The one-field form. Shared with the research before sign-up (FreeCheckResearch), which passes its own message. */
 export function FormState({
   copy,
+  locale = 'he',
   url,
   onUrl,
   error,
@@ -144,6 +155,7 @@ export function FormState({
   onSubmit,
 }: {
   copy: Copy
+  locale?: Locale
   url: string
   onUrl: (v: string) => void
   error: FreeCheckErrorCode | null
@@ -153,21 +165,18 @@ export function FormState({
 }) {
   const message = errorMessage ?? (error ? copy.form.errors[error] : null)
   return (
-    <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-16 pb-24 text-center">
-      <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-medium mb-6">
-        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        {copy.page.badge}
-      </span>
-      <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight mb-4">
+    <section className="relative mx-auto max-w-3xl px-4 pb-20 pt-12 text-center sm:px-6 sm:pt-16">
+      <div className="mb-5">
+        <Eyebrow>{copy.page.badge}</Eyebrow>
+      </div>
+      <h1 className="text-title font-bold tracking-tight text-ink text-balance sm:text-display">
         {copy.page.title}{' '}
-        <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-          {copy.page.titleAccent}
-        </span>
+        <span className="text-action">{copy.page.titleAccent}</span>
       </h1>
-      <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-10">{copy.page.subtitle}</p>
+      <p className="mx-auto mt-5 max-w-2xl text-section font-normal text-body text-pretty">{copy.page.subtitle}</p>
 
       <form
-        className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/60 p-4 sm:p-5"
+        className="mt-10 space-y-3 rounded-card border border-line bg-surface p-4 text-start shadow-card sm:p-5"
         onSubmit={(e) => {
           e.preventDefault()
           onSubmit()
@@ -176,32 +185,32 @@ export function FormState({
         <label htmlFor="free-check-url" className="sr-only">
           {copy.form.label}
         </label>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            id="free-check-url"
-            name="url"
-            type="text"
-            inputMode="url"
-            autoComplete="url"
-            dir="ltr"
-            value={url}
-            onChange={(e) => onUrl(e.target.value)}
-            placeholder={copy.form.placeholder}
-            className="flex-1 px-4 py-3.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <button
-            type="submit"
-            className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-lg shadow-blue-600/25 hover:from-blue-700 hover:to-indigo-700 transition-all"
-          >
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="min-w-0 flex-1">
+            <Input
+              id="free-check-url"
+              name="url"
+              type="text"
+              inputMode="url"
+              autoComplete="url"
+              dir="ltr"
+              value={url}
+              onChange={(e) => onUrl(e.target.value)}
+              placeholder={copy.form.placeholder}
+              aria-invalid={message ? true : undefined}
+              className="h-11"
+            />
+          </div>
+          <Button type="submit" size="lg" className="shrink-0">
             {copy.form.submit}
-          </button>
+          </Button>
         </div>
         {message && (
-          <p role="alert" className="mt-3 text-sm text-red-600 text-start">
-            {message}
-          </p>
+          <div role="alert">
+            <NoticeBox tone="bad" language={locale}>{message}</NoticeBox>
+          </div>
         )}
-        <p className="mt-3 text-xs text-slate-500 text-start">{copy.form.hint}</p>
+        <p className="text-caption text-muted">{copy.form.hint}</p>
       </form>
     </section>
   )
@@ -213,43 +222,45 @@ function ScanningState({ copy, step }: { copy: Copy; step: number }) {
   // request, not the timer, decides when the scan is done.
   const progress = Math.round(((step + 0.5) / total) * 100)
   return (
-    <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 pb-28" aria-live="polite" aria-busy="true">
-      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden mb-10">
-        <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-700" style={{ width: `${progress}%` }} />
+    <section className="mx-auto max-w-2xl px-4 pb-24 pt-12 sm:px-6 sm:pt-16" aria-live="polite" aria-busy="true">
+      <div className="mb-10 h-1.5 w-full overflow-hidden rounded-pill bg-sunk">
+        <div className="h-full rounded-pill bg-action transition-[width] duration-700 ease-snappy" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="text-center mb-10">
-        <div className="mx-auto mb-6 w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
-          <span className="w-8 h-8 rounded-full border-[3px] border-blue-600 border-t-transparent animate-spin" />
+      <div className="mb-8 text-center">
+        <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-inset bg-action-soft">
+          <span className="size-5 animate-spin rounded-pill border-2 border-action border-t-transparent" aria-hidden="true" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">{copy.loading.steps[step] ?? copy.loading.title}</h2>
-        <p className="text-slate-600">{copy.loading.sub}</p>
+        <h2 className="text-title font-bold tracking-tight text-ink">{copy.loading.steps[step] ?? copy.loading.title}</h2>
+        <p className="mt-2 text-copy text-body">{copy.loading.sub}</p>
       </div>
 
-      <ol className="space-y-3">
+      <ol className="space-y-2">
         {copy.loading.steps.map((label, i) => {
           const done = i < step
           const active = i === step
           return (
             <li
               key={label}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
-                active ? 'border-blue-200 bg-blue-50/60' : done ? 'border-slate-200 bg-white' : 'border-slate-100 bg-white'
-              }`}
+              className={cn(
+                'flex items-center gap-3 rounded-inset border px-4 py-3 transition-[background-color,border-color] duration-150 ease-snappy',
+                active ? 'border-action/30 bg-action-soft' : 'border-line bg-surface',
+              )}
             >
               <span
-                className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
-                  done ? 'bg-green-500 text-white' : active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'
-                }`}
+                className={cn(
+                  'flex size-6 shrink-0 items-center justify-center rounded-pill text-caption font-bold tabular-nums',
+                  done ? 'bg-ok-soft text-ok' : active ? 'bg-action text-action-ink' : 'bg-sunk text-muted',
+                )}
               >
-                {done ? '✓' : i + 1}
+                {done ? <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> : i + 1}
               </span>
-              <span className={`text-sm ${done ? 'text-slate-500' : active ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>{label}</span>
+              <span className={cn('text-copy', done ? 'text-muted' : active ? 'font-semibold text-ink' : 'text-muted')}>{label}</span>
             </li>
           )
         })}
       </ol>
-      <p className="mt-8 text-center text-sm text-slate-500">{copy.loading.footer}</p>
+      <p className="mt-8 text-center text-caption text-muted">{copy.loading.footer}</p>
     </section>
   )
 }
@@ -271,42 +282,44 @@ function ResultsState({
 }) {
   const r = copy.results
   return (
-    <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-12 pb-24">
-      <header className="text-center mb-10">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-3">{r.heading}</h1>
-        <p className="text-slate-600">
+    <section className="mx-auto max-w-4xl space-y-8 px-4 pb-24 pt-10 sm:px-6 sm:pt-12">
+      <header className="text-center">
+        <h1 className="text-title font-bold tracking-tight text-ink">{r.heading}</h1>
+        <p className="mt-2 text-copy text-body">
           {r.scanned}{' '}
-          <span dir="ltr" className="font-semibold text-slate-900">
+          <span dir="ltr" className="font-semibold text-ink">
             {result.domain}
           </span>
         </p>
       </header>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-12">
-        <Counter value={String(result.counters.keywords)} label={r.counters.keywords} />
-        <Counter value={String(result.counters.fixes)} label={r.counters.fixes} />
-        <Counter value={`${result.counters.geoPassed}/${result.counters.geoTotal}`} label={r.counters.geo} />
-        <Counter value={String(result.counters.articles)} label={r.counters.articles} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatTile value={String(result.counters.keywords)} label={r.counters.keywords} />
+        <StatTile value={String(result.counters.fixes)} label={r.counters.fixes} />
+        <StatTile value={`${result.counters.geoPassed}/${result.counters.geoTotal}`} label={r.counters.geo} />
+        <StatTile value={String(result.counters.articles)} label={r.counters.articles} />
       </div>
 
       {result.business ? (
         <>
           <Block title={r.businessTitle}>
             {result.business.niche && (
-              <span className="inline-block mb-3 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-medium">
-                {result.business.niche}
-                {result.business.platform ? ` · ${result.business.platform}` : ''}
-              </span>
+              <div className="mb-3">
+                <Badge variant="info">
+                  {result.business.niche}
+                  {result.business.platform ? ` · ${result.business.platform}` : ''}
+                </Badge>
+              </div>
             )}
-            <p className="text-slate-700 leading-relaxed">{result.business.summary}</p>
+            <p className="text-copy text-body">{result.business.summary}</p>
           </Block>
 
           {result.business.audiences.length > 0 && (
             <Block title={r.audienceTitle}>
               <ul className="space-y-2">
                 {result.business.audiences.map((a) => (
-                  <li key={a} className="flex gap-2 text-slate-700">
-                    <span className="mt-2 w-1.5 h-1.5 shrink-0 rounded-full bg-indigo-500" />
+                  <li key={a} className="flex gap-2.5 text-copy text-body">
+                    <span className="mt-2.5 size-1.5 shrink-0 rounded-pill bg-action" aria-hidden="true" />
                     <span>{a}</span>
                   </li>
                 ))}
@@ -316,23 +329,23 @@ function ResultsState({
         </>
       ) : (
         <Block title={r.businessTitle}>
-          <p className="text-slate-600">{r.aiUnavailable}</p>
+          <p className="text-copy text-body">{r.aiUnavailable}</p>
         </Block>
       )}
 
       {result.competitors.length > 0 && (
         <Block title={r.competitorsTitle}>
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="mb-3 flex flex-wrap gap-2">
             {result.competitors.map((c) => (
-              <span key={c} dir="ltr" className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium">
+              <span key={c} dir="ltr" className="inline-flex h-8 items-center rounded-control border border-line bg-sunk px-3 text-caption font-semibold text-ink">
                 {c}
               </span>
             ))}
           </div>
           {result.lockedCompetitors > 0 && (
-            <p className="text-sm text-slate-500">
+            <p className="text-caption text-muted">
               {r.competitorsLocked}
-              <span className="mx-1 font-semibold text-slate-700">+{result.lockedCompetitors}</span>
+              <span className="mx-1 font-semibold text-ink">+{result.lockedCompetitors}</span>
             </p>
           )}
         </Block>
@@ -340,53 +353,52 @@ function ResultsState({
 
       <Block title={r.findingsTitle}>
         {result.findings.length === 0 ? (
-          <p className="text-slate-700">🎉 {r.findingsEmpty}</p>
+          <p className="flex items-center gap-2 text-copy text-body">
+            <CircleCheck className="size-4 shrink-0 text-ok" aria-hidden="true" />
+            {r.findingsEmpty}
+          </p>
         ) : (
           <ul className="space-y-3">
             {result.findings.map((f) => {
-              const style = SEVERITY_STYLES[f.severity]
+              const style = SEVERITY_STYLES[f.severity] ?? SEVERITY_STYLES.info
               return (
-                <li key={f.id} className="rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`w-2 h-2 rounded-full ${style.dot}`} />
-                    <h3 className="font-semibold text-slate-900">{f.title}</h3>
-                    <span className={`ms-auto px-2 py-0.5 rounded-md border text-[11px] font-medium ${style.chip}`}>
-                      {style.label[locale]}
-                    </span>
+                <li key={f.id} className={cn('rounded-inset border border-line border-s-[3px] bg-surface p-4', style.border)}>
+                  <div className="mb-1 flex items-start gap-3">
+                    <h3 className="min-w-0 flex-1 text-copy font-semibold text-ink">{f.title}</h3>
+                    <Badge variant={style.badge}>{style.label[locale]}</Badge>
                   </div>
-                  <p className="text-sm text-slate-600 leading-relaxed">{f.detail}</p>
-                  {f.evidence && <p className="mt-1.5 text-xs text-slate-500">{f.evidence}</p>}
+                  <p className="text-copy text-body">{f.detail}</p>
+                  {f.evidence && <p className="mt-1.5 text-caption text-muted">{f.evidence}</p>}
                 </li>
               )
             })}
           </ul>
         )}
         {result.lockedFindings > 0 && (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            🔒 {r.findingsLocked}
-            <span className="mx-1 font-semibold text-slate-800">+{result.lockedFindings}</span>
+          <div className="mt-3 flex items-center gap-2 rounded-inset bg-sunk px-4 py-3 text-copy text-body">
+            <Lock className="size-4 shrink-0 text-muted" aria-hidden="true" />
+            <span>
+              {r.findingsLocked}
+              <span className="mx-1 font-semibold text-ink">+{result.lockedFindings}</span>
+            </span>
           </div>
         )}
       </Block>
 
       <Block title={r.geoTitle}>
-        <p className="text-slate-600 mb-4">{r.geoIntro}</p>
-        <p className="font-semibold text-slate-900 mb-3">
-          {result.geo.passed}/{result.geo.total} {r.geoScore}
+        <p className="text-copy text-body">{r.geoIntro}</p>
+        <p className="mb-3 mt-4 text-copy font-semibold text-ink">
+          <span className="tabular-nums">{result.geo.passed}/{result.geo.total}</span> {r.geoScore}
         </p>
         <ul className="space-y-3">
           {result.geo.signals.map((s) => (
             <li key={s.id} className="flex gap-3">
-              <span
-                className={`mt-0.5 w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
-                  s.ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                }`}
-              >
-                {s.ok ? '✓' : '!'}
-              </span>
+              {s.ok
+                ? <CircleCheck className="mt-0.5 size-5 shrink-0 text-ok" aria-hidden="true" />
+                : <CircleAlert className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden="true" />}
               <span>
-                <span className="block font-medium text-slate-900">{s.title}</span>
-                <span className="block text-sm text-slate-600">{s.detail}</span>
+                <span className="block text-copy font-semibold text-ink">{s.title}</span>
+                <span className="block text-caption text-muted">{s.detail}</span>
               </span>
             </li>
           ))}
@@ -397,7 +409,7 @@ function ResultsState({
         <Block title={copy.results.counters.keywords}>
           <div className="flex flex-wrap gap-2">
             {result.keywords.map((k) => (
-              <span key={k} className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-800 text-sm font-medium">
+              <span key={k} className="inline-flex h-8 items-center rounded-control border border-line bg-sunk px-3 text-caption font-semibold text-ink">
                 {k}
               </span>
             ))}
@@ -407,66 +419,48 @@ function ResultsState({
 
       {result.articles.length > 0 && (
         <Block title={r.articlesTitle}>
-          <ol className="space-y-2">
+          <ol className="space-y-2.5">
             {result.articles.map((a, i) => (
-              <li key={a} className="flex gap-3 text-slate-800">
-                <span className="w-6 h-6 shrink-0 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center">{i + 1}</span>
-                <span>{a}</span>
+              <li key={a} className="flex items-start gap-3 text-copy text-ink">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-control bg-action-soft text-caption font-bold tabular-nums text-action">{i + 1}</span>
+                <span className="pt-0.5">{a}</span>
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-sm text-slate-500">{r.articlesNote}</p>
+          <p className="mt-4 text-caption text-muted">{r.articlesNote}</p>
         </Block>
       )}
 
-      <div className="mt-12 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 sm:p-10">
-        <h2 className="text-2xl font-bold mb-3">{r.gateTitle}</h2>
-        <p className="text-slate-300 mb-6">{r.gateBody}</p>
-        <ul className="space-y-2 mb-8">
-          {r.gateBullets.map((b) => (
-            <li key={b} className="flex gap-2 text-slate-100">
-              <span className="text-green-400">✓</span>
-              <span>{b}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <Link
-            href={signupHref}
-            className="px-7 py-3.5 rounded-xl bg-white text-slate-900 font-semibold text-center shadow-lg hover:bg-slate-100 transition-colors"
-          >
+      <div className="relative overflow-hidden rounded-card bg-contrast p-6 text-contrast-ink shadow-card sm:p-10 bg-[radial-gradient(90%_120%_at_100%_0%,rgb(0_134_245/0.22),transparent_60%)] rtl:bg-[radial-gradient(90%_120%_at_0%_0%,rgb(0_134_245/0.22),transparent_60%)]">
+        <h2 className="text-title font-bold tracking-tight text-contrast-ink">{r.gateTitle}</h2>
+        <p className="mt-2 text-copy text-contrast-ink/75">{r.gateBody}</p>
+        <CheckList items={r.gateBullets} inverse className="mb-8 mt-6" />
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <Link href={signupHref} className={buttonClasses('primary', 'lg')}>
             {r.gateCta}
           </Link>
-          <Link href={loginHref} className="px-5 py-3.5 rounded-xl border border-white/20 text-white text-center hover:bg-white/10 transition-colors">
+          <Link href={loginHref} className={buttonClasses('inverse', 'lg')}>
             {r.gateSecondary}
           </Link>
         </div>
-        <p className="mt-4 text-xs text-slate-400">{r.gateTerms}</p>
+        <p className="mt-4 text-caption text-contrast-ink/60">{r.gateTerms}</p>
       </div>
 
-      <div className="mt-8 text-center">
-        <button type="button" onClick={onRestart} className="text-sm font-medium text-blue-700 hover:text-blue-800 underline">
+      <div className="text-center">
+        <Button type="button" variant="ghost" onClick={onRestart}>
+          <RotateCcw className="size-4" aria-hidden="true" />
           {r.again}
-        </button>
+        </Button>
       </div>
     </section>
   )
 }
 
-function Counter({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
-      <div className="text-3xl font-extrabold text-slate-900">{value}</div>
-      <div className="mt-1 text-xs sm:text-sm text-slate-600 leading-snug">{label}</div>
-    </div>
-  )
-}
-
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-8">
-      <h2 className="text-lg font-bold text-slate-900 mb-3">{title}</h2>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">{children}</div>
+    <div>
+      <h2 className="mb-3 text-section font-semibold text-ink">{title}</h2>
+      <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">{children}</div>
     </div>
   )
 }

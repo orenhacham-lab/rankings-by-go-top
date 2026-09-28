@@ -41,9 +41,9 @@ export default async function EnglishFreeCheckPage({
   const research = presignupResearchOn(process.env)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav locale="en" />
-      <main className="pt-24">
+      <main className="flex-1 pt-16 lg:pt-[4.5rem]">
         {research ? <FreeCheckResearch locale="en" initialUrl={initialUrl} /> : <FreeCheckExperience locale="en" initialUrl={initialUrl} />}
       </main>
       <Footer />

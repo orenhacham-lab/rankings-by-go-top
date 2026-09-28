@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CookieConsent } from '@/components/CookieConsent'
 import { WhatsAppFloat } from './WhatsAppFloat'
@@ -16,6 +17,9 @@ import { AccessibilityWidget } from './AccessibilityWidget'
  *
  * The cookie banner is bundled here so it coordinates spacing with the mobile
  * contact bar and never overlaps form actions on the login/signup screens.
+ * While it is open it owns the bottom of the screen: the WhatsApp button that
+ * shares its corner steps aside, and the accessibility button lifts above the
+ * phone's bottom sheet.
  */
 
 // Route prefixes where the floating widgets must NOT appear. Matched as exact
@@ -61,6 +65,7 @@ export function shouldRenderPublicWidgets(isAuthenticated: boolean, pathname: st
 
 export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname()
+  const [cookieOpen, setCookieOpen] = useState(false)
 
   if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
     return null
@@ -68,10 +73,10 @@ export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated
 
   return (
     <>
-      <AccessibilityWidget />
-      <WhatsAppFloat />
+      <AccessibilityWidget raised={cookieOpen} />
+      <WhatsAppFloat hidden={cookieOpen} />
       <MobileContactBar />
-      <CookieConsent />
+      <CookieConsent onOpenChange={setCookieOpen} />
     </>
   )
 }
