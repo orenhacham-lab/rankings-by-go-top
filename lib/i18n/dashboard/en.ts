@@ -1500,7 +1500,7 @@ export const dashboardEn = {
       schema: {
         title: 'Structured data (JSON-LD)',
         intro: 'Markup that helps search engines and AI assistants identify the article’s headline, description, dates, image and FAQ. It is not a ranking factor and does not guarantee a special display in Google.',
-        faqNote: 'Since 2023 Google shows FAQ rich results only for well-known government and health sites, so the FAQ markup is not expected to change how you appear in Google. Other engines and AI assistants read it.',
+        faqNote: 'Since May 2026 Google no longer shows FAQ rich results at all, so the FAQ markup will not change how you appear in Google. It does no harm there either. Bing and AI engines still read it.',
         duplicateNote: 'WordPress SEO plugins and many Shopify and Wix themes already add article markup. Check the page source before pasting, so it is not duplicated.',
         webhookNote: 'For a site connected by webhook, the markup is sent automatically on every publish, in the structured_data field.',
         liveNote: 'The preview is built from what is in the editor now, including unsaved changes.',
