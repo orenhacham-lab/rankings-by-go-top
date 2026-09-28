@@ -205,6 +205,7 @@ async function main() {
     const competitorScreens = [
       'components/competitors/CompetitorSummary.tsx', 'components/competitors/TopCompetitorLine.tsx', 'components/settings/CompetitorsCard.tsx',
       'components/onboarding/ResearchSummary.tsx', 'components/dashboard/CompetitorsWidget.tsx', 'components/keyword-research/KeywordSourceLine.tsx',
+      'components/keyword-research/LandscapeRivals.tsx',
     ]
     const missing = competitorScreens.filter((f) => !/CompetitorIcon/.test(code(f)))
     check('F4: every competitor heading uses that one icon', missing.length === 0, show(missing))

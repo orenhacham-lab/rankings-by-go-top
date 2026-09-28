@@ -10,13 +10,14 @@
  * fact the data does not hold is simply not shown.
  */
 import { useState } from 'react'
-import { ArrowUpRight, Check, Radar, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Check, Radar } from 'lucide-react'
+import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCount } from '@/components/gsc/format'
-import SiteMark from './SiteMark'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import type { CompetitorInsight, CompetitorLandscape } from './landscape'
 
 /** Cards shown before "show all". */
@@ -45,7 +46,7 @@ function RivalCard({ c, max, index }: { c: CompetitorInsight; max: number; index
       style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
     >
       <div className="flex items-start gap-3">
-        <SiteMark domain={c.domain} />
+        <SiteAvatar domain={c.domain} tentative={!c.validated && !c.tracked} />
         <div className="min-w-0 flex-1">
           <p dir="ltr" className="truncate text-start text-copy font-semibold text-ink rtl:text-end">{c.domain}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
@@ -146,7 +147,7 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
       <Card padding={false}>
         <header className="flex items-start gap-3.5 border-b border-line bg-gradient-to-b from-info-soft/80 to-surface px-4 py-5 sm:px-6">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-info text-canvas shadow-sm" aria-hidden="true">
-            <UsersRound size={19} strokeWidth={2} />
+            <CompetitorIcon size={19} strokeWidth={2} />
           </span>
           <div className="min-w-0">
             <h2 className="text-lg font-bold leading-6 text-ink">{t.title}</h2>
@@ -165,7 +166,7 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
               {domain && (
                 <li data-rival-own="" className="flex min-w-0 flex-col rounded-card border border-action/30 bg-action-soft p-4">
                   <div className="flex items-start gap-3">
-                    <SiteMark domain={domain} icon={siteIcon} tone="own" />
+                    <SiteAvatar domain={domain} icon={siteIcon} />
                     <div className="min-w-0">
                       <p dir="ltr" className="truncate text-start text-copy font-semibold text-ink rtl:text-end">{domain}</p>
                       <p className="mt-1 inline-flex rounded-pill bg-action px-2 py-0.5 text-overline font-semibold text-action-ink">{dict.yourSite}</p>

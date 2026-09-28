@@ -139,7 +139,7 @@ console.log('\nP) the real page')
 console.log('\nQ) the new sections only read')
 {
   const ROOT = HARNESS.ROOT
-  const srcs = ['useProjectAudiences.ts', 'ResearchLandscape.tsx', 'LandscapeRivals.tsx', 'LandscapeAudiences.tsx', 'SectionNav.tsx', 'SiteMark.tsx']
+  const srcs = ['useProjectAudiences.ts', 'ResearchLandscape.tsx', 'LandscapeRivals.tsx', 'LandscapeAudiences.tsx', 'SectionNav.tsx']
     .map((f) => strip(readFileSync(join(ROOT, 'components/keyword-research', f), 'utf8')))
   const readsOnly = (all: string[]) => all.every((s) => !/method:\s*'(POST|PUT|PATCH|DELETE)'|\.(insert|update|upsert|delete)\(|\.rpc\(|createAdminClient/.test(s))
     && /\.from\('project_audiences'\)\s*\.select\(/.test(all[0]) && /\.eq\('project_id', projectId\)/.test(all[0])
