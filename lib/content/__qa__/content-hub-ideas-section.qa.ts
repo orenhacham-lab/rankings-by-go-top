@@ -46,8 +46,15 @@ function main() {
   check('all create-topic buttons use handleCreateTopic (2 on articles, 1 on topics)',
     (articles.match(/onClick=\{handleCreateTopic\}/g) || []).length === 2
     && (topics.match(/onClick=\{handleCreateTopic\}/g) || []).length === 1)
-  check('handleCreateTopic → ideas section when automation on, else the modal',
-    /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) goToIdeas\(\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(workspace))
+  // "New topic" used to land on the list view's automatic ideas, the old design, where
+  // approving an idea was the only thing it offered. It now opens the content strategy
+  // board's "add a keyword" field (the keyword becomes an approved topic); approving an
+  // idea happens on the board (content-strategy-idea-actions.qa.ts).
+  const createsOnBoard = (src: string) =>
+    /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) router\.push\(strategyAddKeywordHref\(\)\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(src)
+  check('handleCreateTopic → the board\'s keyword field when automation on, else the modal', createsOnBoard(workspace))
+  check('MUT: handleCreateTopic back to the list view\'s ideas fails that check',
+    !createsOnBoard(workspace.replace('router.push(strategyAddKeywordHref())', 'goToIdeas()')))
   // It used to scroll to a section of the one big page, then to navigate to the
   // automation screen. That screen is the ideas section of the content strategy tab's
   // list view now (W6c), so the same intent navigates there, on the automatic sub-tab —
