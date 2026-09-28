@@ -10,7 +10,7 @@
  * administrator is shown as unlimited.
  */
 import Link from 'next/link'
-import { CreditCard } from 'lucide-react'
+import { CreditCard, Hourglass } from 'lucide-react'
 import type { AccountData, Allowance, Section } from '@/lib/dashboard/overview'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { cn } from '@/lib/utils'
@@ -27,7 +27,7 @@ function Meter({ label, value, allowance }: { label: string; value: string; allo
       </div>
       <div role="meter" aria-label={`${label}: ${value}`} aria-valuemin={0} aria-valuemax={allowance.limit} aria-valuenow={allowance.used}
         className="mt-1.5 h-1.5 w-full overflow-hidden rounded-pill bg-sunk">
-        <div className={cn('h-full rounded-pill', full ? 'bg-commit' : 'bg-action')} style={{ width: `${share}%` }} />
+        <div className={cn('h-full rounded-pill', full ? 'bg-warn' : 'bg-action')} style={{ width: `${share}%` }} />
       </div>
     </div>
   )
@@ -52,7 +52,11 @@ export default function AccountStatus({ t, section, retry }: {
             <span data-plan={section.data.plan} className="text-copy font-semibold text-ink">{a.plans[section.data.plan]}</span>
           </p>
           {section.data.trialDaysLeft !== null && (
-            <p className="rounded-control bg-commit-soft px-3 py-2 text-caption font-medium text-warn">{a.trialDays(section.data.trialDaysLeft)}</p>
+            // A fact on the neutral card: the tone is on the icon only, never a tinted strip.
+            <p data-trial-days="" className="flex items-center gap-2 text-caption font-medium text-body">
+              <Hourglass size={14} strokeWidth={2} aria-hidden="true" className="shrink-0 text-warn" />
+              {a.trialDays(section.data.trialDaysLeft)}
+            </p>
           )}
           {section.data.articles && (
             <Meter label={a.articles} value={a.usage(section.data.articles.used, section.data.articles.limit)} allowance={section.data.articles} />

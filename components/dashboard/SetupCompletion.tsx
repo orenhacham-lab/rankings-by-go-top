@@ -41,21 +41,23 @@ export default function SetupCompletion({ t, setup, hrefs }: {
               key={task.key}
               data-setup-task={task.key}
               data-done={task.done ? 'true' : 'false'}
-              className={cn('flex items-center gap-3 rounded-control border p-3', task.done ? 'border-ok/20 bg-ok-soft' : 'border-line')}
+              className="flex items-center gap-3 rounded-control border border-line bg-surface p-3"
             >
+              {/* A done row is the same neutral row: a check in the ok tone and muted
+                  words, never a green-tinted card (the tone lives on the icon only). */}
               <span
                 aria-hidden="true"
-                className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-pill border',
-                  task.done ? 'border-ok bg-ok text-surface' : 'border-line-strong')}
+                className={cn('flex size-6 shrink-0 items-center justify-center rounded-pill',
+                  task.done ? 'bg-ok-soft text-ok' : 'border border-line-strong')}
               >
                 {task.done && <Check size={14} strokeWidth={3} />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-copy font-medium text-ink">{copy.title}</p>
-                <p className="text-caption text-muted">{copy.sub}</p>
+                <p className={cn('text-copy font-medium', task.done ? 'text-muted' : 'text-ink')}>{copy.title}</p>
+                {!task.done && <p className="text-caption text-muted">{copy.sub}</p>}
               </div>
               {task.done
-                ? <span className="shrink-0 text-caption font-medium text-ok">{s.done}</span>
+                ? <span className="shrink-0 text-caption text-muted">{s.done}</span>
                 : <Link href={hrefs[task.key]} className={linkButtonClass('secondary', 'sm')}>{copy.cta}</Link>}
             </li>
           )

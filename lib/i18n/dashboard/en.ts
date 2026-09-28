@@ -2718,6 +2718,8 @@ export const dashboardEn = {
   },
   gscWidgets: {
     source28: 'Search Console · last 28 days',
+    /** The dashboard's row of figures: short enough for one line beside four tiles. */
+    source28Short: 'Last 28 days',
     actions: {
       not_connected: 'Connect Search Console',
       reauth_required: 'Reconnect Search Console',
@@ -3069,10 +3071,14 @@ export const dashboardEn = {
         // Project-level disconnect (removes only the property assignment) — the primary action.
         unassignProperty: 'Disconnect property from project',
         unassigning: 'Disconnecting…',
-        unassignConfirm: 'Disconnect the Search Console property from this project?\n\n• Historical data is preserved.\n• The Google connection itself stays active for other projects.\n\nContinue?',
+        // The confirmation dialog (ui/ConfirmDialog): a question, then what stays.
+        unassignConfirmTitle: 'Disconnect the Search Console property from this project?',
+        unassignConfirmBody: 'Historical data is kept, and the Google connection itself stays active for other projects.',
         // Global authorization revoke — a clearly separate, de-emphasized action.
         globalRevoke: 'Revoke Google access for the whole account',
-        confirmRevoke: 'Revoke Google access for the whole account?\n\n• This affects every project using the connection.\n• Previously synced performance data is preserved.\n\nContinue?',
+        confirmRevokeTitle: 'Revoke Google access for the whole account?',
+        confirmRevokeBody: 'This affects every project using the connection. Previously synced performance data is kept.',
+        confirmRevokeAction: 'Revoke access',
         connectionInUse: (count: number) => `Cannot revoke: ${count} project(s) still use this connection. Disconnect the property from each project first.`,
         connectedAccount: 'Connected Google account',
         selectPropertyTitle: 'Select a Search Console property',
@@ -3720,6 +3726,8 @@ export const dashboardEn = {
     loading: 'Loading...',
     exportExcel: 'Export Excel',
     downloadReport: 'Download report',
+    /** Under the two downloads while the report has nothing in it (they are disabled). */
+    nothingToDownload: 'Nothing to download yet: the report fills in after the first check.',
     generatedOn: 'Generated on',
     excelExportWorkInProgress: 'Excel export for the AI Visibility report isn’t available yet',
     loadAIReportFirst: 'Please load the AI Visibility report first',
@@ -4587,7 +4595,9 @@ export const dashboardEn = {
       noGaps: 'Everything found for them was found for you too.',
       visit: (domain: string) => `Open ${domain} in a new tab`,
       empty: 'The scan has not found competitors for this site yet.',
-      noOverlap: 'Not seen on any keyword of this research. It may compete on other searches.',
+      noOverlap: 'No keyword of this research is tied to it. It may compete on other searches.',
+      /** A competitor seen on Google in the scan's checks, but tied to no keyword of the research list. */
+      noOverlapSeen: 'It showed up in the searches we checked, but no keyword in the research list is tied to it yet.',
       summary: (n: string, searches: string) => `${n} competitors · ${searches} searches a month on keywords only they reach`,
     },
     audiences: {

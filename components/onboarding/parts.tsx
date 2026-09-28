@@ -6,6 +6,7 @@
  * tab, show their address and read as links to a screen reader.
  */
 import Link from 'next/link'
+import { AlertCircle, CheckCircle2, CircleDashed, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import type { Locale } from '@/lib/i18n/locales'
@@ -62,21 +63,17 @@ export function ActionLink({
   )
 }
 
-const DOT: Record<Tone, string> = {
-  ok: 'bg-ok',
-  warn: 'bg-warn',
-  bad: 'bg-bad',
-  neutral: 'bg-line-strong',
-}
+const TONE_ICON = { ok: CheckCircle2, warn: TriangleAlert, bad: AlertCircle, neutral: CircleDashed } as const
+const TONE_TEXT: Record<Tone, string> = { ok: 'text-ok', warn: 'text-warn', bad: 'text-bad', neutral: 'text-muted' }
 
-/** The coloured status point of a tile. Decorative: the value beside it says the same in words. */
-export function StatusDot({ tone, className }: { tone: Tone; className?: string }) {
-  return (
-    <span aria-hidden className={cn('relative inline-flex h-2.5 w-2.5 shrink-0', className)}>
-      <span className={cn('absolute inset-0 rounded-pill opacity-25 scale-[1.9]', DOT[tone])} />
-      <span className={cn('relative h-2.5 w-2.5 rounded-pill', DOT[tone])} />
-    </span>
-  )
+/**
+ * A tile's state as a small lucide icon in its tone (final review R26): the tone
+ * lives on the icon only, never as a coloured dot or a multicolour bar. Decorative:
+ * the value beside it says the same in words.
+ */
+export function StatusIcon({ tone, className }: { tone: Tone; className?: string }) {
+  const Icon = TONE_ICON[tone]
+  return <Icon aria-hidden="true" data-tone={tone} className={cn('size-4 shrink-0', TONE_TEXT[tone], className)} strokeWidth={2} />
 }
 
 /** The small label above a heading. */
@@ -89,9 +86,9 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
  * One block of the research summary: a heading with its one action, then the
  * content. `index` is the block's place in the summary, shown as a quiet
  * numeral beside the section's icon so the page reads as the ordered brief it
- * is. `tone="attention"` tints the whole block, for the one section that asks
- * the merchant to act (what is holding the site back), so it does not sit in
- * the same white as everything around it.
+ * is. `tone="attention"` marks the one section that asks the merchant to act
+ * (what is holding the site back) by its icon's warn tone only: the card stays
+ * the same neutral surface, with no rail bending round its corner (final review G3).
  */
 export function SummaryBlock({
   id,
@@ -121,7 +118,7 @@ export function SummaryBlock({
       data-summary-block={id}
       className={cn(
         'rounded-card border p-5 md:p-6',
-        'border-line bg-surface shadow-card', tone === 'attention' && 'border-s-[3px] border-s-warn',
+        'border-line bg-surface shadow-card',
         className,
       )}
     >

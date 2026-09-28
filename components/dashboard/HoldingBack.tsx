@@ -59,7 +59,7 @@ export default function HoldingBack({ t, model, scannedLabel, settingsHref, summ
       )}
       {model.state === 'ready' && (
         <div className="grid gap-3 lg:grid-cols-2">
-          <div className="min-w-0 rounded-inset bg-surface p-4 shadow-card ring-1 ring-warn/15">
+          <div className="min-w-0 rounded-inset border border-line p-4">
             <h3 className="text-caption font-semibold uppercase tracking-wide text-muted">{h.findingsTitle}</h3>
             {model.findings.length === 0 ? (
               <p className="mt-3 flex items-center gap-2 text-copy text-body">
@@ -83,7 +83,7 @@ export default function HoldingBack({ t, model, scannedLabel, settingsHref, summ
             )}
             {model.hidden > 0 && <p className="mt-2 text-caption text-muted">{h.more(model.hidden)}</p>}
           </div>
-          <div className="min-w-0 rounded-inset bg-surface p-4 shadow-card ring-1 ring-warn/15">
+          <div className="min-w-0 rounded-inset border border-line p-4">
             <h3 className="flex items-baseline justify-between gap-2 text-caption font-semibold uppercase tracking-wide text-muted">
               <span>{h.geoTitle}</span>
               {model.total > 0 && <span className="normal-case tracking-normal tabular-nums">{h.geoScore(model.passed, model.total)}</span>}

@@ -2,22 +2,22 @@
 
 /**
  * The line under a keyword in the research table: whether it is already tracked,
- * where the research found it (the site, a competitor), and what Google reports
- * for it. Nothing at all for a keyword with none of these.
+ * and where it came from when that is NOT the research itself (a competitor,
+ * Google's own report). Finding keywords is what the research does, so its mark
+ * sat on almost every row and said nothing (final review R18): it is gone, and a
+ * keyword the research alone found has no line at all.
  */
-import { ScanSearch, TrendingUp } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCompact, formatCount } from '@/components/gsc/format'
-import { RESEARCH_ORIGINS } from '@/lib/keyword-research/scan-research'
 import type { ResearchRow } from '@/lib/keyword-research/rows'
 
 export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan.source
-  const parts: { key: string; text: string; title?: string }[] = []
-  if (row.origins.some((o) => RESEARCH_ORIGINS.includes(o))) parts.push({ key: 'research', text: t.research })
+  const parts: { key: 'competitor' | 'google'; text: string; title?: string }[] = []
   if (row.competitors.length > 0) parts.push({ key: 'competitor', text: t.competitor(row.competitors[0], row.competitors.length - 1) })
   if (row.gsc) {
     parts.push({
@@ -27,35 +27,18 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
     })
   }
   if (!row.tracked && parts.length === 0) return null
-  // One small icon per source, so the line reads at a glance: the research's own mark
-  // is the same on almost every row, so it is only an icon (its words stay for screen
-  // readers and on hover); a competitor and Google keep their words, which differ per row.
-  const ICONS = { research: ScanSearch, competitor: CompetitorIcon, google: TrendingUp } as const
-  const researchMark = (key: string, text: string) => (
-    <span key={key} title={text} className="inline-grid size-5 place-items-center rounded-pill bg-action-soft text-action">
-      <ScanSearch size={11} strokeWidth={2.5} aria-hidden="true" />
-      <span className="sr-only">{text}</span>
-    </span>
-  )
-  // Only the research's own mark: it sits beside the keyword, so the row keeps one line.
-  if (!row.tracked && parts.length === 1 && parts[0].key === 'research') {
-    return (
-      <span data-keyword-source="" className="ms-2 inline-flex align-[-4px]">
-        {researchMark(parts[0].key, parts[0].text)}
-      </span>
-    )
-  }
+  const ICONS = { competitor: CompetitorIcon, google: TrendingUp } as const
   return (
     <span data-keyword-source="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-caption text-muted">
       {row.tracked && (
         <span className="inline-flex items-center rounded-pill border border-ok/20 bg-ok-soft px-1.5 text-overline font-semibold text-ok">{t.tracked}</span>
       )}
       {parts.map((p) => {
-        const Icon = ICONS[p.key as keyof typeof ICONS]
-        return p.key === 'research' ? researchMark(p.key, p.text) : (
-          <span key={p.key} title={p.title} className="inline-flex items-center gap-1">
-            {Icon && <Icon size={12} strokeWidth={2} aria-hidden="true" className="shrink-0" />}
-            {p.text}
+        const Icon = ICONS[p.key]
+        return (
+          <span key={p.key} title={p.title} className="inline-flex min-w-0 items-center gap-1">
+            <Icon size={12} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+            <span className="break-words sm:truncate">{p.text}</span>
           </span>
         )
       })}

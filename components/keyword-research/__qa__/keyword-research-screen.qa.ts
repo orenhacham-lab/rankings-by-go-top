@@ -274,8 +274,13 @@ function main() {
       const action = row.tracked
         ? item?.html.includes(`>${esc(t.tracked)}</span>`) && !item?.html.includes('<button')
         : item?.html.includes(`aria-label="${esc(`${t.track}: ${row.keyword}`)}"`) && count(item?.html ?? '', '<button') === 1
-      return !item || item.keyword !== row.keyword || count(item.html, esc(why)) !== 1 || !action || !item.html.includes(`aria-label="${esc(t.potentialOf(String(win.score)))}"`)
+      // The sentence once as text (read aloud; visible on a narrow card) and once as the
+      // competition badge's tooltip, never as an orange line in the row (final review R18).
+      return !item || item.keyword !== row.keyword || count(item.html, esc(why)) !== 2 || !item.html.includes(`title="${esc(why)}" data-easy-win-badge=""`)
+        || !action || !item.html.includes(`aria-label="${esc(t.potentialOf(String(win.score)))}"`)
     })
+    check(`W1b (${locale}): no easy-win row turns its sentence orange on a wide card`, !/@3xl:text-warn/.test(section))
+    check(`W1b-MUT (${locale}): the old orange sentence fails W1b`, /@3xl:text-warn/.test(section.replace('@3xl:sr-only', '@3xl:flex @3xl:text-warn')))
     check(`W1 (${locale}): "${t.title}": the ${EASY_WINS_SHOWN} best, best first, each with one "why" sentence from its searches, competition and click price, its potential, and one button to track it (or "tracked")`,
       m.wins.length > EASY_WINS_SHOWN && items.length === EASY_WINS_SHOWN && wrong.length === 0 && section.includes(`>${esc(t.title)}</h2>`)
       && section.includes(esc(t.showing(formatCount(EASY_WINS_SHOWN, locale), formatCount(m.wins.length, locale)))) && section.includes(`>${esc(t.showAll)}</button>`)
@@ -301,9 +306,17 @@ function main() {
     const gscRow = [...table.matchAll(/<tr\b[\s\S]*?<\/tr>/g)].map((x) => x[0]).find((r) => r.includes(`>${esc(FIXTURE[locale].gscOnly)}<`)) ?? ''
     const withCompetitors = FIXTURE[locale].keywords.find((k) => k.competitors.length > 1) as ScanKeyword
     const competitorRow = [...table.matchAll(/<tr\b[\s\S]*?<\/tr>/g)].map((x) => x[0]).find((r) => r.includes(`>${esc(withCompetitors.keyword)}<`)) ?? ''
-    check(`T2 (${locale}): every row of the research (plus the tracked keywords Google reports for), sorted as the table sorts, each with the line saying where it comes from`,
+    // Final review R18: the research's own mark sat on almost every row; only a source
+    // other than the research (a competitor, Google's report) or "tracked" earns a line.
+    const withSource = m.chipRows.filter((r) => r.tracked || r.competitors.length > 0 || !!r.gsc).length
+    const sourceLines = (h: string) => count(h, 'data-keyword-source=')
+    check(`T2b (${locale}): a keyword the research alone found carries no source mark (${withSource} of ${m.chipRows.length} rows have a line)`,
+      withSource > 0 && withSource < m.chipRows.length && sourceLines(table) === withSource, show({ lines: count(table, 'data-keyword-source='), withSource }))
+    check(`T2b-MUT (${locale}): the research mark back on a research-only row fails T2b`,
+      sourceLines(table.replace('<span class="block break-words', `<span data-keyword-source=""><span class="sr-only">${esc(t.source.research)}</span></span><span class="block break-words`)) !== withSource)
+    check(`T2 (${locale}): every row of the research (plus the tracked keywords Google reports for), sorted as the table sorts, each non-research source said on its line`,
       show(rows) === show(byVolume) && rows.length === FIXTURE[locale].keywords.length + 1
-      && table.includes(`>${m.chipRows.length}</span>`) && count(table, 'data-keyword-source=') >= rows.length - 1
+      && table.includes(`>${m.chipRows.length}</span>`) && sourceLines(table) === withSource
       && gscRow.includes(esc(t.source.google(formatCompact(12, locale), formatCompact(950, locale)))) && gscRow.includes(`>${esc(t.source.tracked)}</span>`)
       && competitorRow.includes(esc(t.source.competitor(withCompetitors.competitors[0], withCompetitors.competitors.length - 1)))
       && !table.includes(esc(getDashboardDictionary(locale).keywordResearch.opportunities.show)),

@@ -209,7 +209,7 @@ function main() {
   const extra = broken('mut-extra', mutate('{/* Form */}', '<p>new</p>'))
   check('L1-MUT2: a page that shows one more element with no scan fails L1', !!extra && extra.length > 0, extra ? undefined : 'anchor missing')
   // The table's headers are one list since the P1-4 rewrite; dropping an entry drops a column.
-  const column = broken('mut-column', mutate("['lowCpc', t.results.lowCpc, ''],", ''))
+  const column = broken('mut-column', mutate("['lowCpc', t.results.lowCpc, 'hidden lg:table-cell'],", ''))
   check('L1-MUT3: a table that lost a column fails L1 (a results state only)', !!column && column.some((m) => !m.includes('/initial')), column ? undefined : 'anchor missing')
   const flash = mutate('const firstAnswerPending = !projectsResolved || scanView.kind === \'loading\'', 'const firstAnswerPending = false')
   check('L2-MUT: a page that shows today\'s form while the scan loads (the flash) fails L2',

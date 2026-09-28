@@ -5,7 +5,7 @@ import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
-import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
+import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
@@ -13,6 +13,8 @@ import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import TrackingTargetForm from './TrackingTargetForm'
 import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/app/actions/tracking-targets'
 import { formatDateTime } from '@/lib/utils'
+import { displayUrl } from '@/lib/format/display-url'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ArrowDown, ArrowUp, ArrowUpDown, FileSearch, History, KeyRound, PauseCircle, Pencil, PlayCircle, RefreshCw, Trash2 } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
@@ -20,6 +22,9 @@ import { Card } from '@/components/ui/Card'
 import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
 import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import { GscVolumeCell, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
+
+/** The table's columns: keyword, type, volume, position, change, last check, actions. */
+const COLUMNS = 7
 
 /** A sortable header: the label and its lucide arrow, keyboard-visible focus. */
 const SORT_BUTTON = 'inline-flex items-center gap-1 rounded-control font-semibold transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'
@@ -92,7 +97,7 @@ export default function TrackingTargetsTable({
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  type SortColumn = 'position' | 'keyword' | 'date' | 'found' | 'volume'
+  type SortColumn = 'position' | 'keyword' | 'date' | 'volume'
   const [sortBy, setSortBy] = useState<SortColumn>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -132,10 +137,7 @@ export default function TrackingTargetsTable({
         const bVol = b.avg_monthly_searches ?? -1
         return (aVol - bVol) * dir
       }
-
-      const aFound = aResult?.found ? 1 : 0
-      const bFound = bResult?.found ? 1 : 0
-      return (aFound - bFound) * dir
+      return 0
     })
     return copy
   }, [targets, latestResults, sortBy, sortDir])
@@ -180,7 +182,11 @@ export default function TrackingTargetsTable({
               <button type="button" onClick={() => handleSort('keyword')} className={SORT_BUTTON}>{k.keyword}{sortLabel('keyword')}</button>
             </Th>
             {/* PRIORITY COLUMNS: a phone shows keyword, position (with its change
-                under it) and actions; the rest return as the screen widens. */}
+                under it) and actions; the rest return as the screen widens.
+                SEVEN COLUMNS, NOT NINE (final review R19): "found" said again what the
+                position already says ("not found" instead of a number), and "status"
+                was a green "active" on every row. The one exception, a paused keyword,
+                is a badge beside its name. */}
             <Th className="hidden md:table-cell">{k.scanType}</Th>
             <Th className="hidden sm:table-cell">
               <button type="button" onClick={() => handleSort('volume')} className={SORT_BUTTON}>{k.searchVolume}{sortLabel('volume')}</button>
@@ -192,10 +198,6 @@ export default function TrackingTargetsTable({
             <Th className="hidden lg:table-cell">
               <button type="button" onClick={() => handleSort('date')} className={SORT_BUTTON}>{k.lastChecked}{sortLabel('date')}</button>
             </Th>
-            <Th className="hidden xl:table-cell">
-              <button type="button" onClick={() => handleSort('found')} className={SORT_BUTTON}>{k.found}{sortLabel('found')}</button>
-            </Th>
-            <Th className="hidden md:table-cell">{k.status}</Th>
             <Th>{k.actions}</Th>
           </tr>
         </TableHead>
@@ -205,11 +207,11 @@ export default function TrackingTargetsTable({
               to a merchant, and collapsing them into an empty table is how a
               failure reads as an empty project. */}
           {targets.length === 0 && targetsLoading && (
-            <EmptyRow colSpan={9} message={k.keywordsLoading} />
+            <EmptyRow colSpan={COLUMNS} message={k.keywordsLoading} />
           )}
           {targets.length === 0 && !targetsLoading && targetsError && (
             <tr>
-              <td colSpan={9} className="px-4 py-8 text-center text-copy text-muted">
+              <td colSpan={COLUMNS} className="px-4 py-8 text-center text-copy text-muted">
                 {k.keywordsLoadFailed}
                 {onRetryTargets && (
                   <button
@@ -248,6 +250,7 @@ export default function TrackingTargetsTable({
               <TableRow key={target.id} className="[&>td]:py-2 max-sm:[&>td]:px-2.5">
                 <Td className="min-w-[7rem] sm:whitespace-nowrap">
                   <span className="font-medium text-ink">{target.keyword}</span>
+                  {!target.is_active && <Badge variant="neutral" className="ms-2 align-middle">{dict.common.inactive}</Badge>}
                   {target.notes && (
                     <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
                   )}
@@ -265,7 +268,8 @@ export default function TrackingTargetsTable({
                       // TRUTHFUL PENDING STATE. An em dash is indistinguishable
                       // from "this feature does not work"; a new keyword whose
                       // volume is on its way should say so.
-                      <span className="text-copy text-muted animate-pulse motion-reduce:animate-none">
+                      <span className="inline-flex items-center gap-2 text-caption text-muted">
+                        <Skeleton className="h-3.5 w-10" />
                         {k.volumePending}
                       </span>
                     ) : volumeUnavailable && onRetryVolumes ? (
@@ -327,21 +331,13 @@ export default function TrackingTargetsTable({
                           rel="noopener noreferrer"
                           dir="ltr"
                           title={result.result_url}
-                          className="block max-w-40 truncate text-caption text-muted transition-colors hover:text-action hover:underline"
+                          className="block max-w-48 truncate text-caption text-muted transition-colors hover:text-action hover:underline"
                         >
-                          {result.result_url}
+                          {displayUrl(result.result_url)}
                         </a>
                       )}
                     </div>
                   ) : '—'}
-                </Td>
-                <Td className="hidden xl:table-cell">
-                  <Badge variant={result?.found ? 'success' : 'neutral'}>
-                    {result ? (result.found ? k.yesFound : k.noNotFound) : '—'}
-                  </Badge>
-                </Td>
-                <Td className="hidden md:table-cell">
-                  <ActiveBadge active={target.is_active} />
                 </Td>
                 <Td>
                   <div className="flex items-center gap-1">

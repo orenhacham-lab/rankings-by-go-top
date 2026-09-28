@@ -36,6 +36,7 @@ import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import StatTile from '@/components/ui/StatTile'
+import { Skeleton } from '@/components/ui/Skeleton'
 import EmptyState from '@/components/ui/EmptyState'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
@@ -148,15 +149,15 @@ function nextStep(input: {
   content: boolean
 }): NextStep | null {
   const { t, rankings, overview, content } = input
-  if (rankings.tracked === 0) return { href: '/keyword-research', label: t.actions.addKeywords, commit: false, note: null }
+  if (rankings.tracked === 0) return { href: '/keyword-research', label: t.actions.addKeywords, note: null }
   const articles = overview?.articles
   if (content && articles?.state === 'ready' && articles.data.total === 0) {
-    return { href: strategyHref('board'), label: t.actions.writeFirstArticle, commit: true, note: t.actions.articleQuota }
+    return { href: strategyHref('board'), label: t.actions.writeFirstArticle, note: t.actions.articleQuota }
   }
   // No "connect the site" here (UX review P1-16): it had nothing to do with the
   // number above it, and the setup checklist beside the card already offers it.
   if (content && articles?.state === 'ready') {
-    return { href: strategyHref('board'), label: t.actions.writeArticle, commit: true, note: t.actions.articleQuota }
+    return { href: strategyHref('board'), label: t.actions.writeArticle, note: t.actions.articleQuota }
   }
   return null
 }
@@ -278,12 +279,13 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
 
   if (status === 'loading' || !rankings || !modeKnown) {
     return (
-      <div aria-busy="true" className="space-y-5">
-        <div className="h-44 animate-pulse rounded-card bg-contrast/90 motion-reduce:animate-none" />
+      <div role="status" aria-busy="true" data-skeleton="" className="space-y-5">
+        <span className="sr-only">{home.loading}</span>
+        {/* The shared Skeleton (one shimmer, one radius), in the shape of the opening card and its tiles. */}
+        <Skeleton className="h-44 rounded-card" />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-card border border-line bg-surface motion-reduce:animate-none" />)}
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}
         </div>
-        <p className="sr-only">{home.loading}</p>
       </div>
     )
   }
@@ -298,7 +300,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
   const next = nextStep({ t, projectId: project.id, rankings, overview: data, content: showContent })
   const hold = seed.kind === 'run' ? holdingBack(seed.run, language) : null
   const tile = t.tiles
-  const pending = <span aria-hidden="true" className="inline-block h-7 w-12 animate-pulse rounded-control bg-sunk align-middle motion-reduce:animate-none" />
+  const pending = <Skeleton className="inline-block h-7 w-12 align-middle" />
 
   const siteSummary = mappingOffered && seed.kind === 'run' ? { href: summaryHref(project.id), label: dict.mapping.summaryLink } : null
 

@@ -118,45 +118,44 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
   return 'mediumPotential'
 }
 
+type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral'
+
 interface OpportunityBadgeInfo {
   key: OpportunityKey
   label: string
-  colorClass: string
+  variant: BadgeVariant
 }
 
-/** The SEO potential's pill, in the design tokens (its words come from the dictionary). */
+/** The SEO potential as a ui Badge (its words come from the dictionary). */
 function getOpportunityBadgeInfo(r: KeywordIdeaResult, labels: Record<OpportunityKey, string>): OpportunityBadgeInfo {
   const key = getSeoPotentialBadge(r)
-
-  const colorClasses: Record<OpportunityKey, string> = {
-    high: 'bg-ok-soft text-ok',
-    medium: 'bg-warn-soft text-warn',
-    low: 'bg-sunk text-muted',
-  }
-
-  return {
-    key,
-    label: labels[key],
-    colorClass: colorClasses[key],
-  }
+  const variants: Record<OpportunityKey, BadgeVariant> = { high: 'success', medium: 'warning', low: 'neutral' }
+  return { key, label: labels[key], variant: variants[key] }
 }
 
 /**
- * Google Ads' competition level in the screen's words and a token colour (UX review
- * P1-4): "בינונית", never "MEDIUM (55)". The 0–100 index is the cell's tooltip.
+ * Google Ads' competition level in the screen's words (UX review P1-4): "בינונית",
+ * never "MEDIUM (55)", drawn as a ui Badge like the potential beside it (final review
+ * R18), not as a coloured word. The 0–100 index is the badge's tooltip.
  */
-const COMPETITION_TONE: Record<'LOW' | 'MEDIUM' | 'HIGH', string> = { LOW: 'text-ok', MEDIUM: 'text-warn', HIGH: 'text-bad' }
+const COMPETITION_VARIANT: Record<'LOW' | 'MEDIUM' | 'HIGH', BadgeVariant> = { LOW: 'success', MEDIUM: 'warning', HIGH: 'danger' }
 function competitionCell(
   r: Pick<KeywordIdeaResult, 'competition' | 'competitionIndex'>,
   levels: Record<'LOW' | 'MEDIUM' | 'HIGH', string>,
   indexLabel: (n: number) => string,
-): { label: string; tone: string; title: string | undefined } {
-  if (!r.competition) return { label: '—', tone: 'text-muted', title: undefined }
+): { label: string; variant: BadgeVariant | null; title: string | undefined } {
+  if (!r.competition) return { label: '—', variant: null, title: undefined }
   return {
     label: levels[r.competition],
-    tone: COMPETITION_TONE[r.competition],
+    variant: COMPETITION_VARIANT[r.competition],
     title: typeof r.competitionIndex === 'number' ? indexLabel(r.competitionIndex) : undefined,
   }
+}
+
+/** The competition cell's content: its Badge, or a muted dash when Google gave no level. */
+function CompetitionBadge({ c }: { c: ReturnType<typeof competitionCell> }) {
+  if (!c.variant) return <span className="text-muted">{c.label}</span>
+  return <span title={c.title} data-competition=""><Badge variant={c.variant}>{c.label}</Badge></span>
 }
 
 export default function KeywordResearchPage() {
@@ -1165,7 +1164,7 @@ export default function KeywordResearchPage() {
 
           {/* Opportunities Panel — opt-in, compact, no extra API calls */}
           {!scanMode && opportunitiesOpen && topOpportunities.length > 0 && (
-            <section data-opportunities="" className="mb-4 rounded-inset border border-line border-s-[3px] border-s-action bg-surface p-4">
+            <section data-opportunities="" className="mb-4 rounded-inset border border-line bg-surface p-4">
               <h3 className="text-copy font-semibold text-ink">{t.opportunities.title}</h3>
               <p className="text-caption text-muted">{t.opportunities.subtitle}</p>
               <ul className="mt-2 divide-y divide-line">
@@ -1180,7 +1179,7 @@ export default function KeywordResearchPage() {
                       <span className="whitespace-nowrap text-muted tabular-nums">
                         {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined ? formatCount(r.avgMonthlySearches, language) : '—'} {t.opportunities.searches}
                       </span>
-                      <span className={`whitespace-nowrap font-semibold ${c.tone}`} title={c.title}>{c.label}</span>
+                      <CompetitionBadge c={c} />
                       {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
                         <span className="whitespace-nowrap text-muted tabular-nums">CPC {formatMoney(r.highTopOfPageBid, r.currency, language)}</span>
                       )}
@@ -1198,11 +1197,11 @@ export default function KeywordResearchPage() {
 
           {/* Results Table (§6): a named checkbox per row, the difficulty in words, one
               money format, figures end-aligned, the row's secondary actions behind "⋯". */}
-          <div className="relative -mx-5 overflow-x-auto sm:-mx-6">
+          <div className="relative -mx-5 overflow-x-auto sm:-mx-6" data-research-table-scroll="">
             <table className="w-full text-copy">
               <thead>
                 <tr className="h-10 border-y border-line bg-sunk/70 text-caption text-muted">
-                  <th className="w-10 ps-5 pe-2 text-start sm:ps-6">
+                  <th className="w-10 ps-4 pe-1 text-start sm:ps-6 sm:pe-2">
                     <Checkbox
                       checked={selectedKeywords.size === tableSource.length && tableSource.length > 0}
                       indeterminate={selectedKeywords.size > 0 && selectedKeywords.size < tableSource.length}
@@ -1210,25 +1209,30 @@ export default function KeywordResearchPage() {
                       aria-label={t.results.selectAllRows}
                     />
                   </th>
-                  <th className="px-4 text-start font-semibold">
+                  <th className="px-2.5 text-start font-semibold sm:px-4">
                     {t.results.keyword}
                   </th>
                   {([
+                    // Below sm (a phone at 390) the table keeps the keyword, its searches and
+                    // the row's actions; potential, competition and the click prices return
+                    // from sm/md/lg, and on a phone the competition rides under the keyword.
+                    // There the keyword, its source line and these headers wrap instead of
+                    // truncating, so the three columns fit 390 without a sideways scroll.
                     ['monthlySearches', t.results.monthlySearches, ''],
-                    ['opportunity', t.results.opportunity, 'hidden sm:table-cell'],
-                    ['competition', t.results.competition, ''],
-                    ['lowCpc', t.results.lowCpc, ''],
-                    ['highCpc', t.results.highCpc, ''],
+                    ['opportunity', t.results.opportunity, 'hidden md:table-cell'],
+                    ['competition', t.results.competition, 'hidden sm:table-cell'],
+                    ['lowCpc', t.results.lowCpc, 'hidden lg:table-cell'],
+                    ['highCpc', t.results.highCpc, 'hidden sm:table-cell'],
                   ] as const).map(([key, label, cls]) => {
                     const numeric = key === 'monthlySearches' || key === 'lowCpc' || key === 'highCpc'
                     return (
-                      <th key={key} className={`px-4 font-semibold ${numeric ? 'text-end' : 'text-start'} ${cls}`} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                      <th key={key} className={`px-2.5 font-semibold sm:px-4 ${numeric ? 'text-end' : 'text-start'} ${cls}`} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
                         <button
                           type="button"
                           onClick={() => handleSort(key)}
                           title={key === 'opportunity' ? t.results.opportunityTooltip : undefined}
                           aria-label={t.table.sortBy(label)}
-                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-control transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${sortBy === key ? 'text-ink' : ''}`}
+                          className={`inline-flex items-center gap-1 rounded-control text-start transition-colors sm:whitespace-nowrap duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${sortBy === key ? 'text-ink' : ''}`}
                         >
                           {label}
                           {sortIndicator(key)}
@@ -1236,7 +1240,7 @@ export default function KeywordResearchPage() {
                       </th>
                     )
                   })}
-                  <th className="px-4 pe-5 text-end font-semibold sm:pe-6">
+                  <th className="px-2.5 pe-4 text-end font-semibold sm:px-4 sm:pe-6">
                     <span className="sr-only">{t.results.action}</span>
                   </th>
                 </tr>
@@ -1248,40 +1252,41 @@ export default function KeywordResearchPage() {
                   const selected = selectedKeywords.has(result.keyword)
                   return (
                   <tr key={idx} data-selected={selected || undefined} className={`h-14 transition-colors duration-150 ease-snappy ${selected ? 'bg-action-soft' : 'hover:bg-sunk/60'}`}>
-                    <td className="w-10 ps-5 pe-2 sm:ps-6">
+                    <td className="w-10 ps-4 pe-1 sm:ps-6 sm:pe-2">
                       <Checkbox
                         checked={selected}
                         onChange={() => toggleKeyword(result.keyword)}
                         aria-label={t.results.selectKeyword(result.keyword)}
                       />
                     </td>
-                    <td className="max-w-72 px-4 py-3 text-start">
-                      <span className="block truncate font-medium text-ink" title={result.keyword}>{result.keyword}</span>
+                    <td className="max-w-72 px-2.5 py-3 text-start sm:px-4">
+                      <span className="block break-words font-medium text-ink sm:truncate" title={result.keyword}>{result.keyword}</span>
                       {scanMode && sourceLineFor(result.keyword)}
+                      {competition.variant && (
+                        <span data-phone-meta="" className="mt-1 flex sm:hidden"><CompetitionBadge c={competition} /></span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-end tabular-nums text-body">
+                    <td className="px-2.5 py-3 text-end tabular-nums text-body sm:px-4">
                       {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? formatCount(result.avgMonthlySearches, language) : '—'}
                     </td>
-                    <td className="hidden px-4 py-3 text-start sm:table-cell">
-                      <span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-0.5 text-caption font-semibold ${badge.colorClass}`}>
-                        {badge.label}
-                      </span>
+                    <td className="hidden px-4 py-3 text-start md:table-cell">
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
                     </td>
-                    <td className={`whitespace-nowrap px-4 py-3 text-start font-medium ${competition.tone}`} title={competition.title}>
-                      {competition.label}
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-start sm:table-cell">
+                      <CompetitionBadge c={competition} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-body">
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-end tabular-nums text-body lg:table-cell">
                       {result.lowTopOfPageBid ? formatMoney(result.lowTopOfPageBid, result.currency, language) : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-body">
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-end tabular-nums text-body sm:table-cell">
                       {result.highTopOfPageBid ? formatMoney(result.highTopOfPageBid, result.currency, language) : '—'}
                     </td>
-                    <td className="px-4 py-3 pe-5 sm:pe-6">
+                    <td className="px-2.5 py-3 pe-4 sm:px-4 sm:pe-6">
                       <div className="flex items-center justify-end gap-1">
                         {/* One click to track this keyword: the same request and quota check as "easy wins". */}
                         {scanMode && ((result as ResearchRow).tracked ? (
-                          <span data-row-tracked="" className="inline-flex h-8 items-center gap-1 whitespace-nowrap px-3 text-caption font-semibold text-ok">
-                            <Check aria-hidden="true" className="size-4" />{ti.tracked}
+                          <span data-row-tracked="" className="inline-flex h-8 items-center gap-1 whitespace-nowrap px-2 text-caption font-semibold text-ok sm:px-3">
+                            <Check aria-hidden="true" className="size-4" /><span className="max-sm:sr-only">{ti.tracked}</span>
                           </span>
                         ) : (
                           <button
@@ -1290,10 +1295,10 @@ export default function KeywordResearchPage() {
                             onClick={() => trackKeyword(result as ResearchRow)}
                             disabled={trackingKeys.has(keywordKey(result.keyword))}
                             aria-label={ti.trackAria(result.keyword)}
-                            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50"
+                            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-2 text-caption sm:px-3 font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50"
                           >
                             {trackingKeys.has(keywordKey(result.keyword)) ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Plus aria-hidden="true" className="size-4" />}
-                            {trackingKeys.has(keywordKey(result.keyword)) ? ti.tracking : ti.track}
+                            <span className="max-sm:sr-only">{trackingKeys.has(keywordKey(result.keyword)) ? ti.tracking : ti.track}</span>
                           </button>
                         ))}
                         <RowMenu

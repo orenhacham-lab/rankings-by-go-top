@@ -12,7 +12,6 @@
  * merchant who just started a project sees that the waiting is work.
  */
 import { Newspaper, TrendingDown, TrendingUp } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import type { RankingsView } from '@/lib/dashboard/rankings'
 import type { SeedPhase } from '@/lib/dashboard/seed'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
@@ -24,8 +23,8 @@ import { LinkButton } from './ui'
 export interface NextStep {
   href: string
   label: string
-  /** Costs something (an article counts toward the allowance): the amber colour. */
-  commit: boolean
+  /** Under the button, e.g. that an article counts toward the allowance. The button
+   *  itself is the default action colour: amber (commit) is for paying only. */
   note: string | null
 }
 
@@ -62,7 +61,7 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
       className="relative isolate overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-pop sm:p-8"
     >
       {/* Depth, never an animation of its own: two soft glows and a faint grid that fades out. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,color-mix(in_srgb,var(--color-action)_34%,transparent),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,color-mix(in_srgb,var(--color-commit)_16%,transparent),transparent_70%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,color-mix(in_srgb,var(--color-action)_34%,transparent),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,color-mix(in_srgb,var(--color-action)_14%,transparent),transparent_70%)]" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,var(--color-contrast-ink)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-contrast-ink)_1px,transparent_1px)] [background-size:32px_32px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
@@ -106,7 +105,7 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
         <div className="flex flex-col items-start gap-5 md:items-end">
           {next && (
             <div className="flex flex-col items-start gap-1.5 md:items-end">
-              <LinkButton href={next.href} variant={next.commit ? 'commit' : 'primary'} className={cn('h-11 px-5 shadow-pop')}>
+              <LinkButton href={next.href} variant="primary" className="h-11 px-5 shadow-pop">
                 {next.label}
               </LinkButton>
               {next.note && <span className="text-caption text-contrast-ink/70">{next.note}</span>}

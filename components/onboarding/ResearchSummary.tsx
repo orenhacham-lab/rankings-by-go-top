@@ -5,7 +5,7 @@
  * their order (plan §0), with no sign-up gate since the merchant is signed in.
  *
  *   1 the badge, "here's what we found about {business}", "we just scanned {domain}"
- *   2 four tiles, each with its coloured status dot
+ *   2 four tiles, each with its state as a small icon in its tone
  *   3 the business (chips and description)   ┐
  *   4 its audiences                          ├ each with "Edit", into settings
  *   5 its competitors                        ┘
@@ -53,6 +53,7 @@ import {
   X,
 } from 'lucide-react'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
+import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
 import { freeCheckCopy } from '@/lib/free-check/copy'
@@ -73,44 +74,25 @@ import {
   storefrontLocked,
   tilesView,
   type TileView,
-  type Tone,
 } from '@/lib/onboarding/summary-view'
 import { MAX_CONTINUE_KEYWORDS, type SeedRunView, type SeedSummary } from '@/lib/seed-scan/types'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import { cn } from '@/lib/utils'
 import FirstArticleButton from './FirstArticleButton'
-import { ActionLink, BlockNote, isolate, StatusDot, SummaryBlock } from './parts'
+import { ActionLink, BlockNote, isolate, StatusIcon, SummaryBlock } from './parts'
 import SeedNotice from './SeedNotice'
 
-const SEVERITY_STYLE: Record<string, string> = {
-  blocker: 'bg-bad-soft text-bad border-bad/20',
-  warning: 'bg-warn-soft text-warn border-warn/25',
-  info: 'bg-info-soft text-info border-info/20',
+/**
+ * One action hue plus the ok/warn/bad tones on icons and badges only (final review
+ * R26): a finding's severity is its Badge, never a rail, a dot or a bar of colours.
+ */
+const SEVERITY_BADGE: Record<string, 'danger' | 'warning' | 'neutral'> = {
+  blocker: 'danger',
+  warning: 'warning',
+  info: 'neutral',
 }
-/** The edge a finding's card carries, on the side reading starts from. */
-const SEVERITY_EDGE: Record<string, string> = {
-  blocker: 'border-s-bad',
-  warning: 'border-s-warn',
-  info: 'border-s-info',
-}
-const SEVERITY_BAR: Record<string, string> = {
-  blocker: 'bg-bad',
-  warning: 'bg-warn',
-  info: 'bg-info',
-}
-/** The ring's arc on the dark hero: the state colours, lifted to read on ink. */
-const HERO_ARC: Record<Tone, string> = {
-  ok: 'stroke-[#5bd08a]',
-  warn: 'stroke-[#f3bf5b]',
-  bad: 'stroke-[#f58c80]',
-  neutral: 'stroke-white/30',
-}
-const TILE_FILL: Record<Tone, string> = {
-  ok: 'bg-ok',
-  warn: 'bg-warn',
-  bad: 'bg-bad',
-  neutral: 'bg-line-strong',
-}
+/** The ring's arc on the dark hero: the action hue lifted to read on ink, whatever the score. */
+const HERO_ARC = 'stroke-rail-focus'
 /** Competitors were checked against this many of the site's searches (the scale the bar is drawn on). */
 const COMPETITOR_SCALE = 3
 
@@ -297,7 +279,7 @@ export default function ResearchSummary({
                 size={132}
                 stroke={11}
                 fraction={geo.kind === 'measured' && geo.total > 0 ? geo.passed / geo.total : 0}
-                arcClass={HERO_ARC[geoTile.tone]}
+                arcClass={HERO_ARC}
                 trackClass="stroke-white/12"
               >
                 <span className={cn('font-bold tabular-nums text-contrast-ink', geoTile.state === 'value' ? 'text-metric leading-none' : 'px-3 text-copy')}>
@@ -329,34 +311,22 @@ export default function ResearchSummary({
               )}
             >
               <p className="order-1 flex items-start gap-2 text-copy text-muted">
-                <StatusDot tone={tile.tone} className="mt-1.5" />
+                <StatusIcon tone={tile.tone} className="mt-0.5" />
                 <span className="min-w-0">{tileLabel(tile)}</span>
               </p>
-              <span className="order-3 mt-3 block" aria-hidden>
-                {tile.id === 'fixes' && severityCounts.length > 0 ? (
-                  <>
-                    <span className="flex h-2 w-full gap-0.5 overflow-hidden rounded-pill">
-                      {severityCounts.map((x) => (
-                        <span key={x.sev} className={cn('h-full rounded-pill', SEVERITY_BAR[x.sev])} style={{ flexGrow: x.n }} />
-                      ))}
-                    </span>
-                    <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-caption text-muted">
-                      {severityCounts.map((x) => (
-                        <span key={x.sev} className="inline-flex items-center gap-1.5">
-                          <span className={cn('h-1.5 w-1.5 rounded-pill', SEVERITY_BAR[x.sev])} />
-                          <span className="tabular-nums">{x.n}</span> {t.findings.severity[x.sev]}
-                        </span>
-                      ))}
-                    </span>
-                  </>
-                ) : tile.id === 'geo' ? (
-                  <Segments total={geo.kind === 'measured' ? geo.total : 4} filled={geo.kind === 'measured' ? geo.passed : 0} fillClass={TILE_FILL[tile.tone]} />
-                ) : tile.state === 'value' && Number(tile.value) > 0 ? (
-                  <Segments total={Math.min(Number(tile.value), 10)} filled={Math.min(Number(tile.value), 10)} fillClass="bg-action/70" />
-                ) : (
-                  <Segments total={4} filled={0} fillClass="bg-line" />
-                )}
-              </span>
+              {/* Under the figure: the fixes by severity in words, and the AI signs as one
+                  meter in the action hue. The other tiles are their number alone. */}
+              {tile.id === 'fixes' && severityCounts.length > 0 ? (
+                <span className="order-3 mt-2 block text-caption text-muted" aria-hidden>
+                  {severityCounts.map((x, i) => (
+                    <span key={x.sev}>{i > 0 && ' · '}<span className="tabular-nums">{x.n}</span> {t.findings.severity[x.sev]}</span>
+                  ))}
+                </span>
+              ) : tile.id === 'geo' && geo.kind === 'measured' && geo.total > 0 ? (
+                <span className="order-3 mt-3 block h-1.5 w-full overflow-hidden rounded-pill bg-sunk" aria-hidden>
+                  <span className="block h-full rounded-pill bg-action" style={{ width: `${Math.round((geo.passed / geo.total) * 100)}%` }} />
+                </span>
+              ) : null}
               <p
                 className={cn(
                   'order-2 mt-3 font-semibold tabular-nums text-ink',
@@ -374,7 +344,7 @@ export default function ResearchSummary({
         <div
           data-summary-block="firewall"
           role="note"
-          className="mt-8 flex items-start gap-3 rounded-card border border-line border-s-[3px] border-s-warn bg-surface p-5 shadow-card sm:p-6"
+          className="mt-8 flex items-start gap-3 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
         >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-warn-soft text-warn">
             <ShieldAlert className="h-4 w-4" aria-hidden />
@@ -473,15 +443,15 @@ export default function ResearchSummary({
         <SummaryBlock id="findings" index={4} icon={<TriangleAlert />} tone={findings.kind === 'list' ? 'attention' : 'default'} title={t.findings.title} className="lg:col-span-7">
           {findings.kind === 'list' ? (
             <>
-              <ul className="space-y-2.5">
+              <ul className="divide-y divide-line">
                 {findings.findings.map((f) => {
                   const copy = checks.findings[f.id]
                   return (
-                    <li key={f.id} className={cn('rounded-inset border border-line border-s-[3px] bg-surface p-4', SEVERITY_EDGE[f.severity] ?? SEVERITY_EDGE.info)}>
+                    <li key={f.id} data-finding-severity={f.severity} className="py-3 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={cn('rounded-pill border px-2 py-0.5 text-caption font-semibold', SEVERITY_STYLE[f.severity] ?? SEVERITY_STYLE.info)}>
+                        <Badge variant={SEVERITY_BADGE[f.severity] ?? 'neutral'}>
                           {t.findings.severity[f.severity] ?? t.findings.severity.info}
-                        </span>
+                        </Badge>
                         <p className="min-w-0 font-semibold text-ink" {...(copy ? {} : snapshotText)}>{copy?.title ?? f.title}</p>
                       </div>
                       <p className="mt-1.5 text-copy text-body" {...(copy ? {} : snapshotText)}>{copy?.detail ?? f.detail}</p>
@@ -493,8 +463,8 @@ export default function ResearchSummary({
               {findings.omitted > 0 && <p className="mt-3 text-copy text-muted">{t.findings.omitted(findings.omitted)}</p>}
             </>
           ) : findings.kind === 'clean' ? (
-            <div className="flex items-center gap-3 rounded-control bg-ok-soft px-4 py-3 text-copy font-medium text-ok">
-              <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden />
+            <div className="flex items-center gap-3 rounded-control border border-line px-4 py-3 text-copy font-medium text-ink">
+              <ShieldCheck className="h-5 w-5 shrink-0 text-ok" aria-hidden />
               {t.findings.clean}
             </div>
           ) : (
@@ -627,11 +597,12 @@ export default function ResearchSummary({
               {geo.signals.map((s) => {
                 const copy = checks.geo[s.id]?.[s.ok ? 'pass' : 'fail']
                 return (
-                  <li key={s.id} className={cn('flex items-start gap-3 rounded-inset p-2.5', !s.ok && 'bg-bad-soft/70')}>
+                  <li key={s.id} data-geo-ok={s.ok ? 'true' : 'false'} className="flex items-start gap-3 rounded-inset p-2.5">
+                    {/* A missing sign is the same neutral row: its tone is the icon's only. */}
                     <span
                       className={cn(
                         'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-pill',
-                        s.ok ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad ring-1 ring-bad/30',
+                        s.ok ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad',
                       )}
                     >
                       {s.ok ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : <X className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />}
@@ -772,15 +743,17 @@ export default function ResearchSummary({
           <div
             role="status"
             className={cn(
-              'flex flex-col gap-3 rounded-card border p-4 md:flex-row md:items-center md:justify-between md:p-5',
-              'border-line border-s-[3px] bg-surface shadow-pop', stageB === 'done' ? 'border-s-ok' : 'border-s-warn',
+              'flex flex-col gap-3 rounded-card border border-line bg-surface p-4 shadow-pop md:flex-row md:items-center md:justify-between md:p-5',
             )}
           >
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-start gap-3">
+              <StatusIcon tone={stageB === 'done' ? 'ok' : 'warn'} className="mt-0.5 size-5" />
+              <div className="min-w-0">
               <h2 id="seed-block-start" className="text-copy font-bold text-ink">
                 {stageB === 'done' ? t.start.readyTitle : t.start.failedTitle}
               </h2>
               <p className="mt-0.5 max-w-[70ch] text-copy text-body">{stageB === 'done' ? t.start.readyBody : t.start.failedBody}</p>
+              </div>
             </div>
             <ActionLink href={dashboardHref(projectId)} variant={stageB === 'done' ? 'primary' : 'secondary'} className="shrink-0">
               {t.start.openDashboard}
@@ -867,17 +840,6 @@ function Ring({
         )}
       </svg>
       <span className="absolute inset-0 flex items-center justify-center text-center">{children}</span>
-    </span>
-  )
-}
-
-/** A row of equal segments, `filled` of them lit: a small meter for a count. */
-function Segments({ total, filled, fillClass }: { total: number; filled: number; fillClass: string }) {
-  return (
-    <span className="flex h-2 w-full gap-1">
-      {Array.from({ length: Math.max(1, total) }, (_, i) => (
-        <span key={i} className={cn('h-full flex-1 rounded-pill', i < filled ? fillClass : 'bg-sunk')} />
-      ))}
     </span>
   )
 }

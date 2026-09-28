@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscMetricsTable from '@/components/content/GscMetricsTable'
@@ -44,6 +45,8 @@ type Dict = ReturnType<typeof getDashboardDictionary>['projectDetail']['contentS
 export default function GscPanel({ projectId, connectOrigin = 'project' }: { projectId: string; connectOrigin?: 'hub' | 'project' }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
+  // In-app questions (never window.confirm): both disconnects are destructive, so danger.
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<StatusResponse | null>(null)
@@ -153,7 +156,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   // Normal project-level disconnect: removes ONLY this project's property assignment.
   // Historical metrics and the shared Google connection are preserved.
   async function handleUnassign() {
-    if (!window.confirm(t.unassignConfirm)) return
+    if (!(await confirm({ title: t.unassignConfirmTitle, body: t.unassignConfirmBody, confirmLabel: t.revoke, tone: 'danger' }))) return
     setUnassigning(true); setMessage(null)
     try {
       const res = await fetch(`/api/gsc/property?projectId=${projectId}`, { method: 'DELETE' })
@@ -181,7 +184,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   // GLOBAL, destructive: revokes the user's Google authorization for the WHOLE account.
   // Fails closed (409 connection_in_use) while any project still uses the connection.
   async function handleGlobalRevoke() {
-    if (!window.confirm(t.confirmRevoke)) return
+    if (!(await confirm({ title: t.confirmRevokeTitle, body: t.confirmRevokeBody, confirmLabel: t.confirmRevokeAction, tone: 'danger' }))) return
     setRevoking(true); setMessage(null)
     try {
       const res = await fetch(`/api/gsc/connection?projectId=${projectId}`, { method: 'DELETE' })
@@ -344,6 +347,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
           )}
         </div>
       )}
+      {confirmDialog}
     </Card>
   )
 }

@@ -210,8 +210,12 @@ async function main() {
       tiles.every((x) => x.state === 'value')
       && ['5', '3', '3/4', '5'].every((v, i) => textOf(tiles[i].markup).trim().endsWith(v))
       && has(tiles[0].markup, t.tiles.keywords) && has(tiles[1].markup, t.tiles.fixes) && has(tiles[2].markup, t.tiles.geo) && has(tiles[3].markup, t.tiles.articles))
-    check(`${locale}: …each with its coloured dot (a blocker makes fixes red, 3 of 4 is amber)`,
-      tiles[0].markup.includes('bg-ok') && tiles[1].markup.includes('bg-bad') && tiles[2].markup.includes('bg-warn') && tiles[3].markup.includes('bg-ok'))
+    // Final review R26: the tone is on a small icon (data-tone), never a coloured dot or a multicolour bar.
+    const tones = (ts: { markup: string }[]) => ts.map((x) => /data-tone="([a-z]+)"/.exec(x.markup)?.[1] ?? '')
+    const iconsOnly = (ts: { markup: string }[]) => ts.every((x) => /<svg[^>]*data-tone="[a-z]+"/.test(x.markup) && !/\bbg-(?:ok|warn|bad)\b(?!-)/.test(x.markup))
+    check(`${locale}: …each with its state as an icon in its tone (a blocker makes fixes red, 3 of 4 is amber), no coloured dot or bar`,
+      JSON.stringify(tones(tiles)) === JSON.stringify(['ok', 'bad', 'warn', 'ok']) && iconsOnly(tiles), tones(tiles).join())
+    check(`${locale}: …MUT: a coloured dot back on a tile fails`, !iconsOnly([{ markup: tiles[1].markup + '<span class="h-2.5 w-2.5 rounded-pill bg-bad"></span>' }]))
     const edits = [...html.matchAll(/href="(\/settings\?[^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, '&'))
     check(`${locale}: 3-5 "${t.edit}" on the business, audiences and competitors only, each into its settings section`,
       JSON.stringify(edits) === JSON.stringify(['business', 'audiences', 'competitors'].map((s) => `/settings?projectId=${PROJECT}#${s}`))
@@ -267,8 +271,8 @@ async function main() {
     check(`${locale}: …and no 0/4 anywhere on the page`,
       !/\b0\s*\/\s*\d/.test(textOf(html)) && !has(html, t.geo.score(0, 4)) && !has(html, t.geo.score(0, 0)) && !/0 of 4|0 מתוך 4/.test(textOf(html)))
     const geoTile = tile(html, 'geo')
-    check(`${locale}: …its tile says "${t.tiles.notChecked}", with a grey dot`,
-      geoTile.state === 'notChecked' && has(geoTile.markup, t.tiles.notChecked) && geoTile.markup.includes('bg-line-strong') && !/bg-(bad|warn|ok)\b/.test(geoTile.markup))
+    check(`${locale}: …its tile says "${t.tiles.notChecked}", with a muted icon`,
+      geoTile.state === 'notChecked' && has(geoTile.markup, t.tiles.notChecked) && geoTile.markup.includes('data-tone="neutral"') && !/(?:bg|text)-(bad|warn|ok)\b/.test(geoTile.markup))
     check(`${locale}: …the site's findings are not checked either: never "clean", never failing`,
       has(block(html, 'findings'), t.findings.locked) && !has(html, t.findings.clean) && !has(html, t.findings.failed) && tile(html, 'fixes').state === 'notChecked')
     check(`${locale}: …and the business block says why it is empty`, has(block(html, 'business'), t.business.locked))
@@ -288,9 +292,9 @@ async function main() {
       && !has(failed, t.findings.clean))
     const clean = fullSummary({ findings: [], findingsOmitted: 0 })
     const cleanHtml = render(locale, ResearchSummary, props({ run: runView({ summary: clean }), summary: clean }))
-    check(`${locale}: a site with none of the issues we check: "${t.findings.clean}", and 0 fixes in green`,
+    check(`${locale}: a site with none of the issues we check: "${t.findings.clean}", and 0 fixes with a green icon`,
       has(block(cleanHtml, 'findings'), t.findings.clean) && tile(cleanHtml, 'fixes').state === 'value' && textOf(tile(cleanHtml, 'fixes').markup).trim().endsWith('0')
-      && tile(cleanHtml, 'fixes').markup.includes('bg-ok'))
+      && tile(cleanHtml, 'fixes').markup.includes('data-tone="ok"'))
   }
   {
     const he = render('he', ResearchSummary, props())

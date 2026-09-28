@@ -7,7 +7,6 @@ import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
-import Badge from '@/components/ui/Badge'
 import BackLink from '@/components/ui/BackLink'
 import PositionHistoryChart, { positionPoints } from '@/components/keywords/PositionHistoryChart'
 import StatTile from '@/components/ui/StatTile'
@@ -15,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { SearchX } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { displayUrl } from '@/lib/format/display-url'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -56,8 +56,8 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       <div role="status" aria-busy="true" className="space-y-6">
         <span className="sr-only">{common.loading}</span>
         <Skeleton className="h-9 w-64" />
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
-          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}
         </div>
         <Skeleton className="h-72 rounded-card" />
       </div>
@@ -87,17 +87,20 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
   return (
     <div>
       <div className="mb-3"><BackLink href={backHref}>{t.backToKeywords}</BackLink></div>
-      <Header title={target.keyword} subtitle={t.subtitle} />
+      {/* The engine is a fact about the keyword, not a figure: it sits under the title,
+          so the figures are four tiles (two full rows on a phone, one row on a desktop). */}
+      <Header title={target.keyword} subtitle={t.subtitle}>
+        <p data-history-engine="" className="flex items-center gap-2 text-caption text-muted">
+          <span>{t.engine}</span>
+          <EngineBadge engine={target.engine_type} />
+        </p>
+      </Header>
 
-      {/* Summary: the same tile as every other screen. */}
-      <div className="list-enter mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
-        <div className="flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-card sm:p-5">
-          <span className="text-caption font-medium text-muted">{t.engine}</span>
-          <div className="mt-2"><EngineBadge engine={target.engine_type} /></div>
-        </div>
+      {/* Summary: the same tile as every other screen, plain figures (ok/bad are for up/down only). */}
+      <div data-history-tiles="" className="list-enter mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         <StatTile label={t.currentPosition} value={latestResult?.found ? `#${latestResult.position}` : '—'} />
-        <StatTile label={t.bestPosition} value={<span className="text-ok">{bestPosition !== null ? `#${bestPosition}` : '—'}</span>} />
-        <StatTile label={t.worstPosition} value={<span className="text-bad">{worstPosition !== null ? `#${worstPosition}` : '—'}</span>} />
+        <StatTile label={t.bestPosition} value={bestPosition !== null ? `#${bestPosition}` : '—'} />
+        <StatTile label={t.worstPosition} value={worstPosition !== null ? `#${worstPosition}` : '—'} />
         <StatTile label={t.average} value={avgPosition !== null ? `#${avgPosition}` : '—'} />
       </div>
 
@@ -118,46 +121,47 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         </h2>
       </div>
 
+      {/* Below sm the table keeps the date and the position (its change under it); the
+          previous position, the change, the page and its title return as the screen
+          widens, so nothing is cut inside a sideways-scrolling card at 390. "Found" is
+          no column: a check that did not find the site says so in the position cell. */}
       <Table>
         <TableHead>
-          <tr>
+          <tr className="max-sm:[&>th]:px-3">
             <Th>{t.checkDate}</Th>
             <Th>{t.position}</Th>
-            <Th>{t.previousPosition}</Th>
-            <Th>{t.change}</Th>
-            <Th>{t.found}</Th>
-            <Th>{t.resultUrl}</Th>
-            <Th>{t.resultTitle}</Th>
+            <Th className="hidden sm:table-cell">{t.previousPosition}</Th>
+            <Th className="hidden sm:table-cell">{t.change}</Th>
+            <Th className="hidden md:table-cell">{t.resultUrl}</Th>
+            <Th className="hidden lg:table-cell">{t.resultTitle}</Th>
           </tr>
         </TableHead>
         <TableBody>
           {results.length === 0 && (
-            <EmptyRow colSpan={7} message={t.noHistoryYet} />
+            <EmptyRow colSpan={6} message={t.noHistoryYet} />
           )}
           {results.map((result) => (
-            <TableRow key={result.id}>
+            <TableRow key={result.id} className="max-sm:[&>td]:px-3">
               <Td className="whitespace-nowrap">{formatDateTime(result.checked_at, language)}</Td>
               <Td>
-                {result.found && result.position !== null ? (
-                  <span className="font-semibold text-ink">#{result.position}</span>
-                ) : (
-                  <span className="text-muted">—</span>
-                )}
+                <div className="flex flex-col items-start gap-0.5">
+                  {result.found && result.position !== null ? (
+                    <span className="font-semibold text-ink tabular-nums">#{result.position}</span>
+                  ) : (
+                    <span className="text-caption text-muted">{t.notFound}</span>
+                  )}
+                  <span className="sm:hidden"><PositionChange change={result.change_value} /></span>
+                </div>
               </Td>
-              <Td>
+              <Td className="hidden sm:table-cell">
                 {result.previous_position !== null ? (
-                  <span className="text-muted">#{result.previous_position}</span>
+                  <span className="text-muted tabular-nums">#{result.previous_position}</span>
                 ) : '—'}
               </Td>
-              <Td>
+              <Td className="hidden sm:table-cell">
                 <PositionChange change={result.change_value} />
               </Td>
-              <Td>
-                <Badge variant={result.found ? 'success' : 'neutral'}>
-                  {result.found ? t.found : t.notFound}
-                </Badge>
-              </Td>
-              <Td>
+              <Td className="hidden md:table-cell">
                 {result.result_url ? (
                   <a
                     href={result.result_url}
@@ -167,12 +171,12 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
                     title={result.result_url}
                     className="block max-w-64 truncate text-caption text-muted transition-colors hover:text-action hover:underline"
                   >
-                    {result.result_url}
+                    {displayUrl(result.result_url)}
                   </a>
                 ) : '—'}
               </Td>
-              <Td>
-                <span className="text-caption text-body truncate max-w-40 block">
+              <Td className="hidden lg:table-cell">
+                <span className="block max-w-40 truncate text-caption text-body">
                   {result.result_title || result.result_address || '—'}
                 </span>
               </Td>

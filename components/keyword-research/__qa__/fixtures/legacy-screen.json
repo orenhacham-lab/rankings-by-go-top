@@ -1,25 +1,25 @@
 {
-  "capturedFrom": "shared Header/Button on the token scale (text-lead, shadow-control), page unchanged",
+  "capturedFrom": "preview merge: wave 6",
   "scenarios": {
     "he/initial": {
       "sha256": "94abe65ebbcf96c06c73e793c1278e1afd1958ac0ffa6336d58854c89241efc6",
       "length": 8767
     },
     "he/results": {
-      "sha256": "296768718dd7f4eebeb69835c777cd1655aeb28f2ac16ccd2fd1aca66e431c5f",
-      "length": 28494
+      "sha256": "7216918e8f2a77cfc626b05cd88c19bad38c72f456405f686e411301474b38d8",
+      "length": 32096
     },
     "he/selectedWithOpportunities": {
-      "sha256": "89a70320ffbc4d2c42c258e8e58114af2ac81d89975eaa3a586a5beb34831648",
-      "length": 40519
+      "sha256": "ec9321d196f7f787697515c5619f290647bc99fc59f3e0b1d326b8a0384eb96e",
+      "length": 44632
     },
     "he/added": {
-      "sha256": "90a197b1555764304b561420e8b6d89e286cd91d8c79dcc70662cd7cc5691c28",
-      "length": 35719
+      "sha256": "6a2653be2537e723186f89acbcb91fd6be5c09a46d1a71e5da2d0db469cb4df6",
+      "length": 39321
     },
     "he/addAndAiErrors": {
-      "sha256": "32a42b38af9752a57368d406d6409a90e6962f06684fabee2719f0d598266ee3",
-      "length": 37044
+      "sha256": "6c84452073b1d4d32d71302abc6276e8ee5cb44154a47ff71adae749307b4b31",
+      "length": 40646
     },
     "he/error": {
       "sha256": "f5b848906d246de62aa6bd8e5b3ff4537b5c6dfa7b27215136946966ce4292f5",
@@ -30,32 +30,32 @@
       "length": 8678
     },
     "he/fewResults": {
-      "sha256": "6b23c02c85e1458d8d50b2ccf90735b343b095ad98e665403009ab67fcefd0d9",
-      "length": 17551
+      "sha256": "d4e2f489f710bf53fbb2c422f876536953dd12b7f0083d76a9b22c3ac28d3955",
+      "length": 18435
     },
     "he/filteredSorted": {
-      "sha256": "97278d606913db93f15215b570dbcf32f650ffbae63733ddc51c082f3c4ce740",
-      "length": 29253
+      "sha256": "23ae8377c75f42a5ecc917a9287b37f685be4dfce24befe4addbd89db482aa08",
+      "length": 32855
     },
     "en/initial": {
       "sha256": "39651daa2f5618124ab1d503ded25976916599f3f113458c9317a307e6484881",
       "length": 8825
     },
     "en/results": {
-      "sha256": "95235a9e061a8a417378c1f618a14d6ccff97c1a8febf9d83a71e56789e38f33",
-      "length": 28551
+      "sha256": "c4b7d045c3d4c1e9658acc52c1497634cb9d6a37c7d606d95e6720d2c6284b56",
+      "length": 32176
     },
     "en/selectedWithOpportunities": {
-      "sha256": "3d175280b87c8a1a3aae68cc894aee125a396b694c8b33918fed05bf1b64cb77",
-      "length": 40683
+      "sha256": "804bb337958df92d12b535b7933c5d9982cbd9e9c6a180b64f5c18776212bd87",
+      "length": 44819
     },
     "en/added": {
-      "sha256": "a585e699ed4d65bc6ccfc6bd3eae52020e009ca4cac0d18e6fb69056dabbf7b2",
-      "length": 35818
+      "sha256": "b82f8e44bbbf81a75c8879ff51f8ecff174761685588422341d68c0dd29b2621",
+      "length": 39443
     },
     "en/addAndAiErrors": {
-      "sha256": "4008f2eb56186a500d57f165e4eea983e33060a13d7b4fac3b6f1819608f76c2",
-      "length": 37135
+      "sha256": "18b32d35119956703d3f8678b8f2c40b6b59dcadeb57c4f60ae320da24556603",
+      "length": 40760
     },
     "en/error": {
       "sha256": "447bc20580f1f7e706efea7945246d136e708b26e84e583b35102ccfe83c46d1",
@@ -66,12 +66,12 @@
       "length": 8721
     },
     "en/fewResults": {
-      "sha256": "a3a8a01c02f7614fdd546ee39d027ca06f4292c87ba5446999c10b7b76363b7f",
-      "length": 17681
+      "sha256": "a246d49b86af3c565427a3c2baccb029a569446ab01a8c14538603d51f17e1e6",
+      "length": 18570
     },
     "en/filteredSorted": {
-      "sha256": "b2e7841e7f6d4d8cc1bb9867860e8e1f53ff00149958bec9487bcda8a2f9c717",
-      "length": 29334
+      "sha256": "fff659699511ca6c7fac084fe72c848ea37ae1350c38d6e331fb3631e599f8ce",
+      "length": 32959
     }
   }
 }

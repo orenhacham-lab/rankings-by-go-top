@@ -54,6 +54,9 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).researchInsights.audiences
   const n = (v: number) => formatCount(v, language)
+  // "What people look for" shows once the research splits by need. A mix of one grey
+  // "general information" bar is an empty panel, not data (final review R18).
+  const showMix = mix.some((m) => m.intent !== 'info' && m.searches > 0)
   const mixLabel = mix.map((m) => `${t.intents[m.intent]}: ${t.intentLine(n(m.keywords), n(m.searches))}`).join(' · ')
 
   return (
@@ -70,7 +73,7 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
           {niche && <span className="hidden shrink-0 rounded-pill border border-line bg-surface px-2.5 py-1 text-caption font-semibold text-body sm:inline-flex">{niche}</span>}
         </header>
 
-        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className={cn('grid gap-6 p-4 sm:p-6', showMix && 'lg:grid-cols-[minmax(0,1fr)_18rem]')}>
           <div className="min-w-0">
             {audiences.length === 0 ? (
               <p className="text-copy text-muted">{t.empty}</p>
@@ -119,8 +122,8 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
             </p>
           </div>
 
-          {mix.length > 0 && (
-            <aside className="min-w-0 rounded-card border border-line bg-sunk/50 p-4">
+          {showMix && (
+            <aside data-intent-mix="" className="min-w-0 rounded-card border border-line bg-sunk/50 p-4">
               <h3 className="text-copy font-semibold text-ink">{t.intentTitle}</h3>
               <p className="mt-0.5 text-caption text-muted">{t.intentSubtitle}</p>
               <div className="mt-3"><IntentBar mix={mix} label={mixLabel} /></div>

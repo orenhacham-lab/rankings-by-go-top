@@ -8,6 +8,7 @@
  * ranking does); checks where the site was not found are gaps, not zeros.
  * In Hebrew time runs right to left.
  */
+import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ScanResult } from '@/lib/supabase/types'
 
@@ -42,6 +43,19 @@ function ChartTooltip({ active, payload, positionAt, notFound }: {
   )
 }
 
+/** Below sm (a phone at 390) the chart is ~300px wide: fewer ticks on both axes. */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const sync = () => setNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+  return narrow
+}
+
 export default function PositionHistoryChart({ points, isRTL, label, positionAt, notFound }: {
   points: PositionPoint[]
   isRTL: boolean
@@ -52,16 +66,30 @@ export default function PositionHistoryChart({ points, isRTL, label, positionAt,
 }) {
   let last = -1
   points.forEach((p, i) => { if (p.position !== null) last = i })
+  const narrow = useNarrow()
+  // By the tick's own value: once ticks are skipped (a phone), the formatter's index
+  // counts the ticks shown, not the points, and would print another check's date.
+  const labelOf = new Map(points.map((p) => [p.at, p.label]))
+  // The position ticks, spread evenly from #1 to the lowest position and always ending on
+  // both: recharts' own "nice" ticks put #13 a hair above #14 on a 1-14 axis.
+  const worst = Math.max(1, ...points.map((p) => p.position ?? 1))
+  const count = narrow ? 3 : 5
+  const yTicks = [...new Set(Array.from({ length: count }, (_, i) => Math.round(1 + ((worst - 1) * i) / (count - 1))))]
   const tick = { fontSize: 12, fill: 'var(--color-muted)' }
   return (
     <figure data-position-chart="" role="img" aria-label={label} className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+        <LineChart data={points} margin={{ top: 12, right: 8, bottom: 4, left: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--color-line)" />
-          <XAxis dataKey="at" tickFormatter={(_, i) => points[i]?.label ?? ''} reversed={isRTL} tickLine={false} axisLine={false}
-            interval="preserveStartEnd" minTickGap={24} tick={tick} />
+          <XAxis dataKey="at" tickFormatter={(at: string) => labelOf.get(at) ?? ''} reversed={isRTL} tickLine={false} axisLine={false}
+            interval="preserveStartEnd" minTickGap={narrow ? 56 : 24} tickMargin={8} tick={tick} padding={{ left: 16, right: 16 }} />
+          {/* The date axis is padded at both ends, so the lowest position's tick (#14) keeps
+              clear of the line's first point: at 390 they used to collide in the corner. No
+              padding on this axis (the grid would draw a second dashed line at each edge); every
+              position tick shows, so #1 is never dropped at the top edge. The ticks are set
+              left to right: in Hebrew an inherited rtl flips text-anchor and "#14" ran into the plot. */}
           <YAxis reversed allowDecimals={false} domain={[1, 'dataMax']} orientation={isRTL ? 'right' : 'left'} tickLine={false}
-            axisLine={false} width={40} tickFormatter={(v: number) => `#${v}`} tick={tick} />
+            axisLine={false} width={40} ticks={yTicks} interval={0} tickFormatter={(v: number) => `#${v}`} tick={{ ...tick, direction: 'ltr' }} />
           <Tooltip cursor={{ stroke: 'var(--color-line-strong)', strokeDasharray: '4 4' }}
             content={<ChartTooltip positionAt={positionAt} notFound={notFound} />} />
           <Line

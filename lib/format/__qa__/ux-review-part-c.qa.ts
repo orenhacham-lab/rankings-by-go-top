@@ -122,7 +122,8 @@ console.log('P1-4 keyword research table')
     (raw) => raw.replace('aria-label={t.results.selectAllRows}', ''))
   guard('P1-4: competition is a word in the screen\'s language, the index only in its title', f,
     (s) => /competitionCell\(/.test(s) && !/\{\s*r(esult)?\.competition\s*\}/.test(s) && !/\(\{r(esult)?\.competitionIndex\}\)/.test(s),
-    (raw) => raw.replace(/\{competition\.label\}/, '{result.competition}'))
+    // The label is drawn by CompetitionBadge (a ui Badge, final review R18) as {c.label}.
+    (raw) => raw.replace(/<Badge variant=\{c\.variant\}>\{c\.label\}/, '<Badge variant={c.variant}>{result.competition}'))
   guard('P1-4: CPC in the currency format the hero uses (formatMoney, the screen\'s locale)', f,
     (s) => (s.match(/formatMoney\(/g) ?? []).length >= 3 && !/toFixed\(2\)/.test(s),
     (raw) => raw.replace(/formatMoney\(result\.lowTopOfPageBid, result\.currency, language\)/, 'result.lowTopOfPageBid.toFixed(2)'))

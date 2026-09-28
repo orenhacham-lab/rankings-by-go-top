@@ -10,9 +10,10 @@
  * fact the data does not hold is simply not shown.
  */
 import { useState } from 'react'
-import { ArrowUpRight, Check, Radar } from 'lucide-react'
+import { ArrowUpRight, Check, CheckCircle2, Radar, TriangleAlert } from 'lucide-react'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { Card } from '@/components/ui/Card'
+import Badge from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -87,25 +88,31 @@ function RivalCard({ c, max, index }: { c: CompetitorInsight; max: number; index
         </>
       ) : (
         // Honest empty (no 0 / 0 and an empty bar): the research holds none of its keywords.
-        <p data-rival-no-overlap="" className="mt-4 text-caption text-muted">{t.noOverlap}</p>
+        // Seen on Google but in no research keyword: said as one fact, not as "not seen"
+        // under a badge that says it was seen (final review R18).
+        <p data-rival-no-overlap="" className="mt-4 text-caption text-muted">{c.validated ? t.noOverlapSeen : t.noOverlap}</p>
       )}
 
       {c.found > 0 && (
         <div className="mt-4">
           <span role="img" aria-label={t.overlapLabel(n(c.shared), n(c.gaps))} className="flex h-2 w-full overflow-hidden rounded-pill bg-sunk">
             <span className="h-full bg-action" style={{ width: `${sharedPct}%` }} />
-            <span className="h-full bg-warn/70" style={{ width: `${100 - sharedPct}%` }} />
+            <span className="h-full bg-action/35" style={{ width: `${100 - sharedPct}%` }} />
           </span>
           <p className="mt-1.5 flex flex-wrap gap-x-3 text-caption text-muted" aria-hidden="true">
             <span className="inline-flex items-center gap-1"><span className="size-2 rounded-pill bg-action" />{t.shared(n(c.shared))}</span>
-            <span className="inline-flex items-center gap-1"><span className="size-2 rounded-pill bg-warn/70" />{t.theirs(n(c.gaps))}</span>
+            <span className="inline-flex items-center gap-1"><span className="size-2 rounded-pill bg-action/35" />{t.theirs(n(c.gaps))}</span>
           </p>
         </div>
       )}
 
       {c.standing ? (
-        <p data-rival-standing="" className={cn('mt-3 rounded-inset border-s-[3px] bg-sunk/60 px-2.5 py-1.5 text-caption font-semibold text-ink', c.standing.ahead > 0 ? 'border-s-bad' : 'border-s-ok')}>
-          {c.standing.ahead > 0 ? t.ahead(n(c.standing.ahead), n(c.standing.compared)) : t.notAhead(n(c.standing.compared))}
+        // A plain line with its tone on the icon: no rail on a pill (final review G3).
+        <p data-rival-standing={c.standing.ahead > 0 ? 'ahead' : 'behind'} className="mt-3 flex items-start gap-1.5 text-caption font-semibold text-ink">
+          {c.standing.ahead > 0
+            ? <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-bad" />
+            : <CheckCircle2 size={14} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-ok" />}
+          <span>{c.standing.ahead > 0 ? t.ahead(n(c.standing.ahead), n(c.standing.compared)) : t.notAhead(n(c.standing.compared))}</span>
         </p>
       ) : c.tracked ? (
         <p className="mt-3 text-caption text-muted">{t.notCompared}</p>
@@ -119,7 +126,7 @@ function RivalCard({ c, max, index }: { c: CompetitorInsight; max: number; index
           ) : (
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {c.topGaps.map((g) => (
-                <li key={g.keyword} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-warn/20 bg-warn-soft px-2 py-0.5 text-caption text-warn">
+                <li key={g.keyword} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-line bg-sunk px-2 py-0.5 text-caption text-body">
                   <span className="truncate">{g.keyword}</span>
                   {g.volume !== null && <span className="shrink-0 font-semibold tabular-nums">{n(g.volume)}</span>}
                 </li>
@@ -171,12 +178,12 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
             <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {/* The site itself, the yardstick every competitor card is read against. */}
               {domain && (
-                <li data-rival-own="" className="flex min-w-0 flex-col rounded-card border border-line border-s-[3px] border-s-action bg-surface p-4 shadow-card">
+                <li data-rival-own="" className="flex min-w-0 flex-col rounded-card border border-action/40 bg-surface p-4 shadow-card">
                   <div className="flex items-start gap-3">
                     <SiteAvatar domain={domain} icon={siteIcon} />
                     <div className="min-w-0">
                       <p dir="ltr" className="truncate text-start text-copy font-semibold text-ink rtl:text-end">{domain}</p>
-                      <p className="mt-1 inline-flex rounded-pill bg-action px-2 py-0.5 text-overline font-semibold text-action-ink">{dict.yourSite}</p>
+                      <Badge variant="info" className="mt-1">{dict.yourSite}</Badge>
                     </div>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3">
