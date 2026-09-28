@@ -10,6 +10,14 @@ export const PASSWORD_UI = {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
     logoAlt: 'הלוגו של Go Top',
     backToLogin: 'חזרה לכניסה',
+    footer: {
+      accessibility: 'נגישות',
+      privacy: 'פרטיות',
+      articles: 'מאמרים',
+      accessibilityHref: '/accessibility',
+      privacyHref: '/privacy',
+      articlesHref: '/articles',
+    },
     forgot: {
       heading: 'שכחתם את הסיסמה?',
       intro: 'הזינו את כתובת האימייל של החשבון, ונשלח אליה קישור לבחירת סיסמה חדשה.',
@@ -45,6 +53,14 @@ export const PASSWORD_UI = {
     subtitle: 'Google ranking & AI visibility tracking',
     logoAlt: 'Go Top logo',
     backToLogin: 'Back to sign in',
+    footer: {
+      accessibility: 'Accessibility',
+      privacy: 'Privacy',
+      articles: 'Articles',
+      accessibilityHref: '/en/accessibility',
+      privacyHref: '/en/privacy',
+      articlesHref: '/en/articles',
+    },
     forgot: {
       heading: 'Forgot your password?',
       intro: "Enter your account's email address and we'll send you a link to choose a new password.",

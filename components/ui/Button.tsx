@@ -23,6 +23,32 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
 }
 
+/**
+ * The button's classes, for a control that must be another element — a Next
+ * <Link> that should look like a button (the 404 and error pages' way home).
+ */
+export function buttonClasses({ variant = 'primary', size = 'md', className }: { variant?: ButtonProps['variant']; size?: ButtonProps['size']; className?: string } = {}) {
+  return cn(
+    'inline-flex select-none items-center justify-center gap-2 font-semibold rounded-control',
+    'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-snappy active:scale-[0.98]',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+    {
+      'bg-action text-action-ink hover:bg-action-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(20_24_60/0.18)]': variant === 'primary',
+      'bg-commit text-commit-ink hover:bg-commit-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_0_0_1px_rgb(120_70_0/0.14),0_1px_2px_rgb(80_50_0/0.12)]': variant === 'commit',
+      'bg-surface text-ink border border-line shadow-control hover:border-line-strong hover:bg-sunk/60': variant === 'secondary' || variant === 'outline',
+      'bg-bad text-bad-ink hover:opacity-90 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]': variant === 'danger',
+      'text-body hover:bg-sunk hover:text-ink': variant === 'ghost',
+    },
+    {
+      'text-caption px-3 h-8': size === 'sm',
+      'text-copy px-4 h-10': size === 'md',
+      'text-[0.9375rem] leading-6 px-5 h-11': size === 'lg',
+    },
+    className
+  )
+}
+
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading, disabled, children, ...props }, ref) => {
     return (
@@ -30,25 +56,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
-        className={cn(
-          'inline-flex select-none items-center justify-center gap-2 font-semibold rounded-control',
-          'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-snappy active:scale-[0.98]',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
-          'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
-          {
-            'bg-action text-action-ink hover:bg-action-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(20_24_60/0.18)]': variant === 'primary',
-            'bg-commit text-commit-ink hover:bg-commit-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_0_0_1px_rgb(120_70_0/0.14),0_1px_2px_rgb(80_50_0/0.12)]': variant === 'commit',
-            'bg-surface text-ink border border-line shadow-control hover:border-line-strong hover:bg-sunk/60': variant === 'secondary' || variant === 'outline',
-            'bg-bad text-bad-ink hover:opacity-90 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]': variant === 'danger',
-            'text-body hover:bg-sunk hover:text-ink': variant === 'ghost',
-          },
-          {
-            'text-caption px-3 h-8': size === 'sm',
-            'text-copy px-4 h-9': size === 'md',
-            'text-[0.9375rem] leading-6 px-5 h-11': size === 'lg',
-          },
-          className
-        )}
+        className={buttonClasses({ variant, size, className })}
         {...props}
       >
         {loading && (

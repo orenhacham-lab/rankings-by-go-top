@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import AuthShell from '@/components/auth/AuthShell'
+import AuthShell, { AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
+import BackLink from '@/components/ui/BackLink'
+import { NoticeBox } from '@/components/ui/Notice'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { createClient } from '@/lib/supabase/client'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
@@ -54,54 +56,57 @@ export default function ResetPasswordForm() {
 
   const expired = outcome === 'link_expired'
   return (
-    <AuthShell locale={lang} logoAlt={ui.logoAlt} subtitle={ui.subtitle}>
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">{t.heading}</h2>
-      {outcome === 'updated' ? (
-        <p role="status" className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">{t.updated}</p>
-      ) : (
-        <>
-          {outcome && (
-            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {t.err[outcome]}
-              {expired && (
-                <>
-                  {' '}
-                  <Link href={authHref('forgot-password', lang)} className="font-medium underline">{t.requestNew}</Link>
-                </>
-              )}
-            </div>
-          )}
-          {!expired && (
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <Input
-                label={t.passwordLabel}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                hint={t.hint}
-                required
-                autoComplete="new-password"
-                autoFocus
-              />
-              <Input
-                label={t.confirmLabel}
-                type="password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-                autoComplete="new-password"
-              />
-              <Button type="submit" loading={loading} className="w-full" size="lg">
-                {t.submit}
-              </Button>
-            </form>
-          )}
-        </>
-      )}
-      <div className="mt-6 text-center pt-6 border-t border-slate-200">
-        <Link href={authHref('login', lang)} className="text-blue-600 text-sm font-medium hover:underline">
-          {ui.backToLogin}
-        </Link>
+    <AuthShell
+      locale={lang}
+      logoAlt={ui.logoAlt}
+      subtitle={ui.subtitle}
+      footer={ui.footer}
+      below={<BackLink href={authHref('login', lang)} className="ms-0">{ui.backToLogin}</BackLink>}
+    >
+      <div className="space-y-6">
+        <h1 className={AUTH_TITLE_CLASSES}>{t.heading}</h1>
+        {outcome === 'updated' ? (
+          <NoticeBox tone="ok" language={lang}>{t.updated}</NoticeBox>
+        ) : (
+          <>
+            {outcome && (
+              <NoticeBox tone="bad" language={lang}>
+                {t.err[outcome]}
+                {expired && (
+                  <>
+                    {' '}
+                    <Link href={authHref('forgot-password', lang)} className="font-semibold underline underline-offset-2">{t.requestNew}</Link>
+                  </>
+                )}
+              </NoticeBox>
+            )}
+            {!expired && (
+              <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                <Input
+                  label={t.passwordLabel}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  hint={t.hint}
+                  required
+                  autoComplete="new-password"
+                  autoFocus
+                />
+                <Input
+                  label={t.confirmLabel}
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+                <Button type="submit" loading={loading} className="w-full" size="lg">
+                  {t.submit}
+                </Button>
+              </form>
+            )}
+          </>
+        )}
       </div>
     </AuthShell>
   )

@@ -150,6 +150,7 @@ const count = (s: string, re: RegExp) => (s.match(new RegExp(re.source, re.flags
   check('MUT: the ✕ glyph back fails D4', !lucideClose(dismiss.replace(/<svg[\s\S]*?<\/svg>/, '✕')))
   const withAction = render(h(NoticeBox, { tone: 'bad', language: 'he', action: { label: 'נסו שוב', onClick: () => {} }, onDismiss: () => {}, children: 'x' }))
   const oneAction = (s: string) => count(s, /<button/) === 1 && s.includes('נסו שוב')
+  check('D5a: a bad notice is an alert, the others a polite status', /role="alert"/.test(withAction) && /role="status"/.test(he))
   check('D5: at most one action (an action hides the dismiss)', oneAction(withAction))
   check('MUT: action + dismiss fails D5', !oneAction(withAction + '<button>'))
   const inDash = render(h(DashboardLanguageProvider as never, { initialLocale: 'en', children: h(Notice, { tone: 'ok', onDismiss: () => {}, children: 'Saved' }) } as never))

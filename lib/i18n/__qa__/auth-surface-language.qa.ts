@@ -215,8 +215,8 @@ async function main() {
     check('D1: the shared Button contributes no language of its own while loading',
       !HEBREW.test(btn), (btn.match(/[֐-׿][^<]*/g) ?? []).slice(0, 3).join(' | '))
     check('D2: …and the Suspense fallback both pages use is text-free',
-      /fallback=\{<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" \/>\}/.test(read('app/(auth)/login/page.tsx'))
-      && /fallback=\{<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" \/>\}/.test(read('app/(auth)/signup/page.tsx')))
+      /fallback=\{<div className="min-h-screen bg-canvas" \/>\}/.test(read('app/(auth)/login/page.tsx'))
+      && /fallback=\{<div className="min-h-screen bg-canvas" \/>\}/.test(read('app/(auth)/signup/page.tsx')))
     const enHtml = firstRender(LOGIN.default, 'en', '/login')
     check('D3: the submit control renders its English label, not a Hebrew one',
       enHtml.includes(uiStrings('app/(auth)/login/page.tsx', 'en').loginBtn))

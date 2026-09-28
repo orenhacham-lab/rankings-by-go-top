@@ -48,13 +48,13 @@ export default function GoogleSignInButton({ lang, nextPath, disabled = false }:
   }
 
   return (
-    <div className="mb-6" data-google-signin>
+    <div data-google-signin>
       <button
         type="button"
         onClick={() => void start()}
         disabled={busy || disabled}
         aria-busy={busy || undefined}
-        className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-11 w-full items-center justify-center gap-3 rounded-control border border-line bg-surface text-copy font-semibold text-ink shadow-control transition-[background-color,border-color] duration-150 ease-snappy hover:border-line-strong hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <svg aria-hidden width="18" height="18" viewBox="0 0 48 48">
           <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
@@ -65,14 +65,14 @@ export default function GoogleSignInButton({ lang, nextPath, disabled = false }:
         {t.label}
       </button>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
+        <p role="alert" className="mt-2 text-caption text-bad">
           {t.failed}
         </p>
       )}
-      <div className="mt-6 flex items-center gap-3 text-xs text-slate-400" aria-hidden>
-        <span className="h-px flex-1 bg-slate-200" />
+      <div className="mt-6 flex items-center gap-3 text-caption text-muted" aria-hidden>
+        <span className="h-px flex-1 bg-line" />
         {t.or}
-        <span className="h-px flex-1 bg-slate-200" />
+        <span className="h-px flex-1 bg-line" />
       </div>
     </div>
   )

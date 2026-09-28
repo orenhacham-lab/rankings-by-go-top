@@ -61,7 +61,8 @@ export function NoticeBox({ tone, children, action, onDismiss, className, items,
 
   return (
     <div
-      role="status"
+      // A failure interrupts (alert); everything else is announced politely.
+      role={tone === 'bad' ? 'alert' : 'status'}
       data-notice={tone}
       className={cn(
         'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-inset border px-4 py-3 motion-safe:animate-pop-in',
