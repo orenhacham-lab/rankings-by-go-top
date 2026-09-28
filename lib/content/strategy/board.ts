@@ -19,8 +19,10 @@
  *   written    generated_articles that are not published yet
  *   published  generated_articles that are published
  *
- * Every card carries exactly one date, and the kind of date it is, so every card
- * belongs to exactly one month and the month chips always add up to "all".
+ * Every card carries one date and the kind of date it is. Only a date the plan is
+ * built on (a publish slot, a schedule, a publication) puts a card IN a month; an idea
+ * or a topic that is not scheduled yet carries the day it was added, which is no
+ * month of the plan, so it is shown under every month chip (see "Months" below).
  */
 
 export type StrategyColumn = 'ideas' | 'planned' | 'written' | 'published'
@@ -121,6 +123,8 @@ export type SeedPlan = {
   scannedAt: string | null
   /** Still marked running while its worker's lease lapsed; the cron resumes it. */
   stalled: boolean
+  /** The audiences the scan understood (the "who is it for" of each topic, until the owner's own list is read). */
+  audiences?: string[]
 }
 
 export const NO_SEED_PLAN: SeedPlan = { state: 'none', topics: [], keywords: [], basis: null, scannedAt: null, stalled: false }
@@ -248,7 +252,8 @@ export function seedPlanFromRun(run: SeedRunLike | null | undefined): SeedPlan {
   else if (run.stage === 'b' && (run.status === 'done' || run.status === 'partial')) state = 'failed'
   else state = 'building'
 
-  return { state, topics: state === 'ready' ? [] : topics, keywords, basis, scannedAt, stalled }
+  const audiences = texts(summary?.audiences, 20)
+  return { state, topics: state === 'ready' ? [] : topics, keywords, basis, scannedAt, stalled, audiences }
 }
 
 /**
@@ -315,23 +320,73 @@ export function monthKey(iso: string | null, timeZone?: string): string | null {
   return y && m ? `${y}-${m}` : null
 }
 
+/**
+ * The dates the plan is built on: when it is projected to go live, when it is scheduled,
+ * when it went live. The others (the day an idea or a topic was added, the day an
+ * article was written with no slot, the day the scan ran or a ranking was checked) say
+ * when something happened, not when it belongs in the plan.
+ */
+export const PLAN_DATE_KINDS: readonly StrategyDateKind[] = ['publishTarget', 'scheduled', 'published']
+
+/** The month a card belongs to in the plan, or null: not scheduled (or its date is unreadable). */
+export function planMonth(card: Pick<StrategyCard, 'date' | 'dateKind'>, timeZone?: string): string | null {
+  return PLAN_DATE_KINDS.includes(card.dateKind) ? monthKey(card.date, timeZone) : null
+}
+
 export type MonthChip = { key: string; count: number }
 export const ALL_MONTHS = 'all'
 
-/** "All", then every month that has a card, oldest first, each with its count. Undated cards count only in "all". */
+/**
+ * The month chips, and THE CONTRACT the screen keeps: the number on a chip is exactly
+ * the number of cards that chip shows.
+ *
+ *   all       every card.
+ *   a month   the cards the plan puts in that month, and every card it does not
+ *             schedule yet (ideas, topics waiting for a slot): those belong to no
+ *             month, so no month hides them. Filtering an idea by the day it was added
+ *             made a month show fewer ideas than "all" (the owner's 5 under "all",
+ *             4 under September) and took the swap button with them.
+ * A scheduled card is in exactly one month; months are listed oldest first, and only
+ * those with at least one scheduled card.
+ */
 export function monthChips(cards: readonly StrategyCard[], timeZone?: string): MonthChip[] {
   const byMonth = new Map<string, number>()
+  let unscheduled = 0
   for (const c of cards) {
-    const k = monthKey(c.date, timeZone)
+    const k = planMonth(c, timeZone)
     if (k) byMonth.set(k, (byMonth.get(k) ?? 0) + 1)
+    else unscheduled++
   }
-  const months = [...byMonth.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, count]) => ({ key, count }))
+  const months = [...byMonth.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, count]) => ({ key, count: count + unscheduled }))
   return [{ key: ALL_MONTHS, count: cards.length }, ...months]
 }
 
 export function cardsInMonth(cards: readonly StrategyCard[], month: string, timeZone?: string): StrategyCard[] {
   if (month === ALL_MONTHS) return [...cards]
-  return cards.filter((c) => monthKey(c.date, timeZone) === month)
+  return cards.filter((c) => {
+    const k = planMonth(c, timeZone)
+    return k === null || k === month
+  })
+}
+
+/** How many cards no month schedules (shown under every month). */
+export function unscheduledCount(cards: readonly StrategyCard[], timeZone?: string): number {
+  return cards.filter((c) => planMonth(c, timeZone) === null).length
+}
+
+/** The plan month by month: what is scheduled to go live and what already went live, oldest month first. */
+export type MonthPlanRow = { key: string; published: number; scheduled: number }
+export function monthPlan(cards: readonly StrategyCard[], timeZone?: string): MonthPlanRow[] {
+  const by = new Map<string, MonthPlanRow>()
+  for (const c of cards) {
+    const k = planMonth(c, timeZone)
+    if (!k) continue
+    const row = by.get(k) ?? { key: k, published: 0, scheduled: 0 }
+    if (c.column === 'published') row.published++
+    else row.scheduled++
+    by.set(k, row)
+  }
+  return [...by.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 }
 
 // ── The board ───────────────────────────────────────────────────────────────

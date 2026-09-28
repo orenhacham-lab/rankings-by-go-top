@@ -24,6 +24,8 @@
  *
  * Run: npx tsx lib/keyword-research/__qa__/keyword-research-helpers.qa.ts
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { SeedResearchRow } from '@/lib/seed-scan/research'
 import type { KeywordFigures } from '@/lib/gsc/tab-metrics'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -166,8 +168,22 @@ function main() {
       { ...idea('b', null, 'LOW'), competitors: ['y.com'] },
       { ...idea('c', 250, 'HIGH', 2, 2) },
     ])
-    check('P3: the totals: keywords, the sum of monthly searches, the average click price, distinct competitors',
-      same(totals, { keywords: 3, monthlySearches: 1250, averageCpc: { value: 2, currency: 'ILS', count: 2 }, competitors: 2 }), show(totals))
+    check('P3: the totals: keywords, the monthly searches (distinct keywords: the plain sum), the average click price, distinct competitors',
+      same(totals, { keywords: 3, monthlySearches: 1250, rawMonthlySearches: 1250, averageCpc: { value: 2, currency: 'ILS', count: 2 }, competitors: 2 }), show(totals))
+    // The same demand written a little differently (word order, a Hebrew prefix letter)
+    // is one demand: Google Ads reports it for each spelling, so a sum counts it twice.
+    const variants = researchTotals([
+      idea('נעלי ריצה נשים', 1900, 'LOW'), idea('נעלי ריצה לנשים', 1600, 'LOW'), idea('נשים נעלי ריצה', 1900, 'LOW'),
+      idea('נעלי ריצה גברים', 1000, 'LOW'), idea('shoes running', 50, 'LOW'), idea('running shoes', 70, 'LOW'),
+    ])
+    check('P3b: close variants count once, at their largest figure; the plain sum is kept apart and never shown as the total',
+      variants.monthlySearches === 1900 + 1000 + 70 && variants.rawMonthlySearches === 1900 + 1600 + 1900 + 1000 + 50 + 70 && variants.keywords === 6,
+      show(variants))
+    const plainSum = (rows: { avgMonthlySearches: number | null }[]) => rows.reduce((n, r) => n + (r.avgMonthlySearches ?? 0), 0)
+    check('P3b-MUT: the plain sum (the old total) inflates the same research',
+      plainSum([idea('נעלי ריצה נשים', 1900, 'LOW'), idea('נעלי ריצה לנשים', 1600, 'LOW'), idea('נשים נעלי ריצה', 1900, 'LOW'), idea('נעלי ריצה גברים', 1000, 'LOW'), idea('shoes running', 50, 'LOW'), idea('running shoes', 70, 'LOW')]) !== variants.monthlySearches)
+    const overview = readFileSync(join(process.cwd(), 'components/keyword-research/ScanOverview.tsx'), 'utf8')
+    check('P3c: the overview shows the de-duplicated figure, never the raw sum', /totals\.monthlySearches/.test(overview) && !/rawMonthlySearches/.test(overview))
   }
 
   // ── E) easy wins ─────────────────────────────────────────────────────────

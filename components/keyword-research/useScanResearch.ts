@@ -21,6 +21,7 @@ import {
   pollDelayMs, readResearchAnswer, readSeedAnswer, researchChanged, researchRunning, scanView,
   type ResearchAnswer, type ScanRun, type ScanView, type SeedAnswer,
 } from '@/lib/keyword-research/scan-state'
+import { NO_LANDSCAPE, readLandscape, type SeedLandscape } from './landscape'
 
 export interface ScanResearchState {
   view: ScanView
@@ -28,6 +29,8 @@ export interface ScanResearchState {
   reloadTracked: () => void
   /** Read the run and its research again, after a failed read. */
   retry: () => void
+  /** What the scan's summary says about the market: competitors, audiences, the site's icon (from the same read). */
+  landscape?: SeedLandscape
 }
 
 export function seedRunUrl(projectId: string): string {
@@ -53,6 +56,7 @@ type Answer<T> = { projectId: string; value: T; at: number }
 export function useScanResearch(projectId: string | null): ScanResearchState {
   const [seed, setSeed] = useState<Answer<SeedAnswer> | null>(null)
   const [research, setResearch] = useState<Answer<ResearchAnswer> | null>(null)
+  const [landscape, setLandscape] = useState<{ projectId: string; value: SeedLandscape } | null>(null)
   const [attempt, setAttempt] = useState(0)
   const lastRun = useRef<ScanRun | null>(null)
 
@@ -73,6 +77,7 @@ export function useScanResearch(projectId: string | null): ScanResearchState {
       const value = readSeedAnswer(status, body)
       lastRun.current = value.kind === 'run' ? value.run : null
       setSeed({ projectId, value, at: Date.now() })
+      setLandscape({ projectId, value: readLandscape(status, body) })
     })
     read(scanResearchUrl(projectId)).then(({ status, body }) => {
       if (!cancelled) setResearch({ projectId, value: readResearchAnswer(status, body), at: Date.now() })
@@ -102,6 +107,7 @@ export function useScanResearch(projectId: string | null): ScanResearchState {
       const changed = researchChanged(lastRun.current, value.run, now)
       lastRun.current = value.run
       setSeed({ projectId, value, at: now.getTime() })
+      setLandscape({ projectId, value: readLandscape(status, body) })
       if (changed) readResearch(projectId)
       if (researchRunning(value.run, now)) schedule()
     }
@@ -121,5 +127,6 @@ export function useScanResearch(projectId: string | null): ScanResearchState {
     return scanView(current?.value ?? null, r, new Date(current?.at ?? 0))
   }, [projectId, current, research])
 
-  return { view, reloadTracked, retry }
+  const ownLandscape = landscape && landscape.projectId === projectId ? landscape.value : NO_LANDSCAPE
+  return { view, reloadTracked, retry, landscape: ownLandscape }
 }

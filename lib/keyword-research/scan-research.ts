@@ -12,6 +12,7 @@
  * screen both use it.
  */
 import type { SeedResearchOrigin, SeedResearchRow } from '@/lib/seed-scan/research'
+import { variantKey } from '@/lib/content/strategy/insights'
 
 /**
  * Where a keyword of the research came from: one of the scan's seeds, or
@@ -214,8 +215,15 @@ export function averageClickPrice(rows: readonly KeywordIdea[]): AverageClickPri
 
 export interface ResearchTotals {
   keywords: number
-  /** The sum of the monthly averages, over the keywords that have one. */
+  /**
+   * The monthly searches of the research, counting close variants once: Google Ads
+   * reports the same demand for "נעלי ריצה נשים" and "נעלי ריצה לנשים", so adding both
+   * inflated the figure. Keywords with the same words (any order, with or without a
+   * Hebrew prefix letter) count once, at the largest figure among them.
+   */
   monthlySearches: number
+  /** The plain sum of every keyword's figure, before variants are counted once. */
+  rawMonthlySearches: number
   averageCpc: AverageClickPrice | null
   /** Distinct competitor domains whose research found at least one keyword. */
   competitors: number
@@ -224,10 +232,15 @@ export interface ResearchTotals {
 /** The overview's figures, from the list the table shows (already one row per keyword). */
 export function researchTotals(rows: readonly (KeywordIdea & { competitors?: readonly string[] })[]): ResearchTotals {
   const competitors = new Set<string>()
-  let monthlySearches = 0
+  let rawMonthlySearches = 0
+  const byVariant = new Map<string, number>()
   for (const r of rows) {
-    monthlySearches += r.avgMonthlySearches ?? 0
+    const v = r.avgMonthlySearches ?? 0
+    rawMonthlySearches += v
+    const key = variantKey(r.keyword) || keywordKey(r.keyword)
+    byVariant.set(key, Math.max(byVariant.get(key) ?? 0, v))
     for (const c of r.competitors ?? []) competitors.add(c)
   }
-  return { keywords: rows.length, monthlySearches, averageCpc: averageClickPrice(rows), competitors: competitors.size }
+  const monthlySearches = [...byVariant.values()].reduce((s, v) => s + v, 0)
+  return { keywords: rows.length, monthlySearches, rawMonthlySearches, averageCpc: averageClickPrice(rows), competitors: competitors.size }
 }

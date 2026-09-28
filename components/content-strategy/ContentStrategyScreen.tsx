@@ -13,10 +13,16 @@
  *          (useRankingIdeas), which need no scan. Ideas are approved, rejected and
  *          swapped right on their cards and on the next-article card, and "+ add a
  *          keyword" adds an approved topic (useIdeaActions); none of it leaves the board.
- *   row 3  the list view, which IS the two old screens, unchanged, kept for what only
- *          they do: asking the engine for new ideas ("improve with Pro", filters), the
+ *   row 3  the plan in numbers (PlanOverview), its pillars when the topics form them
+ *          (TopicClusters), and what happens from here (WhatHappensNext), all counted
+ *          from the board's own cards; each card also says why it is worth writing
+ *          (TopicFacts, from the research's cached figures: useStrategyInsights)
+ *   list   the same cards as rows (StrategyList) with the same actions, and, folded
+ *          under "advanced", the two old screens, unchanged, for what only they do:
+ *          asking the engine for new ideas ("improve with Pro", filters), the
  *          publishing queue with its cadence (AutomationScreen), and the topics with
- *          their link plans and "add to the queue" (TopicsScreen).
+ *          their link plans and "add to the queue" (TopicsScreen). A link to one of
+ *          their sections (the old screens' redirects, "open the queue") unfolds it.
  *
  * The view is in the url (?view=list), so a refresh, a shared link and the old
  * screens' redirects all land where they meant to. Opening the tab reads three GET
@@ -24,9 +30,9 @@
  * `?add=keyword` (the workspace's "new topic") opens the keyword field on the board.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Columns3, List, RotateCw } from 'lucide-react'
+import { ChevronDown, Columns3, List, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -35,7 +41,9 @@ import AutomationScreen from '@/components/content/workspace/AutomationScreen'
 import TopicsScreen from '@/components/content/workspace/TopicsScreen'
 import { useContentWorkspace } from '@/components/content/workspace/ContentWorkspaceProvider'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { buildStrategyBoard } from '@/lib/content/strategy/board'
+import { buildStrategyBoard, type StrategyCard } from '@/lib/content/strategy/board'
+import { cardInsights, planSearches, topicInsight, type TopicInsight } from '@/lib/content/strategy/insights'
+import type { Locale } from '@/lib/i18n/locales'
 import {
   STRATEGY_ADD_PARAM, STRATEGY_ANCHORS, STRATEGY_VIEW_PARAM, isStrategyAnchor, strategyViewFromParam, wantsAddKeyword,
   type StrategyView,
@@ -48,6 +56,11 @@ import NextArticleCard from './NextArticleCard'
 import StrategyBoard, { type BoardIdeaActions } from './StrategyBoard'
 import AddKeywordForm, { AddKeywordButton } from './AddKeywordForm'
 import SeedPlanNotice, { PlanBasis } from './SeedPlanNotice'
+import { useStrategyInsights } from './useStrategyInsights'
+import PlanOverview from './PlanOverview'
+import TopicClusters from './TopicClusters'
+import WhatHappensNext from './WhatHappensNext'
+import StrategyList from './StrategyList'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 
@@ -80,34 +93,81 @@ function ViewSwitch({ view, onChange, dict }: { view: StrategyView; onChange: (v
   )
 }
 
-/** The list view: the two screens this tab replaced, as they were. */
-function StrategyListView({ proFirst, dict }: { proFirst: boolean; dict: Dict }) {
+/** The page's anchor, read without an effect (empty on the server), and followed when it changes. */
+function subscribeHash(onChange: () => void) {
+  window.addEventListener('hashchange', onChange)
+  return () => window.removeEventListener('hashchange', onChange)
+}
+const readHash = () => window.location.hash.replace(/^#/, '')
+const noHash = () => ''
+
+/**
+ * The list view: the board's cards as rows, then, folded under "advanced", the two
+ * screens this tab replaced, as they were. They mount only when unfolded, and a link to
+ * one of their sections unfolds them.
+ */
+function StrategyListView({ proFirst, dict, cards, lang, act, insights }: {
+  proFirst: boolean
+  dict: Dict
+  cards: readonly StrategyCard[] | null
+  lang: Locale
+  act: BoardIdeaActions
+  insights: ReadonlyMap<string, TopicInsight> | null
+}) {
   const { automationEnabled, scheduleSectionRef } = useContentWorkspace()
   const s = dict.contentStrategy
+  const l = dict.strategyInsights.list
+  const anchor = useSyncExternalStore(subscribeHash, readHash, noHash)
+  const linked = isStrategyAnchor(anchor)
+  const [choice, setChoice] = useState<boolean | null>(null)
+  const open = choice ?? linked
 
   // A link to a section of the list (the old screens' redirects, "open the queue")
-  // lands on it once the list has rendered.
+  // lands on it once the section has rendered.
   useEffect(() => {
-    const anchor = window.location.hash.replace(/^#/, '')
-    if (!isStrategyAnchor(anchor)) return
+    if (!open || !isStrategyAnchor(anchor)) return
     const id = window.setTimeout(() => {
       const el = anchor === STRATEGY_ANCHORS.queue ? scheduleSectionRef.current : document.getElementById(anchor)
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
     }, 250)
     return () => window.clearTimeout(id)
-  }, [scheduleSectionRef])
+  }, [open, anchor, scheduleSectionRef])
 
   return (
-    <div>
-      <p className="mb-4 max-w-3xl text-copy text-muted">{s.listIntro}</p>
-      {automationEnabled && (
-        <section id={STRATEGY_ANCHORS.ideas} className="scroll-mt-4">
-          <SectionHeading title={s.sections.ideas} />
-          <AutomationScreen proFirst={proFirst} />
-        </section>
-      )}
-      <section id={STRATEGY_ANCHORS.topics} className="scroll-mt-4">
-        <TopicsScreen />
+    <div className="space-y-6">
+      {cards && <StrategyList cards={cards} lang={lang} dict={dict} act={act} insights={insights} />}
+      <section data-strategy-advanced="" className="rounded-card border border-line bg-surface">
+        <h3>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="strategy-advanced"
+            onClick={() => setChoice(!open)}
+            className="flex w-full items-center justify-between gap-3 rounded-card p-4 text-start transition-colors hover:bg-sunk/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+          >
+            <span className="min-w-0">
+              <span className="block text-copy font-semibold text-ink">{l.advancedTitle}</span>
+              <span className="mt-0.5 block text-caption font-normal text-muted">{l.advancedHint}</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-caption font-semibold text-action">
+              <span className="hidden sm:inline">{open ? l.advancedClose : l.advancedOpen}</span>
+              <ChevronDown size={16} aria-hidden className={cn('transition-transform duration-200 ease-snappy motion-reduce:transition-none', open && 'rotate-180')} />
+            </span>
+          </button>
+        </h3>
+        {open && (
+          <div id="strategy-advanced" className="tab-enter border-t border-line p-4">
+            {automationEnabled && (
+              <section id={STRATEGY_ANCHORS.ideas} className="scroll-mt-4">
+                <SectionHeading title={s.sections.ideas} />
+                <AutomationScreen proFirst={proFirst} />
+              </section>
+            )}
+            <section id={STRATEGY_ANCHORS.topics} className="scroll-mt-4">
+              <TopicsScreen />
+            </section>
+          </div>
+        )}
       </section>
     </div>
   )
@@ -152,6 +212,15 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
     const card = board?.next?.cardKey ? board.cards.find((c) => c.key === board.next!.cardKey) : undefined
     return card ? ideaTargetFromCard(card) : null
   }, [board])
+  // Why each topic: the research's cached figures and the project's audiences, read once.
+  const { ctx } = useStrategyInsights(projectId, strategy.seed.audiences)
+  const insights = useMemo(() => (board ? cardInsights(board.cards, ctx) : null), [board, ctx])
+  const searches = useMemo(() => (board ? planSearches(board.cards, ctx) : null), [board, ctx])
+  const nextInsight = useMemo(() => {
+    if (!board?.next || !ctx) return null
+    const i = topicInsight({ keyword: board.next.keyword, title: board.next.title }, ctx)
+    return i.volume !== null || i.audience !== null || i.rivals.length > 0 ? i : null
+  }, [board, ctx])
 
   // "+ add a keyword": opened here, or by the workspace's "new topic" (?add=keyword), which
   // only automation has a route for; without it "new topic" opens the manual brief instead.
@@ -182,6 +251,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           dict={dict}
           idea={nextIdea}
           act={act}
+          insight={nextInsight}
           onOpenBrief={openPrefilledBrief}
           onCreateTopic={automationEnabled ? () => { setView('board'); setAdding(true) } : handleCreateTopic}
           onGenerated={() => { void load(); void loadTopics() }}
@@ -220,15 +290,23 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
         <p role="status" aria-live="polite" className="sr-only">{actions.announcement}</p>
 
         {view === 'list' ? (
-          <StrategyListView proFirst={proFirst} dict={dict} />
+          <StrategyListView proFirst={proFirst} dict={dict} cards={board?.cards ?? null} lang={language} act={act} insights={insights} />
         ) : board ? (
-          <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} act={act} />
+          <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} act={act} insights={insights} />
         ) : strategy.status === 'loading' ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
             {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 animate-pulse rounded-card border border-line bg-sunk/60" />)}
           </div>
         ) : null}
       </section>
+
+      {board && board.cards.length > 0 && (
+        <>
+          <PlanOverview cards={board.cards} counts={board.counts} searches={searches} lang={language} dict={dict} />
+          <TopicClusters cards={board.cards} insights={insights} lang={language} dict={dict} />
+          <WhatHappensNext counts={board.counts} next={board.next} lang={language} dict={dict} />
+        </>
+      )}
     </div>
   )
 }

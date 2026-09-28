@@ -32,7 +32,11 @@ import { EASY_WINS_SHOWN } from '@/lib/keyword-research/easy-wins'
 import { keywordKey, type ScanKeyword, type TrackedKeyword } from '@/lib/keyword-research/scan-research'
 import type { ResearchChip } from '@/lib/keyword-research/chips'
 import type { ResearchRow } from '@/lib/keyword-research/rows'
-import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
+import { Check, Copy, Loader2, CheckCircle, Plus, Sparkles, TrendingUp } from 'lucide-react'
+import ResearchLandscape, { LANDSCAPE_IDS } from '@/components/keyword-research/ResearchLandscape'
+import SectionNav from '@/components/keyword-research/SectionNav'
+import SiteMark from '@/components/keyword-research/SiteMark'
+import { NO_LANDSCAPE } from '@/components/keyword-research/landscape'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -235,6 +239,8 @@ export default function KeywordResearchPage() {
   const scanKeywords = scanOn?.kind === 'seeded' ? scanOn.research.keywords : NO_SCAN_KEYWORDS
   const scanTracked = scanOn ? scanOn.tracked : NO_TRACKED
   const unseeded = scanView.kind === 'unseeded'
+  // What the scan's summary says about the market (competitors, audiences, the site's icon); absent before the scan.
+  const seedLandscape = scan.landscape ?? NO_LANDSCAPE
   // The mapping, offered on the empty start; its end reads the research again.
   const mapping = useMapping(activeProjectId, language, scan.retry)
   // A research the merchant runs from the form takes the screen until they go back to the scan's.
@@ -932,7 +938,18 @@ export default function KeywordResearchPage() {
     <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} retry={gscKeywords.retry} />
   ) : null
 
-  const header = <Header title={t.title} subtitle={t.subtitle} />
+  // The research's own site, named with its icon under the title, once the scan's research is on screen.
+  const ownDomain = scanMode && model.mode === 'scan' ? (scanOn?.domain ?? seedLandscape.domain) : null
+  const ti = dict.researchInsights
+  const siteChip = ownDomain ? (
+    <span data-research-site="" className="inline-flex max-w-full items-center gap-2 rounded-pill border border-line bg-surface py-1 pe-3 ps-1 shadow-control">
+      <SiteMark domain={ownDomain} icon={seedLandscape.siteIcon} size="sm" tone="own" className="size-6" />
+      <span dir="ltr" className="truncate text-caption font-semibold text-ink">{ownDomain}</span>
+      {seedLandscape.niche && <span className="hidden truncate border-s border-line ps-2 text-caption text-muted sm:inline">{seedLandscape.niche}</span>}
+    </span>
+  ) : undefined
+  const header = <Header title={t.title} subtitle={t.subtitle}>{siteChip}</Header>
+  const landscapeOn = scanMode && model.mode === 'scan' && scanOn?.kind === 'seeded' && !!activeProjectId
 
   // Nothing is known yet about which screen this is: its skeleton, not today's form.
   if (firstAnswerPending) {
@@ -956,6 +973,7 @@ export default function KeywordResearchPage() {
         <ScanEmptyCard reason={scanOn.reason} seedKeywords={scanOn.seedKeywords} onRetry={scan.retry} onUseSeeds={fillSeedKeywords} />
       )}
       {scanMode && model.mode && (
+        <div id="research-overview" className="scroll-mt-20">
         <ScanOverview
           totals={model.totals}
           easyWins={model.wins.length}
@@ -966,6 +984,19 @@ export default function KeywordResearchPage() {
           truncated={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.research.truncated}
           onBackToScan={model.mode === 'manual' && scanKeywords.length > 0 ? backToScan : undefined}
           sourceOverride={sourceOverride}
+        />
+        </div>
+      )}
+      {landscapeOn && (
+        <SectionNav
+          label={ti.nav.label}
+          sections={[
+            { id: 'research-overview', label: ti.nav.overview },
+            { id: 'research-wins', label: ti.nav.wins },
+            { id: LANDSCAPE_IDS.rivals, label: ti.nav.rivals },
+            { id: LANDSCAPE_IDS.audiences, label: ti.nav.audiences },
+            { id: 'research-table', label: ti.nav.keywords },
+          ]}
         />
       )}
       {researchStartShown && (
@@ -1171,6 +1202,7 @@ export default function KeywordResearchPage() {
 
       {/* Easy battles to win: the best keywords of the research on screen. */}
       {scanMode && model.mode && (
+        <div id="research-wins" className="scroll-mt-20">
         <EasyWins
           wins={model.wins.slice(0, EASY_WINS_SHOWN)}
           total={model.wins.length}
@@ -1178,6 +1210,12 @@ export default function KeywordResearchPage() {
           onTrack={trackKeyword}
           onShowAll={model.mode === 'scan' ? showSuggestions : undefined}
         />
+        </div>
+      )}
+
+      {/* Who the site competes with, and who searches for it (only with the scan's research on screen). */}
+      {landscapeOn && scanOn?.kind === 'seeded' && activeProjectId && (
+        <ResearchLandscape projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} domain={ownDomain} />
       )}
 
       {/* Search Console's source, where there is no table for it to sit in. */}
@@ -1185,7 +1223,7 @@ export default function KeywordResearchPage() {
 
       {/* Results */}
       {tableVisible && (
-        <div id={scanMode ? 'research-table' : undefined} className="rounded-card border border-line bg-surface p-6 shadow-card">
+        <div id={scanMode ? 'research-table' : undefined} className={`rounded-card border border-line bg-surface p-6 shadow-card${scanMode ? ' scroll-mt-20' : ''}`}>
           {/* The chips of the scan's research, and Search Console's source under them. */}
           {scanMode && (
             <div className="mb-4 space-y-3 scroll-mt-4">
@@ -1522,6 +1560,24 @@ export default function KeywordResearchPage() {
                           <TrendingUp size={16} aria-hidden="true" />
                           <span className="text-xs">{t.trend.button}</span>
                         </button>
+                        {/* One click to track this keyword: the same request and quota check as "easy wins". */}
+                        {scanMode && ((result as ResearchRow).tracked ? (
+                          <span data-row-tracked="" className="inline-flex h-7 items-center gap-1 rounded-pill border border-ok/20 bg-ok-soft px-2.5 text-xs font-semibold text-ok">
+                            <Check size={12} strokeWidth={3} aria-hidden="true" />{ti.tracked}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            data-row-track=""
+                            onClick={() => trackKeyword(result as ResearchRow)}
+                            disabled={trackingKeys.has(keywordKey(result.keyword))}
+                            aria-label={ti.trackAria(result.keyword)}
+                            className="inline-flex h-7 items-center gap-1 rounded-pill border border-line bg-surface px-2.5 text-xs font-semibold text-ink transition-colors hover:border-action/40 hover:bg-action-soft hover:text-action disabled:opacity-60"
+                          >
+                            {trackingKeys.has(keywordKey(result.keyword)) ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Plus size={12} strokeWidth={2.5} aria-hidden="true" />}
+                            {trackingKeys.has(keywordKey(result.keyword)) ? ti.tracking : ti.track}
+                          </button>
+                        ))}
                       </div>
                     </td>
                   </tr>

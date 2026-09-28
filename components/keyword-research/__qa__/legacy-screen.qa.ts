@@ -204,7 +204,7 @@ function main() {
   // A control whose anchor is gone (the page changed) fails, loudly, instead of passing or crashing.
   const mutate = (from: string, to: string): string | null => (page.includes(from) ? page.replace(from, to) : null)
   const broken = (tag: string, source: string | null) => (source === null ? null : mismatches(NONE, tag, source))
-  const header = broken('mut-header', mutate('const header = <Header title={t.title} subtitle={t.subtitle} />', 'const header = <Header title={t.title} />'))
+  const header = broken('mut-header', mutate('const header = <Header title={t.title} subtitle={t.subtitle}>{siteChip}</Header>', 'const header = <Header title={t.title}>{siteChip}</Header>'))
   check('L1-MUT: a page whose header lost its line fails L1', !!header && header.length > 0, header ? undefined : 'anchor missing')
   const extra = broken('mut-extra', mutate('{/* Form */}', '<p>new</p>'))
   check('L1-MUT2: a page that shows one more element with no scan fails L1', !!extra && extra.length > 0, extra ? undefined : 'anchor missing')
@@ -222,7 +222,7 @@ function main() {
     !!legacyForm && unseeded(legacyForm, 'mut-legacy-form').length > 0, legacyForm ? undefined : 'anchor missing')
   const noStart = mutate('{researchStartShown && (', '{false && (')
   check('U1-MUT2: a page without the empty start fails U1', !!noStart && unseeded(noStart, 'mut-no-start').length > 0, noStart ? undefined : 'anchor missing')
-  const oldHeader = mutate('const header = <Header title={t.title} subtitle={t.subtitle} />', 'const header = (<div className="mb-8"><h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1><p className="text-slate-600">{t.subtitle}</p></div>)')
+  const oldHeader = mutate('const header = <Header title={t.title} subtitle={t.subtitle}>{siteChip}</Header>', 'const header = (<div className="mb-8"><h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1><p className="text-slate-600">{t.subtitle}</p></div>)')
   check('U1-MUT3: the older header (raw slate, text-3xl) fails U1', !!oldHeader && unseeded(oldHeader, 'mut-old-header').length > 0, oldHeader ? undefined : 'anchor missing')
   const gscOnStart = mutate('const gscSource = scanMode && !unseeded', 'const gscSource = scanMode')
   check('U1-MUT4: a page that shows the Search Console source on the empty start fails U1',

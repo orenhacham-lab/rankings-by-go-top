@@ -3,8 +3,12 @@
 /**
  * Row 2 of the content strategy tab: the month board. Four columns (ideas, planned,
  * written, published) under a row of month chips, each with its count; "all" is the
- * default and every other chip is a month that has at least one card. A card is dated
- * by the one date that matters for its column, and says which date it is.
+ * default and every other chip is a month the plan schedules something in. A chip's
+ * number is exactly the cards it shows: a month shows what the plan puts in it, and
+ * everything not scheduled yet (ideas, topics waiting for a slot), which belongs to no
+ * month and so is never hidden by one (lib/content/strategy/board.ts monthChips).
+ * A card says which date it carries, and, when the research knows its keyword, why it
+ * is worth writing (TopicFacts).
  *
  * Written and published cards open the article. An idea is acted on right here, on its
  * own card (useIdeaActions): approve it (it moves to "planned"), say it is not a fit, or
@@ -18,9 +22,12 @@ import { CalendarDays, Check, KeyRound, Sparkles, Telescope, TrendingUp } from '
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import {
-  ALL_MONTHS, STRATEGY_COLUMNS, cardsInMonth, monthChips, sameTopicKey,
+  ALL_MONTHS, STRATEGY_COLUMNS, cardsInMonth, monthChips, sameTopicKey, unscheduledCount,
   type StrategyCard, type StrategyColumn,
 } from '@/lib/content/strategy/board'
+import type { TopicInsight } from '@/lib/content/strategy/insights'
+import { formatCount } from '@/components/gsc/format'
+import TopicFacts from './TopicFacts'
 import { canRejectIdea, ideaTargetFromCard } from '@/lib/content/strategy/ideas'
 import type { IdeaActions } from './useIdeaActions'
 import type { Locale } from '@/lib/i18n/locales'
@@ -33,7 +40,7 @@ type Dict = ReturnType<typeof getDashboardDictionary>
 export const COLUMN_PREVIEW = 5
 
 /** One accent per column, from the app's own state tokens. */
-const ACCENT: Record<StrategyColumn, { dot: string; count: string }> = {
+export const ACCENT: Record<StrategyColumn, { dot: string; count: string }> = {
   ideas: { dot: 'bg-info', count: 'bg-info-soft text-info' },
   planned: { dot: 'bg-warn', count: 'bg-warn-soft text-warn' },
   written: { dot: 'bg-action', count: 'bg-action-soft text-action' },
@@ -43,13 +50,13 @@ const ACCENT: Record<StrategyColumn, { dot: string; count: string }> = {
 /** What the board needs to act on an idea; absent, the cards only show. */
 export type BoardIdeaActions = { actions: IdeaActions; automation: boolean }
 
-function IdeaButtons({ card, dict, act, canSwap }: { card: StrategyCard; dict: Dict; act: BoardIdeaActions; canSwap: boolean }) {
+export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card: StrategyCard; dict: Dict; act: BoardIdeaActions; canSwap: boolean; inline?: boolean }) {
   const a = dict.contentStrategy.ideaActions
   const target = ideaTargetFromCard(card)
   if (!target) return null
   const busy = act.actions.busy[card.key]
   return (
-    <div role="group" aria-label={fill(a.groupLabel, { title: card.title })} className="mt-3 flex flex-wrap items-center gap-1 border-t border-line pt-3">
+    <div role="group" aria-label={fill(a.groupLabel, { title: card.title })} className={cn('flex flex-wrap items-center gap-1', !inline && 'mt-3 border-t border-line pt-3')}>
       <Button size="sm" onClick={() => void act.actions.approve(target)} loading={busy === 'approve'} disabled={!!busy}
         aria-label={fill(a.approveAria, { title: card.title })} data-idea-action="approve">
         {busy !== 'approve' && <Check size={14} aria-hidden />} {a.approve}
@@ -70,7 +77,7 @@ function IdeaButtons({ card, dict, act, canSwap }: { card: StrategyCard; dict: D
   )
 }
 
-function BoardCard({ card, lang, dict, act, canSwap }: { card: StrategyCard; lang: Locale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean }) {
+function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: StrategyCard; lang: Locale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean; insight?: TopicInsight }) {
   const s = dict.contentStrategy
   const date = shortDate(card.date, lang)
   const approvedNow = card.column === 'planned' && !!act && act.actions.approvedNow.has(sameTopicKey(card.title))
@@ -83,6 +90,7 @@ function BoardCard({ card, lang, dict, act, canSwap }: { card: StrategyCard; lan
           <span className="truncate">{card.keyword}</span>
         </p>
       )}
+      {insight && <TopicFacts insight={insight} lang={lang} dict={dict} className="mt-2" />}
       {card.column === 'ideas' && card.reason && (
         <p className="mt-1.5 line-clamp-2 text-caption text-muted [overflow-wrap:anywhere]">{card.reason}</p>
       )}
@@ -128,7 +136,7 @@ function BoardCard({ card, lang, dict, act, canSwap }: { card: StrategyCard; lan
   return <div data-strategy-card={card.key} className={cn(frame, approvedNow && 'border-ok/40')}>{body}</div>
 }
 
-function Column({ column, cards, lang, dict, note, act }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; note?: string | null; act: BoardIdeaActions | null }) {
+function Column({ column, cards, lang, dict, note, act, insights }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; note?: string | null; act: BoardIdeaActions | null; insights?: ReadonlyMap<string, TopicInsight> | null }) {
   const s = dict.contentStrategy
   const [open, setOpen] = useState(false)
   const shown = open ? cards : cards.slice(0, COLUMN_PREVIEW)
@@ -153,7 +161,7 @@ function Column({ column, cards, lang, dict, note, act }: { column: StrategyColu
       ) : (
         <ul className="space-y-2">
           {/* Swap brings the next pending idea in, so it is offered while the column holds more than it shows. */}
-          {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} /></li>)}
+          {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} /></li>)}
         </ul>
       )}
       {(hidden > 0 || open) && cards.length > COLUMN_PREVIEW && (
@@ -165,11 +173,16 @@ function Column({ column, cards, lang, dict, note, act }: { column: StrategyColu
           {open ? s.showLess : fill(s.showMore, { n: hidden })}
         </button>
       )}
+      {hidden > 0 && (
+        <p data-column-shown="" className="mt-1 px-2 text-overline text-muted tabular-nums">
+          {dict.strategyInsights.board.shown(formatCount(shown.length, lang), formatCount(cards.length, lang))}
+        </p>
+      )}
     </section>
   )
 }
 
-export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act = null }: {
+export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act = null, insights = null }: {
   cards: StrategyCard[]
   lang: Locale
   dict: Dict
@@ -177,6 +190,8 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
   ideasNote?: string | null
   /** The idea actions; without them the board only shows. */
   act?: BoardIdeaActions | null
+  /** Why each card is worth writing, by card key (the research's facts); none until read. */
+  insights?: ReadonlyMap<string, TopicInsight> | null
 }) {
   const s = dict.contentStrategy
   const chips = useMemo(() => monthChips(cards), [cards])
@@ -184,6 +199,7 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
   // A month that no longer has a card (after an approval moved it) falls back to all.
   const active = chips.some((c) => c.key === month) ? month : ALL_MONTHS
   const visible = useMemo(() => cardsInMonth(cards, active), [cards, active])
+  const unscheduled = useMemo(() => unscheduledCount(cards), [cards])
   const byColumn = useMemo(() => {
     const m: Record<StrategyColumn, StrategyCard[]> = { ideas: [], planned: [], written: [], published: [] }
     for (const c of visible) m[c.column].push(c)
@@ -213,8 +229,12 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
         })}
       </div>
 
+      {active !== ALL_MONTHS && unscheduled > 0 && (
+        <p data-unscheduled-note="" className="-mt-2 mb-3 text-caption text-muted">{dict.strategyInsights.board.unscheduled(formatCount(unscheduled, lang))}</p>
+      )}
+
       <div key={active} className="grid animate-pop-in items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {STRATEGY_COLUMNS.map((col) => <Column key={col} column={col} cards={byColumn[col]} lang={lang} dict={dict} note={col === 'ideas' ? ideasNote : null} act={act} />)}
+        {STRATEGY_COLUMNS.map((col) => <Column key={col} column={col} cards={byColumn[col]} lang={lang} dict={dict} note={col === 'ideas' ? ideasNote : null} act={act} insights={insights} />)}
       </div>
     </div>
   )
