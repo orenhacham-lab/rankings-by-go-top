@@ -28,7 +28,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { FileText, KeyRound, Send, ShieldAlert, Target } from 'lucide-react'
+import { FileText, KeyRound, Send, Target } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
@@ -65,10 +65,13 @@ import { PublishingBoard, RecentArticles } from '@/components/dashboard/ContentW
 import AiVisibilityBrief from '@/components/dashboard/AiVisibilityBrief'
 import AccountStatus from '@/components/dashboard/AccountStatus'
 import MonthlyReportTeaser from '@/components/reports/monthly/MonthlyReportTeaser'
-import { Widget } from '@/components/dashboard/ui'
-import { ToastHost, useToasts } from '@/components/content/Toast'
+import { ToastHost, useToasts } from '@/components/ui/Toast'
+import { Reveal } from '@/components/ui/motion'
+import StartHere, { type StartHrefs } from '@/components/dashboard/StartHere'
+import { isStartMode, sectionData, showWidget, startSteps, type StartInput, type WidgetData } from '@/lib/dashboard/start'
+import { platformSetupHref } from '@/lib/content/content-hub-setup'
+import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
 import MappingBanner from '@/components/mapping/MappingBanner'
-import MappingPlaceholder from '@/components/mapping/MappingPlaceholder'
 import { useMapping } from '@/components/mapping/useMapping'
 import { summaryHref } from '@/lib/onboarding/links'
 
@@ -118,14 +121,19 @@ export default function DashboardPage() {
   const dict = getDashboardDictionary(language)
   const home = dict.home
 
+  // A new project opens on "Start here" alone: the header's shortcuts would be
+  // three more buttons beside its steps.
+  const [startMode, setStartMode] = useState(false)
+
   // The guided tour is not mounted here any more: the Guide pill in the top bar
   // (components/guide/GuideMenu.tsx) runs it on every screen.
   return (
     <div>
-      <Header title={home.title} subtitle={home.subtitle} actions={<Shortcuts t={dict.dashboardHome} />} />
+      {/* "Since your last visit" means nothing on a project that has no data yet. */}
+      <Header title={home.title} subtitle={startMode ? undefined : home.subtitle} actions={startMode ? undefined : <Shortcuts t={dict.dashboardHome} />} />
 
       <WorkspaceGate>
-        {(project) => <ProjectDashboard key={project.id} project={project} />}
+        {(project) => <ProjectDashboard key={project.id} project={project} onStartMode={setStartMode} />}
       </WorkspaceGate>
     </div>
   )
@@ -153,7 +161,7 @@ function nextStep(input: {
   return null
 }
 
-function ProjectDashboard({ project }: { project: Project }) {
+function ProjectDashboard({ project, onStartMode }: { project: Project; onStartMode: (on: boolean) => void }) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const home = dict.home
@@ -167,7 +175,6 @@ function ProjectDashboard({ project }: { project: Project }) {
   const [now, setNow] = useState(() => new Date())
   // On a phone: the first five cards, and the rest behind one button (P1-16).
   const [allCards, setAllCards] = useState(false)
-  const fold = allCards ? '' : 'max-xl:hidden'
   // Read alongside the keywords but never part of them: each is its own widgets' state.
   const { overview, reload } = useDashboardOverview(project.id)
   // The mapping (lib/project-mapping/state.ts): the banner above the opening card, and
@@ -237,6 +244,30 @@ function ProjectDashboard({ project }: { project: Project }) {
     }
   }, [competitorView, seed])
 
+  // ── What the project has, and whether it opens on "Start here" ──────────────
+  const m = mapping.mapping
+  const scan: StartInput['scan'] = m.available === true
+    ? (m.state === 'done' ? 'done' : m.state === 'running' ? 'running' : 'open')
+    : m.available === false
+      ? 'off'
+      // The mapping's read has not answered: the scan's own read (same route) decides.
+      : seed.kind === 'run'
+        ? (seed.phase === 'stage_a' ? 'running' : seed.phase === 'failed' ? 'open' : 'done')
+        : seed.kind === 'none' ? 'off' : null
+  const articlesTotal = !showContent ? null : data?.articles.state === 'ready' ? data.articles.data.total : 0
+  const steps = rankings ? startSteps({
+    scan,
+    tracked: rankings.tracked,
+    platform: data?.setup.state === 'ready' ? data.setup.data.platform : null,
+    articles: articlesTotal,
+  }) : []
+  // Known once the keywords, the dashboard route and the scan have answered (each read is bounded).
+  const modeKnown = !!rankings && (rankings.checked > 0 || (overview.status !== 'loading' && scan !== null))
+  const startMode = modeKnown && !!rankings && isStartMode({ checked: rankings.checked, articles: articlesTotal, steps })
+  useEffect(() => { onStartMode(startMode) }, [startMode, onStartMode])
+  // A new project's few cards all show on a phone too; otherwise the rest waits behind "more".
+  const fold = allCards || startMode ? '' : 'max-xl:hidden'
+
   if (status === 'error') {
     return (
       <Card>
@@ -245,7 +276,7 @@ function ProjectDashboard({ project }: { project: Project }) {
     )
   }
 
-  if (status === 'loading' || !rankings) {
+  if (status === 'loading' || !rankings || !modeKnown) {
     return (
       <div aria-busy="true" className="space-y-5">
         <div className="h-44 animate-pulse rounded-card bg-contrast/90 motion-reduce:animate-none" />
@@ -265,81 +296,119 @@ function ProjectDashboard({ project }: { project: Project }) {
       ? { kind: 'move', keyword: rankings.biggestMove.keyword, change: rankings.biggestMove.change, position: rankings.biggestMove.position }
       : null
   const next = nextStep({ t, projectId: project.id, rankings, overview: data, content: showContent })
-  const heroHasFirstArticle = next?.label === t.actions.writeFirstArticle
   const hold = seed.kind === 'run' ? holdingBack(seed.run, language) : null
   const tile = t.tiles
   const pending = <span aria-hidden="true" className="inline-block h-7 w-12 animate-pulse rounded-control bg-sunk align-middle motion-reduce:animate-none" />
 
   const siteSummary = mappingOffered && seed.kind === 'run' ? { href: summaryHref(project.id), label: dict.mapping.summaryLink } : null
 
+  // Which widgets have something to show (lib/dashboard/start.ts showWidget): an
+  // empty widget is left out, a failed one keeps its retry.
+  const activityData: WidgetData = activity.state === 'loading' ? 'loading' : activity.state === 'error' ? 'error'
+    : activity.items.length > 0 || activity.pending > 0 ? 'data' : 'empty'
+  const competitorsData: WidgetData = competitors.state === 'loading' ? 'loading' : competitors.state === 'error' ? 'error'
+    : competitors.state === 'scan_only' || (competitors.state === 'ready' && competitors.rows.length > 0) ? 'data' : 'empty'
+  const show = {
+    hold: !!hold,
+    distribution: rankings.checked > 0,
+    improvements: rankings.improvements.length > 0,
+    drops: rankings.drops.length > 0,
+    opportunities: rankings.pageTwo.length > 0,
+    board: showContent && showWidget(sectionData(sectionOf('board'), (b) => b.upcoming.length + b.published.length > 0)),
+    articles: showContent && showWidget(sectionData(sectionOf('articles'), (a) => a.total > 0)),
+    activity: showWidget(activityData),
+    competitors: showWidget(competitorsData),
+    ai: showAi && showWidget(sectionData(sectionOf('ai'), (a) => a.score !== null)),
+    // The plan and its allowances; on a new project the trial bar already says it.
+    account: !startMode && showWidget(sectionData(sectionOf('account'), () => true)),
+  }
+  const startHrefs: StartHrefs = {
+    todo: { scan: summaryHref(project.id), keywords: '/keyword-research', connect: platformSetupHref(project.id), article: strategyHref('board') },
+    done: { scan: summaryHref(project.id), keywords: '/keywords', connect: platformSetupHref(project.id), article: CONTENT_ROOT_PATH },
+  }
+
   return (
     <div className="space-y-5">
-      <MappingBanner projectId={project.id} control={mapping} locale={language} />
+      {/* On a new project the scan is the first step of "Start here", with its progress there. */}
+      {!startMode && <MappingBanner projectId={project.id} control={mapping} locale={language} />}
       <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
 
-      <HeroCard
-        t={t}
-        language={language}
-        domain={project.target_domain}
-        siteIcon={(seed.kind === 'run' ? seed.run.summary?.siteIcon : null) ?? projects.find((p) => p.id === project.id)?.site_icon}
-        rankings={rankings}
-        news={news}
-        seedPhase={seed.kind === 'run' ? seed.phase : null}
-        next={next}
-      />
-
-      {/* One equal column per tile from sm up; the clicks tile renders nothing when
-          Search Console is off, and the row closes up. On a phone, two per row. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-flow-col sm:auto-cols-fr max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-        <Link href="/keywords" className="block rounded-card transition-shadow hover:shadow-card">
-          <StatTile className="h-full" label={tile.keywords} value={formatCount(rankings.tracked, language)} source={tile.keywordsSource}
-            icon={<KeyRound size={16} strokeWidth={2} />} />
-        </Link>
-        <StatTile
-          className="h-full"
-          label={tile.avgPosition}
-          value={rankings.avgPosition ?? ''}
-          empty={rankings.avgPosition === null ? tile.noChecks : undefined}
-          delta={rankings.avgChange !== null && rankings.avgChange !== 0
-            ? { value: String(Math.abs(rankings.avgChange)), direction: rankings.avgChange > 0 ? 'up' : 'down' }
-            : undefined}
-          source={tile.avgPositionSource}
-          icon={<Target size={16} strokeWidth={2} />}
+      {startMode ? (
+        <StartHere
+          t={dict.dashboardStart}
+          steps={steps}
+          domain={project.target_domain}
+          hrefs={startHrefs}
+          mapping={mappingOffered ? mapping : null}
+          locale={language}
         />
-        {showContent && (
-          <StatTile
-            className="h-full"
-            label={tile.articlesLive}
-            value={articles ? formatCount(articles.live, language) : pending}
-            empty={data?.articles.state === 'error' ? tile.unavailable : articles && articles.live === 0 ? tile.noArticles : undefined}
-            source={tile.articlesLiveSource}
-            icon={<FileText size={16} strokeWidth={2} />}
+      ) : (
+        <>
+          <HeroCard
+            t={t}
+            language={language}
+            domain={project.target_domain}
+            siteIcon={(seed.kind === 'run' ? seed.run.summary?.siteIcon : null) ?? projects.find((p) => p.id === project.id)?.site_icon}
+            rankings={rankings}
+            news={news}
+            seedPhase={seed.kind === 'run' ? seed.phase : null}
+            next={next}
           />
-        )}
-        {showContent && (
-          <StatTile
-            className="h-full"
-            label={tile.publishedMonth}
-            value={articles ? formatCount(articles.publishedThisMonth, language) : pending}
-            empty={data?.articles.state === 'error' ? tile.unavailable : undefined}
-            delta={articles && articles.publishedThisMonth !== articles.publishedLastMonth
-              ? {
-                  value: String(Math.abs(articles.publishedThisMonth - articles.publishedLastMonth)),
-                  direction: articles.publishedThisMonth > articles.publishedLastMonth ? 'up' : 'down',
-                }
-              : undefined}
-            source={tile.publishedMonthSource}
-            icon={<Send size={16} strokeWidth={2} />}
-          />
-        )}
-        <GscClicksTile projectId={project.id} />
-      </div>
+
+          {/* One equal column per tile from sm up; the clicks tile renders only once it
+              has a figure, and the row closes up. On a phone, two per row. */}
+          <Reveal index={1} className="grid grid-cols-2 gap-3 sm:grid-flow-col sm:auto-cols-fr max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+            <Link href="/keywords" className="block rounded-card transition-shadow hover:shadow-card">
+              <StatTile className="h-full" label={tile.keywords} value={formatCount(rankings.tracked, language)} source={tile.keywordsSource}
+                icon={<KeyRound size={16} strokeWidth={2} />} />
+            </Link>
+            <StatTile
+              className="h-full"
+              label={tile.avgPosition}
+              value={rankings.avgPosition ?? ''}
+              empty={rankings.avgPosition === null ? tile.noChecks : undefined}
+              delta={rankings.avgChange !== null && rankings.avgChange !== 0
+                ? { value: String(Math.abs(rankings.avgChange)), direction: rankings.avgChange > 0 ? 'up' : 'down' }
+                : undefined}
+              source={tile.avgPositionSource}
+              icon={<Target size={16} strokeWidth={2} />}
+            />
+            {showContent && (
+              <StatTile
+                className="h-full"
+                label={tile.articlesLive}
+                value={articles ? formatCount(articles.live, language) : pending}
+                empty={data?.articles.state === 'error' ? tile.unavailable : articles && articles.live === 0 ? tile.noArticles : undefined}
+                source={tile.articlesLiveSource}
+                icon={<FileText size={16} strokeWidth={2} />}
+              />
+            )}
+            {showContent && (
+              <StatTile
+                className="h-full"
+                label={tile.publishedMonth}
+                value={articles ? formatCount(articles.publishedThisMonth, language) : pending}
+                empty={data?.articles.state === 'error' ? tile.unavailable : undefined}
+                delta={articles && articles.publishedThisMonth !== articles.publishedLastMonth
+                  ? {
+                      value: String(Math.abs(articles.publishedThisMonth - articles.publishedLastMonth)),
+                      direction: articles.publishedThisMonth > articles.publishedLastMonth ? 'up' : 'down',
+                    }
+                  : undefined}
+                source={tile.publishedMonthSource}
+                icon={<Send size={16} strokeWidth={2} />}
+              />
+            )}
+            <GscClicksTile projectId={project.id} onlyWithData />
+          </Reveal>
+        </>
+      )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
-        {/* Main column: the charts and the lists. */}
+        {/* Main column: the charts and the lists. Each card enters once, as it is first seen. */}
         <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-5">
-          {hold && (
-            <div className="order-2 min-w-0 animate-pop-in">
+          {show.hold && hold && (
+            <Reveal index={0} className="order-2 min-w-0">
               <HoldingBack
                 t={t}
                 model={hold}
@@ -347,73 +416,79 @@ function ProjectDashboard({ project }: { project: Project }) {
                 settingsHref={settingsHref}
                 summary={siteSummary}
               />
-            </div>
+            </Reveal>
           )}
-          {/* A project the mapping has not read yet: the same card, in the same place,
-              holding what only the mapping can find. */}
-          {!hold && mappingOffered && seed.kind !== 'loading' && (
-            <div className="order-2 min-w-0">
-              <Widget id="holding-back" state="mapping" title={t.holdingBack.title} subtitle={t.holdingBack.subtitle}
-                icon={<ShieldAlert size={16} strokeWidth={2} />}>
-                <MappingPlaceholder control={mapping} body={dict.mapping.holdingPlaceholder} locale={language} />
-              </Widget>
-            </div>
+          {show.distribution && (
+            <Reveal index={1} className="order-4 min-w-0">
+              <RankDistribution t={t} rankings={rankings} language={language} />
+            </Reveal>
           )}
-          <div className="order-4 min-w-0">
-            <RankDistribution t={t} rankings={rankings} language={language} />
-          </div>
-          <div className="order-5 grid min-w-0 gap-5 md:grid-cols-2">
-            <RankingChanges t={t} direction="up" title={home.majorImprovements} moves={rankings.improvements} />
-            <RankingChanges t={t} direction="down" title={home.majorDrops} moves={rankings.drops} />
-          </div>
-          <div className={`order-7 min-w-0 ${fold}`}>
-            <ContentOpportunities t={t} language={language} projectId={project.id} items={rankings.pageTwo} canCreateTopics={showContent} />
-          </div>
-          {showContent && (
-            <div className={`order-8 grid min-w-0 gap-5 md:grid-cols-2 ${fold}`}>
-              <PublishingBoard t={t} language={language} section={sectionOf('board')} retry={reload} />
-              <RecentArticles t={t} language={language} section={sectionOf('articles')} retry={reload}
-                firstArticleHref={heroHasFirstArticle ? null : strategyHref('board')} />
-            </div>
+          {(show.improvements || show.drops) && (
+            <Reveal index={2} className={`order-5 grid min-w-0 gap-5 ${show.improvements && show.drops ? 'md:grid-cols-2' : ''}`}>
+              {show.improvements && <RankingChanges t={t} direction="up" title={home.majorImprovements} moves={rankings.improvements} />}
+              {show.drops && <RankingChanges t={t} direction="down" title={home.majorDrops} moves={rankings.drops} />}
+            </Reveal>
           )}
-          <div className={`order-11 min-w-0 ${fold} empty:hidden`}>
-            <GscTopPages projectId={project.id} />
-          </div>
+          {show.opportunities && (
+            <Reveal index={3} className={`order-7 min-w-0 ${fold}`}>
+              <ContentOpportunities t={t} language={language} projectId={project.id} items={rankings.pageTwo} canCreateTopics={showContent} />
+            </Reveal>
+          )}
+          {(show.board || show.articles) && (
+            <Reveal index={4} className={`order-8 grid min-w-0 gap-5 ${show.board && show.articles ? 'md:grid-cols-2' : ''} ${fold}`}>
+              {show.board && <PublishingBoard t={t} language={language} section={sectionOf('board')} retry={reload} />}
+              {show.articles && <RecentArticles t={t} language={language} section={sectionOf('articles')} retry={reload} firstArticleHref={null} />}
+            </Reveal>
+          )}
+          <Reveal index={5} className={`order-11 min-w-0 ${fold} empty:hidden`}>
+            <GscTopPages projectId={project.id} onlyWithData />
+          </Reveal>
         </div>
 
         {/* Side column: the short status cards. */}
         <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-5">
-          <div className="order-1 min-w-0 empty:hidden">
-            <DashboardSetup t={t} projectId={project.id} facts={sectionOf('setup')}
-              hasKeywords={rankings.tracked > 0} />
-          </div>
-          <div className="order-3 min-w-0">
-            <RecentActivity t={t} model={activity} now={now} language={language} emptyHref="/keyword-research" />
-          </div>
-          <div className={`order-6 min-w-0 ${fold}`}>
-            <CompetitorsWidget t={t} model={competitors} manageHref={competitorView.manageHref ?? `${settingsHref}#competitors`}
-              mapping={mappingOffered && mapping.mapping.state !== 'done' ? mapping : null} mappingCopy={dict.mapping} />
-          </div>
-          {/* The latest automatic monthly report, linking to it on the Reports screen. */}
-          <div className={`order-9 min-w-0 ${fold} empty:hidden`}>
-            <MonthlyReportTeaser projectId={project.id} language={language} />
-          </div>
-          {showAi && (
-            <div className={`order-10 min-w-0 ${fold}`}>
-              <AiVisibilityBrief t={t} language={language} section={sectionOf('ai')} retry={reload} now={now} />
-            </div>
+          {!startMode && (
+            <Reveal index={0} className="order-1 min-w-0 empty:hidden">
+              <DashboardSetup t={t} projectId={project.id} facts={sectionOf('setup')}
+                hasKeywords={rankings.tracked > 0} />
+            </Reveal>
           )}
-          <div className={`order-12 min-w-0 ${fold}`}>
-            <AccountStatus t={t} section={sectionOf('account')} retry={reload} />
-          </div>
+          {show.activity && (
+            <Reveal index={1} className="order-3 min-w-0">
+              <RecentActivity t={t} model={activity} now={now} language={language} emptyHref="/keyword-research" />
+            </Reveal>
+          )}
+          {show.competitors && (
+            <Reveal index={2} className={`order-6 min-w-0 ${fold}`}>
+              <CompetitorsWidget t={t} model={competitors} manageHref={competitorView.manageHref ?? `${settingsHref}#competitors`}
+                mapping={null} mappingCopy={dict.mapping} />
+            </Reveal>
+          )}
+          {/* The latest automatic monthly report, once there is one. */}
+          <Reveal index={3} className={`order-9 min-w-0 ${fold} empty:hidden`}>
+            <MonthlyReportTeaser projectId={project.id} language={language} onlyWithData />
+          </Reveal>
+          {show.ai && (
+            <Reveal index={4} className={`order-10 min-w-0 ${fold}`}>
+              <AiVisibilityBrief t={t} language={language} section={sectionOf('ai')} retry={reload} now={now} />
+            </Reveal>
+          )}
+          {show.account && (
+            <Reveal index={5} className={`order-12 min-w-0 ${fold}`}>
+              <AccountStatus t={t} section={sectionOf('account')} retry={reload} />
+            </Reveal>
+          )}
         </div>
 
-        {/* Phone only: the fold after the fifth card (P1-16), and back. */}
-        <div className={`${allCards ? 'order-last' : 'order-5'} flex justify-center xl:hidden`}>
-          <Button type="button" variant="secondary" aria-expanded={allCards} data-dashboard-fold onClick={() => setAllCards((v) => !v)}>
-            {allCards ? t.fewerCards : t.moreCards}
-          </Button>
-        </div>
+        {/* Phone only: the fold after the fifth card (P1-16), and back. Not on a new
+            project, whose few cards all fit. */}
+        {!startMode && (
+          <div className={`${allCards ? 'order-last' : 'order-5'} flex justify-center xl:hidden`}>
+            <Button type="button" variant="secondary" aria-expanded={allCards} data-dashboard-fold onClick={() => setAllCards((v) => !v)}>
+              {allCards ? t.fewerCards : t.moreCards}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

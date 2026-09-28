@@ -48,10 +48,12 @@ export function MonthlyTeaserBody({ body, language: l }: { body: MonthlyGetRespo
   )
 }
 
-export default function MonthlyReportTeaser({ projectId, language }: { projectId: string; language: Locale }) {
+/** `onlyWithData`: nothing until a report exists (the dashboard shows widgets that have something to show). */
+export default function MonthlyReportTeaser({ projectId, language, onlyWithData = false }: { projectId: string; language: Locale; onlyWithData?: boolean }) {
   const t = monthlyCopy(language)
   const { load } = useMonthlyReports(projectId)
   if (load.status === 'unavailable' || load.status === 'error') return null
+  if (onlyWithData && !(load.status === 'ready' && load.body.months.length > 0)) return null
   return (
     <Widget id="monthly-report" state={load.status} title={t.teaser.title} icon={<CalendarRange size={16} strokeWidth={2} />}
       action={load.status === 'ready' && load.body.months.length > 0 ? <HeaderLink href={REPORTS_HREF}>{t.teaser.open}</HeaderLink> : undefined}>

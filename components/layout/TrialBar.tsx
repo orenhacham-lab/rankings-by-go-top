@@ -37,8 +37,10 @@ export default function TrialBar({ state }: { state: TrialBarState }) {
         urgent ? 'border-warn/20 bg-warn-soft text-warn' : 'border-info/15 bg-info-soft text-info',
       )}
     >
-      <div className="mx-auto flex min-h-10 w-full max-w-[1280px] flex-wrap items-center justify-center gap-x-4 gap-y-1 py-1.5 sm:justify-between">
-        <p className="flex items-center gap-2 text-copy font-medium">
+      {/* One line on a phone too: the sentence shrinks to the caption size and the
+          link to a compact pill, so the strip stays 40px instead of wrapping to two. */}
+      <div className="mx-auto flex min-h-10 w-full max-w-[1280px] items-center justify-between gap-x-3 py-1.5 sm:gap-x-4">
+        <p className="flex min-w-0 items-center gap-2 text-caption font-medium sm:text-copy">
           <Hourglass size={15} strokeWidth={2} aria-hidden className="shrink-0" />
           <span>{text}</span>
         </p>
@@ -46,7 +48,7 @@ export default function TrialBar({ state }: { state: TrialBarState }) {
           <Link
             href={BILLING_HREF}
             data-trial-upgrade
-            className="inline-flex h-8 shrink-0 items-center rounded-control bg-commit px-3 text-caption font-semibold text-commit-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_0_0_1px_rgb(120_70_0/0.14)] transition-colors duration-150 hover:bg-commit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2"
+            className="inline-flex h-7 shrink-0 items-center rounded-control bg-commit px-2.5 text-caption sm:h-8 sm:px-3 font-semibold text-commit-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_0_0_1px_rgb(120_70_0/0.14)] transition-colors duration-150 hover:bg-commit-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2"
           >
             {t.upgrade}
           </Link>

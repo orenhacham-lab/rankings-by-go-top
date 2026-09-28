@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { count, dayMonth, monthName, monthlyCopy } from './copy'
 import MonthlyReportView from './MonthlyReportView'
 import { useMonthlyReports } from './useMonthlyReports'
+import type { useToasts } from '@/components/ui/Toast'
 
 export const MONTHLY_REPORTS_ANCHOR = 'monthly-reports'
 
@@ -128,9 +129,19 @@ function prevMonthKey(iso: string): string {
   return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
-export default function MonthlyReports({ projectId, projectLabel, language }: { projectId: string | null; projectLabel: string; language: Locale }) {
+export default function MonthlyReports({ projectId, projectLabel, language, toasts }: {
+  projectId: string | null
+  projectLabel: string
+  language: Locale
+  /** The screen's toasts: making a report shows its progress and outcome there. */
+  toasts?: ReturnType<typeof useToasts>
+}) {
   const t = monthlyCopy(language)
   const { load, switching, month, setMonth, reload, generate, generating } = useMonthlyReports(projectId)
+  const onGenerate = () => {
+    if (!toasts) { void generate(); return }
+    toasts.track(t.generateToast, async () => { if (!(await generate())) throw new Error('not generated') }).catch(() => {})
+  }
   if (!projectId || load.status === 'unavailable') return null
 
   return (
@@ -156,7 +167,7 @@ export default function MonthlyReports({ projectId, projectLabel, language }: { 
       )}
       {load.status === 'ready' && (
         <MonthlyReportsBody body={load.body} language={language} projectLabel={projectLabel} selected={month}
-          onSelect={setMonth} onGenerate={generate} generating={generating} switching={switching} />
+          onSelect={setMonth} onGenerate={onGenerate} generating={generating} switching={switching} />
       )}
     </section>
   )

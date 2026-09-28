@@ -121,6 +121,7 @@ export const dashboardEn = {
       aiVisibility: { title: 'Does ChatGPT mention you?', body: 'We check whether AI engines mention your business when they answer customers’ questions.' },
       connections: { title: 'Connect your site to publish', body: 'In project settings, under Connections, link your site for publishing articles, and Search Console.' },
       guide: { title: 'Come back here anytime', body: 'Tours, common questions, and a WhatsApp chat with us.' },
+      start: { title: 'Start here', body: 'A few steps that fill this dashboard with data about your site. Each one opens the screen that does it.' },
       dashboardHero: { title: 'What’s happening on the site', body: 'The big number sums up your keywords on Google; below it, what changed and the next step.' },
       dashboardShortcuts: { title: 'Shortcuts', body: 'The screens you come back to most, one click away.' },
       researchHeader: { title: 'Keyword research', body: 'Keyword ideas, search volumes, competition and estimated cost per click, from Google Ads data.' },
@@ -4189,6 +4190,52 @@ export const dashboardEn = {
       article_empty: 'The article is missing a title or content.',
       save_failed: 'Saving failed. Try again.',
       unexpected: 'Something went wrong. Try again.',
+    },
+  },
+  // The dashboard of a project with nothing to show yet: one card, "Start here"
+  // (components/dashboard/StartHere.tsx, lib/dashboard/start.ts).
+  dashboardStart: {
+    title: 'Start here',
+    subtitle: (domain: string) => `A few short steps, and this dashboard fills up with data about ${domain}.`,
+    progress: (done: number, total: number) => `${done} of ${total} done`,
+    stepLabel: (n: number) => `Step ${n}`,
+    done: 'Done',
+    running: 'Running now',
+    steps: {
+      scan: {
+        title: 'Scan your site',
+        body: 'We learn what the business offers and to whom, find keywords and competitors, and check what holds the site back on Google and in AI answers. Takes a few minutes.',
+        runningBody: 'The scan is running. You can keep working; this dashboard updates when it finishes.',
+        cta: 'Scan the site',
+        retry: 'Try again',
+        doneLink: 'See the scan summary',
+      },
+      keywords: {
+        title: 'Choose keywords',
+        body: 'The words customers search for on Google. We check where your site appears for each one.',
+        cta: 'Open keyword research',
+        doneLink: 'See your keywords',
+      },
+      connect: {
+        title: 'Connect your site',
+        body: 'Connect WordPress, Wix, Shopify or another site, so articles publish to your site in one click.',
+        cta: 'Connect the site',
+        doneLink: 'Connection settings',
+      },
+      article: {
+        title: 'Write your first article',
+        body: 'Pick a topic from the suggestions, and we write a full article, ready to review and publish.',
+        cta: 'Choose a topic',
+        doneLink: 'See your articles',
+      },
+    },
+  },
+  // Progress and outcome toasts for actions that take a while (components/ui/Toast.tsx).
+  longActions: {
+    reportPdf: {
+      pending: 'Creating the PDF. This can take up to a minute.',
+      done: 'The report is ready and downloaded.',
+      failed: 'We could not create the report. Try again in a moment.',
     },
   },
 } as const

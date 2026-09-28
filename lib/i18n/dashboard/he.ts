@@ -119,6 +119,7 @@ export const dashboardHe = {
       aiVisibility: { title: 'האם ChatGPT מזכיר אתכם?', body: 'בודקים אם מנועי AI מזכירים את העסק כשהם עונים על שאלות של לקוחות.' },
       connections: { title: 'חברו את האתר לפרסום', body: 'בהגדרות הפרויקט, תחת "חיבורים", מחברים את האתר לפרסום מאמרים ואת Search Console.' },
       guide: { title: 'תמיד אפשר לחזור לכאן', body: 'סיורים, שאלות נפוצות ושיחה איתנו ב-WhatsApp.' },
+      start: { title: 'מתחילים כאן', body: 'כמה צעדים שממלאים את הלוח בנתונים על האתר. כל צעד פותח את המסך שעושה אותו.' },
       dashboardHero: { title: 'מה קורה באתר', body: 'המספר הגדול מסכם את מילות המפתח שלכם בגוגל. מתחתיו מה השתנה והצעד הבא.' },
       dashboardShortcuts: { title: 'קיצורי דרך', body: 'המסכים שחוזרים אליהם הכי הרבה, בלחיצה אחת.' },
       researchHeader: { title: 'מחקר ביטויים', body: 'רעיונות לביטויים, נפחי חיפוש, תחרות ועלות משוערת לקליק, לפי נתוני Google Ads.' },
@@ -4206,6 +4207,52 @@ export const dashboardHe = {
       article_empty: 'למאמר חסרים כותרת או תוכן.',
       save_failed: 'השמירה נכשלה. נסו שוב.',
       unexpected: 'משהו השתבש. נסו שוב.',
+    },
+  },
+  // The dashboard of a project with nothing to show yet: one card, "Start here"
+  // (components/dashboard/StartHere.tsx, lib/dashboard/start.ts).
+  dashboardStart: {
+    title: 'מתחילים כאן',
+    subtitle: (domain: string) => `כמה צעדים קצרים, והלוח הזה יתמלא בנתונים על ${domain}.`,
+    progress: (done: number, total: number) => `${done} מתוך ${total} הושלמו`,
+    stepLabel: (n: number) => `שלב ${n}`,
+    done: 'הושלם',
+    running: 'רץ עכשיו',
+    steps: {
+      scan: {
+        title: 'סורקים את האתר',
+        body: 'נלמד מה העסק מציע ולמי, נמצא מילות מפתח ומתחרים, ונבדוק מה מעכב את האתר בגוגל ובמנועי AI. לוקח כמה דקות.',
+        runningBody: 'הסריקה רצה. אפשר להמשיך לעבוד, והלוח יתעדכן כשהיא תסתיים.',
+        cta: 'סרקו את האתר',
+        retry: 'נסו שוב',
+        doneLink: 'לסיכום הסריקה',
+      },
+      keywords: {
+        title: 'בוחרים מילות מפתח',
+        body: 'המילים שלקוחות מחפשים בגוגל. נבדוק איפה האתר שלכם מופיע על כל אחת מהן.',
+        cta: 'למחקר ביטויים',
+        doneLink: 'למילות המפתח',
+      },
+      connect: {
+        title: 'מחברים את האתר',
+        body: 'חיבור ל-WordPress, ל-Wix, ל-Shopify או לאתר אחר, כדי שמאמרים יתפרסמו באתר בלחיצה אחת.',
+        cta: 'לחיבור האתר',
+        doneLink: 'להגדרות החיבור',
+      },
+      article: {
+        title: 'כותבים את המאמר הראשון',
+        body: 'בוחרים נושא מההצעות, ואנחנו כותבים מאמר מלא שמוכן לבדיקה ולפרסום.',
+        cta: 'לבחירת נושא',
+        doneLink: 'למאמרים',
+      },
+    },
+  },
+  // Progress and outcome toasts for actions that take a while (components/ui/Toast.tsx).
+  longActions: {
+    reportPdf: {
+      pending: 'יוצרים את קובץ ה-PDF. זה יכול לקחת עד דקה.',
+      done: 'הדוח מוכן והורד למחשב.',
+      failed: 'לא הצלחנו ליצור את הדוח. נסו שוב בעוד רגע.',
     },
   },
 } as const

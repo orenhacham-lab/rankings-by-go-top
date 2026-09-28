@@ -60,8 +60,9 @@ export function useMonthlyReports(projectId: string | null) {
 
   const reload = useCallback(() => setTick((n) => n + 1), [])
 
-  const generate = useCallback(async () => {
-    if (!projectId) return
+  /** Resolves true when the report was made, false when it was not. */
+  const generate = useCallback(async (): Promise<boolean> => {
+    if (!projectId) return false
     setGenerating('busy')
     try {
       const res = await fetch('/api/reports/monthly/generate', {
@@ -70,12 +71,14 @@ export function useMonthlyReports(projectId: string | null) {
         body: JSON.stringify({ projectId }),
       })
       const body = await res.json().catch(() => null) as { ok?: boolean; month?: string } | null
-      if (!res.ok || !body?.ok) { setGenerating('failed'); return }
+      if (!res.ok || !body?.ok) { setGenerating('failed'); return false }
       setGenerating('idle')
       setMonth(body.month ?? null)
       setTick((n) => n + 1)
+      return true
     } catch {
       setGenerating('failed')
+      return false
     }
   }, [projectId])
 

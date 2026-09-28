@@ -45,8 +45,8 @@ function writeSnooze(projectId: string, at: number): void {
   }
 }
 
-/** The four steps of a running mapping, each with its state in words. */
-export function MappingSteps({ mapping, locale }: { mapping: Mapping; locale: Locale }) {
+/** The four steps of a running mapping, each with its state in words. `stacked`: one per line, for a narrow card. */
+export function MappingSteps({ mapping, locale, stacked = false }: { mapping: Mapping; locale: Locale; stacked?: boolean }) {
   const dict = getDashboardDictionary(locale)
   const m = dict.mapping
   if (mapping.available !== true) return null
@@ -63,7 +63,7 @@ export function MappingSteps({ mapping, locale }: { mapping: Mapping; locale: Lo
       >
         <div className="h-full rounded-pill bg-action transition-[width] duration-500" style={{ width: `${Math.max(6, (done / MAPPING_STEPS.length) * 100)}%` }} />
       </div>
-      <ol className="mt-3 grid gap-2 sm:grid-cols-4">
+      <ol className={cn('mt-3 grid gap-2', !stacked && 'sm:grid-cols-4')}>
         {mapping.steps.map((s) => (
           <li key={s.step} data-mapping-step={s.step} data-state={s.state} className="flex min-w-0 items-center gap-2 text-caption">
             <span

@@ -17,8 +17,11 @@
  *   - focus goes to the bubble's main button on every step and back to where it
  *     was when the tour ends;
  *   - on a phone the bubble is a sheet across the bottom (or the top, when the
- *     target is down there); a target the phone hides (the sidebar, behind its
- *     menu button) gets the bubble without a spotlight instead of being skipped.
+ *     target is down there). A sidebar entry, which the phone keeps inside its
+ *     closed menu, is shown by OPENING the menu (lib/shell/nav-drawer.ts) and
+ *     spotlighting the entry there; the menu closes again when the tour moves
+ *     off the sidebar or ends. A step never points at nothing: a target that
+ *     still cannot be seen is skipped.
  * A step whose target is not on the page is skipped, so a screen switched off in
  * this build is never described.
  */
@@ -30,6 +33,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import type { TourStep } from '@/lib/guide/tours'
 import { BUBBLE_WIDTH, placeBubble, type Box, type Placement } from '@/lib/guide/placement'
 import { cn } from '@/lib/utils'
+import { navIsDrawer, requestNavDrawer } from '@/lib/shell/nav-drawer'
 
 export interface TourRun {
   /** A new id is a fresh runner, even for the same steps. */
@@ -41,6 +45,8 @@ export type TourEnd = 'completed' | 'dismissed'
 
 /** How long a step whose target renders late (after its data) is waited for. */
 const LAZY_WAIT_MS = 2500
+/** How long a sidebar entry is waited for once the phone's menu was asked to open. */
+const DRAWER_WAIT_MS = 1200
 const POLL_MS = 150
 const SPOT_PAD = 6
 const DIM = 'color-mix(in srgb, var(--color-contrast) 58%, transparent)'
@@ -64,8 +70,8 @@ const sameBox = (a: Box | null, b: Box | null) =>
 
 const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-/** The step on screen: its index, and the element it points at ('none': shown without a spotlight). */
-interface Shown { index: number; target: HTMLElement | 'none' }
+/** The step on screen: its index, and the element it points at. */
+interface Shown { index: number; target: HTMLElement }
 
 export function DashboardOnboardingTour({ run, onEnd }: { run: TourRun | null; onEnd: (how: TourEnd) => void }) {
   // A new run is a fresh runner (keyed by its id): it starts at its first step
@@ -95,6 +101,14 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
   // Where focus was when the tour started: it goes back there at the end.
   const [returnFocus] = useState(() => document.activeElement as HTMLElement | null)
   const moveDir = useRef<1 | -1>(1)
+  // Whether this tour opened the phone's menu, so it closes it again.
+  const drawerOpened = useRef(false)
+  const closeDrawer = useCallback(() => {
+    if (!drawerOpened.current) return
+    drawerOpened.current = false
+    requestNavDrawer(false, { restoreFocus: false })
+  }, [])
+  useEffect(() => closeDrawer, [closeDrawer])
   const bubbleRef = useRef<HTMLDivElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
 
@@ -119,13 +133,24 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
     const current = steps[index]
     let cancelled = false
     const started = Date.now()
+    let askedDrawer = 0
     const attempt = () => {
       if (cancelled) return
       const found = findTarget(current.target)
-      if (found.el || found.exists) {
-        const target = found.el ?? 'none'
-        setBox(found.el ? toBox(found.el.getBoundingClientRect()) : null)
-        setShown({ index, target })
+      // A sidebar entry on a phone: in the closed menu. Open the menu and wait for it.
+      if (!found.el && found.exists && current.navEntry && navIsDrawer()) {
+        if (!askedDrawer) {
+          askedDrawer = Date.now()
+          drawerOpened.current = true
+          requestNavDrawer(true, { restoreFocus: false })
+        }
+        if (Date.now() - askedDrawer < DRAWER_WAIT_MS) { timer = window.setTimeout(attempt, POLL_MS); return }
+      }
+      if (found.el) {
+        // Off the sidebar now: the menu the tour opened closes.
+        if (!current.navEntry) closeDrawer()
+        setBox(toBox(found.el.getBoundingClientRect()))
+        setShown({ index, target: found.el })
         setSkipped((s) => (s.has(index) ? new Set([...s].filter((i) => i !== index)) : s))
         return
       }
@@ -137,12 +162,12 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
     }
     let timer = window.setTimeout(attempt, 0)
     return () => { cancelled = true; window.clearTimeout(timer) }
-  }, [index, steps, end])
+  }, [index, steps, end, closeDrawer])
 
   // Bring the target into view, then follow it while the page scrolls or resizes.
   const target = shown?.target ?? null
   useEffect(() => {
-    if (target && target !== 'none') {
+    if (target) {
       const r = target.getBoundingClientRect()
       if (r.top < 64 || r.bottom > window.innerHeight - 16) {
         target.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' })
@@ -153,7 +178,7 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         setViewport((v) => (v.width === window.innerWidth && v.height === window.innerHeight ? v : { width: window.innerWidth, height: window.innerHeight }))
-        if (!target || target === 'none') return
+        if (!target) return
         const next = toBox(target.getBoundingClientRect())
         setBox((prev) => (sameBox(prev, next) ? prev : next))
       })
@@ -210,11 +235,13 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
   }, [dir, go, end])
 
   const step = shown ? steps[shown.index] : null
+  // The text: the step's own, or the variant the element it found asks for.
+  const variant = shown?.target.dataset.tourVariant
+  const copyKey = (step && variant && step.variants?.[variant]) || step?.key
   // Until the first step is found, the page is held and dimmed, with no bubble yet.
   const placement: Placement | null =
     !shown ? null
-      : shown.target === 'none' ? placeBubble(null, bubbleHeight, viewport, dir)
-        : box ? placeBubble(box, bubbleHeight, viewport, dir, !!shown.target.closest('aside'))
+      : box ? placeBubble(box, bubbleHeight, viewport, dir, !!shown.target.closest('aside'))
           : null
 
   const at = shown?.index ?? 0
@@ -232,7 +259,7 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
         : placement.mode === 'center' ? { left: '50%', top: '50%', width: BUBBLE_WIDTH, transform: 'translate(-50%, -50%)' }
           : {}
 
-  const spotlight = shown && shown.target !== 'none' && box ? (
+  const spotlight = shown && box ? (
     <div
       aria-hidden="true"
       data-tour-spotlight=""
@@ -264,7 +291,7 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
           aria-roledescription={t.label}
           aria-labelledby={titleId}
           aria-describedby={bodyId}
-          data-tour-bubble={step.key}
+          data-tour-bubble={copyKey}
           className={cn(
             'fixed z-[92] rounded-card border border-line bg-surface p-4 text-start shadow-pop motion-safe:animate-pop-in',
             placement?.mode === 'sheet' && 'inset-x-4',
@@ -283,8 +310,8 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
               <X size={16} strokeWidth={2} />
             </button>
           </div>
-          <h2 id={titleId} className="text-section font-semibold text-ink text-balance">{dict.steps[step.key].title}</h2>
-          <p id={bodyId} className="mt-1 text-copy text-body text-pretty">{dict.steps[step.key].body}</p>
+          <h2 id={titleId} className="text-section font-semibold text-ink text-balance">{dict.steps[copyKey ?? step.key].title}</h2>
+          <p id={bodyId} className="mt-1 text-copy text-body text-pretty">{dict.steps[copyKey ?? step.key].body}</p>
 
           <div className="mt-3 flex items-center gap-1" aria-hidden="true">
             {steps.map((_, i) => skipped.has(i) ? null : (

@@ -138,13 +138,20 @@ function main() {
       offMeansNothing(banner) && offMeansNothing(placeholder) && /const offered = mapping\?\.mapping\.available === true && mapping\.mapping\.state !== 'done' \? mapping : null/.test(start))
     check('G3-MUT: a placeholder shown to everyone fails G3', !offMeansNothing(placeholder.replace('if (mapping.available !== true) return null', '')))
     const dash = src('app/(dashboard)/dashboard/page.tsx')
+    // A new project's dashboard is the "Start here" card, whose first step runs the scan
+    // (lib/dashboard/start.ts); later the banner carries it. The old "holding back"
+    // placeholder and the competitors' own run button are gone from the dashboard, so
+    // the scan is offered in one place at a time.
     const dashGated = (s: string) => /const mapping = useMapping\(project\.id, language, onMappingFinished\)/.test(s)
       && /const mappingOffered = mapping\.mapping\.available === true/.test(s)
-      && /<MappingBanner projectId=\{project\.id\} control=\{mapping\} locale=\{language\} \/>/.test(s)
-      && /\{!hold && mappingOffered && seed\.kind !== 'loading' && \(/.test(s)
-      && /mapping=\{mappingOffered && mapping\.mapping\.state !== 'done' \? mapping : null\}/.test(s)
-    check('G4: the dashboard\'s banner, its "holding back" placeholder and the competitors\' run button all hang on that one answer', dashGated(dash))
-    check('G4-MUT: a placeholder offered without the gate fails G4', !dashGated(dash.replace("{!hold && mappingOffered && seed.kind !== 'loading' && (", "{!hold && seed.kind !== 'loading' && (")))
+      && /\{!startMode && <MappingBanner projectId=\{project\.id\} control=\{mapping\} locale=\{language\} \/>\}/.test(s)
+      && /<StartHere\b[^>]*?\bmapping=\{mappingOffered \? mapping : null\}/.test(s)
+      && /<CompetitorsWidget\b[^>]*?\bmapping=\{null\}/.test(s)
+      && !/<MappingPlaceholder\b/.test(s)
+    check('G4: the dashboard\'s banner and its start card both hang on that one answer, and only one of them offers the scan', dashGated(dash))
+    check('G4-MUT: a start card offered the scan without the gate fails G4', !dashGated(dash.replace('mapping={mappingOffered ? mapping : null}', 'mapping={mapping}')))
+    check('G4-MUT2: the banner beside the start card fails G4', !dashGated(dash.replace('{!startMode && <MappingBanner', '{<MappingBanner')))
+    check('G4-MUT3: the competitors\' run button back on the dashboard fails G4', !dashGated(dash.replace(/mapping=\{null\}/, 'mapping={mappingOffered ? mapping : null}')))
     // Every screen is the new one for every project: the scan's absence decides no design.
     const ai = src('app/(dashboard)/ai-visibility/page.tsx')
     const noOldTool = (s: string) => !/if \(seed\.kind === 'none'\) return tool/.test(s) && /overviewMode\b/.test(s)

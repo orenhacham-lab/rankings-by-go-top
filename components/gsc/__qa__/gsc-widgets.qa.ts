@@ -25,7 +25,10 @@
  *     sentence and exactly one button to settings (the REAL components, first render),
  *     and nothing at all when Search Console is switched off;
  *  E) no merchant screen hides a widget: each is mounted unconditionally, and no screen
- *     reads the connection to decide; the raw opportunity browser stays behind its flag;
+ *     reads the connection to decide; the raw opportunity browser stays behind its flag.
+ *     The one exception is the dashboard, which shows a widget only once it has
+ *     something to show (lib/dashboard/start.ts): it asks the widget for that with
+ *     `onlyWithData`, and the widget alone decides (a failed read still shows its retry);
  *  F) the copy exists in both languages, one sentence each, English without Hebrew;
  *  G) the two widgets that act and keep their own data: what they report reaches the
  *     screen, and a project switch starts them afresh;
@@ -487,7 +490,7 @@ async function main() {
   console.log('\nE) every merchant screen mounts its widgets unconditionally; the raw browser stays behind its flag')
   {
     const SCREENS: [string, string[]][] = [
-      ['app/(dashboard)/dashboard/page.tsx', ['<GscClicksTile projectId={project.id} />', '<GscTopPages projectId={project.id} />']],
+      ['app/(dashboard)/dashboard/page.tsx', ['<GscClicksTile projectId={project.id} onlyWithData />', '<GscTopPages projectId={project.id} onlyWithData />']],
       ['app/(dashboard)/reports/page.tsx', ['<GscPerformance projectId={activeProjectId}']],
       ['components/keywords/ProjectKeywordsPanel.tsx', ['<GscKeywordsNotice projectId={id} view={gscKeywords}', 'gscKeywords={gscKeywords}']],
       ['components/content/workspace/TopicsScreen.tsx', ['<GscRecommendations']],
@@ -507,9 +510,16 @@ async function main() {
     check('E1: the dashboard, reports, keywords and Topics mount their widgets whatever the connection', hidden(all).length === 0, hidden(all).join(' | '))
     const dash = all[0][1]
     check('E1-MUT: a dashboard that shows top pages only when connected fails E1',
-      hidden([['dash', dash.replace('<GscTopPages projectId={project.id} />', '{gscConnected && <GscTopPages projectId={project.id} />}'), '<GscTopPages projectId={project.id} />']]).length === 1)
+      hidden([['dash', dash.replace('<GscTopPages projectId={project.id} onlyWithData />', '{gscConnected && <GscTopPages projectId={project.id} onlyWithData />}'), '<GscTopPages projectId={project.id} onlyWithData />']]).length === 1)
     check('E1-MUT2: a dashboard that puts its tile behind a Search Console flag fails E1',
-      hidden([['dash', `${dash}\nconst on = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'`, '<GscClicksTile projectId={project.id} />']]).length === 1)
+      hidden([['dash', `${dash}\nconst on = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'`, '<GscClicksTile projectId={project.id} onlyWithData />']]).length === 1)
+    // Only the dashboard asks for data-only widgets: every other screen keeps its setup
+    // prompts and loading states.
+    const dataOnlyElsewhere = (list: [string, string][]) => list.filter(([, src]) => /\bonlyWithData\b/.test(src)).map(([p]) => p)
+    const others = SCREENS.slice(1).map(([p]) => [p, code(p)] as [string, string])
+    check('E1b: only the dashboard mounts a widget with onlyWithData', dataOnlyElsewhere(others).length === 0, dataOnlyElsewhere(others).join(', '))
+    check('E1b-MUT: reports asking for a data-only performance widget fails E1b',
+      dataOnlyElsewhere([['reports', others[0][1].replace('<GscPerformance projectId={activeProjectId}', '<GscPerformance onlyWithData projectId={activeProjectId}')]]).length === 1)
 
     // The raw opportunity browser is a diagnostic: on main and on the base branch it was
     // rendered only when NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true', and it still is.
@@ -538,7 +548,9 @@ async function main() {
     // The widgets never remove themselves, except when Search Console is switched off on
     // the server; none reads a Search Console flag to decide.
     const widgetFiles = ['components/gsc/GscClicksTile.tsx', 'components/gsc/GscTopPages.tsx', 'components/gsc/GscPerformance.tsx', 'components/gsc/GscKeywordFigures.tsx', 'components/gsc/GscSetupPrompt.tsx', 'components/content/GscOpportunities.tsx', 'components/content/GscRecommendations.tsx']
-    const hidesOnlyWhenOff = (src: string) => (src.match(/return null\b/g) ?? []).length === (src.match(/if \((?:[\w.]+\.)?state === 'disabled'\) return null\b/g) ?? []).length
+    // Also allowed: the dashboard's `onlyWithData` return, which never hides a failed read.
+    const allowedNull = /if \((?:[\w.]+\.)?state === 'disabled'\) return null\b|if \(onlyWithData && [^\n]*?\.state !== 'error'\) return null\b/g
+    const hidesOnlyWhenOff = (src: string) => (src.match(/return null\b/g) ?? []).length === (src.match(allowedNull) ?? []).length
       && !/NEXT_PUBLIC_GSC_(READ_ONLY|RAW_BROWSER)/.test(src)
     const selfHiding = (files: [string, string][]) => files.filter(([, src]) => !hidesOnlyWhenOff(src)).map(([p]) => p)
     const widgetSrc = widgetFiles.map((p) => [p, code(p)] as [string, string])
@@ -547,6 +559,8 @@ async function main() {
       selfHiding([['tile', widgetSrc[0][1].replace("if (view.state === 'ready' && view.summary) {", "if (view.state === 'not_connected') return null\n  if (view.state === 'ready' && view.summary) {")]]).length === 1)
     check('E3-MUT2: a widget that hides behind a Search Console flag fails E3',
       selfHiding([['tile', `${widgetSrc[0][1]}\nconst off = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED !== 'true'`]]).length === 1)
+    check('E3-MUT3: a data-only tile that also hides its failed read fails E3',
+      selfHiding([['tile', widgetSrc[0][1].replace(" && view.state !== 'error') return null", ') return null')]]).length === 1)
   }
 
   // ── F) the copy ─────────────────────────────────────────────────────────
@@ -668,8 +682,9 @@ async function main() {
     const dash = code('app/(dashboard)/dashboard/page.tsx')
     const closesUp = (src: string) => {
       const at = src.indexOf('<GscClicksTile')
-      const open = src.lastIndexOf('<div className="grid', at)
-      const cls = open < 0 ? '' : (/^<div className="([^"]*)"/.exec(src.slice(open))?.[1] ?? '')
+      // The row is a div, or the dashboard's entrance wrapper (Reveal renders a div).
+      const open = Math.max(src.lastIndexOf('<div className="grid', at), src.lastIndexOf('<Reveal ', at))
+      const cls = open < 0 ? '' : (/^<(?:div|Reveal)\b[^>]*?\bclassName="([^"]*)"/.exec(src.slice(open))?.[1] ?? '')
       return /(^|\s)sm:grid-flow-col(\s|$)/.test(cls) && /(^|\s)sm:auto-cols-fr(\s|$)/.test(cls) && !/(^|\s)sm:grid-cols-\d/.test(cls)
     }
     check('H2: the dashboard tile row has one equal column per tile, so it closes up when the clicks tile renders nothing', closesUp(dash))

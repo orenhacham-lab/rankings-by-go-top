@@ -20,11 +20,17 @@ import { useGscStatus } from './gsc-data'
 import GscSetupPrompt, { GscLoadError, GscLoading } from './GscSetupPrompt'
 import { formatCount } from './format'
 
-export default function GscClicksTile({ projectId, className }: { projectId: string | null | undefined; className?: string }) {
+/**
+ * `onlyWithData`: render only the figure itself (or a failed read's retry), never a
+ * setup prompt or a loading tile: the dashboard's row of figures, where connecting
+ * Search Console is the setup checklist's job, not one more button among the numbers.
+ */
+export default function GscClicksTile({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const { view, reload } = useGscStatus(projectId)
   if (view.state === 'disabled') return null
+  if (onlyWithData && !(view.state === 'ready' && view.summary) && view.state !== 'error') return null
   // A sync that predates the property totals has rows but no total yet: one more sync.
   const state = view.state === 'ready' && !view.summary ? 'never_synced' : view.state
   const icon = <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />
