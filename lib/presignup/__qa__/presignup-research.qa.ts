@@ -194,7 +194,6 @@ async function main() {
     check('the run row is done and names its ledger row', s.tables[RESEARCH_RUNS_TABLE][0]?.status === 'done' && s.tables[RESEARCH_RUNS_TABLE][0]?.check_id === ledger?.id)
     check('the fixture has something to lock (else the gating checks would be vacuous)', locked.competitors.length >= 1 && locked.keywords.length >= 1, JSON.stringify(locked))
 
-    const line = JSON.stringify(firstResult ?? {})
     const view = (firstResult?.view ?? {}) as { summary: Row; locked: Row; steps: Row[] }
     check('the result line is exactly { type, view, claimToken } and the view { summary, steps, locked }',
       Object.keys(first.lines.at(-1) ?? {}).sort().join(',') === 'claimToken,type,view' && Object.keys(view).sort().join(',') === 'locked,steps,summary')

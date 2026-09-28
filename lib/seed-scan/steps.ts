@@ -210,8 +210,15 @@ export type StageAWrites = {
   addCompetitors: typeof addValidatedCompetitors
 }
 
-/** A project's run: its settings and its competitors, under the field-ownership rules. */
-export const PROJECT_WRITES: StageAWrites = { applyBusiness: applyBusinessToSettings, addCompetitors: addValidatedCompetitors }
+/**
+ * A project's run: its settings and its competitors, under the field-ownership
+ * rules. Looked up at call time, never captured, so settings.ts stays the one
+ * place these writes live (the owner-data suite swaps it for broken copies).
+ */
+export const PROJECT_WRITES: StageAWrites = {
+  applyBusiness: (...args) => applyBusinessToSettings(...args),
+  addCompetitors: (...args) => addValidatedCompetitors(...args),
+}
 
 export type StepContext = {
   admin: ServiceRoleClient

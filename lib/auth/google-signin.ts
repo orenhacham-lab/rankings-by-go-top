@@ -44,3 +44,23 @@ export function googleRedirectTo(origin: string, nextPath: string, lang: Locale)
   url.searchParams.set('lang', lang)
   return url.toString()
 }
+
+/** The button's words, per language: kept here, out of the shared auth components (lib/i18n/__qa__/auth-surface-language.qa.ts). */
+const COPY = {
+  he: { label: 'המשך עם Google', or: 'או', failed: 'לא הצלחנו להתחיל את ההתחברות עם Google. נסו שוב, או המשיכו עם אימייל.' },
+  en: { label: 'Continue with Google', or: 'or', failed: "We couldn't start signing in with Google. Try again, or continue with email." },
+} as const
+
+export function googleSignInCopy(lang: Locale): (typeof COPY)[Locale] {
+  return COPY[lang] ?? COPY.en
+}
+
+/** Whether this page runs inside a frame; a cross-origin parent throws on access, and that is a frame too. */
+export function isFramed(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.self !== window.top
+  } catch {
+    return true
+  }
+}

@@ -10,30 +10,20 @@
  * A failure to start it is one sentence in the page's language; the provider's
  * own message is never shown.
  */
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { googleRedirectTo, googleSignInEnabled, googleSignInVisible } from '@/lib/auth/google-signin'
+import { googleRedirectTo, googleSignInCopy, googleSignInEnabled, googleSignInVisible, isFramed } from '@/lib/auth/google-signin'
 import type { Locale } from '@/lib/i18n/locales'
 
-const COPY = {
-  he: { label: 'המשך עם Google', or: 'או', failed: 'לא הצלחנו להתחיל את ההתחברות עם Google. נסו שוב, או המשיכו עם אימייל.' },
-  en: { label: 'Continue with Google', or: 'or', failed: "We couldn't start signing in with Google. Try again, or continue with email." },
-} as const
+// A page never moves in or out of a frame: nothing to subscribe to.
+const noSubscription = () => () => {}
 
 export default function GoogleSignInButton({ lang, nextPath, disabled = false }: { lang: Locale; nextPath: string; disabled?: boolean }) {
-  const t = COPY[lang]
-  const [framed, setFramed] = useState(false)
+  const t = googleSignInCopy(lang)
+  // The server renders as if unframed; the browser's first render corrects it.
+  const framed = useSyncExternalStore(noSubscription, isFramed, () => false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
-
-  useEffect(() => {
-    try {
-      setFramed(window.self !== window.top)
-    } catch {
-      // A cross-origin parent throws on access: that is a frame too.
-      setFramed(true)
-    }
-  }, [])
 
   if (!googleSignInVisible({ enabled: googleSignInEnabled(), nextPath, framed })) return null
 
