@@ -1,30 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
+import GoTopMark from '@/components/brand/GoTopMark'
+import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { LucideIcon } from 'lucide-react'
 import {
-  BarChart3,
-  KeyRound,
-  Sparkles,
-  Search,
+  LayoutGrid,
+  Telescope,
+  TrendingUp,
+  CalendarRange,
   FileText,
+  Sparkles,
+  FileChartColumn,
+  Settings2,
   CreditCard,
+  Newspaper,
   Plug,
   ClipboardList,
   LogOut,
-  MessageCircle,
-  Lightbulb,
-  Newspaper,
-  Settings,
-  CalendarRange,
   Menu,
   X,
 } from 'lucide-react'
@@ -56,6 +56,12 @@ type NavGroup = {
   items: readonly NavItem[]
 }
 
+/**
+ * Every nav icon is drawn the same way (UX review, decision 3): 20px, a 1.75
+ * stroke that scales with the icon. Inline icons elsewhere are 16px at 2.
+ */
+export const NAV_ICON = { size: 20, strokeWidth: 1.75, absoluteStrokeWidth: false } as const
+
 /** Read as literal member expressions, which is what lets Next inline them. */
 const CONTENT_FLAGS = {
   NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION: process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION,
@@ -63,7 +69,7 @@ const CONTENT_FLAGS = {
 
 const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
   strategy: CalendarRange,
-  articles: Newspaper,
+  articles: FileText,
 }
 
 /**
@@ -107,23 +113,24 @@ const aiVisibilityNavItems: readonly NavItem[] =
  * "what am I paying". A new screen joins the group that matches its
  * question — it does not get appended to the end.
  *
- * Desktop renders the group headings. Mobile deliberately does not: the nav
- * there is a two-column grid of tiles, where four headings would cost more
- * vertical space than the tiles they label. The order is identical in both,
- * so the grouping still governs what sits next to what.
+ * The desktop rail and the phone drawer render the same groups, with the same
+ * headings, in the same order.
+ *
+ * There is no Scans entry: its history is a section of Keywords and of Reports
+ * (UX review, decision 5), and /scans redirects there.
  */
 const navGroupKeys: readonly NavGroup[] = [
   {
     groupKey: 'groupMain',
     items: [
-      { href: '/dashboard', labelKey: 'dashboard', icon: BarChart3 },
+      { href: '/dashboard', labelKey: 'dashboard', icon: LayoutGrid },
     ],
   },
   {
     groupKey: 'groupResearch',
     items: [
-      { href: '/keyword-research', labelKey: 'keywordResearch', icon: Lightbulb, onboarding: 'keyword-research' },
-      { href: '/keywords', labelKey: 'keywords', icon: KeyRound },
+      { href: '/keyword-research', labelKey: 'keywordResearch', icon: Telescope, onboarding: 'keyword-research' },
+      { href: '/keywords', labelKey: 'keywords', icon: TrendingUp },
       ...contentNavItems,
     ],
   },
@@ -131,27 +138,25 @@ const navGroupKeys: readonly NavGroup[] = [
     groupKey: 'groupMonitoring',
     items: [
       ...aiVisibilityNavItems,
-      { href: '/scans', labelKey: 'scans', icon: Search },
-      { href: '/reports', labelKey: 'reports', icon: FileText, onboarding: 'reports' },
+      { href: '/reports', labelKey: 'reports', icon: FileChartColumn, onboarding: 'reports' },
     ],
   },
   {
     groupKey: 'groupAccount',
     items: [
-      { href: '/settings', labelKey: 'projectSettings', icon: Settings },
+      { href: '/settings', labelKey: 'projectSettings', icon: Settings2 },
       { href: '/billing', labelKey: 'billing', icon: CreditCard },
     ],
   },
 ]
 
-/** Flattened in group order — what the mobile grid renders, and what a guard can
- *  assert the active-entry resolution against. */
+/** Flattened in group order — what a guard can assert the active-entry resolution against. */
 export const navItemKeys = navGroupKeys.flatMap((g) => g.items)
 
-const adminItemKeys = [
-  { href: '/admin/articles', labelKey: 'articleManagement' as const, icon: FileText },
-  { href: '/setup', labelKey: 'connectionStatus' as const, icon: Plug },
-  { href: '/admin/logs', labelKey: 'errorLogs' as const, icon: ClipboardList },
+const adminItemKeys: readonly NavItem[] = [
+  { href: '/admin/articles', labelKey: 'articleManagement', icon: Newspaper },
+  { href: '/setup', labelKey: 'connectionStatus', icon: Plug },
+  { href: '/admin/logs', labelKey: 'errorLogs', icon: ClipboardList },
 ]
 
 /**
@@ -177,14 +182,17 @@ function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem
   return dict.sidebar[item.labelKey]
 }
 
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus focus-visible:ring-offset-2 focus-visible:ring-offset-rail'
+
 /**
- * One nav entry, shared by the mobile menu and the desktop groups so the two
- * cannot drift apart. The tile shape (stacked icon over label) is the mobile
- * presentation; `md:` restores the row shape used in the sidebar proper.
+ * One nav entry, shared by the desktop rail and the phone drawer so the two
+ * cannot drift apart.
  *
- * The active entry is a translucent cobalt fill on the ink rail, with a short
- * glowing bar on the sidebar's outer edge — the logical START, so it sits on the right in Hebrew and on the left in
- * English. A filled accent block would outshout every button on the screen.
+ * The active entry is FILLED with the action blue, white icon and text (UX
+ * review, decision 2). On the desktop rail the fill is one element that slides
+ * between entries (the pill below); until it has measured itself, and in the
+ * drawer, the entry carries the fill itself. Inactive entries: muted icon, text
+ * white at 86%.
  */
 function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; label: string }) {
   const IconComponent = item.icon
@@ -194,50 +202,74 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
       data-onboarding={item.onboarding}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'group relative w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1.5 md:gap-3 px-2 md:px-3 py-3 md:py-0 md:h-9 rounded-control text-caption md:text-copy font-medium text-center md:text-start leading-tight break-words',
+        'group relative flex h-9 w-full min-w-0 items-center gap-3 rounded-control px-3 text-copy',
         'transition-[background-color,color] duration-150 ease-snappy',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset',
+        FOCUS_RING,
         isActive
-          ? 'bg-rail-active text-rail-ink font-semibold'
-          : 'text-rail-muted hover:bg-rail-hover hover:text-rail-ink'
+          ? 'bg-rail-active font-semibold text-rail-active-ink group-data-[pill=on]/nav:bg-transparent'
+          : 'font-medium text-rail-ink/86 hover:bg-rail-hover hover:text-rail-ink'
       )}
     >
-      {isActive && (
-        <span aria-hidden="true" className="absolute hidden md:block inset-y-1.5 -start-3 w-[3px] rounded-e-full bg-rail-accent shadow-[0_0_12px_rgb(157_180_255/0.7)]" />
-      )}
       <IconComponent
-        size={18}
+        {...NAV_ICON}
+        aria-hidden="true"
         className={cn(
           'shrink-0 transition-colors duration-150',
-          isActive ? 'text-rail-accent' : 'text-rail-label group-hover:text-rail-ink'
+          isActive ? 'text-rail-active-ink' : 'text-rail-muted group-hover:text-rail-ink'
         )}
-        strokeWidth={isActive ? 2.2 : 1.8}
       />
-      <span className="min-w-0 truncate md:whitespace-nowrap">{label}</span>
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   )
 }
 
-/** The mark and the product name. The name is the brand, in Latin, in both languages. */
+/** The groups under their headings: the same list for the rail and the drawer. */
+function NavGroups({ dict, activeHref, isAdmin }: {
+  dict: ReturnType<typeof getDashboardDictionary>
+  activeHref: string | null
+  isAdmin: boolean
+}) {
+  const groups: { key: SidebarLabelKey; items: readonly NavItem[] }[] = [
+    ...navGroupKeys.map((g) => ({ key: g.groupKey, items: g.items })),
+    ...(isAdmin ? [{ key: 'system' as SidebarLabelKey, items: adminItemKeys }] : []),
+  ]
+  return (
+    <>
+      {groups.map((group) => (
+        group.items.length === 0 ? null : (
+          <div key={group.key}>
+            <p className="mb-1.5 px-3 text-overline font-semibold text-rail-section ltr:uppercase ltr:tracking-wider">
+              {dict.sidebar[group.key]}
+            </p>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => (
+                <li key={item.href}>
+                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      ))}
+    </>
+  )
+}
+
+/**
+ * The mark and the product name (UX review, decision 1): the light-blue Go Top
+ * mark as inline SVG at 28px, 10px from a two-line wordmark. The name is the
+ * brand, in Latin, in both languages.
+ */
 function Brand({ logoAlt }: { logoAlt: string }) {
   return (
     <Link
       href="/dashboard"
-      className="flex min-w-0 items-center gap-1 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent"
+      className={cn('flex min-w-0 items-center gap-2.5 rounded-control', FOCUS_RING)}
     >
-      {/* The rail is ink in both themes, so the mark is always the one drawn for a dark ground. */}
-      <Image
-        src="/gotop-dark-transparent.png"
-        alt={logoAlt}
-        width={500}
-        height={500}
-        className="size-14 shrink-0 object-contain"
-        sizes="56px"
-        priority
-      />
+      <GoTopMark size={28} label={logoAlt} className="shrink-0" />
       <span className="flex min-w-0 flex-col" dir="ltr">
-        <span className="text-[1.0625rem] font-bold leading-tight tracking-tight text-rail-ink">Rankings</span>
-        <span className="text-overline font-medium text-rail-muted">by Go Top</span>
+        <span className="text-[0.9375rem] font-semibold leading-5 text-rail-ink">Rankings</span>
+        <span className="text-overline font-medium text-rail-tagline">by Go Top</span>
       </span>
     </Link>
   )
@@ -250,137 +282,186 @@ interface SidebarProps {
 const WHATSAPP_SUPPORT =
   'https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94'
 
-const QUIET_ROW =
-  'flex w-full items-center gap-3 px-3 h-9 rounded-control text-copy font-medium text-rail-muted hover:bg-rail-hover hover:text-rail-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset'
+const QUIET_ROW = cn(
+  'group flex h-9 w-full items-center gap-3 rounded-control px-3 text-copy font-medium text-rail-ink/86 transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink',
+  FOCUS_RING
+)
+
+/** Support, the two preferences and logout: the same foot on the rail and in the drawer. */
+function RailFoot({ dict, isAdmin }: { dict: ReturnType<typeof getDashboardDictionary>; isAdmin: boolean }) {
+  return (
+    <div className="space-y-2">
+      {!isAdmin && (
+        <a
+          href={WHATSAPP_SUPPORT}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={dict.sidebar.supportAria}
+          data-support="whatsapp"
+          className={QUIET_ROW}
+        >
+          <WhatsAppGlyph size={NAV_ICON.size} className="shrink-0 text-rail-muted transition-colors duration-150 group-hover:text-whatsapp" />
+          <span>{dict.sidebar.support}</span>
+        </a>
+      )}
+      <div className="grid grid-cols-2 gap-2 px-1">
+        <DashboardLanguageSwitcher />
+        <ThemeToggle />
+      </div>
+      <form action="/api/auth/signout" method="post">
+        <button type="submit" className={QUIET_ROW}>
+          <LogOut {...NAV_ICON} aria-hidden="true" className="shrink-0 text-rail-muted group-hover:text-rail-ink" />
+          <span>{dict.common.logout}</span>
+        </button>
+      </form>
+    </div>
+  )
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
-  const activeHref = activeNavHref(pathname ?? '', navItemKeys)
-  // Phones: the nav is a menu behind one button instead of a wall of tiles above
-  // every screen. It closes itself when the page changes.
-  // The phone menu is open AT a pathname: navigating anywhere closes it without an effect,
-  // because the pathname it was opened at is no longer the current one.
+  const activeHref = activeNavHref(pathname, isAdmin ? [...navItemKeys, ...adminItemKeys] : navItemKeys)
+
+  // Phones: the nav is a drawer behind one button. It is open AT a pathname:
+  // navigating anywhere closes it without an effect, because the pathname it was
+  // opened at is no longer the current one.
   const [menuOpenAt, setMenuOpenAt] = useState<string | null>(null)
   const menuOpen = menuOpenAt !== null && menuOpenAt === pathname
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const wasOpenRef = useRef(false)
+
+  // The drawer is modal: focus moves into it, the page behind does not scroll,
+  // and when it closes focus returns to the button that opened it.
+  useEffect(() => {
+    if (menuOpen) {
+      drawerRef.current?.querySelector<HTMLElement>('[data-drawer-close]')?.focus()
+      const root = document.documentElement
+      const previous = root.style.overflow
+      root.style.overflow = 'hidden'
+      wasOpenRef.current = true
+      return () => { root.style.overflow = previous }
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false
+      menuButtonRef.current?.focus()
+    }
+  }, [menuOpen])
+
+  /** Escape closes; Tab and Shift+Tab stay inside the drawer. */
+  function onDrawerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setMenuOpenAt(null)
+      return
+    }
+    if (e.key !== 'Tab' || !drawerRef.current) return
+    const items = [...drawerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null)
+    if (items.length === 0) return
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  }
+
+  // The desktop rail's active fill is ONE element that slides between entries
+  // (200ms). It is placed from the DOM, not from state: no re-render, and the
+  // first placement jumps instead of sliding in from the top.
+  const railRef = useRef<HTMLDivElement>(null)
+  const pillRef = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const rail = railRef.current
+    const pill = pillRef.current
+    if (!rail || !pill) return
+    const active = rail.querySelector<HTMLElement>('a[aria-current="page"]')
+    if (!active || active.offsetHeight === 0) {
+      rail.dataset.pill = 'off'
+      return
+    }
+    pill.style.height = `${active.offsetHeight}px`
+    pill.style.transform = `translateY(${active.offsetTop}px)`
+    rail.dataset.pill = 'on'
+    const frame = requestAnimationFrame(() => { pill.dataset.slide = 'on' })
+    return () => cancelAnimationFrame(frame)
+  }, [activeHref, isAdmin, language])
 
   return (
-    <aside className="relative z-40 w-full md:w-64 md:shrink-0 bg-rail text-rail-ink border-b md:border-b-0 md:border-e border-rail-line">
+    <aside className="relative z-40 w-full border-b border-rail-line bg-rail text-rail-ink md:w-64 md:shrink-0 md:border-b-0 md:border-e">
       <div className="flex flex-col md:sticky md:top-0 md:h-dvh">
-        {/* Brand — the same height as the top bar, so the two share one line. */}
-        <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-3 md:px-4">
+        {/* Brand — 64px, the same height as the top bar, so the two share one line. */}
+        <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-4">
           <Brand logoAlt={dict.sidebar.logoAlt} />
           <button
+            ref={menuButtonRef}
             type="button"
-            onClick={() => setMenuOpenAt(menuOpen ? null : pathname)}
+            onClick={() => setMenuOpenAt(pathname)}
             aria-expanded={menuOpen}
-            aria-controls="app-nav-mobile"
-            aria-label={dict.common.menu}
-            className="md:hidden inline-flex size-10 items-center justify-center rounded-control border border-rail-line bg-rail-hover text-rail-ink transition-colors hover:bg-rail-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent"
+            aria-controls="app-nav-drawer"
+            aria-haspopup="dialog"
+            aria-label={dict.sidebar.openMenu}
+            className={cn('inline-flex size-10 items-center justify-center rounded-control border border-rail-line bg-rail-hover text-rail-ink transition-colors hover:bg-rail-active md:hidden', FOCUS_RING)}
           >
-            {menuOpen ? <X size={18} strokeWidth={2} /> : <Menu size={18} strokeWidth={2} />}
+            <Menu size={NAV_ICON.size} strokeWidth={NAV_ICON.strokeWidth} aria-hidden="true" />
           </button>
         </div>
 
-        {/* Mobile: one flat grid of tiles, then the language, the theme and logout. */}
-        <div
-          id="app-nav-mobile"
-          className={cn(
-            'md:hidden absolute inset-x-0 top-full z-50 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-rail-line bg-rail p-3 shadow-pop origin-top animate-pop-in',
-            !menuOpen && 'hidden'
-          )}
-        >
-          <nav>
-            <ul className="grid grid-cols-3 gap-1.5 w-full">
-              {navItemKeys.map((item) => (
-                <li key={item.href}>
-                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
-                </li>
-              ))}
-            </ul>
-          </nav>
-          <div className="mt-3 grid grid-cols-2 items-center gap-2 border-t border-rail-line pt-3">
-            <DashboardLanguageSwitcher />
-            <ThemeToggle />
-          </div>
-          <form action="/api/auth/signout" method="post" className="mt-1">
-            <button type="submit" className={QUIET_ROW}>
-              <LogOut size={18} className="shrink-0" strokeWidth={1.8} />
-              <span>{dict.common.logout}</span>
-            </button>
-          </form>
-        </div>
-
-        {/* Desktop: the same order, split under its group headings. */}
-        <nav className="hidden md:block flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-5">
-            {navGroupKeys.map((group) => (
-              group.items.length === 0 ? null : (
-                <div key={group.groupKey}>
-                  <p className="px-3 mb-1.5 text-overline font-semibold text-rail-label">
-                    {dict.sidebar[group.groupKey]}
-                  </p>
-                  <ul className="space-y-0.5">
-                    {group.items.map((item) => (
-                      <li key={item.href}>
-                        <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )
-            ))}
-
-            {/* Admin section — only shown to admins */}
-            {isAdmin && (
-              <div>
-                <p className="px-3 mb-1.5 text-overline font-semibold text-rail-label">{dict.sidebar.system}</p>
-                <ul className="space-y-0.5">
-                  {adminItemKeys.map((item) => {
-                    const IconComponent = item.icon
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                    const label = dict.sidebar[item.labelKey]
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          aria-current={isActive ? 'page' : undefined}
-                          className={cn(
-                            'group flex items-center gap-3 px-3 h-9 rounded-control text-copy font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset',
-                            isActive ? 'bg-rail-active text-rail-ink font-semibold' : 'text-rail-muted hover:bg-rail-hover hover:text-rail-ink'
-                          )}
-                        >
-                          <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-rail-accent' : 'text-rail-label group-hover:text-rail-ink')} strokeWidth={1.8} />
-                          <span>{label}</span>
-                        </Link>
-                      </li>
-                    )
-                  })}
-                </ul>
+        {/* Phones: a drawer from the logical start (the right in Hebrew), over a
+            navy scrim, with the rail's groups, support, the preferences and logout. */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div aria-hidden="true" data-drawer-scrim="" onClick={() => setMenuOpenAt(null)} className="scrim-in absolute inset-0 bg-scrim" />
+            <div
+              ref={drawerRef}
+              id="app-nav-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={dict.sidebar.navLabel}
+              onKeyDown={onDrawerKeyDown}
+              className="drawer-start absolute inset-y-0 start-0 flex w-[85vw] max-w-[22rem] flex-col bg-rail text-rail-ink shadow-pop"
+            >
+              <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-rail-line px-4">
+                <Brand logoAlt={dict.sidebar.logoAlt} />
+                <button
+                  type="button"
+                  data-drawer-close=""
+                  onClick={() => setMenuOpenAt(null)}
+                  aria-label={dict.sidebar.closeMenu}
+                  className={cn('inline-flex size-10 items-center justify-center rounded-control text-rail-ink transition-colors hover:bg-rail-hover', FOCUS_RING)}
+                >
+                  <X size={NAV_ICON.size} strokeWidth={NAV_ICON.strokeWidth} aria-hidden="true" />
+                </button>
               </div>
-            )}
+              <nav aria-label={dict.sidebar.navLabel} className="flex-1 overflow-y-auto px-3 py-4">
+                <div className="space-y-5">
+                  <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} />
+                </div>
+              </nav>
+              <div className="shrink-0 border-t border-rail-line px-3 py-3">
+                <RailFoot dict={dict} isAdmin={isAdmin} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop: the same groups, with the sliding active fill behind them. */}
+        <nav aria-label={dict.sidebar.navLabel} className="hidden flex-1 overflow-y-auto px-3 py-4 md:block">
+          <div ref={railRef} data-pill="off" className="group/nav relative space-y-5">
+            <span
+              ref={pillRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 hidden rounded-control bg-rail-active group-data-[pill=on]/nav:block data-[slide=on]:transition-transform data-[slide=on]:duration-200 data-[slide=on]:ease-snappy"
+            />
+            <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} />
           </div>
         </nav>
 
-        {/* Footer - Desktop only: help, then the two preferences, then logout. */}
-        <div className="hidden md:block shrink-0 border-t border-rail-line px-3 py-3 space-y-1">
-          {!isAdmin && (
-            <a href={WHATSAPP_SUPPORT} target="_blank" rel="noopener noreferrer" className={QUIET_ROW}>
-              <MessageCircle size={18} className="shrink-0" strokeWidth={1.8} />
-              <span>{dict.sidebar.support}</span>
-            </a>
-          )}
-          <ThemeToggle />
-          <div className="px-1 py-1">
-            <DashboardLanguageSwitcher />
-          </div>
-          <form action="/api/auth/signout" method="post">
-            <button type="submit" className={QUIET_ROW}>
-              <LogOut size={18} className="shrink-0" strokeWidth={1.8} />
-              <span>{dict.common.logout}</span>
-            </button>
-          </form>
+        {/* Desktop foot: support, then the two preferences, then logout. */}
+        <div className="hidden shrink-0 border-t border-rail-line px-3 py-3 md:block">
+          <RailFoot dict={dict} isAdmin={isAdmin} />
         </div>
       </div>
     </aside>

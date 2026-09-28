@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Header from '@/components/layout/Header'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
@@ -105,8 +106,7 @@ export default function BillingView({
 
   return (
     <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
-      <p className="text-slate-600 dark:text-slate-300 mb-8">{t.subtitle}</p>
+      <Header title={t.title} subtitle={t.subtitle} />
 
       {trialActive && (
         <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">

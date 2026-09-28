@@ -20,7 +20,7 @@ export function DashboardLanguageSwitcher() {
   // so a screen reader pronounces "עברית" in Hebrew from an English screen.
   const option = (active: boolean) => cn(
     'h-7 rounded-[calc(var(--radius-control)-2px)] px-2 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus',
     active ? 'bg-rail-ink text-rail shadow-control' : 'text-rail-muted hover:text-rail-ink'
   )
 

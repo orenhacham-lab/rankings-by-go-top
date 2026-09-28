@@ -18,6 +18,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
+import ScanHistory from '@/components/scans/ScanHistory'
 
 type ReportType = 'google' | 'ai'
 
@@ -439,6 +440,9 @@ function ReportsContent() {
           t={t}
         />
       )}
+
+      {/* The project's check history, closed until asked for (it was the Scans tab). */}
+      <ScanHistory key={activeProjectId ?? 'none'} projectId={activeProjectId} className="mt-8" />
     </div>
   )
 }

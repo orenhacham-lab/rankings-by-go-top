@@ -1,4 +1,6 @@
 import Sidebar from '@/components/layout/Sidebar'
+import SkipLink from '@/components/layout/SkipLink'
+import { MAIN_CONTENT_ID } from '@/components/layout/main-content'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import TrialBar from '@/components/layout/TrialBar'
 import { loadTrialBar } from '@/lib/billing/trial-bar'
@@ -74,8 +76,9 @@ export default async function DashboardLayout({
               matching margin, so the two can never disagree about its width. */}
           <div className="flex flex-col md:flex-row min-h-screen bg-canvas text-body">
             <DashboardLocaleEffect />
+            <SkipLink />
             <Sidebar isAdmin={isAdmin} />
-            <main className="flex-1 min-w-0 min-h-screen bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(53_83_215/0.07),transparent_70%)]">
+            <main className="flex-1 min-w-0 min-h-screen bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(0_112_214/0.06),transparent_70%)]">
               <DashboardDirectionWrapper>
                 {/* The top bar. Every screen shows the SAME workspace control, because
                     "which site am I looking at" is a question about the app, not about
@@ -86,7 +89,7 @@ export default async function DashboardLayout({
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
                 </Suspense>
-                <div className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 md:px-8 md:py-8">{children}</div>
+                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">{children}</div>
               </DashboardDirectionWrapper>
             </main>
           </div>
