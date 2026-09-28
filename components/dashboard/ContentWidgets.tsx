@@ -15,12 +15,14 @@ import type { ArticleLine, ArticleStatus, BoardData, BoardStatus, Section } from
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
 import { strategyHref } from '@/lib/content/strategy/view'
+import { formatDate } from '@/lib/format/date'
 import { HeaderLink, LinkButton, StatusPill, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
 
 type Copy = DashboardDictionary['dashboardHome']
 
+/** Cards say when relatively ("in 2 days", "3 days ago"); tables give the full date (lib/format/date.ts). */
 function formatDay(iso: string, language: 'he' | 'en'): string {
-  return new Intl.DateTimeFormat(language === 'he' ? 'he-IL' : 'en-US', { day: 'numeric', month: 'short' }).format(new Date(iso))
+  return formatDate(iso, language, 'relative')
 }
 
 const BOARD_TONE: Record<BoardStatus, 'ok' | 'info' | 'warn' | 'neutral'> = {

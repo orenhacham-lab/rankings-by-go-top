@@ -204,6 +204,10 @@ const STRINGS = {
   all_engines: { he: 'כל המנועים', en: 'All engines' },
   all_mention: { he: 'כל האזכורים', en: 'All mentions' },
   all_citations: { he: 'כל הציטוטים', en: 'All citations' },
+  // The results filter's selects, by name (axe: a select needs an accessible name).
+  filter_engine: { he: 'סינון לפי מנוע', en: 'Filter by engine' },
+  filter_mention: { he: 'סינון לפי אזכור', en: 'Filter by mention' },
+  filter_citation: { he: 'סינון לפי ציטוט', en: 'Filter by citation' },
   overall: { he: 'כולל', en: 'Overall' },
   search: { he: 'חיפוש', en: 'Search' },
 

@@ -1,25 +1,25 @@
 {
-  "capturedFrom": "app/(dashboard)/keyword-research/page.tsx at f44468d",
+  "capturedFrom": "polish-c: the results table after UX review P1-4 (words for competition, formatMoney, named checkboxes, tokens)",
   "scenarios": {
     "he/initial": {
       "sha256": "0f55d21c4ed5b0c4860ecb87974e3b16eee3a1e60e92f1be8988126e584b89cc",
       "length": 4242
     },
     "he/results": {
-      "sha256": "8a66d69d0be9f884ea081ddd3d9c56c81eefc71e4413085828195bc20dfef9ae",
-      "length": 19506
+      "sha256": "632d25e6c41712a7fe015269c9e282698a7e226022b9703ad98d420056e069a2",
+      "length": 18357
     },
     "he/selectedWithOpportunities": {
-      "sha256": "06268bc4d894b8848dcd5f07ebc629a719ae2698cc568dca9159cc595fdb71cd",
-      "length": 26284
+      "sha256": "874afbb9f193ca6fdb9afe9d1623ef757f269c18186140d3f38a0902678cc978",
+      "length": 24362
     },
     "he/added": {
-      "sha256": "d5afe56a85f64f6be9a8099ee19de6fe08e2b1a81ebf35d443768305e08e08cd",
-      "length": 23082
+      "sha256": "137ef4bad7cc720cf01cd092dfd9915f0808bc36705c6562823a0838c5e40c8a",
+      "length": 21667
     },
     "he/addAndAiErrors": {
-      "sha256": "5e4e0d5ba7c41892fbd912e7470cb0b69477d514fbc07f79fa505b6ba8ceb912",
-      "length": 22766
+      "sha256": "2dad54b302f8947c02b64d74d70d37141161412c60f94b36d0b0300ba20dee84",
+      "length": 21241
     },
     "he/error": {
       "sha256": "198f57695b839073e53c6d8228049fba9b31925086b4a81b178a107814a887c4",
@@ -30,32 +30,32 @@
       "length": 5050
     },
     "he/fewResults": {
-      "sha256": "efddaad868376519b3a76385324507f2645c5c5a13d8fa1a12188c00a2bfb138",
-      "length": 9842
+      "sha256": "8f1ecb9be4013c37992f5e66d7cfd4670aaec8c45f020e07c749966c1b822b3e",
+      "length": 9362
     },
     "he/filteredSorted": {
-      "sha256": "3bdd483f33ef6cb874f67fdd427382a568784f4333632679084c21e83c872eaf",
-      "length": 19752
+      "sha256": "ce62a656ca037e640bfe5b0464d2a767b975e66612d87f7122af6419c408c5fe",
+      "length": 18602
     },
     "en/initial": {
       "sha256": "040b4490cb23b681ae45852f28d113797a22feacebc2f0c5983b1b3d26489ce0",
       "length": 4285
     },
     "en/results": {
-      "sha256": "dc25a86fcf1b759ce8955344672c03eb5f0ad7b1f8dee447711d09ca210b01bd",
-      "length": 19455
+      "sha256": "552ab3bd3669427511ea438533e3b320e87a4887722c0b9d9b750a3a1ef6995c",
+      "length": 18421
     },
     "en/selectedWithOpportunities": {
-      "sha256": "25f985c09aeb5cac63f60d6cfc86e966f7c7016493e591814f7bb56f0c4de864",
-      "length": 26184
+      "sha256": "e4c7fa7986734b523677dda346512e4639703cba07895d8a57c7142833d9a5ad",
+      "length": 24383
     },
     "en/added": {
-      "sha256": "97320cf52a8e8747375a304687cd422252a550c3be99c0d4b65ea2a01dd59470",
-      "length": 23007
+      "sha256": "9ca788b3669747feb8528134ad16e8721ee1c40c4420d9eec5540e2462e334bb",
+      "length": 21707
     },
     "en/addAndAiErrors": {
-      "sha256": "e10f246ea6572ac703d99ac78aea263bf6d4052ea79fcfb21e846097c0b4155f",
-      "length": 22699
+      "sha256": "185a26b13d75d820a8bf562dbb7b2603b30794c2ad664fe35659b84b0df2e00a",
+      "length": 21289
     },
     "en/error": {
       "sha256": "2f39fd9649ad75c71c81c1ba8c269eda1e6163ab90820899b2b06c43f424d559",
@@ -66,12 +66,12 @@
       "length": 5087
     },
     "en/fewResults": {
-      "sha256": "050a8154c63e484461ccd20f5b28e4c355018dde962b80642dbc1a87f14c74fc",
-      "length": 9926
+      "sha256": "6677881c809db3e8a8799486942a0bc4371851d6ee6dbd2b707fd3eb5be08c93",
+      "length": 9479
     },
     "en/filteredSorted": {
-      "sha256": "b42366aa7f0d96aa9941af18efcb6f695eada95e0c6938ba21933c9c50d60474",
-      "length": 19725
+      "sha256": "6a2c4d63776263064886078cf309714dd7109dc97cf6e008f51920009dd74b75",
+      "length": 18690
     }
   }
 }

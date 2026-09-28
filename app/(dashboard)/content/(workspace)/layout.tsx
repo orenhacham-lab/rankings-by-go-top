@@ -20,7 +20,7 @@ export default function ContentLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Suspense fallback={<div className="py-20 text-center text-slate-400 text-sm">…</div>}>
+    <Suspense fallback={<div className="py-20 text-center text-muted text-sm">…</div>}>
       <ContentWorkspaceProvider>
         <ContentWorkspaceShell>{children}</ContentWorkspaceShell>
       </ContentWorkspaceProvider>

@@ -9,9 +9,16 @@ export type SaveState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved' 
 
 /**
  * A card's footer: what is unsaved, saved or wrong on the one side, and the
- * card's own discard and save on the other. The save button is always there,
- * in the same place, and only works when there is something to save.
+ * card's own discard and save on the other. The save button is there only
+ * while there is something to save (UX review P1-19: with a disabled save on
+ * every card's sticky footer, two or three "save" buttons showed at once and
+ * none said which card it saved). A card shows this bar only while it has
+ * something to say: see `showSaveBar`.
  */
+export function showSaveBar(dirty: boolean, state: SaveState): boolean {
+  return dirty || state.kind !== 'idle'
+}
+
 export default function SaveBar({
   dirty,
   state,
@@ -55,9 +62,11 @@ export default function SaveBar({
             {t.save.discard}
           </Button>
         )}
-        <Button size="sm" onClick={onSave} disabled={!dirty} loading={saving}>
-          {saving ? t.save.saving : t.save.save}
-        </Button>
+        {(dirty || saving) && (
+          <Button size="sm" onClick={onSave} disabled={!dirty} loading={saving}>
+            {saving ? t.save.saving : t.save.save}
+          </Button>
+        )}
       </div>
     </>
   )

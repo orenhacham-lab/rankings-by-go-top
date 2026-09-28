@@ -4,6 +4,22 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { scrollToSection } from './anchors'
 
+/** Pixels from the top of the window: the sections' scroll margin (scroll-mt-20, 80px), where a click on the index lands them, with a little slack. */
+export const READING_LINE = 96
+
+/**
+ * The section being read, from each section's distance to the top of the window
+ * (in screen order): the last one whose top has passed READING_LINE; at the end of
+ * the page, the last one; before the first has passed, the first. Pure, for the QA.
+ */
+export function activeSection(tops: readonly { id: string; top: number }[], atEnd: boolean): string | null {
+  if (tops.length === 0) return null
+  if (atEnd) return tops[tops.length - 1].id
+  let current = tops[0].id
+  for (const s of tops) if (s.top <= READING_LINE) current = s.id
+  return current
+}
+
 /**
  * "On this page", beside the cards on a wide screen: every section the screen
  * shows, the one being read marked as the owner scrolls.
@@ -13,26 +29,34 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
   const ids = items.map((i) => i.id).join(' ')
 
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return
     const order = ids.split(' ')
-    const inView = new Set<string>()
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) inView.add(e.target.id)
-          else inView.delete(e.target.id)
-        }
-        const first = order.find((id) => inView.has(id))
-        if (first) setActive(first)
-      },
-      // A section counts once its top has passed under the top bar, until it leaves the upper part of the screen.
-      { rootMargin: '-72px 0px -55% 0px' },
-    )
-    for (const id of order) {
-      const el = document.getElementById(id)
-      if (el) observer.observe(el)
+    let frame = 0
+    // The section being read is the last one whose top has passed the reading line
+    // (where a click on the index lands it: scroll-mt-20);
+    // at the end of the page, the last section, even when it is too short to reach
+    // the line. It used to be "the first section in the upper half", which kept the
+    // previous, taller section marked while the next one was already being read
+    // (UX review P1-19).
+    const pick = () => {
+      frame = 0
+      const tops: { id: string; top: number }[] = []
+      for (const id of order) {
+        const el = document.getElementById(id)
+        if (el) tops.push({ id, top: el.getBoundingClientRect().top })
+      }
+      const doc = document.documentElement
+      const atEnd = window.scrollY > 0 && window.innerHeight + window.scrollY >= doc.scrollHeight - 2
+      setActive(activeSection(tops, atEnd))
     }
-    return () => observer.disconnect()
+    const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(pick) }
+    pick()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
   }, [ids])
 
   const position = active ? items.findIndex((i) => i.id === active) : -1

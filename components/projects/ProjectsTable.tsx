@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ProjectForm from './ProjectForm'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
-import { formatDate, getFrequencyLabel } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { toggleProjectActiveAction, deleteProjectAction } from '@/app/actions/projects'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -36,13 +36,15 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Phase 3 — weekly/monthly_first_day removed. A legacy value that somehow
-  // still reaches this component (pre-migration data) falls back to the
-  // generic label helper rather than a dedicated (now-removed) translation.
+  // Phase 3 removed weekly scans, but a project saved before it can still carry
+  // "weekly": it is named as what it is, in the screen's language (UX review
+  // P2-2; it used to fall through to a Hebrew-only helper that called it
+  // "manual"). Anything else unknown reads as manual, also in the screen's language.
   function localizedFrequency(freq: string): string {
-    if (freq === 'monthly') return dict.projects.frequency.monthly
-    if (freq === 'manual') return dict.projects.frequency.manual
-    return getFrequencyLabel(freq)
+    const f = dict.projects.frequency
+    if (freq === 'monthly') return f.monthly
+    if (freq === 'weekly') return f.weekly
+    return f.manual
   }
 
   const filtered = projects.filter(
@@ -120,7 +122,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
                   {localizedFrequency(project.scan_frequency)}
                 </Badge>
               </Td>
-              <Td>{project.last_scan_at ? formatDate(project.last_scan_at) : '—'}</Td>
+              <Td>{project.last_scan_at ? formatDate(project.last_scan_at, language) : '—'}</Td>
               <Td>
                 <ActiveBadge active={project.is_active} />
               </Td>

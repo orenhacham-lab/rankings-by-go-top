@@ -214,14 +214,16 @@ export function OverviewOpeningCard({
             <p className="text-caption font-medium text-contrast-ink/60">{c.emptyWhatYouGet}</p>
             <dl className="mt-2 grid gap-2">
               {([[c.scoreLabel, c.scoreHelp], [c.mentionsLabel, c.mentionsHelp], [c.citationsLabel, c.citationsHelp]] as const).map(([label, help], i) => (
-                <div key={label} className="flex items-start gap-3 rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.04] px-3 py-2.5">
-                  <span aria-hidden="true" className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-contrast-ink/10 text-caption font-semibold tabular-nums">
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <dt className="text-caption font-semibold">{label}</dt>
-                    <dd className="text-caption text-contrast-ink/65">{help}</dd>
-                  </div>
+                // A <dl> group holds only its <dt> and <dd> (axe: definition-list), so the
+                // number sits inside the term and the help is indented to line up with it.
+                <div key={label} className="min-w-0 rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.04] px-3 py-2.5">
+                  <dt className="flex items-start gap-3 text-caption font-semibold">
+                    <span aria-hidden="true" className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-contrast-ink/10 text-caption font-semibold tabular-nums">
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0">{label}</span>
+                  </dt>
+                  <dd className="ps-8 text-caption text-contrast-ink/65">{help}</dd>
                 </div>
               ))}
             </dl>

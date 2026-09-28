@@ -293,7 +293,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const filtering = search.trim() !== '' || engineFilter !== ''
 
   const activeTargets = targets.filter((t) => t.is_active)
-  const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict)
+  const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict, language)
 
   // You vs. competitors: each keyword's latest check, the one the table shows,
   // paired with the competitor positions recorded in that same check.
@@ -342,15 +342,12 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           to be the project page's summary row. */}
       <dl className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line lg:grid-cols-4">
         <Fact label={k.summary.domain}><span dir="ltr" className="font-mono">{project.target_domain}</span></Fact>
-        <Fact label={k.summary.lastScan}>{project.last_scan_at ? formatDateTime(project.last_scan_at) : '—'}</Fact>
+        <Fact label={k.summary.lastScan}>{project.last_scan_at ? formatDateTime(project.last_scan_at, language) : '—'}</Fact>
         <Fact label={k.summary.frequency}>
           <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>{facts.frequency}</Badge>
         </Fact>
         <Fact label={k.summary.scanParameters}>
-          <span className="text-caption">
-            {facts.engine} · {facts.device} · gl={facts.gl} · hl={facts.hl}
-            {facts.location !== '—' && <> · {facts.location}</>}
-          </span>
+          <span className="block min-w-0 truncate text-caption" title={facts.line}>{facts.line}</span>
         </Fact>
       </dl>
 
@@ -449,33 +446,44 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-surface px-4 py-3">
+    <div className="min-w-0 bg-surface px-4 py-3">
       <dt className="text-caption text-muted">{label}</dt>
       <dd className="mt-1 truncate text-sm font-medium text-ink">{children}</dd>
     </div>
   )
 }
 
-/** The scan parameters in words, exactly as the project page derived them. */
-function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>) {
-  const map = dict.projects.frequency as Record<string, string>
-  const frequency = (project.scan_frequency || 'manual').toLowerCase() === 'monthly' ? map.monthly : map.manual
+/** A country or language code by its name in the screen's language ("IL" → "ישראל"); the code when the browser cannot name it. */
+function displayName(lang: 'he' | 'en', type: 'region' | 'language', code: string | null | undefined): string {
+  if (!code) return ''
+  try {
+    return new Intl.DisplayNames([lang], { type }).of(type === 'region' ? code.toUpperCase() : code.toLowerCase()) ?? code
+  } catch {
+    return code
+  }
+}
+
+/**
+ * The scan parameters in words. It used to read "גוגל אורגני — מחשב · gl=il ·
+ * hl=he", Google's own parameter codes; it now says the market the way a merchant
+ * would (UX review P2-6): "גוגל ישראל · עברית · מחשב · תל אביב".
+ */
+function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>, lang: 'he' | 'en') {
+  const f = dict.projects.frequency
+  const cadence = (project.scan_frequency || 'manual').toLowerCase()
+  const frequency = cadence === 'monthly' ? f.monthly : cadence === 'weekly' ? f.weekly : f.manual
 
   const device = project.device_type === 'mobile' ? dict.common.deviceMobile
     : project.device_type === 'desktop' ? dict.common.deviceDesktop
     : dict.common.deviceDefault
 
-  const engine = primaryEngine === 'google_search'
-    ? (project.device_type === 'mobile' ? dict.common.searchTypeGoogleMobile : dict.common.searchTypeGoogleDesktop)
-    : primaryEngine === 'google_maps' ? dict.common.engineGoogleMaps
-    : primaryEngine
+  const region = displayName(lang, 'region', project.country)
+  const market = primaryEngine === 'google_maps'
+    ? [dict.common.engineGoogleMaps, region].filter(Boolean).join(' · ')
+    : dict.projectDetail.summary.market(region)
 
   return {
     frequency,
-    engine,
-    device,
-    gl: project.country.toLowerCase(),
-    hl: project.language,
-    location: project.city || '—',
+    line: [market, displayName(lang, 'language', project.language), device, project.city || ''].filter(Boolean).join(' · '),
   }
 }

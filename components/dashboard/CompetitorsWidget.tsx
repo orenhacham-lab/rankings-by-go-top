@@ -61,10 +61,12 @@ export default function CompetitorsWidget({ t, model, manageHref }: {
             const share = compared ? Math.round((r.ahead / r.compared) * 100) : 0
             return (
               <li key={r.domain} data-competitor={r.domain} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate text-copy font-medium text-ink">
-                    {r.name}
-                    {r.name !== r.domain && <span dir="ltr" className="ms-2 text-caption font-normal text-muted">{r.domain}</span>}
+                {/* Name, then the domain on a line of its own (P1-6): side by side in an RTL
+                    row the two ran together ("Rival Plumberrival-plumber.co.il"). */}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="flex min-w-0 flex-col">
+                    <span className="truncate text-copy font-medium text-ink">{r.name}</span>
+                    {r.name !== r.domain && <span dir="ltr" data-competitor-domain className="max-w-full self-start truncate text-caption text-muted">{r.domain}</span>}
                   </p>
                   {compared && r.best != null && <span className="shrink-0 text-caption tabular-nums text-muted">#{r.best}</span>}
                 </div>

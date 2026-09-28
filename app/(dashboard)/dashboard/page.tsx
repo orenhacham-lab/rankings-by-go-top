@@ -47,7 +47,6 @@ import GscClicksTile from '@/components/gsc/GscClicksTile'
 import GscTopPages from '@/components/gsc/GscTopPages'
 import { formatCount } from '@/components/gsc/format'
 import { strategyHref } from '@/lib/content/strategy/view'
-import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { buildRankings, type DashboardResult, type DashboardTarget, type RankingsView } from '@/lib/dashboard/rankings'
 import { holdingBack, seedFeed } from '@/lib/dashboard/seed'
 import { mergeFeed, relativeTime } from '@/lib/dashboard/activity'
@@ -144,9 +143,8 @@ function nextStep(input: {
   if (content && articles?.state === 'ready' && articles.data.total === 0) {
     return { href: strategyHref('board'), label: t.actions.writeFirstArticle, commit: true, note: t.actions.articleQuota }
   }
-  if (overview?.setup.state === 'ready' && !overview.setup.data.platform) {
-    return { href: platformSetupHref(input.projectId), label: t.actions.connectSite, commit: false, note: null }
-  }
+  // No "connect the site" here (UX review P1-16): it had nothing to do with the
+  // number above it, and the setup checklist beside the card already offers it.
   if (content && articles?.state === 'ready') {
     return { href: strategyHref('board'), label: t.actions.writeArticle, commit: true, note: t.actions.articleQuota }
   }
@@ -165,6 +163,9 @@ function ProjectDashboard({ project }: { project: Project }) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
   const [now, setNow] = useState(() => new Date())
+  // On a phone: the first five cards, and the rest behind one button (P1-16).
+  const [allCards, setAllCards] = useState(false)
+  const fold = allCards ? '' : 'max-xl:hidden'
   // Read alongside the keywords but never part of them: each is its own widgets' state.
   const { overview, reload } = useDashboardOverview(project.id)
   const seed = useSeedState(project.id)
@@ -308,7 +309,7 @@ function ProjectDashboard({ project }: { project: Project }) {
             icon={<Send size={16} strokeWidth={2} />}
           />
         )}
-        <GscClicksTile projectId={project.id} />
+        <GscClicksTile projectId={project.id} hideSetup />
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
@@ -331,18 +332,18 @@ function ProjectDashboard({ project }: { project: Project }) {
             <RankingChanges t={t} direction="up" title={home.majorImprovements} moves={rankings.improvements} />
             <RankingChanges t={t} direction="down" title={home.majorDrops} moves={rankings.drops} />
           </div>
-          <div className="order-7 min-w-0">
+          <div className={`order-7 min-w-0 ${fold}`}>
             <ContentOpportunities t={t} language={language} projectId={project.id} items={rankings.pageTwo} canCreateTopics={showContent} />
           </div>
           {showContent && (
-            <div className="order-8 grid min-w-0 gap-5 md:grid-cols-2">
+            <div className={`order-8 grid min-w-0 gap-5 md:grid-cols-2 ${fold}`}>
               <PublishingBoard t={t} language={language} section={sectionOf('board')} retry={reload} />
               <RecentArticles t={t} language={language} section={sectionOf('articles')} retry={reload}
                 firstArticleHref={heroHasFirstArticle ? null : strategyHref('board')} />
             </div>
           )}
-          <div className="order-11 min-w-0 empty:hidden">
-            <GscTopPages projectId={project.id} />
+          <div className={`order-11 min-w-0 ${fold} empty:hidden`}>
+            <GscTopPages projectId={project.id} hideSetup />
           </div>
         </div>
 
@@ -355,21 +356,28 @@ function ProjectDashboard({ project }: { project: Project }) {
           <div className="order-3 min-w-0">
             <RecentActivity t={t} model={activity} now={now} language={language} emptyHref="/keyword-research" />
           </div>
-          <div className="order-6 min-w-0">
+          <div className={`order-6 min-w-0 ${fold}`}>
             <CompetitorsWidget t={t} model={competitors} manageHref={competitorView.manageHref ?? `${settingsHref}#competitors`} />
           </div>
           {/* The latest automatic monthly report, linking to it on the Reports screen. */}
-          <div className="order-9 min-w-0 empty:hidden">
+          <div className={`order-9 min-w-0 ${fold} empty:hidden`}>
             <MonthlyReportTeaser projectId={project.id} language={language} />
           </div>
           {showAi && (
-            <div className="order-10 min-w-0">
+            <div className={`order-10 min-w-0 ${fold}`}>
               <AiVisibilityBrief t={t} language={language} section={sectionOf('ai')} retry={reload} now={now} />
             </div>
           )}
-          <div className="order-12 min-w-0">
+          <div className={`order-12 min-w-0 ${fold}`}>
             <AccountStatus t={t} section={sectionOf('account')} retry={reload} />
           </div>
+        </div>
+
+        {/* Phone only: the fold after the fifth card (P1-16), and back. */}
+        <div className={`${allCards ? 'order-last' : 'order-5'} flex justify-center xl:hidden`}>
+          <Button type="button" variant="secondary" aria-expanded={allCards} data-dashboard-fold onClick={() => setAllCards((v) => !v)}>
+            {allCards ? t.fewerCards : t.moreCards}
+          </Button>
         </div>
       </div>
     </div>

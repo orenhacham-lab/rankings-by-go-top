@@ -256,6 +256,13 @@ export const dashboardEn = {
       gscReauthTitle: 'Reconnect Google Search Console',
       gscReauthBody: 'Access to Search Console has expired. Reconnect to keep using its data (optional — not required for topic generation).',
       gscReconnect: 'Reconnect',
+      rowLabel: 'Missing connections',
+      rowPlatformNone: 'The site is not connected for publishing yet',
+      rowPlatformFailed: 'The site connection needs attention',
+      rowGscNone: 'Search Console is not connected (optional)',
+      rowGscNoProperty: 'No Search Console property chosen (optional)',
+      rowGscReauth: 'Search Console access expired (optional)',
+      connectInSettings: 'Connect in settings',
     },
     autoIdeas: {
       title: 'Automatic article ideas',
@@ -626,6 +633,18 @@ export const dashboardEn = {
       emptyTitle: 'No articles yet for this project',
       emptyHint: 'Article creation arrives in the next phase. For now you can connect your WordPress site.',
       openInWordpress: 'Open in WordPress',
+      publishedOn: 'Published on',
+      publishDate: 'Publish date',
+      rowMenu: (title: string) => `More actions for "${title}"`,
+      selectArticle: (title: string) => `Select "${title}"`,
+    },
+    deleteDialog: {
+      title: 'Delete article',
+      body: 'Delete "{name}"? The article is deleted from the system only. Anything already live on the site stays there.',
+      confirm: 'Delete',
+      cancel: 'Cancel',
+      deleting: 'Deleting…',
+      error: 'Failed to delete the article. Please try again.',
     },
     actions: {
       edit: 'Edit',
@@ -1785,6 +1804,9 @@ export const dashboardEn = {
   // and when it has nothing yet it says in one sentence what will appear, with one action.
   dashboardHome: {
     shortcutsLabel: 'Shortcuts',
+    /** On a phone the dashboard shows its first cards and folds the rest behind one button (UX review P1-16). */
+    moreCards: 'More on the dashboard',
+    fewerCards: 'Show less',
     shortcuts: {
       research: 'Keyword research',
       schedule: 'Content calendar',
@@ -2047,6 +2069,8 @@ export const dashboardEn = {
     frequency: {
       manual: 'Manual',
       monthly: 'Monthly',
+      /** A legacy cadence some older projects still carry (UX review P2-2). */
+      weekly: 'Weekly',
     },
     actions: {
       edit: 'Edit',
@@ -2775,6 +2799,7 @@ export const dashboardEn = {
       lastScan: 'Last scan',
       frequency: 'Frequency',
       scanParameters: 'Scan parameters',
+      market: (country: string) => `Google ${country}`,
     },
     keywordsSection: {
       title: 'Keywords',
@@ -2830,6 +2855,12 @@ export const dashboardEn = {
       confirmDelete: 'Confirm deletion',
       cancel: 'Cancel',
       editKeywordTitle: 'Edit Keyword',
+      moreActions: (keyword: string) => `More actions for "${keyword}"`,
+      scanNow: (keyword: string) => `Check the position of "${keyword}" now`,
+      deleteTitle: 'Delete keyword',
+      deleteBody: 'Delete "{name}"? Its check history is deleted too, and this cannot be undone.',
+      deleting: 'Deleting…',
+      deleteFailed: 'The keyword could not be deleted. Try again.',
     },
     modals: {
       editProjectTitle: 'Edit Project',
@@ -3397,6 +3428,11 @@ export const dashboardEn = {
       copySelected: 'Copy selected keywords',
       selectAll: 'Select all',
       deselectAll: 'Deselect all',
+      competitionLevel: { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High' },
+      competitionIndex: (n: number) => `Competition index ${n} of 100 (Google Ads)`,
+      potentialLevel: { high: 'High', medium: 'Medium', low: 'Low' },
+      selectAllRows: 'Select every keyword in the table',
+      selectKeyword: (keyword: string) => `Select "${keyword}"`,
     },
     opportunities: {
       show: 'Show recommended opportunities',
