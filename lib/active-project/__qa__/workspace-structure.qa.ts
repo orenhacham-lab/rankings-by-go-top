@@ -352,9 +352,20 @@ async function main() {
           + (src.match(/\.in\('tracking_target_id', targetIds\)/g) ?? []).length === reads.length
     }
     const dash = code('app/(dashboard)/dashboard/page.tsx')
-    const scans = code('app/(dashboard)/scans/page.tsx')
+    // The scans list is the check-history section of Keywords and Reports now. Its
+    // runs are read by the project; a run's keywords by the id of a run from that list.
+    const history = code('components/scans/ScanHistory.tsx')
+    const historyScoped = (src: string) => {
+      const reads = src.match(/\.from\('[a-z_]+'\)/g) ?? []
+      return reads.length === 2
+        && /\.from\('scans'\)[\s\S]{0,200}?\.eq\('project_id', projectId\)/.test(src)
+        && /\.from\('scan_results'\)[\s\S]{0,200}?\.eq\('scan_id', run\.id\)/.test(src)
+        && !/\.from\('(clients|projects)'\)/.test(src) && !/\.eq\('user_id'/.test(src)
+    }
     check('H1: every dashboard read is filtered to the current project', scoped(dash))
-    check('H2: the scans list reads the current project\'s scans only', scoped(scans))
+    check('H2: the check history reads the current project\'s runs only', historyScoped(history))
+    check('H2-MUT: a history that reads every run in the account fails H2',
+      !historyScoped(history.replace(".eq('project_id', projectId)", '')))
     check('H-MUT: an account-wide read fails H1',
       !scoped(dash + "\nsupabase.from('clients').select('*').eq('user_id', user.id)"))
     const research = code('app/(dashboard)/keyword-research/page.tsx')

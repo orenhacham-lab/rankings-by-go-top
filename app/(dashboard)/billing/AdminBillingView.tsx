@@ -1,8 +1,8 @@
 'use client'
 
+import Header from '@/components/layout/Header'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import Header from '@/components/layout/Header'
 
 /**
  * Hotfix — admin billing bypass. Rendered INSTEAD of BillingView for any

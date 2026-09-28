@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Header from '@/components/layout/Header'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
 import type { BillingMarket } from '@/lib/paypal/checkout-plans'
 import { Check, CheckCircle2, Coins, Info } from 'lucide-react'
-import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'

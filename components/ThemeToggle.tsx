@@ -1,49 +1,61 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { useEffect, useState, useMemo } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import { Sun, Moon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
+const noop = () => () => {}
+
+/**
+ * The theme as a two-option segmented control: a sun and a moon, the chosen one
+ * lifted onto a light chip, each a button that says whether it is pressed.
+ *
+ * It was one switch labelled with the CURRENT state ("Light mode" while light
+ * was on), which read as the action to take: nobody could tell which way it
+ * pointed. Two named options cannot be misread. The same track and chip as the
+ * language control beside it.
+ *
+ * The theme is only known in the browser, so the server (and the first client
+ * render) draws the track with neither option pressed, in the same size.
+ */
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
+  const mounted = useSyncExternalStore(noop, () => true, () => false)
   const { language } = useDashboardLanguage()
   const dict = useMemo(() => getDashboardDictionary(language), [language])
+  const current = mounted ? (resolvedTheme === 'dark' ? 'dark' : 'light') : null
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div className="h-9" />
-  }
-
-  const isLight = theme === 'light'
+  const option = (active: boolean) => cn(
+    'inline-flex h-7 items-center justify-center rounded-[calc(var(--radius-control)-2px)] transition-[background-color,color,box-shadow] duration-150 ease-snappy',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus',
+    active ? 'bg-rail-ink text-rail shadow-control' : 'text-rail-muted hover:text-rail-ink'
+  )
 
   return (
-    <button
-      type="button"
-      onClick={() => setTheme(isLight ? 'dark' : 'light')}
-      className="w-full flex items-center justify-between gap-3 px-3 h-9 rounded-control text-copy font-medium text-rail-muted transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-accent focus-visible:ring-inset"
-      aria-label={isLight ? dict.common.switchToDarkMode : dict.common.switchToLightMode}
-    >
-      <span className="flex items-center gap-3">
-        {isLight ? <Sun size={18} strokeWidth={1.8} className="shrink-0" /> : <Moon size={18} strokeWidth={1.8} className="shrink-0" />}
-        <span>{isLight ? dict.common.lightMode : dict.common.darkMode}</span>
-      </span>
-      {/* The switch: the knob travels toward the logical END when dark is on. */}
-      <span
-        aria-hidden="true"
-        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${isLight ? 'bg-white/20' : 'bg-rail-accent'}`}
+    <div role="group" aria-label={dict.sidebar.themeLabel} className="grid grid-cols-2 gap-0.5 rounded-control border border-rail-line bg-rail-hover p-0.5">
+      <button
+        type="button"
+        aria-pressed={current === 'light'}
+        aria-label={dict.common.lightMode}
+        title={dict.common.lightMode}
+        onClick={() => setTheme('light')}
+        className={option(current === 'light')}
       >
-        <span
-          className={`absolute top-0.5 start-0.5 size-4 rounded-full bg-white shadow-control transition-transform duration-200 ease-snappy ${
-            isLight ? 'translate-x-0' : 'translate-x-4 rtl:-translate-x-4'
-          }`}
-        />
-      </span>
-    </button>
+        <Sun size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-pressed={current === 'dark'}
+        aria-label={dict.common.darkMode}
+        title={dict.common.darkMode}
+        onClick={() => setTheme('dark')}
+        className={option(current === 'dark')}
+      >
+        <Moon size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+    </div>
   )
 }

@@ -41,21 +41,35 @@
   --font-sans: var(--font-inter), var(--font-heebo), ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif;
 
   /* Surfaces */
-  --color-canvas: #f6f5f1;        /* the page behind everything: warm paper */
+  --color-canvas: #f7f6f2;        /* the page behind everything: warm paper (action as text on it 4.5:1) */
   --color-surface: #ffffff;       /* cards, panels, table rows */
 
   /* The rail: the sidebar is the one confident, branded surface of the shell —
-     deep ink with the cobalt accent lit on it — so the paper-and-white screen
-     beside it reads as the work area. muted 7.8:1, label 5.8:1, white on the
-     active fill 13:1, accent icon on it 6.5:1. */
-  --color-rail: #10152a;
-  --color-rail-ink: #f5f6f8;
-  --color-rail-muted: #a3aabb;
-  --color-rail-label: #8a92a6;
+     the navy of gotop.co.il (#0A1B3D, the UX review's value: the site itself is
+     unreachable from the build environment, so it was not re-sampled) — so the
+     paper-and-white screen beside it reads as the work area. On the navy: ink 17:1,
+     muted 8.5:1, section titles 5.6:1 (the review's #6F82A8 is 4.4:1, under AA for
+     11px text, so it is one step lighter), the tagline 9:1, the focus ring 7.9:1.
+     The active tab is FILLED with the action blue: white on it 4.9:1. */
+  --color-rail: #0a1b3d;
+  --color-rail-ink: #ffffff;
+  --color-rail-muted: #a9b8d6;
+  --color-rail-section: #8494b8;
+  --color-rail-tagline: #7fc3ff;
   --color-rail-line: rgba(255, 255, 255, 0.08);
-  --color-rail-hover: rgba(255, 255, 255, 0.06);
-  --color-rail-active: rgba(110, 145, 250, 0.2);
-  --color-rail-accent: #9db4ff;
+  --color-rail-hover: rgba(0, 134, 245, 0.12);
+  --color-rail-active: #0070d6;
+  --color-rail-active-ink: #ffffff;
+  --color-rail-focus: #5cb8ff;
+  /* A menu drawn over the page dims it with the rail's own navy. */
+  --color-scrim: rgba(10, 27, 61, 0.5);
+
+  /* The Go Top light blue, sampled from the mark (public/gotop-primary.png). For
+     the logo, indicators, icons and charts ONLY: white on it is 3.7:1, which fails
+     AA for text, so it is never a text background; `action` is. */
+  --color-brand: #0086f5;
+  /* WhatsApp's own green, on the support glyph's hover only. */
+  --color-whatsapp: #25d366;
   --color-sunk: #f0eee9;          /* table heads, insets, hover fills */
   --color-line: #e6e3dc;          /* every default border */
   --color-line-strong: #d3cfc6;   /* a border that has to be noticed */
@@ -65,11 +79,14 @@
   --color-body: #3b3f46;          /* body copy */
   --color-muted: #686c73;         /* labels, sub-labels, placeholders */
 
-  /* Actions — exactly two. White on action 6.2:1; action as text 5.7:1. */
-  --color-action: #3553d7;
-  --color-action-hover: #2942b6;
+  /* Actions — exactly two. The action is the Go Top blue one step darker than the
+     mark (white on #0086F5 fails AA): white on it 4.9:1, as text 4.9:1 on surface
+     and 4.5:1 on canvas. Its soft tint is lighter than the review's #E6F2FE, on
+     which the action as text is only 4.3:1; on this one it is 4.5:1. */
+  --color-action: #0070d6;
+  --color-action-hover: #005cb3;
   --color-action-ink: #ffffff;
-  --color-action-soft: #ecf0fe;   /* selected rows, active chips (action on it 5.5:1) */
+  --color-action-soft: #f0f7ff;   /* selected rows, active chips, icon squircles */
   --color-commit: #f0b03f;        /* commit-ink on it 9.2:1 */
   --color-commit-hover: #e39e22;
   --color-commit-ink: #231703;
@@ -83,29 +100,32 @@
   --color-bad: #b42318;
   --color-bad-soft: #fdf1ef;
   --color-bad-ink: #ffffff;       /* text on a filled `bad` (a destructive confirm): 6.0:1 */
-  --color-info: #2346b8;
-  --color-info-soft: #eff3fe;
+  --color-info: #005cb3;
+  --color-info-soft: #eef6fe;
 
-  /* The one dark surface: a screen's opening context card. Its own token,
-     because it must stay dark in dark mode instead of inverting. */
-  --color-contrast: #12172a;
+  /* The one dark surface: a screen's opening context card, in the rail's navy.
+     Its own token, because it must stay dark in dark mode instead of inverting. */
+  --color-contrast: #0a1b3d;
   --color-contrast-ink: #f5f6f8;
 
+  /* Loading placeholders: a quiet two-stop shimmer (see .skeleton). */
+  --color-skeleton: #eef1f6;
+  --color-skeleton-shine: #f7f9fc;
+
   /* The accent scale. Legacy screens still say `indigo-600` where the new ones
-     say `action`; remapping the scale to the same cobalt makes the two agree
-     without touching a single screen. Same lightness steps as Tailwind's indigo,
-     so every contrast those screens had is kept (600 on white: 6.2:1). */
-  --color-indigo-50: #f2f6ff;
-  --color-indigo-100: #e2ebff;
-  --color-indigo-200: #c6d7ff;
-  --color-indigo-300: #9eb8ff;
-  --color-indigo-400: #6f92f7;
-  --color-indigo-500: #4b6fee;
-  --color-indigo-600: #3553d7;
-  --color-indigo-700: #2942b6;
-  --color-indigo-800: #20358f;
-  --color-indigo-900: #1a2b6c;
-  --color-indigo-950: #0e1a43;
+     say `action`; remapping the scale to the same Go Top blue makes the two agree
+     without touching a single screen. 600 is the action (white on it 4.9:1). */
+  --color-indigo-50: #eef6fe;
+  --color-indigo-100: #d9ebfd;
+  --color-indigo-200: #b5d8fb;
+  --color-indigo-300: #84bef8;
+  --color-indigo-400: #4da0f0;
+  --color-indigo-500: #1f86e6;
+  --color-indigo-600: #0070d6;
+  --color-indigo-700: #005cb3;
+  --color-indigo-800: #004a91;
+  --color-indigo-900: #003a73;
+  --color-indigo-950: #00254a;
 
   /* Radii — a card, an inset inside a card, a control, a pill. Nothing else. */
   --radius-card: 1rem;
@@ -145,11 +165,18 @@
   --text-overline: 0.6875rem;
   --text-overline--line-height: 1rem;
 
-  /* Motion — short, and out of the way: an ease that arrives quickly and settles,
-     for hover, press and anything that appears on demand. Nothing animates on
-     its own, and nothing blocks an action while it moves. */
+  /* Motion — short, and out of the way: an ease that arrives quickly and settles.
+     The whole budget (UX review, decision 4), and nothing else moves:
+       tab content enters   180ms, 30ms apart for the first four blocks
+       a KPI counts up      600ms, once, on mount (never on a refetch)
+       a score ring draws   700ms
+       a menu pops in       160ms
+       the phone drawer     240ms, its scrim 200ms
+       the active tab pill  200ms, sliding between entries
+       a skeleton shimmers  1.2s, the ONLY loop, gone when the data arrives
+     Never on table rows, never on scroll, nothing over 300ms between tabs. */
   --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-pop-in: pop-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes pop-in {
@@ -165,14 +192,104 @@
   }
 }
 
+/* ── Motion utilities: CSS only, and each exists only with no-preference ── */
+
+/* Tab content: the screen's blocks rise 8px and fade in as the tab opens.
+   `backwards` fill, so no transform is left behind once they land (a leftover
+   transform would become the containing block of every fixed dialog inside). */
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tab-enter > * > * {
+    animation: tab-in 180ms var(--ease-snappy) backwards;
+  }
+  .tab-enter > * > :nth-child(2) { animation-delay: 30ms; }
+  .tab-enter > * > :nth-child(3) { animation-delay: 60ms; }
+  .tab-enter > * > :nth-child(n + 4) { animation-delay: 90ms; }
+}
+
+/* A KPI counts up from 0 to its value once, when it first renders. The real,
+   formatted value is in the DOM the whole time (for screen readers, copy and
+   print) and only held transparent while ::after draws the count over it. */
+@property --count {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+@keyframes count-up {
+  from { --count: 0; visibility: visible; }
+  to { --count: var(--count-to); visibility: hidden; }
+}
+@keyframes count-up-hold {
+  from, to { color: transparent; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .count-up { position: relative; display: inline-block; }
+  .count-up > .count-up-value { animation: count-up-hold 600ms ease-out; }
+  .count-up::after {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    counter-reset: count var(--count);
+    content: counter(count);
+    animation: count-up 600ms ease-out forwards;
+    pointer-events: none;
+  }
+}
+
+/* A score ring draws itself: the dash starts empty and grows to its share. */
+@keyframes ring-draw {
+  from { stroke-dashoffset: var(--ring-length); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ring-draw { animation: ring-draw 700ms var(--ease-snappy) backwards; }
+}
+
+/* The phone menu: a drawer from the logical start, over the navy scrim. */
+@keyframes drawer-in-ltr {
+  from { transform: translateX(-100%); }
+}
+@keyframes drawer-in-rtl {
+  from { transform: translateX(100%); }
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .drawer-start { animation: drawer-in-ltr 240ms var(--ease-snappy); }
+  [dir='rtl'] .drawer-start { animation-name: drawer-in-rtl; }
+  .scrim-in { animation: scrim-in 200ms ease-out; }
+}
+
+/* A loading placeholder. The shimmer is the one animation allowed to loop, and
+   it stops by construction: the skeleton is replaced when the data arrives. */
+.skeleton {
+  background-color: var(--color-skeleton);
+  background-image: linear-gradient(90deg, var(--color-skeleton) 0%, var(--color-skeleton-shine) 50%, var(--color-skeleton) 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+}
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton { animation: shimmer 1.2s linear infinite; }
+}
+
 /* Dark mode redefines the SAME names, so no component carries a second palette.
    Ink-blue night, not pure black. The accent is LIGHTER here and carries dark
-   text (6.4:1), because white on a cobalt light enough to read as text on the
-   dark surface would fail; as text it is 6.1:1 on surface. */
+   text (7.6:1), because white on a blue light enough to read as text on the
+   dark surface would fail; as text it is 7.1:1 on surface. */
 .dark {
-  --color-canvas: #0d0f14;
+  --color-canvas: #0d1117;
   --color-surface: #14171e;
-  --color-rail: #0a0c11;
+  /* The rail stays NAVY in the dark, so it separates from the neutral canvas by
+     hue and by a lit edge (it was #0a0c11 on #0d0f14: one surface). */
+  --color-rail: #081329;
+  --color-rail-line: rgba(92, 184, 255, 0.16);
+  --color-rail-hover: rgba(77, 168, 255, 0.12);
   --color-sunk: #1b1f28;
   --color-line: #252a35;
   --color-line-strong: #353b48;
@@ -181,10 +298,10 @@
   --color-body: #c8ccd3;
   --color-muted: #9097a3;         /* 6.1:1 on surface, 5.6:1 on sunk */
 
-  --color-action: #6e91fa;
-  --color-action-hover: #8aa6ff;
+  --color-action: #4da8ff;        /* 7.1:1 on surface; the dark ink on it 7.6:1 */
+  --color-action-hover: #7dbeff;
   --color-action-ink: #0a0f24;
-  --color-action-soft: #1a2245;
+  --color-action-soft: #0f2542;
   --color-commit: #f0b03f;
   --color-commit-hover: #f5c262;
   --color-commit-ink: #231703;
@@ -197,11 +314,14 @@
   --color-bad: #f58c80;
   --color-bad-soft: #2e1614;
   --color-bad-ink: #2a0c08;
-  --color-info: #9db4ff;
-  --color-info-soft: #131d3a;
+  --color-info: #7dbeff;
+  --color-info-soft: #0f2138;
 
-  --color-contrast: #181e33;
+  --color-contrast: #0f2247;
   --color-contrast-ink: #f5f6f8;
+
+  --color-skeleton: #1b1f28;
+  --color-skeleton-shine: #252a35;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px -10px rgba(0, 0, 0, 0.5);
   --shadow-control: 0 1px 1px rgba(0, 0, 0, 0.3);

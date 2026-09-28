@@ -136,7 +136,7 @@ export function WidgetLoading({ lines = 3, label }: { lines?: number; label: str
   return (
     <div className="flex flex-col gap-3" aria-busy="true">
       {Array.from({ length: lines }, (_, i) => (
-        <span key={i} aria-hidden="true" className={cn('h-3.5 rounded-control bg-sunk', i === lines - 1 ? 'w-1/2' : 'w-full')} />
+        <span key={i} aria-hidden="true" className={cn('skeleton h-3.5 rounded-control', i === lines - 1 ? 'w-1/2' : 'w-full')} />
       ))}
       <span className="sr-only">{label}</span>
     </div>

@@ -31,7 +31,7 @@ export function Card({ children, className, padding = true, tone = 'default', in
         tone === 'sunk' && 'bg-sunk border-line',
         // The context card: deep ink with one quiet cobalt glow in its top corner,
         // drawn on the card itself so it needs no extra element.
-        tone === 'ink' && 'overflow-hidden bg-contrast text-contrast-ink border-white/5 shadow-card bg-[radial-gradient(120%_140%_at_100%_0%,rgb(83_115_255/0.20),transparent_55%)] rtl:bg-[radial-gradient(120%_140%_at_0%_0%,rgb(83_115_255/0.20),transparent_55%)]',
+        tone === 'ink' && 'overflow-hidden bg-contrast text-contrast-ink border-white/5 shadow-card bg-[radial-gradient(120%_140%_at_100%_0%,rgb(0_134_245/0.20),transparent_55%)] rtl:bg-[radial-gradient(120%_140%_at_0%_0%,rgb(0_134_245/0.20),transparent_55%)]',
         interactive && 'cursor-pointer hover:border-line-strong hover:shadow-[0_1px_2px_rgb(28_25_18/0.05),0_10px_24px_-12px_rgb(28_25_18/0.16)]',
         padding && 'p-6',
         className

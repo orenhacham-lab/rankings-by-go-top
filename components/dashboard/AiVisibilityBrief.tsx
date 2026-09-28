@@ -13,6 +13,7 @@ import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { relativeTime } from '@/lib/dashboard/activity'
 import { formatCount } from '@/components/gsc/format'
 import { cn } from '@/lib/utils'
+import CountUp from '@/components/ui/CountUp'
 import { HeaderLink, LinkButton, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
 
 export default function AiVisibilityBrief({ t, language, section, retry, now }: {
@@ -38,7 +39,7 @@ export default function AiVisibilityBrief({ t, language, section, retry, now }: 
         <div>
           <div className="flex items-end justify-between gap-4">
             <p className="flex items-baseline gap-1">
-              <span className="text-title font-semibold tabular-nums text-ink">{section.data.score}</span>
+              <span className="text-title font-semibold tabular-nums text-ink"><CountUp value={section.data.score}>{section.data.score}</CountUp></span>
               <span className="text-caption text-muted">/100 · {a.score}</span>
             </p>
             {section.data.change !== null && (

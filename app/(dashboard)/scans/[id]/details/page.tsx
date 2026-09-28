@@ -1,4 +1,7 @@
 'use client'
+/* The audit columns are free-form JSON written by the scanner's versions over
+   time; they are read field by field below, as they always were. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, use, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -12,10 +15,13 @@ import Badge from '@/components/ui/Badge'
 import Link from 'next/link'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { TableSkeleton } from '@/components/ui/Skeleton'
+import { EngineChip } from '@/components/scans/ScanHistory'
+import { scanHistoryHref } from '@/lib/scans/history-href'
 
 export default function ScanDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<div className="py-20 text-center text-slate-400">…</div>}>
+    <Suspense fallback={<div className="py-20 text-center text-muted">…</div>}>
       <ScanDetailsContent params={params} />
     </Suspense>
   )
@@ -60,21 +66,19 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
   }, [id, resultId, targetId])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20 text-slate-400">
-        <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        {dict.scans.loading}
-      </div>
-    )
+    return <TableSkeleton label={dict.scans.loading} rows={3} />
   }
 
-  // Back to the list this page was opened from: one keyword's result comes from
-  // the keywords table, a whole scan from the scans list. Both are tabs of the
-  // scan's own project.
+  // Back to where this page was opened from: one keyword's result comes from
+  // Keywords (its table or its check history), a whole run from the check
+  // history, which is a section of Keywords now that the Scans tab is gone.
   const fromKeyword = !!(resultId || targetId)
-  const backPath = fromKeyword ? '/keywords' : '/scans'
-  const backHref = projectId ? `${backPath}?projectId=${encodeURIComponent(projectId)}` : backPath
-  const backLabel = fromKeyword ? t.backToKeywords : t.backToScans
+  const backHref = fromKeyword
+    ? (projectId ? `/keywords?projectId=${encodeURIComponent(projectId)}` : '/keywords')
+    : scanHistoryHref(projectId)
+  const backLabel = fromKeyword ? t.backToKeywords : t.backToHistory
+  // One notice for the whole page, not a copy on every result without a breakdown.
+  const someWithoutAudit = results.some((r) => !(r.audit_request || r.audit_response || r.audit_decision))
 
   if (results.length === 0) {
     return (
@@ -89,7 +93,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
           }
         />
         <Card>
-          <div className="p-6 text-center text-slate-500">{t.noResults}</div>
+          <div className="p-6 text-center text-muted">{t.noResults}</div>
         </Card>
       </div>
     )
@@ -107,6 +111,12 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
         }
       />
 
+      {someWithoutAudit && (
+        <p data-audit-notice="" className="mb-6 rounded-control border border-info/20 bg-info-soft px-4 py-3 text-copy text-info">
+          {t.noAuditData}
+        </p>
+      )}
+
       <div className="space-y-6">
         {results.map((result) => {
           const hasAudit = Boolean(result.audit_request || result.audit_response || result.audit_decision)
@@ -116,74 +126,75 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
           const auditVersion = result.audit_scanner_version
 
           return (
-            <Card key={result.id} className="overflow-hidden">
+            <Card key={result.id} padding={false} className="overflow-hidden">
               <div className="p-6 space-y-6">
-                {/* Header */}
-                <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-700 pb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{result.keyword}</h3>
-                    <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                      {t.timestamp}: {formatDateTime(result.checked_at)}
+                {/* The keyword, which engine checked it and when, and what it found.
+                    The engine chip is what tells a Maps row from an organic one of the
+                    same keyword. A failed check says so in words, never the provider's. */}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-section font-semibold text-ink">{result.keyword}</h2>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted">
+                      <EngineChip engine={result.engine_type} />
+                      <span>{t.checkedAt(formatDateTime(result.checked_at))}</span>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-end">
                     <Badge variant={result.found ? 'success' : 'neutral'}>
                       {result.found ? `${t.positionPrefix} #${result.position}` : t.notFound}
                     </Badge>
                     {result.error_message && (
-                      <div className="text-sm text-red-600 mt-2">{t.errorPrefix}: {result.error_message}</div>
+                      <p className="mt-2 max-w-xs text-caption text-warn">{t.checkFailed}</p>
                     )}
                   </div>
                 </div>
 
-                {!hasAudit ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded p-4">
-                    <p className="text-amber-800 text-sm">{t.noAuditData}</p>
-                  </div>
-                ) : (
-                  <>
+                {hasAudit && (
+                  <details className="group rounded-control border border-line">
+                  <summary className="cursor-pointer select-none px-4 py-2.5 text-copy font-semibold text-ink hover:bg-sunk/60">{t.technical}</summary>
+                  <div className="space-y-6 border-t border-line p-4">
                     {/* Request Section */}
                     {auditRequest && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{t.auditRequest}</h4>
-                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-2 text-sm">
+                        <h4 className="font-semibold text-ink mb-3">{t.auditRequest}</h4>
+                        <div className="bg-sunk p-4 rounded-control space-y-2 text-sm">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">keyword:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.keyword}</div>
+                              <span className="text-muted">keyword:</span>
+                              <div className="font-mono text-ink">{auditRequest.keyword}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">engine:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.engine}</div>
+                              <span className="text-muted">engine:</span>
+                              <div className="font-mono text-ink">{auditRequest.engine}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">project city:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.projectCity || '(none)'}</div>
+                              <span className="text-muted">project city:</span>
+                              <div className="font-mono text-ink">{auditRequest.projectCity || '(none)'}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">country:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.projectCountry}</div>
+                              <span className="text-muted">country:</span>
+                              <div className="font-mono text-ink">{auditRequest.projectCountry}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">location_sent:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.locationSent || '(none)'}</div>
+                              <span className="text-muted">location_sent:</span>
+                              <div className="font-mono text-ink">{auditRequest.locationSent || '(none)'}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">ll_sent:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.llSent || '(none)'}</div>
+                              <span className="text-muted">ll_sent:</span>
+                              <div className="font-mono text-ink">{auditRequest.llSent || '(none)'}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">gl:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.gl}</div>
+                              <span className="text-muted">gl:</span>
+                              <div className="font-mono text-ink">{auditRequest.gl}</div>
                             </div>
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">hl:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.hl}</div>
+                              <span className="text-muted">hl:</span>
+                              <div className="font-mono text-ink">{auditRequest.hl}</div>
                             </div>
                             {auditRequest.scanner_version && (
                               <div>
-                                <span className="text-slate-600 dark:text-slate-300">scanner_version:</span>
-                                <div className="font-mono text-slate-900 dark:text-slate-100">{auditRequest.scanner_version}</div>
+                                <span className="text-muted">scanner_version:</span>
+                                <div className="font-mono text-ink">{auditRequest.scanner_version}</div>
                               </div>
                             )}
                           </div>
@@ -194,26 +205,26 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Response Section */}
                     {auditResponse && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{t.auditResponse}</h4>
-                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-3 text-sm">
+                        <h4 className="font-semibold text-ink mb-3">{t.auditResponse}</h4>
+                        <div className="bg-sunk p-4 rounded-control space-y-3 text-sm">
                           <div>
-                            <span className="text-slate-600 dark:text-slate-300">searchParameters.location:</span>
-                            <div className="font-mono text-slate-900 dark:text-slate-100">{auditResponse.searchParameters?.location || '(none)'}</div>
+                            <span className="text-muted">searchParameters.location:</span>
+                            <div className="font-mono text-ink">{auditResponse.searchParameters?.location || '(none)'}</div>
                           </div>
                           <div>
-                            <span className="text-slate-600 dark:text-slate-300">searchParameters.ll:</span>
-                            <div className="font-mono text-slate-900 dark:text-slate-100">{auditResponse.searchParameters?.ll || '(none)'}</div>
+                            <span className="text-muted">searchParameters.ll:</span>
+                            <div className="font-mono text-ink">{auditResponse.searchParameters?.ll || '(none)'}</div>
                           </div>
                           <div>
-                            <span className="text-slate-600 dark:text-slate-300">places_count:</span>
-                            <div className="font-mono text-slate-900 dark:text-slate-100">{auditResponse.placesCount || 0}</div>
+                            <span className="text-muted">places_count:</span>
+                            <div className="font-mono text-ink">{auditResponse.placesCount || 0}</div>
                           </div>
                           {auditResponse.placesSample && auditResponse.placesSample.length > 0 && (
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">top 10 place titles:</span>
-                              <ul className="mt-2 space-y-1 ml-4">
+                              <span className="text-muted">top 10 place titles:</span>
+                              <ul className="mt-2 space-y-1 ms-4">
                                 {auditResponse.placesSample.map((place: any, idx: number) => (
-                                  <li key={idx} className="text-slate-700 dark:text-slate-200">• {place.title || '(no title)'}</li>
+                                  <li key={idx} className="text-body">• {place.title || '(no title)'}</li>
                                 ))}
                               </ul>
                             </div>
@@ -225,43 +236,43 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Decision Section */}
                     {auditDecision && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{t.auditDecision}</h4>
-                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-3 text-sm">
+                        <h4 className="font-semibold text-ink mb-3">{t.auditDecision}</h4>
+                        <div className="bg-sunk p-4 rounded-control space-y-3 text-sm">
                           <div>
-                            <span className="text-slate-600 dark:text-slate-300">found:</span>
-                            <div className="font-mono text-slate-900 dark:text-slate-100">{auditDecision.found ? 'yes' : 'no'}</div>
+                            <span className="text-muted">found:</span>
+                            <div className="font-mono text-ink">{auditDecision.found ? 'yes' : 'no'}</div>
                           </div>
                           {auditDecision.found && (
                             <>
                               <div>
-                                <span className="text-slate-600 dark:text-slate-300">matched title:</span>
-                                <div className="font-mono text-slate-900 dark:text-slate-100">{auditDecision.matchedTitle || '(none)'}</div>
+                                <span className="text-muted">matched title:</span>
+                                <div className="font-mono text-ink">{auditDecision.matchedTitle || '(none)'}</div>
                               </div>
                               <div>
-                                <span className="text-slate-600 dark:text-slate-300">matched position:</span>
-                                <div className="font-mono text-slate-900 dark:text-slate-100">
+                                <span className="text-muted">matched position:</span>
+                                <div className="font-mono text-ink">
                                   #{auditDecision.matchedPosition}
                                   {auditDecision.position_source && (
-                                    <span className="text-slate-500 dark:text-slate-400 text-xs ml-2">({auditDecision.position_source})</span>
+                                    <span className="text-muted text-xs ms-2">({auditDecision.position_source})</span>
                                   )}
                                 </div>
                               </div>
                               <div>
-                                <span className="text-slate-600 dark:text-slate-300">matched address:</span>
-                                <div className="font-mono text-slate-900 dark:text-slate-100">{auditDecision.matchedAddress || '(none)'}</div>
+                                <span className="text-muted">matched address:</span>
+                                <div className="font-mono text-ink">{auditDecision.matchedAddress || '(none)'}</div>
                               </div>
                             </>
                           )}
                           {!auditDecision.grid_enabled && (
                             <div>
-                              <span className="text-slate-600 dark:text-slate-300">geo validation result:</span>
-                              <div className="font-mono text-slate-900 dark:text-slate-100">{auditDecision.geoValidationPassed ? 'passed' : 'failed'}</div>
+                              <span className="text-muted">geo validation result:</span>
+                              <div className="font-mono text-ink">{auditDecision.geoValidationPassed ? 'passed' : 'failed'}</div>
                             </div>
                           )}
                           {auditDecision.rejectionReason && (
                             <div>
-                              <span className="text-red-600">rejection reason:</span>
-                              <div className="font-mono text-red-700">{auditDecision.rejectionReason}</div>
+                              <span className="text-bad">rejection reason:</span>
+                              <div className="font-mono text-bad">{auditDecision.rejectionReason}</div>
                             </div>
                           )}
                         </div>
@@ -271,12 +282,12 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Grid Results Section */}
                     {auditDecision?.grid_enabled && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                        <h4 className="font-semibold text-ink mb-3">
                           Grid Scan — {auditDecision.grid_size} ({auditDecision.executed_points || auditDecision.per_point_results?.length || 0} executed{auditDecision.early_stopped && `, ${auditDecision.skipped_points} skipped`})
                         </h4>
 
                         {auditDecision.early_stopped && (
-                          <div className="bg-amber-50 border border-amber-200 rounded p-3 mb-4 text-xs text-amber-800">
+                          <div className="bg-warn-soft border border-warn/20 rounded-control p-3 mb-4 text-caption text-warn">
                             <strong>Early stop:</strong> {auditDecision.early_stop_reason}
                           </div>
                         )}
@@ -293,10 +304,10 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                               : '—',
                               sub: `${auditDecision.per_point_results?.filter((p: any) => p.found).length || 0} / ${auditDecision.executed_points || auditDecision.per_point_results?.length || 0} points` },
                           ].map((m, i) => (
-                            <div key={i} className="bg-slate-50 dark:bg-slate-800 p-3 rounded text-sm">
-                              <div className="text-slate-500 dark:text-slate-400 text-xs mb-1">{m.label}</div>
-                              <div className="font-mono font-semibold text-slate-900 dark:text-slate-100">{m.value}</div>
-                              {m.sub && <div className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">{m.sub}</div>}
+                            <div key={i} className="bg-sunk p-3 rounded-control text-sm">
+                              <div className="text-muted text-xs mb-1">{m.label}</div>
+                              <div className="font-mono font-semibold text-ink">{m.value}</div>
+                              {m.sub && <div className="text-muted text-xs mt-0.5">{m.sub}</div>}
                             </div>
                           ))}
                         </div>
@@ -305,58 +316,58 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                         {auditDecision.per_point_results && auditDecision.per_point_results.length > 0 && (
                           <div className="space-y-3">
                             {auditDecision.per_point_results.map((pt: any, idx: number) => (
-                              <div key={idx} className={`p-3 rounded border-l-4 ${pt.found ? 'bg-green-50 dark:bg-green-900/20 border-green-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>
+                              <div key={idx} className={`p-3 rounded-control border-s-4 ${pt.found ? 'bg-ok-soft border-ok/40' : 'bg-sunk border-line-strong'}`}>
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+                                  <span className="font-semibold text-body text-sm">
                                     #{pt.point_index + 1} {pt.label}
-                                    <span className="font-normal text-slate-400 dark:text-slate-500 ml-2 text-xs">{pt.lat}, {pt.lng}</span>
+                                    <span className="font-normal text-muted ms-2 text-xs">{pt.lat}, {pt.lng}</span>
                                   </span>
-                                  <span className={`font-mono font-semibold text-sm ${pt.found ? 'text-green-700' : 'text-slate-400'}`}>
+                                  <span className={`font-mono font-semibold text-sm ${pt.found ? 'text-ok' : 'text-muted'}`}>
                                     {pt.found ? `#${pt.position}` : 'not found'}
                                   </span>
                                 </div>
 
                                 {/* Match Status Debug */}
-                                <div className="bg-white dark:bg-slate-900 p-2 rounded text-xs space-y-1 mb-2">
+                                <div className="bg-surface p-2 rounded-control text-xs space-y-1 mb-2">
                                   <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                      <span className="text-slate-600 dark:text-slate-300">business_returned:</span>
-                                      <span className="font-mono ml-1">{pt.business_returned ? 'yes' : 'no'}</span>
+                                      <span className="text-muted">business_returned:</span>
+                                      <span className="font-mono ms-1">{pt.business_returned ? 'yes' : 'no'}</span>
                                     </div>
                                     <div>
-                                      <span className="text-slate-600 dark:text-slate-300">business_rejected:</span>
-                                      <span className="font-mono ml-1">{pt.business_rejected ? 'yes' : 'no'}</span>
+                                      <span className="text-muted">business_rejected:</span>
+                                      <span className="font-mono ms-1">{pt.business_rejected ? 'yes' : 'no'}</span>
                                     </div>
                                     <div>
-                                      <span className="text-slate-600 dark:text-slate-300">places_checked_count:</span>
-                                      <span className="font-mono ml-1">{pt.places_checked_count || pt.places_count || '—'}</span>
+                                      <span className="text-muted">places_checked_count:</span>
+                                      <span className="font-mono ms-1">{pt.places_checked_count || pt.places_count || '—'}</span>
                                     </div>
                                     <div>
-                                      <span className="text-slate-600 dark:text-slate-300">checked_all_places:</span>
-                                      <span className="font-mono ml-1">{pt.target_checked_against_all_places ? 'yes' : 'no'}</span>
+                                      <span className="text-muted">checked_all_places:</span>
+                                      <span className="font-mono ms-1">{pt.target_checked_against_all_places ? 'yes' : 'no'}</span>
                                     </div>
                                   </div>
                                   {pt.rejection_reason && (
-                                    <div className="text-red-600">
+                                    <div className="text-bad">
                                       <span>rejection reason:</span>
-                                      <span className="font-mono ml-1">{pt.rejection_reason}</span>
+                                      <span className="font-mono ms-1">{pt.rejection_reason}</span>
                                     </div>
                                   )}
                                   {pt.result_signature && (
-                                    <div className="text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
-                                      <span className="text-slate-600 dark:text-slate-300">signature:</span>
-                                      <div className="font-mono text-slate-700 dark:text-slate-200 break-all text-xs mt-0.5">{pt.result_signature}</div>
+                                    <div className="text-muted border-t border-line pt-1 mt-1">
+                                      <span className="text-muted">signature:</span>
+                                      <div className="font-mono text-body break-all text-xs mt-0.5">{pt.result_signature}</div>
                                     </div>
                                   )}
                                 </div>
 
                                 {/* Top Places */}
                                 {pt.top_places && pt.top_places.length > 0 && (
-                                  <div className="bg-white dark:bg-slate-900 p-2 rounded text-xs mb-2">
-                                    <div className="text-slate-600 dark:text-slate-300 font-semibold mb-1">Top {pt.top_places.length} places:</div>
-                                    <ul className="space-y-0.5 ml-2">
+                                  <div className="bg-surface p-2 rounded-control text-xs mb-2">
+                                    <div className="text-muted font-semibold mb-1">Top {pt.top_places.length} places:</div>
+                                    <ul className="space-y-0.5 ms-2">
                                       {pt.top_places.map((place: any, pidx: number) => (
-                                        <li key={pidx} className="text-slate-700 dark:text-slate-200">
+                                        <li key={pidx} className="text-body">
                                           #{place.position}: {place.title}
                                         </li>
                                       ))}
@@ -365,11 +376,11 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                                 )}
 
                                 {pt.found && pt.matched_title && (
-                                  <div className="text-slate-600 dark:text-slate-300 text-xs mt-1">
+                                  <div className="text-muted text-xs mt-1">
                                     <strong>Matched:</strong> {pt.matched_title}{pt.matched_address ? ` — ${pt.matched_address}` : ''}
                                   </div>
                                 )}
-                                <div className="text-slate-400 dark:text-slate-500 text-xs mt-1">{pt.places_count} places returned</div>
+                                <div className="text-muted text-xs mt-1">{pt.places_count} places returned</div>
                               </div>
                             ))}
                           </div>
@@ -380,18 +391,18 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     {/* Attempts Section — only for non-grid scans */}
                     {!auditDecision?.grid_enabled && auditDecision?.attempts && auditDecision.attempts.length > 0 && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Attempts ({auditDecision.attempts.length})</h4>
+                        <h4 className="font-semibold text-ink mb-3">Attempts ({auditDecision.attempts.length})</h4>
                         <div className="space-y-3">
                           {auditDecision.attempts.map((attempt: any, idx: number) => (
-                            <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded text-sm border-l-4 border-slate-300 dark:border-slate-600">
-                              <div className="font-semibold text-slate-900 dark:text-slate-100 mb-2">#{attempt.attemptNumber}: {attempt.context}</div>
-                              <div className="grid grid-cols-2 gap-2 text-slate-700 dark:text-slate-200">
+                            <div key={idx} className="bg-sunk p-3 rounded-control text-sm border-s-4 border-line-strong">
+                              <div className="font-semibold text-ink mb-2">#{attempt.attemptNumber}: {attempt.context}</div>
+                              <div className="grid grid-cols-2 gap-2 text-body">
                                 <div>location: <span className="font-mono">{attempt.location || '(none)'}</span></div>
                                 <div>ll: <span className="font-mono">{attempt.ll || '(none)'}</span></div>
                                 <div>found: <span className="font-mono">{attempt.found ? 'yes' : 'no'}</span></div>
                                 <div>geo_validation: <span className="font-mono">{attempt.geoValidationPassed !== undefined ? (attempt.geoValidationPassed ? 'passed' : 'failed') : '—'}</span></div>
                                 {attempt.rejectionReason && (
-                                  <div className="col-span-2 text-red-600">
+                                  <div className="col-span-2 text-bad">
                                     reason: <span className="font-mono">{attempt.rejectionReason}</span>
                                   </div>
                                 )}
@@ -407,12 +418,12 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                       <div>
                         <button
                           onClick={() => setExpandedRawId(expandedRawId === result.id ? null : result.id)}
-                          className="font-semibold text-slate-900 hover:text-blue-600 text-sm flex items-center gap-1"
+                          className="font-semibold text-ink hover:text-action text-sm flex items-center gap-1"
                         >
                           {expandedRawId === result.id ? '▼' : '▶'} Raw Response
                         </button>
                         {expandedRawId === result.id && (
-                          <div className="bg-slate-900 text-slate-100 p-4 rounded mt-2 overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                          <div className="bg-contrast text-contrast-ink p-4 rounded-control mt-2 overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
                             {typeof auditResponse.rawResponse === 'string'
                               ? auditResponse.rawResponse
                               : JSON.stringify(auditResponse.rawResponse, null, 2)}
@@ -423,12 +434,13 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
 
                     {/* Scanner Version */}
                     {auditVersion && (
-                      <div className="border-t border-slate-200 dark:border-slate-700 pt-4 text-xs">
-                        <span className="text-slate-600 dark:text-slate-300">scanner version:</span>
-                        <div className="font-mono text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 p-2 rounded mt-1">{auditVersion}</div>
+                      <div className="border-t border-line pt-4 text-xs">
+                        <span className="text-muted">scanner version:</span>
+                        <div className="font-mono text-ink bg-sunk p-2 rounded-control mt-1">{auditVersion}</div>
                       </div>
                     )}
-                  </>
+                  </div>
+                  </details>
                 )}
               </div>
             </Card>

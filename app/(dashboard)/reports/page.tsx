@@ -20,6 +20,7 @@ import { formatDate } from '@/lib/i18n/format-date'
 import type { Locale } from '@/lib/i18n/locales'
 import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
+import ScanHistory from '@/components/scans/ScanHistory'
 
 type ReportType = 'google' | 'ai'
 type ReportsCopy = ReturnType<typeof getDashboardDictionary>['reports']
@@ -436,6 +437,9 @@ function ReportsContent() {
           />
         )}
       </section>
+
+      {/* The project's check history, closed until asked for (it was the Scans tab). */}
+      <ScanHistory key={activeProjectId ?? 'none'} projectId={activeProjectId} className="mt-8" />
     </div>
   )
 }

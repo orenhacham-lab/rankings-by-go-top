@@ -24,7 +24,7 @@ export default function Header({ title, subtitle, actions, eyebrow, children }: 
         <div className="min-w-0">
           {eyebrow && <p className="mb-1.5 text-overline font-semibold text-action">{eyebrow}</p>}
           <h1 className="text-title font-bold text-ink text-balance">{title}</h1>
-          {subtitle && <p className="mt-1.5 max-w-2xl text-copy text-muted text-pretty">{subtitle}</p>}
+          {subtitle && <p className="mt-1.5 max-w-2xl text-[0.9375rem] leading-6 text-muted text-pretty">{subtitle}</p>}
           {children && <div className="mt-3">{children}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 md:gap-3 shrink-0">{actions}</div>}

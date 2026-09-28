@@ -18,6 +18,8 @@ import type { SeedPhase } from '@/lib/dashboard/seed'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { formatCount } from '@/components/gsc/format'
 import SiteIcon from '@/components/ui/SiteIcon'
+import CountUp from '@/components/ui/CountUp'
+import type { CSSProperties } from 'react'
 import { LinkButton } from './ui'
 
 export interface NextStep {
@@ -63,7 +65,7 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
       className="relative isolate overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-pop sm:p-8"
     >
       {/* Depth, never an animation of its own: two soft glows and a faint grid that fades out. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,rgb(99_130_246/0.38),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,rgb(240_176_63/0.16),transparent_70%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,rgb(0_134_245/0.34),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,rgb(240_176_63/0.16),transparent_70%)]" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:32px_32px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
@@ -80,7 +82,7 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
             </p>
           </div>
           <p className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-[3.5rem] font-bold leading-none tabular-nums sm:text-[4.25rem]">{formatCount(big, language)}</span>
+            <span className="text-[3.5rem] font-bold leading-none tabular-nums sm:text-[4.25rem]"><CountUp value={big}>{formatCount(big, language)}</CountUp></span>
             <span className="text-section font-medium text-contrast-ink/75">{unit}</span>
           </p>
           <p className="mt-3 max-w-xl text-[0.9375rem] leading-6 text-contrast-ink/85">{sentence}</p>

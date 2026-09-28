@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ProjectForm from '@/components/projects/ProjectForm'
 import ProjectsTable from '@/components/projects/ProjectsTable'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -95,10 +96,7 @@ export default function ProjectsPage() {
       />
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          {dict.common.loading}
-        </div>
+        <TableSkeleton label={dict.common.loading} rows={4} />
       ) : (
         <ProjectsTable projects={projects} clients={clients} onProjectsChange={loadData} />
       )}

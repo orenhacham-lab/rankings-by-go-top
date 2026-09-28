@@ -2,11 +2,10 @@ import { redirect } from 'next/navigation'
 import { scanHistoryHref } from '@/lib/scans/history-href'
 
 /**
- * The Scans tab is gone (UX review, decision 5): its history is a section of
- * Keywords and of Reports. This route stays only to send old links there, on the
- * server, before anything renders.
+ * /scans/<id> never had a page of its own; with the Scans tab gone it leads to
+ * the check history like /scans does. A run's details stay at /scans/<id>/details.
  */
-export default async function ScansRedirect({
+export default async function ScanRedirect({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
