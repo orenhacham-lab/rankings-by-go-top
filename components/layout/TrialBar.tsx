@@ -96,8 +96,9 @@ export default function TrialBar({ state }: { state: TrialBarState }) {
         urgent ? 'bg-contrast-urgent' : 'bg-contrast',
       )}
     >
-      <div className="mx-auto flex min-h-10 w-full max-w-[1280px] flex-wrap items-center justify-center gap-x-4 gap-y-1 py-1.5 sm:justify-between">
-        <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium leading-5">
+      {/* One line on a phone too, so the strip stays 40px instead of wrapping to two. */}
+      <div className="mx-auto flex min-h-10 w-full max-w-[1280px] items-center justify-between gap-x-3 py-1.5 sm:gap-x-4">
+        <p className="flex min-w-0 items-center gap-1.5 text-caption font-medium leading-5 sm:text-[0.8125rem]">
           <Hourglass size={15} strokeWidth={2} aria-hidden className="me-0.5 shrink-0" />
           {sentence}
         </p>

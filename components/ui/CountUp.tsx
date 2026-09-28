@@ -1,8 +1,16 @@
+'use client'
+
 import type { CSSProperties, ReactNode } from 'react'
+import { useInView } from './motion'
 
 /**
- * A KPI that counts up from 0 to its value when it first renders (600ms, once).
- * CSS only (.count-up in globals.css): the formatted value is rendered as usual
+ * A KPI that counts up from 0 to its value (600ms, once), starting the first
+ * time it is ON SCREEN (useInView, components/ui/motion.tsx). It used to start
+ * on render, so a figure further down the dashboard had finished counting before
+ * anyone scrolled to it. Until then the count waits at its first frame
+ * (data-count="wait" pauses the animation in app/globals.css).
+ *
+ * CSS only for the drawing (.count-up): the formatted value is rendered as usual
  * and held transparent while ::after draws an animated integer over it, so
  * screen readers, copy and print always get the real figure, and a refetch that
  * changes the value does not replay the count (the animation has already ended).
@@ -14,8 +22,13 @@ import type { CSSProperties, ReactNode } from 'react'
  */
 export default function CountUp({ value, children }: { value: number; children: ReactNode }) {
   if (!Number.isInteger(value) || value < 1 || value > 999) return <>{children}</>
+  return <Counting value={value}>{children}</Counting>
+}
+
+function Counting({ value, children }: { value: number; children: ReactNode }) {
+  const [ref, seen] = useInView<HTMLSpanElement>({ threshold: 0.6, rootMargin: '0px' })
   return (
-    <span className="count-up" data-count-up={value} style={{ '--count-to': value } as CSSProperties}>
+    <span ref={ref} className="count-up" data-count-up={value} data-count={seen ? 'run' : 'wait'} style={{ '--count-to': value } as CSSProperties}>
       <span className="count-up-value">{children}</span>
     </span>
   )

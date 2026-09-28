@@ -36,13 +36,15 @@ function describePage(url: string, homePage: string): { label: string; isPath: b
   }
 }
 
-export default function GscTopPages({ projectId, className }: { projectId: string | null | undefined; className?: string }) {
+/** `onlyWithData`: render only pages that were found (or a failed read's retry): no setup prompt, no loading card. */
+export default function GscTopPages({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const status = useGscStatus(projectId)
   const pages = useGscMetrics(projectId, status.view, 'pages', pickPages)
   const data = pages.data
   if (data.state === 'disabled') return null
+  if (onlyWithData && !(data.state === 'ready' && data.data.length > 0) && data.state !== 'error') return null
   const retry = () => { status.reload(); pages.reload() }
   const max = data.state === 'ready' ? Math.max(1, ...data.data.map((p) => p.clicks)) : 1
 

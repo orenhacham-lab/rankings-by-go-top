@@ -10,6 +10,7 @@ import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { NAV_DRAWER_EVENT, type NavDrawerRequest } from '@/lib/shell/nav-drawer'
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutGrid,
@@ -160,6 +161,9 @@ const adminItemKeys: readonly NavItem[] = [
   { href: '/setup', labelKey: 'connectionStatus', icon: Plug },
   { href: '/admin/logs', labelKey: 'errorLogs', icon: ClipboardList },
 ]
+
+/** The administrator's entries, for the tab title (components/layout/DocumentTitle.tsx). */
+export const adminNavItems = adminItemKeys
 
 /**
  * The entry that owns a pathname: the LONGEST matching href wins.
@@ -336,12 +340,25 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
   const wasOpenRef = useRef(false)
+  // Opened or closed by the guided tour (lib/shell/nav-drawer.ts): focus stays in
+  // the tour's bubble instead of moving into the drawer and back to the button.
+  const tourDrivenRef = useRef(false)
+
+  useEffect(() => {
+    const onRequest = (e: Event) => {
+      const { open, restoreFocus } = (e as CustomEvent<NavDrawerRequest>).detail ?? { open: false, restoreFocus: true }
+      tourDrivenRef.current = !restoreFocus
+      setMenuOpenAt(open ? pathname : null)
+    }
+    window.addEventListener(NAV_DRAWER_EVENT, onRequest)
+    return () => window.removeEventListener(NAV_DRAWER_EVENT, onRequest)
+  }, [pathname])
 
   // The drawer is modal: focus moves into it, the page behind does not scroll,
   // and when it closes focus returns to the button that opened it.
   useEffect(() => {
     if (menuOpen) {
-      drawerRef.current?.querySelector<HTMLElement>('[data-drawer-close]')?.focus()
+      if (!tourDrivenRef.current) drawerRef.current?.querySelector<HTMLElement>('[data-drawer-close]')?.focus()
       const root = document.documentElement
       const previous = root.style.overflow
       root.style.overflow = 'hidden'
@@ -350,7 +367,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
     }
     if (wasOpenRef.current) {
       wasOpenRef.current = false
-      menuButtonRef.current?.focus()
+      if (!tourDrivenRef.current) menuButtonRef.current?.focus()
     }
   }, [menuOpen])
 
@@ -392,11 +409,15 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   }, [activeHref, isAdmin, language])
 
   return (
-    <aside className="relative z-40 w-full border-b border-rail-line bg-rail text-rail-ink md:w-64 md:shrink-0 md:border-b-0 md:border-e">
+    // On a phone the rail takes no height of its own: it is a zero-height strip
+    // that sticks to the top, and its one visible control, the menu button, sits
+    // at the start of the top bar's row (which leaves room for it), so the phone
+    // has ONE 56px bar instead of a navy brand bar above the top bar.
+    <aside className="sticky top-0 z-40 h-0 w-full text-rail-ink md:relative md:h-auto md:w-64 md:shrink-0 md:border-e md:border-rail-line md:bg-rail">
       <div className="flex flex-col md:sticky md:top-0 md:h-dvh">
-        {/* Brand — 64px, the same height as the top bar, so the two share one line. */}
-        <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-4">
-          <Brand logoAlt={dict.sidebar.logoAlt} />
+        {/* Brand — 64px on the rail. On a phone only the menu button, in the top bar's row. */}
+        <div className="absolute start-0 top-0 flex h-14 shrink-0 items-center ps-3 md:static md:h-16 md:justify-between md:gap-3 md:px-4">
+          <span className="hidden md:contents"><Brand logoAlt={dict.sidebar.logoAlt} /></span>
           <button
             ref={menuButtonRef}
             type="button"
@@ -405,7 +426,8 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             aria-controls="app-nav-drawer"
             aria-haspopup="dialog"
             aria-label={dict.sidebar.openMenu}
-            className={cn('inline-flex size-10 items-center justify-center rounded-control border border-rail-line bg-rail-hover text-rail-ink transition-colors hover:bg-rail-active md:hidden', FOCUS_RING)}
+            data-nav-menu-button=""
+            className="inline-flex size-10 items-center justify-center rounded-control border border-line bg-surface text-ink shadow-card transition-colors hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action md:hidden"
           >
             <Menu size={NAV_ICON.size} strokeWidth={NAV_ICON.strokeWidth} aria-hidden="true" />
           </button>

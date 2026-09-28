@@ -21,6 +21,7 @@ import type { Locale } from '@/lib/i18n/locales'
 import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
 import ScanHistory from '@/components/scans/ScanHistory'
+import { ToastHost, useToasts } from '@/components/ui/Toast'
 
 type ReportType = 'google' | 'ai'
 type ReportsCopy = ReturnType<typeof getDashboardDictionary>['reports']
@@ -56,6 +57,8 @@ function ReportsContent() {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const t = dict.reports
+  // Creating a PDF takes a while: a progress toast, then its outcome (components/ui/Toast.tsx).
+  const toasts = useToasts()
 
   // Area D — the selected project is the GLOBAL active project, picked in the top
   // bar like on every screen. This page has no project dropdown of its own.
@@ -315,48 +318,53 @@ function ReportsContent() {
     }
 
     setExporting('pdf')
+    const payload: {
+      projectId: string
+      reportType: ReportType
+      language: Locale
+      aiReportData?: { summary: unknown; results: unknown }
+    } = {
+      projectId: selectedProjectId,
+      reportType,
+      language,
+    }
+    if (reportType === 'ai' && aiReportData) {
+      payload.aiReportData = {
+        summary: aiReportData.summary,
+        results: aiReportData.results,
+      }
+    }
     try {
-      const payload: any = {
-        projectId: selectedProjectId,
-        reportType,
-        language,
-      }
+      await toasts.track(dict.longActions.reportPdf, async () => {
+        const res = await fetch('/api/reports/export-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
 
-      if (reportType === 'ai' && aiReportData) {
-        payload.aiReportData = {
-          summary: aiReportData.summary,
-          results: aiReportData.results,
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`)
         }
-      }
 
-      const res = await fetch('/api/reports/export-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const projectName = (reportType === 'google'
+          ? googleReportData?.project.name
+          : aiReportData?.project.name) || t.reportFilename
+        const safeName = projectName.replace(/[/\\:*?"<>|]/g, '-').slice(0, 60)
+        const timestamp = new Date().toISOString().slice(0, 10)
+        const reportTypeLabel = reportType === 'google' ? t.rankingsLabel : 'AI'
+        link.href = url
+        link.download = `${t.reportFilename}_${reportTypeLabel}_${safeName}_${timestamp}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
       })
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
-      }
-
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      const projectName = (reportType === 'google'
-        ? googleReportData?.project.name
-        : aiReportData?.project.name) || t.reportFilename
-      const safeName = projectName.replace(/[/\\:*?"<>|]/g, '-').slice(0, 60)
-      const timestamp = new Date().toISOString().slice(0, 10)
-      const reportTypeLabel = reportType === 'google' ? t.rankingsLabel : 'AI'
-      link.href = url
-      link.download = `${t.reportFilename}_${reportTypeLabel}_${safeName}_${timestamp}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
     } catch (error) {
+      // The toast already says so, in our words; the details stay in the console.
       console.error('PDF export error:', error)
-      alert(t.downloadError)
     } finally {
       setExporting(null)
     }
@@ -365,6 +373,7 @@ function ReportsContent() {
   return (
     <div>
       <Header title={t.title} subtitle={t.subtitle} />
+      <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
 
       {/* The automatic monthly reports, made on the 1st. Self-contained: it reads its
           own route and renders nothing until the report tables exist. The reports
@@ -373,6 +382,7 @@ function ReportsContent() {
         projectId={activeProjectId}
         projectLabel={projects.find((p) => p.id === activeProjectId)?.name ?? ''}
         language={language}
+        toasts={toasts}
       />
 
       {/* Clicks, impressions and position on Google, with their trend across syncs.

@@ -1,5 +1,6 @@
 import Sidebar from '@/components/layout/Sidebar'
 import SkipLink from '@/components/layout/SkipLink'
+import DocumentTitle from '@/components/layout/DocumentTitle'
 import { MAIN_CONTENT_ID } from '@/components/layout/main-content'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
@@ -13,6 +14,8 @@ import { getServerLocale } from '@/lib/i18n/server-locale'
 // component, and calling a function exported by a client module throws at runtime.
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
+import { GscFeatureProvider } from '@/components/gsc/GscFeature'
+import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
@@ -67,6 +70,9 @@ export default async function DashboardLayout({
   // Area G — the language provider is seeded from the signup-origin locale.
   return (
     <DashboardLanguageProvider initialLocale={initialLocale}>
+      {/* The server's own Search Console flag, so a screen with it off asks nothing
+          (components/gsc/GscFeature.tsx) instead of learning it from a 404. */}
+      <GscFeatureProvider enabled={isGscReadOnlyEnabled()}>
       {/* Area D — ONE global active-project source of truth for the whole dashboard.
           Wrapped in Suspense because the provider reads the URL via useSearchParams. */}
       <Suspense fallback={null}>
@@ -77,14 +83,17 @@ export default async function DashboardLayout({
               matching margin, so the two can never disagree about its width. */}
           <div className="flex flex-col md:flex-row min-h-screen bg-canvas text-body">
             <DashboardLocaleEffect />
+            <DocumentTitle />
             <SkipLink />
             <Sidebar isAdmin={isAdmin} />
             <main className="flex-1 min-w-0 min-h-screen bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(0_112_214/0.06),transparent_70%)]">
               <DashboardDirectionWrapper>
                 {/* The top bar. Every screen shows the SAME workspace control, because
                     "which site am I looking at" is a question about the app, not about
-                    the screen — it used to be answered by a different widget per page. */}
-                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md backdrop-saturate-150 md:px-8">
+                    the screen — it used to be answered by a different widget per page.
+                    On a phone it is the only bar: the menu button (the sidebar's) sits
+                    at its start, hence the wider start padding there. */}
+                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 pe-4 ps-16 backdrop-blur-md backdrop-saturate-150 md:px-8">
                   <WorkspaceSwitcher />
                   <GuideMenu userId={user.id} accountCreatedAt={user.created_at ?? null} />
                 </div>
@@ -97,6 +106,7 @@ export default async function DashboardLayout({
           </div>
         </ActiveProjectProvider>
       </Suspense>
+      </GscFeatureProvider>
     </DashboardLanguageProvider>
   )
 }

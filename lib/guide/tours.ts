@@ -9,10 +9,10 @@
  * under `guide.steps`, keyed by the step's `key`.
  *
  * A step points at the page by a CSS selector list. The runner uses the first
- * match that is visible; a match that exists but is hidden (the sidebar's links
- * on a phone, where the nav is a closed menu) still gets its bubble, centred and
- * without a spotlight. A step whose target is not on the page at all is skipped —
- * a screen that is switched off in this build is never described.
+ * match that is visible. A sidebar entry (`navEntry`) is inside the closed menu
+ * on a phone: the runner opens the menu and points at the entry there. A step
+ * whose target cannot be seen at all is skipped, so the bubble never points at
+ * nothing, and a screen switched off in this build is never described.
  */
 import { CONTENT_STRATEGY_PATH } from '@/lib/content/content-workspace-nav'
 
@@ -21,6 +21,8 @@ export type TourStepKey =
   | 'switcher' | 'hero' | 'research' | 'keywords' | 'strategy' | 'aiVisibility' | 'connections' | 'guide'
   // Steps of the per-screen tours.
   | 'dashboardHero' | 'dashboardShortcuts'
+  // A new project's dashboard opens on "Start here" instead of the opening card.
+  | 'start'
   | 'researchHeader' | 'researchForm'
   | 'keywordsHeader'
   | 'strategyHeader'
@@ -40,7 +42,19 @@ export interface TourStep {
   lazy?: boolean
   /** Only meaningful with a project open: left out for an account that has none yet. */
   needsProject?: boolean
+  /** A sidebar entry: on a phone the runner opens the menu to show it. */
+  navEntry?: boolean
+  /**
+   * Another text for the step when the element it found says so: the matched
+   * element's `data-tour-variant` names a key here (a new project's "Start here"
+   * card stands where the opening card would be).
+   */
+  variants?: Readonly<Record<string, TourStepKey>>
 }
+
+/** The dashboard's first card: the opening card, or "Start here" on a new project. */
+export const DASHBOARD_FIRST_CARD = '[data-dashboard-widget="hero"], [data-dashboard-widget="start"]'
+const FIRST_CARD_VARIANTS = { start: 'start' } as const
 
 /** The top bar's switcher carries this anchor in every state it renders. */
 export const SWITCHER_TARGET = '[data-onboarding="workspace"]'
@@ -53,12 +67,12 @@ export const navTarget = (href: string) => `aside a[href="${href}"]`
 
 export const FULL_TOUR: readonly TourStep[] = [
   { key: 'switcher', target: SWITCHER_TARGET },
-  { key: 'hero', target: '[data-dashboard-widget="hero"]', lazy: true, needsProject: true },
-  { key: 'research', target: navTarget('/keyword-research') },
-  { key: 'keywords', target: navTarget('/keywords') },
-  { key: 'strategy', target: navTarget(CONTENT_STRATEGY_PATH) },
-  { key: 'aiVisibility', target: navTarget('/ai-visibility') },
-  { key: 'connections', target: navTarget('/settings') },
+  { key: 'hero', target: DASHBOARD_FIRST_CARD, lazy: true, needsProject: true, variants: FIRST_CARD_VARIANTS },
+  { key: 'research', target: navTarget('/keyword-research'), navEntry: true },
+  { key: 'keywords', target: navTarget('/keywords'), navEntry: true },
+  { key: 'strategy', target: navTarget(CONTENT_STRATEGY_PATH), navEntry: true },
+  { key: 'aiVisibility', target: navTarget('/ai-visibility'), navEntry: true },
+  { key: 'connections', target: navTarget('/settings'), navEntry: true },
   { key: 'guide', target: GUIDE_TARGET },
 ]
 
@@ -72,7 +86,7 @@ export const SCREEN_TOURS: Readonly<Record<ScreenKey, { path: string; steps: rea
   dashboard: {
     path: '/dashboard',
     steps: [
-      { key: 'dashboardHero', target: '[data-dashboard-widget="hero"]', lazy: true, needsProject: true },
+      { key: 'dashboardHero', target: DASHBOARD_FIRST_CARD, lazy: true, needsProject: true, variants: FIRST_CARD_VARIANTS },
       { key: 'dashboardShortcuts', target: '[data-tour="screen-actions"]' },
     ],
   },

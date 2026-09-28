@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { gscStatusView, type GscSetupState, type GscStatusView } from '@/lib/gsc/widget-state'
+import { useGscEnabled } from './GscFeature'
 
 export interface GscResponse { status: number; body: unknown }
 
@@ -84,12 +85,15 @@ export function useGscResponse(url: string | null): { response: GscResponse | nu
  */
 export function useGscStatus(projectId: string | null | undefined): { view: GscStatusView; reload: () => void } {
   const { isResolved } = useActiveProject()
-  const { response, reload } = useGscResponse(projectId ? gscStatusUrl(projectId) : null)
+  // Switched off on the server (the layout says so): nothing to ask, and nothing shown.
+  const off = useGscEnabled() === false
+  const { response, reload } = useGscResponse(projectId && !off ? gscStatusUrl(projectId) : null)
   const view = useMemo<GscStatusView>(() => {
+    if (off) return { state: 'disabled' }
     if (!projectId) return isResolved ? { state: 'not_connected' } : { state: 'loading' }
     if (!response) return { state: 'loading' }
     return gscStatusView(response.status, response.body)
-  }, [projectId, isResolved, response])
+  }, [off, projectId, isResolved, response])
   return { view, reload }
 }
 

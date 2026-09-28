@@ -170,14 +170,17 @@
   /* Motion — short, and out of the way: an ease that arrives quickly and settles.
      The whole budget (UX review, decision 4), and nothing else moves:
        tab content enters   180ms, 30ms apart for the first four blocks
-       a KPI counts up      600ms, once, on mount (never on a refetch)
+       a KPI counts up      600ms, once, when first on screen (never on a refetch)
+       a dashboard card     280ms, once, when first on screen, 40ms apart
        a score ring draws   700ms
        a menu pops in       160ms
        the phone drawer     240ms, its scrim 200ms
        the active tab pill  200ms, sliding between entries
        a list's items enter 180ms, 30ms apart for the first four (.list-enter)
-       a skeleton shimmers  1.2s, the ONLY loop, gone when the data arrives
-     Never on table rows, never on scroll, nothing over 300ms between tabs. */
+       a skeleton shimmers  1.2s, a loop, gone when the data arrives
+       a long action's bar  1.4s, a loop, gone when the action ends
+     Never on table rows, never replayed on scroll, nothing over 300ms between
+     tabs. One helper drives the on-screen ones: components/ui/motion.tsx. */
   --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -251,6 +254,37 @@
     animation: count-up 600ms ease-out forwards;
     pointer-events: none;
   }
+  /* Not on screen yet (components/ui/CountUp.tsx): the count waits at 0 and
+     starts the first time the figure is seen. */
+  .count-up[data-count='wait'] > .count-up-value,
+  .count-up[data-count='wait']::after { animation-play-state: paused; }
+}
+
+/* A block that enters the first time it scrolls into view (<Reveal>,
+   components/ui/motion.tsx): it rises 8px and fades in, 280ms, staggered by
+   --reveal-delay. `backwards` fill, so no transform is left behind. */
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal[data-reveal='wait'] { opacity: 0; }
+  .reveal[data-reveal='in'] { animation: reveal-in 280ms var(--ease-snappy) var(--reveal-delay, 0ms) backwards; }
+}
+
+/* A long action's progress (components/ui/Toast.tsx): an indeterminate bar
+   sweeping across. With reduced motion it is a still, half-filled bar. */
+@keyframes progress-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@keyframes progress-sweep-rtl {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-250%); }
+}
+.progress-sweep { width: 40%; }
+@media (prefers-reduced-motion: no-preference) {
+  .progress-sweep { animation: progress-sweep 1.4s var(--ease-snappy) infinite; }
+  [dir='rtl'] .progress-sweep { animation-name: progress-sweep-rtl; }
 }
 
 /* A score ring draws itself: the dash starts empty and grows to its share. */

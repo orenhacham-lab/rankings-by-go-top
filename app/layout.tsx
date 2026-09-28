@@ -40,15 +40,10 @@ export async function generateMetadata(): Promise<Metadata> {
     title: m.title,
     description: m.description,
     keywords: m.keywords,
-    icons: {
-      icon: [
-        { url: '/favicon.ico' },
-        { url: '/favicon-192.png', sizes: '192x192', type: 'image/png' },
-        { url: '/favicon-512.png', sizes: '512x512', type: 'image/png' },
-      ],
-      shortcut: '/favicon.ico',
-      apple: '/apple-touch-icon.png',
-    },
+    // No `icons` here, and no <link rel="icon"> in <head> below: the icons are
+    // the file conventions app/favicon.ico, app/icon.png and app/apple-icon.png
+    // (rendered by scripts/brand/icons.ts), which Next links ONCE each, with a
+    // content hash. Declaring them here too put every icon in the head three times.
     openGraph: {
       title: m.ogTitle,
       description: m.ogDescription,
@@ -90,14 +85,6 @@ export default async function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
-        {/* Favicon - Go Top logo */}
-        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=8" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=8" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=8" />
-        <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=8" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=8" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=8" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=8" />
         <meta name="theme-color" content="#0666C2" />
 
         {/* Google Tag Manager - Initialize data layer BEFORE GTM script */}

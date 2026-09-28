@@ -398,12 +398,22 @@ async function main() {
     const composed = (src: string) => ['<HeroCard', '<DashboardSetup', '<HoldingBack', '<RecentActivity', '<RankDistribution', '<RankingChanges', '<CompetitorsWidget',
       '<ContentOpportunities', '<PublishingBoard', '<RecentArticles', '<AiVisibilityBrief', '<AccountStatus', '<Shortcuts', '<GscClicksTile', '<GscTopPages'].every((w) => src.includes(w))
     check('P1: the page composes all the widgets', composed(page))
-    const scanGated = (src: string) => /const hold = seed\.kind === 'run' \? holdingBack\(/.test(src) && /\{hold && \(\s*<div[^>]*>\s*<HoldingBack/.test(src)
+    // A widget appears once it has something to show (lib/dashboard/start.ts); the scan
+    // widget also needs a scan run at all.
+    const scanGated = (src: string) => /const hold = seed\.kind === 'run' \? holdingBack\(/.test(src)
+      && /\bhold: !!hold\b/.test(src)
+      && /\{show\.hold && hold && \(\s*<Reveal[^>]*>\s*<HoldingBack/.test(src)
     check('P2: with no scan (switched off, or an older project) the scan widget is not rendered', scanGated(page))
-    check('P-MUT: rendering it unconditionally fails P2', !scanGated(page.replace('{hold && (', '{(')))
-    const oneButton = (src: string) => /firstArticleHref=\{heroHasFirstArticle \? null : strategyHref\('board'\)\}/.test(src)
+    check('P-MUT: rendering it unconditionally fails P2', !scanGated(page.replace('{show.hold && hold && (', '{(')))
+    check('P-MUT: a scan widget shown without a run fails P2', !scanGated(page.replace('hold: !!hold', 'hold: true')))
+    // One "Write the first article" button: a new project's is the start card's article
+    // step and the hero is not there; later it is the hero's next step. The articles list
+    // is shown only once there are articles, and never carries its own.
+    const oneButton = (src: string) => /<RecentArticles\b[^>]*\bfirstArticleHref=\{null\}/.test(src)
+      && /\{startMode \? \(\s*<StartHere\b[\s\S]*?\) : \(\s*<>\s*<HeroCard\b/.test(src)
     check('P3: one "Write the first article" button on the screen', oneButton(page))
-    check('P-MUT: a second one fails P3', !oneButton(page.replace("heroHasFirstArticle ? null : strategyHref('board')", "strategyHref('board')")))
+    check('P-MUT: a second one, on the articles list, fails P3', !oneButton(page.replace('firstArticleHref={null}', "firstArticleHref={strategyHref('board')}")))
+    check('P-MUT: the hero rendered beside the start card fails P3', !oneButton(page.replace(/\) : \(\s*<>\s*<HeroCard/, ')}\n<><HeroCard')))
     const FORBIDDEN = /google-ads|googleads|serper|openai|anthropic|@ai-sdk|lib\/ai\/|lib\/llm|scrapellm|dataforseo|lib\/seed-scan\/(?!types)|lib\/free-check\/(?!copy)|usage-reservations|reserveUsage/i
     const dir = join(ROOT, 'components/dashboard')
     const files = ['app/(dashboard)/dashboard/page.tsx', 'lib/dashboard/seed.ts', 'lib/dashboard/rankings.ts', 'lib/dashboard/activity.ts', 'lib/dashboard/competitors.ts',
