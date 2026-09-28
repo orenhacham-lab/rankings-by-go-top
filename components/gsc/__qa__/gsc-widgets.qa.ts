@@ -408,6 +408,14 @@ async function main() {
         }
         check(`D1 (${locale}) ${widget.name}: title, one sentence, one button to settings in all four setup states`, failures.length === 0, failures.join(' | '))
       }
+      // UX review P1-8: before Search Console gives figures, the performance section on
+      // Reports is ONE card. It used to add three tiles that each said "waiting for
+      // Search Console" with their own source line: the same placeholder four times.
+      const oneCard = (html: string) => !html.includes('data-gsc-tile=') && count(html, esc(w.emptyTile)) === 0 && count(html, esc(w.source28)) === 0
+      const perfSetup = GSC_SETUP_STATES.map((state) => { prime('p1', 200, STATUS_BODY[state]); return render(locale, createElement(GscPerformance, { projectId: 'p1' })) })
+      check(`D1b (${locale}) performance before Search Console: one card, no "waiting" tiles`, perfSetup.every(oneCard))
+      check(`D1b-MUT (${locale}) a "waiting" tile beside the card fails D1b`,
+        !oneCard(perfSetup[0].replace('</section>', `<div data-gsc-tile="clicks">${esc(w.emptyTile)}</div></section>`)))
       // Feature switched off on the server: nothing to connect, so nothing at all, not even
       // the title. Then an account with no project yet.
       prime('p1', 404, { error: 'Not found' })

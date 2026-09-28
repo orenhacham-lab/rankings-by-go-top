@@ -11,15 +11,20 @@ import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import { formatDateTime } from '@/lib/utils'
+import StatTile from '@/components/ui/StatTile'
 import { sortTargetsByPosition } from '@/lib/sorting'
-import { BarChart3, FileText, Zap } from 'lucide-react'
+import { BarChart3, FileText } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { formatDate } from '@/lib/i18n/format-date'
+import type { Locale } from '@/lib/i18n/locales'
 import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
 
 type ReportType = 'google' | 'ai'
+type ReportsCopy = ReturnType<typeof getDashboardDictionary>['reports']
+/** One row of the AI results table, as loadAiReport flattens it. */
+type AiResultRow = { id: string; prompt_text?: string; engine: string; mentioned?: boolean; target_cited?: boolean; citation_count?: number; created_at: string }
 
 interface AIScanResult {
   id: string
@@ -358,10 +363,7 @@ function ReportsContent() {
 
   return (
     <div>
-      <Header
-        title={t.title}
-        subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}
-      />
+      <Header title={t.title} subtitle={t.subtitle} />
 
       {/* The automatic monthly reports, made on the 1st. Self-contained: it reads its
           own route and renders nothing until the report tables exist. The reports
@@ -375,12 +377,18 @@ function ReportsContent() {
       {/* Clicks, impressions and position on Google, with their trend across syncs.
           Always here: before Search Console is set up it says what it will show
           (with Search Console switched off on the server it renders nothing). */}
-      <GscPerformance projectId={activeProjectId} className="mb-6" />
+      <GscPerformance projectId={activeProjectId} className="mb-8" />
 
-      {/* Report type. The project is the one the top bar names. */}
-      <Card className="mb-6">
-        <div className="flex gap-4 items-end flex-wrap">
-          <div className="flex-1 min-w-48">
+      {/* The report built on demand. The project is the one the top bar names; the
+          report loads on arrival and again whenever its type changes, so there is
+          no separate "load" step. */}
+      <section aria-labelledby="on-demand-report-title" data-on-demand-report={reportType}>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <h2 id="on-demand-report-title" className="text-section font-semibold text-ink">{t.onDemandTitle}</h2>
+            <p className="mt-0.5 max-w-prose text-copy text-muted">{t.onDemandBody}</p>
+          </div>
+          <div className="w-full sm:w-72">
             <Select
               label={t.reportType}
               value={reportType}
@@ -391,55 +399,92 @@ function ReportsContent() {
               ]}
             />
           </div>
-          <Button
-            onClick={() => {
-              if (reportType === 'google') {
-                loadGoogleReport(selectedProjectId)
-              } else {
-                loadAiReport(selectedProjectId)
-              }
-            }}
-            disabled={!selectedProjectId}
-            loading={loading}
-          >
-            {t.loadReport}
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center gap-2 rounded-card border border-line bg-surface py-16 text-copy text-muted" aria-busy="true">
+            <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-action border-t-transparent motion-reduce:animate-none" />
+            {t.loadingReportData}
+          </div>
+        )}
+
+        {/* Google Report */}
+        {reportType === 'google' && googleReportData && !loading && (
+          <GoogleReport
+            reportData={googleReportData}
+            exporting={exporting}
+            onExportPDF={handleExportPDF}
+            onExportExcel={handleExportExcel}
+            sortColumn={sortColumn}
+            setSortColumn={setSortColumn}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            t={t}
+            language={language}
+          />
+        )}
+
+        {/* AI Visibility Report */}
+        {reportType === 'ai' && aiReportData && !loading && (
+          <AIVisibilityReport
+            reportData={aiReportData}
+            exporting={exporting}
+            onExportPDF={handleExportPDF}
+            onExportExcel={handleExportExcel}
+            t={t}
+            language={language}
+          />
+        )}
+      </section>
+    </div>
+  )
+}
+
+/**
+ * The head of a report built on demand: what kind of report, for which project,
+ * when it was made, and its two downloads. A surface card with a 4px brand stripe
+ * on the reading side (UX review P1-8), not a saturated banner: the old #155dfc
+ * block sat outside the palette and its light-blue text read at 3.68:1.
+ */
+function ReportCard({ kind, project, language, exporting, onExportExcel, onExportPDF, t }: {
+  kind: string
+  project: Project & { clients?: Client }
+  language: Locale
+  exporting: 'excel' | 'pdf' | null
+  onExportExcel: () => void
+  onExportPDF: () => void
+  t: ReportsCopy
+}) {
+  const meta = [project.clients?.name, project.target_domain].filter(Boolean) as string[]
+  return (
+    <Card className="mb-6 border-s-4 border-s-action">
+      <div className="flex flex-wrap items-center justify-between gap-4" data-report-card="">
+        <div className="min-w-0">
+          <p className="text-overline font-semibold text-action">{kind}</p>
+          <h3 className="mt-1 text-section font-bold text-ink">{project.name}</h3>
+          {meta.length > 0 && (
+            <p className="mt-0.5 text-copy text-muted">
+              {meta.map((m, i) => (
+                <span key={m}>{i > 0 && ' · '}<bdi>{m}</bdi></span>
+              ))}
+            </p>
+          )}
+          <p className="mt-1 text-caption text-muted" data-report-date="">
+            {t.generatedOn} {formatDate(language).date(new Date())}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onExportExcel} loading={exporting === 'excel'}>
+            <BarChart3 size={16} strokeWidth={2} aria-hidden="true" />
+            {t.exportExcel}
+          </Button>
+          <Button onClick={onExportPDF} loading={exporting === 'pdf'}>
+            <FileText size={16} strokeWidth={2} aria-hidden="true" />
+            {t.downloadReport}
           </Button>
         </div>
-      </Card>
-
-      {loading && (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          {t.loadingReportData}
-        </div>
-      )}
-
-      {/* Google Report */}
-      {reportType === 'google' && googleReportData && !loading && (
-        <GoogleReport
-          reportData={googleReportData}
-          exporting={exporting}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          sortColumn={sortColumn}
-          setSortColumn={setSortColumn}
-          sortOrder={sortOrder}
-          setSortOrder={setSortOrder}
-          t={t}
-        />
-      )}
-
-      {/* AI Visibility Report */}
-      {reportType === 'ai' && aiReportData && !loading && (
-        <AIVisibilityReport
-          reportData={aiReportData}
-          exporting={exporting}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          t={t}
-        />
-      )}
-    </div>
+      </div>
+    </Card>
   )
 }
 
@@ -454,10 +499,10 @@ function GoogleReport({
   sortOrder,
   setSortOrder,
   t,
+  language,
 }: any) {
   const foundCount = Object.values(reportData.latestResults).filter((r: any) => r.found).length
   const total = reportData.targets.length || 0
-  const primaryEngine = reportData.targets[0]?.engine_type || 'google_search'
 
   const getSortedTargets = () => {
     if (!reportData) return []
@@ -479,65 +524,24 @@ function GoogleReport({
 
   return (
     <>
-      <div className="bg-blue-600 text-white rounded-xl p-6 mb-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <div className="text-xs text-blue-200 mb-1">Rankings by Go Top</div>
-            <h2 className="text-xl font-bold">{reportData.project.name}</h2>
-            <p className="text-blue-200 text-sm mt-1">
-              {reportData.project.clients?.name} · {reportData.project.target_domain}
-            </p>
-            <p className="text-blue-300 text-xs mt-1">
-              {t.generatedOn} {new Date().toLocaleDateString('en-US')}
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={onExportExcel}
-              loading={exporting === 'excel'}
-              className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
-            >
-              <BarChart3 size={18} strokeWidth={2} />
-              {t.exportExcel}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={onExportPDF}
-              loading={exporting === 'pdf'}
-              className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
-            >
-              <FileText size={18} strokeWidth={2} />
-              {t.downloadReport}
-            </Button>
-          </div>
-        </div>
+      <ReportCard
+        kind={t.googleReport}
+        project={reportData.project}
+        language={language}
+        exporting={exporting}
+        onExportExcel={onExportExcel}
+        onExportPDF={onExportPDF}
+        t={t}
+      />
+
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatTile label={t.google.totalKeywords} value={total} />
+        <StatTile label={t.google.found} value={<span className="text-ok">{foundCount}</span>} />
+        <StatTile label={t.google.notFound} value={<span className={total - foundCount > 0 ? 'text-bad' : undefined}>{total - foundCount}</span>} />
+        <StatTile label={t.google.coverage} value={total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'} />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.totalKeywords}</div>
-          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{total}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.found}</div>
-          <div className="text-2xl font-bold text-green-600">{foundCount}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.notFound}</div>
-          <div className="text-2xl font-bold text-red-500">{total - foundCount}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.coverage}</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'}
-          </div>
-        </Card>
-      </div>
-
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.google.currentRankings} ({total})</h3>
-      </div>
+      <h3 className="mb-3 text-section font-semibold text-ink">{t.google.currentRankings} ({total})</h3>
 
       <Table>
         <TableHead>
@@ -546,8 +550,9 @@ function GoogleReport({
             <Th>{t.google.engine}</Th>
             <Th>
               <button
+                type="button"
                 onClick={() => handleSortClick('position')}
-                className="cursor-pointer select-none"
+                className="cursor-pointer select-none rounded-control hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
               >
                 {t.google.ranking} {sortColumn === 'position' && (sortOrder === 'asc' ? '↑' : '↓')}
               </button>
@@ -560,7 +565,7 @@ function GoogleReport({
             const result = reportData.latestResults[target.id]
             return (
               <TableRow key={target.id}>
-                <Td>{target.keyword}</Td>
+                <Td className="font-medium text-ink">{target.keyword}</Td>
                 <Td><EngineBadge engine={target.engine_type} /></Td>
                 <Td>{result?.found ? result.position : '—'}</Td>
                 <Td>{result && <PositionChange change={result.change_value} />}</Td>
@@ -583,6 +588,7 @@ function AIVisibilityReport({
   onExportPDF,
   onExportExcel,
   t,
+  language,
 }: any) {
   const engines = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode']
   const engineLabels: Record<string, string> = {
@@ -593,170 +599,117 @@ function AIVisibilityReport({
     grok: 'Grok',
     google_ai_mode: 'Google AI',
   }
+  const dates = formatDate(language)
+  const engineCards = engines.filter((engine) => (reportData.summary.engineBreakdown[engine]?.scans ?? 0) > 0)
 
   return (
     <>
-      <div className="bg-indigo-600 text-white rounded-xl p-6 mb-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <div className="text-xs text-indigo-200 mb-1">Rankings by Go Top</div>
-            <h2 className="text-xl font-bold">{reportData.project.name}</h2>
-            <p className="text-indigo-200 text-sm mt-1">
-              {reportData.project.clients?.name} · {reportData.project.target_domain}
-            </p>
-            <p className="text-indigo-300 text-xs mt-1">
-              {t.ai.aiVisibilityReport} | {t.generatedOn} {new Date().toLocaleDateString('en-US')}
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={onExportExcel}
-              loading={exporting === 'excel'}
-              className="!bg-white !text-indigo-700 hover:!bg-indigo-50 flex items-center gap-2"
-            >
-              <BarChart3 size={18} strokeWidth={2} />
-              {t.exportExcel}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={onExportPDF}
-              loading={exporting === 'pdf'}
-              className="!bg-white !text-indigo-700 hover:!bg-indigo-50 flex items-center gap-2"
-            >
-              <FileText size={18} strokeWidth={2} />
-              {t.downloadReport}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ReportCard
+        kind={t.ai.aiVisibilityReport}
+        project={reportData.project}
+        language={language}
+        exporting={exporting}
+        onExportExcel={onExportExcel}
+        onExportPDF={onExportPDF}
+        t={t}
+      />
 
       {/* Summary Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.aiScans}</div>
-          <div className="text-2xl font-bold text-indigo-600">{reportData.summary.totalScans}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.aiQueries}</div>
-          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{reportData.summary.totalResults}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.mentions}</div>
-          <div className="text-2xl font-bold text-green-600">{reportData.summary.mentionedCount}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.mentionRate}</div>
-          <div className="text-2xl font-bold text-indigo-600">
-            {Math.round(reportData.summary.mentionRate)}%
-          </div>
-        </Card>
+      <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatTile label={t.ai.aiScans} value={reportData.summary.totalScans} />
+        <StatTile label={t.ai.aiQueries} value={reportData.summary.totalResults} />
+        <StatTile label={t.ai.mentions} value={reportData.summary.mentionedCount} />
+        <StatTile label={t.ai.mentionRate} value={`${Math.round(reportData.summary.mentionRate)}%`} />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.domainCited}</div>
-          <div className="text-2xl font-bold text-cyan-600">{reportData.summary.totalCitations}</div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.citationRate}</div>
-          <div className="text-2xl font-bold text-indigo-600">
-            {Math.round(reportData.summary.citationRate)}%
-          </div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.activeEngines}</div>
-          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-            {Object.keys(reportData.summary.engineBreakdown).length}
-          </div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.overallVisibility}</div>
-          <div className="text-2xl font-bold text-indigo-600">
-            {reportData.summary.totalResults > 0
-              ? Math.round(((reportData.summary.mentionedCount + reportData.summary.citedCount) / (reportData.summary.totalResults * 2)) * 100)
-              : 0}%
-          </div>
-        </Card>
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatTile label={t.ai.domainCited} value={reportData.summary.totalCitations} />
+        <StatTile label={t.ai.citationRate} value={`${Math.round(reportData.summary.citationRate)}%`} />
+        <StatTile label={t.ai.activeEngines} value={Object.keys(reportData.summary.engineBreakdown).length} />
+        <StatTile
+          label={t.ai.overallVisibility}
+          value={`${reportData.summary.totalResults > 0
+            ? Math.round(((reportData.summary.mentionedCount + reportData.summary.citedCount) / (reportData.summary.totalResults * 2)) * 100)
+            : 0}%`}
+        />
       </div>
 
       {/* Engine Breakdown */}
-      <div className="mb-6">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{t.ai.performanceByEngine}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {engines.map((engine) => {
-            const breakdown = reportData.summary.engineBreakdown[engine]
-            if (!breakdown || breakdown.scans === 0) return null
-            const mentionRate = Math.round((breakdown.mentions / breakdown.scans) * 100)
-            const citationRate = Math.round((breakdown.cited / breakdown.scans) * 100)
-            return (
-              <Card key={engine}>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">{engineLabels[engine]}</div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">{t.ai.scans}:</span>
-                    <span className="font-medium">{breakdown.scans}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">{t.ai.mentions}:</span>
-                    <span className="font-medium text-green-600">{breakdown.mentions} ({mentionRate}%)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">{t.ai.citations}:</span>
-                    <span className="font-medium text-cyan-600">{breakdown.cited} ({citationRate}%)</span>
-                  </div>
-                </div>
-              </Card>
-            )
-          })}
+      {engineCards.length > 0 && (
+        <div className="mb-8">
+          <h3 className="mb-3 text-section font-semibold text-ink">{t.ai.performanceByEngine}</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {engineCards.map((engine) => {
+              const breakdown = reportData.summary.engineBreakdown[engine]
+              const mentionRate = Math.round((breakdown.mentions / breakdown.scans) * 100)
+              const citationRate = Math.round((breakdown.cited / breakdown.scans) * 100)
+              return (
+                <Card key={engine} padding={false} className="p-5">
+                  <div className="mb-3 text-copy font-semibold text-ink">{engineLabels[engine]}</div>
+                  <dl className="space-y-2 text-caption">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted">{t.ai.scans}</dt>
+                      <dd className="font-medium tabular-nums text-ink">{breakdown.scans}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted">{t.ai.mentions}</dt>
+                      <dd className="font-medium tabular-nums text-ok">{breakdown.mentions} ({mentionRate}%)</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted">{t.ai.citations}</dt>
+                      <dd className="font-medium tabular-nums text-info">{breakdown.cited} ({citationRate}%)</dd>
+                    </div>
+                  </dl>
+                </Card>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* AI Query Results Table */}
       <div className="mb-6">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{t.ai.aiQueryResults} ({reportData.results.length})</h3>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHead>
-              <tr>
-                <Th>{t.ai.query}</Th>
-                <Th>{t.ai.engine}</Th>
-                <Th>{t.ai.mentioned}</Th>
-                <Th>{t.ai.domainCited2}</Th>
-                <Th>{t.ai.citations2}</Th>
-                <Th>{t.ai.date}</Th>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {reportData.results.slice(0, 50).map((result: any) => (
-                <TableRow key={result.id}>
-                  <Td className="max-w-xs">
-                    {result.prompt_text}
-                  </Td>
-                  <Td><EngineBadge engine={result.engine} /></Td>
-                  <Td>
-                    <Badge variant={result.mentioned ? 'success' : 'neutral'}>
-                      {result.mentioned ? t.ai.yes : t.ai.no}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <Badge variant={result.target_cited ? 'success' : 'neutral'}>
-                      {result.target_cited ? t.ai.yes : t.ai.no}
-                    </Badge>
-                  </Td>
-                  <Td>{result.citation_count}</Td>
-                  <Td>{formatDateTime(result.created_at)}</Td>
-                </TableRow>
-              ))}
-              {reportData.results.length === 0 && (
-                <EmptyRow colSpan={6} message={t.ai.noResultsInReport} />
-              )}
-            </TableBody>
-          </Table>
-          {reportData.results.length > 50 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{t.ai.showingResults(50, reportData.results.length)}</p>
-          )}
-        </div>
+        <h3 className="mb-3 text-section font-semibold text-ink">{t.ai.aiQueryResults} ({reportData.results.length})</h3>
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>{t.ai.query}</Th>
+              <Th>{t.ai.engine}</Th>
+              <Th>{t.ai.mentioned}</Th>
+              <Th>{t.ai.domainCited2}</Th>
+              <Th>{t.ai.citations2}</Th>
+              <Th>{t.ai.date}</Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {reportData.results.slice(0, 50).map((result: AiResultRow) => (
+              <TableRow key={result.id}>
+                <Td className="max-w-xs text-ink">
+                  {result.prompt_text}
+                </Td>
+                <Td><EngineBadge engine={result.engine} /></Td>
+                <Td>
+                  <Badge variant={result.mentioned ? 'success' : 'neutral'}>
+                    {result.mentioned ? t.ai.yes : t.ai.no}
+                  </Badge>
+                </Td>
+                <Td>
+                  <Badge variant={result.target_cited ? 'success' : 'neutral'}>
+                    {result.target_cited ? t.ai.yes : t.ai.no}
+                  </Badge>
+                </Td>
+                <Td className="tabular-nums">{result.citation_count}</Td>
+                <Td className="whitespace-nowrap tabular-nums">{dates.dateTime(result.created_at)}</Td>
+              </TableRow>
+            ))}
+            {reportData.results.length === 0 && (
+              <EmptyRow colSpan={6} message={t.ai.noResultsInReport} />
+            )}
+          </TableBody>
+        </Table>
+        {reportData.results.length > 50 && (
+          <p className="mt-2 text-caption text-muted">{t.ai.showingResults(50, reportData.results.length)}</p>
+        )}
       </div>
     </>
   )

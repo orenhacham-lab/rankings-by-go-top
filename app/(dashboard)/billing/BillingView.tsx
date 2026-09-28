@@ -5,6 +5,11 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
 import type { BillingMarket } from '@/lib/paypal/checkout-plans'
+import { Check, CheckCircle2, Coins, Info } from 'lucide-react'
+import Header from '@/components/layout/Header'
+import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
+import { cn } from '@/lib/utils'
 import BillingClient from './client'
 
 /** The 5 plans this view actually has cards/labels for. */
@@ -104,27 +109,30 @@ export default function BillingView({
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
-      <p className="text-slate-600 dark:text-slate-300 mb-8">{t.subtitle}</p>
+    <div>
+      <Header title={t.title} subtitle={t.subtitle} />
 
       {trialActive && (
-        <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-blue-900">
-            {t.trialActive}
-            {trialEndsAt && (
-              <span className="font-semibold">
-                {' '}{t.validUntilPrefix} {new Date(trialEndsAt).toLocaleDateString(dateLocale)}
-              </span>
-            )}
-          </p>
-          <p className="text-blue-800 text-sm mt-2">{t.trialNoChargeNotice}</p>
+        <div className="mb-6 flex items-start gap-3 rounded-card border border-info/20 bg-info-soft px-5 py-4" data-billing-notice="trial">
+          <Info size={18} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-info" />
+          <div className="min-w-0">
+            <p className="text-copy text-ink">
+              {t.trialActive}
+              {trialEndsAt && (
+                <span className="font-semibold">
+                  {' '}{t.validUntilPrefix} {new Date(trialEndsAt).toLocaleDateString(dateLocale)}
+                </span>
+              )}
+            </p>
+            <p className="mt-1 text-caption text-muted">{t.trialNoChargeNotice}</p>
+          </div>
         </div>
       )}
 
       {hasActiveSubscription && (
-        <div className="mb-8 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-900">
+        <div className="mb-6 flex items-start gap-3 rounded-card border border-ok/20 bg-ok-soft px-5 py-4" data-billing-notice="active">
+          <CheckCircle2 size={18} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-ok" />
+          <p className="min-w-0 text-copy text-ink">
             {t.onPlanPrefix} <span className="font-semibold">{plan in t.planLabels ? t.planLabels[plan as PlanKey] : plan}</span>.
             {subscriptionEndsAt && (
               <span>
@@ -136,10 +144,10 @@ export default function BillingView({
       )}
 
       {billingStateUnavailable ? (
-        <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.unavailable.title}</h2>
-          <p className="text-slate-600 dark:text-slate-300 text-sm">{t.unavailable.description}</p>
-        </div>
+        <Card className="mb-8 border-s-4 border-s-warn">
+          <h2 className="mb-1.5 text-section font-semibold text-ink">{t.unavailable.title}</h2>
+          <p className="text-copy text-muted">{t.unavailable.description}</p>
+        </Card>
       ) : shopifyConnected ? (
         <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.shopify.title}</h2>
@@ -164,10 +172,10 @@ export default function BillingView({
       ) : (
         <>
           {hasActiveSubscription && (
-            <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t.manage.title}</h2>
+            <Card className="mb-8">
+              <h2 className="mb-3 text-section font-semibold text-ink">{t.manage.title}</h2>
               {renewalCancelled ? (
-                <p className="text-slate-700 dark:text-slate-300 text-sm">
+                <p className="text-copy text-body">
                   {t.manage.renewalAlreadyCancelled}
                   {subscriptionEndsAt && (
                     <span className="font-semibold">
@@ -177,22 +185,18 @@ export default function BillingView({
                 </p>
               ) : hasPaypalSubscriptionId ? (
                 <>
-                  <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.manage.description}</p>
-                  <button
-                    onClick={handleCancel}
-                    disabled={cancelling}
-                    className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
+                  <p className="mb-4 text-copy text-muted">{t.manage.description}</p>
+                  <Button variant="danger" onClick={handleCancel} disabled={cancelling}>
                     {cancelling ? t.manage.cancelling : t.manage.cancelButton}
-                  </button>
+                  </Button>
                 </>
               ) : (
-                <p className="text-slate-700 dark:text-slate-300 text-sm">{t.manage.contactToCancel}</p>
+                <p className="text-copy text-body">{t.manage.contactToCancel}</p>
               )}
               {cancelMessage && (
-                <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{cancelMessage}</p>
+                <p className="mt-3 text-copy text-body">{cancelMessage}</p>
               )}
-            </div>
+            </Card>
           )}
 
           {market === null ? (
@@ -200,48 +204,55 @@ export default function BillingView({
             // Never silently defaulted (browser locale, dashboard toggle) —
             // an explicit, one-time, persisted choice is required before any
             // plan/price/checkout is shown.
-            <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-center">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.marketPrompt.title}</h2>
-              <p className="text-slate-600 dark:text-slate-300 mb-6 text-sm">{t.marketPrompt.description}</p>
-              <div className="flex justify-center gap-4">
-                <button
-                  onClick={() => selectMarket('ILS')}
-                  disabled={savingMarket !== null}
-                  className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {savingMarket === 'ILS' ? t.marketPrompt.saving : t.marketPrompt.ilsOption}
-                </button>
-                <button
-                  onClick={() => selectMarket('USD')}
-                  disabled={savingMarket !== null}
-                  className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {savingMarket === 'USD' ? t.marketPrompt.saving : t.marketPrompt.usdOption}
-                </button>
+            <Card className="mb-8" >
+              <div className="mx-auto flex max-w-xl flex-col items-center py-2 text-center" data-billing-market-prompt="">
+                <span aria-hidden="true" className="mb-4 grid size-11 place-items-center rounded-2xl bg-action-soft text-action ring-1 ring-action/10">
+                  <Coins size={20} strokeWidth={2} />
+                </span>
+                <h2 className="text-section font-semibold text-ink">{t.marketPrompt.title}</h2>
+                <p className="mt-1.5 text-copy text-muted">{t.marketPrompt.description}</p>
+                <div className="mt-6 grid w-full gap-3 sm:grid-cols-2">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={() => selectMarket('ILS')}
+                    disabled={savingMarket !== null}
+                  >
+                    {savingMarket === 'ILS' ? t.marketPrompt.saving : t.marketPrompt.ilsOption}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={() => selectMarket('USD')}
+                    disabled={savingMarket !== null}
+                  >
+                    {savingMarket === 'USD' ? t.marketPrompt.saving : t.marketPrompt.usdOption}
+                  </Button>
+                </div>
               </div>
-            </div>
+            </Card>
           ) : (
             <>
-              <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {t.marketPrompt.currentMarketPrefix} {market === 'USD' ? t.marketPrompt.usdLabel : t.marketPrompt.ilsLabel}
-              </p>
-              <p className="mb-6 text-xs text-slate-500 dark:text-slate-400">
-                {t.keywordCheckNote}
+              <p className="mb-4 flex flex-wrap items-center gap-2 text-copy font-semibold text-ink" data-billing-market={market}>
+                {t.marketPrompt.currentMarketPrefix}
+                <span className="rounded-pill border border-line bg-surface px-2.5 py-0.5 text-caption font-semibold text-ink">
+                  {market === 'USD' ? t.marketPrompt.usdLabel : t.marketPrompt.ilsLabel}
+                </span>
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <PlanCard
-                  name={t.trialName}
-                  price={0}
-                  currencySymbol={currencySymbol}
-                  period=""
-                  features={t.features.trial}
-                  isPopular={false}
-                  isCurrent={plan === 'trial'}
-                  plan="trial"
-                  recommendedLabel={t.recommended}
-                  currentLabel={t.currentPlan}
-                />
+              {/* The trial is a line above the paid plans rather than a fifth card in
+                  their grid, so the four plans you can buy sit side by side and the
+                  grid has no orphan row. Its words, price and "current plan" mark are
+                  the ones its card had. */}
+              <TrialPlanRow
+                name={t.trialName}
+                currencySymbol={currencySymbol}
+                features={t.features.trial}
+                isCurrent={plan === 'trial'}
+                currentLabel={t.currentPlan}
+              />
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <PlanCard
                   name={t.planLabels.regular}
                   price={planPrices.regular}
@@ -295,10 +306,52 @@ export default function BillingView({
               </div>
 
               <BillingClient market={market} />
+
+              <p className="mt-6 max-w-4xl text-caption text-muted">
+                {t.keywordCheckNote}
+              </p>
             </>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function Feature({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2 text-copy text-body">
+      <Check size={16} strokeWidth={2.25} aria-hidden="true" className="mt-0.5 shrink-0 text-ok" />
+      <span className="min-w-0">{children}</span>
+    </li>
+  )
+}
+
+function TrialPlanRow({ name, currencySymbol, features, isCurrent, currentLabel }: {
+  name: string
+  currencySymbol: string
+  features: readonly string[]
+  isCurrent: boolean
+  currentLabel: string
+}) {
+  return (
+    <div
+      data-plan-card="trial"
+      className={cn(
+        'mb-4 grid gap-4 rounded-card border bg-surface p-5 shadow-card md:grid-cols-[12rem_minmax(0,1fr)] md:items-center',
+        isCurrent ? 'border-action ring-1 ring-action' : 'border-line',
+      )}
+    >
+      <div className="min-w-0">
+        {isCurrent && (
+          <span className="mb-2 inline-flex rounded-pill bg-action-soft px-2.5 py-0.5 text-caption font-semibold text-action">{currentLabel}</span>
+        )}
+        <h3 className="text-section font-semibold text-ink">{name}</h3>
+        <p className="mt-1 text-[1.75rem] font-bold leading-none tracking-tight text-ink tabular-nums">{currencySymbol}0</p>
+      </div>
+      <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+        {features.map((feature, i) => <Feature key={i}>{feature}</Feature>)}
+      </ul>
     </div>
   )
 }
@@ -330,45 +383,42 @@ function PlanCard({
 }: PlanCardProps) {
   return (
     <div
-      className={`rounded-lg border-2 p-6 ${
-        isCurrent
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-          : isPopular
-            ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
-            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
-      }`}
+      data-plan-card={plan}
+      className={cn(
+        'flex h-full min-w-0 flex-col rounded-card border bg-surface p-5 shadow-card',
+        isCurrent ? 'border-action ring-1 ring-action' : isPopular ? 'border-commit ring-1 ring-commit' : 'border-line',
+      )}
     >
-      {isPopular && (
-        <div className="mb-4 inline-block px-3 py-1 bg-amber-400 text-amber-900 text-sm font-semibold rounded-full">
-          {recommendedLabel}
-        </div>
-      )}
-      {isCurrent && (
-        <div className="mb-4 inline-block px-3 py-1 bg-blue-500 text-white text-sm font-semibold rounded-full">
-          {currentLabel}
-        </div>
-      )}
-
-      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{name}</h3>
-
-      <div className="mb-6">
-        <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">{currencySymbol}{price}</span>
-        {period && <span className="text-slate-600 dark:text-slate-300 ml-2">{period}</span>}
+      {/* One line for the plan's mark. Side by side it is kept even when empty, so the prices of
+          the four cards sit on one line. */}
+      <div className="flex flex-wrap items-center gap-2 empty:hidden md:min-h-6 md:empty:flex">
+        {isPopular && (
+          <span className="inline-flex rounded-pill bg-commit px-2.5 py-0.5 text-caption font-semibold text-commit-ink">
+            {recommendedLabel}
+          </span>
+        )}
+        {isCurrent && (
+          <span className="inline-flex rounded-pill bg-action-soft px-2.5 py-0.5 text-caption font-semibold text-action">
+            {currentLabel}
+          </span>
+        )}
       </div>
 
-      <ul className="space-y-3 mb-6">
-        {features.map((feature, i) => (
-          <li key={i} className="text-sm text-slate-700 dark:text-slate-200 flex items-start gap-2">
-            <span className="text-green-600 dark:text-green-400 font-bold mt-0.5">✓</span>
-            <span>{feature}</span>
-          </li>
-        ))}
+      <h3 className="mt-3 text-section font-semibold text-ink">{name}</h3>
+
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+        <span className="text-[2.25rem] font-bold leading-tight tracking-tight text-ink tabular-nums">{currencySymbol}{price}</span>
+        {period && <span className="text-copy text-muted">{period}</span>}
+      </div>
+
+      <ul className="mt-5 mb-6 flex-1 space-y-2.5">
+        {features.map((feature, i) => <Feature key={i}>{feature}</Feature>)}
       </ul>
 
       {isCurrent ? (
         <button
           disabled
-          className="w-full py-2 px-4 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold cursor-not-allowed"
+          className="h-11 w-full cursor-not-allowed rounded-control bg-sunk px-4 text-copy font-semibold text-muted"
         >
           {currentLabel}
         </button>
