@@ -63,6 +63,8 @@
   --color-rail-focus: #5cb8ff;
   /* A menu drawn over the page dims it with the rail's own navy. */
   --color-scrim: rgba(10, 27, 61, 0.5);
+  /* A dialog dims the page behind it with a neutral ink (ui/Modal, dialog::backdrop). */
+  --color-backdrop: rgba(21, 23, 28, 0.42);
 
   /* The Go Top light blue, sampled from the mark (public/gotop-primary.png). For
      the logo, indicators, icons and charts ONLY: white on it is 3.7:1, which fails
@@ -113,6 +115,14 @@
   /* Loading placeholders: a quiet two-stop shimmer (see .skeleton). */
   --color-skeleton: #eef1f6;
   --color-skeleton-shine: #f7f9fc;
+  /* The same shimmer on the dark context surface (.skeleton-contrast): the
+     contrast ink at 10% and 18%, so it stays dark in dark mode too. */
+  --color-skeleton-contrast: rgba(245, 246, 248, 0.1);
+  --color-skeleton-contrast-shine: rgba(245, 246, 248, 0.18);
+  /* The plate a site's favicon sits on (ui/SiteAvatar). Always white, in dark
+     mode too: most favicons are drawn for a white page, and a dark logo on a
+     transparent background would vanish on the dark surface. */
+  --color-plate: #ffffff;
 
   /* The accent scale. Legacy screens still say `indigo-600` where the new ones
      say `action`; remapping the scale to the same Go Top blue makes the two agree
@@ -147,6 +157,7 @@
        title    — the screen's title
        metric   — a figure in a stat tile
        section  — a card or section heading
+       lead     — the line under a screen's title, the wordmark, a large button
        copy     — body text
        caption  — labels, sources, meta
        overline — group labels in the sidebar, eyebrows above a title
@@ -160,6 +171,8 @@
   --text-metric--line-height: 2rem;
   --text-section: 1.0625rem;
   --text-section--line-height: 1.5rem;
+  --text-lead: 0.9375rem;
+  --text-lead--line-height: 1.5rem;
   --text-copy: 0.875rem;
   --text-copy--line-height: 1.5rem;
   --text-caption: 0.75rem;
@@ -332,8 +345,17 @@
   from { background-position: 150% 0; }
   to { background-position: -50% 0; }
 }
+/* On the dark context surface (a hero card loading): the same shimmer in the
+   contrast ink, so a dark card's placeholders do not read as light holes. */
+.skeleton-contrast {
+  background-color: var(--color-skeleton-contrast);
+  background-image: linear-gradient(90deg, var(--color-skeleton-contrast) 0%, var(--color-skeleton-contrast-shine) 50%, var(--color-skeleton-contrast) 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+}
 @media (prefers-reduced-motion: no-preference) {
   .skeleton { animation: shimmer 1.2s linear infinite; }
+  .skeleton-contrast { animation: shimmer 1.2s linear infinite; }
 }
 
 /* Dark mode redefines the SAME names, so no component carries a second palette.
@@ -381,6 +403,7 @@
 
   --color-skeleton: #1b1f28;
   --color-skeleton-shine: #252a35;
+  --color-backdrop: rgba(0, 0, 0, 0.6);
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px -10px rgba(0, 0, 0, 0.5);
   --shadow-control: 0 1px 1px rgba(0, 0, 0, 0.3);
@@ -477,7 +500,7 @@ select {
 
 /* ── Native dialog backdrop ────────────────────── */
 dialog::backdrop {
-  background: rgba(21, 23, 28, 0.42);
+  background: var(--color-backdrop);
   backdrop-filter: blur(3px);
 }
 

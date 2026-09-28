@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -62,8 +63,8 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       // No onClose binding here — we manage state ourselves
       className={cn(
         'rounded-card shadow-pop border border-line p-0 m-auto bg-surface text-body max-w-[calc(100vw-2rem)] open:animate-pop-in',
-        // Backdrop styled via globals.css (dialog::backdrop)
-        'backdrop:bg-[rgb(21_23_28/0.42)] dark:backdrop:bg-black/60 backdrop:backdrop-blur-[3px]',
+        // The backdrop is the one `backdrop` token (globals.css), dimmer in dark mode.
+        'backdrop:bg-backdrop backdrop:backdrop-blur-[3px]',
         {
           'w-full max-w-sm': size === 'sm',
           'w-full max-w-lg': size === 'md',
@@ -78,10 +79,10 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
         <button
           type="button"
           onClick={onClose}
-          className="-me-2 size-8 shrink-0 flex items-center justify-center rounded-control text-muted hover:text-ink hover:bg-sunk transition-colors text-sm leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+          className="-me-2 size-8 shrink-0 flex items-center justify-center rounded-control text-muted hover:text-ink hover:bg-sunk transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
           aria-label={dict.common.close}
         >
-          <span aria-hidden="true">✕</span>
+          <X aria-hidden="true" className="size-4" />
         </button>
       </div>
 

@@ -1,6 +1,8 @@
 'use client'
 
 import Badge from './Badge'
+import ChangeArrow, { ChangeSign } from './ChangeArrow'
+import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -47,21 +49,27 @@ export function EngineBadge({ engine, device }: { engine: string; device?: strin
   return <Badge>{engine}</Badge>
 }
 
+/**
+ * A ranking's move since the previous check: a lucide arrow and the number of
+ * places, green up (better) and red down, a muted dash-line when it held.
+ * Positive `change` = improved (a lower position number).
+ */
 export function PositionChange({ change }: { change: number | null }) {
   if (change === null) return <span className="text-muted">—</span>
-  if (change > 0) {
-    return (
-      <span className="text-ok font-semibold text-copy tabular-nums">
-        ▲ {change}
-      </span>
-    )
-  }
-  if (change < 0) {
-    return (
-      <span className="text-bad font-semibold text-copy tabular-nums">
-        ▼ {Math.abs(change)}
-      </span>
-    )
-  }
-  return <span className="text-muted text-copy">=</span>
+  const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat'
+  return (
+    <span
+      data-position-change={direction}
+      className={cn(
+        'inline-flex items-center gap-0.5 text-copy font-semibold tabular-nums',
+        direction === 'up' && 'text-ok',
+        direction === 'down' && 'text-bad',
+        direction === 'flat' && 'font-normal text-muted'
+      )}
+    >
+      <ChangeArrow direction={direction} />
+      <ChangeSign direction={direction} />
+      {direction === 'flat' ? <span className="sr-only">0</span> : Math.abs(change)}
+    </span>
+  )
 }

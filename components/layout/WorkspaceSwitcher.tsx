@@ -256,7 +256,7 @@ export default function WorkspaceSwitcher() {
                 <Link
                   href="/billing"
                   onClick={() => setOpen(false)}
-                  className="rounded-sm font-semibold text-action underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+                  className="rounded-control font-semibold text-action underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
                 >
                   {t.upgrade}
                 </Link>

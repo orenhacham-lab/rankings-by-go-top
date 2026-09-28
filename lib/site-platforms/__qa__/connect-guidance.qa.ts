@@ -64,8 +64,8 @@ function main() {
   for (const locale of ['he', 'en'] as const) {
     const t = DICTS[locale].projectDetail.contentSection
     check(`${locale}: three short steps and a title`, t.wpSteps.length === 3 && t.wpSteps.every((s) => s.length > 10 && s.length < 140) && t.wpStepsTitle.length > 0)
-    check(`${locale}: …naming the wp-admin path (Users → Profile) and Application Passwords`,
-      locale === 'he' ? t.wpSteps[0].includes('משתמשים ← פרופיל') && t.wpSteps[1].includes('סיסמאות אפליקציה') : t.wpSteps[0].includes('Users → Profile') && t.wpSteps[1].includes('Application Passwords'))
+    check(`${locale}: …naming the wp-admin path (Users › Profile) and Application Passwords`,
+      locale === 'he' ? t.wpSteps[0].includes('משתמשים › פרופיל') && t.wpSteps[1].includes('סיסמאות אפליקציה') : t.wpSteps[0].includes('Users › Profile') && t.wpSteps[1].includes('Application Passwords'))
     check(`${locale}: in the right language`, locale === 'he' ? [t.wpStepsTitle, ...t.wpSteps, t.wpOpenProfile].every((s) => HEBREW.test(s)) : ![t.wpStepsTitle, ...t.wpSteps, t.wpOpenProfile].some((s) => HEBREW.test(s)))
   }
   check('a site address → its own profile page, at the Application Passwords section',
