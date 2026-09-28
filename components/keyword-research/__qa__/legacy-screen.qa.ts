@@ -31,7 +31,8 @@
  *      would silently render the default);
  *  U1) no scan and no research ('unseeded'): the empty start (one keyword field),
  *      the older form folded away, no second "new research" bar; the header is
- *      the shared one, in the tokens (no raw slate);
+ *      the shared one, in the tokens (no raw slate); no Search Console source
+ *      (there is no research for Google's keywords to join);
  *  U2) the start's "search by web address" opens the older form, whole;
  *  U3) a research run from the start takes the screen: the overview of it, the
  *      table, the form folded, the start gone;
@@ -169,6 +170,7 @@ function main() {
       const initial = HARNESS.renderPage(locale, { state: {}, scan: UNSEEDED, tag, source })
       const head = initial.slice(0, initial.indexOf('data-research-start'))
       if (!startShown(initial) || !formFolded(initial) || initial.includes('data-research-form="collapsed"') || !initial.includes('text-title') || /slate-|text-3xl/.test(head)) bad.push(`${locale}/initial`)
+      if (initial.includes('data-gsc-widget') || initial.includes('data-chip="google"')) bad.push(`${locale}/search-console`)
       const loading = HARNESS.renderPage(locale, { state: { keyword: 'נעלי ריצה', loading: true }, scan: UNSEEDED, tag, source })
       if (!startShown(loading) || !formFolded(loading)) bad.push(`${locale}/searching`)
       const failed = HARNESS.renderPage(locale, { state: { error: 'SEARCH FAILED' }, scan: UNSEEDED, tag, source })
@@ -177,7 +179,7 @@ function main() {
     return bad
   }
   const u1 = unseeded()
-  check('U1: no scan and no research: the empty start, the older form folded away (also while searching and after an error), one way in, the shared header', u1.length === 0, u1.join(', '))
+  check('U1: no scan and no research: the empty start, the older form folded away (also while searching and after an error), one way in, the shared header, no Search Console source', u1.length === 0, u1.join(', '))
   const opened = LOCALES.filter((locale) => {
     const html = HARNESS.renderPage(locale, { state: { formChoice: true }, scan: UNSEEDED })
     return !(formShown(html) && !startShown(html) && html.includes('data-research-form="open"') && html.includes('name="researchType"'))
@@ -191,10 +193,11 @@ function main() {
   const own = (source?: string, tag = 'current') => LOCALES.filter((locale) => {
     const html = HARNESS.renderPage(locale, { state: {}, scan: OWN_RESEARCH, tag, source })
     const line = locale === 'he' ? 'מקור: מחקר ידני מ-' : 'Source: manual research from '
-    return !(html.includes('data-scan-overview="scan"') && html.includes(line) && formFolded(html) && !startShown(html) && !html.includes(locale === 'he' ? 'מסריקה של' : 'from a scan'))
+    return !(html.includes('data-scan-overview="scan"') && html.includes(line) && formFolded(html) && !startShown(html) && !html.includes(locale === 'he' ? 'מסריקה של' : 'from a scan')
+      && html.includes('data-gsc-widget="keyword-research"'))
   })
   const u4 = own()
-  check('U4: no scan, but research of the project\'s own: the same overview, its source said as it is (a manual research and its date), never "from a scan"', u4.length === 0, u4.join(', '))
+  check('U4: no scan, but research of the project\'s own: the same overview, its source said as it is (a manual research and its date), never "from a scan", with its Search Console source', u4.length === 0, u4.join(', '))
 
   console.log('\nMUT) broken copies of the page fail the checks')
   const page = readFileSync(HARNESS.PAGE_PATH, 'utf8')
@@ -221,6 +224,12 @@ function main() {
   check('U1-MUT2: a page without the empty start fails U1', !!noStart && unseeded(noStart, 'mut-no-start').length > 0, noStart ? undefined : 'anchor missing')
   const oldHeader = mutate('const header = <Header title={t.title} subtitle={t.subtitle} />', 'const header = (<div className="mb-8"><h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1><p className="text-slate-600">{t.subtitle}</p></div>)')
   check('U1-MUT3: the older header (raw slate, text-3xl) fails U1', !!oldHeader && unseeded(oldHeader, 'mut-old-header').length > 0, oldHeader ? undefined : 'anchor missing')
+  const gscOnStart = mutate('const gscSource = scanMode && !unseeded', 'const gscSource = scanMode')
+  check('U1-MUT4: a page that shows the Search Console source on the empty start fails U1',
+    !!gscOnStart && unseeded(gscOnStart, 'mut-gsc-start').length > 0, gscOnStart ? undefined : 'anchor missing')
+  const gscNowhere = mutate('const gscSource = scanMode && !unseeded', 'const gscSource = false')
+  check('U4-MUT2: a page that drops the Search Console source from research of the project\'s own fails U4',
+    !!gscNowhere && own(gscNowhere, 'mut-gsc-nowhere').length > 0, gscNowhere ? undefined : 'anchor missing')
   const scanLine = mutate('          sourceOverride={sourceOverride}\n', '')
   check('U4-MUT: an overview that says "from a scan" of research the project ran by hand fails U4',
     !!scanLine && own(scanLine, 'mut-scan-line').length > 0, scanLine ? undefined : 'anchor missing')

@@ -244,9 +244,14 @@ export default function KeywordResearchPage() {
   // null: the form folds by itself once there is research on screen; true/false: the merchant chose.
   const [formChoice, setFormChoice] = useState<boolean | null>(null)
   const [trackingKeys, setTrackingKeys] = useState<Set<string>>(new Set())
-  // Search Console's keywords view, asked for only with the scan's research on screen.
+  // Search Console's keywords view, asked for only with the scan's research on screen
+  // (or on its way). The empty start ('unseeded': no scan and no research of the
+  // project's own) is one keyword field and the mapping, with no Search Console
+  // source: there is no research for Google's keywords to join, and its count would
+  // read 0 however many clicks Google reports.
+  const gscSource = scanMode && !unseeded
   const trackedIdsKey = useMemo(() => scanTracked.map((k) => k.id).sort().join(','), [scanTracked])
-  const gscKeywords = useGscKeywordFigures(scanMode ? activeProjectId : null, trackedIdsKey)
+  const gscKeywords = useGscKeywordFigures(gscSource ? activeProjectId : null, trackedIdsKey)
   const googleFigures = gscKeywords.data.state === 'ready' ? gscKeywords.data.data : null
   const model = useMemo(
     () => researchModel({
@@ -921,9 +926,9 @@ export default function KeywordResearchPage() {
     return row ? <KeywordSourceLine row={row} /> : null
   }
 
-  const gscState = gscKeywords.data.state
+  const gscState = gscSource ? gscKeywords.data.state : 'disabled'
   const googleChip = gscState === 'disabled' ? 'hidden' : gscState === 'loading' ? 'loading' : 'counted'
-  const gscNotice = scanMode ? (
+  const gscNotice = gscSource ? (
     <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} retry={gscKeywords.retry} />
   ) : null
 
