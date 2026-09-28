@@ -94,13 +94,9 @@ export default function ScanBand({
   const blocked = running || stalled || wait !== null
   return (
     <section id={SITE_SCAN_ANCHOR} aria-labelledby={`${SITE_SCAN_ANCHOR}-title`} className="scroll-mt-20" data-scan-band>
-      <div className="overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-pop ring-1 ring-black/5">
+      <div className="overflow-hidden rounded-card bg-contrast text-contrast-ink shadow-card">
         <div className="relative isolate">
-          {/* Two soft glows and a faint grid: the band is the one dark surface on the screen, the site itself. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(36rem_14rem_at_85%_-20%,rgb(99_130_246/0.35),transparent_70%),radial-gradient(24rem_12rem_at_0%_120%,rgb(240_176_63/0.16),transparent_70%)]"
-          />
+          {/* A faint grid: the band is the one dark surface on the screen, the site itself. */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
@@ -108,23 +104,22 @@ export default function ScanBand({
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 py-5 sm:px-7 sm:py-6">
             <span aria-hidden className="relative shrink-0">
               {domain.trim() ? <SiteAvatar domain={domain} size="xl" tone="dark" /> : (
-                <span className="grid size-14 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15"><ScanSearch size={22} /></span>
+                <span className="grid size-14 place-items-center rounded-inset bg-white/10 ring-1 ring-white/15"><ScanSearch className="size-5" /></span>
               )}
               <span
                 className={cn(
-                  'absolute -bottom-1.5 -end-1.5 grid size-6 place-items-center rounded-full ring-2 ring-contrast transition-colors',
-                  running ? 'bg-info-soft text-info' : 'bg-white text-contrast',
+                  'absolute -bottom-1.5 -end-1.5 grid size-6 place-items-center rounded-pill ring-2 ring-contrast transition-colors duration-150 ease-snappy',
+                  running ? 'bg-action text-action-ink' : 'bg-surface text-contrast',
                 )}
               >
-                <ScanSearch size={13} />
-                {running && <span className="absolute inset-0 rounded-full bg-info-soft opacity-70 motion-safe:animate-ping" />}
+                <ScanSearch className="size-3.5" />
               </span>
             </span>
             <div className="min-w-0 flex-1 basis-60">
-              <h2 id={`${SITE_SCAN_ANCHOR}-title`} className="text-caption font-semibold uppercase tracking-wide text-contrast-ink/70">
+              <h2 id={`${SITE_SCAN_ANCHOR}-title`} className="text-overline font-semibold uppercase tracking-wide text-contrast-ink/70">
                 {t.scan.title}
               </h2>
-              {!never && <Ltr className="mt-0.5 block truncate text-xl font-bold leading-7 text-contrast-ink">{domain}</Ltr>}
+              {!never && <Ltr className="mt-0.5 block truncate text-section font-bold text-contrast-ink">{domain}</Ltr>}
               <p className="mt-1 text-copy text-contrast-ink/80" aria-live="polite">{status}</p>
               {!never && <p className="mt-1 text-caption text-contrast-ink/60">{t.scan.fieldsNote}</p>}
             </div>
@@ -136,13 +131,13 @@ export default function ScanBand({
               className={cn('w-full sm:w-auto', !never && 'border-transparent bg-contrast-ink text-contrast hover:bg-contrast-ink/90')}
               data-rescan
             >
-              {scan.phase !== 'starting' && <RefreshCw size={15} aria-hidden className={cn(running && 'animate-spin')} />}
+              {scan.phase !== 'starting' && <RefreshCw aria-hidden className={cn('size-4', running && 'motion-safe:animate-spin')} />}
               {scan.phase === 'starting' ? t.scan.starting : never ? t.scan.start : t.scan.again}
             </Button>
           </div>
           {running && (
-            <div aria-hidden className="h-1 w-full bg-white/10">
-              <div className="h-full w-1/3 rounded-e-full bg-info-soft motion-safe:animate-pulse" />
+            <div aria-hidden className="h-1 w-full overflow-hidden bg-white/10">
+              <div className="progress-sweep h-full rounded-pill bg-action" />
             </div>
           )}
         </div>

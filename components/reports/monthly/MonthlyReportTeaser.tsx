@@ -37,7 +37,7 @@ export function MonthlyTeaserBody({ body, language: l }: { body: MonthlyGetRespo
       <p className="text-copy font-semibold text-ink">{monthName(latest.month, l)}</p>
       <dl className="grid grid-cols-3 gap-2">
         {figures.map(([label, value, tone]) => (
-          <div key={label} className="min-w-0 rounded-xl bg-sunk px-2.5 py-2">
+          <div key={label} className="min-w-0 rounded-inset bg-sunk px-2.5 py-2">
             <dt className="truncate text-caption text-muted">{label}</dt>
             <dd className={`mt-0.5 text-section font-semibold tabular-nums ${tone ?? 'text-ink'}`}>{value}</dd>
           </div>

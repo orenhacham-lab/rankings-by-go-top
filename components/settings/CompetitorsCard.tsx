@@ -5,6 +5,7 @@ import { Plus, ScanSearch, X } from 'lucide-react'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import Button from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { MAX_ACTIVE_COMPETITORS } from '@/lib/seed-scan/settings'
 import { competitorDomainInput, competitorKey } from '@/lib/project-settings/view'
@@ -173,7 +174,7 @@ export default function CompetitorsCard({
           <span className="inline-flex items-center gap-2 rounded-pill border border-line bg-surface px-2.5 py-1 text-caption font-semibold tabular-nums text-ink">
             <span aria-hidden className="flex gap-0.5">
               {Array.from({ length: MAX_ACTIVE_COMPETITORS }, (_, i) => (
-                <span key={i} className={cn('h-2.5 w-1.5 rounded-full', i < active.length ? 'bg-action' : 'bg-line-strong')} />
+                <span key={i} className={cn('h-2.5 w-1.5 rounded-pill', i < active.length ? 'bg-action' : 'bg-line-strong')} />
               ))}
             </span>
             {active.length}/{MAX_ACTIVE_COMPETITORS}
@@ -185,7 +186,7 @@ export default function CompetitorsCard({
         {load.status === 'loading' && (
           <div className="space-y-2" aria-hidden>
             {[0, 1].map((i) => (
-              <div key={i} className="h-11 animate-pulse rounded-control bg-sunk" />
+              <Skeleton key={i} className="h-11" />
             ))}
           </div>
         )}
@@ -199,9 +200,9 @@ export default function CompetitorsCard({
         {load.status === 'ready' && (
           <>
             {active.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line-strong bg-sunk/40 px-4 py-6 text-center text-copy text-muted">{c.empty}</p>
+              <p className="rounded-inset bg-sunk px-4 py-6 text-center text-copy text-muted">{c.empty}</p>
             ) : (
-              <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+              <ul className="list-enter divide-y divide-line overflow-hidden rounded-inset border border-line">
                 {active.map((item) => {
                   const key = competitorKey(item)
                   const shown = item.domain ?? item.name
@@ -211,7 +212,7 @@ export default function CompetitorsCard({
                       key={item.id}
                       data-competitor={key ?? item.id}
                       className={cn(
-                        'flex items-center gap-3 bg-surface px-3.5 py-3 animate-pop-in transition-[opacity,background-color] hover:bg-sunk/50',
+                        'flex items-center gap-3 bg-surface px-4 py-3 transition-[opacity,background-color] duration-150 ease-snappy hover:bg-sunk/60',
                         removing === item.id && 'opacity-50',
                       )}
                     >
@@ -229,9 +230,9 @@ export default function CompetitorsCard({
                         disabled={removing !== null}
                         aria-label={`${c.remove} ${shown}`}
                         title={c.remove}
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-control text-muted transition-colors hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:opacity-50"
+                        className="grid size-8 shrink-0 place-items-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50"
                       >
-                        <X size={16} aria-hidden />
+                        <X aria-hidden className="size-4" />
                       </button>
                     </li>
                   )
@@ -260,7 +261,7 @@ export default function CompetitorsCard({
                   className={cn(fieldClass, 'min-w-0 flex-1 text-start')}
                 />
                 <Button type="submit" variant="secondary" loading={adding} disabled={full || !input.trim()}>
-                  {!adding && <Plus size={15} aria-hidden />}
+                  {!adding && <Plus aria-hidden className="size-4" />}
                   {c.add}
                 </Button>
               </div>
@@ -275,7 +276,7 @@ export default function CompetitorsCard({
 
         {seedFeatures && (
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line pt-4 text-caption text-muted">
-            <ScanSearch size={14} aria-hidden className="shrink-0 text-info" />
+            <ScanSearch aria-hidden className="size-4 shrink-0 text-muted" />
             <span className="min-w-0">{c.scanNote}</span>
             <a
               href={`#${SECTION.scan}`}

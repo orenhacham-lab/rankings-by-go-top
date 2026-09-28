@@ -6,9 +6,10 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
 import type { BillingMarket } from '@/lib/paypal/checkout-plans'
-import { Check, CheckCircle2, Info } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import Notice from '@/components/ui/Notice'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
 
@@ -100,11 +101,11 @@ export default function BillingView({
     }
   }
 
-  const planAction = (plan: Exclude<PlanKey, 'trial'>) =>
+  // One primary per screen: the recommended plan's button; the other plans' are secondary.
+  const planAction = (plan: Exclude<PlanKey, 'trial'>, recommended = false) =>
     market === null ? (
       <Button
-        variant="primary"
-        size="lg"
+        variant={recommended ? 'primary' : 'secondary'}
         className="w-full"
         data-continue-to-payment={plan}
         onClick={() => selectMarket(shownMarket)}
@@ -140,10 +141,9 @@ export default function BillingView({
       <Header title={t.title} subtitle={t.subtitle} />
 
       {trialActive && (
-        <div className="mb-6 flex items-start gap-3 rounded-card border border-info/20 bg-info-soft px-5 py-4" data-billing-notice="trial">
-          <Info size={18} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-info" />
-          <div className="min-w-0">
-            <p className="text-copy text-ink">
+        <div className="mb-6" data-billing-notice="trial">
+          <Notice tone="info">
+            <p>
               {t.trialActive}
               {trialEndsAt && (
                 <span className="font-semibold">
@@ -151,15 +151,15 @@ export default function BillingView({
                 </span>
               )}
             </p>
-            <p className="mt-1 text-caption text-muted">{t.trialNoChargeNotice}</p>
-          </div>
+            <p className="mt-1 text-caption text-body">{t.trialNoChargeNotice}</p>
+          </Notice>
         </div>
       )}
 
       {hasActiveSubscription && (
-        <div className="mb-6 flex items-start gap-3 rounded-card border border-ok/20 bg-ok-soft px-5 py-4" data-billing-notice="active">
-          <CheckCircle2 size={18} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-ok" />
-          <p className="min-w-0 text-copy text-ink">
+        <div className="mb-6" data-billing-notice="active">
+          <Notice tone="ok">
+          <p>
             {t.onPlanPrefix} <span className="font-semibold">{plan in t.planLabels ? t.planLabels[plan as PlanKey] : plan}</span>.
             {subscriptionEndsAt && (
               <span>
@@ -167,6 +167,7 @@ export default function BillingView({
               </span>
             )}
           </p>
+          </Notice>
         </div>
       )}
 
@@ -235,7 +236,7 @@ export default function BillingView({
             <div className="mb-5 flex flex-col gap-2" data-billing-market-choice={shownMarket}>
               <div className="flex flex-wrap items-center gap-3">
                 <span id="billing-currency-label" className="text-copy font-semibold text-ink">{t.marketPrompt.title}</span>
-                <div role="group" aria-labelledby="billing-currency-label" className="inline-flex rounded-pill border border-line bg-surface p-0.5 shadow-control">
+                <div role="group" aria-labelledby="billing-currency-label" className="inline-flex items-center gap-0.5 rounded-pill bg-sunk p-1">
                   {(['ILS', 'USD'] as const).map((m) => (
                     <button
                       key={m}
@@ -245,9 +246,9 @@ export default function BillingView({
                       onClick={() => setPickedMarket(m)}
                       disabled={savingMarket !== null}
                       className={cn(
-                        'h-8 rounded-pill px-3.5 text-caption font-semibold transition-colors duration-150',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-1',
-                        shownMarket === m ? 'bg-action text-action-ink' : 'text-body hover:bg-sunk',
+                        'h-8 rounded-pill px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy',
+                        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50',
+                        shownMarket === m ? 'bg-surface text-ink shadow-control' : 'text-muted hover:text-ink',
                       )}
                     >
                       {m === 'USD' ? t.marketPrompt.usdOption : t.marketPrompt.ilsOption}
@@ -306,7 +307,7 @@ export default function BillingView({
               isPopular={true}
               isCurrent={plan === 'advanced' && hasActiveSubscription}
               plan="advanced"
-              action={planAction('advanced')}
+              action={planAction('advanced', true)}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
             />
@@ -354,7 +355,7 @@ export default function BillingView({
 function Feature({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2 text-copy text-body">
-      <Check size={16} strokeWidth={2.25} aria-hidden="true" className="mt-0.5 shrink-0 text-ok" />
+      <Check strokeWidth={2.25} aria-hidden="true" className="mt-1 size-4 shrink-0 text-action" />
       <span className="min-w-0">{children}</span>
     </li>
   )
@@ -371,16 +372,17 @@ function TrialPlanRow({ name, currencySymbol, features, isCurrent, currentLabel 
     <div
       data-plan-card="trial"
       className={cn(
-        'mb-4 grid gap-4 rounded-card border bg-surface p-5 shadow-card md:grid-cols-[12rem_minmax(0,1fr)] md:items-center',
-        isCurrent ? 'border-action ring-1 ring-action' : 'border-line',
+        'mb-4 grid gap-4 rounded-card border bg-surface p-5 shadow-card sm:p-6 md:grid-cols-[12rem_minmax(0,1fr)] md:items-center',
+        // The current plan is marked by its badge and a stronger border; the ring is the recommended plan's alone.
+        isCurrent ? 'border-line-strong' : 'border-line',
       )}
     >
       <div className="min-w-0">
         {isCurrent && (
-          <span className="mb-2 inline-flex rounded-pill bg-action-soft px-2.5 py-0.5 text-caption font-semibold text-action">{currentLabel}</span>
+          <span className="mb-2 inline-flex items-center gap-1 rounded-pill bg-sunk px-2.5 py-0.5 text-caption font-semibold text-ink"><Check aria-hidden="true" className="size-3.5" />{currentLabel}</span>
         )}
         <h3 className="text-section font-semibold text-ink">{name}</h3>
-        <p className="mt-1 text-[1.75rem] font-bold leading-none tracking-tight text-ink tabular-nums">{currencySymbol}0</p>
+        <p className="mt-1 text-metric font-bold tracking-tight text-ink tabular-nums">{currencySymbol}0</p>
       </div>
       <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
         {features.map((feature, i) => <Feature key={i}>{feature}</Feature>)}
@@ -421,8 +423,8 @@ function PlanCard({
     <div
       data-plan-card={plan}
       className={cn(
-        'flex h-full min-w-0 flex-col rounded-card border bg-surface p-5 shadow-card',
-        isCurrent || isPopular ? 'border-action ring-1 ring-action' : 'border-line',
+        'flex h-full min-w-0 flex-col rounded-card border bg-surface p-5 shadow-card sm:p-6',
+        isPopular ? 'border-action ring-1 ring-action' : isCurrent ? 'border-line-strong' : 'border-line',
       )}
     >
       {/* One line for the plan's mark. Side by side it is kept even when empty, so the prices of
@@ -434,7 +436,8 @@ function PlanCard({
           </span>
         )}
         {isCurrent && (
-          <span className="inline-flex rounded-pill bg-action-soft px-2.5 py-0.5 text-caption font-semibold text-action">
+          <span className="inline-flex items-center gap-1 rounded-pill bg-sunk px-2.5 py-0.5 text-caption font-semibold text-ink">
+            <Check aria-hidden="true" className="size-3.5" />
             {currentLabel}
           </span>
         )}
@@ -443,7 +446,7 @@ function PlanCard({
       <h3 className="mt-3 text-section font-semibold text-ink">{name}</h3>
 
       <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
-        <span className="text-[2.25rem] font-bold leading-tight tracking-tight text-ink tabular-nums">{currencySymbol}{price}</span>
+        <span className="text-metric font-bold tracking-tight text-ink tabular-nums">{currencySymbol}{price}</span>
         {period && <span className="text-copy text-muted">{period}</span>}
       </div>
 
@@ -454,7 +457,7 @@ function PlanCard({
       {isCurrent ? (
         <button
           disabled
-          className="h-11 w-full cursor-not-allowed rounded-control bg-sunk px-4 text-copy font-semibold text-muted"
+          className="h-10 w-full cursor-not-allowed rounded-control bg-sunk px-4 text-copy font-semibold text-muted"
         >
           {currentLabel}
         </button>

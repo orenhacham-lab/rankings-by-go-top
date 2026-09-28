@@ -43,15 +43,12 @@ export default function SaveBar({
           <span role="alert" className="font-medium text-bad">{t.save.errors[state.code]}</span>
         ) : dirty ? (
           <span className="inline-flex items-center gap-2 font-semibold text-ink">
-            <span aria-hidden className="relative flex size-2 shrink-0">
-              <span className="absolute inset-0 rounded-full bg-commit opacity-60 motion-safe:animate-ping motion-safe:[animation-iteration-count:3]" />
-              <span className="relative size-2 rounded-full bg-commit" />
-            </span>
+            <span aria-hidden className="size-2 shrink-0 rounded-pill bg-action" />
             {note || t.save.dirty}
           </span>
         ) : state.kind === 'saved' ? (
           <span className="inline-flex items-center gap-1 font-medium text-ok animate-pop-in">
-            <Check size={14} aria-hidden />
+            <Check aria-hidden className="size-4" />
             {t.save.saved}
           </span>
         ) : null}

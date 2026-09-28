@@ -53,7 +53,7 @@ export function ActionLink({
         variant === 'primary' && 'bg-action text-action-ink hover:bg-action-hover',
         variant === 'secondary' && 'bg-surface text-body border border-line hover:bg-sunk',
         variant === 'onInk' && 'bg-contrast-ink text-contrast hover:opacity-90',
-        size === 'md' ? 'text-sm px-4 py-2 h-9' : 'text-base px-6 py-2.5 h-12',
+        size === 'md' ? 'text-copy px-4 py-2 h-9' : 'text-copy px-6 py-2.5 h-12',
         className,
       )}
     >
@@ -73,8 +73,8 @@ const DOT: Record<Tone, string> = {
 export function StatusDot({ tone, className }: { tone: Tone; className?: string }) {
   return (
     <span aria-hidden className={cn('relative inline-flex h-2.5 w-2.5 shrink-0', className)}>
-      <span className={cn('absolute inset-0 rounded-full opacity-25 scale-[1.9]', DOT[tone])} />
-      <span className={cn('relative h-2.5 w-2.5 rounded-full', DOT[tone])} />
+      <span className={cn('absolute inset-0 rounded-pill opacity-25 scale-[1.9]', DOT[tone])} />
+      <span className={cn('relative h-2.5 w-2.5 rounded-pill', DOT[tone])} />
     </span>
   )
 }
@@ -121,7 +121,7 @@ export function SummaryBlock({
       data-summary-block={id}
       className={cn(
         'rounded-card border p-5 md:p-6',
-        tone === 'attention' ? 'border-warn/25 bg-warn-soft/70' : 'border-line bg-surface shadow-card',
+        'border-line bg-surface shadow-card', tone === 'attention' && 'border-s-[3px] border-s-warn',
         className,
       )}
     >
@@ -131,17 +131,17 @@ export function SummaryBlock({
             <span
               aria-hidden
               className={cn(
-                'flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.625rem] [&_svg]:h-[18px] [&_svg]:w-[18px]',
-                tone === 'attention' ? 'bg-warn/15 text-warn' : 'bg-action-soft text-action',
+                'flex size-10 shrink-0 items-center justify-center rounded-inset [&_svg]:size-5',
+                tone === 'attention' ? 'bg-warn-soft text-warn' : 'bg-action-soft text-action',
               )}
             >
               {icon}
             </span>
           )}
           <div className="min-w-0">
-            <p aria-hidden className="font-mono text-[0.6875rem] leading-4 tabular-nums text-muted">{String(index).padStart(2, '0')}</p>
+            <p aria-hidden className="text-overline tabular-nums text-muted">{String(index).padStart(2, '0')}</p>
             <h2 id={headingId} className="text-section font-semibold text-ink">{title}</h2>
-            {description && <p className="mt-1 max-w-[65ch] text-sm leading-6 text-muted">{description}</p>}
+            {description && <p className="mt-1 max-w-[65ch] text-copy text-muted">{description}</p>}
           </div>
         </div>
         {action && <div className="shrink-0">{action}</div>}
@@ -154,7 +154,7 @@ export function SummaryBlock({
 /** A quiet, honest line for a block with nothing in it. */
 export function BlockNote({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 rounded-control bg-sunk px-4 py-3 text-sm leading-6 text-muted">
+    <div className="flex items-start gap-3 rounded-control bg-sunk px-4 py-3 text-copy text-muted">
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
       <p>{children}</p>
     </div>

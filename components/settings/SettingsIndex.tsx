@@ -84,15 +84,15 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
                 }}
                 aria-current={on ? 'location' : undefined}
                 className={cn(
-                  'group flex items-center gap-2.5 rounded-control px-2 py-1.5 text-copy transition-colors duration-150',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
+                  'group flex items-center gap-2.5 rounded-control px-2 py-1.5 text-copy transition-colors duration-150 ease-snappy',
+                  'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
                   on ? 'bg-action-soft font-semibold text-action' : 'text-muted hover:bg-sunk hover:text-ink',
                 )}
               >
                 <span
                   aria-hidden
                   className={cn(
-                    'grid size-5 shrink-0 place-items-center rounded-full text-[0.625rem] font-bold tabular-nums transition-colors',
+                    'grid size-5 shrink-0 place-items-center rounded-pill text-overline font-bold tabular-nums transition-colors duration-150 ease-snappy',
                     on ? 'bg-action text-action-ink' : passed ? 'bg-line-strong/70 text-ink' : 'bg-sunk text-muted group-hover:bg-line',
                   )}
                 >

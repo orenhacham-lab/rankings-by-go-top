@@ -13,7 +13,9 @@ import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import StatTile from '@/components/ui/StatTile'
 import { sortTargetsByPosition } from '@/lib/sorting'
-import { BarChart3, FileText } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, Bot, FileText, Search } from 'lucide-react'
+import { LinkButton } from '@/components/dashboard/ui'
+import EmptyState from '@/components/ui/EmptyState'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/i18n/format-date'
@@ -548,6 +550,18 @@ function GoogleReport({
         t={t}
       />
 
+      {total === 0 ? (
+        // Nothing tracked: four tiles of zeros say nothing, so the report says what fills it.
+        <Card padding={false}>
+          <EmptyState
+            icon={<Search />}
+            title={t.google.emptyTitle}
+            body={t.google.emptyBody}
+            action={<LinkButton href="/keyword-research" variant="secondary" size="sm">{t.google.emptyAction}</LinkButton>}
+          />
+        </Card>
+      ) : (
+      <>
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label={t.google.totalKeywords} value={total} />
         <StatTile label={t.google.found} value={<span className="text-ok">{foundCount}</span>} />
@@ -566,9 +580,14 @@ function GoogleReport({
               <button
                 type="button"
                 onClick={() => handleSortClick('position')}
-                className="cursor-pointer select-none rounded-control hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+                className="cursor-pointer select-none rounded-control hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
               >
-                {t.google.ranking} {sortColumn === 'position' && (sortOrder === 'asc' ? '↑' : '↓')}
+                <span className="inline-flex items-center gap-1">
+                  {t.google.ranking}
+                  {sortColumn !== 'position'
+                    ? <ArrowUpDown aria-hidden="true" className="size-3.5" />
+                    : sortOrder === 'asc' ? <ArrowUp aria-hidden="true" className="size-3.5" /> : <ArrowDown aria-hidden="true" className="size-3.5" />}
+                </span>
               </button>
             </Th>
             <Th>{t.google.change}</Th>
@@ -581,7 +600,7 @@ function GoogleReport({
               <TableRow key={target.id}>
                 <Td className="font-medium text-ink">{target.keyword}</Td>
                 <Td><EngineBadge engine={target.engine_type} /></Td>
-                <Td>{result?.found ? result.position : '—'}</Td>
+                <Td className="tabular-nums">{result?.found ? result.position : '—'}</Td>
                 <Td>{result && <PositionChange change={result.change_value} />}</Td>
               </TableRow>
             )
@@ -591,6 +610,8 @@ function GoogleReport({
           )}
         </TableBody>
       </Table>
+      </>
+      )}
     </>
   )
 }
@@ -628,6 +649,17 @@ function AIVisibilityReport({
         t={t}
       />
 
+      {reportData.summary.totalResults === 0 ? (
+        <Card padding={false}>
+          <EmptyState
+            icon={<Bot />}
+            title={t.ai.emptyTitle}
+            body={t.ai.emptyBody}
+            action={<LinkButton href="/ai-visibility" variant="secondary" size="sm">{t.ai.emptyAction}</LinkButton>}
+          />
+        </Card>
+      ) : (
+      <>
       {/* Summary Metrics */}
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label={t.ai.aiScans} value={reportData.summary.totalScans} />
@@ -658,7 +690,7 @@ function AIVisibilityReport({
               const mentionRate = Math.round((breakdown.mentions / breakdown.scans) * 100)
               const citationRate = Math.round((breakdown.cited / breakdown.scans) * 100)
               return (
-                <Card key={engine} padding={false} className="p-5">
+                <Card key={engine} padding={false} className="p-5 sm:p-6">
                   <div className="mb-3 text-copy font-semibold text-ink">{engineLabels[engine]}</div>
                   <dl className="space-y-2 text-caption">
                     <div className="flex justify-between gap-3">
@@ -667,11 +699,11 @@ function AIVisibilityReport({
                     </div>
                     <div className="flex justify-between gap-3">
                       <dt className="text-muted">{t.ai.mentions}</dt>
-                      <dd className="font-medium tabular-nums text-ok">{breakdown.mentions} ({mentionRate}%)</dd>
+                      <dd className="font-medium tabular-nums text-ink">{breakdown.mentions} ({mentionRate}%)</dd>
                     </div>
                     <div className="flex justify-between gap-3">
                       <dt className="text-muted">{t.ai.citations}</dt>
-                      <dd className="font-medium tabular-nums text-info">{breakdown.cited} ({citationRate}%)</dd>
+                      <dd className="font-medium tabular-nums text-ink">{breakdown.cited} ({citationRate}%)</dd>
                     </div>
                   </dl>
                 </Card>
@@ -725,6 +757,8 @@ function AIVisibilityReport({
           <p className="mt-2 text-caption text-muted">{t.ai.showingResults(50, reportData.results.length)}</p>
         )}
       </div>
+      </>
+      )}
     </>
   )
 }

@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Checkbox from '@/components/ui/Checkbox'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
 import { fill, formatWait, redetectNoticeAction, type NoticeAction, type RedetectNotice } from '@/lib/project-settings/view'
@@ -81,7 +82,7 @@ export function RedetectButton({
       title={busyScan ? t.ai.busyScan : undefined}
       data-redetect
     >
-      {!working && <Sparkles size={14} className="text-action" aria-hidden />}
+      {!working && <Sparkles className="size-4 text-action" aria-hidden />}
       {working ? t.ai.working : t.ai.button}
       {busyScan && <span className="sr-only">. {t.ai.busyScan}</span>}
     </Button>
@@ -181,11 +182,11 @@ export function SuggestionsPanel({
       role="group"
       aria-labelledby={titleId}
       data-suggestions
-      className="rounded-control border border-action/25 bg-action-soft/50 p-4 animate-pop-in"
+      className="rounded-inset border border-line bg-sunk p-4 motion-safe:animate-pop-in"
     >
-      <div className="flex items-start gap-2.5">
-        <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-pill bg-action text-action-ink">
-          <Sparkles size={13} />
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
+          <Sparkles className="size-5" />
         </span>
         <div className="min-w-0">
           <p id={titleId} className="text-copy font-semibold text-ink">{t.ai.panelTitle}</p>
@@ -193,26 +194,27 @@ export function SuggestionsPanel({
         </div>
       </div>
 
-      <ul className="mt-3 divide-y divide-line rounded-control border border-line bg-surface">
+      <ul className="mt-3 divide-y divide-line overflow-hidden rounded-inset border border-line bg-surface">
         {rows.map((row) => {
           const on = chosen.has(row.key)
           const locked = !on && row.group === 'new' && full
           return (
             <li key={row.key}>
-              <label
+              <div
                 className={
-                  'flex items-start gap-3 px-3 py-2.5 transition-colors ' +
-                  (locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-sunk/60')
+                  'flex items-start gap-3 px-4 py-3 transition-colors duration-150 ease-snappy ' +
+                  (locked ? 'opacity-50' : 'hover:bg-sunk/60')
                 }
               >
-                <input
-                  type="checkbox"
-                  checked={on}
-                  disabled={locked}
-                  onChange={() => toggle(row.key)}
-                  className="mt-1 h-4 w-4 shrink-0 accent-action"
-                />
-                <span className="min-w-0 flex-1">
+                <span className="flex h-6 items-center">
+                  <Checkbox
+                    id={`${titleId}-${row.key}`}
+                    checked={on}
+                    disabled={locked}
+                    onChange={() => toggle(row.key)}
+                  />
+                </span>
+                <label htmlFor={`${titleId}-${row.key}`} className={'min-w-0 flex-1 ' + (locked ? 'cursor-not-allowed' : 'cursor-pointer')}>
                   <span className="block text-caption font-medium text-muted">{row.label}</span>
                   <span className="block break-words text-copy text-ink">{row.value}</span>
                   {row.current !== undefined && (
@@ -220,8 +222,8 @@ export function SuggestionsPanel({
                       {fillRich(t.ai.now, { value: row.current ?? t.ai.empty })}
                     </span>
                   )}
-                </span>
-              </label>
+                </label>
+              </div>
             </li>
           )
         })}

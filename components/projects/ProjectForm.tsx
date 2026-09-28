@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Button from '@/components/ui/Button'
+import Notice from '@/components/ui/Notice'
+import Switch from '@/components/ui/Switch'
 import { Project, Client } from '@/lib/supabase/types'
 import { saveProjectAction } from '@/app/actions/projects'
 import { apiErrorText } from '@/lib/i18n/user-facing-error'
@@ -134,11 +136,7 @@ export default function ProjectForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="bad">{error}</Notice>}
 
       {!project && (
         <Select
@@ -180,7 +178,7 @@ export default function ProjectForm({
         {fieldNotes?.business_name}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Select
             label={f.countryLabel}
@@ -210,7 +208,7 @@ export default function ProjectForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Input
             label={country === 'US' ? f.cityLabelUS : f.cityLabel}
@@ -236,8 +234,8 @@ export default function ProjectForm({
       </div>
 
       {/* Scheduling */}
-      <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">{f.schedulingTitle}</h4>
+      <div className="space-y-4 border-t border-line pt-4">
+        <h4 className="text-copy font-semibold text-ink">{f.schedulingTitle}</h4>
 
         <Select
           label={f.scanFrequencyLabel}
@@ -254,19 +252,11 @@ export default function ProjectForm({
         />
 
         {scanFreq !== 'manual' && (
-          <label className="flex items-center gap-2 mt-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoScan}
-              onChange={(e) => setAutoScan(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-slate-700 dark:text-slate-200">{f.autoScanLabel}</span>
-          </label>
+          <Switch checked={autoScan} onChange={setAutoScan} label={f.autoScanLabel} />
         )}
       </div>
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex flex-wrap gap-3 pt-2">
         <Button type="submit" loading={loading}>
           {project ? f.submitUpdate : f.submitCreate}
         </Button>
