@@ -29,6 +29,7 @@ import {
   Library,
   Menu,
   X,
+  Waypoints,
 } from 'lucide-react'
 import {
   CONTENT_SCREENS,
@@ -135,6 +136,7 @@ const navGroupKeys: readonly NavGroup[] = [
       { href: '/keyword-research', labelKey: 'keywordResearch', icon: Telescope, onboarding: 'keyword-research' },
       { href: '/keywords', labelKey: 'keywords', icon: TrendingUp },
       ...contentNavItems,
+      { href: '/site-links', labelKey: 'siteLinks', icon: Waypoints },
     ],
   },
   {
