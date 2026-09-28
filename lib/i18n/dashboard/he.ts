@@ -51,6 +51,86 @@ export const dashboardHe = {
     noProjectCta: 'צרו פרויקט',
     projectLoadError: 'לא הצלחנו לטעון את הפרויקט הזה',
     projectMissing: 'הפרויקט הזה לא נמצא. בחרו פרויקט אחר מהבורר שלמעלה.',
+    // The "New project" entry when the plan's project limit is reached: it stays
+    // in the menu, switched off, and says why before anyone fills in a form.
+    createLimitReached: (used: number, limit: number) =>
+      limit === 0 ? 'החבילה הנוכחית לא מאפשרת לפתוח פרויקטים.' : `כל הפרויקטים בחבילה שלכם בשימוש (${used} מתוך ${limit}).`,
+    createLimitCount: (used: number, limit: number) => `${used}/${limit}`,
+    upgrade: 'שדרוג החבילה',
+    listLabel: 'הפרויקטים שלכם',
+  },
+  // The Guide pill in the top bar (components/guide/GuideMenu.tsx) and the tours
+  // it starts (components/onboarding/DashboardOnboardingTour.tsx). Every answer and
+  // every step describes something the product does today.
+  guide: {
+    label: 'מדריך',
+    menuLabel: 'מדריך ועזרה',
+    fullTour: 'סיור בכל המערכת',
+    fullTourMeta: '2 דק׳',
+    screenTour: 'סיור במסך הזה',
+    screenTourNone: 'למסך הזה עוד אין סיור',
+    faq: 'שאלות נפוצות',
+    whatsapp: 'דברו איתנו ב-WhatsApp',
+    whatsappMessage: 'היי, אני צריך עזרה',
+    opensNewTab: '(נפתח בחלון חדש)',
+    back: 'חזרה',
+    faqItems: {
+      project: {
+        q: 'מה זה פרויקט?',
+        a: 'פרויקט הוא אתר אחד, עם לוח בקרה, מילות מפתח והגדרות משלו. עוברים בין פרויקטים מהבורר שבראש המסך.',
+      },
+      moreProjects: {
+        q: 'איך מוסיפים עוד אתר?',
+        a: 'מהבורר שבראש המסך, "פרויקט חדש". מספר הפרויקטים תלוי בחבילה, והבורר מראה כשהגעתם אליו.',
+      },
+      rankings: {
+        q: 'מתי בודקים את המיקומים בגוגל?',
+        a: 'אפשר להגדיר לפרויקט בדיקה חודשית, ובכל זמן אפשר להריץ בדיקה בעצמכם ממסך מילות המפתח. כל בדיקה נספרת במכסת החבילה.',
+      },
+      volumes: {
+        q: 'מאיפה מגיעים נפחי החיפוש?',
+        a: 'מנתוני Google Ads. זה ממוצע חודשי משוער, לא ספירה מדויקת של חיפושים.',
+      },
+      ai: {
+        q: 'מה בודקת נראות ב-AI?',
+        a: 'אנחנו שואלים מנועי AI, כמו ChatGPT, שאלות שלקוחות שואלים, ובודקים אם העסק שלכם מוזכר או מצוטט בתשובות.',
+      },
+      publishing: {
+        q: 'איך מפרסמים מאמרים באתר?',
+        a: 'בהגדרות הפרויקט, תחת "חיבורים", מחברים את פלטפורמת האתר. אחרי החיבור מפרסמים מאמרים ישירות מהמערכת.',
+      },
+    },
+    tour: {
+      label: 'סיור מודרך',
+      stepOf: (n: number, total: number) => `${n} מתוך ${total}`,
+      next: 'הבא',
+      back: 'הקודם',
+      skip: 'דלגו',
+      done: 'סיום',
+      close: 'סגירת הסיור',
+      keysHint: 'חיצים למעבר, Esc לסגירה',
+    },
+    steps: {
+      switcher: { title: 'כאן עוברים בין אתרים', body: 'כל אתר הוא פרויקט. מכאן בוחרים פרויקט או פותחים חדש.' },
+      hero: { title: 'המצב שלכם במבט אחד', body: 'מילות המפתח שלכם בגוגל, מה השתנה, ומה הצעד הבא.' },
+      research: { title: 'מה מחפשים הלקוחות שלכם', body: 'רעיונות לביטויים עם נפח חיפוש ותחרות, לפי נתוני Google Ads.' },
+      keywords: { title: 'איפה אתם מדורגים היום', body: 'המיקום של כל מילה בגוגל, ומה השתנה מאז הבדיקה הקודמת.' },
+      strategy: { title: 'מה כדאי לכתוב ומתי', body: 'נושאים למאמרים, מתי כל אחד ייכתב, ולמה.' },
+      aiVisibility: { title: 'האם ChatGPT מזכיר אתכם?', body: 'בודקים אם מנועי AI מזכירים את העסק כשהם עונים על שאלות של לקוחות.' },
+      connections: { title: 'חברו את האתר לפרסום', body: 'בהגדרות הפרויקט, תחת "חיבורים", מחברים את האתר לפרסום מאמרים ואת Search Console.' },
+      guide: { title: 'תמיד אפשר לחזור לכאן', body: 'סיורים, שאלות נפוצות ושיחה איתנו ב-WhatsApp.' },
+      dashboardHero: { title: 'מה קורה באתר', body: 'המספר הגדול מסכם את מילות המפתח שלכם בגוגל. מתחתיו מה השתנה והצעד הבא.' },
+      dashboardShortcuts: { title: 'קיצורי דרך', body: 'המסכים שחוזרים אליהם הכי הרבה, בלחיצה אחת.' },
+      researchHeader: { title: 'מחקר ביטויים', body: 'רעיונות לביטויים, נפחי חיפוש, תחרות ועלות משוערת לקליק, לפי נתוני Google Ads.' },
+      researchForm: { title: 'מתחילים מכאן', body: 'כתבו מילת מפתח או כתובת אתר. את הביטויים שמתאימים מוסיפים לפרויקט.' },
+      keywordsHeader: { title: 'איפה אתם מדורגים היום', body: 'המיקום של כל מילה בגוגל ומה השתנה מאז הבדיקה הקודמת. כאן גם מוסיפים מילים ומריצים בדיקה.' },
+      strategyHeader: { title: 'מה כדאי לכתוב ומתי', body: 'נושאים למאמרים, מתי כל אחד ייכתב, ולמה.' },
+      aiHeader: { title: 'האם ChatGPT מזכיר אתכם?', body: 'שואלים מנועי AI שאלות של לקוחות, ובודקים אם העסק מוזכר או מצוטט בתשובות.' },
+      settingsHeader: { title: 'הגדרות הפרויקט', body: 'פרטי העסק, שמהם נגזרים מחקר הביטויים, הסריקות והתוכן.' },
+      settingsConnections: { title: 'חברו את האתר', body: 'פלטפורמת האתר לפרסום מאמרים, ו-Search Console לנתוני חיפוש אמיתיים.' },
+      reportsHeader: { title: 'דוחות', body: 'דוחות על הדירוגים בגוגל ועל הנראות ב-AI, לפרויקט שבחרתם.' },
+      projectScope: { title: 'לכל פרויקט נתונים משלו', body: 'המסך מציג את הפרויקט שבחרתם כאן. החלפת פרויקט מעדכנת אותו במקום.' },
+    },
   },
   // Project settings — who the business is and what it is connected to, for the
   // workspace the top bar names.

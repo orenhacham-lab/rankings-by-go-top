@@ -37,7 +37,6 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
-import { DashboardOnboardingTour } from '@/components/onboarding/DashboardOnboardingTour'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -118,14 +117,11 @@ export default function DashboardPage() {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const home = dict.home
-  const { projects, isResolved, projectsError } = useActiveProject()
 
+  // The guided tour is not mounted here any more: the Guide pill in the top bar
+  // (components/guide/GuideMenu.tsx) runs it on every screen.
   return (
     <div>
-      {/* The tour picks its first step from the project count, so it waits for
-          the list; mounted earlier it would read an account with projects as new. */}
-      {isResolved && !projectsError && <DashboardOnboardingTour totalProjects={projects.length} />}
-
       <Header title={home.title} subtitle={home.subtitle} actions={<Shortcuts t={dict.dashboardHome} />} />
 
       <WorkspaceGate>

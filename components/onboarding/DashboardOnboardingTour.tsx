@@ -1,347 +1,336 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+/**
+ * The guided tour — the app's ONE tour system.
+ *
+ * It used to be a three-step tour that ran only for an account without projects,
+ * from the dashboard, once. It is now the runner for every tour: the full tour and
+ * each screen's short tour (lib/guide/tours.ts), started from the Guide pill in the
+ * top bar (components/guide/GuideMenu.tsx), which also decides when one starts on
+ * its own and remembers, per user, which were seen.
+ *
+ * Each step is a spotlight on one element of the page and a 320px bubble: a short
+ * title, one line, Next / Skip. It is a modal dialog:
+ *   - keyboard: Arrow keys move (the arrow that points FORWARD in the reading
+ *     direction is "next": ← in Hebrew, → in English), Enter activates the
+ *     focused button, Escape closes, Tab stays inside the bubble;
+ *   - focus goes to the bubble's main button on every step and back to where it
+ *     was when the tour ends;
+ *   - on a phone the bubble is a sheet across the bottom (or the top, when the
+ *     target is down there); a target the phone hides (the sidebar, behind its
+ *     menu button) gets the bubble without a spotlight instead of being skipped.
+ * A step whose target is not on the page is skipped, so a screen switched off in
+ * this build is never described.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronLeft, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { createClient } from '@/lib/supabase/client'
-import { X, ChevronLeft } from 'lucide-react'
+import type { TourStep } from '@/lib/guide/tours'
+import { BUBBLE_WIDTH, placeBubble, type Box, type Placement } from '@/lib/guide/placement'
+import { cn } from '@/lib/utils'
 
-const STORAGE_KEY_BASE = 'rankings_dashboard_onboarding_completed'
-const CURRENT_STEP_KEY_BASE = 'rankings_dashboard_onboarding_step'
-
-const TOOLTIP_WIDTH = 380
-const GAP = 16
-const MOBILE_BP = 768
-
-type TourStep = 'createProject' | 'keywordResearch' | 'generateReports'
-
-interface TourConfig {
-  step: TourStep
-  selector: string
+export interface TourRun {
+  /** A new id is a fresh runner, even for the same steps. */
+  id: number
+  steps: readonly TourStep[]
 }
 
-const tourSteps: TourConfig[] = [
-  // A workspace IS the project now, and it is created from the top-bar switcher —
-  // there is no Clients tab to send anyone to, and no separate "create a client" step.
-  { step: 'createProject', selector: '[data-onboarding="workspace"]' },
-  { step: 'keywordResearch', selector: '[data-onboarding="keyword-research"]' },
-  { step: 'generateReports', selector: '[data-onboarding="reports"]' },
-]
+export type TourEnd = 'completed' | 'dismissed'
 
-interface TooltipPosition {
-  left: number
-  top: number
-  isMobile: boolean
+/** How long a step whose target renders late (after its data) is waited for. */
+const LAZY_WAIT_MS = 2500
+const POLL_MS = 150
+const SPOT_PAD = 6
+const DIM = 'color-mix(in srgb, var(--color-contrast) 58%, transparent)'
+
+function isVisible(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect()
+  if (r.width <= 0 || r.height <= 0) return false
+  return getComputedStyle(el).visibility !== 'hidden'
 }
 
-interface DashboardOnboardingTourProps {
-  totalProjects: number
-  shouldShowTour?: boolean
+/** The first VISIBLE match, and whether the selector matches anything at all. */
+function findTarget(selector: string): { el: HTMLElement | null; exists: boolean } {
+  let all: HTMLElement[] = []
+  try { all = Array.from(document.querySelectorAll<HTMLElement>(selector)) } catch { all = [] }
+  return { el: all.find(isVisible) ?? null, exists: all.length > 0 }
 }
 
-const HIGHLIGHT_CLASS = 'onboarding-highlight'
+const toBox = (r: DOMRect): Box => ({ left: r.left, top: r.top, width: r.width, height: r.height })
+const sameBox = (a: Box | null, b: Box | null) =>
+  !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height
 
-// Dev-only logging — stripped in production builds.
-const isDev = process.env.NODE_ENV !== 'production'
-const debugLog = (...args: unknown[]) => {
-  if (isDev) console.log(...args)
-}
-const debugWarn = (...args: unknown[]) => {
-  if (isDev) console.warn(...args)
+const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/** The step on screen: its index, and the element it points at ('none': shown without a spotlight). */
+interface Shown { index: number; target: HTMLElement | 'none' }
+
+export function DashboardOnboardingTour({ run, onEnd }: { run: TourRun | null; onEnd: (how: TourEnd) => void }) {
+  // A new run is a fresh runner (keyed by its id): it starts at its first step
+  // with nothing left over from the previous tour.
+  return run ? <TourRunner key={run.id} run={run} onEnd={onEnd} /> : null
 }
 
-export function DashboardOnboardingTour({
-  totalProjects,
-  shouldShowTour = false,
-}: DashboardOnboardingTourProps) {
+function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => void }) {
   const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
-  const t = dict.onboarding
+  const dict = getDashboardDictionary(language).guide
+  const t = dict.tour
+  const dir = language === 'he' ? 'rtl' : 'ltr'
+  const steps = run.steps
 
-  const [isVisible, setIsVisible] = useState(false)
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
-  const [position, setPosition] = useState<TooltipPosition | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
+  // The step being looked for. The bubble keeps showing the previous step until
+  // this one's target is found, so moving between steps never flashes.
+  const [index, setIndex] = useState(0)
+  // Steps that are not on this page. A step that renders later (lazy) is only
+  // known to be missing once it has been waited for.
+  const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set(
+    steps.flatMap((s, i) => (!s.lazy && !findTarget(s.target).exists ? [i] : [])),
+  ))
+  const [shown, setShown] = useState<Shown | null>(null)
+  const [box, setBox] = useState<Box | null>(null)
+  const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
+  const [bubbleHeight, setBubbleHeight] = useState(200)
+  // Where focus was when the tour started: it goes back there at the end.
+  const [returnFocus] = useState(() => document.activeElement as HTMLElement | null)
+  const moveDir = useRef<1 | -1>(1)
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const primaryRef = useRef<HTMLButtonElement>(null)
 
-  // Get the user ID to make localStorage keys user-specific
-  useEffect(() => {
-    const getUserId = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user?.id) {
-        setUserId(user.id)
-        const debugUserId = user.id.slice(0, 8) + '...'
-        debugLog('[onboarding] mounted, userId:', debugUserId)
-
-        // Debug: check if selectors can find targets
-        const foundTargets = tourSteps
-          .map((step) => ({
-            step: step.step,
-            selector: step.selector,
-            found: !!document.querySelector(step.selector),
-          }))
-          .filter((t) => !t.found)
-        if (foundTargets.length > 0) {
-          debugWarn('[onboarding] some targets not found:', foundTargets)
-        }
-      }
-    }
-    // Small delay to ensure DOM is fully painted
-    const timer = setTimeout(getUserId, 100)
-    return () => clearTimeout(timer)
-  }, [])
-
-  // Construct user-specific storage keys
-  const getStorageKey = (userId: string | null) => userId ? `${STORAGE_KEY_BASE}_${userId}` : STORAGE_KEY_BASE
-  const getCurrentStepKey = (userId: string | null) => userId ? `${CURRENT_STEP_KEY_BASE}_${userId}` : CURRENT_STEP_KEY_BASE
-
-  // Skip steps the user already finished. Step 0 is "create a project" (the
-  // switcher); an account that has one starts at keyword research.
-  const getStartStep = useCallback(() => (totalProjects === 0 ? 0 : 1), [totalProjects])
-
-  // Decide whether to run the tour
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!userId) return // Wait for user ID
-
-    const storageKey = getStorageKey(userId)
-    const currentStepKey = getCurrentStepKey(userId)
-
-    const isCompleted = localStorage.getItem(storageKey) === 'true'
-    const startStep = getStartStep()
-    const hasProjects = totalProjects > 0
-
-    debugLog('[onboarding] check conditions', {
-      isCompleted,
-      shouldShowTour,
-      hasProjects,
-      startStep,
+  const end = useCallback((how: TourEnd) => {
+    onEnd(how)
+    // Focus returns to where it was (the Guide pill, usually), once the dialog is gone.
+    requestAnimationFrame(() => {
+      if (returnFocus && returnFocus !== document.body && document.contains(returnFocus)) returnFocus.focus({ preventScroll: true })
+      else document.querySelector<HTMLElement>('[data-tour="guide"]')?.focus({ preventScroll: true })
     })
+  }, [onEnd, returnFocus])
 
-    // Don't show if already completed
-    if (isCompleted) {
-      debugLog('[onboarding] already completed, skipping')
-      return
-    }
-
-    // Don't show if established user (has a project) and shouldn't force show
-    if (!shouldShowTour && hasProjects) {
-      debugLog('[onboarding] user is established (has a project), skipping')
-      return
-    }
-
-    const savedStep = localStorage.getItem(currentStepKey)
-    const parsed = savedStep ? parseInt(savedStep, 10) : NaN
-    const initialStep =
-      !Number.isNaN(parsed) && parsed >= startStep && parsed < tourSteps.length
-        ? parsed
-        : startStep
-
-    debugLog('[onboarding] showing tour, initialStep:', initialStep)
-    setCurrentStepIndex(initialStep)
-    setIsVisible(true)
-  }, [totalProjects, shouldShowTour, getStartStep, userId])
-
-  // Locate the target for the current step
-  const resolveTarget = useCallback((fromIndex: number): { el: HTMLElement; index: number } | null => {
-    for (let i = fromIndex; i < tourSteps.length; i++) {
-      const el = document.querySelector(tourSteps[i].selector) as HTMLElement | null
-      if (el) {
-        debugLog('[onboarding] found target:', tourSteps[i].selector, 'at step', i)
-        return { el, index: i }
-      }
-    }
-    debugLog('[onboarding] no targets found from step', fromIndex)
-    return null
+  const go = useCallback((delta: 1 | -1) => {
+    moveDir.current = delta
+    setIndex((i) => Math.max(0, i + delta))
   }, [])
 
-  const computePosition = useCallback((el: HTMLElement): TooltipPosition => {
-    const rect = el.getBoundingClientRect()
-    const isMobile = window.innerWidth < MOBILE_BP
-
-    if (isMobile) {
-      return { left: 0, top: 0, isMobile: true }
-    }
-
-    let left = rect.left - TOOLTIP_WIDTH - GAP
-    let top = rect.top - 8
-
-    if (left < GAP) {
-      left = Math.max(GAP, Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - GAP))
-      top = rect.bottom + GAP
-    }
-
-    top = Math.max(GAP, Math.min(top, window.innerHeight - 300))
-
-    return { left, top, isMobile: false }
-  }, [])
-
-  // Apply highlight + position tooltip
+  // Find the step's target: skip the step when it is not on the page, wait a
+  // little for one that renders after its data.
   useEffect(() => {
-    if (!isVisible) return
-
-    const resolved = resolveTarget(currentStepIndex)
-
-    if (!resolved) {
-      debugLog('[onboarding] no target found, ending tour')
-      finishTour()
-      return
+    if (index >= steps.length) { end('completed'); return }
+    const current = steps[index]
+    let cancelled = false
+    const started = Date.now()
+    const attempt = () => {
+      if (cancelled) return
+      const found = findTarget(current.target)
+      if (found.el || found.exists) {
+        const target = found.el ?? 'none'
+        setBox(found.el ? toBox(found.el.getBoundingClientRect()) : null)
+        setShown({ index, target })
+        setSkipped((s) => (s.has(index) ? new Set([...s].filter((i) => i !== index)) : s))
+        return
+      }
+      if (current.lazy && Date.now() - started < LAZY_WAIT_MS) { timer = window.setTimeout(attempt, POLL_MS); return }
+      setSkipped((s) => new Set(s).add(index))
+      // Skipping backwards past the first step turns round.
+      if (index + moveDir.current < 0) moveDir.current = 1
+      setIndex(index + moveDir.current)
     }
+    let timer = window.setTimeout(attempt, 0)
+    return () => { cancelled = true; window.clearTimeout(timer) }
+  }, [index, steps, end])
 
-    if (resolved.index !== currentStepIndex) {
-      debugLog('[onboarding] skipping to next available step:', resolved.index)
-      setCurrentStepIndex(resolved.index)
-      return
+  // Bring the target into view, then follow it while the page scrolls or resizes.
+  const target = shown?.target ?? null
+  useEffect(() => {
+    if (target && target !== 'none') {
+      const r = target.getBoundingClientRect()
+      if (r.top < 64 || r.bottom > window.innerHeight - 16) {
+        target.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' })
+      }
     }
-
-    const el = resolved.el
-    el.classList.add(HIGHLIGHT_CLASS)
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    setPosition(computePosition(el))
-
-    const reposition = () => setPosition(computePosition(el))
-    window.addEventListener('resize', reposition)
-    window.addEventListener('scroll', reposition, true)
-
+    let frame = 0
+    const measure = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        setViewport((v) => (v.width === window.innerWidth && v.height === window.innerHeight ? v : { width: window.innerWidth, height: window.innerHeight }))
+        if (!target || target === 'none') return
+        const next = toBox(target.getBoundingClientRect())
+        setBox((prev) => (sameBox(prev, next) ? prev : next))
+      })
+    }
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    // The page can still move under a step (data arriving above the target).
+    const settle = window.setInterval(measure, 400)
     return () => {
-      el.classList.remove(HIGHLIGHT_CLASS)
-      window.removeEventListener('resize', reposition)
-      window.removeEventListener('scroll', reposition, true)
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+      window.clearInterval(settle)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVisible, currentStepIndex])
+  }, [target])
 
-  function finishTour() {
-    if (!userId) return
-    const storageKey = getStorageKey(userId)
-    const currentStepKey = getCurrentStepKey(userId)
-    localStorage.setItem(storageKey, 'true')
-    localStorage.removeItem(currentStepKey)
-    document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((n) => n.classList.remove(HIGHLIGHT_CLASS))
-    debugLog('[onboarding] tour finished')
-    setIsVisible(false)
-    setPosition(null)
-  }
+  // The bubble's own height, for placing it above a target or as a sheet.
+  const hasBubble = shown !== null
+  useEffect(() => {
+    const el = bubbleRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setBubbleHeight(el.offsetHeight || 200))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [hasBubble])
 
-  const goNext = () => {
-    const next = resolveTarget(currentStepIndex + 1)
-    if (next) {
-      debugLog('[onboarding] moving to next step:', next.index)
-      setCurrentStepIndex(next.index)
-      if (userId) {
-        localStorage.setItem(getCurrentStepKey(userId), next.index.toString())
+  // Focus the main button once per step. Not on every re-placement: that would
+  // pull focus off Back or Skip while the page scrolls.
+  const shownIndex = shown?.index ?? null
+  useEffect(() => {
+    if (shownIndex !== null) primaryRef.current?.focus({ preventScroll: true })
+  }, [shownIndex])
+
+  // Keys work wherever focus is while the tour is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); end('dismissed'); return }
+      const forward = dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight'
+      const backward = dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft'
+      if (e.key === forward) { e.preventDefault(); go(1); return }
+      if (e.key === backward) { e.preventDefault(); go(-1); return }
+      if (e.key === 'Tab' && bubbleRef.current) {
+        const focusables = Array.from(bubbleRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'))
+        if (focusables.length === 0) return
+        const first = focusables[0], last = focusables[focusables.length - 1]
+        const active = document.activeElement
+        const inside = active instanceof Node && bubbleRef.current.contains(active)
+        if (e.shiftKey && (active === first || !inside)) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && (active === last || !inside)) { e.preventDefault(); first.focus() }
       }
-    } else {
-      finishTour()
     }
-  }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [dir, go, end])
 
-  if (!isVisible || !position) return null
+  const step = shown ? steps[shown.index] : null
+  // Until the first step is found, the page is held and dimmed, with no bubble yet.
+  const placement: Placement | null =
+    !shown ? null
+      : shown.target === 'none' ? placeBubble(null, bubbleHeight, viewport, dir)
+        : box ? placeBubble(box, bubbleHeight, viewport, dir, !!shown.target.closest('aside'))
+          : null
 
-  const currentConfig = tourSteps[currentStepIndex]
-  const stepData = t.steps[currentConfig.step]
-  const isLast = currentStepIndex === tourSteps.length - 1
-  const stepLabel =
-    language === 'he'
-      ? `שלב ${currentStepIndex + 1} מתוך ${tourSteps.length}`
-      : `Step ${currentStepIndex + 1} of ${tourSteps.length}`
+  const at = shown?.index ?? 0
+  const total = steps.length - skipped.size
+  let position = 1
+  for (let i = 0; i < at; i++) if (!skipped.has(i)) position++
+  let isLast = true
+  for (let i = at + 1; i < steps.length; i++) if (!skipped.has(i)) { isLast = false; break }
+  const titleId = `tour-title-${run.id}`
+  const bodyId = `tour-body-${run.id}`
 
-  const cardStyle: React.CSSProperties = position.isMobile
-    ? {
-        left: 16,
-        right: 16,
-        bottom: 16,
-        maxWidth: 'none',
-      }
-    : {
-        left: position.left,
-        top: position.top,
-        width: TOOLTIP_WIDTH,
-      }
+  const bubbleStyle: React.CSSProperties =
+    !placement ? { visibility: 'hidden', left: 0, top: 0, width: BUBBLE_WIDTH }
+      : placement.mode === 'anchored' ? { left: placement.left, top: placement.top, width: placement.width }
+        : placement.mode === 'center' ? { left: '50%', top: '50%', width: BUBBLE_WIDTH, transform: 'translate(-50%, -50%)' }
+          : {}
 
-  return (
+  const spotlight = shown && shown.target !== 'none' && box ? (
+    <div
+      aria-hidden="true"
+      data-tour-spotlight=""
+      className="pointer-events-none fixed z-[91] rounded-inset motion-safe:transition-[left,top,width,height] motion-safe:duration-200 motion-safe:ease-snappy"
+      style={{
+        left: box.left - SPOT_PAD, top: box.top - SPOT_PAD,
+        width: box.width + SPOT_PAD * 2, height: box.height + SPOT_PAD * 2,
+        boxShadow: `0 0 0 200vmax ${DIM}`,
+        // An outline, not a ring: a ring is a box-shadow, and this box-shadow is the dimming.
+        outline: '2px solid var(--color-action)', outlineOffset: 0,
+      }}
+    />
+  ) : (
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[91]" style={{ backgroundColor: DIM }} />
+  )
+
+  return createPortal(
     <>
-      {/* Subtle overlay — sits BELOW the sidebar (z-40) so the highlighted
-          sidebar item stays bright, visible and clickable. */}
-      <div
-        className="fixed inset-0 z-30"
-        style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        onClick={finishTour}
-        aria-hidden="true"
-      />
-
-      {/* Tooltip card */}
-      <div
-        dir={language === 'he' ? 'rtl' : 'ltr'}
-        className="fixed z-50 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 p-5"
-        style={cardStyle}
-        role="dialog"
-        aria-modal="true"
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">
-              {stepLabel}
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug">
-              {stepData.title}
-            </h3>
+      {/* Holds the page still while the tour is open; a click outside does not end it. */}
+      <div aria-hidden="true" className="fixed inset-0 z-[90]" />
+      {spotlight}
+      {step && (
+        <div
+          ref={bubbleRef}
+          dir={dir}
+          lang={language}
+          role="dialog"
+          aria-modal="true"
+          aria-roledescription={t.label}
+          aria-labelledby={titleId}
+          aria-describedby={bodyId}
+          data-tour-bubble={step.key}
+          className={cn(
+            'fixed z-[92] rounded-card border border-line bg-surface p-4 text-start shadow-pop motion-safe:animate-pop-in',
+            placement?.mode === 'sheet' && 'inset-x-4',
+            placement?.mode === 'sheet' && (placement.edge === 'top' ? 'top-4' : 'bottom-4'),
+          )}
+          style={bubbleStyle}
+        >
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <span className="text-caption font-semibold text-action">{t.stepOf(position, total)}</span>
+            <button
+              type="button"
+              onClick={() => end('dismissed')}
+              aria-label={t.close}
+              className="-me-1.5 inline-flex size-7 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
           </div>
-          <button
-            onClick={finishTour}
-            className="flex-shrink-0 -mt-1 -me-1 p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            aria-label={t.buttons.skip}
-          >
-            <X size={18} />
-          </button>
-        </div>
+          <h2 id={titleId} className="text-section font-semibold text-ink text-balance">{dict.steps[step.key].title}</h2>
+          <p id={bodyId} className="mt-1 text-copy text-body text-pretty">{dict.steps[step.key].body}</p>
 
-        {/* Description */}
-        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
-          {stepData.description}
-        </p>
+          <div className="mt-3 flex items-center gap-1" aria-hidden="true">
+            {steps.map((_, i) => skipped.has(i) ? null : (
+              <span
+                key={i}
+                className={cn('h-1.5 rounded-pill transition-[width,background-color] duration-200',
+                  i === at ? 'w-4 bg-action' : i < at ? 'w-1.5 bg-action/40' : 'w-1.5 bg-line-strong')}
+              />
+            ))}
+          </div>
 
-        {/* Progress dots */}
-        <div className="flex items-center gap-1.5 mb-4">
-          {tourSteps.map((_, index) => (
-            <span
-              key={index}
-              className={`h-1.5 rounded-full transition-all ${
-                index === currentStepIndex
-                  ? 'bg-indigo-600 w-5'
-                  : index < currentStepIndex
-                    ? 'bg-indigo-300 dark:bg-indigo-500/60 w-2'
-                    : 'bg-slate-200 dark:bg-slate-600 w-2'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between gap-3">
-          <button
-            onClick={finishTour}
-            className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-          >
-            {t.buttons.skip}
-          </button>
-
-          <button
-            onClick={isLast ? finishTour : goNext}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors ${
-              isLast
-                ? 'bg-emerald-600 hover:bg-emerald-700'
-                : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
-          >
-            {isLast ? t.buttons.done : t.buttons.next}
-            {!isLast && (
-              <ChevronLeft size={16} className={language === 'he' ? '' : 'rotate-180'} />
+          <div className="mt-4 flex items-center justify-between gap-2">
+            {isLast ? <span /> : (
+              <button
+                type="button"
+                onClick={() => end('dismissed')}
+                className="rounded-control px-2 py-1.5 text-copy font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+              >
+                {t.skip}
+              </button>
             )}
-          </button>
+            <div className="flex items-center gap-2">
+              {position > 1 && (
+                <button
+                  type="button"
+                  onClick={() => go(-1)}
+                  className="rounded-control border border-line px-3 py-1.5 text-copy font-medium text-body transition-colors hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+                >
+                  {t.back}
+                </button>
+              )}
+              <button
+                ref={primaryRef}
+                type="button"
+                onClick={() => (isLast ? end('completed') : go(1))}
+                className="inline-flex items-center gap-1 rounded-control bg-action px-3.5 py-1.5 text-copy font-semibold text-action-ink transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-surface motion-safe:active:scale-[.98]"
+              >
+                {isLast ? t.done : t.next}
+                {!isLast && <ChevronLeft size={15} strokeWidth={2.2} className="ltr:rotate-180" aria-hidden="true" />}
+              </button>
+            </div>
+          </div>
+          <p className="sr-only">{t.keysHint}</p>
         </div>
-      </div>
-    </>
+      )}
+    </>,
+    document.body,
   )
 }
