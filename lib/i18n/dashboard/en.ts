@@ -2854,7 +2854,7 @@ export const dashboardEn = {
       moreActions: (keyword: string) => `More actions for "${keyword}"`,
       scanNow: (keyword: string) => `Check the position of "${keyword}" now`,
       deleteTitle: 'Delete keyword',
-      deleteBody: 'Delete "{name}"? Its check history is deleted too, and this cannot be undone.',
+      deleteBody: 'Stop tracking and delete "{name}"? This cannot be undone.',
       deleting: 'Deleting…',
       deleteFailed: 'The keyword could not be deleted. Try again.',
     },

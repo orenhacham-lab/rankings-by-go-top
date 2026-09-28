@@ -2868,7 +2868,7 @@ export const dashboardHe = {
       moreActions: (keyword: string) => `פעולות נוספות ל"${keyword}"`,
       scanNow: (keyword: string) => `בדיקת מיקום עכשיו ל"${keyword}"`,
       deleteTitle: 'מחיקת מילת מפתח',
-      deleteBody: 'למחוק את "{name}"? גם היסטוריית הבדיקות שלה תימחק, ואי אפשר לבטל.',
+      deleteBody: 'למחוק את "{name}" ממעקב? אי אפשר לבטל את זה.',
       deleting: 'מוחק…',
       deleteFailed: 'המחיקה לא הצליחה. נסו שוב.',
     },
