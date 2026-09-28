@@ -309,7 +309,7 @@ function ProjectDashboard({ project }: { project: Project }) {
             icon={<Send size={16} strokeWidth={2} />}
           />
         )}
-        <GscClicksTile projectId={project.id} hideSetup />
+        <GscClicksTile projectId={project.id} />
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
@@ -343,7 +343,7 @@ function ProjectDashboard({ project }: { project: Project }) {
             </div>
           )}
           <div className={`order-11 min-w-0 ${fold} empty:hidden`}>
-            <GscTopPages projectId={project.id} hideSetup />
+            <GscTopPages projectId={project.id} />
           </div>
         </div>
 

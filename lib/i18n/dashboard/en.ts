@@ -633,8 +633,6 @@ export const dashboardEn = {
       emptyTitle: 'No articles yet for this project',
       emptyHint: 'Article creation arrives in the next phase. For now you can connect your WordPress site.',
       openInWordpress: 'Open in WordPress',
-      publishedOn: 'Published on',
-      publishDate: 'Publish date',
       rowMenu: (title: string) => `More actions for "${title}"`,
       selectArticle: (title: string) => `Select "${title}"`,
     },
@@ -2069,8 +2067,6 @@ export const dashboardEn = {
     frequency: {
       manual: 'Manual',
       monthly: 'Monthly',
-      /** A legacy cadence some older projects still carry (UX review P2-2). */
-      weekly: 'Weekly',
     },
     actions: {
       edit: 'Edit',

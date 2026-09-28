@@ -27,10 +27,6 @@ function check(name: string, ok: boolean, detail?: string) {
 
 const ROOT = join(__dirname, '..', '..', '..')
 /** A source without its comments (JSX ones too): printed back by the TypeScript printer. */
-function code(rel: string): string {
-  const src = readFileSync(join(ROOT, rel), 'utf8')
-  return strip(src, rel.endsWith('.tsx'))
-}
 function strip(src: string, tsx = true): string {
   const sf = ts.createSourceFile('x.tsx', src, ts.ScriptTarget.Latest, true, tsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   return ts.createPrinter({ removeComments: true }).printFile(sf)
@@ -146,18 +142,12 @@ console.log('P1-6 / P1-16 dashboard')
     (s) => !/FirstPageRing|<circle\b|strokeDasharray/.test(s),
     (raw) => raw.replace(/<\/section>/, '<svg><circle r="1" /></svg></section>'))
   const page = 'app/(dashboard)/dashboard/page.tsx'
-  guard('P1-16: one ask for Search Console: the two GSC widgets leave it to the checklist', page,
-    (s) => /<GscClicksTile[^>]*\bhideSetup\b/.test(s) && /<GscTopPages[^>]*\bhideSetup\b/.test(s),
-    (raw) => raw.replace(/<GscTopPages projectId=\{project\.id\} hideSetup \/>/, '<GscTopPages projectId={project.id} />'))
   guard('P1-16: on a phone, five cards and the rest behind one button', page,
     (s) => /data-dashboard-fold/.test(s) && /aria-expanded=\{allCards\}/.test(s) && (s.match(/\$\{fold\}/g) ?? []).length >= 7,
     (raw) => raw.replace(/order-12 min-w-0 \$\{fold\}/, 'order-12 min-w-0'))
   guard('P1-16: the hero\'s next step is never "connect the site" (the checklist asks that)', page,
     (s) => !/connectSite/.test(s),
     (raw) => raw.replace(/const next\b/, 'const __c = t.hero.connectSite\n  const next'))
-  guard('P1-16: a hidden GSC widget hides only the checklist\'s own steps', 'components/gsc/GscClicksTile.tsx',
-    (s) => /new Set\(\[["']not_connected["'], ["']reauth_required["'], ["']no_property["']\]\)/.test(s) && /if \(hideSetup && CHECKLIST_STEPS\.has\(state\)\)\s*return null/.test(s),
-    (raw) => raw.replace("'no_property'])", "'no_property', 'never_synced'])"))
   for (const [lang, d] of [['he', he], ['en', en]] as const) {
     check(`P1-16 (${lang}): the fold's two labels exist`, !!d.dashboardHome.moreCards && !!d.dashboardHome.fewerCards)
   }
@@ -170,7 +160,7 @@ console.log('P1-18 content: one line for the setup, no project column')
     (raw) => raw.replace(/<div\s+role="note"/, '<Card role="note"'))
   guard('P1-18: the articles table has no "project" column (it is always the current project)', 'components/content/workspace/ArticlesScreen.tsx',
     (s) => !/t\.table\.project\b/.test(s) && !/selectedProject/.test(s),
-    (raw) => raw.replace(/<Th>\{t\.table\.publishDate\}<\/Th>/, '<Th>{t.table.project}</Th><Th>{t.table.publishDate}</Th>'))
+    (raw) => raw.replace(/<Th>\{t\.table\.status\}<\/Th>/, '<Th>{t.table.project}</Th><Th>{t.table.status}</Th>'))
 }
 
 console.log('P1-19 settings: the right section marked, one save')
@@ -198,16 +188,12 @@ console.log('P1-19 settings: the right section marked, one save')
 
 console.log('P2-2 / P2-6 wording')
 {
-  guard('P2-2: a weekly project reads "weekly" in the screen\'s language', 'components/projects/ProjectsTable.tsx',
-    (s) => /freq === ["']weekly["']\)\s*return f\.weekly/.test(s) && !/getFrequencyLabel/.test(s),
-    (raw) => raw.replace(/if \(freq === 'weekly'\) return f\.weekly/, ''))
-  check('P2-2: weekly is in both dictionaries', he.projects.frequency.weekly === 'פעם בשבוע' && en.projects.frequency.weekly === 'Weekly')
+  guard('P2-2: the projects table names the cadence in the screen\'s language, never through the Hebrew-only helper', 'components/projects/ProjectsTable.tsx',
+    (s) => /freq === ["']monthly["'] \? f\.monthly : f\.manual/.test(s) && !/getFrequencyLabel/.test(s),
+    (raw) => raw.replace("return freq === 'monthly' ? f.monthly : f.manual", "return freq === 'monthly' ? f.monthly : getFrequencyLabel(freq)"))
   guard('P2-6: the scan facts say the market in words, not hl=/gl=', 'components/keywords/ProjectKeywordsPanel.tsx',
     (s) => !/\b[hg]l=/.test(s) && /Intl\.DisplayNames/.test(s),
     (raw) => raw.replace("displayName(lang, 'language', project.language)", '`hl=${project.language}`'))
-  guard('P2-2: the keywords tab names a weekly cadence too', 'components/keywords/ProjectKeywordsPanel.tsx',
-    (s) => /cadence === ["']weekly["'] \? f\.weekly/.test(s),
-    (raw) => raw.replace("cadence === 'weekly' ? f.weekly : ", ''))
 }
 
 console.log('axe: names for selects and checkboxes; tokens, not raw palette colours')

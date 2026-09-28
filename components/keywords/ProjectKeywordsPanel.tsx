@@ -470,8 +470,7 @@ function displayName(lang: 'he' | 'en', type: 'region' | 'language', code: strin
  */
 function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>, lang: 'he' | 'en') {
   const f = dict.projects.frequency
-  const cadence = (project.scan_frequency || 'manual').toLowerCase()
-  const frequency = cadence === 'monthly' ? f.monthly : cadence === 'weekly' ? f.weekly : f.manual
+  const frequency = (project.scan_frequency || 'manual').toLowerCase() === 'monthly' ? f.monthly : f.manual
 
   const device = project.device_type === 'mobile' ? dict.common.deviceMobile
     : project.device_type === 'desktop' ? dict.common.deviceDesktop

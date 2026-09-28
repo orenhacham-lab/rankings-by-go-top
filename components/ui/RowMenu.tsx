@@ -44,7 +44,6 @@ export default function RowMenu({ label, items, className }: {
   className?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const startAt = useRef<'first' | 'last'>('first')
@@ -53,21 +52,24 @@ export default function RowMenu({ label, items, className }: {
 
   const close = useCallback((refocus: boolean) => {
     setOpen(false)
-    setPos(null)
     if (refocus) buttonRef.current?.focus()
   }, [])
 
+  // Written straight onto the list (not through state): it is measured and placed
+  // in the same layout pass, before the browser paints it.
   const place = useCallback(() => {
     const b = buttonRef.current
-    if (!b) return
+    const list = listRef.current
+    if (!b || !list) return
     const r = b.getBoundingClientRect()
     const rtl = getComputedStyle(b).direction === 'rtl'
-    const height = listRef.current?.offsetHeight ?? shown.length * 36 + 8
+    const height = list.offsetHeight || shown.length * 36 + 8
     const up = r.bottom + 4 + height > window.innerHeight && r.top - 4 - height > 0
     // Aligned to the button's inline END edge, so the list opens into the table.
     const rawLeft = rtl ? r.left : r.right - MENU_WIDTH
     const left = Math.min(Math.max(8, rawLeft), window.innerWidth - MENU_WIDTH - 8)
-    setPos({ top: up ? r.top - 4 - height : r.bottom + 4, left, up })
+    list.style.top = `${up ? r.top - 4 - height : r.bottom + 4}px`
+    list.style.left = `${left}px`
   }, [shown.length])
 
   useLayoutEffect(() => {
@@ -149,7 +151,7 @@ export default function RowMenu({ label, items, className }: {
           role="menu"
           aria-label={label}
           onKeyDown={onListKey}
-          style={{ position: 'fixed', top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: MENU_WIDTH }}
+          style={{ position: 'fixed', top: -9999, left: -9999, width: MENU_WIDTH }}
           className="z-[90] rounded-card border border-line bg-surface p-1 shadow-pop animate-pop-in"
         >
           {shown.map((item) => item.href && !item.disabled ? (

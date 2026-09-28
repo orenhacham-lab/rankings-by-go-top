@@ -17,7 +17,6 @@ import type { TopPage } from '@/lib/gsc/tab-metrics'
 import { useGscMetrics, useGscStatus } from './gsc-data'
 import GscSetupPrompt, { GscLoadError, GscLoading } from './GscSetupPrompt'
 import { formatCount } from './format'
-import { CHECKLIST_STEPS } from './GscClicksTile'
 
 function pickPages(body: Record<string, unknown>): TopPage[] {
   return Array.isArray(body.pages) ? (body.pages as TopPage[]) : []
@@ -37,15 +36,13 @@ function describePage(url: string, homePage: string): { label: string; isPath: b
   }
 }
 
-/** `hideSetup`: as GscClicksTile, says nothing where the dashboard's checklist already asks for the step. */
-export default function GscTopPages({ projectId, className, hideSetup = false }: { projectId: string | null | undefined; className?: string; hideSetup?: boolean }) {
+export default function GscTopPages({ projectId, className }: { projectId: string | null | undefined; className?: string }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const status = useGscStatus(projectId)
   const pages = useGscMetrics(projectId, status.view, 'pages', pickPages)
   const data = pages.data
   if (data.state === 'disabled') return null
-  if (hideSetup && CHECKLIST_STEPS.has(data.state)) return null
   const retry = () => { status.reload(); pages.reload() }
   const max = data.state === 'ready' ? Math.max(1, ...data.data.map((p) => p.clicks)) : 1
 

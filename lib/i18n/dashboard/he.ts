@@ -634,9 +634,6 @@ export const dashboardHe = {
       emptyTitle: 'אין עדיין מאמרים לפרויקט הזה',
       emptyHint: 'יצירת מאמרי SEO/GEO תתווסף בשלב הבא. בינתיים אפשר לחבר את אתר ה-WordPress.',
       openInWordpress: 'פתח ב-WordPress',
-      // UX review P1-18: where the article went live, whatever the platform.
-      publishedOn: 'פורסם ב-',
-      publishDate: 'תאריך פרסום',
       rowMenu: (title: string) => `פעולות נוספות למאמר "${title}"`,
       selectArticle: (title: string) => `בחירת המאמר "${title}"`,
     },
@@ -2074,8 +2071,6 @@ export const dashboardHe = {
     frequency: {
       manual: 'ידני',
       monthly: 'פעם בחודש',
-      /** A legacy cadence some older projects still carry (UX review P2-2). */
-      weekly: 'פעם בשבוע',
     },
     actions: {
       edit: 'עריכה',

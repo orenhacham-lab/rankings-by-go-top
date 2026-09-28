@@ -36,15 +36,15 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Phase 3 removed weekly scans, but a project saved before it can still carry
-  // "weekly": it is named as what it is, in the screen's language (UX review
-  // P2-2; it used to fall through to a Hebrew-only helper that called it
-  // "manual"). Anything else unknown reads as manual, also in the screen's language.
+  // UX review P2-2 ("does not handle weekly"): there is no weekly any more. Phase 3
+  // converted every weekly project to monthly and the column's CHECK allows only
+  // manual | monthly, so naming "weekly" here would describe a cadence that never
+  // runs. What was wrong is the fallback: an unknown value went to a Hebrew-only
+  // helper, so the English screen showed "ידני". Every value now reads in the
+  // screen's language.
   function localizedFrequency(freq: string): string {
     const f = dict.projects.frequency
-    if (freq === 'monthly') return f.monthly
-    if (freq === 'weekly') return f.weekly
-    return f.manual
+    return freq === 'monthly' ? f.monthly : f.manual
   }
 
   const filtered = projects.filter(

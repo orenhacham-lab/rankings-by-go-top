@@ -277,7 +277,7 @@ export default function TrackingTargetsTable({
                   <div className="flex flex-col items-start gap-0.5">
                     {result ? (
                       result.found ? (
-                        <span className="text-base font-bold text-ink">
+                        <span className="text-base font-bold leading-5 text-ink">
                           #{result.position}
                         </span>
                       ) : (

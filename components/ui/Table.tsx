@@ -6,6 +6,11 @@ import { cn } from '@/lib/utils'
  * Cells align to the logical START, so a Hebrew table reads from the right and
  * an English one from the left without a class per language. On a narrow screen
  * the table scrolls inside its own frame instead of widening the page.
+ *
+ * The frame is `relative` so it is the containing block of anything absolutely
+ * placed in a cell (every `sr-only` label is): otherwise those escape the scroll
+ * clip, and in Hebrew a label in a column scrolled out of view to the left made
+ * the whole page wider than a phone (390px wide page measured at 415-475px).
  */
 interface TableProps {
   children: React.ReactNode
@@ -14,7 +19,7 @@ interface TableProps {
 
 export function Table({ children, className }: TableProps) {
   return (
-    <div className="max-w-full overflow-x-auto rounded-card border border-line bg-surface shadow-card">
+    <div className="relative max-w-full overflow-x-auto rounded-card border border-line bg-surface shadow-card">
       <table className={cn('w-full text-copy tabular-nums', className)}>
         {children}
       </table>

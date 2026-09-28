@@ -462,10 +462,13 @@ export default function ArticlesScreen() {
               <Th>{t.table.created}</Th>
               <Th>{t.table.updated}</Th>
               <Th>{t.table.scheduledAt}</Th>
-              <Th>{t.table.publishDate}</Th>
-              {/* The row's PUBLICATION state, on whichever platform is active:
-                  "Published on", never "WordPress" for a Shopify or Wix site. */}
-              <Th>{t.table.publishedOn}</Th>
+              <Th>{t.table.publishedAt}</Th>
+              {/* The column carries the row's PUBLICATION state, which is
+                  WordPress or Shopify depending on the active platform.
+                  Labelling it "WordPress" for a Shopify project was simply
+                  wrong; a neutral heading is used whenever the row is not
+                  WordPress. */}
+              <Th>{isSite ? t.table.publication : isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
               <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
