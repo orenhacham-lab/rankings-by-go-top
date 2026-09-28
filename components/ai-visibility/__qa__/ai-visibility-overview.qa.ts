@@ -264,13 +264,24 @@ async function main() {
       const card = render(locale, createElement(OverviewOpeningCard, { overview: ov, questionsPending: false, questionsSuggested: 8, onChooseQuestions: () => {} }))
       check(`${locale}: the opening card asks "${c.heroTitle}" and shows the score 50, mentions, citations and +50 points`,
         text(card).includes(c.heroTitle) && /data-ai-opening="ready"/.test(card) && /text-\[3\.5rem\][^"]*">50<\/span>/.test(card) && text(card).includes(c.changePoints(50)) && card.includes('data-ai-change="up"')
-        && /<span class="[^"]*\btext-section\b[^"]*\btext-emerald-300\b[^"]*">/.test(card))
-      const targets = card.match(/<button type="button" class="h-full flex-1[^>]*>/g) ?? []
-      check(`${locale}: …with the score trend drawn (0 → 50 on a 0-100 scale), one hover target per check naming its score`,
-        card.includes('data-ai-trend="2"') && /<path d="M4\.00,92\.00 L96\.00,50\.00"/.test(card) && targets.length === 2
-        && targets[1].includes(`aria-label="${c.trendPoint(50, formatWhen(ago(5), locale))}"`), targets.join(' '))
+        && /<span class="[^"]*\btext-section\b[^"]*\bbg-ok-soft text-ok\b[^"]*">/.test(card) && !/emerald|rose-/.test(card))
+      // R21: two checks draw no line (it would be flat and say nothing); the card says one more is needed.
+      check(`${locale}: …two checks draw no trend line, only "${c.trendPending(1)}"`,
+        !card.includes('data-ai-trend=') && card.includes('data-ai-trend-pending="1"') && text(card).includes(c.trendPending(1)))
+      const three = render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview(M.readRuns([aiRun('n', 5, [res('perplexity', true, true)]), aiRun('m', 60, [res('chatgpt', false)]), aiRun('l', 90, [res('gemini', false)])])), questionsPending: false, questionsSuggested: null, onChooseQuestions: () => {} }))
+      const targets = three.match(/<button type="button" class="h-full flex-1[^>]*>/g) ?? []
+      check(`${locale}: …from the third check the trend is drawn on a 0-100 scale, one hover target per check naming its score`,
+        three.includes('data-ai-trend="3"') && /<path d="M4\.00,92\.00 L50\.00,92\.00 L96\.00,[\d.]+"/.test(three) && targets.length === 3
+        && targets[2].includes(`aria-label="${c.trendPoint(M.buildOverview(M.readRuns([aiRun('n', 5, [res('perplexity', true, true)]), aiRun('m', 60, [res('chatgpt', false)]), aiRun('l', 90, [res('gemini', false)])]))!.score ?? -1, formatWhen(ago(5), locale))}"`), targets.join(' '))
+      const mutTrend = (html: string) => html.replace('data-ai-trend-pending="1"', 'data-ai-trend="2"')
+      check(`${locale}: MUT a two-point line fails the two-check rule`, mutTrend(card).includes('data-ai-trend='))
+      // R21: a zero change is said in words, never "– 0 pts".
+      const flat = render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview(M.readRuns([aiRun('b', 5, [res('chatgpt', true)]), aiRun('a', 60, [res('chatgpt', true)])])), questionsPending: false, questionsSuggested: null, onChooseQuestions: () => {} }))
+      const flatRule = (html: string) => html.includes('data-ai-change="flat"') && text(html).includes(c.changeFlat) && !text(html).includes(c.changePoints(0))
+      check(`${locale}: …an unchanged score reads "${c.changeFlat}", with no 0-point delta`, flatRule(flat))
+      check(`${locale}: MUT printing the 0-point delta fails that rule`, !flatRule(flat.replace(c.changeFlat, c.changePoints(0))))
       const oneCheck = render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview(M.readRuns([aiRun('only', 3, [res('chatgpt', true)])])), questionsPending: false, questionsSuggested: null, onChooseQuestions: () => {} }))
-      check(`${locale}: …and no trend from a single check`, !oneCheck.includes('data-ai-trend'))
+      check(`${locale}: …and no trend from a single check, only "${c.trendPending(2)}"`, !oneCheck.includes('data-ai-trend=') && oneCheck.includes('data-ai-trend-pending="2"'))
       const empty = text(render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview([]), questionsPending: false, questionsSuggested: 8, onChooseQuestions: () => {} })))
       check(`${locale}: with no check yet it names the scan's 8 questions and offers to choose one`, empty.includes(c.emptyBodyQuestions(8)) && empty.includes(c.chooseQuestions))
       check(`${locale}: …and says what a check will measure instead of empty figures`,

@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { FileSearch, Link2, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Segmented from '@/components/ui/Segmented'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Reveal } from '@/components/ui/motion'
@@ -191,24 +192,17 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
 
         {loaded && report && report.findings.length > 0 && (
           <section aria-label={copy.counts.findings(report.findings.length)} className={cn('space-y-4', scanning && 'pointer-events-none opacity-50')}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Below sm the filter takes its own full-width line under the count. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-section font-semibold text-ink">{copy.counts.findings(report.findings.length)}</h2>
-              <div role="group" aria-label={copy.filters.label} className="inline-flex rounded-control border border-line bg-sunk/70 p-1">
-                {(['all', 'fixable', 'guide'] as const).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    aria-pressed={filter === f}
-                    onClick={() => setFilter(f)}
-                    className={cn(
-                      'h-8 rounded-[0.5rem] px-3.5 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-                      filter === f ? 'bg-surface text-ink shadow-control' : 'text-muted hover:text-ink',
-                    )}
-                  >
-                    {copy.filters[f]}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                ariaLabel={copy.filters.label}
+                value={filter}
+                onChange={setFilter}
+                fill
+                className="sm:inline-flex sm:w-auto"
+                options={(['all', 'fixable', 'guide'] as const).map((f) => ({ value: f, label: copy.filters[f] }))}
+              />
             </div>
             <div className="space-y-4">
               {visible.map((f, i) => (

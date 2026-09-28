@@ -89,7 +89,7 @@ export function ResultRowCard({
       <div
         data-ai-result-error=""
         className={cn(
-          'rounded-inset border border-line border-s-[3px] border-s-bad bg-surface p-4',
+          'rounded-inset border border-line bg-surface p-4',
           highlighted && 'ring-4 ring-action/20'
         )}
       >

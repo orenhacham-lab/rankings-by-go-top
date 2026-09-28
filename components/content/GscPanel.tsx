@@ -35,7 +35,7 @@ interface SanitizedConnection { id: string; status: ConnStatus; grantedScope: st
 interface AssignedProperty { siteUrl: string; permissionLevel: string | null; selectedAt: string }
 // The read-only metrics view (windows summary + table) lives in GscMetricsTable now.
 // `windows` is still read here for Area A's last-sync / next-eligible derivation.
-interface StatusResponse { ok: boolean; oauthConfigured: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null> }
+interface StatusResponse { ok: boolean; oauthConfigured: boolean; /** Server says the viewer is an administrator and may read why. */ opsDetail?: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null> }
 
 interface PropertyView { siteUrl: string; permissionLevel: string; kind: 'domain' | 'url_prefix'; covers: boolean; assignable: boolean }
 
@@ -225,8 +225,11 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
       {loading ? (
         <Skeleton className="mt-4 h-12 w-full rounded-inset" />
       ) : status && !status.oauthConfigured ? (
-        <Notice tone="warn" className="mt-4">
-          {t.notConfigured}
+        // A merchant reads that it is unavailable, with nothing to press; only an administrator
+        // (the server's opsDetail) also reads the configuration reason.
+        <Notice tone="info" className="mt-4">
+          <span data-gsc-unavailable={status.opsDetail ? 'admin' : 'merchant'}>{t.unavailable}</span>
+          {status.opsDetail && <span className="mt-1 block text-caption text-body">{t.notConfigured}</span>}
         </Notice>
       ) : !connected ? (
         <>

@@ -100,7 +100,7 @@ function SearchResultMock({ url, title, description, caption }: { url: string; t
     <div className="rounded-inset border border-line bg-surface p-4" data-site-health="serp">
       <p className="text-overline font-semibold uppercase tracking-wide text-muted">{caption}</p>
       <p className="mt-2 truncate text-caption text-muted" dir="ltr">{hostOf(url)} › {pathLabel(url).split('/').filter(Boolean).join(' › ')}</p>
-      <p className="mt-1 line-clamp-1 text-[1.0625rem] leading-6 font-medium text-action">{title}</p>
+      <p className="mt-1 line-clamp-1 text-section font-medium text-action">{title}</p>
       {description && <p className="mt-0.5 line-clamp-2 text-copy text-body">{description}</p>}
     </div>
   )

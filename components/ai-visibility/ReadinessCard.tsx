@@ -98,7 +98,7 @@ export default function ReadinessCard({
               key={row.id}
               data-ai-readiness-check={row.id}
               data-status={row.status}
-              className={cn('min-w-0', row.status === 'fail' && 'border-s-[3px] border-s-warn')}
+              className="min-w-0"
             >
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3.5 py-3 transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">

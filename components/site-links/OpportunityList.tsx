@@ -53,7 +53,9 @@ export default function OpportunityList({ copy, items, statusOf, setStatus }: {
 
   return (
     <div className="space-y-4">
-      <div role="group" aria-label={copy.filterLabel} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      {/* Up to five categories: chips that wrap (a five-way Segmented would not fit a phone). The chosen
+          chip takes the action-soft pair, never a black fill. */}
+      <div role="group" aria-label={copy.filterLabel} className="flex flex-wrap gap-2">
         {FILTERS.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
           const on = filter === f
           return (
@@ -66,11 +68,11 @@ export default function OpportunityList({ copy, items, statusOf, setStatus }: {
               className={cn(
                 'inline-flex h-9 shrink-0 items-center gap-2 rounded-pill border px-3.5 text-caption font-semibold transition-colors duration-150',
                 FOCUS,
-                on ? 'border-ink bg-ink text-surface' : 'border-line bg-surface text-body hover:border-line-strong hover:text-ink',
+                on ? 'border-action/30 bg-action-soft text-action' : 'border-line bg-surface text-body hover:border-line-strong hover:text-ink',
               )}
             >
               <span>{f === 'all' ? copy.filterAll : copy.categories[f]}</span>
-              <span className={cn('rounded-pill px-1.5 tabular-nums', on ? 'bg-surface/15' : 'bg-sunk text-muted')}>{counts[f]}</span>
+              <span className={cn('rounded-pill px-1.5 tabular-nums', on ? 'bg-surface/70' : 'bg-sunk text-muted')}>{counts[f]}</span>
             </button>
           )
         })}

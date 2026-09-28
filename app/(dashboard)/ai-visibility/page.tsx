@@ -47,7 +47,6 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import MappingPlaceholder from '@/components/mapping/MappingPlaceholder'
 import { useMapping } from '@/components/mapping/useMapping'
-import { Telescope } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import type { Project } from '@/lib/supabase/types'
@@ -161,17 +160,11 @@ function ProjectAIVisibility({ project }: { project: Project }) {
   const mappingCard = seed.kind === 'none' && mapping.mapping.available === true && (
     <section
       id="ai-readiness"
-      aria-labelledby="ai-mapping-title"
+      aria-label={mappingCopy.aiTitle}
       data-ai-readiness="mapping"
       className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
     >
-      <header className="mb-4 flex items-start gap-3">
-        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
-          <Telescope className="size-5" />
-        </span>
-        <h2 id="ai-mapping-title" className="text-section font-semibold text-ink">{mappingCopy.aiTitle}</h2>
-      </header>
-      <MappingPlaceholder control={mapping} body={mappingCopy.aiBody} locale={language} withNotice />
+      <MappingPlaceholder control={mapping} title={mappingCopy.aiTitle} body={mappingCopy.aiBody} locale={language} withNotice />
     </section>
   )
   return (

@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Settings2, Sparkles } from 'lucide-react'
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -102,7 +103,8 @@ export default function CompetitorsReadOnly({
           {state.rows.map((r) => {
             const scanned = fromScan.has(domainKey(r.domain)) || fromScan.has(domainKey(r.name))
             return (
-              <li key={r.id} className="flex min-w-0 max-w-full items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2">
+              <li key={r.id} data-ai-competitor-chip="" className="flex min-w-0 max-w-full items-center gap-2.5 rounded-control border border-line bg-surface py-2 pe-3 ps-2 shadow-control">
+                <SiteAvatar domain={r.domain} name={r.name} size="sm" />
                 <span className="min-w-0">
                   <span className="block truncate text-copy font-medium text-ink">{r.name}</span>
                   {r.domain && r.domain !== r.name && <span className="block truncate text-caption text-muted" dir="ltr">{r.domain}</span>}

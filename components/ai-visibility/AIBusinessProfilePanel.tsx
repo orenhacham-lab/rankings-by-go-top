@@ -138,6 +138,9 @@ export default function AIBusinessProfilePanel({
   const displayedCategoryRaw =
     mode === 'manual' && primaryCategory ? primaryCategory : autoCategory
   const displayedCategoryLabel = categoryLabelText(t, displayedCategoryRaw)
+  // Detection that found nothing ("Other") tells the owner nothing: the line is left out
+  // until they set a category or detection finds a real one.
+  const showDetected = !!displayedCategoryLabel && !(mode === 'auto' && displayedCategoryLabel === t('cat_generic'))
 
   const filteredSuggestions = useMemo(() => {
     const q = primaryCategory.trim().toLowerCase()
@@ -266,12 +269,14 @@ export default function AIBusinessProfilePanel({
               {mode === 'manual' ? t('manual_badge') : t('auto_badge')}
             </Badge>
           </div>
-          <div className="mt-1 text-caption text-body truncate">
-            <span className="text-muted">
-              {mode === 'manual' ? t('manually_set') : t('auto_detected')}:
-            </span>{' '}
-            <span className="font-medium text-ink">{displayedCategoryLabel}</span>
-          </div>
+          {showDetected && (
+            <div className="mt-1 text-caption text-body truncate" data-ai-profile-detected="">
+              <span className="text-muted">
+                {mode === 'manual' ? t('manually_set') : t('auto_detected')}:
+              </span>{' '}
+              <span className="font-medium text-ink">{displayedCategoryLabel}</span>
+            </div>
+          )}
         </div>
 
         <span

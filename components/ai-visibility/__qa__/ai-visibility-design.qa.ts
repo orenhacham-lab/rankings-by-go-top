@@ -5,10 +5,10 @@
  *      the answer); archive/restore sits in the row's menu, outside the button
  *   B  the result drawer is a dialog: role, aria-modal, a named close button,
  *      Escape closes it
- *   C  the two competitor percentages say what they measure: "share of all
- *      mentions" (sums to 100%) vs "of answers" (each business against every
- *      answer, so several can reach 100%). The 43% next to 100% was a wording
- *      problem, not a math one.
+ *   C  the competitors tab says it once: each business's rate "of answers"
+ *      (the score's own unit). The "share of all mentions" card re-divided the
+ *      same counts, so 43% sat next to 100% for one competitor; it is gone (R21).
+ *      The key wording stays pinned for any other reader of those keys.
  *   D  no raw server or provider text reaches the merchant from the tab
  *   E  the contract: tokens only, ui primitives (Select, Checkbox), lucide
  *      icons (no glyph icons), no banned sizes, radii, shadows or motion
@@ -121,9 +121,14 @@ function main() {
         !/results|תוצאות/i.test(t('competitor_results_of')) && /\{mentions\}/.test(t('competitor_results_of')))
     }
     const panel = code('components/ai-visibility/CompetitorAnalysisPanel.tsx')
-    const rule = (s: string) => /t\('share_of_voice_of_all'\)/.test(s) && /t\('competitor_visibility'\)/.test(s) && /t\('competitor_results_of'\)/.test(s)
-    check('C4: both cards print their unit next to the number', rule(panel))
-    check('C5: MUT the share card without its unit fails C4', !rule(panel.replace("t('share_of_voice_of_all')", "''")))
+    // R21: the tab says it once. The per-business rate ("of answers", the score's own unit) is the
+    // one comparison; the "share of all mentions" card re-divided the same counts and put 43% next
+    // to 100% for one competitor, so it is gone.
+    const rule = (s: string) => /t\('competitor_visibility'\)/.test(s) && /t\('competitor_results_of'\)/.test(s)
+      && !/t\('share_of_voice_(?:title|of_all|help)'\)/.test(s) && !/shareOfVoice\b(?!\?: ShareOfVoice)/.test(s.replace(/type AnalysisResponse[\s\S]*?\n\}/, ''))
+    check('C4: one comparison card, its unit next to the number, no second "share of mentions" percentage', rule(panel))
+    check('C5: MUT putting the share card back fails C4', !rule(panel + "\n<h3>{t('share_of_voice_title')}</h3>"))
+    check('C5b: MUT dropping the unit fails C4', !rule(panel.replace("t('competitor_visibility')", "''")))
     check('C6: MUT the old "share of voice" title fails C1', !/מכלל האזכורים/.test('נתח קול בתשובות AI'))
     check('C7: the bars follow the chart rule (the business in action, competitors in line-strong)',
       /isProject \? 'bg-action' : 'bg-line-strong'/.test(panel) && /row\.isProject \? 'bg-action' : 'bg-line-strong'/.test(panel))
@@ -147,11 +152,12 @@ function main() {
   console.log('\nE) the design contract in the AI tab\'s files')
   {
     // Two known exceptions, both reported: the ChatGPT and Grok logos are black
-    // SVGs that must invert in dark mode, and the always-dark opening card shows
-    // its up/down change (and its guarded 3.5rem score) with no token for either.
+    // SVGs that must invert in dark mode, and the always-dark opening card's
+    // guarded 3.5rem score has no token. Its up/down change is on the ok/bad
+    // soft pair now (R12), so emerald/rose are no longer allowed there.
     const ALLOW: Array<[string, RegExp]> = [
       ['components/ai-visibility/EngineIcon.tsx', /^dark:$/],
-      ['components/ai-visibility/OverviewRows.tsx', /^(?:text-emerald-300|text-rose-300|text-\[3)$/],
+      ['components/ai-visibility/OverviewRows.tsx', /^text-\[3$/],
     ]
     const BANNED = /\b(?:text|bg|border|ring|from|to|via|fill|stroke|divide|shadow)-(?:slate|gray|zinc|neutral|stone|blue|indigo|violet|purple|green|emerald|teal|red|rose|amber|yellow|orange|sky|cyan|pink|white|black)(?:-\d{2,3})?\b|\bdark:|\btext-(?:xs|sm|base|lg|xl|2xl|3xl)\b|text-\[\d|\bshadow-(?:sm|md|lg|xl|2xl)\b|\brounded-(?:md|lg|xl|2xl|3xl|full)\b|transition-all|hover:scale|animate-pulse|animate-bounce|gradient|font-mono/g
     const hits: string[] = []
@@ -166,6 +172,10 @@ function main() {
     const before = hits.length
     scan(SECTION, code(SECTION) + '\n<p className="text-slate-500 rounded-xl shadow-lg" />')
     check('E2: MUT a raw palette class, a banned radius and a banned shadow are each caught', hits.length - before === 3)
+    const beforeRows = hits.length
+    scan('components/ai-visibility/OverviewRows.tsx', code('components/ai-visibility/OverviewRows.tsx') + "\n<span className={dir === 'up' ? 'text-emerald-300' : 'text-rose-300'} />")
+    check('E2b: MUT the old emerald/rose change colours in OverviewRows are caught (no allowance left)', hits.length - beforeRows === 2)
+    hits.length = beforeRows
 
     const natives = WP2.filter((f) => /<select\b|type="checkbox"/.test(code(f)))
     check('E3: no native select or checkbox (ui/Select, ui/Checkbox)', natives.length === 0, natives.join(', '))
