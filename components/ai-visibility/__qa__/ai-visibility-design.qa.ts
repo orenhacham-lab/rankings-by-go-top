@@ -17,7 +17,7 @@
  *
  * Run: npx tsx components/ai-visibility/__qa__/ai-visibility-design.qa.ts
  */
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
