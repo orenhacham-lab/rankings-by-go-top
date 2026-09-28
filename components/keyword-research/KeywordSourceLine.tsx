@@ -32,7 +32,7 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
   // readers and on hover); a competitor and Google keep their words, which differ per row.
   const ICONS = { research: ScanSearch, competitor: CompetitorIcon, google: TrendingUp } as const
   const researchMark = (key: string, text: string) => (
-    <span key={key} title={text} className="inline-grid size-5 place-items-center rounded-full bg-action-soft text-action">
+    <span key={key} title={text} className="inline-grid size-5 place-items-center rounded-pill bg-action-soft text-action">
       <ScanSearch size={11} strokeWidth={2.5} aria-hidden="true" />
       <span className="sr-only">{text}</span>
     </span>
@@ -48,7 +48,7 @@ export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
   return (
     <span data-keyword-source="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-caption text-muted">
       {row.tracked && (
-        <span className="inline-flex items-center rounded-pill border border-ok/20 bg-ok-soft px-1.5 text-[11px] font-semibold text-ok">{t.tracked}</span>
+        <span className="inline-flex items-center rounded-pill border border-ok/20 bg-ok-soft px-1.5 text-overline font-semibold text-ok">{t.tracked}</span>
       )}
       {parts.map((p) => {
         const Icon = ICONS[p.key as keyof typeof ICONS]

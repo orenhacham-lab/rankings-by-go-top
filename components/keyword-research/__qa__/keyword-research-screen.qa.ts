@@ -217,7 +217,7 @@ function modelFor(locale: Locale, chip: ResearchChip = 'all', google = true) {
 function tableKeywords(html: string): string[] {
   const table = el(html, 'id="research-table"')
   const body = table.slice(table.indexOf('<tbody'))
-  return [...body.matchAll(/<tr\b[^>]*>\s*<td\b[^>]*>[\s\S]*?<\/td>\s*<td\b[^>]*>([^<]*)/g)].map((m) => m[1].replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').trim())
+  return [...body.matchAll(/<tr\b[^>]*>\s*<td\b[^>]*>[\s\S]*?<\/td>\s*<td\b[^>]*>\s*(?:<span\b[^>]*>)?([^<]*)/g)].map((m) => m[1].replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').trim())
 }
 
 function main() {
@@ -289,7 +289,7 @@ function main() {
     const t = getDashboardDictionary(locale).keywordResearchScan
     const m = modelFor(locale)
     const chips = el(html, 'data-research-chips=')
-    const buttons = [...chips.matchAll(/<button[^>]*data-chip="([a-z_]+)"[^>]*aria-pressed="(true|false)"[^>]*>([\s\S]*?)<\/button>/g)].map((x) => ({ chip: x[1], pressed: x[2] === 'true', html: x[3] }))
+    const buttons = [...chips.matchAll(/<button[^>]*data-chip="([a-z_]+)"[^>]*aria-checked="(true|false)"[^>]*>([\s\S]*?)<\/button>/g)].map((x) => ({ chip: x[1], pressed: x[2] === 'true', html: x[3] }))
     const bad = RESEARCH_CHIPS.filter((c, i) => buttons[i]?.chip !== c || !buttons[i].html.includes(esc(t.chips[c])) || !buttons[i].html.includes(`>${formatCount(m.counts[c], locale)}</span>`))
     check(`T1 (${locale}): the chips, in order, each with its count (${RESEARCH_CHIPS.map((c) => `${t.chips[c]} ${m.counts[c]}`).join(', ')}); "all" pressed`,
       buttons.length === RESEARCH_CHIPS.length && bad.length === 0 && buttons.filter((b) => b.pressed).map((b) => b.chip).join() === 'all'
@@ -314,7 +314,7 @@ function main() {
     check(`T3 (${locale}): "${t.chips.suggested}" shows the scan's keywords not tracked yet that pass the relevance filter, ranked by the easy-wins score`,
       show(suggestedRows) === show(expected) && expected.length === m.counts.suggested && !expected.includes('run shop')
       && !expected.some((k) => FIXTURE[locale].tracked.some((tr) => tr.keyword === k))
-      && /data-chip="suggested"[^>]*aria-pressed="true"/.test(suggestedHtml),
+      && /data-chip="suggested"[^>]*aria-checked="true"/.test(suggestedHtml),
       show({ suggestedRows, expected }))
   }
   {
@@ -551,7 +551,8 @@ function main() {
         const line = page.slice(page.lastIndexOf('\n', at) + 1, page.indexOf('\n', at))
         const inHandler = fetching.has(enclosing(at)) && enclosing(at) !== name
         const isDef = new RegExp(`const ${name} = `).test(line)
-        const isEventProp = new RegExp(`\\bon[A-Z]\\w*=\\{(?:\\([^)]*\\) => )?${name}\\b`).test(line)
+        // An event prop (onClick={…}) or a menu item's handler (onSelect: () => …): both run only on a click.
+        const isEventProp = new RegExp(`\\bon[A-Z]\\w*(?:=\\{|: )(?:\\([^)]*\\) => )?${name}\\b`).test(line)
         if (!inHandler && !isDef && !isEventProp) loose.push(`${name}: ${line.trim()}`)
       }
     }

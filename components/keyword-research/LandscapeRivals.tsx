@@ -71,17 +71,24 @@ function RivalCard({ c, max, index }: { c: CompetitorInsight; max: number; index
         </a>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3">
-        <div>
-          <dt className="text-overline text-muted">{t.found}</dt>
-          <dd className="text-metric font-semibold leading-none text-ink tabular-nums">{n(c.found)}</dd>
-        </div>
-        <div>
-          <dt className="text-overline text-muted">{t.searches}</dt>
-          <dd className="text-metric font-semibold leading-none text-ink tabular-nums">{n(c.searches)}</dd>
-        </div>
-      </dl>
-      <div className="mt-2"><Bar share={max > 0 ? c.searches / max : 0} className="bg-gradient-to-r from-indigo-300 to-action rtl:bg-gradient-to-l" /></div>
+      {c.found > 0 ? (
+        <>
+          <dl className="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <dt className="text-overline text-muted">{t.found}</dt>
+              <dd className="text-metric font-semibold leading-none text-ink tabular-nums">{n(c.found)}</dd>
+            </div>
+            <div>
+              <dt className="text-overline text-muted">{t.searches}</dt>
+              <dd className="text-metric font-semibold leading-none text-ink tabular-nums">{n(c.searches)}</dd>
+            </div>
+          </dl>
+          <div className="mt-2"><Bar share={max > 0 ? c.searches / max : 0} className="bg-action/60" /></div>
+        </>
+      ) : (
+        // Honest empty (no 0 / 0 and an empty bar): the research holds none of its keywords.
+        <p data-rival-no-overlap="" className="mt-4 text-caption text-muted">{t.noOverlap}</p>
+      )}
 
       {c.found > 0 && (
         <div className="mt-4">
@@ -97,7 +104,7 @@ function RivalCard({ c, max, index }: { c: CompetitorInsight; max: number; index
       )}
 
       {c.standing ? (
-        <p data-rival-standing="" className={cn('mt-3 rounded-control px-2.5 py-1.5 text-caption font-semibold', c.standing.ahead > 0 ? 'bg-bad-soft text-bad' : 'bg-ok-soft text-ok')}>
+        <p data-rival-standing="" className={cn('mt-3 rounded-inset border-s-[3px] bg-sunk/60 px-2.5 py-1.5 text-caption font-semibold text-ink', c.standing.ahead > 0 ? 'border-s-bad' : 'border-s-ok')}>
           {c.standing.ahead > 0 ? t.ahead(n(c.standing.ahead), n(c.standing.compared)) : t.notAhead(n(c.standing.compared))}
         </p>
       ) : c.tracked ? (
@@ -145,26 +152,26 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
   return (
     <section id={id} data-landscape-rivals="" className="mb-6 scroll-mt-20">
       <Card padding={false}>
-        <header className="flex items-start gap-3.5 border-b border-line bg-gradient-to-b from-info-soft/80 to-surface px-4 py-5 sm:px-6">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-info text-canvas shadow-sm" aria-hidden="true">
-            <CompetitorIcon size={19} strokeWidth={2} />
+        <header className="flex items-start gap-3.5 border-b border-line px-4 py-5 sm:px-6">
+          <span className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+            <CompetitorIcon size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold leading-6 text-ink">{t.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-muted text-pretty">{t.subtitle}</p>
+            <h2 className="text-section font-semibold text-ink">{t.title}</h2>
+            <p className="mt-1 max-w-3xl text-copy text-muted text-pretty">{t.subtitle}</p>
             {landscape.competitors.length > 0 && (
               <p className="mt-2 text-caption font-semibold text-body tabular-nums">{t.summary(n(landscape.competitors.length), n(gapSearches))}</p>
             )}
           </div>
         </header>
         {landscape.competitors.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted sm:px-6">{t.empty}</p>
+          <p className="px-4 py-6 text-copy text-muted sm:px-6">{t.empty}</p>
         ) : (
           <div className="p-4 sm:p-6">
             <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {/* The site itself, the yardstick every competitor card is read against. */}
               {domain && (
-                <li data-rival-own="" className="flex min-w-0 flex-col rounded-card border border-action/30 bg-action-soft p-4">
+                <li data-rival-own="" className="flex min-w-0 flex-col rounded-card border border-line border-s-[3px] border-s-action bg-surface p-4 shadow-card">
                   <div className="flex items-start gap-3">
                     <SiteAvatar domain={domain} icon={siteIcon} />
                     <div className="min-w-0">
@@ -196,7 +203,7 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
                 <button
                   type="button"
                   onClick={() => setAll((v) => !v)}
-                  className="inline-flex h-9 items-center rounded-control border border-line bg-surface px-4 text-sm font-semibold text-body transition-colors hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+                  className="inline-flex h-9 items-center rounded-control border border-line bg-surface px-4 text-copy font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:border-line-strong hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
                 >
                   {all ? getDashboardDictionary(language).contentStrategy.showLess : getDashboardDictionary(language).contentStrategy.showMore.replace('{n}', n(hidden))}
                 </button>

@@ -69,15 +69,15 @@ export default function GscPerformance({ projectId, className }: { projectId: st
           const delta = state === 'ready' ? performanceDelta(tile.metric, tile.value, prev) : null
           const spark = points.flatMap((x, i) => (tile.series[i] === null ? [] : [{ label: formatDay(x.endDate, language), value: tile.series[i] as number }]))
           return (
-            <div key={tile.metric} className="flex flex-col gap-1 rounded-card border border-line bg-surface p-4" data-gsc-tile={tile.metric}>
+            <div key={tile.metric} className="flex flex-col gap-1 rounded-card border border-line bg-surface p-4 shadow-card sm:p-5" data-gsc-tile={tile.metric}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted">{tile.label}</span>
+                <span className="text-caption font-medium text-muted">{tile.label}</span>
                 <span className="shrink-0 text-muted">{tile.icon}</span>
               </div>
               {state === 'ready' ? (
                 <>
-                  <span className="text-2xl font-bold leading-tight text-ink tabular-nums">{tile.value === null ? '—' : tile.format(tile.value)}</span>
-                  <span className="h-4 text-[11px] text-muted">
+                  <span className="text-metric font-bold text-ink tabular-nums">{tile.value === null ? '—' : tile.format(tile.value)}</span>
+                  <span className="h-4 text-overline text-muted">
                     {delta && (
                       <>
                         <span className={cn('font-semibold tabular-nums', delta.direction === 'up' && 'text-ok', delta.direction === 'down' && 'text-bad')}>
@@ -103,9 +103,9 @@ export default function GscPerformance({ projectId, className }: { projectId: st
               ) : state === 'loading' ? (
                 <span className="my-1.5 h-6 w-24 rounded-control bg-sunk" aria-hidden="true" />
               ) : (
-                <span className="text-sm text-muted">{state === 'error' ? '—' : t.emptyTile}</span>
+                <span className="text-copy text-muted">{state === 'error' ? '—' : t.emptyTile}</span>
               )}
-              <span className="text-[11px] text-muted">{t.source28}</span>
+              <span className="text-overline text-muted">{t.source28}</span>
             </div>
           )
         })}

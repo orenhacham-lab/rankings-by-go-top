@@ -69,7 +69,7 @@ export function GscKeywordsNotice({ projectId, view, className }: { projectId: s
       data-gsc-state={state}
       className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 rounded-card border border-line bg-surface px-4 py-3', className)}
     >
-      <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+      <span className="inline-flex items-center gap-2 text-copy font-semibold text-ink">
         <MousePointerClick size={16} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
         {t.keywords.title}
       </span>
@@ -78,9 +78,9 @@ export function GscKeywordsNotice({ projectId, view, className }: { projectId: s
       ) : state === 'error' ? (
         <GscLoadError onRetry={view.retry} className="min-w-0 flex-1 basis-72" />
       ) : state === 'ready' ? (
-        <p className="min-w-0 flex-1 basis-72 text-sm text-muted">{t.keywords.legend}</p>
+        <p className="min-w-0 flex-1 basis-72 text-copy text-muted">{t.keywords.legend}</p>
       ) : (
-        <p className="min-w-0 flex-1 basis-72 text-sm text-muted" aria-busy="true">{t.keywords.loading}</p>
+        <p className="min-w-0 flex-1 basis-72 text-copy text-muted" aria-busy="true">{t.keywords.loading}</p>
       )}
     </div>
   )

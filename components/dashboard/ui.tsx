@@ -76,7 +76,7 @@ export function Widget({ id, title, subtitle, icon, action, state, tone = 'defau
             <span
               aria-hidden="true"
               className={cn(
-                'grid size-9 shrink-0 place-items-center rounded-xl ring-1',
+                'grid size-9 shrink-0 place-items-center rounded-inset ring-1',
                 attention ? 'bg-surface text-warn ring-warn/20' : 'bg-action-soft text-action ring-action/10',
               )}
             >
@@ -108,8 +108,8 @@ export function WidgetEmpty({ icon, title, body, action }: {
   action?: ReactNode
 }) {
   return (
-    <div data-empty="" className="flex items-start gap-3 rounded-xl border border-dashed border-line-strong bg-sunk/50 p-4">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-action shadow-card ring-1 ring-line" aria-hidden="true">
+    <div data-empty="" className="flex items-start gap-3 rounded-inset border border-dashed border-line-strong bg-sunk/50 p-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-inset bg-surface text-action shadow-card ring-1 ring-line" aria-hidden="true">
         {icon}
       </span>
       <div className="min-w-0 space-y-1">

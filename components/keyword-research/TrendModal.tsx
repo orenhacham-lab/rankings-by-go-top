@@ -1,13 +1,34 @@
 'use client'
 
-import { X, Loader2 } from 'lucide-react'
+/**
+ * A keyword's search trend over the last twelve months (Google Ads Keyword Planner).
+ *
+ * The shared modal, three stat tiles (the monthly average, the peak month and the
+ * quietest one), the direction as one badge, and a single-series line on the
+ * design tokens (design contract §10): the action colour at 2px with a dot on the
+ * latest month only, dashed horizontal grid lines, muted caption ticks that never
+ * overlap, and month names from Intl in the screen's language. Every word comes
+ * from the dictionary; an error is ours, never the provider's text.
+ */
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import Modal from '@/components/ui/Modal'
+import StatTile from '@/components/ui/StatTile'
+import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { formatCount } from '@/components/gsc/format'
 
 interface MonthlySearch {
   month: string
   year: number
   searches: number
 }
+
+type Trend = 'up' | 'down' | 'stable' | 'seasonal' | 'unknown'
+
+/** What went wrong, as a code: the modal says it in its own words, never the provider's. */
+export type TrendError = '' | 'reauth' | 'failed'
 
 interface TrendModalProps {
   open: boolean
@@ -16,272 +37,134 @@ interface TrendModalProps {
   language: 'he' | 'en'
   isRTL: boolean
   loading?: boolean
-  error?: string
+  error?: TrendError
   data?: {
     avgMonthlySearches: number | null
     monthlySearchVolumes: MonthlySearch[]
-    trend: 'up' | 'down' | 'stable' | 'seasonal' | 'unknown'
-    peakMonth: { month: string; year: number; searches: number } | null
-    lowestMonth: { month: string; year: number; searches: number } | null
+    trend: Trend
+    peakMonth: MonthlySearch | null
+    lowestMonth: MonthlySearch | null
   }
 }
 
-const translations = {
-  he: {
-    title: (keyword: string) => `טרנד חיפושים: ${keyword}`,
-    loading: 'טוען נתוני טרנד...',
-    error: 'לא הצליח לטעון את נתוני הטרנד. אנא נסה שוב מאוחר יותר.',
-    noData: 'אין נתוני טרנד זמינים לביטוי זה.',
-    monthlyAverage: 'ממוצע חודשי',
-    trend: 'טרנד',
-    trendRising: 'עולה',
-    trendDeclining: 'יורד',
-    trendStable: 'יציב',
-    trendSeasonal: 'עונתי',
-    trendUnknown: 'לא ידוע',
-    peakMonth: 'חודש שיא',
-    lowestMonth: 'חודש נמוך ביותר',
-    disclaimer: 'הנתונים מבוססים על Google Ads Keyword Planner ועשויים להיות משוערים.',
-    close: 'סגור',
-    searches: 'חיפושים',
-  },
-  en: {
-    title: (keyword: string) => `Search Trend: ${keyword}`,
-    loading: 'Loading trend data...',
-    error: 'Trend data could not be loaded right now. Please try again later.',
-    noData: 'No trend data is available for this keyword.',
-    monthlyAverage: 'Monthly average',
-    trend: 'Trend',
-    trendRising: 'Rising',
-    trendDeclining: 'Declining',
-    trendStable: 'Stable',
-    trendSeasonal: 'Seasonal',
-    trendUnknown: 'Unknown',
-    peakMonth: 'Peak month',
-    lowestMonth: 'Lowest month',
-    disclaimer: 'Data is based on Google Ads Keyword Planner and may be approximate.',
-    close: 'Close',
-    searches: 'Searches',
-  },
+const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER']
+
+/** Google's "JANUARY" of 2026 in the screen's language, long ("ינואר" / "January"), with the year when asked. */
+export function monthName(month: string, year: number, language: 'he' | 'en', withYear = false): string {
+  const i = MONTHS.indexOf(String(month).toUpperCase())
+  if (i < 0) return month
+  const locale = language === 'he' ? 'he-IL' : 'en-US'
+  return new Intl.DateTimeFormat(locale, withYear ? { month: 'long', year: 'numeric', timeZone: 'UTC' } : { month: 'long', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(year, i, 15)))
 }
 
-const monthNames = {
-  he: {
-    JANUARY: 'ינואר',
-    FEBRUARY: 'פברואר',
-    MARCH: 'מרץ',
-    APRIL: 'אפריל',
-    MAY: 'מאי',
-    JUNE: 'יוני',
-    JULY: 'יולי',
-    AUGUST: 'אוגוסט',
-    SEPTEMBER: 'ספטמבר',
-    OCTOBER: 'אוקטובר',
-    NOVEMBER: 'נובמבר',
-    DECEMBER: 'דצמבר',
-  },
-  en: {
-    JANUARY: 'Jan',
-    FEBRUARY: 'Feb',
-    MARCH: 'Mar',
-    APRIL: 'Apr',
-    MAY: 'May',
-    JUNE: 'Jun',
-    JULY: 'Jul',
-    AUGUST: 'Aug',
-    SEPTEMBER: 'Sep',
-    OCTOBER: 'Oct',
-    NOVEMBER: 'Nov',
-    DECEMBER: 'Dec',
-  },
+/** Up and down are the only directions that take a state colour (§1); the rest are information. */
+const TREND_BADGE: Record<Trend, 'success' | 'danger' | 'info' | 'neutral'> = {
+  up: 'success', down: 'danger', stable: 'info', seasonal: 'info', unknown: 'neutral',
 }
 
-const getTrendLabel = (trend: string, labels: typeof translations.en): string => {
-  const trendMap: Record<string, string> = {
-    up: labels.trendRising,
-    down: labels.trendDeclining,
-    stable: labels.trendStable,
-    seasonal: labels.trendSeasonal,
-    unknown: labels.trendUnknown,
-  }
-  return trendMap[trend] || labels.trendUnknown
-}
+interface Point { label: string; full: string; searches: number }
 
-const getTrendColor = (trend: string): string => {
-  switch (trend) {
-    case 'up':
-      return 'text-green-600 dark:text-green-400'
-    case 'down':
-      return 'text-red-600 dark:text-red-400'
-    case 'stable':
-      return 'text-blue-600 dark:text-blue-400'
-    case 'seasonal':
-      return 'text-purple-600 dark:text-purple-400'
-    default:
-      return 'text-slate-600 dark:text-slate-400'
-  }
-}
-
-const getLocalizedMonthName = (monthEnum: string, language: 'he' | 'en'): string => {
-  const monthMap = monthNames[language] as Record<string, string>
-  return monthMap[monthEnum] || monthEnum
-}
-
-interface ChartDataPoint extends MonthlySearch {
-  displayMonth: string
-}
-
-const CustomTooltip = ({ active, payload, language }: { active?: boolean; payload?: any; language: 'he' | 'en' }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload as ChartDataPoint
-    const labels = translations[language]
-    return (
-      <div className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-100">
-        <p>{data.displayMonth}</p>
-        <p>
-          {labels.searches}: {data.searches.toLocaleString()}
-        </p>
-      </div>
-    )
-  }
-  return null
+function ChartTooltip({ active, payload, searchesLabel, language }: {
+  active?: boolean
+  payload?: Array<{ payload: Point }>
+  searchesLabel: string
+  language: 'he' | 'en'
+}) {
+  if (!active || !payload?.length) return null
+  const p = payload[0].payload
+  return (
+    <div className="rounded-inset border border-line bg-surface px-3 py-2 text-caption shadow-pop">
+      <p className="font-semibold text-ink">{p.full}</p>
+      <p className="text-muted tabular-nums">{searchesLabel}: {formatCount(p.searches, language)}</p>
+    </div>
+  )
 }
 
 export default function TrendModal({ open, onClose, keyword, language, isRTL, loading = false, error, data }: TrendModalProps) {
   if (!open) return null
+  const dict = getDashboardDictionary(language)
+  const t = dict.keywordResearch.trend
 
-  const labels = translations[language]
-
-  // Transform chart data to include localized month names
-  const chartData: ChartDataPoint[] = (data?.monthlySearchVolumes || []).map((item) => ({
-    ...item,
-    displayMonth: getLocalizedMonthName(item.month, language),
+  const trendLabel: Record<Trend, string> = {
+    up: t.trendRising, down: t.trendDeclining, stable: t.trendStable, seasonal: t.trendSeasonal, unknown: t.trendUnknown,
+  }
+  const points: Point[] = (data?.monthlySearchVolumes ?? []).map((m) => ({
+    label: monthName(m.month, m.year, language),
+    full: monthName(m.month, m.year, language, true),
+    searches: m.searches,
   }))
+  const lastIndex = points.length - 1
+  const n = (v: number) => formatCount(v, language)
+  const tick = { fontSize: 12, fill: 'var(--color-muted)' }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className={`bg-white dark:bg-slate-900 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isRTL ? 'rtl' : 'ltr'}`}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-900">
-          <h2 className={`text-lg font-bold text-slate-900 dark:text-slate-100 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-            {labels.title(keyword)}
-          </h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 ml-2">
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6">
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-blue-600 dark:text-blue-400" />
-              <span className={`ml-2 text-slate-600 dark:text-slate-400 ${isRTL ? 'ml-0 mr-2' : ''}`}>{labels.loading}</span>
+    <Modal open={open} onClose={onClose} title={t.titleFor(keyword)} size="lg">
+      <div data-trend-modal="" className={`space-y-5 ${isRTL ? 'rtl' : 'ltr'}`}>
+        {loading && (
+          <div role="status" aria-busy="true" className="space-y-4">
+            <span className="sr-only">{t.loading}</span>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}
             </div>
-          )}
+            <Skeleton className="h-56 rounded-card" />
+          </div>
+        )}
 
-          {error && (
-            <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <p className="text-red-700 dark:text-red-400">{labels.error}</p>
+        {!loading && error && (
+          <Notice tone="bad">{error === 'reauth' ? dict.keywordResearch.states.errorReauth : t.error}</Notice>
+        )}
+
+        {!loading && !error && data && points.length === 0 && <Notice tone="info">{t.noData}</Notice>}
+
+        {!loading && !error && data && points.length > 0 && (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-caption text-muted">{t.trend}</span>
+              <Badge variant={TREND_BADGE[data.trend] ?? 'neutral'}>{trendLabel[data.trend] ?? t.trendUnknown}</Badge>
             </div>
-          )}
-
-          {!loading && !error && data && data.monthlySearchVolumes.length === 0 && (
-            <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <p className="text-slate-600 dark:text-slate-400">{labels.noData}</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatTile label={t.monthlyAverage} value={data.avgMonthlySearches ? n(data.avgMonthlySearches) : '—'} source={t.searches} />
+              {data.peakMonth && (
+                <StatTile label={t.peakMonth} value={monthName(data.peakMonth.month, data.peakMonth.year, language)}
+                  source={`${n(data.peakMonth.searches)} ${t.searches}`} />
+              )}
+              {data.lowestMonth && (
+                <StatTile label={t.lowestMonth} value={monthName(data.lowestMonth.month, data.lowestMonth.year, language)}
+                  source={`${n(data.lowestMonth.searches)} ${t.searches}`} />
+              )}
             </div>
-          )}
 
-          {!loading && !error && data && data.monthlySearchVolumes.length > 0 && (
-            <div className="space-y-6">
-              {/* KPI Stats */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {/* Monthly Average */}
-                <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <p className={`text-xs font-medium text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {labels.monthlyAverage}
-                  </p>
-                  <p className={`text-lg font-bold text-slate-900 dark:text-slate-100 mt-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {data.avgMonthlySearches ? data.avgMonthlySearches.toLocaleString() : '—'}
-                  </p>
-                </div>
+            <figure data-trend-chart="" className="h-60 w-full" role="img" aria-label={t.chartLabel(keyword)}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--color-line)" />
+                  <XAxis dataKey="label" reversed={isRTL} tickLine={false} axisLine={false}
+                    interval="preserveStartEnd" minTickGap={20} tick={tick} />
+                  <YAxis orientation={isRTL ? 'right' : 'left'} tickLine={false} axisLine={false} width={48}
+                    tickFormatter={(v: number) => n(v)} tick={tick} />
+                  <Tooltip cursor={{ stroke: 'var(--color-line-strong)', strokeDasharray: '4 4' }}
+                    content={<ChartTooltip searchesLabel={t.searches} language={language} />} />
+                  <Line
+                    type="monotone"
+                    dataKey="searches"
+                    stroke="var(--color-action)"
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={(p: { cx?: number; cy?: number; index?: number }) =>
+                      p.index === lastIndex && p.cx !== undefined && p.cy !== undefined
+                        ? <circle key="last" cx={p.cx} cy={p.cy} r={3} fill="var(--color-action)" />
+                        : <g key={`p${p.index}`} />}
+                    activeDot={{ r: 4, fill: 'var(--color-action)', stroke: 'var(--color-surface)', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </figure>
 
-                {/* Trend */}
-                <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <p className={`text-xs font-medium text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {labels.trend}
-                  </p>
-                  <p className={`text-lg font-bold mt-1 ${getTrendColor(data.trend)} ${isRTL ? 'text-right' : 'text-left'}`}>
-                    {getTrendLabel(data.trend, labels)}
-                  </p>
-                </div>
-
-                {/* Peak Month */}
-                {data.peakMonth && (
-                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <p className={`text-xs font-medium text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {labels.peakMonth}
-                    </p>
-                    <p className={`text-sm font-semibold text-slate-900 dark:text-slate-100 mt-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {data.peakMonth.month}
-                    </p>
-                    <p className={`text-xs text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {data.peakMonth.searches.toLocaleString()}
-                    </p>
-                  </div>
-                )}
-
-                {/* Lowest Month */}
-                {data.lowestMonth && (
-                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <p className={`text-xs font-medium text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {labels.lowestMonth}
-                    </p>
-                    <p className={`text-sm font-semibold text-slate-900 dark:text-slate-100 mt-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {data.lowestMonth.month}
-                    </p>
-                    <p className={`text-xs text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {data.lowestMonth.searches.toLocaleString()}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Chart */}
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis
-                      dataKey="displayMonth"
-                      tick={{ fontSize: 12 }}
-                      stroke="#9ca3af"
-                      style={{ direction: isRTL ? 'rtl' : 'ltr' }}
-                    />
-                    <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                    <Tooltip content={<CustomTooltip language={language} />} />
-                    <Line
-                      type="monotone"
-                      dataKey="searches"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={{ fill: '#3b82f6', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Disclaimer */}
-              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                <p className={`text-xs text-blue-700 dark:text-blue-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                  {labels.disclaimer}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+            <Notice tone="info">{t.disclaimer}</Notice>
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }

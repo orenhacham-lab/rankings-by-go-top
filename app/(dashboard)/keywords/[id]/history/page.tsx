@@ -8,13 +8,13 @@ import { Card } from '@/components/ui/Card'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import Button from '@/components/ui/Button'
+import BackLink from '@/components/ui/BackLink'
+import PositionHistoryChart, { positionPoints } from '@/components/keywords/PositionHistoryChart'
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { SearchX } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
-import Link from 'next/link'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -67,7 +67,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
   if (!target) {
     return (
       <Card padding={false}>
-        <EmptyState icon={<SearchX />} title={t.keywordNotFound} action={<Link href="/keywords"><Button variant="outline">{t.backToKeywords}</Button></Link>} />
+        <EmptyState icon={<SearchX />} title={t.keywordNotFound} action={<BackLink href="/keywords" className="ms-0">{t.backToKeywords}</BackLink>} />
       </Card>
     )
   }
@@ -80,21 +80,14 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
     ? Math.round(foundResults.reduce((sum, r) => sum + r.position!, 0) / foundResults.length)
     : null
 
+  const backHref = target.projects ? `/keywords?projectId=${encodeURIComponent(target.projects.id)}` : '/keywords'
+  const points = positionPoints(results, language)
+  const chartable = points.filter((p) => p.position !== null).length >= 2
+
   return (
     <div>
-      <Header
-        title={target.keyword}
-        subtitle={t.subtitle}
-        actions={
-          <div className="flex gap-2">
-            {target.projects && (
-              <Link href={`/keywords?projectId=${encodeURIComponent(target.projects.id)}`}>
-                <Button variant="outline" size="sm">{t.backToKeywords}</Button>
-              </Link>
-            )}
-          </div>
-        }
-      />
+      <div className="mb-3"><BackLink href={backHref}>{t.backToKeywords}</BackLink></div>
+      <Header title={target.keyword} subtitle={t.subtitle} />
 
       {/* Summary: the same tile as every other screen. */}
       <div className="list-enter mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
@@ -108,10 +101,20 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         <StatTile label={t.average} value={avgPosition !== null ? `#${avgPosition}` : '—'} />
       </div>
 
+      {/* The position over time (§10), before the rows it is drawn from. */}
+      <Card className="mb-8">
+        <h2 className="mb-4 text-section font-semibold text-ink">{t.chartTitle}</h2>
+        {chartable ? (
+          <PositionHistoryChart points={points} isRTL={language === 'he'} label={t.chartLabel(target.keyword)} positionAt={t.positionAt} notFound={t.notFound} />
+        ) : (
+          <p className="text-copy text-muted">{t.chartEmpty}</p>
+        )}
+      </Card>
+
       {/* History Table */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-section font-semibold text-ink">
-          {t.historyLabel} ({results.length} {t.checks})
+          {t.historyLabel} <span className="text-caption font-normal text-muted tabular-nums">({results.length} {t.checks})</span>
         </h2>
       </div>
 
@@ -133,7 +136,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
           )}
           {results.map((result) => (
             <TableRow key={result.id}>
-              <Td>{formatDateTime(result.checked_at)}</Td>
+              <Td className="whitespace-nowrap">{formatDateTime(result.checked_at, language)}</Td>
               <Td>
                 {result.found && result.position !== null ? (
                   <span className="font-semibold text-ink">#{result.position}</span>
@@ -161,7 +164,8 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
                     target="_blank"
                     rel="noopener noreferrer"
                     dir="ltr"
-                    className="block max-w-48 truncate text-caption text-action hover:underline"
+                    title={result.result_url}
+                    className="block max-w-64 truncate text-caption text-muted transition-colors hover:text-action hover:underline"
                   >
                     {result.result_url}
                   </a>

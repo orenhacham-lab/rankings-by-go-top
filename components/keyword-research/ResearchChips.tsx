@@ -10,6 +10,7 @@
  * nothing; with Search Console switched off on the server it is not there at all.
  */
 import { cn } from '@/lib/utils'
+import { SEGMENTED_ITEM_CLASSES, SEGMENTED_TRACK_CLASSES } from '@/components/ui/Segmented'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCount } from '@/components/gsc/format'
@@ -28,30 +29,45 @@ export default function ResearchChips({
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan.chips
   const chips = RESEARCH_CHIPS.filter((c) => c !== 'google' || google !== 'hidden')
+  // The one segmented control's look (design contract §5: a sunk pill, the chosen
+  // item lifted onto the surface, never the black "all" chip), drawn here so each
+  // item keeps its data-chip and its count; a radiogroup, one tab stop, arrow keys.
+  const move = (e: React.KeyboardEvent<HTMLButtonElement>, from: number) => {
+    const rtl = getComputedStyle(e.currentTarget).direction === 'rtl'
+    const step = ({ ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, ArrowDown: 1, ArrowUp: -1 } as Record<string, number>)[e.key]
+    if (step === undefined) return
+    e.preventDefault()
+    const next = (from + step + chips.length) % chips.length
+    const buttons = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[data-chip]')
+    buttons?.[next]?.focus()
+    onChange(chips[next])
+  }
   return (
-    <div role="group" aria-label={t.label} data-research-chips="" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:flex-wrap md:overflow-visible">
-      {chips.map((chip) => {
-        const on = chip === active
-        const loading = chip === 'google' && google === 'loading'
-        return (
-          <button
-            key={chip}
-            type="button"
-            data-chip={chip}
-            aria-pressed={on}
-            onClick={() => onChange(chip)}
-            className={cn(
-              'inline-flex h-9 shrink-0 items-center gap-2 rounded-pill border ps-3.5 pe-1.5 text-sm transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2',
-              on ? 'border-ink bg-ink font-semibold text-canvas shadow-sm' : 'border-line bg-surface font-medium text-body hover:border-line-strong hover:bg-sunk',
-            )}
-          >
-            {t[chip]}
-            <span className={cn('min-w-6 rounded-pill px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums', on ? 'bg-canvas/20 text-canvas' : 'bg-sunk text-muted')} aria-busy={loading || undefined}>
-              {loading ? '…' : formatCount(counts[chip], language)}
-            </span>
-          </button>
-        )
-      })}
+    <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-1">
+      <div role="radiogroup" aria-label={t.label} data-research-chips="" className={cn(SEGMENTED_TRACK_CLASSES, 'flex-nowrap md:flex-wrap md:rounded-card')}>
+        {chips.map((chip, i) => {
+          const on = chip === active
+          const loading = chip === 'google' && google === 'loading'
+          return (
+            <button
+              key={chip}
+              type="button"
+              role="radio"
+              data-chip={chip}
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => onChange(chip)}
+              onKeyDown={(e) => move(e, i)}
+              className={cn(SEGMENTED_ITEM_CLASSES, 'shrink-0')}
+            >
+              {t[chip]}
+              <span className={cn('tabular-nums', on ? 'text-muted' : 'text-muted/80')} aria-busy={loading || undefined}>
+                {loading ? '…' : formatCount(counts[chip], language)}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

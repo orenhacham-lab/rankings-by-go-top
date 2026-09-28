@@ -22,7 +22,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { gscSettingsHref, type GscSetupState } from '@/lib/gsc/widget-state'
 
 export const GSC_ACTION_LINK_CLASS =
-  'inline-flex h-7 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-action px-3 text-xs font-semibold text-action-ink transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas'
+  'inline-flex h-7 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-action px-3 text-caption font-semibold text-action-ink transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas'
 
 export default function GscSetupPrompt({
   state, about, projectId, layout = 'stack', className,
@@ -48,7 +48,7 @@ export default function GscSetupPrompt({
       {/* The sentence's basis is what lets the button wrap under it on a phone:
           at basis 0 the sentence gives up all its width and the unbreakable
           button runs past the screen's edge. */}
-      <p className={cn('text-sm text-muted', layout === 'inline' && 'min-w-0 flex-1 basis-56')}>{about}</p>
+      <p className={cn('text-copy text-muted', layout === 'inline' && 'min-w-0 flex-1 basis-56')}>{about}</p>
       <Link href={gscSettingsHref(projectId)} className={GSC_ACTION_LINK_CLASS}>
         {t.actions[state]}
       </Link>
@@ -60,7 +60,7 @@ export function GscLoadError({ onRetry, className }: { onRetry: () => void; clas
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   return (
-    <p data-gsc-error="" className={cn('text-sm text-muted', className)}>
+    <p data-gsc-error="" className={cn('text-copy text-muted', className)}>
       {t.loadError}{' '}
       <button
         type="button"

@@ -62,8 +62,8 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
       className="relative isolate overflow-hidden rounded-card bg-contrast p-5 text-contrast-ink shadow-pop sm:p-8"
     >
       {/* Depth, never an animation of its own: two soft glows and a faint grid that fades out. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,rgb(0_134_245/0.34),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,rgb(240_176_63/0.16),transparent_70%)]" />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:32px_32px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-15%,color-mix(in_srgb,var(--color-action)_34%,transparent),transparent_70%),radial-gradient(28rem_14rem_at_0%_115%,color-mix(in_srgb,var(--color-commit)_16%,transparent),transparent_70%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(to_right,var(--color-contrast-ink)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-contrast-ink)_1px,transparent_1px)] [background-size:32px_32px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-3">
@@ -73,17 +73,17 @@ export default function HeroCard({ t, language, domain, siteIcon, rankings, news
             </p>
           </div>
           <p className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-[3.5rem] font-bold leading-none tabular-nums sm:text-[4.25rem]"><CountUp value={big}>{formatCount(big, language)}</CountUp></span>
+            <span className="text-display font-bold leading-none tracking-tight tabular-nums"><CountUp value={big}>{formatCount(big, language)}</CountUp></span>
             <span className="text-section font-medium text-contrast-ink/75">{unit}</span>
           </p>
-          <p className="mt-3 max-w-xl text-[0.9375rem] leading-6 text-contrast-ink/85">{sentence}</p>
+          <p className="mt-3 max-w-xl text-copy text-contrast-ink/85">{sentence}</p>
           {news && (
-            <p className="mt-4 flex min-w-0 max-w-xl items-center gap-2.5 rounded-xl bg-white/[0.06] px-3 py-2 text-copy text-contrast-ink/90 ring-1 ring-white/10">
+            <p className="mt-4 flex min-w-0 max-w-xl items-center gap-2.5 rounded-inset bg-contrast-ink/[0.06] px-3 py-2 text-copy text-contrast-ink/90 ring-1 ring-contrast-ink/10">
               {news.kind === 'article'
                 ? <Newspaper size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-contrast-ink/70" />
                 : news.change > 0
-                  ? <TrendingUp size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[#6ee7a0]" />
-                  : <TrendingDown size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-[#fca5a5]" />}
+                  ? <TrendingUp size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-ok-soft" />
+                  : <TrendingDown size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-bad-soft" />}
               <span className="truncate">
                 {news.kind === 'article'
                   ? h.newsArticle(news.title)

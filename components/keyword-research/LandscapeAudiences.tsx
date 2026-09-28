@@ -10,7 +10,7 @@
  * so an empty audience reads as "nothing names it yet", never as "nobody searches".
  */
 import Link from 'next/link'
-import { Compass, UserRound } from 'lucide-react'
+import { Briefcase, Compass, GraduationCap, HeartHandshake, Home, Store, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -20,13 +20,16 @@ import type { AudienceKeywords, IntentShare, SearchIntent } from '@/lib/content/
 
 /** One token colour per search need (the app's state and brand tokens only). */
 export const INTENT_TONE: Record<SearchIntent, { bar: string; dot: string }> = {
-  cost: { bar: 'bg-warn/70', dot: 'bg-warn/70' },
-  compare: { bar: 'bg-indigo-700', dot: 'bg-indigo-700' },
+  cost: { bar: 'bg-contrast', dot: 'bg-contrast' },
+  compare: { bar: 'bg-action/60', dot: 'bg-action/60' },
   selection: { bar: 'bg-action', dot: 'bg-action' },
-  local: { bar: 'bg-ok/80', dot: 'bg-ok/80' },
-  howto: { bar: 'bg-indigo-300', dot: 'bg-indigo-300' },
+  local: { bar: 'bg-action/80', dot: 'bg-action/80' },
+  howto: { bar: 'bg-action/35', dot: 'bg-action/35' },
   info: { bar: 'bg-line-strong', dot: 'bg-line-strong' },
 }
+
+/** One icon per audience card, so the cards read as different people, not one repeated avatar. */
+export const AUDIENCE_ICONS: readonly LucideIcon[] = [UserRound, Users, Home, Briefcase, Store, HeartHandshake, GraduationCap]
 
 /** Keywords shown per audience. */
 export const AUDIENCE_KEYWORDS_SHOWN = 4
@@ -56,13 +59,13 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
   return (
     <section id={id} data-landscape-audiences="" className="mb-6 scroll-mt-20">
       <Card padding={false}>
-        <header className="flex items-start gap-3.5 border-b border-line bg-gradient-to-b from-action-soft to-surface px-4 py-5 sm:px-6">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-action text-action-ink shadow-sm" aria-hidden="true">
-            <Compass size={19} strokeWidth={2} />
+        <header className="flex items-start gap-3.5 border-b border-line px-4 py-5 sm:px-6">
+          <span className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+            <Compass size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold leading-6 text-ink">{t.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-muted text-pretty">{t.subtitle}</p>
+            <h2 className="text-section font-semibold text-ink">{t.title}</h2>
+            <p className="mt-1 max-w-3xl text-copy text-muted text-pretty">{t.subtitle}</p>
           </div>
           {niche && <span className="hidden shrink-0 rounded-pill border border-line bg-surface px-2.5 py-1 text-caption font-semibold text-body sm:inline-flex">{niche}</span>}
         </header>
@@ -70,7 +73,7 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
         <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="min-w-0">
             {audiences.length === 0 ? (
-              <p className="text-sm text-muted">{t.empty}</p>
+              <p className="text-copy text-muted">{t.empty}</p>
             ) : (
               <ol className="grid gap-3 md:grid-cols-2">
                 {audiences.map((a, i) => (
@@ -81,9 +84,14 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
                     style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
                   >
                     <div className="flex items-start gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-pill bg-action-soft text-action" aria-hidden="true">
-                        <UserRound size={17} strokeWidth={2} />
-                      </span>
+                      {(() => {
+                        const Icon = AUDIENCE_ICONS[i % AUDIENCE_ICONS.length]
+                        return (
+                          <span className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+                            <Icon className="size-5" strokeWidth={2} />
+                          </span>
+                        )
+                      })()}
                       <div className="min-w-0">
                         <p className="text-copy font-semibold leading-snug text-ink text-pretty [overflow-wrap:anywhere]">{a.label}</p>
                         {a.keywords.length > 0 && <p className="mt-0.5 text-caption text-muted tabular-nums">{t.matched(n(a.keywords.length), n(a.searches))}</p>}
