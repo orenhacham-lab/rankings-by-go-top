@@ -49,9 +49,12 @@ function mutant<T>(file: string, from: string | RegExp, to: string): T {
   const out = src.replace(from, to)
   if (out === src) throw new Error(`mutation did not apply to ${file}: ${String(from)}`)
   const dir = file.slice(0, file.lastIndexOf('/'))
-  const name = `.qa-mut-misses-${++mutants}-${file.slice(file.lastIndexOf('/') + 1)}`
-  const path = join(ROOT, dir, name)
-  writeFileSync(path, out)
+  // The copy lives in this suite's own __qa__ folder (tree-walking suites skip __qa__, so a
+  // concurrent walker never sees a file that is about to vanish); relative imports are pinned
+  // to the original folder so the copy resolves exactly what the source does.
+  const pinned = out.replace(/(from\s+|require\(|import\()(['"])(\.\.?\/[^'"]*)\2/g, (_m, pre: string, q: string, spec: string) => `${pre}${q}${join(ROOT, dir, spec)}${q}`)
+  const path = join(__dirname, `.qa-mut-misses-${++mutants}-${file.slice(file.lastIndexOf('/') + 1)}`)
+  writeFileSync(path, pinned)
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require(path) as T
@@ -119,9 +122,49 @@ async function main() {
   check('S1: an icon has more than 1x1 pixels', comp.isIconSize(32, 32) && !comp.isIconSize(1, 1) && !comp.isIconSize(0, 0))
   check('S2: an SVG is known by its path, the query aside', comp.isSvg('https://x.co.il/favicon.svg?v=2') && !comp.isSvg('https://x.co.il/favicon.ico') && !comp.isSvg(null))
   const src = strip(read('components/ui/SiteIcon.tsx'))
-  const svgAccepted = (s: string) => /isSvg\(src\) && img\.naturalWidth === 0 && img\.naturalHeight === 0\)\) setLoaded\(true\)/.test(s)
+  const svgAccepted = (s: string) => /isSvg\(src\) && img\.naturalWidth === 0 && img\.naturalHeight === 0\)\) \{\s*settled\.current = src\s*setLoaded\(true\)/.test(s)
   check('S3: an SVG that loaded at 0x0 is shown, only from the load event (a broken image fires error, not load)', svgAccepted(src) && /onLoad=\{\(e\) => onLoad\(e\.currentTarget\)\}/.test(src))
   check('MUT: dropping the SVG case fails S3', !svgAccepted(src.replace('|| (isSvg(src) && img.naturalWidth === 0 && img.naturalHeight === 0)', '')))
+
+  // S4-S9: an <img> already "complete" when the tile mounts. Chromium reports a
+  // complete image with no size both for one that really failed and for one
+  // whose outcome is not known yet; the mount check waits for decode() instead
+  // of failing it on sight, and a cancelled check never reports.
+  type Mounted = Parameters<typeof comp.checkMountedImage>[0]
+  const tick = () => new Promise((r) => setTimeout(r, 0))
+  async function mount(check_: typeof comp.checkMountedImage, img: Mounted, cancelEarly = false) {
+    const seen: string[] = []
+    const cancel = check_(img, { load: () => seen.push('load'), fail: () => seen.push('fail') })
+    if (cancelEarly) cancel()
+    await tick(); await tick()
+    return seen.join(',')
+  }
+  const img = (over: Partial<NonNullable<Mounted>>): Mounted => ({ complete: true, naturalWidth: 0, naturalHeight: 0, ...over })
+  const decodes = () => Promise.resolve()
+  const breaks = () => Promise.reject(new Error('EncodingError'))
+  const cases = async (c: typeof comp.checkMountedImage) => ({
+    pending: await mount(c, img({ complete: false })),
+    loaded: await mount(c, img({ naturalWidth: 32, naturalHeight: 32 })),
+    notYetDecoded: await mount(c, img({ decode: decodes })),
+    broken: await mount(c, img({ decode: breaks })),
+    cancelled: await mount(c, img({ decode: breaks }), true),
+    noDecode: await mount(c, img({})),
+  })
+  const real = await cases(comp.checkMountedImage)
+  check('S4: an image still loading is left to its own load/error event', real.pending === '', real.pending)
+  check('S5: an image that loaded before hydration is taken at once', real.loaded === 'load', real.loaded)
+  check('S6: complete with no size is NOT failed on sight: once decode() resolves it is taken', real.notYetDecoded === 'load', real.notYetDecoded)
+  check('S7: an image that really failed before hydration (decode rejects) moves to the next candidate', real.broken === 'fail', real.broken)
+  check('S8: a check cancelled first (a newer candidate, or unmounted) never reports', real.cancelled === '', real.cancelled)
+  check('S9: a browser without decode() keeps the old rule (fail)', real.noDecode === 'fail', real.noDecode)
+  const failOnSight = await cases(mutant<typeof comp>('components/ui/SiteIcon.tsx', "if (typeof img.decode !== 'function') { on.fail(); return cancel }", 'on.fail(); return cancel').checkMountedImage)
+  check('MUT: failing a complete, size-less image on sight (the old rule) fails S6', failOnSight.notYetDecoded === 'fail')
+  const noCancel = await cases(mutant<typeof comp>('components/ui/SiteIcon.tsx', "() => { if (!cancelled) on.fail() },", '() => on.fail(),').checkMountedImage)
+  check('MUT: a decode that ignores its cancellation fails S8', noCancel.cancelled === 'fail')
+  const once = /const next = \(\) => \{\s*if \(src\) \{\s*if \(settled\.current === src\) return/.test(src) && /const onLoad = \(img: MountedImage\) => \{\s*if \(src && settled\.current === src\) return/.test(src)
+  const wired = /return checkMountedImage\(imgRef\.current, \{ load: onLoad, fail: next \}\)/.test(src)
+  check('S10: the tile runs that check on mount and settles each candidate once (its event and the check cannot both advance it)', once && wired)
+  check('MUT: a tile back to failing on complete alone fails S10', !/return checkMountedImage\(/.test(src.replace(/return checkMountedImage\([^\n]*/, 'if (imgRef.current?.complete) next()')))
 
   console.log('\nMUT) each fix broken on purpose makes its fixture fail')
   const byId = (id: string) => FIXTURES.find((f) => f.id === id) as Fixture
