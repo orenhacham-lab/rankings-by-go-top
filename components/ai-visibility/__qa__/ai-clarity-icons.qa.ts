@@ -205,11 +205,15 @@ async function main() {
     const competitorScreens = [
       'components/competitors/CompetitorSummary.tsx', 'components/competitors/TopCompetitorLine.tsx', 'components/settings/CompetitorsCard.tsx',
       'components/onboarding/ResearchSummary.tsx', 'components/dashboard/CompetitorsWidget.tsx', 'components/keyword-research/KeywordSourceLine.tsx',
-      'components/keyword-research/ScanOverview.tsx',
     ]
     const missing = competitorScreens.filter((f) => !/CompetitorIcon/.test(code(f)))
     check('F4: every competitor heading uses that one icon', missing.length === 0, show(missing))
-    check('F5: easy wins grow (Sprout), not fight', /<Sprout\b/.test(code('components/keyword-research/EasyWins.tsx')))
+    // The research overview's swords sat on its EASY WINS tile, so it takes the easy-wins icon, not the competitor one.
+    const grows = (src: string) => /<Sprout\b/.test(src)
+    check('F5: easy wins grow (Sprout), not fight', grows(code('components/keyword-research/EasyWins.tsx')))
+    const overview = code('components/keyword-research/ScanOverview.tsx')
+    check('F5b: the research overview\'s easy-wins tile grows too', grows(overview))
+    check('MUT: the competitor icon on that tile fails F5b', !grows(overview.replace(/<Sprout\b/, '<CompetitorIcon')))
     const echoes = files.filter((f) => !f.startsWith('app/(public)') && /\b(?:Crosshair|Award)\b/.test(code(f)))
     check('F6: no crosshair or award ribbon in the app (public marketing pages aside)', echoes.length === 0, show(echoes))
   }
