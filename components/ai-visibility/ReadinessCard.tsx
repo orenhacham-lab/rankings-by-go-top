@@ -16,7 +16,7 @@
  * generator here (plan section 5, "not built now"): only the check.
  */
 import Link from 'next/link'
-import { AlertTriangle, CheckCircle2, Clock, Lock, MinusCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Lock, MinusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -58,7 +58,7 @@ export default function ReadinessCard({
       id="ai-readiness"
       aria-labelledby="ai-readiness-title"
       data-ai-readiness={view.state}
-      className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card"
+      className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -79,7 +79,7 @@ export default function ReadinessCard({
       </header>
 
       {banner && (
-        <div className="mt-4 flex items-start gap-3 rounded-control bg-sunk p-3" data-ai-readiness-banner="">
+        <div className="mt-4 flex items-start gap-3 rounded-inset bg-sunk p-3" data-ai-readiness-banner="">
           <banner.Icon size={18} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />
           <div className="min-w-0">
             <p className="text-copy font-semibold text-ink">{banner.title}</p>
@@ -88,7 +88,8 @@ export default function ReadinessCard({
         </div>
       )}
 
-      <ul className="mt-4 grid gap-3 md:grid-cols-2">
+      {/* One line per check; why it matters and how to fix it open under it. */}
+      <ul className="mt-4 divide-y divide-line rounded-inset border border-line">
         {view.rows.map((row) => {
           const s = STATUS[row.status]
           const copy = c.checks[row.id]
@@ -97,33 +98,33 @@ export default function ReadinessCard({
               key={row.id}
               data-ai-readiness-check={row.id}
               data-status={row.status}
-              className={cn('min-w-0 rounded-control border p-3.5', row.status === 'fail' ? 'border-warn/30' : 'border-line')}
+              className={cn('min-w-0', row.status === 'fail' && 'border-s-[3px] border-s-warn')}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="flex min-w-0 items-start gap-2 text-copy font-semibold text-ink">
-                  <s.Icon size={16} className={cn('mt-1 shrink-0', s.tone)} aria-hidden="true" />
-                  <span className="min-w-0">{copy.title}</span>
-                </p>
-                <span className={`shrink-0 rounded-pill px-2 py-0.5 text-caption font-medium ${s.chip}`}>{label[row.status]}</span>
-              </div>
-              <dl className="mt-2 space-y-1.5 ps-6 text-caption">
-                <div>
-                  <dt className="font-medium text-ink">{c.whyLabel}</dt>
-                  <dd className="text-body">{copy.why}</dd>
-                </div>
-                <div className={cn(row.status === 'pass' && 'opacity-70')}>
-                  <dt className="font-medium text-ink">{c.fixLabel}</dt>
-                  <dd className="text-body">{copy.fix}</dd>
-                </div>
-              </dl>
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3.5 py-3 transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                  <s.Icon size={16} className={cn('shrink-0', s.tone)} aria-hidden="true" />
+                  <span className="min-w-0 flex-1 text-copy font-medium text-ink">{copy.title}</span>
+                  <span className={`shrink-0 rounded-pill px-2 py-0.5 text-caption font-medium ${s.chip}`}>{label[row.status]}</span>
+                  <ChevronDown size={16} className="shrink-0 text-muted transition-transform duration-150 ease-snappy group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <dl className="space-y-2 px-3.5 pb-3 ps-10 text-caption">
+                  <div>
+                    <dt className="font-medium text-ink">{c.whyLabel}</dt>
+                    <dd className="text-body">{copy.why}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink">{c.fixLabel}</dt>
+                    <dd className="text-body">{copy.fix}</dd>
+                  </div>
+                </dl>
+              </details>
             </li>
           )
         })}
       </ul>
 
       <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
-        {scannedAt && view.state === 'measured' && <span>{c.checkedOn(formatWhen(scannedAt, language))}</span>}
-        {scannedAt && view.state === 'measured' && <span aria-hidden="true">·</span>}
+        {scannedAt && view.state === 'measured' && <span>{c.checkedOn(formatWhen(scannedAt, language))}.</span>}
         <span>{c.rescanHint}</span>
         <Link href={settingsHref} className="font-medium text-action hover:underline">{c.rescanLink}</Link>
       </p>

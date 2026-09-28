@@ -16,6 +16,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
+import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import { ChevronDown, Settings2, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import {
@@ -202,8 +206,8 @@ export default function AIBusinessProfilePanel({
       setSuccess(t('profile_saved'))
       setExpanded(false)
       onProfileSaved?.()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('profile_save_failed'))
+    } catch {
+      setError(t('profile_save_failed'))
     } finally {
       setSaving(false)
     }
@@ -227,8 +231,8 @@ export default function AIBusinessProfilePanel({
       setSuccess(t('profile_reset'))
       setExpanded(false)
       onProfileSaved?.()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('profile_reset_failed'))
+    } catch {
+      setError(t('profile_reset_failed'))
     } finally {
       setSaving(false)
     }
@@ -241,68 +245,52 @@ export default function AIBusinessProfilePanel({
 
   return (
     <div
-      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 mb-4 overflow-hidden"
+      className="overflow-hidden rounded-card border border-line bg-surface shadow-card"
       dir={isHebrew ? 'rtl' : 'ltr'}
     >
       {/* Collapsed/header — the WHOLE row is clickable */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full text-start p-4 hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 transition flex items-center gap-4 cursor-pointer"
+        className="flex w-full cursor-pointer items-center gap-4 p-4 text-start transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-action/20 sm:px-5"
         aria-expanded={expanded}
       >
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
-          {/* gear icon */}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </div>
+        <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+          <Settings2 className="size-5" />
+        </span>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('ai_business_profile')}</h3>
+            <h3 className="text-copy font-semibold text-ink">{t('ai_business_profile')}</h3>
             <Badge variant={mode === 'manual' ? 'warning' : 'info'}>
               {mode === 'manual' ? t('manual_badge') : t('auto_badge')}
             </Badge>
           </div>
-          <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
-            <span className="text-slate-500 dark:text-slate-400">
+          <div className="mt-1 text-caption text-body truncate">
+            <span className="text-muted">
               {mode === 'manual' ? t('manually_set') : t('auto_detected')}:
             </span>{' '}
-            <span className="font-medium text-slate-800 dark:text-slate-100">{displayedCategoryLabel}</span>
+            <span className="font-medium text-ink">{displayedCategoryLabel}</span>
           </div>
         </div>
 
         <span
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition pointer-events-none"
+          className="pointer-events-none hidden shrink-0 items-center gap-1.5 text-caption font-semibold text-action sm:inline-flex"
           aria-hidden="true"
         >
           {expanded ? t('close_panel') : t('edit_ai_profile')}
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
         </span>
+        <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-muted transition-transform duration-150 ease-snappy ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Expanded editor */}
       {expanded && (
-        <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-700">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('ai_business_profile_help')}</p>
+        <div className="space-y-4 border-t border-line px-4 py-4 sm:px-5">
+          <p className="text-caption text-muted">{t('ai_business_profile_help')}</p>
 
           {/* Primary category — freeform combobox */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <div className="flex flex-col gap-1.5">
+            <label className={FIELD_LABEL_CLASSES}>
               {t('primary_category')}
             </label>
             <div className="relative">
@@ -317,16 +305,16 @@ export default function AIBusinessProfilePanel({
                 onFocus={() => setSuggestionsOpen(true)}
                 onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)}
                 placeholder={t('primary_category_placeholder')}
-                className="w-full rounded-md border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
+                className={cn(FIELD_CLASSES, 'py-2')}
                 dir={isHebrew ? 'rtl' : 'ltr'}
                 autoComplete="off"
               />
               {suggestionsOpen && filteredSuggestions.length > 0 && (
                 <div
-                  className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
+                  className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-card border border-line bg-surface p-1 shadow-pop"
                   dir={isHebrew ? 'rtl' : 'ltr'}
                 >
-                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-700">
+                  <div className="px-2.5 py-1.5 text-overline font-semibold uppercase tracking-wide text-muted">
                     {t('category_suggestions')}
                   </div>
                   {filteredSuggestions.map((opt) => (
@@ -338,43 +326,42 @@ export default function AIBusinessProfilePanel({
                         setPrimaryCategory(opt.value)
                         setSuggestionsOpen(false)
                       }}
-                      className="w-full text-start px-2.5 py-1.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 flex items-center justify-between gap-2"
+                      className="flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-start text-copy text-ink transition-colors duration-150 ease-snappy hover:bg-sunk"
                     >
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       <span>{t(opt.labelKey as any)}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{opt.value}</span>
+                      <span className="text-caption text-muted" dir="ltr">{opt.value}</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
             {primaryCategory.trim().length > 0 && (
-              <p className="mt-1 text-[11px] text-slate-500">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              <p className="text-caption text-muted">
                 {t('manually_set')}: <span className="font-medium">{primaryCategory}</span>
               </p>
             )}
           </div>
 
           {/* Secondary categories tag input */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <div className="flex flex-col gap-1.5">
+            <label className={FIELD_LABEL_CLASSES}>
               {t('secondary_categories')}
             </label>
-            <div className="flex flex-wrap gap-1.5 mb-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {secondaryCategories.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-xs text-indigo-700"
+                  className="inline-flex h-7 items-center gap-1 rounded-pill border border-line bg-sunk ps-2.5 pe-1 text-caption font-medium text-ink"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => removeTag(tag, secondaryCategories, setSecondaryCategories)}
-                    className="text-indigo-400 hover:text-indigo-700"
+                    className="grid size-5 place-items-center rounded-pill text-muted transition-colors duration-150 ease-snappy hover:bg-line hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
                     aria-label={t('remove_tag')}
                   >
-                    ×
+                    <X aria-hidden="true" className="size-3.5" />
                   </button>
                 </span>
               ))}
@@ -397,30 +384,30 @@ export default function AIBusinessProfilePanel({
                 )
               }
               placeholder={t('add_secondary_placeholder')}
-              className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={cn(FIELD_CLASSES, 'py-2')}
               dir={isHebrew ? 'rtl' : 'ltr'}
             />
           </div>
 
           {/* Excluded topics tag input */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <div className="flex flex-col gap-1.5">
+            <label className={FIELD_LABEL_CLASSES}>
               {t('excluded_topics')}
             </label>
-            <div className="flex flex-wrap gap-1.5 mb-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {excludedTopics.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-xs text-red-700"
+                  className="inline-flex h-7 items-center gap-1 rounded-pill border border-bad/20 bg-bad-soft ps-2.5 pe-1 text-caption font-medium text-bad"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => removeTag(tag, excludedTopics, setExcludedTopics)}
-                    className="text-red-400 hover:text-red-700"
+                    className="grid size-5 place-items-center rounded-pill transition-colors duration-150 ease-snappy hover:bg-bad/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
                     aria-label={t('remove_tag')}
                   >
-                    ×
+                    <X aria-hidden="true" className="size-3.5" />
                   </button>
                 </span>
               ))}
@@ -443,28 +430,20 @@ export default function AIBusinessProfilePanel({
                 )
               }
               placeholder={t('add_excluded_placeholder')}
-              className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={cn(FIELD_CLASSES, 'py-2')}
               dir={isHebrew ? 'rtl' : 'ltr'}
             />
           </div>
 
-          {error && (
-            <div className="p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 mb-3">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="p-2 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 mb-3">
-              {success}
-            </div>
-          )}
+          {error && <Notice tone="bad">{error}</Notice>}
+          {success && <Notice tone="ok">{success}</Notice>}
 
           <div className="flex gap-2">
             <Button size="sm" onClick={save} loading={saving} disabled={saving}>
               {t('save_profile')}
             </Button>
             {mode === 'manual' && (
-              <Button size="sm" variant="outline" onClick={resetToAuto} disabled={saving}>
+              <Button size="sm" variant="secondary" onClick={resetToAuto} disabled={saving}>
                 {t('reset_to_auto')}
               </Button>
             )}

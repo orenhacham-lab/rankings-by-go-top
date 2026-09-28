@@ -13,6 +13,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
+import Checkbox from '@/components/ui/Checkbox'
+import EmptyState from '@/components/ui/EmptyState'
+import Input from '@/components/ui/Input'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { Pencil, RefreshCw, Sparkles } from 'lucide-react'
 import { dropOffTopicSuggestions } from '@/lib/ai-visibility/question-relevance'
 import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
@@ -85,7 +91,9 @@ export default function PromptSuggestions({
       case 'medium': return t('confidence_medium')
       case 'opportunity': return t('confidence_opportunity')
       case 'experimental': return t('confidence_experimental')
-      default: return tier
+      // A tier with no words of its own (starter: its chip already says so) shows
+      // no badge, never the raw identifier.
+      default: return ''
     }
   }
 
@@ -646,10 +654,7 @@ export default function PromptSuggestions({
           targetBrandName: businessName,
         }),
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id))
       setSelectedIds((prev) => {
         const next = new Set(prev)
@@ -658,7 +663,8 @@ export default function PromptSuggestions({
       })
       onAdded()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add prompt')
+      console.error('[ai-suggestions] add failed', e)
+      setError(t('something_went_wrong'))
     } finally {
       setSaving(false)
     }
@@ -682,17 +688,15 @@ export default function PromptSuggestions({
             targetBrandName: businessName,
           }),
         })
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || `HTTP ${res.status}`)
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
       }
       setSuggestions((prev) => prev.filter((s) => !selectedIds.has(s.id)))
       setSelectedIds(new Set())
       onAdded()
       if (suggestions.length === targets.length) onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add selected prompts')
+      console.error('[ai-suggestions] add selected failed', e)
+      setError(t('something_went_wrong'))
     } finally {
       setSaving(false)
     }
@@ -703,77 +707,68 @@ export default function PromptSuggestions({
   return (
     <Modal open={open} onClose={onClose} title={t('smart_questions_title')} size="lg">
       <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <p className="text-slate-600 dark:text-slate-300 flex-1">{t('smart_questions_help')}</p>
-          <button
-            onClick={regenerate}
-            disabled={regenerating}
-            className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed transition"
-            type="button"
-          >
-            <span className={`inline-block transition-transform ${regenerating ? 'animate-spin' : ''}`}>↻</span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="min-w-0 flex-1 text-copy text-body">{t('smart_questions_help')}</p>
+          <Button variant="secondary" size="sm" onClick={regenerate} disabled={regenerating} className="shrink-0">
+            <RefreshCw aria-hidden="true" className={`size-4 ${regenerating ? 'animate-spin' : ''}`} />
             {t('regenerate')}
-          </button>
+          </Button>
         </div>
 
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {error && <Notice tone="bad" onDismiss={() => setError(null)}>{error}</Notice>}
 
         {isLoadingSuggestions || regenerating ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <span>{t('loading_suggestions')}</span>
-            </div>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div role="status" aria-busy="true" className="space-y-3" data-skeleton="">
+            <span className="sr-only">{t('loading_suggestions')}</span>
+            <div className="max-h-96 space-y-2 overflow-y-auto">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 animate-pulse">
-                  <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 mt-1" />
+                <div key={i} className="flex items-start gap-3 rounded-inset border border-line bg-surface p-4">
+                  <Skeleton className="mt-1 size-4" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
-                    <div className="h-3 w-20 bg-slate-100 dark:bg-slate-800 rounded-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-20 rounded-pill" />
                   </div>
-                  <div className="w-12 h-7 bg-slate-100 dark:bg-slate-800 rounded" />
+                  <Skeleton className="h-8 w-14" />
                 </div>
               ))}
             </div>
           </div>
         ) : suggestions.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 dark:text-slate-400">
-            <div className="text-sm mb-3">
-              {alreadyAddedPromptsRef.current.size > 0 ? t('all_added') : t('no_new_suggestions')}
-            </div>
-            <Button size="sm" variant="outline" onClick={regenerate}>
-              {t('generate_again')}
-            </Button>
-          </div>
+          <EmptyState
+            icon={<Sparkles />}
+            title={alreadyAddedPromptsRef.current.size > 0 ? t('all_added') : t('no_new_suggestions')}
+            action={
+              <Button size="sm" variant="secondary" onClick={regenerate}>
+                <RefreshCw aria-hidden="true" className="size-4" />
+                {t('generate_again')}
+              </Button>
+            }
+          />
         ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+          <ul className="max-h-96 space-y-2 overflow-y-auto pe-1">
             {suggestions.map((s) => {
               const checked = selectedIds.has(s.id)
               const isEditing = editingId === s.id
+              const tier = 'confidenceTier' in s ? confidenceTierLabel(s.confidenceTier) : ''
               return (
-                <div
+                <li
                   key={s.id}
-                  className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-200 ${
-                    checked
-                      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-900/20 shadow-sm'
-                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm'
+                  className={`flex items-start gap-3 rounded-inset border p-4 transition-colors duration-150 ease-snappy ${
+                    checked ? 'border-action' : 'border-line hover:border-line-strong'
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleSelect(s.id)}
-                    className="mt-1.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <div className="flex-1 min-w-0">
+                  <span className="flex h-6 items-center">
+                    <Checkbox
+                      checked={checked}
+                      onChange={() => toggleSelect(s.id)}
+                      aria-label={s.prompt}
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1.5">
                     {isEditing ? (
-                      <input
+                      <Input
                         type="text"
+                        aria-label={t('edit')}
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={commitEdit}
@@ -786,75 +781,59 @@ export default function PromptSuggestions({
                         }}
                         autoFocus
                         dir={isHebrew ? 'rtl' : 'ltr'}
-                        className="w-full px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     ) : (
-                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-snug">
-                        {s.prompt}
-                      </div>
+                      <p className="text-copy font-medium text-ink">{s.prompt}</p>
                     )}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Badge variant={INTENT_TONE[s.intent] || 'neutral'}>
                         {intentLabel(s.intent)}
                       </Badge>
-                      {'confidenceTier' in s && (
-                        <Badge variant={confidenceTierColor(s.confidenceTier)}>
-                          {confidenceTierLabel(s.confidenceTier)}
-                        </Badge>
+                      {'confidenceTier' in s && tier && (
+                        <Badge variant={confidenceTierColor(s.confidenceTier)}>{tier}</Badge>
                       )}
-                      <button
-                        onClick={() => startEdit(s.id, s.prompt)}
-                        className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                        type="button"
-                      >
-                        {t('edit')}
-                      </button>
                     </div>
                     {'valueReason' in s && s.valueReason && (
-                      <p className="text-[12px] font-medium text-indigo-700 dark:text-indigo-300 mt-1.5">
-                        {s.valueReason}
-                      </p>
+                      <p className="text-caption font-medium text-body">{s.valueReason}</p>
                     )}
                     {s.reason && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2" title={s.reason}>
+                      <p className="line-clamp-2 text-caption text-muted" title={s.reason}>
                         {s.reason}
                       </p>
                     )}
                     {'chips' in s && s.chips && s.chips.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {s.chips.map((chip) => (
-                          <span
-                            key={chip}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                          >
-                            {chipLabel(chip)}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="text-caption text-muted">{s.chips.map(chipLabel).join(' · ')}</p>
                     )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => addOne(s)}
-                    disabled={saving}
-                  >
-                    {t('add')}
-                  </Button>
-                </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEdit(s.id, s.prompt)}
+                      aria-label={t('edit')}
+                      title={t('edit')}
+                      className="size-8 px-0"
+                    >
+                      <Pencil aria-hidden="true" className="size-4" />
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => addOne(s)} disabled={saving}>
+                      {t('add')}
+                    </Button>
+                  </div>
+                </li>
               )
             })}
-          </div>
+          </ul>
         )}
 
-        <div className="flex items-center justify-between gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
-          <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
+          <p className="text-caption text-muted tabular-nums">
             {selectedCount > 0
               ? `${selectedCount} ${t('selected')} ${t('of')} ${suggestions.length}`
               : `${suggestions.length}`}
-          </div>
+          </p>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={saving}>
+            <Button variant="secondary" onClick={onClose} disabled={saving}>
               {t('close')}
             </Button>
             <Button
