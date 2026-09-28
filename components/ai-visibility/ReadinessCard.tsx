@@ -103,7 +103,7 @@ export default function ReadinessCard({
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3.5 py-3 transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
                   <s.Icon size={16} className={cn('shrink-0', s.tone)} aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate text-copy font-medium text-ink">{copy.title}</span>
+                  <span className="min-w-0 flex-1 text-copy font-medium text-ink">{copy.title}</span>
                   <span className={`shrink-0 rounded-pill px-2 py-0.5 text-caption font-medium ${s.chip}`}>{label[row.status]}</span>
                   <ChevronDown size={16} className="shrink-0 text-muted transition-transform duration-150 ease-snappy group-open:rotate-180" aria-hidden="true" />
                 </summary>

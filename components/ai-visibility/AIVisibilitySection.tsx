@@ -2073,7 +2073,7 @@ export default function AIVisibilitySection({
                               {/* Custom CSS tooltip — appears instantly on hover/focus, not delayed like native title */}
                               <span
                                 role="tooltip"
-                                className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 whitespace-nowrap rounded-control bg-contrast px-2 py-1 text-caption font-medium text-contrast-ink opacity-0 shadow-pop transition-opacity duration-150 ease-snappy group-focus-within:opacity-100 group-hover:opacity-100"
+                                className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 hidden w-max max-w-[min(16rem,70vw)] rounded-control bg-contrast px-2 py-1 text-caption font-medium text-contrast-ink shadow-pop group-focus-within:block group-hover:block"
                               >
                                 {tooltip}
                               </span>
@@ -2199,7 +2199,7 @@ export default function AIVisibilitySection({
                         </span>
                         <span
                           role="tooltip"
-                          className="pointer-events-none absolute bottom-full start-1/2 z-50 mb-1.5 w-max max-w-[200px] -translate-x-1/2 rounded-control bg-contrast px-2 py-1.5 text-center text-caption font-medium text-contrast-ink opacity-0 shadow-pop transition-opacity duration-150 ease-snappy group-focus-within:opacity-100 group-hover:opacity-100 rtl:translate-x-1/2"
+                          className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 hidden w-max max-w-[200px] rounded-control bg-contrast px-2 py-1.5 text-caption font-medium text-contrast-ink shadow-pop group-focus-within:block group-hover:block"
                         >
                           {t('priority_tag_help')}
                         </span>

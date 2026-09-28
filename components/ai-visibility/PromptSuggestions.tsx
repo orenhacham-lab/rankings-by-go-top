@@ -91,8 +91,8 @@ export default function PromptSuggestions({
       case 'medium': return t('confidence_medium')
       case 'opportunity': return t('confidence_opportunity')
       case 'experimental': return t('confidence_experimental')
-      case 'starter': return t('starter_questions')
-      // A tier with no words of its own shows no badge, never the raw identifier.
+      // A tier with no words of its own (starter: its chip already says so) shows
+      // no badge, never the raw identifier.
       default: return ''
     }
   }

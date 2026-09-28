@@ -58,9 +58,8 @@ export function SmartQuestionCard({
       case 'medium': return t('confidence_medium')
       case 'opportunity': return t('confidence_opportunity')
       case 'experimental': return t('confidence_experimental')
-      case 'starter': return t('starter_questions')
-      // A tier with no words of its own (e.g. insufficient_context) shows no badge,
-      // never the raw English identifier.
+      // A tier with no words of its own (starter: its chip already says so;
+      // insufficient_context) shows no badge, never the raw English identifier.
       default: return ''
     }
   }

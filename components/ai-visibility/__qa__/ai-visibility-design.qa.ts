@@ -97,6 +97,13 @@ function main() {
     check('B1: role="dialog", aria-modal, a named close button, and Escape closes it', rule(src))
     check('B2: MUT dropping the Escape handler fails B1', !rule(src.replace("e.key === 'Escape'", "e.key === 'Enter'")))
     check('B3: no glyph marks (✓ ×) in the drawer', !/[✓×]/.test(src))
+    const portal = (x: string) => /return createPortal\(\s*<div className="fixed inset-0 z-\[70\]">[\s\S]*document\.body,\s*\)/.test(x)
+    check('B5: the drawer is drawn into <body>, so no ancestor cuts it short of full height', portal(src))
+    check('B6: MUT rendering it in place fails B5', !portal(src.replace('return createPortal(', 'return (')))
+    const tips = code(SECTION).match(/role="tooltip"[\s\S]{0,40}className="[^"]*"/g) ?? []
+    check('B7: a closed tooltip takes no room (hidden, not opacity-0), so the questions tab never scrolls sideways on a phone',
+      tips.length === 2 && tips.every((c) => /\bhidden\b/.test(c) && !/opacity-0/.test(c)), tips.join(' | '))
+    check('B8: MUT an opacity-0 tooltip fails B7', !['className="absolute opacity-0 group-hover:opacity-100"'].every((c) => /\bhidden\b/.test(c) && !/opacity-0/.test(c)))
     check('B4: the summary is one Notice built from our keys', /<Notice tone=\{summaryTone\}>\{t\(summaryKey\)\}<\/Notice>/.test(src) && /'drawer_summary_none'/.test(src))
   }
 

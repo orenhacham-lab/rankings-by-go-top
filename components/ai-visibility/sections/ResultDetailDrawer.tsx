@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { ExternalLink, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -92,8 +93,12 @@ export function ResultDetailDrawer({
         ? 'drawer_summary_cited'
         : 'drawer_summary_none'
 
-  return (
-    <div className="fixed inset-0 z-50">
+  // Drawn into <body>: an ancestor of the tab creates its own containing block,
+  // which clipped the old drawer short of the screen's bottom and left the
+  // sidebar above its scrim.
+  if (typeof document === 'undefined') return null
+  return createPortal(
+    <div className="fixed inset-0 z-[70]">
       <div aria-hidden="true" className="scrim-in absolute inset-0 bg-scrim" onClick={onClose} />
       <div
         role="dialog"
@@ -210,6 +215,7 @@ export function ResultDetailDrawer({
           </Button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
