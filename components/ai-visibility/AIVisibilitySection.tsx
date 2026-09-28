@@ -224,6 +224,8 @@ export default function AIVisibilitySection({
     domain: projectDomain,
   }
   const [showAllPrompts, setShowAllPrompts] = useState(false)
+  // Questions whose full engine row is open (the rest show only the engines that named the business).
+  const [enginesOpenFor, setEnginesOpenFor] = useState<ReadonlySet<string>>(() => new Set())
   const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(() => {
     if (typeof window === 'undefined') return false
     try {
@@ -2003,8 +2005,18 @@ export default function AIVisibilitySection({
                       />
                     </div>
                     <PromptInsightRow insight={promptInsights.get(p.id) ?? null} t={t} isRTL={isHebrew} />
-                    <div className="flex flex-wrap gap-1.5">
-                      {SUPPORTED_ENGINES.map((engine) => {
+                    {(() => {
+                    // One quiet row per question: the engines that mentioned the business
+                    // (and one that is running now), the rest behind "+N". A question never
+                    // checked anywhere shows every engine, since each chip is how a check starts.
+                    const checkedAny = SUPPORTED_ENGINES.some((e) => scannedSet.has(`${p.id}:${e}`))
+                    const allOpen = !checkedAny || enginesOpenFor.has(p.id)
+                    const shownEngines = allOpen ? SUPPORTED_ENGINES
+                      : SUPPORTED_ENGINES.filter((e) => mentionedByPair.get(`${p.id}:${e}`) === true || scanningKey === `${p.id}:${e}`)
+                    const hiddenEngines = SUPPORTED_ENGINES.length - shownEngines.length
+                    return (
+                    <div className="flex flex-wrap gap-1.5" data-ai-engine-row={allOpen ? 'all' : 'mentioned'}>
+                      {shownEngines.map((engine) => {
                         const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
                         const key = `${p.id}:${engine}`
                         const scanned = scannedSet.has(key)
@@ -2080,7 +2092,21 @@ export default function AIVisibilitySection({
                           </div>
                         )
                       })}
+                      {hiddenEngines > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setEnginesOpenFor((prev) => new Set(prev).add(p.id))}
+                          aria-label={t('engines_show_rest').replace('{n}', String(hiddenEngines))}
+                          title={t('engines_show_rest').replace('{n}', String(hiddenEngines))}
+                          data-ai-engines-more={hiddenEngines}
+                          className="inline-flex h-8 items-center rounded-control border border-line bg-surface px-2.5 text-caption font-semibold tabular-nums text-body transition-colors duration-150 ease-snappy hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                        >
+                          <span dir="ltr">+{hiddenEngines}</span>
+                        </button>
+                      )}
                     </div>
+                    )
+                    })()}
                   </li>
                 ))}
               </ul>

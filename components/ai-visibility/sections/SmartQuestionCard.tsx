@@ -79,6 +79,11 @@ export function SmartQuestionCard({
     return t(chip as I18nKey) || chip
   }
 
+  const reasonLine =
+    ('valueReason' in question && question.valueReason) ||
+    question.reason ||
+    ('chips' in question && question.chips && question.chips.length > 0 ? question.chips.map(chipLabel).join(' · ') : '')
+
   return (
     <div className="flex items-start gap-3 rounded-inset border border-line bg-surface p-4">
       <div className="min-w-0 flex-1 space-y-1.5">
@@ -91,13 +96,9 @@ export function SmartQuestionCard({
             </Badge>
           )}
         </div>
-        {'valueReason' in question && question.valueReason && (
-          <p className="text-caption font-medium text-body">{question.valueReason}</p>
-        )}
-        {'chips' in question && question.chips && question.chips.length > 0 && (
-          <p className="text-caption text-muted">{question.chips.map(chipLabel).join(' · ')}</p>
-        )}
-        {question.reason && <p className="line-clamp-1 text-caption text-muted">{question.reason}</p>}
+        {/* Why this question, said once: the scorer's own sentence when it wrote one, else the
+            template's reason, else its chips. The three used to stack and repeat each other. */}
+        {reasonLine && <p className="line-clamp-2 text-caption text-muted" data-question-reason="">{reasonLine}</p>}
       </div>
       {isAlreadyTracked ? (
         <Badge variant="success" className="shrink-0">

@@ -21,6 +21,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import Notice from '@/components/ui/Notice'
 import RowMenu from '@/components/ui/RowMenu'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,22 @@ function parseAliases(text: string): string[] {
     .filter((s) => s.length > 0)
 }
 
+/**
+ * A failed write, in our words. The route's own `error` text is never shown; only its
+ * machine `code` is read, so the one limit a merchant can act on gets its own sentence.
+ */
+type ActionFailure = 'max' | 'save' | 'remove' | 'reactivate'
+function failureOf(body: unknown, fallback: Exclude<ActionFailure, 'max'>): ActionFailure {
+  const code = body && typeof body === 'object' ? (body as { code?: unknown }).code : null
+  return code === 'max_competitors_reached' ? 'max' : fallback
+}
+const FAILURE_KEY = {
+  max: 'competitor_max_reached',
+  save: 'competitor_save_failed',
+  remove: 'competitor_remove_failed',
+  reactivate: 'competitor_reactivate_failed',
+} as const
+
 function aliasesToText(aliases: string[]): string {
   return aliases.join(', ')
 }
@@ -73,6 +90,9 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
   const [draft, setDraft] = useState<DraftForm>(emptyDraft)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // A failed remove or reactivate: an inline notice above the list, not a browser alert.
+  const [actionError, setActionError] = useState<ActionFailure | null>(null)
+  const { confirm, dialog } = useConfirm()
 
   const activeCount = useMemo(
     () => competitors.filter((c) => c.is_active).length,
@@ -85,8 +105,8 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
     try {
       const res = await fetch(`/api/projects/${projectId}/ai-visibility/competitors`)
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setLoadError(body.error || t('competitor_load_failed'))
+        // The route's text is not the merchant's to read; ours is.
+        setLoadError(t('competitor_load_failed'))
         setCompetitors([])
         return
       }
@@ -153,41 +173,49 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setSaveError(body.error || t('competitor_load_failed'))
+        setSaveError(t(FAILURE_KEY[failureOf(body, 'save')]))
         return
       }
       await load()
       closeForm()
       onCompetitorsChanged?.()
     } catch {
-      setSaveError(t('competitor_load_failed'))
+      setSaveError(t('competitor_save_failed'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleSoftDelete = async (id: string) => {
-    if (!confirm(t('competitor_delete_confirm'))) return
+    const ok = await confirm({
+      title: t('competitor_remove_title'),
+      body: t('competitor_delete_confirm'),
+      confirmLabel: t('competitor_remove_action'),
+      cancelLabel: t('competitor_cancel'),
+      tone: 'danger',
+    })
+    if (!ok) return
+    setActionError(null)
     try {
       const res = await fetch(
         `/api/projects/${projectId}/ai-visibility/competitors/${id}`,
         { method: 'DELETE' },
       )
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        alert(body.error || t('competitor_load_failed'))
+        setActionError(failureOf(await res.json().catch(() => ({})), 'remove'))
         return
       }
       await load()
       onCompetitorsChanged?.()
     } catch {
-      alert(t('competitor_load_failed'))
+      setActionError('remove')
     }
   }
 
   const handleReactivate = async (id: string) => {
+    setActionError(null)
     if (activeCount >= MAX_ACTIVE) {
-      alert(t('competitor_max_reached'))
+      setActionError('max')
       return
     }
     try {
@@ -200,14 +228,13 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
         },
       )
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        alert(body.error || t('competitor_load_failed'))
+        setActionError(failureOf(await res.json().catch(() => ({})), 'reactivate'))
         return
       }
       await load()
       onCompetitorsChanged?.()
     } catch {
-      alert(t('competitor_load_failed'))
+      setActionError('reactivate')
     }
   }
 
@@ -289,6 +316,12 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
       )}
 
       {!loading && loadError && <Notice tone="bad">{loadError}</Notice>}
+
+      {actionError && (
+        <Notice tone={actionError === 'max' ? 'warn' : 'bad'} onDismiss={() => setActionError(null)} className="mb-4">
+          <span data-competitor-action-error={actionError}>{t(FAILURE_KEY[actionError])}</span>
+        </Notice>
+      )}
 
       {/* Form (add or edit) */}
       {isFormOpen && (
@@ -412,6 +445,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
           })}
         </ul>
       )}
+      {dialog}
     </div>
   )
 }

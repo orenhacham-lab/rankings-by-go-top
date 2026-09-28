@@ -238,7 +238,7 @@ function SecretReveal({ t, secret, onDone }: { t: T; secret: string; onDone: () 
       <p className="text-copy font-semibold text-ink">{t.modal.secretTitle}</p>
       <p className="text-copy text-muted">{t.modal.secretBody}</p>
       <div className="flex items-center gap-2">
-        <code dir="ltr" className="min-w-0 flex-1 truncate rounded-control border border-line bg-sunk px-3 py-2 font-mono text-caption text-ink">{secret}</code>
+        <code dir="ltr" className="min-w-0 flex-1 truncate rounded-control border border-line bg-sunk px-3 py-2 text-caption tabular-nums text-ink">{secret}</code>
         <Button size="sm" variant="secondary" onClick={() => { void navigator.clipboard?.writeText(secret).then(() => setCopied(true)) }}>
           {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />} {copied ? t.modal.copied : t.modal.copy}
         </Button>

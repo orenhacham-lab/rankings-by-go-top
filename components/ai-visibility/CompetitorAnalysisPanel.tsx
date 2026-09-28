@@ -176,7 +176,6 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
   const totalResults = data.project.totalResults
   const showSmallSampleWarning = totalResults > 0 && totalResults < SMALL_SAMPLE_THRESHOLD
 
-  const sov = data?.shareOfVoice
   const updatedAt = data.meta?.scanCompletedAt
     ? new Date(data.meta.scanCompletedAt).toLocaleDateString(language === 'he' ? 'he-IL' : 'en-US')
     : null
@@ -197,7 +196,8 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
     return (
       <li
         key={row.key}
-        className={`rounded-inset border border-line p-4 ${row.isProject ? 'border-s-[3px] border-s-action' : ''}`}
+        className="rounded-inset border border-line p-4"
+        data-competitor-row={row.isProject ? 'project' : 'competitor'}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -253,49 +253,9 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
 
   return (
     <div className="space-y-6">
-      {/* Share of all mentions: every entity's slice of the same total, so the slices sum to 100%. */}
-      <section aria-labelledby="ai-sov-title" className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
-        <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
-            <BarChart3 className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <h3 id="ai-sov-title" className="text-section font-semibold text-ink">{t('share_of_voice_title')}</h3>
-            <p className="mt-0.5 text-caption text-muted">{t('share_of_voice_help')}</p>
-          </div>
-        </div>
-
-        {!sov || sov.totalMentions === 0 ? (
-          <p className="text-copy text-muted">{t('share_of_voice_empty')}</p>
-        ) : (
-          <ul className="space-y-3">
-            {sov.entities.map((entity) => {
-              const key = entity.type === 'project' ? '__project__' : entity.competitorId || entity.name
-              const isProject = entity.type === 'project'
-              return (
-                <li key={key} className="space-y-1.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className={`min-w-0 truncate text-copy ${isProject ? 'font-semibold text-ink' : 'font-medium text-body'}`}>
-                      {entity.name || (isProject ? t('competitor_your_business') : '')}
-                    </span>
-                    <span className="shrink-0 text-caption text-muted tabular-nums">
-                      <span className="text-copy font-semibold text-ink">{entity.sharePercent}%</span>{' '}
-                      {t('share_of_voice_of_all')} · {t('share_of_voice_answers').replace('{count}', String(entity.mentionsCount))}
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-pill bg-sunk">
-                    <div
-                      className={`h-full rounded-pill ${isProject ? 'bg-action' : 'bg-line-strong'}`}
-                      style={{ width: `${Math.max(entity.sharePercent, entity.mentionsCount > 0 ? 2 : 0)}%` }}
-                    />
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
+      {/* One measure, said once: in how many of the checked answers each business was named
+          (the same unit as the visibility score above). The old "share of all mentions" card
+          re-divided these same counts into slices, so 43% sat beside 100% for one competitor. */}
       {/* Per-business rate: each one against ALL answers, so several can reach 100%. */}
       <section aria-labelledby="ai-comparison-title" className="space-y-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
         <div className="flex items-start gap-3">

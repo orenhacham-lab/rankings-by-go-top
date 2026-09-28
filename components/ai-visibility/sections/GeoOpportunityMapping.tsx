@@ -292,7 +292,9 @@ export function GeoOpportunityMappingSection({
       {cards.length === 0 ? (
         <p className="text-copy text-muted">{t('geo_opp_fallback')}</p>
       ) : (
-        <div className={cn('grid grid-cols-1 gap-4', cards.length > 1 && 'md:grid-cols-2')}>
+        // Two columns only for an even count, so the grid never leaves a hole beside the last card;
+        // an odd count reads as one list.
+        <div className={cn('grid grid-cols-1 gap-4', cards.length % 2 === 0 && 'md:grid-cols-2')} data-insight-grid={cards.length % 2 === 0 ? 'pairs' : 'list'}>
           {cards.map((card, i) => (
             <InsightCard key={i} title={card.title} icon={card.icon} lines={card.lines} t={t} />
           ))}

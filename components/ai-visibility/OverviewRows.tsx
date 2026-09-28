@@ -14,7 +14,7 @@
  * 'error' when they could not be read; each row keeps its height in every state.
  */
 import { useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, CheckCircle2, CircleDashed, Info, Loader2, Minus, Quote, XCircle } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, CheckCircle2, CircleDashed, Info, Loader2, Quote, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -242,7 +242,15 @@ export function OverviewOpeningCard({
         )}
         {state === 'ready' && (
         <div className="flex min-w-0 flex-col justify-end gap-4">
-        {data && data.trend.length >= 2 && <ScoreTrend points={data.trend} c={c} language={language} />}
+        {/* A line needs three checks to say anything; before that, say how many are missing. */}
+        {data && data.trend.length >= TREND_MIN_POINTS && <ScoreTrend points={data.trend} c={c} language={language} />}
+        {data && data.trend.length > 0 && data.trend.length < TREND_MIN_POINTS && (
+          <p data-ai-trend-pending={TREND_MIN_POINTS - data.trend.length} className="text-caption text-contrast-ink/60">
+            <span className="font-medium text-contrast-ink/80">{c.trendLabel}</span>
+            <span aria-hidden="true"> · </span>
+            {c.trendPending(TREND_MIN_POINTS - data.trend.length)}
+          </p>
+        )}
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
           <Figure label={c.mentionsLabel} help={c.mentionsHelp} value={data && data.score !== null ? data.mentions : null} note={data && data.score !== null ? c.ofAnswers(data.answers) : null} />
           <Figure label={c.citationsLabel} help={c.citationsHelp} value={data && data.score !== null ? data.citations : null} note={data && data.score !== null ? c.ofAnswers(data.answers) : null} />
@@ -281,6 +289,9 @@ function NextStep({ c, data, onRunMore }: { c: Copy; data: AiOverview; onRunMore
     </div>
   )
 }
+
+/** Fewer checks than this draw a flat, meaningless line, so the chart waits for the third. */
+export const TREND_MIN_POINTS = 3
 
 /**
  * The score after each check, on a fixed 0-100 scale (it is a share, so the
@@ -366,25 +377,34 @@ function Figure({ label, help, value, note }: { label: string; help: string; val
 function ChangeFigure({ c, data, language }: { c: Copy; data: AiOverview | null; language: Locale }) {
   const change = data?.change ?? null
   const dir = !change ? null : change.points > 0 ? 'up' : change.points < 0 ? 'down' : 'flat'
-  const Icon = dir === 'up' ? ArrowUpRight : dir === 'down' ? ArrowDownRight : Minus
+  const Icon = dir === 'up' ? ArrowUpRight : ArrowDownRight
   return (
     <div className="col-span-2 min-w-0 rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.04] p-3 sm:col-span-1" title={c.changeLabel} data-ai-change={dir ?? 'none'}>
       <dt className="truncate text-caption text-contrast-ink/70">{c.changeLabel}</dt>
       <dd className="mt-1">
-        {change && dir ? (
+        {change && (dir === 'up' || dir === 'down') ? (
           <>
+            {/* The direction on the soft ok/bad pair: the tokens stay readable on the navy band. */}
             <span
               // Joined by hand: tailwind-merge would drop text-section next to a text colour.
-              className={`flex items-center gap-1 text-section font-semibold leading-tight sm:text-title ${
-                dir === 'up' ? 'text-emerald-300' : dir === 'down' ? 'text-rose-300' : ''
+              className={`inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-section font-semibold leading-tight ${
+                dir === 'up' ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad'
               }`}
             >
-              <Icon size={18} strokeWidth={2.5} aria-hidden="true" className="shrink-0 rtl:-scale-x-100" />
-              <span dir="ltr" className="whitespace-nowrap">{c.changePoints(change.points)}</span>
-              <span className="sr-only">{dir === 'up' ? c.changeUp : dir === 'down' ? c.changeDown : c.changeFlat}</span>
+              <Icon size={16} strokeWidth={2.5} aria-hidden="true" className="shrink-0 rtl:-scale-x-100" />
+              <span dir="ltr" className="whitespace-nowrap tabular-nums">{c.changePoints(change.points)}</span>
+              <span className="sr-only">{dir === 'up' ? c.changeUp : c.changeDown}</span>
             </span>
+            <span className="mt-1 block truncate text-caption text-contrast-ink/60">
+              {change.since ? c.changeSince(formatWhen(change.since, language, true)) : ''}
+            </span>
+          </>
+        ) : change && dir === 'flat' ? (
+          // No change is said in words; a "0" with a dash reads like a missing value.
+          <>
+            <span className="block text-section font-semibold leading-tight">{c.changeFlat}</span>
             <span className="block truncate text-caption text-contrast-ink/60">
-              {change.since ? c.changeSince(formatWhen(change.since, language, true)) : dir === 'flat' ? c.changeFlat : ''}
+              {change.since ? c.changeSince(formatWhen(change.since, language, true)) : ''}
             </span>
           </>
         ) : (

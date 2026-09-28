@@ -37,10 +37,12 @@ export default function SettingsCard({
     <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20">
       {/* overflow-clip, not overflow-hidden: it rounds the corners the same way but is not a
           scroll container, so the footer below can stick to the bottom of the screen. */}
-      <Card padding={false} className={cn('overflow-clip', danger && 'border-s-[3px] border-s-bad')}>
-        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-line px-5 py-4 sm:px-6 sm:py-5">
+      <Card padding={false} className="overflow-clip">
+        {/* Below sm the section's own action drops under the title, so the description keeps the
+            full width instead of wrapping three words to a line beside a pill. */}
+        <header className="flex flex-col gap-3 border-b border-line px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-x-4 sm:px-6 sm:py-5">
           <div className="flex min-w-0 flex-1 items-start gap-3.5">
-            {/* One accent per card: the icon squircle, or for the danger zone its start border. */}
+            {/* One accent per card: the icon squircle, in the bad tone for the danger zone (no start rail). */}
             <span
               aria-hidden
               className={cn(
@@ -55,7 +57,7 @@ export default function SettingsCard({
               {description && <p className="mt-0.5 max-w-prose text-copy text-muted text-pretty">{description}</p>}
             </div>
           </div>
-          {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+          {actions && <div className="flex flex-wrap items-center gap-2 sm:shrink-0" data-settings-card-actions="">{actions}</div>}
         </header>
         <div className="px-5 py-5 sm:px-6 sm:py-6">{children}</div>
         {footer && (

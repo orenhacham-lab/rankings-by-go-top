@@ -13,6 +13,7 @@ import { ExternalLink, Send } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -67,9 +68,11 @@ export function SitePublishCard({ projectId, articleId }: { projectId: string; a
   const { conn } = useSiteConnection(projectId)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string | null } | null>(null)
+  const { confirm, dialog } = useConfirm()
 
   async function publish() {
-    if (!window.confirm(sp.publish.confirm)) return
+    // Publishing is not destructive, so the confirm keeps the default (action) tone.
+    if (!(await confirm({ title: sp.publish.confirm, confirmLabel: sp.publish.button }))) return
     setBusy(true); setResult(null)
     try {
       const res = await fetch(`/api/content/articles/${articleId}/site-platform`, { method: 'POST' })
@@ -98,6 +101,7 @@ export function SitePublishCard({ projectId, articleId }: { projectId: string; a
           </span>
         )}
       </div>
+      {dialog}
     </Card>
   )
 }

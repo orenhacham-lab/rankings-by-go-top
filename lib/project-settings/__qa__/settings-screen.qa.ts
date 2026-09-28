@@ -112,7 +112,12 @@ function main() {
         count(on, 'data-source-chip="scan"') === 2 && count(on, 'data-redetect') === 1 && on.includes(t.source.scan))
       check('profile card, the owner\'s own values: no chip', count(mine, 'data-source-chip') === 0 && count(mine, 'data-redetect') === 1)
       check('profile card, flag off: editable, no chip, no AI button', count(off, 'data-source-chip') === 0 && count(off, 'data-redetect') === 0 &&
-        off.includes('<textarea') && count(off, 'data-commerce') === 4)
+        off.includes('<textarea') && count(off, 'data-commerce="') === 4)
+      // R33: the commerce type is the one ui/Segmented (a radiogroup of four role="radio" buttons), no native radio.
+      const segRule = (html: string) => /role="radiogroup" aria-label="[^"]+"/.test(html) && count(html, 'role="radio"') >= 4 && !/type="radio"/.test(html)
+        && count(html, 'data-commerce-hint=') === 1
+      check('profile card: the commerce type is a Segmented radiogroup with its hint, never a native radio', segRule(off))
+      check('MUT: a native radio back in the card fails that rule', !segRule(off + '<input type="radio" name="x"/>'))
       check(`profile card: the ${locale === 'he' ? 'rtl' : 'ltr'} copy in its own language`, on.includes(t.profile.title) && on.includes(t.profile.commerce.service.label))
     }
     {

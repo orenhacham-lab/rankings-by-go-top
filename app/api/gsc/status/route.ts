@@ -6,6 +6,7 @@
  * precomputed run aggregates (no metric-row re-scan). This endpoint changes no state.
  */
 import { authContentProject } from '@/lib/content/api-auth'
+import { isAdminUser } from '@/lib/auth/admin-role'
 import { isGscReadOnlyEnabled, isGscOAuthConfigured } from '@/lib/gsc/config'
 import { loadUserConnection, loadProjectProperty, latestSucceededRun, sanitizeConnection, GscServiceError } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
@@ -63,9 +64,14 @@ export async function GET(request: Request) {
       GSC_WINDOWS.forEach((w, i) => { windows[String(w)] = summaryCard(runs[i]) })
     }
 
+    const oauthConfigured = isGscOAuthConfigured()
+    // Why it is unavailable (server configuration) is for an administrator to read; a merchant
+    // sees only that it is unavailable. The role comes from profiles via the service-role client.
+    const opsDetail = !oauthConfigured && await isAdminUser(auth.admin, auth.user.id)
     return Response.json({
       ok: true,
-      oauthConfigured: isGscOAuthConfigured(),
+      oauthConfigured,
+      opsDetail,
       connection: sanitizeConnection(connection),
       property: property ? { siteUrl: property.site_url, permissionLevel: property.permission_level, selectedAt: property.selected_at } : null,
       windows,

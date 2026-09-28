@@ -19,7 +19,6 @@ import { fixKey } from './useSiteHealthScan'
 type Copy = DashboardDictionary['siteHealth']
 
 const SEVERITY_BADGE: Record<Severity, 'danger' | 'warning' | 'info'> = { urgent: 'danger', important: 'warning', minor: 'info' }
-const SEVERITY_RAIL: Record<Severity, string> = { urgent: 'bg-bad', important: 'bg-warn', minor: 'bg-info' }
 /** Pages shown before "and N more". */
 const FIRST_PAGES = 3
 
@@ -91,13 +90,13 @@ export default function FindingCard({
 
   return (
     <article
-      className="relative overflow-hidden rounded-card border border-line bg-surface shadow-card"
+      className="overflow-hidden rounded-card border border-line bg-surface shadow-card"
       data-finding={finding.id}
       data-severity={finding.severity}
       data-fixable={finding.fixable ? 'yes' : 'no'}
     >
-      <span aria-hidden="true" className={cn('absolute start-0 top-6 h-10 w-[3px] rounded-e-pill sm:top-7', SEVERITY_RAIL[finding.severity])} />
-      <div className="p-5 ps-6 sm:p-6 sm:ps-7">
+      {/* The severity reads from its Badge (a word and a dot); the card carries no start rail. */}
+      <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Badge variant={SEVERITY_BADGE[finding.severity]} dot>{copy.severity[finding.severity]}</Badge>
           {!siteWide && <span className="text-caption font-medium text-muted">{count}</span>}
@@ -130,7 +129,7 @@ export default function FindingCard({
                     {done ? (
                       <Badge variant="success"><Check size={14} strokeWidth={2.4} aria-hidden="true" />{copy.fixedBadge}</Badge>
                     ) : page.fixable ? (
-                      <Button size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.field ?? ''}>
+                      <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.field ?? ''}>
                         {copy.fixForMe}
                       </Button>
                     ) : page.adminUrl ? (

@@ -1,7 +1,8 @@
 'use client'
 
 import { useId, useState } from 'react'
-import { Briefcase, Check, FileText, Newspaper, Package, Shapes, type LucideIcon } from 'lucide-react'
+import { FileText } from 'lucide-react'
+import Segmented from '@/components/ui/Segmented'
 import { saveProjectSettingsAction } from '@/app/(dashboard)/settings/actions'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
@@ -28,13 +29,6 @@ import { useRedetect } from './useRedetect'
 type Copy = DashboardDictionary['projectSettings']
 type Draft = { description: string; commerce_type: CommerceType | null }
 type Field = keyof Draft
-
-const COMMERCE_ICONS: Record<CommerceType, LucideIcon> = {
-  product: Package,
-  service: Briefcase,
-  content: Newspaper,
-  other: Shapes,
-}
 
 /** The description as the server stores it (lib/project-settings/data.ts), for comparing. */
 export const normalizeDescription = (s: string) =>
@@ -210,56 +204,26 @@ export default function ProfileCard({
           />
         </div>
 
-        <div role="radiogroup" aria-labelledby={`${ids}-commerce-label`}>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <span id={`${ids}-commerce-label`} className="text-copy font-semibold text-ink">{t.profile.commerceLabel}</span>
             {chip('commerce_type')}
           </div>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            {COMMERCE_TYPES.map((type) => {
-              const Icon = COMMERCE_ICONS[type]
-              const on = draft.commerce_type === type
-              const copy = t.profile.commerce[type]
-              return (
-                <label
-                  key={type}
-                  data-commerce={type}
-                  className={cn(
-                    'relative flex cursor-pointer flex-col gap-1 rounded-inset border p-3.5 transition-[border-color,background-color,box-shadow] duration-150 ease-snappy',
-                    'has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-action/20',
-                    on ? 'border-action bg-surface ring-1 ring-action' : 'border-line bg-surface hover:border-line-strong',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name={`${ids}-commerce`}
-                    value={type}
-                    checked={on}
-                    onChange={() => edit({ commerce_type: type })}
-                    className="sr-only"
-                  />
-                  <span className="mb-1 flex items-start justify-between">
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'grid size-10 place-items-center rounded-inset transition-colors duration-150 ease-snappy',
-                        on ? 'bg-action-soft text-action' : 'bg-sunk text-muted',
-                      )}
-                    >
-                      <Icon className="size-5" />
-                    </span>
-                    {on && (
-                      <span aria-hidden className="grid size-5 place-items-center rounded-pill bg-action text-action-ink motion-safe:animate-pop-in">
-                        <Check className="size-3" strokeWidth={3} />
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-copy font-semibold text-ink">{copy.label}</span>
-                  <span className="text-caption leading-snug text-muted">{copy.hint}</span>
-                </label>
-              )
-            })}
-          </div>
+          {/* The one segmented control (as "is the business local?" in the card below), with the
+              chosen type's one-line hint under it, instead of four choice cards. */}
+          <Segmented
+            ariaLabel={t.profile.commerceLabel}
+            fill
+            value={draft.commerce_type ?? ''}
+            onChange={(v) => edit({ commerce_type: v as CommerceType })}
+            options={COMMERCE_TYPES.map((type) => ({
+              value: type,
+              label: <span data-commerce={type}>{t.profile.commerce[type].label}</span>,
+            }))}
+          />
+          <p className="mt-1.5 min-h-[1.125rem] text-caption text-muted" data-commerce-hint={draft.commerce_type ?? ''}>
+            {draft.commerce_type ? t.profile.commerce[draft.commerce_type].hint : ''}
+          </p>
         </div>
       </div>
     </SettingsCard>

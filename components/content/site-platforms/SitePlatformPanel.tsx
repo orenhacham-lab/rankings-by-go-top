@@ -11,6 +11,8 @@ import { Send, ShieldCheck, Unplug } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { formatDateTime } from '@/lib/utils'
 import type { SanitizedSiteConnection } from '@/lib/site-platforms/types'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
@@ -31,6 +33,7 @@ export default function SitePlatformPanel({
   const [testing, setTesting] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  const { confirm, dialog } = useConfirm()
   const wix = connection.platform === 'wix'
   const status = connection.connection_status
   const tone = status === 'connected' ? 'success' : status === 'failed' ? 'danger' : 'neutral'
@@ -46,7 +49,8 @@ export default function SitePlatformPanel({
   }
 
   async function disconnect() {
-    if (!window.confirm(t.panel.disconnectConfirm)) return
+    const ok = await confirm({ title: t.panel.disconnectTitle, body: t.panel.disconnectBody, confirmLabel: t.panel.disconnect, tone: 'danger' })
+    if (!ok) return
     setRemoving(true); setMessage(null)
     try {
       const res = await fetch(`/api/site-platforms/connection?projectId=${encodeURIComponent(projectId)}`, { method: 'DELETE' })
@@ -80,7 +84,7 @@ export default function SitePlatformPanel({
       </dl>
 
       {status === 'failed' && connection.last_error_code && (
-        <p role="status" className="rounded-inset border border-bad/20 bg-bad-soft px-4 py-3 text-copy text-bad">{siteErrorText(t, connection.last_error_code)}</p>
+        <Notice tone="bad">{siteErrorText(t, connection.last_error_code)}</Notice>
       )}
 
       {!wix && <WebhookDocs t={t.webhook.docs} />}
@@ -101,6 +105,7 @@ export default function SitePlatformPanel({
         <p role="status" className={`text-caption font-medium motion-safe:animate-pop-in ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>
       )}
     </Card>
+    {dialog}
     </div>
   )
 }

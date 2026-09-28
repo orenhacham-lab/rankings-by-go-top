@@ -22,6 +22,7 @@ import Modal from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
 import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { ChevronDown } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -53,6 +54,7 @@ export default function WordPressConnectionPanel({
   const [loading, setLoading] = useState(true)
   const [connection, setConnection] = useState<SanitizedConnection | null>(null)
   const [showForm, setShowForm] = useState(startWithForm)
+  const { confirm, dialog } = useConfirm()
   const [guideOpen, setGuideOpen] = useState(false)
 
   const [siteUrl, setSiteUrl] = useState('')
@@ -172,7 +174,13 @@ export default function WordPressConnectionPanel({
   }
 
   async function handleDisconnect() {
-    if (!window.confirm(t.confirmDisconnectExclusive)) return
+    const ok = await confirm({
+      title: t.confirmDisconnectTitle,
+      body: t.confirmDisconnectBody,
+      confirmLabel: t.confirmDisconnectAction,
+      tone: 'danger',
+    })
+    if (!ok) return
     setDisconnecting(true)
     setMessage(null)
     try {
@@ -345,6 +353,7 @@ export default function WordPressConnectionPanel({
           <Button size="sm" onClick={() => setGuideOpen(false)}>{t.guideClose}</Button>
         </div>
       </Modal>
+      {dialog}
     </Card>
   )
 }
