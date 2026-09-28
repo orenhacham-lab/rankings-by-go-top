@@ -58,9 +58,9 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
       if (!planId) {
         const envVarName = `NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`
         console.warn(`[PayPal] Plan ID for "${plan}" not configured. Set env var: ${envVarName}`)
-        container.innerHTML = `<p class="text-xs text-slate-500 text-center py-3 p-2 bg-amber-50 rounded border border-amber-200">
+        container.innerHTML = `<p class="rounded-control border border-line bg-sunk p-2 py-3 text-center text-caption text-muted">
           ${t.planNotConfiguredPrefix} ${plan} ${t.planNotConfiguredSuffix}<br/>
-          <span class="text-xs">${t.envVarLabel} ${envVarName}</span>
+          <span class="text-caption">${t.envVarLabel} ${envVarName}</span>
         </p>`
         continue
       }
@@ -178,13 +178,13 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
 
   if (loading) {
     return (
-      <div className="text-center py-4 text-slate-400 text-sm">{t.loading}</div>
+      <div className="py-4 text-center text-copy text-muted">{t.loading}</div>
     )
   }
 
   if (configError) {
     return (
-      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm text-center">
+      <div role="status" className="mt-4 rounded-card border border-line bg-surface p-3 text-center text-copy text-body" data-paypal-unavailable="">
         {configError}
       </div>
     )

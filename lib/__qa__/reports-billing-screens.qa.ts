@@ -10,9 +10,14 @@
  *      reports stay at the top, and the type names are one language each.
  *   C) Billing (render, both languages): the plans, prices and features the
  *      dictionary and PLAN_LIMITS give are all there, each paid plan keeps its
- *      PayPal container, the currency prompt keeps both choices, and a
- *      Shopify-billed account sees the Shopify panel and nothing of PayPal, with
- *      that branch's markup unchanged. No raw slate/blue classes outside it.
+ *      PayPal container, and a Shopify-billed account sees the Shopify panel and
+ *      nothing of PayPal, with that branch's markup unchanged. No raw slate/blue
+ *      classes outside it, and no amber (commit) colour on the plan cards.
+ *      With no stored currency the plans show at once in the language's
+ *      currency (he ILS, en USD) with a visible switch and no PayPal button; the
+ *      one request that persists the currency is byte-for-byte the old one.
+ *   D) Copy: the billing, trial-bar and reports dictionaries address the reader
+ *      in the plural, as the rest of the Hebrew app does, and carry no em-dash.
  * Every guard has a MUTATION CONTROL: the same check on a broken copy fails.
  *
  * Run: npx tsx lib/__qa__/reports-billing-screens.qa.ts
@@ -126,9 +131,25 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
     check(`C2 (${locale}) the header is the screen header (text-title), not the old text-3xl`, /<h1 class="[^"]*text-title/.test(html) && !/text-3xl/.test(html))
 
     const prompt = render(locale, { market: null })
-    const promptOk = (h: string) => h.includes(esc(t.marketPrompt.title)) && h.includes(esc(t.marketPrompt.ilsOption)) && h.includes(esc(t.marketPrompt.usdOption)) && !/paypal-button-/.test(h)
-    check(`C3 (${locale}) no stored currency: the prompt with both choices, no plan or PayPal button`, promptOk(prompt))
-    check(`C3-MUT (${locale}) a prompt that also shows PayPal buttons fails C3`, !promptOk(prompt + '<div id="paypal-button-regular"></div>'))
+    const promptOk = (h: string) => {
+      const missing: string[] = []
+      for (const p of PAID) {
+        if (!h.includes(`data-plan-card="${p}"`)) missing.push(`${p} card`)
+        if (!h.includes(`${sym}${prices[p]}`)) missing.push(`${p} ${market} price`)
+        if (!h.includes(`data-continue-to-payment="${p}"`)) missing.push(`${p} continue button`)
+      }
+      if (!h.includes(`data-billing-market-choice="${market}"`)) missing.push(`default display currency ${market}`)
+      if (!new RegExp(`aria-pressed="true"[^>]*data-currency-option="${market}"`).test(h)) missing.push('switch default')
+      if (!h.includes('data-currency-option="ILS"') || !h.includes('data-currency-option="USD"')) missing.push('switch options')
+      if (!h.includes(esc(t.marketPrompt.ilsOption)) || !h.includes(esc(t.marketPrompt.usdOption))) missing.push('switch labels')
+      if (/paypal-button-/.test(h)) missing.push('a PayPal button before the currency is stored')
+      return missing
+    }
+    const promptMissing = promptOk(prompt)
+    check(`C3 (${locale}) no stored currency: every plan shows at once in ${market}, with the currency switch and no PayPal button`, promptMissing.length === 0, promptMissing.join(', '))
+    check(`C3-MUT (${locale}) a view that also shows PayPal buttons fails C3`, promptOk(prompt + '<div id="paypal-button-regular"></div>').length > 0)
+    check(`C3-MUT (${locale}) the old prompt without plans fails C3`, promptOk(prompt.replace(/data-plan-card="[^"]*"/g, '')).length > 0)
+    check(`C3-MUT (${locale}) the other language's currency by default fails C3`, promptOk(prompt.split(`${sym}${prices.regular}`).join('x')).length > 0)
 
     const shop = render(locale, { market, shopifyConnected: true, trialActive: false })
     const shopOk = (h: string) => h.includes('href="/api/shopify/billing/start-intent"') && h.includes(esc(t.shopify.title)) && !/paypal-button-|data-plan-card/.test(h) && !h.includes(esc(t.marketPrompt.title))
@@ -151,11 +172,65 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
   const rest = strip(src.replace(shopBranch(src), ''))
   check('C6: outside the Shopify panel, no raw palette colours', !RAW_COLOUR.test(rest), (RAW_COLOUR.exec(rest) || [])[0])
   check('C6-MUT: the old plan card colours fail C6', RAW_COLOUR.test(rest + 'border-blue-500 bg-blue-50'))
-  // The currency is still an explicit choice through the same route (P1-9's default
-  // by language is a billing-logic change left to the owner).
-  const choice = (s: string) => s.includes("fetch('/api/billing-market/select'") && /market === null \?/.test(s)
-  check('C7: no stored currency still means the explicit choice, through the same route', choice(strip(src)))
-  check('C7-MUT: defaulting the market in the view fails C7', !choice(strip(src).replace(/market === null \?/, "(market ?? 'ILS') === null ?")))
+  // The display currency is display only. The currency is persisted by exactly
+  // the request the old prompt sent (same route, method, header and body), only
+  // from a plan's "continue" button with the currency on screen, and PayPal's
+  // checkout still receives the STORED market, never the display one.
+  const code = strip(src)
+  const OLD_REQUEST = `const res = await fetch('/api/billing-market/select', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ market: chosen }),
+      })`
+  const persistOk = (s: string) =>
+    s.includes(OLD_REQUEST)
+    && s.split('/api/billing-market/select').length === 2
+    && (s.match(/fetch\(/g) || []).length === 2 // this request and /api/paypal/cancel, nothing else
+    && /onClick=\{\(\) => selectMarket\(shownMarket\)\}/.test(s)
+    && (s.match(/selectMarket\(/g) || []).length === 1 // called from the continue button only
+    && /onClick=\{\(\) => setPickedMarket\(m\)\}/.test(s)
+    && s.includes('{market !== null && <BillingClient market={market} />}')
+    && /market === null \? \(\s*<Button/.test(s)
+  check('C7: the currency is saved only by the unchanged request, from a plan\'s continue button; PayPal gets the stored market', persistOk(code))
+  check('C7-MUT: a changed request body fails C7', !persistOk(code.replace('JSON.stringify({ market: chosen })', 'JSON.stringify({ market: chosen, source: "plans" })')))
+  check('C7-MUT: a continue button that saves a fixed currency fails C7', !persistOk(code.replace('selectMarket(shownMarket)', "selectMarket('ILS')")))
+  check('C7-MUT: a switch that saves on click fails C7', !persistOk(code.replace('onClick={() => setPickedMarket(m)}', 'onClick={() => { setPickedMarket(m); selectMarket(m) }}')))
+  check('C7-MUT: PayPal given the display currency fails C7', !persistOk(code.replace('<BillingClient market={market} />', '<BillingClient market={shownMarket} />')))
+  const noAmber = (s: string) => !/\b(?:bg|border|ring|text)-commit\b/.test(s)
+  check('C8: no amber (commit) colour on the billing screen; "recommended" uses the action colour', noAmber(code) && /bg-action px-2\.5 py-0\.5 text-caption font-semibold text-action-ink/.test(code))
+  check('C8-MUT: the old amber "recommended" badge fails C8', !noAmber(code + ' bg-commit text-commit-ink'))
+  const client = strip(read('app/(dashboard)/billing/client.tsx'))
+  check('C9: the PayPal notices are token cards, not cream/amber', !RAW_COLOUR.test(client), (RAW_COLOUR.exec(client) || [])[0])
+  check('C9-MUT: the old amber notice fails C9', RAW_COLOUR.test(client + 'bg-amber-50 border-amber-200'))
+}
+
+// ── D) Copy: one form of address, no em-dash ────────────────────────────────
+console.log('\nD) Copy: plural address and no em-dash in billing, trial bar and reports')
+{
+  const he = getDashboardDictionary('he')
+  const en = getDashboardDictionary('en')
+  const strings = (v: unknown, out: string[] = []): string[] => {
+    if (typeof v === 'string') out.push(v)
+    else if (typeof v === 'function') { for (const a of [2, 5, 'X']) { try { strings((v as (x: unknown, y?: unknown) => unknown)(a, a), out) } catch { /* not for this arg */ } } }
+    else if (Array.isArray(v)) v.forEach((x) => strings(x, out))
+    else if (v && typeof v === 'object') Object.values(v).forEach((x) => strings(x, out))
+    return out
+  }
+  const monthly = require('../../components/reports/monthly/copy') as { monthlyCopy: (l: Locale) => unknown }
+  const surfaces = (d: typeof he, m: unknown) => ({ billing: d.billing, trialBar: d.trialBar, reports: d.reports, scans: d.scans, gscWidgets: d.gscWidgets, engines: [d.common.searchTypeGoogleDesktop, d.common.searchTypeGoogleMobile], monthly: m })
+  // Singular (אתה/את) forms of address and imperatives that the rest of the app writes in the plural.
+  const SINGULAR = /(^|[\s(])(?:אתה|שלך|לך|בחר|בדוק|רענן|רענן\/י|שדרג|בטל|חבר|סנכרן|נסה|טען|אנא)(?=[\s.,:!?)]|$)/
+  const offenders = (d: typeof he, m: unknown) => {
+    const out: string[] = []
+    for (const [k, v] of Object.entries(surfaces(d, m))) for (const x of strings(v)) if (SINGULAR.test(x) || x.includes('—')) out.push(`${k}: ${x}`)
+    return out
+  }
+  const heBad = offenders(he, monthly.monthlyCopy('he'))
+  check('D1: Hebrew billing, trial bar and reports copy use the plural and no em-dash', heBad.length === 0, heBad.join(' | '))
+  check('D1-MUT: an old singular line fails D1', offenders({ ...he, billing: { ...he.billing, subtitle: 'בחר את התוכנית המתאימה לך' } } as unknown as typeof he, monthly.monthlyCopy('he')).length > 0)
+  check('D1-MUT: an em-dash fails D1', offenders({ ...he, reports: { ...he.reports, title: 'דוחות — כל הנתונים' } } as unknown as typeof he, monthly.monthlyCopy('he')).length > 0)
+  const enDash = strings(surfaces(en, monthly.monthlyCopy('en'))).filter((x) => x.includes('—'))
+  check('D2: English billing, trial bar and reports copy carry no em-dash either', enDash.length === 0, enDash.join(' | '))
+  const excel = read('lib/utils.ts')
+  check('D3: the Excel export\'s engine labels carry no em-dash', !/גוגל אורגני —/.test(excel))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

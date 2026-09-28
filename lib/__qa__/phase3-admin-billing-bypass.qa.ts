@@ -160,7 +160,7 @@ async function main() {
 
   console.log('\n8) Hebrew and English admin billing text exists verbatim')
   {
-    check('8: Hebrew title matches exactly', dashboardHe.billing.admin.title === 'חשבון מנהל — גישה מלאה')
+    check('8: Hebrew title matches exactly', dashboardHe.billing.admin.title === 'חשבון מנהל: גישה מלאה')
     check('8: Hebrew description matches exactly', dashboardHe.billing.admin.description === 'לחשבון זה יש גישה מלאה למערכת ואינו דורש תוכנית חיוב.')
     check('8: English admin section exists with non-empty title and description', typeof dashboardEn.billing.admin.title === 'string' && dashboardEn.billing.admin.title.length > 0 && typeof dashboardEn.billing.admin.description === 'string' && dashboardEn.billing.admin.description.length > 0)
     const enTitle: string = dashboardEn.billing.admin.title
