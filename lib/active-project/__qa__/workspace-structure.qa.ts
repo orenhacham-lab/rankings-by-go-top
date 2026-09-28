@@ -282,13 +282,19 @@ async function main() {
     check('E-MUT: a state without the anchor fails E1', !anchored(sw.replace('data-onboarding="workspace" className="text-sm text-muted"', 'className="text-sm text-muted"')))
     check('E2: the menu keeps a link to the project list, where inactive projects are',
       /href="\/projects"/.test(sw) && /\{t\.manage\}/.test(sw))
-    const tour = code('components/onboarding/DashboardOnboardingTour.tsx')
-    check('E3: the tour starts at the switcher for a new account, past it otherwise',
-      /\{ step: 'createProject', selector: '\[data-onboarding="workspace"\]' \}/.test(tour)
-      && /const getStartStep = useCallback\(\(\) => \(totalProjects === 0 \? 0 : 1\), \[totalProjects\]\)/.test(tour))
-    const dash = code('app/(dashboard)/dashboard/page.tsx')
-    check('E4: the tour waits for the project list before it decides',
-      /\{isResolved && !projectsError && <DashboardOnboardingTour totalProjects=\{projects\.length\} \/>\}/.test(dash))
+    // The tour moved to the Guide pill (lib/guide/tours.ts, components/guide/GuideMenu.tsx);
+    // its own contracts live in lib/guide/__qa__/guide-tours.qa.ts.
+    const tours = code('lib/guide/tours.ts')
+    const firstStopIsSwitcher = (src: string) =>
+      /FULL_TOUR: readonly TourStep\[\] = \[\s*\{ key: 'switcher', target: SWITCHER_TARGET \}/.test(src)
+      && /SWITCHER_TARGET = '\[data-onboarding="workspace"\]'/.test(src)
+    check('E3: the full tour starts at the switcher, whatever state it is in', firstStopIsSwitcher(tours))
+    check('E3-MUT: a tour that starts elsewhere fails E3',
+      !firstStopIsSwitcher(tours.replace("{ key: 'switcher', target: SWITCHER_TARGET },", '')))
+    const guide = code('components/guide/GuideMenu.tsx')
+    const waitsForList = (src: string) => /if \(run \|\| pendingFull \|\| fullState === null \|\| !isResolved \|\| !pathname\) return/.test(src)
+    check('E4: no tour starts on its own before the project list is known', waitsForList(guide))
+    check('E4-MUT: dropping the wait fails E4', !waitsForList(guide.replace('|| !isResolved ', '')))
   }
 
   // ── F) the workspace gate ────────────────────────────────────────────────

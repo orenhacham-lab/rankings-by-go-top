@@ -47,6 +47,86 @@ export const dashboardEn = {
     noProjectCta: 'Create a project',
     projectLoadError: 'We couldn’t load this project',
     projectMissing: 'This project was not found. Pick another one from the switcher above.',
+    // The "New project" entry when the plan's project limit is reached: it stays
+    // in the menu, switched off, and says why before anyone fills in a form.
+    createLimitReached: (used: number, limit: number) =>
+      limit === 0 ? 'Your current plan does not include projects.' : `All the projects in your plan are in use (${used} of ${limit}).`,
+    createLimitCount: (used: number, limit: number) => `${used}/${limit}`,
+    upgrade: 'Upgrade plan',
+    listLabel: 'Your projects',
+  },
+  // The Guide pill in the top bar (components/guide/GuideMenu.tsx) and the tours
+  // it starts (components/onboarding/DashboardOnboardingTour.tsx). Every answer and
+  // every step describes something the product does today.
+  guide: {
+    label: 'Guide',
+    menuLabel: 'Guide and help',
+    fullTour: 'Tour the whole app',
+    fullTourMeta: '2 min',
+    screenTour: 'Tour this screen',
+    screenTourNone: 'This screen has no tour yet',
+    faq: 'Common questions',
+    whatsapp: 'Chat with us on WhatsApp',
+    whatsappMessage: 'Hi, I need help',
+    opensNewTab: '(opens in a new tab)',
+    back: 'Back',
+    faqItems: {
+      project: {
+        q: 'What is a project?',
+        a: 'A project is one site, with its own dashboard, keywords and settings. Switch between projects from the switcher at the top of the screen.',
+      },
+      moreProjects: {
+        q: 'How do I add another site?',
+        a: 'From the switcher at the top, choose "New project". How many projects you can have depends on your plan, and the switcher shows when you have reached it.',
+      },
+      rankings: {
+        q: 'When are Google rankings checked?',
+        a: 'You can set a project to be checked monthly, and you can run a check yourself at any time from the Keywords screen. Every check counts toward your plan’s allowance.',
+      },
+      volumes: {
+        q: 'Where do search volumes come from?',
+        a: 'From Google Ads data. They are estimated monthly averages, not an exact count of searches.',
+      },
+      ai: {
+        q: 'What does AI visibility check?',
+        a: 'We ask AI engines such as ChatGPT the questions customers ask, and check whether your business is mentioned or cited in the answers.',
+      },
+      publishing: {
+        q: 'How do I publish articles to my site?',
+        a: 'In project settings, under Connections, connect your site’s platform. Once it is connected, you publish articles straight from the app.',
+      },
+    },
+    tour: {
+      label: 'Guided tour',
+      stepOf: (n: number, total: number) => `${n} of ${total}`,
+      next: 'Next',
+      back: 'Back',
+      skip: 'Skip',
+      done: 'Done',
+      close: 'Close the tour',
+      keysHint: 'Arrow keys to move, Esc to close',
+    },
+    steps: {
+      switcher: { title: 'Switch between sites here', body: 'Each site is a project. Pick one here, or open a new one.' },
+      hero: { title: 'Your status at a glance', body: 'Your keywords on Google, what changed, and the next step.' },
+      research: { title: 'What your customers search for', body: 'Keyword ideas with search volume and competition, from Google Ads data.' },
+      keywords: { title: 'Where you rank today', body: 'Each keyword’s position on Google, and what changed since the last check.' },
+      strategy: { title: 'What to write, and when', body: 'Article topics, when each one gets written, and why.' },
+      aiVisibility: { title: 'Does ChatGPT mention you?', body: 'We check whether AI engines mention your business when they answer customers’ questions.' },
+      connections: { title: 'Connect your site to publish', body: 'In project settings, under Connections, link your site for publishing articles, and Search Console.' },
+      guide: { title: 'Come back here anytime', body: 'Tours, common questions, and a WhatsApp chat with us.' },
+      dashboardHero: { title: 'What’s happening on the site', body: 'The big number sums up your keywords on Google; below it, what changed and the next step.' },
+      dashboardShortcuts: { title: 'Shortcuts', body: 'The screens you come back to most, one click away.' },
+      researchHeader: { title: 'Keyword research', body: 'Keyword ideas, search volumes, competition and estimated cost per click, from Google Ads data.' },
+      researchForm: { title: 'Start here', body: 'Enter a keyword or a site address, then add the ideas that fit to the project.' },
+      keywordsHeader: { title: 'Where you rank today', body: 'Each keyword’s position on Google and what changed since the last check. You also add keywords and run checks here.' },
+      strategyHeader: { title: 'What to write, and when', body: 'Article topics, when each one gets written, and why.' },
+      aiHeader: { title: 'Does ChatGPT mention you?', body: 'We ask AI engines customers’ questions and check whether your business is mentioned or cited in the answers.' },
+      settingsHeader: { title: 'Project settings', body: 'Your business details, which keyword research, scans and content are built from.' },
+      settingsConnections: { title: 'Connect your site', body: 'Your site’s platform for publishing articles, and Search Console for real search data.' },
+      reportsHeader: { title: 'Reports', body: 'Reports on your Google rankings and your AI visibility, for the project you picked.' },
+      projectScope: { title: 'Each project, its own data', body: 'This screen shows the project picked here; switching updates it in place.' },
+    },
   },
   // Project settings — who the business is and what it is connected to, for the
   // workspace the top bar names.

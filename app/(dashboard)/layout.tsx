@@ -1,5 +1,6 @@
 import Sidebar from '@/components/layout/Sidebar'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
+import GuideMenu from '@/components/guide/GuideMenu'
 import TrialBar from '@/components/layout/TrialBar'
 import { loadTrialBar } from '@/lib/billing/trial-bar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
@@ -82,6 +83,7 @@ export default async function DashboardLayout({
                     the screen — it used to be answered by a different widget per page. */}
                 <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md backdrop-saturate-150 md:px-8">
                   <WorkspaceSwitcher />
+                  <GuideMenu userId={user.id} accountCreatedAt={user.created_at ?? null} />
                 </div>
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
