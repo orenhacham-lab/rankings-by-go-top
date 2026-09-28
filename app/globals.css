@@ -271,6 +271,15 @@
   .reveal[data-reveal='in'] { animation: reveal-in 280ms var(--ease-snappy) var(--reveal-delay, 0ms) backwards; }
 }
 
+/* The site health score ring (components/site-health/ScoreCard.tsx): its arc
+   draws from 0 to the score once, 900ms. With reduced motion it is simply there. */
+@keyframes score-arc-in {
+  from { stroke-dasharray: 0 1000; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .score-arc { animation: score-arc-in 900ms var(--ease-snappy) 120ms backwards; }
+}
+
 /* A long action's progress (components/ui/Toast.tsx): an indeterminate bar
    sweeping across. With reduced motion it is a still, half-filled bar. */
 @keyframes progress-sweep {
