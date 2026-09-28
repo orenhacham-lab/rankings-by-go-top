@@ -22,6 +22,7 @@ import { SITE_ARTICLE_SELECT, type SitePlatform, type SitePublishArticle, type S
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
+import { loadSchemaContext } from '@/lib/content/article-visibility'
 import type { PublishItemResult } from '@/lib/content/automation/publish-item'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -87,6 +88,12 @@ export async function publishArticleToSite(
       await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', article.id)
     }
     return { ok: true, platform, postId: article.site_post_id, url: article.site_post_url ?? null, reconciled: true }
+  }
+
+  // The webhook payload carries structured_data (JSON-LD): its publisher facts
+  // come from the project this call already scoped the article to.
+  if (platform === 'webhook') {
+    try { article.schema_context = await loadSchemaContext(admin, projectId, article.topic_id) } catch { article.schema_context = null }
   }
 
   const adapter = (deps.adapters ?? SITE_ADAPTERS)[platform]

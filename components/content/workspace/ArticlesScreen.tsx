@@ -21,7 +21,9 @@ import SiteHubCard from '@/components/content/site-platforms/SiteHubCard'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, Pencil, Plug, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { resolvePublishCta } from '@/lib/content/publish-cta'
+import { CitedBadge } from '@/components/content/ArticleAiVisibilityCard'
 import RowMenu from '@/components/ui/RowMenu'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
@@ -51,6 +53,29 @@ export default function ArticlesScreen() {
   const [articleBatchMode, setArticleBatchMode] = useState<'publish' | 'draft' | null>(null)
   const articleBatchRef = useRef(false)
   const cancelArticleRef = useRef(false)
+
+  // C9 — which published articles a stored AI citation points at (by live URL).
+  const [cited, setCited] = useState<Record<string, string[]>>({})
+  const articleCount = data?.articles?.length ?? 0
+  useEffect(() => {
+    if (!projectId || articleCount === 0) { setCited({}); return }
+    let live = true
+    fetch(`/api/content/citations?projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => (r.ok ? r.json() : { cited: {} }))
+      .then((d: { cited?: Record<string, string[]> }) => { if (live) setCited(d.cited ?? {}) })
+      .catch(() => { if (live) setCited({}) })
+    return () => { live = false }
+  }, [projectId, articleCount])
+
+  // C1 — the same invitation as the article viewer's top bar: with no site
+  // connected (or a Shopify store without the publishing scope) an unpublished
+  // row offers the connect / scope-upgrade link instead of a publish button.
+  const rowCta = resolvePublishCta({
+    projectId,
+    platform: activePlatform,
+    shopifyNeedsScope: !!data?.platform?.shopifyNeedsScope,
+    shopDomain: data?.shopify?.shopDomain ?? null,
+  })
 
   // The article whose deletion is being confirmed (the "⋯" menu opens the dialog).
   const [deleting, setDeleting] = useState<ArticleRow | null>(null)
@@ -494,6 +519,9 @@ export default function ArticlesScreen() {
                   </Td>
                   <Td>
                     <Link href={`/content/articles/${a.id}`} className="font-medium text-ink hover:text-action hover:underline">{a.title}</Link>
+                    {a.status === 'published' && cited[a.id]?.length ? (
+                      <div className="mt-1"><CitedBadge t={t.editor.aiVisibility} engines={cited[a.id]} /></div>
+                    ) : null}
                   </Td>
                   <Td><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
                   <Td><span className="whitespace-nowrap text-xs text-muted">{formatDate(a.created_at, language)}</span></Td>
@@ -560,14 +588,24 @@ export default function ArticlesScreen() {
                       }
                       return (
                         <div className="flex flex-wrap items-center gap-2">
+                          {a.status !== 'published' && rowCta.kind === 'connect' && (
+                            <Link href={rowCta.href} data-cta="connect" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-surface px-3 text-caption font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+                              <Plug size={14} aria-hidden /> {t.editor.topBar.connectToPublish}
+                            </Link>
+                          )}
+                          {a.status !== 'published' && rowCta.kind === 'grant_scope' && (
+                            <a href={rowCta.href} data-cta="grant_scope" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-surface px-3 text-caption font-semibold text-action shadow-control hover:border-line-strong hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+                              <ShieldCheck size={14} aria-hidden /> {t.editor.topBar.grantScope}
+                            </a>
+                          )}
                           {/* State-based publish actions — routed by the active platform
                               (WordPress or Shopify). Hidden entirely for conflict/none. */}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
+                          {activePlatform !== 'conflict' && activePlatform !== 'none' && rowCta.kind !== 'grant_scope' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
                             <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
                               {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : isSite ? sp.publish.button : t.rowWp.publish)}
                             </Button>
                           )}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && !isSite && a.status === 'ready' && !exportedIdOf(a) && (
+                          {activePlatform !== 'conflict' && activePlatform !== 'none' && rowCta.kind !== 'grant_scope' && !isSite && a.status === 'ready' && !exportedIdOf(a) && (
                             <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
                               {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : (isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft)}
                             </Button>

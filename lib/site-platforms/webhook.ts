@@ -21,13 +21,21 @@
 import crypto from 'crypto'
 import { sendGuardedPost, type Resolver, type Transport } from './outbound'
 import type { SitePublishArticle, SitePublishResult, SiteErrorCode } from './types'
+import { buildStructuredData, type JsonLd } from '@/lib/content/structured-data'
 
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, EVENT_HEADER, DELIVERY_HEADER } from './webhook-headers'
 export { SIGNATURE_HEADER, TIMESTAMP_HEADER, EVENT_HEADER, DELIVERY_HEADER }
 
 export type WebhookEvent = 'article.published' | 'test'
 
+/**
+ * The payload's version. 1 had no structured_data; 2 adds `article.structured_data`
+ * (additive: every version-1 field is unchanged, so a version-1 receiver keeps working).
+ */
+export const WEBHOOK_PAYLOAD_VERSION = 2
+
 export type WebhookPayload = {
+  payload_version: number
   event: WebhookEvent
   delivery_id: string
   sent_at: string
@@ -39,6 +47,14 @@ export type WebhookPayload = {
     excerpt: string | null
     image_url: string | null
     meta: { title: string | null; description: string | null }
+    /**
+     * JSON-LD objects for the article's page (BlogPosting, then FAQPage when the
+     * article has FAQ pairs), from lib/content/structured-data.ts. The page URL
+     * is the receiver's to add (it decides where the article lives). Each object
+     * is plain JSON; a receiver that prints it inside a script element must
+     * escape it (e.g. JSON.stringify(x).replace(/</g, '\\u003c')).
+     */
+    structured_data: JsonLd[]
   }
 }
 
@@ -64,7 +80,19 @@ export function deliveryIdFor(articleId: string): string {
 const httpsImage = (u: string | null | undefined): string | null => (u && /^https:\/\//i.test(u) && u.length <= 2048 ? u : null)
 
 export function buildArticlePayload(article: SitePublishArticle, event: WebhookEvent, now: Date): WebhookPayload {
+  const ctx = article.schema_context ?? null
+  const structured = buildStructuredData({
+    headline: String(article.title ?? ''),
+    description: article.meta_description || article.excerpt || null,
+    imageUrl: httpsImage(article.featured_image_url),
+    datePublished: article.published_at ?? now.toISOString(),
+    dateModified: article.updated_at ?? now.toISOString(),
+    language: ctx?.language ?? null,
+    publisher: ctx ? { name: ctx.publisherName, url: ctx.publisherUrl } : null,
+    faq: Array.isArray(article.faq_json) ? article.faq_json : [],
+  })
   return {
+    payload_version: WEBHOOK_PAYLOAD_VERSION,
     event,
     delivery_id: event === 'test' ? `test_${crypto.randomBytes(12).toString('hex')}` : deliveryIdFor(article.id),
     sent_at: now.toISOString(),
@@ -76,6 +104,7 @@ export function buildArticlePayload(article: SitePublishArticle, event: WebhookE
       excerpt: article.excerpt ?? null,
       image_url: httpsImage(article.featured_image_url),
       meta: { title: article.meta_title ?? null, description: article.meta_description ?? null },
+      structured_data: structured,
     },
   }
 }

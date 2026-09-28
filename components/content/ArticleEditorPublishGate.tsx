@@ -16,46 +16,83 @@
  * rendering them disabled. No publishing behavior changes.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { resolveActivePlatform, siteConnectionState, type ActivePlatform } from '@/lib/content/platform/active-platform'
 import { SitePublishCard } from './site-platforms/SiteHubCard'
+import { resolveActivePlatform, siteConnectionState, type ActivePlatform } from '@/lib/content/platform/active-platform'
 
-export default function ArticleEditorPublishGate({ projectId, children, shopifyPanel, articleId }: { projectId: string | null; children: React.ReactNode; shopifyPanel?: React.ReactNode; articleId?: string }) {
+/**
+ * The project's active publishing platform, detected ONCE for the article viewer
+ * and shared by its top bar and this gate (so the two can never disagree, and
+ * the three connection reads are not made twice). Platform by connection
+ * VALIDITY through the shared resolver, never by a WordPress post id.
+ */
+export interface PublishPlatformState {
+  loading: boolean
+  platform: ActivePlatform
+  shopifyNeedsScope: boolean
+  shopDomain: string | null
+}
+
+export function usePublishPlatform(projectId: string | null, enabled = true): PublishPlatformState {
+  // The result carries the project it was read for, so a project change reads as
+  // "loading" until its own answer arrives (no stale platform, no flash).
+  const [result, setResult] = useState<(Omit<PublishPlatformState, 'loading'> & { key: string }) | null>(null)
+
+  useEffect(() => {
+    if (!enabled || !projectId) return
+    let live = true
+    void (async () => {
+      let next: Omit<PublishPlatformState, 'loading'> = { platform: 'none', shopifyNeedsScope: false, shopDomain: null }
+      try {
+        const q = encodeURIComponent(projectId)
+        const [wpRes, shRes, siteRes] = await Promise.all([
+          fetch(`/api/wordpress/connection?projectId=${q}`),
+          fetch(`/api/shopify/connection?projectId=${q}`),
+          fetch(`/api/site-platforms/connection?projectId=${q}`),
+        ])
+        const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
+        const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
+        const st = siteRes.ok ? await siteRes.json().catch(() => ({})) : {}
+        const shConn = (sh.connection ?? null) as { connection_status?: string; can_publish?: boolean; shop_domain?: string } | null
+        const resolved = resolveActivePlatform({
+          wordpress: { present: !!wp.connection, connectionStatus: (wp.connection as { connection_status?: string } | null)?.connection_status ?? null },
+          shopify: { present: !!shConn, connectionStatus: shConn?.connection_status ?? null, canPublish: !!shConn?.can_publish },
+          site: siteConnectionState(st.connection ?? null),
+        })
+        next = { platform: resolved.platform, shopifyNeedsScope: resolved.shopifyNeedsScope, shopDomain: shConn?.shop_domain ?? null }
+      } catch { /* leave none */ }
+      if (live) setResult({ key: projectId, ...next })
+    })()
+    return () => { live = false }
+  }, [projectId, enabled])
+
+  const loading = !!projectId && result?.key !== projectId
+  if (loading || !result) return { loading, platform: 'none', shopifyNeedsScope: false, shopDomain: null }
+  return { loading: false, platform: result.platform, shopifyNeedsScope: result.shopifyNeedsScope, shopDomain: result.shopDomain }
+}
+
+export default function ArticleEditorPublishGate({ projectId, children, shopifyPanel, articleId, detected }: {
+  projectId: string | null
+  children: React.ReactNode
+  shopifyPanel?: React.ReactNode
+  articleId?: string
+  /** The platform the page already detected (the article viewer's top bar); the gate then does not read it again. */
+  detected?: PublishPlatformState
+}) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.publishGate, [language])
   const dir: 'rtl' | 'ltr' = language === 'he' ? 'rtl' : 'ltr'
 
-  const [loading, setLoading] = useState(true)
-  const [platform, setPlatform] = useState<ActivePlatform>('none')
-
-  const load = useCallback(async () => {
-    if (!projectId) { setLoading(false); return }
-    try {
-      const [wpRes, shRes, siteRes] = await Promise.all([
-        fetch(`/api/wordpress/connection?projectId=${projectId}`),
-        fetch(`/api/shopify/connection?projectId=${projectId}`),
-        fetch(`/api/site-platforms/connection?projectId=${projectId}`),
-      ])
-      const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
-      const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
-      const st = siteRes.ok ? await siteRes.json().catch(() => ({})) : {}
-      // Platform by connection VALIDITY (shared resolver), not row existence — a
-      // stale/failed WordPress row never masks a valid Shopify connection.
-      setPlatform(resolveActivePlatform({
-        wordpress: { present: !!wp.connection, connectionStatus: (wp.connection as { connection_status?: string } | null)?.connection_status ?? null },
-        shopify: { present: !!sh.connection, connectionStatus: (sh.connection as { connection_status?: string } | null)?.connection_status ?? null, canPublish: !!(sh.connection as { can_publish?: boolean } | null)?.can_publish },
-        site: siteConnectionState(st.connection ?? null),
-      }).platform)
-    } catch { /* leave none */ } finally { setLoading(false) }
-  }, [projectId])
-
-  useEffect(() => { load() }, [load])
+  // Platform by connection VALIDITY (shared resolver), not row existence — a
+  // stale/failed WordPress row never masks a valid Shopify connection.
+  const own = usePublishPlatform(projectId, !detected)
+  const { loading, platform } = detected ?? own
 
   // Wait for detection so WordPress controls never flash in a Shopify project.
   if (loading) {
