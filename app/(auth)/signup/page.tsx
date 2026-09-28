@@ -11,6 +11,7 @@ import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { keepSeedClaim } from './claim-action'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 
 const SIGNUP_UI = {
@@ -476,6 +477,10 @@ export function SignupForm() {
               {success}
             </div>
           )}
+
+          {/* Off unless NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED. Held while a free-check claim is still being
+              kept (it leaves the address once its cookie is set), so the claim survives the trip to Google. */}
+          <GoogleSignInButton lang={lang} nextPath="/dashboard" disabled={searchParams.has('claim')} />
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Input

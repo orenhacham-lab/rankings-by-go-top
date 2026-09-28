@@ -256,3 +256,107 @@ export async function restoreClaimToken(admin: ServiceRoleClient, token: string,
     .select('check_id')
   return !error && ((data as unknown[] | null)?.length ?? 0) === 1
 }
+
+// ── A claimed research (the visitor's anonymous stage A, lib/presignup) ─────
+
+type SavedStep = { status: 'done' | 'skipped' | 'failed'; errorCode: string | null; itemCount: number | null }
+
+/**
+ * What a claimed research's run keeps on step a1, beside the visitor's own a1
+ * detail: the site the research read and how, and how each of its four steps
+ * ended. steps.ts replays the run from it without any I/O.
+ */
+export type ResearchMarker = {
+  domain: string
+  url: string
+  locale: Locale
+  scannedAt: string | null
+  storefrontLocked: boolean
+  siteAccess: 'direct' | 'search_index'
+  sitemapUrlCount: number | null
+  sitemapTruncated: boolean
+  steps: Partial<Record<'a1' | 'a2' | 'a3' | 'a4', SavedStep>>
+}
+
+/** The research a free_site_checks row carries in `seed.research` (lib/presignup/view.ts researchSeed). */
+export type ResearchSeed = {
+  marker: ResearchMarker
+  /** The visitor's own step details: a1's read of the site, a2's answer, a4's searches. */
+  details: { a1: Record<string, unknown>; a2: Record<string, unknown>; a4: Record<string, unknown> }
+}
+
+const STEP_CODE = /^[a-z0-9_]{1,64}$/
+
+function savedSteps(v: unknown): ResearchMarker['steps'] | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: ResearchMarker['steps'] = {}
+  for (const step of ['a1', 'a2', 'a3', 'a4'] as const) {
+    const raw = (v as Record<string, unknown>)[step]
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    if (r.status !== 'done' && r.status !== 'skipped' && r.status !== 'failed') continue
+    out[step] = {
+      status: r.status,
+      errorCode: typeof r.errorCode === 'string' && STEP_CODE.test(r.errorCode) ? r.errorCode : null,
+      itemCount: typeof r.itemCount === 'number' && Number.isFinite(r.itemCount) && r.itemCount >= 0 ? Math.floor(r.itemCount) : null,
+    }
+  }
+  return out
+}
+
+/** Read a marker back defensively; null when `v` is not one. */
+function marker(v: unknown): ResearchMarker | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const r = v as Record<string, unknown>
+  if (typeof r.domain !== 'string' || !r.domain || typeof r.url !== 'string') return null
+  const admitted = normalizeCheckUrl(r.url)
+  // The research read THIS site: its address is on the site the marker names.
+  if (!admitted.ok || domainKey(admitted.url) !== r.domain) return null
+  const steps = savedSteps(r.steps)
+  if (!steps) return null
+  return {
+    domain: r.domain.slice(0, 253),
+    url: admitted.url.toString().slice(0, 2_000),
+    locale: r.locale === 'en' ? 'en' : 'he',
+    scannedAt: typeof r.scannedAt === 'string' ? r.scannedAt.slice(0, 40) : null,
+    storefrontLocked: r.storefrontLocked === true,
+    siteAccess: r.siteAccess === 'search_index' ? 'search_index' : 'direct',
+    sitemapUrlCount: typeof r.sitemapUrlCount === 'number' && Number.isFinite(r.sitemapUrlCount) && r.sitemapUrlCount >= 0 ? Math.floor(r.sitemapUrlCount) : null,
+    sitemapTruncated: r.sitemapTruncated === true,
+    steps,
+  }
+}
+
+/** The marker on a run's a1 detail, when the run replays a claimed research. */
+export function readResearchMarker(detail: Record<string, unknown> | null | undefined): ResearchMarker | null {
+  return marker(detail?.research)
+}
+
+const detailObject = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null)
+
+/**
+ * The research a redeemed claim carries, when its row is one the anonymous
+ * stage A wrote AND it read this project's site; null for a plain free check
+ * (which then seeds as before) and for anything malformed. Its a1 must have
+ * finished: a research that could not read the site is never offered a claim.
+ */
+export function readResearchSeed(seed: unknown, siteKey: string): ResearchSeed | null {
+  const s = detailObject(seed)
+  const research = detailObject(s?.research)
+  if (!research || research.version !== 1) return null
+  const m = marker(research.marker)
+  if (!m || m.domain !== siteKey || m.steps.a1?.status !== 'done') return null
+  const details = detailObject(research.details)
+  const a1 = detailObject(details?.a1)
+  if (!a1) return null
+  return { marker: m, details: { a1, a2: detailObject(details?.a2) ?? {}, a4: detailObject(details?.a4) ?? {} } }
+}
+
+/** The step details a claimed research's run is created with: every step's saved result, and the marker on a1. */
+export function researchStepDetail(research: ResearchSeed): Partial<Record<'a1' | 'a2' | 'a4', Record<string, unknown>>> {
+  return {
+    a1: { ...research.details.a1, research: research.marker },
+    a2: research.details.a2,
+    a4: research.details.a4,
+  }
+}

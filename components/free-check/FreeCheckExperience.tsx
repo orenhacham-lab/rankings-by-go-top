@@ -134,19 +134,24 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
 
 type Copy = ReturnType<typeof freeCheckCopy>
 
-function FormState({
+/** The one-field form. Shared with the research before sign-up (FreeCheckResearch), which passes its own message. */
+export function FormState({
   copy,
   url,
   onUrl,
   error,
+  errorMessage,
   onSubmit,
 }: {
   copy: Copy
   url: string
   onUrl: (v: string) => void
   error: FreeCheckErrorCode | null
+  /** A message of the caller's own, shown in place of the free check's for `error`. */
+  errorMessage?: string | null
   onSubmit: () => void
 }) {
+  const message = errorMessage ?? (error ? copy.form.errors[error] : null)
   return (
     <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-16 pb-24 text-center">
       <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-medium mb-6">
@@ -191,9 +196,9 @@ function FormState({
             {copy.form.submit}
           </button>
         </div>
-        {error && (
+        {message && (
           <p role="alert" className="mt-3 text-sm text-red-600 text-start">
-            {copy.form.errors[error]}
+            {message}
           </p>
         )}
         <p className="mt-3 text-xs text-slate-500 text-start">{copy.form.hint}</p>

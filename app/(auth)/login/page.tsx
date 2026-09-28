@@ -11,6 +11,7 @@ import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 // Minimal locale-aware UI strings for the login page. Auth/Supabase logic
 // is fully language-agnostic — only the visible text changes per ?lang.
@@ -143,6 +144,9 @@ export function AuthForm() {
               {error}
             </div>
           )}
+
+          {/* Off unless NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED, and never for a Shopify destination or inside a frame. */}
+          <GoogleSignInButton lang={lang} nextPath={nextPath} />
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Input

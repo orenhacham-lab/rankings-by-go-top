@@ -1,6 +1,8 @@
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience'
+import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
+import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
@@ -23,6 +25,11 @@ export const metadata = {
  * `?url=` lets the landing-page hero field hand the address over and start the
  * scan straight away. It is passed to the client as a plain string and is
  * admitted server-side by the API's own URL guard, never trusted here.
+ *
+ * With the research before sign-up on (ENABLE_SEED_SCAN and
+ * ENABLE_PRESIGNUP_RESEARCH, preview only) the same address runs the whole
+ * research instead (components/free-check/FreeCheckResearch.tsx). Off, as in
+ * Production, this page is exactly the short check.
  */
 export default async function EnglishFreeCheckPage({
   searchParams,
@@ -31,12 +38,13 @@ export default async function EnglishFreeCheckPage({
 }) {
   const sp = await searchParams
   const initialUrl = typeof sp.url === 'string' ? sp.url.slice(0, 300) : ''
+  const research = presignupResearchOn(process.env)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <PublicNav locale="en" />
       <main className="pt-24">
-        <FreeCheckExperience locale="en" initialUrl={initialUrl} />
+        {research ? <FreeCheckResearch locale="en" initialUrl={initialUrl} /> : <FreeCheckExperience locale="en" initialUrl={initialUrl} />}
       </main>
       <Footer />
     </div>

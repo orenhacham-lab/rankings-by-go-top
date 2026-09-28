@@ -15,6 +15,13 @@
  *   9 the articles we would write (and the one first-article button)
  *  10 "Start": tracks the keywords still checked, starts stage B, opens the dashboard
  *
+ * BEFORE SIGN-UP (`preview`, the free check's research, lib/presignup) the
+ * same screen shows what an anonymous stage A found, minus what the account
+ * opens: no "Edit" links (there is no project yet), the competitors and
+ * keywords the server sent (the rest arrive only as counts, "+N in the full
+ * research"), each keyword's search volume locked, no tracking checkboxes, and
+ * block 10 is "Open the full research, free": the sign-up itself.
+ *
  * Every block says honestly when it has nothing: a locked storefront is "not
  * checked", never failing and never 0/4; so is a site whose firewall refused
  * our reader, whose research was built from Google's index of it (a notice
@@ -106,6 +113,16 @@ const TILE_FILL: Record<Tone, string> = {
 /** Competitors were checked against this many of the site's searches (the scale the bar is drawn on). */
 const COMPETITOR_SCALE = 3
 
+/** The research before sign-up: what is locked, and where "open the full research" leads. */
+export type SummaryPreview = {
+  signupHref: string
+  loginHref: string
+  lockedCompetitors: number
+  lockedKeywords: number
+  /** Under the call to action: "email me the report". */
+  after?: ReactNode
+}
+
 export default function ResearchSummary({
   projectId,
   domain,
@@ -116,6 +133,7 @@ export default function ResearchSummary({
   contentEnabled,
   serverNow,
   onContinued,
+  preview,
 }: {
   projectId: string
   domain: string
@@ -129,11 +147,14 @@ export default function ResearchSummary({
   serverNow: string
   /** Stage B was accepted: read the run again. */
   onContinued: () => void
+  /** Before sign-up: the free check's research, gated (see the header). */
+  preview?: SummaryPreview
 }) {
   const router = useRouter()
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language).seedOnboarding
   const t = dict.summary
+  const p = dict.preview
   const checks = freeCheckCopy(language)
   const Arrow = language === 'he' ? ArrowLeft : ArrowRight
 
@@ -213,7 +234,7 @@ export default function ResearchSummary({
 
   const reasonOf = (keyword: string) => keywordReason(keyword, business, domain)
 
-  const editLink = (section: SummaryEditSection, title: string) => (
+  const editLink = (section: SummaryEditSection, title: string) => preview ? null : (
     <ActionLink href={settingsHref(projectId, section)} variant="secondary" className="h-8 px-3">
       <Pencil className="h-3.5 w-3.5" aria-hidden />
       <span aria-hidden>{t.edit}</span>
@@ -223,7 +244,12 @@ export default function ResearchSummary({
 
   const tileLabel = (tile: TileView) => t.tiles[tile.id]
   const tileValue = (tile: TileView) =>
-    tile.state === 'value' ? tile.value : tile.state === 'pending' ? t.tiles.pending : t.tiles.notChecked
+    tile.state !== 'value'
+      ? tile.state === 'pending' ? t.tiles.pending : t.tiles.notChecked
+      : preview && tile.id === 'keywords'
+        // The keywords the research found, the locked ones included: only their words are withheld.
+        ? String(summary.seedKeywords.length + preview.lockedKeywords)
+        : tile.value
   const geoTile = tiles.find((x) => x.id === 'geo')
   const severityCounts = findings.kind === 'list'
     ? (['blocker', 'warning', 'info'] as const).map((sev) => ({ sev, n: findings.findings.filter((f) => f.severity === sev).length })).filter((x) => x.n > 0)
@@ -231,7 +257,7 @@ export default function ResearchSummary({
   const initial = (domain.replace(/^www\./, '').trim().charAt(0) || '·').toUpperCase()
 
   return (
-    <div className="mx-auto w-full max-w-6xl" data-seed-screen={started ? 'started' : 'summary'}>
+    <div className="mx-auto w-full max-w-6xl" data-seed-screen={preview ? 'preview' : started ? 'started' : 'summary'}>
       {/* 1 ── who and when: the one dark surface of the screen, with the site's
           readiness for AI answers as its single visual. */}
       <div className="relative overflow-hidden rounded-[1.25rem] bg-contrast text-contrast-ink shadow-card">
@@ -444,6 +470,7 @@ export default function ResearchSummary({
                   </div>
                 </li>
               ))}
+              {preview && preview.lockedCompetitors > 0 && <LockedRow data-locked="competitors">{p.competitorsLocked(preview.lockedCompetitors)}</LockedRow>}
             </ul>
           ) : (
             <BlockNote>{t.competitors.empty}</BlockNote>
@@ -508,9 +535,9 @@ export default function ResearchSummary({
           index={5}
           icon={<KeyRound />}
           title={t.keywords.title}
-          description={started || summary.seedKeywords.length === 0 ? undefined : t.keywords.hint}
+          description={summary.seedKeywords.length === 0 ? undefined : preview ? p.keywordsHint : started ? undefined : t.keywords.hint}
           action={
-            started || summary.seedKeywords.length === 0 ? null : (
+            preview || started || summary.seedKeywords.length === 0 ? null : (
               <p className="rounded-pill bg-action-soft px-2.5 py-1 text-caption font-semibold tabular-nums text-action" aria-live="polite">
                 {t.keywords.selected(selected.length, summary.seedKeywords.length)}
               </p>
@@ -520,6 +547,27 @@ export default function ResearchSummary({
         >
           {summary.seedKeywords.length === 0 ? (
             <BlockNote>{t.keywords.empty}</BlockNote>
+          ) : preview ? (
+            <ul className="divide-y divide-line overflow-hidden rounded-[0.75rem] border border-line">
+              {summary.seedKeywords.map((keyword, i) => {
+                const reason = reasonOf(keyword)
+                const repeat = i > 0 && reasonOf(summary.seedKeywords[i - 1]) === reason
+                return (
+                  <li key={keyword} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-semibold text-ink" {...snapshotText}>{keyword}</span>
+                      <span className={repeat ? 'sr-only' : 'rounded-pill bg-sunk px-2.5 py-0.5 text-caption text-muted'}>{t.keywords.reasons[reason]}</span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill border border-dashed border-line-strong px-2.5 py-0.5 text-caption text-muted" data-locked="volume">
+                      <Lock className="h-3 w-3" aria-hidden />
+                      <span aria-hidden>{p.volumeLocked}</span>
+                      <span className="sr-only">{p.volumeLockedLabel}</span>
+                    </span>
+                  </li>
+                )
+              })}
+              {preview.lockedKeywords > 0 && <LockedRow className="px-4 py-3" data-locked="keywords">{p.keywordsLocked(preview.lockedKeywords)}</LockedRow>}
+            </ul>
           ) : started ? (
             <>
               <ul className="divide-y divide-line overflow-hidden rounded-[0.75rem] border border-line">
@@ -676,7 +724,7 @@ export default function ResearchSummary({
                   </li>
                 ))}
               </ol>
-              {contentEnabled && (
+              {contentEnabled && !preview && (
                 <FirstArticleButton
                   projectId={projectId}
                   projectName={projectName || domain}
@@ -693,11 +741,51 @@ export default function ResearchSummary({
         </SummaryBlock>
       </div>
 
+      {/* 10 ── before sign-up: "Open the full research, free", the sign-up itself. On a phone it
+          rides above the public pages' contact bar (components/public/MobileContactBar), and is compact. */}
+      {preview && (
+        <>
+          <section data-summary-block="cta" aria-labelledby="seed-block-cta" className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 mb-4 md:bottom-5">
+            <div className="relative overflow-hidden rounded-card bg-contrast p-4 text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5">
+              <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_140%_at_100%_50%,rgb(83_115_255/0.28),transparent_65%)]" />
+              <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <span aria-hidden className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 sm:flex">
+                    <Lock className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 id="seed-block-cta" className="text-lg font-bold text-contrast-ink">{p.ctaTitle}</h2>
+                    <p className="mt-0.5 hidden max-w-[70ch] text-sm leading-6 text-contrast-ink/75 sm:block">{p.ctaBody}</p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-stretch gap-2 md:items-end">
+                  <ActionLink href={preview.signupHref} size="lg" variant="onInk" className="shrink-0">
+                    {p.cta}
+                    <Arrow className="h-4 w-4" aria-hidden />
+                  </ActionLink>
+                  <p className="text-center text-caption text-contrast-ink/60 md:text-end">{p.terms}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div className="mb-10 flex flex-col items-center gap-3 text-sm text-muted">
+            <p>
+              {p.haveAccount}{' '}
+              <a href={preview.loginHref} className="font-medium text-action underline-offset-4 hover:underline">
+                {p.login}
+              </a>
+            </p>
+            {preview.after}
+          </div>
+        </>
+      )}
+
       {/* 10 ── start: a bar that stays at the bottom of the screen while the summary
           scrolls, carrying how many keywords "Start" will track. Once stage B began it
           says where stage B really is (P1-12): working (still at the bottom, and short on
           a phone), ready, or not finished. A finished stage B is news, not a task, so
           its line sits in the page instead of covering it. */}
+      {!preview && (
       <section
         data-summary-block="start"
         data-stage-b={stageB ?? 'not_started'}
@@ -767,7 +855,20 @@ export default function ResearchSummary({
           />
         )}
       </section>
+      )}
     </div>
+  )
+}
+
+/** "+N more in the full research": what the account opens, counted, never listed. */
+function LockedRow({ children, className, ...rest }: { children: ReactNode; className?: string; 'data-locked': string }) {
+  return (
+    <li className={cn('flex items-center gap-2 text-sm font-medium text-muted', className)} {...rest}>
+      <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong">
+        <Lock className="h-3.5 w-3.5" />
+      </span>
+      {children}
+    </li>
   )
 }
 

@@ -68,7 +68,8 @@ export default function SeedProgress({
   /** The run as last read; null for the moment between an accepted start and its first read. */
   run: SeedRunView | null
   domain: string
-  projectId: string
+  /** Null before sign-up (the free check's research): there is no dashboard to send a stalled run to. */
+  projectId: string | null
   reconnecting: boolean
 }) {
   const { language } = useDashboardLanguage()
@@ -204,7 +205,7 @@ export default function SeedProgress({
           </div>
         </div>
 
-        {stalled && (
+        {stalled && projectId && (
           <div className="flex flex-col gap-4 border-t border-white/10 bg-white/[0.04] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 md:px-10" role="status">
             <div className="flex min-w-0 items-start gap-3">
               <Info className="mt-0.5 h-5 w-5 shrink-0 text-indigo-200" aria-hidden />
