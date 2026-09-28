@@ -19,7 +19,7 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH } from '../../../lib/content/content-workspace-nav'
+import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH, CONTENT_EXISTING_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH } from '../../../lib/content/content-workspace-nav'
 import { getDashboardDictionary } from '../../../lib/i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -184,9 +184,10 @@ function main() {
   // merged tab is one entry, it comes before the articles, and the old two are gone
   // from the declaration, the icons, the runtime list and both dictionaries.
   const contentHrefs = navItemKeys.map((i) => i.href).filter((h) => h === CONTENT_ROOT_PATH || h.startsWith(`${CONTENT_ROOT_PATH}/`))
+  // The existing content (what was on the site before us) follows the articles.
   const oneStrategyEntry = (hrefs: readonly string[]) =>
-    JSON.stringify(hrefs) === JSON.stringify([CONTENT_STRATEGY_PATH, CONTENT_ROOT_PATH])
-  check('the content entries are the content strategy, then the articles, and nothing else',
+    JSON.stringify(hrefs) === JSON.stringify([CONTENT_STRATEGY_PATH, CONTENT_ROOT_PATH, CONTENT_EXISTING_PATH])
+  check('the content entries are the content strategy, then the articles, then the existing content, and nothing else',
     oneStrategyEntry(contentHrefs), contentHrefs.join(', '))
   check('MUT: a nav that keeps the topics and automation entries fails that check',
     !oneStrategyEntry([...contentHrefs, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH])

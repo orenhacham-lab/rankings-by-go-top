@@ -25,6 +25,7 @@ import {
   Newspaper,
   Settings,
   CalendarRange,
+  Library,
   Menu,
   X,
 } from 'lucide-react'
@@ -64,6 +65,7 @@ const CONTENT_FLAGS = {
 const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
   strategy: CalendarRange,
   articles: Newspaper,
+  existing: Library,
 }
 
 /**

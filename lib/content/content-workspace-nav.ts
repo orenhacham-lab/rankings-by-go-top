@@ -24,12 +24,14 @@
 
 export const CONTENT_ROOT_PATH = '/content'
 export const CONTENT_STRATEGY_PATH = '/content/strategy'
+/** What is already on the site (read-only): lib/content/existing-content. */
+export const CONTENT_EXISTING_PATH = '/content/existing'
 /** Retired screens: each is a redirect into the strategy tab's list view now. */
 export const CONTENT_TOPICS_PATH = '/content/topics'
 export const CONTENT_AUTOMATION_PATH = '/content/automation'
 
 /** Label keys in the dashboard dictionary's `contentHub.screens` block. */
-export type ContentScreenKey = 'strategy' | 'articles'
+export type ContentScreenKey = 'strategy' | 'articles' | 'existing'
 
 export type ContentScreen = {
   key: ContentScreenKey
@@ -41,6 +43,7 @@ export type ContentScreen = {
 export const CONTENT_SCREENS: readonly ContentScreen[] = [
   { key: 'strategy', href: CONTENT_STRATEGY_PATH },
   { key: 'articles', href: CONTENT_ROOT_PATH },
+  { key: 'existing', href: CONTENT_EXISTING_PATH },
 ]
 
 /**

@@ -591,12 +591,14 @@ export const dashboardEn = {
     screens: {
       strategy: 'Content strategy',
       articles: 'Articles',
+      existing: 'Existing content',
     },
     // One line of context per screen, shown under its heading. Each screen is its
     // own sidebar entry now, so it has to say what it is without a tab bar around it.
     screenSubtitles: {
       articles: 'Every article in this project, from draft to published',
       strategy: 'What gets written, when, and why this one',
+      existing: 'What is already on your site, what brings traffic, and where pages compete',
     },
     tabs: {
       articles: 'Articles',
@@ -2196,6 +2198,72 @@ export const dashboardEn = {
   // keywords table, "my progress", keyword research and topics. Each has its title and
   // one sentence on what it shows and why that is worth having; before Search Console
   // is set up, that sentence stands next to the widget's one button.
+  // The existing-content screen (/content/existing, lib/content/existing-content):
+  // what is already on the site, read-only.
+  existingContent: {
+    tilesLabel: 'Filter by type',
+    tiles: { all: 'All', content: 'Articles and pages', commerce: 'Products and collections' },
+    tileSource: { shopify: 'From your Shopify store', wordpress: 'From your WordPress site', crawl: 'From the site scan', none: '' },
+    onlyRisk: 'Cannibalization risk only ({n})',
+    sourceLine: {
+      shopify: 'Source: your Shopify store, as last synced',
+      wordpress: 'Source: your WordPress site index',
+      crawl: 'Source: the site scan',
+      none: '',
+    },
+    indexedAt: 'Scanned {date}',
+    partialTitle: 'This is a partial list',
+    partialCrawlBody: 'The site scan reads up to 25 key pages, not the whole site. Connect your site to see all of its content.',
+    partialIndexBody: 'The last scan of your site did not finish, so some pages may be missing here.',
+    truncatedNote: 'Showing the first {n} items from the store.',
+    connectSite: 'Connect your site',
+    resync: 'Resync',
+    resyncing: 'Syncing…',
+    resyncDone: 'The list is up to date',
+    resyncRunning: 'A sync is already running. The list updates when it finishes.',
+    resyncFailed: 'The sync did not complete. Try again in a few minutes.',
+    tableLabel: 'Existing content on the site',
+    columns: {
+      title: 'Title', type: 'Type', updated: 'Updated', clicks: 'Clicks', impressions: 'Impressions',
+      topQuery: 'Top query', flags: 'Flags', action: 'Action',
+    },
+    types: { article: 'Article', page: 'Page', blog: 'Blog', product: 'Product', collection: 'Collection' },
+    origin: { ours: 'Our article', site: 'Already on the site' },
+    cannibal: 'Cannibalization risk',
+    cannibalDetail: '{n} of your pages get impressions for "{query}"',
+    writeSupport: 'Write a supporting article',
+    supportPlanned: 'Topic planned',
+    supportCreated: 'The topic was added to your content strategy',
+    supportFailed: 'We could not add the topic. Try again.',
+    viewStrategy: 'Open the content strategy',
+    // The new topic is written in the PROJECT's language, so this pair is read from
+    // the dictionary of that language, not of the dashboard.
+    supportTopic: {
+      topic: 'A guide to {title}',
+      notes: 'A supporting article for "{title}" ({url}). The article must link to that page.',
+    },
+    gscNote: {
+      not_connected: 'With Search Console set up for this project, each page shows its clicks, impressions and top query here.',
+      not_synced: 'Search Console is connected. Figures appear here after its first sync.',
+      unavailable: 'Search Console figures are not available right now.',
+    },
+    gscBrand: 'Search Console',
+    gscWindow: '28 days, {start} to {end}',
+    gscRowsNote: "Summed from query rows. Google leaves out anonymised queries, so a sum can be lower than the page's own total.",
+    empty: {
+      noConnectionTitle: "Your site's content shows up here",
+      noConnectionBody: 'Connect your site and its pages, articles and products appear here.',
+      noDataTitle: 'Your content arrives with the sync',
+      noDataBody: 'Your site is connected, but no content has been saved from it yet. A resync brings it in.',
+      noDataBodyNoResync: 'Your site is connected, and its content appears here after the next scan.',
+      filterEmpty: 'There is nothing of this type here.',
+    },
+    loading: 'Loading your existing content…',
+    loadError: 'We could not load your existing content.',
+    retry: 'Try again',
+    openPage: 'Open {title} in a new tab',
+    showMore: 'Show {n} more',
+  },
   gscWidgets: {
     source28: 'Search Console · last 28 days',
     actions: {
