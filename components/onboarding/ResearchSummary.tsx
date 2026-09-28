@@ -733,10 +733,11 @@ export default function ResearchSummary({
         </SummaryBlock>
       </div>
 
-      {/* 10 ── before sign-up: "Open the full research, free", the sign-up itself. */}
+      {/* 10 ── before sign-up: "Open the full research, free", the sign-up itself. On a phone it
+          rides above the public pages' contact bar (components/public/MobileContactBar), and is compact. */}
       {preview && (
         <>
-          <section data-summary-block="cta" aria-labelledby="seed-block-cta" className="sticky bottom-3 z-20 mt-6 mb-4 md:bottom-5">
+          <section data-summary-block="cta" aria-labelledby="seed-block-cta" className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 mb-4 md:bottom-5">
             <div className="relative overflow-hidden rounded-card bg-contrast p-4 text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5">
               <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_140%_at_100%_50%,rgb(83_115_255/0.28),transparent_65%)]" />
               <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -746,7 +747,7 @@ export default function ResearchSummary({
                   </span>
                   <div className="min-w-0">
                     <h2 id="seed-block-cta" className="text-lg font-bold text-contrast-ink">{p.ctaTitle}</h2>
-                    <p className="mt-0.5 max-w-[70ch] text-sm leading-6 text-contrast-ink/75">{p.ctaBody}</p>
+                    <p className="mt-0.5 hidden max-w-[70ch] text-sm leading-6 text-contrast-ink/75 sm:block">{p.ctaBody}</p>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-stretch gap-2 md:items-end">
@@ -774,7 +775,7 @@ export default function ResearchSummary({
       {/* 10 ── start: a bar that stays at the bottom of the screen while the summary
           scrolls, carrying how many keywords "Start" will track. */}
       {!preview && (
-      <section data-summary-block="start" aria-labelledby="seed-block-start" className="sticky bottom-3 z-20 mt-6 mb-4 md:bottom-5">
+      <section data-summary-block="start" aria-labelledby="seed-block-start" className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 mb-4 md:bottom-5">
         <div className="relative overflow-hidden rounded-card bg-contrast p-4 text-contrast-ink shadow-[0_24px_48px_-20px_rgb(16_21_42/0.55)] ring-1 ring-white/10 md:p-5">
           <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_140%_at_100%_50%,rgb(83_115_255/0.28),transparent_65%)]" />
           <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
