@@ -10,7 +10,6 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -18,6 +17,7 @@ import Checkbox from '@/components/ui/Checkbox'
 import Notice from '@/components/ui/Notice'
 import RowMenu from '@/components/ui/RowMenu'
 import Segmented from '@/components/ui/Segmented'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { ChevronDown, Sparkles, WandSparkles, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
@@ -131,6 +131,7 @@ export default function AutomationIdeas({
   const intents = getDashboardDictionary(language).contentHub.brief.intents as Record<string, string>
   const intentText = (code: string) => (intents[code] ?? code).split(' — ')[0]
   const isHebrew = language === 'he'
+  const { confirm, dialog: confirmDialog } = useConfirm()
   // The exact per-topic queue payload to RETRY (links already saved; only the enqueue
   // step failed) — re-sent to the authoritative approve-and-queue route.
   const [lastQueueTopics, setLastQueueTopics] = useState<{ topicId: string; expectsLinks: boolean; recommendedPageType: string }[]>([])
@@ -396,6 +397,7 @@ export default function AutomationIdeas({
 
   async function rejectOne(id: string) {
     if (rejectingId) return
+    if (!(await confirm({ title: t.rejectConfirmTitleOne, body: t.rejectConfirmBody, confirmLabel: t.rejectConfirmAction, tone: 'danger' }))) return
     setRejectingId(id)
     try { await rejectIds([id]) } finally { setRejectingId(null) }
   }
@@ -431,8 +433,12 @@ export default function AutomationIdeas({
     }
   }
 
-  function rejectSelected() {
-    void rejectIds(suggestions.filter((s) => selected.has(s.id)).map((s) => s.id))
+  // A reject is final (the idea is never suggested again), so it asks first.
+  async function rejectSelected() {
+    const ids = suggestions.filter((s) => selected.has(s.id)).map((s) => s.id)
+    if (ids.length === 0) return
+    if (!(await confirm({ title: ids.length === 1 ? t.rejectConfirmTitleOne : t.rejectConfirmTitle, body: t.rejectConfirmBody, confirmLabel: t.rejectConfirmAction, tone: 'danger' }))) return
+    void rejectIds(ids)
   }
 
   // Phase 3F.3.7e — ONE resolution used by BOTH buttons. The SERVER is authoritative:
@@ -594,7 +600,8 @@ export default function AutomationIdeas({
     try {
       const gr = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topicIds.join(','))}`)
       const gd = await gr.json().catch(() => ({}))
-      if (!gr.ok) return failAll(gd.cacheState === 'missing' ? 'no_cache' : 'plan_unavailable')
+      // A missing index answers 200 { ok: false, cacheState: 'missing' }; a failure is a non-2xx.
+      if (!gr.ok || gd.ok === false) return failAll(gd.cacheState === 'missing' ? 'no_cache' : 'plan_unavailable')
       currentSnapshot = { scannerVersion: typeof gd.scannerVersion === 'string' ? gd.scannerVersion : null, scanCompletedAt: typeof gd.scanCompletedAt === 'string' ? gd.scanCompletedAt : null }
       out.currentSnapshot = currentSnapshot
       for (const p of Array.isArray(gd.topics) ? gd.topics : []) {
@@ -787,8 +794,23 @@ export default function AutomationIdeas({
     }
   }
 
+  // An idea without saved links says why in one sentence. The common reason (links are
+  // chosen after the topic is approved) is the same for every idea, so it is said once
+  // above the list, not repeated on each row (final review R14).
+  const noLinksReason = (s: Suggestion): string | null => {
+    if (s.suggestedInternalLinks.length > 0) return null
+    if (s.linkPreviewReason === 'low_confidence_only') return t.linkReasonLowConf
+    if (s.linkPreviewReason === 'stale_index') return t.linkReasonStale
+    if (s.linkPreviewReason === 'valid_no_match' || s.linkPreviewReason === 'target_type_gap' || s.linkPreviewReason === 'already_linked_or_duplicate') return t.noPreciseLink
+    return t.linksNoneHint
+  }
+  const shownIdeas = suggestions.slice(0, visibleCount)
+  const linksNoneOnce = shownIdeas.some((s) => noLinksReason(s) === t.linksNoneHint)
+
+  // Flat inside the strategy's "advanced" card: sections are split by dividers, never
+  // by a card inside a card (final review R14).
   return (
-    <Card>
+    <div data-auto-ideas="">
       <h3 className="text-section font-semibold text-ink">{t.title}</h3>
       <p className="mt-1 mb-4 max-w-prose text-copy text-muted">{t.intro}</p>
 
@@ -800,7 +822,7 @@ export default function AutomationIdeas({
           <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" />
           {t.onboardTitle}
         </summary>
-        <div className="mt-3 max-w-prose space-y-3 rounded-inset border border-line bg-sunk/60 px-4 py-3">
+        <div className="mt-3 max-w-prose space-y-3">
           <p className="text-copy text-body">{t.onboardBody}</p>
           <ol className="space-y-2 text-copy text-body">
             {[t.onboardStep1, t.onboardStep2, t.onboardStep3, t.onboardStep4, t.onboardStep5].map((step, i) => (
@@ -830,12 +852,14 @@ export default function AutomationIdeas({
       )}
 
       {/* Part 1 — one smart combined scan. No source selector, no keyword input. */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-inset border border-line bg-sunk/60 px-4 py-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <div className="min-w-0 flex-1 basis-64">
           <div className="text-copy font-semibold text-ink">{t.smartScanTitle}</div>
           <p className="mt-1 max-w-prose text-caption text-muted">{t.smartScanExplain}</p>
         </div>
-        <Button onClick={generate} loading={loading} disabled={loading} className="shrink-0">
+        {/* The first run is this section's call to action; once there are ideas, approving
+            them is, and "find more" steps back to a bordered button. */}
+        <Button onClick={generate} loading={loading} disabled={loading} variant={suggestions.length > 0 ? 'secondary' : 'primary'} className="shrink-0">
           {!loading && <Sparkles aria-hidden="true" className="size-4" />}
           {loading ? t.generating : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
@@ -1012,7 +1036,7 @@ export default function AutomationIdeas({
           keywords: which existing row (source/status/keyword) killed each idea.
           Collapsible tech details; rendered only when the API returned evidence. */}
       {meta?.keywordMatches && meta.keywordMatches.length > 0 && meta.newlyAdded === 0 && !loading && (
-        <details className="mb-2 rounded-inset border border-line bg-sunk px-3 py-2">
+        <details className="mb-2 border-y border-line py-2">
           <summary className="cursor-pointer text-caption font-medium text-body">
             {t.kwMatchTitle.replace('{n}', String(meta.keywordMatches.length))}
           </summary>
@@ -1043,7 +1067,7 @@ export default function AutomationIdeas({
         <p className="text-caption text-muted mb-2">{t.noSavedIdeas}</p>
       )}
       {lastQueueTopics.length > 0 && (
-        <div ref={ctaRef} className="mb-4 scroll-mt-4 rounded-inset border border-line border-s-[3px] border-s-action bg-surface px-4 py-3 motion-safe:animate-pop-in">
+        <div ref={ctaRef} className="mb-4 scroll-mt-4 rounded-inset border border-line bg-surface px-4 py-3 motion-safe:animate-pop-in">
           <p className="text-copy font-semibold text-ink">{t.ctaTitle}</p>
           <p className="mt-0.5 text-caption text-body">{t.ctaBody}</p>
           {/* Link-status summary: none / some / all of the topics being queued. */}
@@ -1084,7 +1108,8 @@ export default function AutomationIdeas({
             <Button size="sm" variant="ghost" onClick={approveAndReview} loading={creating && busyAction === 'review'} disabled={creating || selected.size === 0}>
               {creating && busyAction === 'review' ? t.creating : t.reviewEditBeforeBtn}
             </Button>
-            <Button size="sm" variant="ghost" onClick={rejectSelected} disabled={selected.size === 0 || creating} className="text-bad hover:bg-bad-soft hover:text-bad">{t.rejectSelected}</Button>
+            {/* Quiet like the other bulk actions; the red is on the confirmation it opens. */}
+            <Button size="sm" variant="ghost" onClick={() => void rejectSelected()} disabled={selected.size === 0 || creating} data-idea-reject-selected="">{t.rejectSelected}</Button>
             {/* PRIMARY — approve + save links + enqueue in one click. */}
             <Button size="sm" onClick={approveAndQueue} loading={creating && busyAction === 'queue'} disabled={creating || selected.size === 0}>
               {creating && busyAction === 'queue' ? t.creating : `${t.approveAndQueue}${selected.size > 0 ? ` (${selected.size})` : ''}`}
@@ -1093,16 +1118,20 @@ export default function AutomationIdeas({
           <p className="text-caption text-muted">{t.linksOptionalNote}</p>
           </div>
 
-          <div className="list-enter space-y-2">
+          {linksNoneOnce && (
+            <Notice tone="info" className="mb-3"><span data-links-none-once="">{t.linksNoneHint}</span></Notice>
+          )}
+
+          <div className="list-enter divide-y divide-line border-y border-line">
             {loading && [0, 1].map((i) => (
-              <div key={`skeleton-${i}`} aria-hidden className="rounded-inset border border-line bg-surface p-4">
+              <div key={`skeleton-${i}`} aria-hidden className="py-4">
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="mt-2.5 h-3 w-1/3" />
                 <Skeleton className="mt-2 h-3 w-1/2" />
               </div>
             ))}
-            {suggestions.slice(0, visibleCount).map((s) => (
-              <div key={s.id} className={`rounded-inset border p-4 transition-[border-color,background-color] duration-150 ${selected.has(s.id) ? 'border-action/40 bg-action-soft/40' : 'border-line bg-surface hover:border-line-strong'}`}>
+            {shownIdeas.map((s) => (
+              <div key={s.id} data-idea-row="" className={`px-3 py-4 transition-colors duration-150 ${selected.has(s.id) ? 'bg-action-soft' : 'hover:bg-sunk/60'}`}>
                 <div className="flex items-start gap-3">
                   <Checkbox checked={selected.has(s.id)} onChange={() => toggle(s.id)} aria-label={s.title} className="mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -1176,7 +1205,7 @@ export default function AutomationIdeas({
                         </div>
                       )
                       return (
-                        <div className="mt-3 space-y-1 rounded-inset border border-line bg-sunk/60 px-3 py-2.5" dir={isHebrew ? 'rtl' : 'ltr'}>
+                        <div className="mt-3 space-y-1 border-s-2 border-line ps-3" dir={isHebrew ? 'rtl' : 'ltr'}>
                           <div className="text-caption font-medium text-body">{t.internalLinksLabel}</div>
                           {lp ? (
                             <>
@@ -1204,14 +1233,8 @@ export default function AutomationIdeas({
                         </div>
                       )
                     })()}
-                    {s.suggestedInternalLinks.length === 0 && (
-                      <div className="mt-2 text-caption text-muted">
-                        {s.linkPreviewReason === 'low_confidence_only' ? t.linkReasonLowConf
-                          : s.linkPreviewReason === 'stale_index' ? t.linkReasonStale
-                            : (s.linkPreviewReason === 'valid_no_match' || s.linkPreviewReason === 'target_type_gap' || s.linkPreviewReason === 'already_linked_or_duplicate') ? t.noPreciseLink
-                              : t.linksNoneHint}
-                      </div>
-                    )}
+                    {/* Only a reason particular to this idea; the shared one is said once above. */}
+                    {(() => { const why = noLinksReason(s); return why && why !== t.linksNoneHint ? <div className="mt-2 text-caption text-muted">{why}</div> : null })()}
                   </div>
                 </div>
               </div>
@@ -1222,7 +1245,7 @@ export default function AutomationIdeas({
                 cleanly on mobile. The rendered list is actually sliced (above) — no
                 hidden-via-CSS cards. */}
             {suggestions.length > INITIAL_VISIBLE && visibleCount < suggestions.length && (
-              <div className="flex flex-wrap items-center gap-2 pt-2">
+              <div className="flex flex-wrap items-center gap-2 py-3">
                 <button
                   type="button"
                   data-testid="ideas-show-more"
@@ -1246,6 +1269,7 @@ export default function AutomationIdeas({
           <p className="mt-4 text-caption text-muted">{t.nextStepHint}</p>
         </>
       )}
-    </Card>
+      {confirmDialog}
+    </div>
   )
 }

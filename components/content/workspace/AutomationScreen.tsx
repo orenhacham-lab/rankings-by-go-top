@@ -9,7 +9,6 @@
  * queue they feed were easy to miss entirely.
  */
 
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
 import AutomationSchedule from '@/components/content/AutomationSchedule'
@@ -28,7 +27,7 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
   } = useContentWorkspace()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* M — the ideas destination: automatic ideas (default) + a manual
           topic sub-tab. The automatic workflow below is unchanged. */}
       <Segmented<'auto' | 'manual'>
@@ -42,13 +41,13 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
       />
 
       {ideasSection === 'manual' ? (
-        <Card className="p-5 motion-safe:animate-pop-in sm:p-6">
+        <div className="motion-safe:animate-pop-in">
           <h3 className="text-section font-semibold text-ink">{t.manualTopicTitle}</h3>
           <p className="mb-4 mt-1 max-w-prose text-copy text-muted">{t.manualTopicHint}</p>
           {/* Reuses the SAME ArticleBriefModal → POST /api/content/topics (source='manual');
               all duplicate/title/ownership/quota checks apply; never auto-queued. */}
           <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus className="size-4" aria-hidden="true" /> {t.newTopicButton}</Button>
-        </Card>
+        </div>
       ) : (
         <>
           <AutomationIdeas
@@ -77,13 +76,16 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
           automationEnabled — one component, one state, one
           scheduleSectionRef, so switching tabs neither duplicates it
           nor loses its refreshed state. */}
-      <div ref={scheduleSectionRef} className="scroll-mt-4">
-        <AutomationSchedule
-          projectId={projectId}
-          language={language}
-          refreshKey={automationRefresh}
-          onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
-        />
+      {/* One card (the strategy's "advanced" panel), its sections split by a divider. */}
+      <div className="mt-8 border-t border-line pt-8">
+        <div ref={scheduleSectionRef} className="scroll-mt-4">
+          <AutomationSchedule
+            projectId={projectId}
+            language={language}
+            refreshKey={automationRefresh}
+            onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+          />
+        </div>
       </div>
     </div>
   )

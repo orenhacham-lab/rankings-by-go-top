@@ -122,7 +122,7 @@ export default function ArticleAiVisibilityCard({ t, language, projectId, data, 
             {s.tracked ? (
               <Badge variant="success"><Check aria-hidden="true" className="size-3.5" /> {t.tracked}</Badge>
             ) : (
-              <Button size="sm" onClick={() => void track()} loading={busy} disabled={busy || !projectId} data-testid="ai-suggestion-track">
+              <Button size="sm" variant="secondary" onClick={() => void track()} loading={busy} disabled={busy || !projectId} data-testid="ai-suggestion-track">
                 {!busy && <Plus aria-hidden="true" className="size-4" />} {busy ? t.tracking : t.track}
               </Button>
             )}

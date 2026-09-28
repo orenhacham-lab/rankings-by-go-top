@@ -15,6 +15,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import Checkbox from '@/components/ui/Checkbox'
 import Notice from '@/components/ui/Notice'
 import RowMenu from '@/components/ui/RowMenu'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Check, ChevronDown, Loader2, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -81,6 +82,7 @@ export default function TopicsList({
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
   const router = useRouter()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [busyId, setBusyId] = useState<string | null>(null)
   // Phase 2E.2: internal-link planning (flag-gated). Status is loaded lazily by
   // the drawer (never per-row), so rendering the list triggers zero plan fetches.
@@ -155,7 +157,7 @@ export default function TopicsList({
   }
 
   async function remove(id: string) {
-    if (!window.confirm(c.topicActions.confirmDelete)) return
+    if (!(await confirm({ title: c.topicActions.confirmDeleteTitle, body: c.topicActions.confirmDelete, confirmLabel: c.topicActions.delete, tone: 'danger' }))) return
     setBusyId(id)
     try {
       const res = await fetch(`/api/content/topics/${id}`, { method: 'DELETE' })
@@ -169,7 +171,7 @@ export default function TopicsList({
   // Create a NEW draft article for a topic that already has one. Never deletes
   // or overwrites the existing article — /generate always inserts a new row.
   async function regenerateArticle(topicId: string) {
-    if (!window.confirm(c.topicActions.regenerateConfirm)) return
+    if (!(await confirm({ title: c.topicActions.regenerateConfirmTitle, body: c.topicActions.regenerateConfirm, confirmLabel: c.topicActions.regenerate }))) return
     await createArticle(topicId)
   }
 
@@ -211,12 +213,14 @@ export default function TopicsList({
               )}
             </Th>
             <Th>{c.topicsTable.topic}</Th>
-            <Th>{c.topicsTable.primaryKeyword}</Th>
-            <Th>{c.topicsTable.searchIntent}</Th>
-            <Th>{c.topicsTable.status}</Th>
-            <Th className="text-end">{c.topicsTable.anchors}</Th>
-            <Th>{c.topicsTable.created}</Th>
-            <Th className="text-end">{c.topicsTable.actions}</Th>
+            {/* Below md the row stacks: keyword, intent and status move under the title,
+                and the secondary columns step aside (final review R14/R15). */}
+            <Th className="hidden md:table-cell">{c.topicsTable.primaryKeyword}</Th>
+            <Th className="hidden lg:table-cell">{c.topicsTable.searchIntent}</Th>
+            <Th className="hidden md:table-cell">{c.topicsTable.status}</Th>
+            <Th className="hidden text-end lg:table-cell">{c.topicsTable.anchors}</Th>
+            <Th className="hidden lg:table-cell">{c.topicsTable.created}</Th>
+            <Th className="text-end"><span className="sr-only md:not-sr-only">{c.topicsTable.actions}</span></Th>
           </tr>
         </TableHead>
         <TableBody>
@@ -231,6 +235,28 @@ export default function TopicsList({
               const bs = batchState[topic.id]
               const selectable = !hasArticle
               const highlighted = highlightIds.includes(topic.id)
+              const intentLabel = topic.search_intent ? ((c.brief.intents as Record<string, string>)[topic.search_intent] ?? topic.search_intent).split(' — ')[0] : null
+              // The same status reads in its column from md up, and under the title below it.
+              const statusCell = bs && bs.status !== 'success' ? (
+                bs.status === 'generating' ? (
+                  <span className="inline-flex items-center gap-1.5 text-caption text-muted">
+                    <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+                    {c.batch.generating}
+                  </span>
+                ) : bs.status === 'queued' ? (
+                  <Badge variant="neutral">{c.batch.queued}</Badge>
+                ) : (
+                  <span className="inline-flex flex-col gap-0.5">
+                    <span className="inline-flex items-center gap-2">
+                      <Badge variant="danger">{c.batch.failed}</Badge>
+                      <Button size="sm" variant="ghost" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-action"><RefreshCw className="size-4" aria-hidden="true" />{c.batch.retry}</Button>
+                    </span>
+                    {bs.error && <span className="max-w-64 truncate text-caption text-muted" title={bs.error}>{bs.error}</span>}
+                  </span>
+                )
+              ) : (
+                <Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge>
+              )
               return (
                 <TableRow key={topic.id} className={cn(highlighted ? 'bg-action-soft' : selectedIds?.has(topic.id) && 'bg-action-soft hover:bg-action-soft')}>
                   {/* Batch selection — only for topics without an article. */}
@@ -244,45 +270,34 @@ export default function TopicsList({
                       />
                     )}
                   </Td>
-                  {/* De-emphasize topics that already produced an article. */}
-                  <Td className="min-w-48"><span className={hasArticle ? 'text-muted' : 'font-medium text-ink'}>{topic.topic}</span></Td>
-                  <Td><span className="text-copy text-body">{topic.primary_keyword || '—'}</span></Td>
-                  <Td><span className="text-copy text-body">{topic.search_intent ? ((c.brief.intents as Record<string, string>)[topic.search_intent] ?? topic.search_intent).split(' — ')[0] : '—'}</span></Td>
-                  <Td>
-                    {bs && bs.status !== 'success' ? (
-                      bs.status === 'generating' ? (
-                        <span className="inline-flex items-center gap-1.5 text-caption text-muted">
-                          <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
-                          {c.batch.generating}
-                        </span>
-                      ) : bs.status === 'queued' ? (
-                        <Badge variant="neutral">{c.batch.queued}</Badge>
-                      ) : (
-                        <span className="inline-flex flex-col gap-0.5">
-                          <span className="inline-flex items-center gap-2">
-                            <Badge variant="danger">{c.batch.failed}</Badge>
-                            <Button size="sm" variant="ghost" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-action"><RefreshCw className="size-4" aria-hidden="true" />{c.batch.retry}</Button>
-                          </span>
-                          {bs.error && <span className="max-w-64 truncate text-caption text-muted" title={bs.error}>{bs.error}</span>}
-                        </span>
-                      )
-                    ) : (
-                      <Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge>
+                  {/* De-emphasize topics that already produced an article. The link plan is
+                      the topic's own status, so its chip sits with the title, not as a
+                      second button beside the row's one action. */}
+                  <Td className="min-w-40 md:min-w-48">
+                    <span className={hasArticle ? 'text-muted' : 'font-medium text-ink'}>{topic.topic}</span>
+                    <span data-topic-meta="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-caption text-muted md:hidden">
+                      {topic.primary_keyword && <span>{topic.primary_keyword}</span>}
+                      {statusCell}
+                    </span>
+                    {planningOn && (
+                      <span className="mt-1.5 flex">
+                        <TopicPlanBadge summary={planStatus[topic.id]} checking={planStatusLoading && !planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
+                      </span>
                     )}
                   </Td>
-                  <Td className="text-end"><span className="text-copy tabular-nums">{anchorCount}</span></Td>
-                  <Td><span className="whitespace-nowrap text-caption text-muted">{formatDate(topic.created_at)}</span></Td>
+                  <Td className="hidden md:table-cell"><span className="text-copy text-body">{topic.primary_keyword || '—'}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="text-copy text-body">{intentLabel || '—'}</span></Td>
+                  <Td className="hidden md:table-cell">{statusCell}</Td>
+                  <Td className="hidden text-end lg:table-cell"><span className="text-copy tabular-nums">{anchorCount}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(topic.created_at)}</span></Td>
                   <Td>
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* Internal-link planning entry point (flag-gated). Opens the
-                          drawer; status is loaded there, never per row. */}
-                      {planningOn && (
-                        <TopicPlanBadge summary={planStatus[topic.id]} checking={planStatusLoading && !planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
-                      )}
+                    {/* Below md the two actions stack, so the row fits a 390 screen
+                        without scrolling the table sideways (final review R15). */}
+                    <div className="flex flex-col items-end gap-1 md:flex-row md:items-center md:justify-end md:gap-1.5">
                       {/* Visible feedback while (re)generating — the primary button
                           may be "Edit article" during a regenerate. */}
                       {creatingId === topic.id && (
-                        <span className="inline-flex items-center gap-1.5 text-caption text-muted">
+                        <span className="hidden items-center gap-1.5 text-caption text-muted lg:inline-flex">
                           <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
                           {c.creatingArticleWithImage}
                         </span>
@@ -355,6 +370,7 @@ export default function TopicsList({
           onSaveAndQueue={onSaveAndQueue}
         />
       )}
+      {confirmDialog}
     </div>
   )
 }

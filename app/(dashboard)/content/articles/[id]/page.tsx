@@ -17,7 +17,6 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import Badge from '@/components/ui/Badge'
 import BackLink from '@/components/ui/BackLink'
 import Notice from '@/components/ui/Notice'
-import StatTile from '@/components/ui/StatTile'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
@@ -34,11 +33,12 @@ import ShopifyPublishSettings from '@/components/content/ShopifyPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { Check, FileQuestion } from 'lucide-react'
+import { AlertCircle, Check, FileQuestion, TriangleAlert } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
 type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
@@ -54,6 +54,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const auditLabel = (code: string) => (e.auditCodes as Record<string, string>)[code] || code
   const toast = useToasts()
   const router = useRouter()
+  // Every question this page asks goes through the app's own dialog, never the browser's.
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const cf = c.confirms
 
   const enabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 
@@ -238,7 +241,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     // if the last manual preview this session found approved links not yet
     // applied, confirm before marking ready. Never triggers a fetch.
     if (nextStatus === 'ready' && linkPlanningOn && ilpPreviewSummary && ilpPreviewSummary.wouldInsert > 0) {
-      if (!window.confirm(c.editor.linkApply.readyHasUnappliedConfirm)) return
+      if (!(await confirm({ title: cf.readyTitle, body: c.editor.linkApply.readyHasUnappliedConfirm, confirmLabel: e.markReady }))) return
     }
     setSaving(true)
     setMessage(null)
@@ -255,7 +258,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         return
       }
       if (!res.ok) {
-        setMessage({ text: data.error || e.saveError, ok: false })
+        // Never the server's own error text: our sentence (design contract §8).
+        setMessage({ text: e.saveError, ok: false })
         return
       }
       if (data.article?.status) setStatus(data.article.status === 'ready' ? 'ready' : 'draft')
@@ -273,7 +277,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   async function deleteArticle() {
-    if (!window.confirm(c.confirmDeleteArticle)) return
+    if (!(await confirm({ title: cf.deleteArticleTitle, body: c.confirmDeleteArticle, confirmLabel: cf.deleteAction, tone: 'danger' }))) return
     try {
       const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
       if (res.ok) { window.location.href = backHref; return }
@@ -305,7 +309,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   async function removeImage() {
-    if (!window.confirm(e.imageRemoveConfirm)) return
+    if (!(await confirm({ title: e.imageRemoveConfirm, confirmLabel: cf.deleteAction, tone: 'danger' }))) return
     setImageBusy(true)
     setMessage(null)
     try {
@@ -322,7 +326,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   async function exportWordPress(status: 'draft' | 'publish') {
     if (wpBusy) return // one export at a time
     // Publishing goes live → confirm. Draft needs no dangerous confirmation.
-    if (status === 'publish' && !window.confirm(e.wpPublishConfirm)) return
+    if (status === 'publish' && !(await confirm({ title: cf.publishTitle, body: e.wpPublishConfirm, confirmLabel: cf.publishAction }))) return
     // Phase 4E — once exported, a re-export UPDATES the same post in place
     // (idempotent: no duplicate post/taxonomy). A brand-new separate post is no
     // longer the default; the existing post is reconciled by wp_post_id.
@@ -494,6 +498,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         downloading={downloading}
         tab={tab}
         onTabChange={setTab}
+        quiet={editing}
       />
 
       {message && (
@@ -538,7 +543,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          <div className="list-enter mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          {/* The article's anatomy as one compact definition list (final review R23):
+              seven grey tiles made a count of lists look as weighty as the score. */}
+          <dl data-audit-counts="" className="mb-4 grid grid-cols-2 gap-x-6 border-y border-line py-3 sm:grid-cols-4 lg:grid-cols-7">
             {[
               { l: e.auditWords, v: audit.counts.words },
               { l: e.auditH2, v: audit.counts.h2 },
@@ -548,9 +555,12 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               { l: e.auditTables, v: audit.counts.tables },
               { l: e.auditLists, v: audit.counts.lists },
             ].map((c) => (
-              <StatTile key={c.l} label={c.l} value={c.v} className="rounded-inset bg-sunk/60 p-3 shadow-none sm:p-4" />
+              <div key={c.l} className="flex items-baseline justify-between gap-3 py-1.5 lg:flex-col lg:items-start lg:gap-0.5">
+                <dt className="text-caption text-muted">{c.l}</dt>
+                <dd className="text-copy font-semibold tabular-nums text-ink">{c.v.toLocaleString(language)}</dd>
+              </div>
             ))}
-          </div>
+          </dl>
 
           <p className={`mb-3 inline-flex items-center gap-1.5 text-caption ${audit.tocReady ? 'text-ok' : 'text-muted'}`}>
             {audit.tocReady && <Check aria-hidden="true" className="size-4 shrink-0" />}
@@ -576,14 +586,15 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           {audit.blockers.length > 0 && (
             // On a published article nothing is blocked any more: the same items
             // read as advice, in the warning tone, not as a red "must fix".
-            <Notice tone={isPublished ? 'warn' : 'bad'} className="mb-3" items={audit.blockers.map((b) => auditLabel(b))}>
-              <span className="font-semibold">{isPublished ? e.auditBlockersPublished : e.auditBlockers}</span>
-            </Notice>
+            <AuditList
+              tone={isPublished ? 'warn' : 'bad'}
+              title={isPublished ? e.auditBlockersPublished : e.auditBlockers}
+              items={audit.blockers.map((b) => auditLabel(b))}
+              moreLabel={getDashboardDictionary(language).uiKit.noticeMore}
+            />
           )}
           {audit.warnings.length > 0 && (
-            <Notice tone="warn" className="mb-3" items={audit.warnings.map((w) => auditLabel(w))}>
-              <span className="font-semibold">{e.auditWarnings}</span>
-            </Notice>
+            <AuditList tone="warn" title={e.auditWarnings} items={audit.warnings.map((w) => auditLabel(w))} moreLabel={getDashboardDictionary(language).uiKit.noticeMore} />
           )}
           {audit.blockers.length === 0 && audit.warnings.length === 0 && (
             <Notice tone="ok">{e.auditAllGood}</Notice>
@@ -671,7 +682,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           ) : (
             <div className="space-y-2">
               <p className="text-caption text-muted">{e.imageHint}</p>
-              <Button size="sm" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
+              <Button size="sm" variant="secondary" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
             </div>
           )}
           <p className="text-caption text-muted mt-2">{e.imageSafetyNote}</p>
@@ -745,7 +756,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <h3 className="text-section font-semibold text-ink mb-2">{e.wpTitle}</h3>
             {!featuredImageUrl && <Notice tone="warn" className="mb-3">{e.wpNoImageWarn}</Notice>}
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
+              {/* Bordered: the top bar's publish call is the page's one primary, and it leads here. */}
+              <Button size="sm" variant="secondary" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
                 {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
@@ -857,6 +869,40 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       </div>
 
       <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />
+      {confirmDialog}
     </div>
+  )
+}
+
+/**
+ * One group of quality findings (final review R3): a neutral panel on the card's own
+ * surface. The tone lives only on the icon and the title, never as a tinted box, so a
+ * long list of advice does not paint half the page orange. Three items show; the
+ * rest open behind "N more", as in the Notice primitive.
+ */
+function AuditList({ tone, title, items, moreLabel }: { tone: 'warn' | 'bad'; title: string; items: string[]; moreLabel: string }) {
+  const [open, setOpen] = useState(false)
+  const shown = open ? items : items.slice(0, 3)
+  const hidden = items.length - shown.length
+  const Icon = tone === 'bad' ? AlertCircle : TriangleAlert
+  return (
+    <section data-audit-list={tone} className="mb-3 rounded-inset border border-line bg-surface px-4 py-3">
+      <h4 className="flex items-center gap-2 text-copy font-semibold text-ink">
+        <Icon aria-hidden="true" className={tone === 'bad' ? 'size-4 shrink-0 text-bad' : 'size-4 shrink-0 text-warn'} />
+        {title}
+      </h4>
+      <ul className="mt-2 list-disc space-y-1 ps-10 text-copy text-body marker:text-muted">
+        {shown.map((item, i) => <li key={i}>{item}</li>)}
+      </ul>
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-1.5 ms-6 rounded-control text-caption font-semibold text-action underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+        >
+          {moreLabel.replace('{n}', String(hidden))}
+        </button>
+      )}
+    </section>
   )
 }

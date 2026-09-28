@@ -1,7 +1,12 @@
 'use client'
 
 /**
- * TopicPlanDrawer — per-topic internal-link planning modal (Phase 2E.2).
+ * TopicPlanDrawer — per-topic internal-link planning side sheet (Phase 2E.2).
+ *
+ * A sheet from the inline end, like the AI result sheet: the topics list stays in
+ * view beside it. Its one primary action adds the topic to the queue WITH the
+ * recommended links; "without links" is the quiet alternative, offered only when
+ * the site has no index to suggest links from (final review R17).
  *
  * MANUAL, read/plan/review only. Reuses existing endpoints:
  *   GET  …/plan?topicIds=…            (dry-run, no write)
@@ -11,14 +16,13 @@
  * No content mutation, no apply UI, no auto actions — every call is a button.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Modal from '@/components/ui/Modal'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Checkbox from '@/components/ui/Checkbox'
 import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { ChevronDown, ExternalLink } from 'lucide-react'
+import { ChevronDown, ExternalLink, RefreshCw, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
@@ -221,7 +225,9 @@ export default function TopicPlanDrawer({
       const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`, { signal })
       const data = await res.json().catch(() => ({}))
       if (!current()) return
-      if (!res.ok) {
+      // A missing site index answers 200 { ok: false, cacheState: 'missing' } (an
+      // expected state, not an error); a real failure is a non-2xx. Both say no plan.
+      if (!res.ok || data.ok === false) {
         // A non-2xx counts as a LOADED preview only when the response itself
         // states the cache state (e.g. an explicit 'missing'). Defaulting to
         // 'missing' here — which this used to do — turned any server error into
@@ -323,7 +329,7 @@ export default function TopicPlanDrawer({
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve, reviewedSnapshot: reviewedSnapshotRef.current ?? undefined }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.reason === 'cache_changed_replan_required' ? t.cacheChanged : (d.warning || d.error || t.saveError)); return { ok: false, warning: null } }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.reason === 'cache_changed_replan_required' ? t.cacheChanged : d.cacheState === 'missing' ? t.cacheMissing : t.saveError); return { ok: false, warning: null } }
       if (approve) {
         const d = await res.json().catch(() => ({}))
         const r0 = Array.isArray(d.results) ? d.results[0] : null
@@ -339,7 +345,7 @@ export default function TopicPlanDrawer({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, topicId: topic.id, approve }),
     })
-    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return { ok: false, warning: null } }
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.cacheState === 'missing' ? t.cacheMissing : t.saveError); return { ok: false, warning: null } }
     if (approve) {
       const d = await res.json().catch(() => ({}))
       if (typeof d.linkCount === 'number' && typeof d.approvedCount === 'number' && d.approvedCount < d.linkCount) {
@@ -425,6 +431,7 @@ export default function TopicPlanDrawer({
   }, [projectId, busyLink, emitStatus])
 
   if (!topic) return null
+  const closeLabel = getDashboardDictionary(language).common.close
 
   const statusHe = (s: string) => (t.linkStatus as Record<string, string>)[s] ?? s
   const linkRow = (l: SavedLink) => (
@@ -498,17 +505,50 @@ export default function TopicPlanDrawer({
     </div>
   )
 
+  // The footer's two queue actions. The primary always means "with the recommended
+  // links"; with no site index there is nothing to recommend, so it waits (disabled,
+  // with the reason) and the link-free queue is the bordered alternative.
+  const noIndexPath = queueDecision.canQueue && !queueDecision.expectsLinks
+  const queueFooter = onSaveAndQueue ? (
+    <>
+      <Button
+        onClick={saveAndQueue}
+        loading={savingQueue && !noIndexPath}
+        disabled={saving || savingQueue || !queueDecision.canQueue || noIndexPath}
+        aria-describedby={noIndexPath ? 'topic-plan-with-links-why' : undefined}
+        data-plan-action="queue-with-links"
+      >
+        {savingQueue && !noIndexPath ? t.savingQueue : checkedCount > 0 ? `${t.queueWithLinks} (${checkedCount})` : t.saveAndQueue}
+      </Button>
+      {noIndexPath && (
+        <Button variant="secondary" onClick={saveAndQueue} loading={savingQueue} disabled={saving || savingQueue} data-plan-action="queue-without-links">
+          {savingQueue ? t.savingQueue : t.queueWithoutLinks}
+        </Button>
+      )}
+      {noIndexPath && <p id="topic-plan-with-links-why" className="basis-full text-caption text-muted">{t.withLinksUnavailable}</p>}
+    </>
+  ) : (
+    <Button onClick={savePlan} loading={saving} disabled={saving}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
+  )
+
   return (
-    <Modal open={open} onClose={onClose} title={t.drawerTitle} size="lg">
-      <div dir={language === 'he' ? 'rtl' : 'ltr'}>
-        <p className="text-section font-semibold text-ink">{topic.topic}</p>
-        {topic.primary_keyword && <p className="text-caption text-muted">{t.primaryKeyword}: {topic.primary_keyword}</p>}
+    <PlanSheet
+      open={open}
+      onClose={onClose}
+      dir={language === 'he' ? 'rtl' : 'ltr'}
+      overline={t.drawerTitle}
+      title={topic.topic}
+      subtitle={topic.primary_keyword ? `${t.primaryKeyword}: ${topic.primary_keyword}` : null}
+      closeLabel={closeLabel}
+      footer={queueFooter}
+    >
+      <div>
 
         {/* Persistent completion state after a successful save (Phase 3F.3.3f) —
             placed at the top so it is always visible, and stays until the user
             returns / keeps editing / closes / starts a new search. */}
         {justSaved && (
-          <Notice tone="ok" className="mt-4" action={{ label: t.returnToQueue, onClick: () => { onReturnToQueue?.(); onClose() } }}>
+          <Notice tone="ok" action={{ label: t.returnToQueue, onClick: () => { onReturnToQueue?.(); onClose() } }}>
             <p className="font-semibold">{t.savedOk}</p>
             <p className="text-caption">{t.savedBody}</p>
             <button type="button" onClick={() => setJustSaved(false)} className="mt-1 rounded-control text-caption font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.keepEditing}</button>
@@ -517,7 +557,7 @@ export default function TopicPlanDrawer({
 
         {/* Purpose + step hint (hidden once saved, to keep the completion clear). */}
         {!justSaved && (
-          <div className="mt-3 max-w-prose">
+          <div className="max-w-prose">
             <p className="text-copy text-body">{t.drawerIntro1} <span className="text-muted">{t.drawerIntro2}</span></p>
             <details className="group mt-1">
               <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
@@ -541,24 +581,15 @@ export default function TopicPlanDrawer({
         {dry?.warnings?.includes('cache_version_stale') && <Notice tone="warn" className="mt-3">{t.versionStale}</Notice>}
         {error && <Notice tone="bad" className="mt-3">{error}</Notice>}
 
-        {/* Actions — all manual */}
+        {/* The plan's own tools — all manual. The queue actions are in the footer; the
+            labels there state what the click will actually do (with no site index and
+            nothing selected there is no plan to save, so "with the recommended links"
+            waits and "without links" is offered), and they stay disabled until the
+            preview resolves, so a label can never describe the wrong path. */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={runPlan} loading={running} disabled={running || savingQueue}>{running ? t.running : t.runPlan}</Button>
-          <Button size="sm" variant={onSaveAndQueue ? 'secondary' : 'primary'} onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
-          {/* Phase 3F.3.6 (Part G) — streamlined save + enqueue in one click. */}
+          <Button size="sm" variant="secondary" onClick={runPlan} loading={running} disabled={running || savingQueue}>{!running && <RefreshCw aria-hidden="true" className="size-4" />}{running ? t.running : t.runPlan}</Button>
           {onSaveAndQueue && (
-            /* The label states what the click will actually do. With no site
-               index and nothing selected there is no plan to save, so promising
-               "save links and add to queue" would be untrue. Disabled until the
-               preview resolves, so the label can never describe the wrong path. */
-            <Button
-              size="sm"
-              onClick={saveAndQueue}
-              loading={savingQueue}
-              disabled={saving || savingQueue || !queueDecision.canQueue}
-            >
-              {savingQueue ? t.savingQueue : queueDecision.canQueue && !queueDecision.expectsLinks ? t.queueWithoutLinks : t.saveAndQueue}
-            </Button>
+            <Button size="sm" variant="ghost" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
           )}
           {hasUnsavedChanges && <span className="basis-full text-caption font-medium text-ink">{t.unsavedChanges}</span>}
         </div>
@@ -685,6 +716,61 @@ export default function TopicPlanDrawer({
           </>
         )}
       </div>
-    </Modal>
+    </PlanSheet>
+  )
+}
+
+/**
+ * The side sheet: a native modal dialog (focus stays inside, Escape closes, the page
+ * behind is inert) drawn from the inline end at full height, with a sticky footer for
+ * the queue actions. Same shape as the AI result sheet.
+ */
+function PlanSheet({ open, onClose, dir, overline, title, subtitle, closeLabel, footer, children }: {
+  open: boolean
+  onClose: () => void
+  dir: 'rtl' | 'ltr'
+  overline: string
+  title: string
+  subtitle: string | null
+  closeLabel: string
+  footer: ReactNode
+  children: ReactNode
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const d = ref.current
+    if (!d) return
+    if (open && !d.open) d.showModal()
+    if (!open && d.open) d.close()
+  }, [open])
+  return (
+    <dialog
+      ref={ref}
+      dir={dir}
+      aria-labelledby="topic-plan-sheet-title"
+      data-topic-plan-sheet=""
+      onCancel={(e) => { e.preventDefault(); onClose() }}
+      // A click on the scrim lands on the dialog element itself.
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className="fixed inset-y-0 end-0 start-auto m-0 h-dvh max-h-dvh w-full max-w-xl border-0 border-s border-line bg-surface p-0 text-body shadow-pop backdrop:bg-scrim open:flex open:flex-col motion-safe:open:animate-pop-in"
+    >
+      <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+        <div className="min-w-0">
+          <p className="text-overline font-semibold uppercase tracking-wide text-muted">{overline}</p>
+          <h2 id="topic-plan-sheet-title" className="mt-1 text-section font-semibold text-ink [overflow-wrap:anywhere]">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-caption text-muted">{subtitle}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={closeLabel}
+          className="grid size-9 shrink-0 place-items-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+        >
+          <X aria-hidden="true" className="size-5" />
+        </button>
+      </header>
+      <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+      <footer className="flex flex-wrap items-center gap-2 border-t border-line bg-surface px-5 py-4 sm:px-6">{footer}</footer>
+    </dialog>
   )
 }

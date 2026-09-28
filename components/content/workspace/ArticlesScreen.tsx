@@ -27,11 +27,12 @@ import EmptyState from '@/components/ui/EmptyState'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Checkbox from '@/components/ui/Checkbox'
-import { CheckCircle2, ChevronDown, ExternalLink, FileText, Loader2, Pencil, Plug, Plus, Search, Send, ShieldCheck, Trash2, Upload, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ExternalLink, FileText, Loader2, Pencil, Plus, Search, Send, ShieldCheck, Trash2, Upload, X } from 'lucide-react'
 import { resolvePublishCta } from '@/lib/content/publish-cta'
 import { CitedBadge } from '@/components/content/ArticleAiVisibilityCard'
 import RowMenu from '@/components/ui/RowMenu'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT, STATUS_TONE, type ArticleRow } from './types'
 
@@ -57,6 +58,10 @@ export default function ArticlesScreen() {
   const { language } = useDashboardLanguage()
   const sp = getDashboardDictionary(language).sitePlatforms
   const siteError = (code: unknown) => (sp.errors as Record<string, string>)[String(code ?? '')] ?? sp.errors.unexpected
+  // Publishing goes live, so it asks first — in the app's own dialog, not the browser's.
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const cf = t.confirms
+  const confirmPublish = (body: string) => confirm({ title: cf.publishTitle, body, confirmLabel: cf.publishAction })
 
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -116,10 +121,10 @@ export default function ArticlesScreen() {
     if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
     if (activePlatform === 'shopify') { await exportRowShopify(a, wpStatus); return }
     if (isSite) { await exportRowSite(a, wpStatus); return }
-    if (wpStatus === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
+    if (wpStatus === 'publish' && !(await confirmPublish(t.rowWp.publishConfirm))) return
     let force = false
     if (a.wp_post_id) {
-      if (!window.confirm(t.rowWp.newPostConfirm)) return
+      if (!(await confirm({ title: cf.newPostTitle, body: t.rowWp.newPostConfirm, confirmLabel: cf.newPostAction }))) return
       force = true
     }
     setRowBusy({ id: a.id, action: wpStatus })
@@ -160,7 +165,7 @@ export default function ArticlesScreen() {
   // shopify_article_id (a retry reconciles the same article, never a duplicate). Surfaces the
   // exact corrective action for a real Shopify prerequisite (scope / blog) — never hidden.
   async function exportRowShopify(a: ArticleRow, status: 'draft' | 'publish') {
-    if (status === 'publish' && !window.confirm(t.rowShopify.publishConfirm)) return
+    if (status === 'publish' && !(await confirmPublish(t.rowShopify.publishConfirm))) return
     setRowBusy({ id: a.id, action: status })
     try {
       const res = await fetch(`/api/content/articles/${a.id}/shopify`, {
@@ -196,7 +201,7 @@ export default function ArticlesScreen() {
   // Idempotent server-side: an article already on the site is reconciled.
   async function exportRowSite(a: ArticleRow, mode: 'draft' | 'publish') {
     if (mode === 'draft') { toast.error(sp.publish.draftUnsupported); return }
-    if (!window.confirm(sp.publish.confirm)) return
+    if (!(await confirm({ title: sp.publish.confirm, confirmLabel: cf.publishAction }))) return
     setRowBusy({ id: a.id, action: 'publish' })
     try {
       const res = await fetch(`/api/content/articles/${a.id}/site-platform`, { method: 'POST' })
@@ -330,7 +335,13 @@ export default function ArticlesScreen() {
     if (ids.length === 0) return
     if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
     if (isSite && mode === 'draft') { toast.error(sp.publish.draftUnsupported); return }
-    if (mode === 'publish' && !window.confirm(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : isSite ? sp.publish.confirm : t.rowWp.publishConfirm)) return
+    if (mode === 'publish') {
+      // The lock is taken only after the answer, so a cancelled question leaves nothing held.
+      const ok = isSite
+        ? await confirm({ title: sp.publish.confirm, confirmLabel: cf.publishAction })
+        : await confirmPublish(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : t.rowWp.publishConfirm)
+      if (!ok || articleBatchRef.current) return
+    }
     articleBatchRef.current = true
     cancelArticleRef.current = false
     setArticleBatchRunning(true); setArticleBatchMode(mode)
@@ -565,10 +576,10 @@ export default function ArticlesScreen() {
                       if (isSite) {
                         return a.status === 'published'
                           ? <Badge variant="success">{sp.publish.live}</Badge>
-                          : <Badge variant="neutral">{sp.publish.notSent}</Badge>
+                          : <NotSent label={sp.publish.notSent} />
                       }
                       if (isShopify) {
-                        if (!a.shopify_article_id) return <Badge variant="neutral">{t.shopifyState.notSent}</Badge>
+                        if (!a.shopify_article_id) return <NotSent label={t.shopifyState.notSent} />
                         const published = a.status === 'published' || a.shopify_status === 'published'
                         return (
                           <span className="inline-flex items-center gap-2">
@@ -582,7 +593,7 @@ export default function ArticlesScreen() {
                         )
                       }
                       const s = wpState(a)
-                      if (s === 'none') return <Badge variant="neutral">{t.wpState.notSent}</Badge>
+                      if (s === 'none') return <NotSent label={t.wpState.notSent} />
                       const published = s === 'published'
                       return (
                         <span className="inline-flex items-center gap-2">
@@ -629,11 +640,10 @@ export default function ArticlesScreen() {
                       const publishLabel = isShopify ? t.rowShopify.publish : isSite ? sp.publish.button : t.rowWp.publish
                       const draftLabel = isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft
                       const INLINE = 'inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:whitespace-nowrap'
-                      const inline = a.status !== 'published' && rowCta.kind === 'connect' ? (
-                        <Link href={rowCta.href} data-cta="connect" className={INLINE}>
-                          <Plug aria-hidden="true" className="size-4" /> {t.editor.topBar.connectToPublish}
-                        </Link>
-                      ) : a.status !== 'published' && rowCta.kind === 'grant_scope' ? (
+                      // With no site connected the rows never repeat "connect the site to
+                      // publish": the setup card at the top of the workspace says it once
+                      // (final review R24). A draft still offers "mark ready" inline.
+                      const inline = a.status !== 'published' && rowCta.kind === 'grant_scope' ? (
                         <a href={rowCta.href} data-cta="grant_scope" className={INLINE}>
                           <ShieldCheck aria-hidden="true" className="size-4" /> {t.editor.topBar.grantScope}
                         </a>
@@ -646,7 +656,7 @@ export default function ArticlesScreen() {
                           {t.rowWp.markReady}
                         </Button>
                       ) : null
-                      const inlineIsMarkReady = !canPublish && canMarkReady && rowCta.kind !== 'connect' && !(a.status !== 'published' && rowCta.kind === 'grant_scope')
+                      const inlineIsMarkReady = !canPublish && canMarkReady && !(a.status !== 'published' && rowCta.kind === 'grant_scope')
                       const menuBusy = busyHere && (rowBusy?.action === 'draft' || (rowBusy?.action === 'ready' && !inlineIsMarkReady))
                       return (
                         <div className="flex items-center justify-end gap-1">
@@ -705,6 +715,16 @@ export default function ArticlesScreen() {
         onClose={() => setDeleting(null)}
         onDeleted={() => { load(); loadTopics(); toast.success(t.toasts.articleDeleted) }}
       />
+      {confirmDialog}
     </>
   )
+}
+
+/**
+ * "Not sent yet" is every new article's normal state, so it is not a badge on each
+ * row (only the exceptions are: exported, published). A quiet dash keeps the column
+ * aligned, and the words stay for a screen reader.
+ */
+function NotSent({ label }: { label: string }) {
+  return <span className="text-caption text-muted" title={label}><span aria-hidden="true">—</span><span className="sr-only">{label}</span></span>
 }

@@ -11,7 +11,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -126,6 +125,7 @@ export default function AutomationSchedule({
 
   // Settings form.
   const [preset, setPreset] = useState<Preset>('weekly1')
+  const cadenceOptions: { value: Preset; label: string }[] = [{ value: 'weekly1', label: t.weekly1 }, { value: 'weekly2', label: t.weekly2 }, { value: 'custom', label: t.customLabel }]
   const [customDays, setCustomDays] = useState(3)
   const [publishTime, setPublishTime] = useState('09:00')
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
@@ -393,8 +393,9 @@ export default function AutomationSchedule({
 
   const active = pool?.isActive ?? false
 
+  // Flat inside the strategy's "advanced" card, below a divider (final review R14).
   return (
-    <Card>
+    <div data-auto-schedule="">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={active ? 'success' : 'neutral'}>{active ? t.active : t.paused}</Badge>
@@ -405,21 +406,34 @@ export default function AutomationSchedule({
 
       {/* Part א — schedule settings. Compact single row (cadence · publish day(s) ·
           actions); stacks on mobile. Exact time/timezone stay internal (hidden).
-          Subtle tint marks it as a distinct panel without adding a heavy card. */}
+          It sits on the page surface; no inner panel (final review R14). */}
       <div className="mb-2 text-copy font-semibold text-ink">{t.settingsTitle}</div>
-      <div className="space-y-3 rounded-inset border border-line bg-sunk/60 p-4">
+      <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
           {/* Cadence */}
           <div className="min-w-0 max-w-full">
             <div className="mb-1.5 text-caption font-semibold text-ink">{t.cadenceLabel}</div>
             <div className="flex flex-wrap items-center gap-2">
-              <Segmented<Preset>
-                ariaLabel={t.cadenceLabel}
-                value={preset}
-                onChange={setPreset}
-                options={[{ value: 'weekly1', label: t.weekly1 }, { value: 'weekly2', label: t.weekly2 }, { value: 'custom', label: t.customLabel }]}
-                className="max-w-full overflow-x-auto"
-              />
+              {/* Three long options do not fit a phone: a Select below sm, the
+                  Segmented from sm (same state, same values). */}
+              <div className="w-full sm:hidden" data-cadence-select="">
+                <Select
+                  id="automation-cadence"
+                  aria-label={t.cadenceLabel}
+                  value={preset}
+                  onChange={(e) => setPreset(e.target.value as Preset)}
+                  options={cadenceOptions}
+                />
+              </div>
+              <div className="hidden sm:block">
+                <Segmented<Preset>
+                  ariaLabel={t.cadenceLabel}
+                  value={preset}
+                  onChange={setPreset}
+                  options={cadenceOptions}
+                  className="max-w-full"
+                />
+              </div>
               {preset === 'custom' && (
                 <label className="inline-flex items-center gap-1.5 text-caption text-body">
                   {t.customDays}
@@ -531,7 +545,7 @@ export default function AutomationSchedule({
                 </button>
               </div>
             )}
-            <Button size="sm" onClick={addSelected} loading={saving} disabled={saving || selected.size === 0}>
+            <Button size="sm" variant="secondary" onClick={addSelected} loading={saving} disabled={saving || selected.size === 0}>
               {t.addSelected} ({selected.size})
             </Button>
           </div>
@@ -549,9 +563,9 @@ export default function AutomationSchedule({
         ) : items.length === 0 ? (
           <p className="rounded-inset border border-dashed border-line-strong px-4 py-5 text-center text-copy text-muted">{t.queueEmpty}</p>
         ) : (
-          <div className="list-enter space-y-2">
+          <div className="list-enter divide-y divide-line border-y border-line">
             {(queueExpanded ? items : items.slice(0, 3)).map((it, idx) => (
-              <div key={it.id} className="flex flex-wrap items-center gap-3 rounded-inset border border-line bg-surface p-3 transition-colors hover:border-line-strong">
+              <div key={it.id} className="flex flex-wrap items-center gap-3 py-3">
                 <div className="flex flex-col">
                   <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={t.moveUp}
                     className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronUp aria-hidden="true" className="size-4" /></button>
@@ -590,7 +604,7 @@ export default function AutomationSchedule({
               </div>
             ))}
             {items.length > 3 && (
-              <div className="pt-0.5">
+              <div className="py-3">
                 <button
                   type="button"
                   onClick={() => setQueueExpanded((v) => !v)}
@@ -613,7 +627,7 @@ export default function AutomationSchedule({
         </summary>
         {/* Distinct soft block: this acts on the EXISTING publishing queue only —
             visually separated from the "add approved topics to queue" area above. */}
-        <div className="mt-3 space-y-2 rounded-inset border border-line bg-sunk/60 p-4">
+        <div className="mt-3 space-y-2">
           <p className="text-caption font-medium text-body">{t.runNowSectionTitle}</p>
           <Button size="sm" variant="secondary" onClick={runNow} loading={runningNow} disabled={runningNow}>
             {runningNow ? t.runNowRunning : t.runNowLabel}
@@ -626,6 +640,6 @@ export default function AutomationSchedule({
           )}
         </div>
       </details>
-    </Card>
+    </div>
   )
 }

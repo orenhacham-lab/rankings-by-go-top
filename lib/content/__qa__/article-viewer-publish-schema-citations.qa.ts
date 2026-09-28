@@ -281,7 +281,13 @@ async function main() {
     check('E4 MUT: the wrong order is caught by the same expectation', wrongOrder({ platform: 'shopify', shopifyNeedsScope: true }) !== 'grant_scope')
     const bar = strip(read('components/content/ArticleTopBar.tsx'))
     const rows = strip(read('components/content/workspace/ArticlesScreen.tsx'))
-    check('E9: the top bar and the article rows use the same resolver', /resolvePublishCta\(/.test(bar) && /resolvePublishCta\(/.test(rows) && /connectToPublish/.test(bar) && /connectToPublish/.test(rows))
+    // R24 — the top bar still offers "connect to publish"; the rows use the same resolver
+    // but no longer repeat the connect link on every row (the setup card says it once).
+    const e9 = (barSrc: string, rowsSrc: string) => /resolvePublishCta\(/.test(barSrc) && /resolvePublishCta\(/.test(rowsSrc) && /connectToPublish/.test(barSrc) && !/connectToPublish/.test(rowsSrc)
+    check('E9: the top bar and the article rows use the same resolver; only the top bar says "connect"', e9(bar, rows))
+    // MUTATION CONTROL: a per-row connect link coming back is caught.
+    check('E9 MUT: a per-row "connect to publish" link is caught',
+      !e9(bar, rows.replace("const inline = a.status !== 'published' && rowCta.kind === 'grant_scope'", "const inline = a.status !== 'published' && rowCta.kind === 'connect' ? <a href={rowCta.href}>{t.editor.topBar.connectToPublish}</a> : a.status !== 'published' && rowCta.kind === 'grant_scope'")))
   }
 
   // ── F) webhook payload ──────────────────────────────────────────────────────

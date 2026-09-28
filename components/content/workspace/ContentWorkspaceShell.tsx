@@ -31,7 +31,7 @@ import type { ReactNode } from 'react'
 
 export default function ContentWorkspaceShell({ children }: { children: ReactNode }) {
   const {
-    t, isHebrew, toast, projectId, projects, data, loading,
+    t, isHebrew, toast, projectId, projects, data, loading, topics,
     projectsResolved, projectsError, reloadProjects,
     briefOpen, closeBrief, briefPrefill, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
   } = useContentWorkspace()
@@ -97,6 +97,7 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
         defaultProjectId={projectId}
         editing={editingTopic}
         prefill={briefPrefill}
+        exampleTerm={topics.find((tp) => tp.primary_keyword?.trim())?.primary_keyword ?? null}
         onSaved={loadTopics}
         onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
         onTopicsCreated={(created) => { if (created.length) { setNewTopicsUnchecked({}); setNewTopicsSelected({}); setNewTopics(created) } }}

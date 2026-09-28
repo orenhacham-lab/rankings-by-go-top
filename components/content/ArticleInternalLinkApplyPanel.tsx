@@ -23,6 +23,7 @@ import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Notice from '@/components/ui/Notice'
@@ -112,6 +113,8 @@ export default function ArticleInternalLinkApplyPanel({
   onPreviewSummaryChange?: (s: PreviewSummary | null) => void
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.linkApply, [language])
+  const cf = useMemo(() => getDashboardDictionary(language).contentHub.confirms, [language])
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const isHebrew = language === 'he'
   const isDraft = status === 'draft' && !isPublished
 
@@ -273,7 +276,7 @@ export default function ArticleInternalLinkApplyPanel({
 
   const apply = useCallback(async () => {
     if (applying || !canApply || !previewToken) return
-    if (!window.confirm(t.applyConfirm)) return
+    if (!(await confirm({ title: cf.applyTitle, body: t.applyConfirm, confirmLabel: cf.applyAction }))) return
     setApplying(true); setError(null); onNoticeChange(null)
     try {
       const res = await fetch(APPLY_URL, {
@@ -311,11 +314,11 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setApplying(false)
     }
-  }, [applying, canApply, previewToken, previewResult, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
+  }, [applying, canApply, previewToken, previewResult, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t, cf, confirm])
 
   const rollback = useCallback(async () => {
     if (rollingBack) return
-    if (!window.confirm(t.rollbackConfirm)) return
+    if (!(await confirm({ title: cf.rollbackTitle, body: t.rollbackConfirm, confirmLabel: cf.rollbackAction }))) return
     setRollingBack(true); setError(null); onNoticeChange(null)
     try {
       const res = await fetch(ROLLBACK_URL, {
@@ -340,7 +343,7 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setRollingBack(false)
     }
-  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
+  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t, cf, confirm])
 
   if (process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING !== 'true') return null
 
@@ -378,7 +381,7 @@ export default function ArticleInternalLinkApplyPanel({
   } else chip = { label: s.readyToPreview, tone: 'neutral' }
 
   return (
-    <Card className="border-s-[3px] border-s-action p-5 sm:p-6">
+    <Card className="p-5 sm:p-6">
       <div dir={isHebrew ? 'rtl' : 'ltr'}>
         {/* Header — distinct from the QA card; toggle does NOT fetch. */}
         <button type="button" onClick={() => setCollapsed((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 rounded-control text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
@@ -411,7 +414,7 @@ export default function ArticleInternalLinkApplyPanel({
                     {loadingPreview ? t.previewing : t.runPreview}
                   </Button>
                   {canApply && (
-                    <Button size="sm" onClick={apply} loading={applying} disabled={applying}>
+                    <Button size="sm" variant="secondary" onClick={apply} loading={applying} disabled={applying}>
                       {applying ? t.applying : t.apply}
                     </Button>
                   )}
@@ -465,7 +468,7 @@ export default function ArticleInternalLinkApplyPanel({
                     <Notice tone="info" className="mt-3">
                       <span className="flex flex-wrap items-center gap-3">
                         <span className="min-w-0 flex-1">{t.plannedAvailable.replace('{n}', String(previewResult.plannedLinks))}</span>
-                        <Button size="sm" onClick={approvePlanned} loading={approvingPlanned} disabled={approvingPlanned || loadingPreview}>
+                        <Button size="sm" variant="secondary" onClick={approvePlanned} loading={approvingPlanned} disabled={approvingPlanned || loadingPreview}>
                           {approvingPlanned ? t.approvingPlanned : t.approvePlanned}
                         </Button>
                       </span>
@@ -612,7 +615,7 @@ export default function ArticleInternalLinkApplyPanel({
                             <p className="max-w-prose text-caption text-muted">{t.reanchorFutureNote}</p>
                             {hasAnyAlternatives && (
                               <div>
-                                <Button size="sm" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
+                                <Button size="sm" variant="secondary" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
                                   {reanchorApplying ? t.reanchorApproving : t.reanchorApprove}
                                 </Button>
                               </div>
@@ -629,6 +632,7 @@ export default function ArticleInternalLinkApplyPanel({
           </div>
         )}
       </div>
+      {confirmDialog}
     </Card>
   )
 }

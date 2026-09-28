@@ -20,7 +20,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { settingsGscHref } from '@/lib/content/content-hub-setup'
-import { Card } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
@@ -146,13 +145,13 @@ export default function GscRecommendations({ projectId, onToast, className }: {
       </div>
 
       {isGscSetupState(gsc.view.state) ? (
-        <Card className="p-5 sm:p-6">
+        <div>
           <GscSetupPrompt state={gsc.view.state} about={w.about} projectId={projectId} />
-        </Card>
+        </div>
       ) : gsc.view.state === 'error' ? (
-        <Card className="p-5 sm:p-6"><GscLoadError onRetry={gsc.reload} /></Card>
+        <div><GscLoadError onRetry={gsc.reload} /></div>
       ) : gsc.view.state === 'loading' ? (
-        <Card className="p-5 sm:p-6"><GscLoading /></Card>
+        <div><GscLoading /></div>
       ) : (
       <>
       {/* Window toggle */}
@@ -171,16 +170,14 @@ export default function GscRecommendations({ projectId, onToast, className }: {
           {[0, 1].map((i) => <Skeleton key={i} className="h-40 rounded-card" />)}
         </div>
       ) : errored ? (
-        <Card className="p-5 text-copy text-muted sm:p-6">{t.genericError}</Card>
+        <p className="text-copy text-muted">{t.genericError}</p>
       ) : stateMessage && stateCta ? (
-        <Card className="p-5 sm:p-6">
+        <div>
           <p className="mb-3 max-w-prose text-copy text-muted">{stateMessage}</p>
           <Link href={gscHref} className={LINK_BUTTON}>{stateCta}</Link>
-        </Card>
+        </div>
       ) : recommendations.length === 0 ? (
-        <Card padding={false}>
-          <EmptyState icon={<Lightbulb />} title={t.emptyTitle} body={t.emptyBody} />
-        </Card>
+        <EmptyState icon={<Lightbulb />} title={t.emptyTitle} body={t.emptyBody} />
       ) : (
         <>
           {/* Summary strip */}
@@ -203,13 +200,13 @@ export default function GscRecommendations({ projectId, onToast, className }: {
 
           {/* One compact list: a row per recommendation, its page, its numbers, the
               reason behind a disclosure, one inline action and the rest in the row menu. */}
-          <Card padding={false}>
-          <ul className="divide-y divide-line">
+          {/* Flat inside the strategy's "advanced" card: hairlines, not a card in a card. */}
+          <ul className="divide-y divide-line border-y border-line">
             {filtered.map((r) => {
               const pages = r.involvedPages ?? []
               const shown = showAllPages[r.id] ? pages : pages.slice(0, OVERLAP_INITIAL)
               return (
-                <li key={r.id} className="px-4 py-4 sm:px-5">
+                <li key={r.id} className="py-4">
                   <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                     <div className="min-w-0 flex-1 basis-72">
                       <div className="flex flex-wrap items-center gap-2">
@@ -287,7 +284,7 @@ export default function GscRecommendations({ projectId, onToast, className }: {
                     {t.whyLabel}
                   </button>
                   {expanded[r.id] && (
-                    <div className="mt-1.5 space-y-1.5 rounded-inset border border-line bg-sunk/60 p-3 text-caption text-body motion-safe:animate-pop-in">
+                    <div className="mt-1.5 space-y-1.5 border-s-2 border-line ps-3 text-caption text-body motion-safe:animate-pop-in">
                       <ul className="list-disc space-y-0.5 ps-4">
                         {r.reasonKeys.map((k) => <li key={k}>{t.reasons[k]}</li>)}
                       </ul>
@@ -303,7 +300,6 @@ export default function GscRecommendations({ projectId, onToast, className }: {
               )
             })}
           </ul>
-          </Card>
         </>
       )}
       </>
