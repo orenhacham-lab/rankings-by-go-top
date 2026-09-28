@@ -528,7 +528,8 @@ async function main() {
     // The volume cell: GscVolumeCell alone decides whether a line goes under the volume
     // (and, switched off, whether there is a column to stack it in at all).
     const table = code('components/keywords/TrackingTargetsTable.tsx')
-    const volumeInCell = (src: string) => /<Td>\s*<GscVolumeCell view=\{gscKeywords\} targetId=\{target\.id\}>\s*\{target\.avg_monthly_searches !== null[\s\S]*?<\/GscVolumeCell>\s*<\/Td>/.test(src)
+    // The cell may drop out on a phone (priority columns); its content is what E2 is about.
+    const volumeInCell = (src: string) => /<Td(?: className="hidden sm:table-cell")?>\s*<GscVolumeCell view=\{gscKeywords\} targetId=\{target\.id\}>\s*\{target\.avg_monthly_searches !== null[\s\S]*?<\/GscVolumeCell>\s*<\/Td>/.test(src)
       && !/<GscKeywordLine\b/.test(src)
     check('E2: the keywords table puts every search volume in the Search Console cell, which alone decides what goes under it', volumeInCell(table))
     check('E2-MUT: a table that stacks the line itself, in a column kept in every state, fails E2',

@@ -8,6 +8,7 @@
  * flatten them into plain text). Emits HTML.
  */
 
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -42,7 +43,7 @@ export default function ArticleContentEditor({
     content: value || '',
     editorProps: {
       attributes: {
-        class: 'article-content max-w-none min-h-[320px] focus:outline-none px-3 py-2 text-slate-800 dark:text-slate-100',
+        class: 'article-content max-w-none min-h-[320px] focus:outline-none px-3 py-2 text-ink',
         dir,
       },
     },
@@ -60,14 +61,14 @@ export default function ArticleContentEditor({
   }, [value, editor])
 
   if (!editor) {
-    return <div className="min-h-[320px] rounded-lg border border-slate-200 dark:border-slate-700 animate-pulse" />
+    return <Skeleton className="min-h-[320px] rounded-control border border-line" />
   }
 
   const btn = (active: boolean) =>
-    `px-2 py-1 text-sm rounded border transition ${
+    `px-2 py-1 text-copy rounded border transition ${
       active
-        ? 'bg-indigo-600 text-white border-indigo-600'
-        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+        ? 'bg-action text-action-ink border-action'
+        : 'bg-surface text-body border-line'
     }`
 
   function setLink() {
@@ -82,8 +83,8 @@ export default function ArticleContentEditor({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div className="flex flex-wrap gap-1 p-2 border-b border-slate-200 dark:border-slate-700">
+    <div className="rounded-control border border-line bg-surface">
+      <div className="flex flex-wrap gap-1 p-2 border-b border-line">
         <button type="button" className={btn(editor.isActive('heading', { level: 2 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title={tb.heading2} aria-label={tb.heading2}>H2</button>
         <button type="button" className={btn(editor.isActive('heading', { level: 3 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title={tb.heading3} aria-label={tb.heading3}>H3</button>
         <button type="button" className={btn(editor.isActive('bold'))} onClick={() => editor.chain().focus().toggleBold().run()} title={tb.bold} aria-label={tb.bold}><strong>B</strong></button>
@@ -91,7 +92,7 @@ export default function ArticleContentEditor({
         <button type="button" className={btn(editor.isActive('bulletList'))} onClick={() => editor.chain().focus().toggleBulletList().run()}>• {tb.bulletList}</button>
         <button type="button" className={btn(editor.isActive('orderedList'))} onClick={() => editor.chain().focus().toggleOrderedList().run()}>1. {tb.orderedList}</button>
         <button type="button" className={btn(editor.isActive('link'))} onClick={setLink}>{tb.link}</button>
-        <span className="mx-1 w-px self-stretch bg-slate-200 dark:bg-slate-700" aria-hidden />
+        <span className="mx-1 w-px self-stretch bg-line" aria-hidden />
         {editor.isActive('table') ? (
           <>
             <button type="button" className={btn(false)} onClick={() => editor.chain().focus().addColumnAfter().run()} title={tb.addColumn}>+ {tb.column}</button>
@@ -101,7 +102,7 @@ export default function ArticleContentEditor({
         ) : (
           <button type="button" className={btn(false)} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title={tb.insertTable}>▦ {tb.table}</button>
         )}
-        <span className="mx-1 w-px self-stretch bg-slate-200 dark:bg-slate-700" aria-hidden />
+        <span className="mx-1 w-px self-stretch bg-line" aria-hidden />
         <button type="button" className={btn(false)} onClick={() => editor.chain().focus().undo().run()} title={tb.undo} aria-label={tb.undo}>↶</button>
         <button type="button" className={btn(false)} onClick={() => editor.chain().focus().redo().run()} title={tb.redo} aria-label={tb.redo}>↷</button>
       </div>

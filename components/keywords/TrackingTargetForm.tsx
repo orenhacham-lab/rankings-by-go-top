@@ -5,6 +5,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
+import { FIELD_CLASSES } from '@/components/ui/Input'
 import { TrackingTarget, LocationMode } from '@/lib/supabase/types'
 import { saveTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -156,12 +157,12 @@ export default function TrackingTargetForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-3 bg-bad-soft border border-bad/30 rounded-control text-bad text-copy">
           {error}
         </div>
       )}
       {successMsg && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+        <div className="p-3 bg-ok-soft border border-ok/30 rounded-control text-ok text-copy">
           {successMsg}
         </div>
       )}
@@ -170,14 +171,14 @@ export default function TrackingTargetForm({
 
       {/* Bulk mode toggle — only when creating */}
       {!target && (
-        <div className="flex gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
+        <div role="group" className="inline-flex rounded-control border border-line bg-sunk p-0.5">
           <button
             type="button"
             onClick={() => setBulkMode(false)}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
               !bulkMode
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                ? 'bg-surface text-ink shadow-card'
+                : 'text-muted hover:text-ink'
             }`}
           >
             {t.modeSingle}
@@ -185,10 +186,10 @@ export default function TrackingTargetForm({
           <button
             type="button"
             onClick={() => setBulkMode(true)}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
               bulkMode
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                ? 'bg-surface text-ink shadow-card'
+                : 'text-muted hover:text-ink'
             }`}
           >
             {t.modeBulk}
@@ -198,7 +199,7 @@ export default function TrackingTargetForm({
 
       {bulkMode ? (
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <label className="mb-1.5 block text-caption font-semibold text-ink">
             {t.bulkKeywordsLabel}
           </label>
           <textarea
@@ -207,9 +208,9 @@ export default function TrackingTargetForm({
             rows={6}
             dir={isEnglish ? 'ltr' : 'rtl'}
             placeholder={t.bulkPlaceholder}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className={`${FIELD_CLASSES} resize-none py-2.5`}
           />
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+          <p className="text-caption text-muted mt-1">
             {t.bulkHint}
           </p>
         </div>
@@ -287,7 +288,7 @@ export default function TrackingTargetForm({
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
-          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+          <div className="mt-2 p-2 bg-info-soft border border-info/25 rounded-control text-info text-caption">
             {t.locationUsOnlyNote}
           </div>
         )}
@@ -308,12 +309,12 @@ export default function TrackingTargetForm({
             required
           />
           {validationError && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+            <div className="mt-2 p-2 bg-bad-soft border border-bad/30 rounded-control text-bad text-caption">
               {validationError}
             </div>
           )}
           {customCityDiffers && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+            <div className="mt-2 p-2 bg-warn-soft border border-warn/30 rounded-control text-warn text-caption">
               {t.customCityDiffers}
             </div>
           )}
@@ -368,21 +369,21 @@ export default function TrackingTargetForm({
       )}
 
       {locationMode === 'exact_point' && (
-        <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-          <div className="text-sm text-slate-700 dark:text-slate-200 font-medium">
+        <div className="space-y-3 p-3 bg-sunk border border-line rounded-control">
+          <div className="text-copy text-body font-medium">
             {t.exactPointTitle}
           </div>
-          <div className="flex gap-2">
+          <div role="group" className="inline-flex rounded-control border border-line bg-sunk p-0.5">
             <button
               type="button"
               onClick={() => {
                 setExactSubMode('address')
                 setValidationError('')
               }}
-              className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+              className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
                 exactSubMode === 'address'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  ? 'bg-surface text-ink shadow-card'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               {t.exactSubModeAddress}
@@ -393,10 +394,10 @@ export default function TrackingTargetForm({
                 setExactSubMode('coords')
                 setValidationError('')
               }}
-              className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+              className={`inline-flex h-8 items-center rounded-[0.375rem] px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ${
                 exactSubMode === 'coords'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  ? 'bg-surface text-ink shadow-card'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               {t.exactSubModeCoords}
@@ -448,12 +449,12 @@ export default function TrackingTargetForm({
           )}
 
           {validationError && (
-            <div className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+            <div className="p-2 bg-bad-soft border border-bad/30 rounded-control text-bad text-caption">
               {validationError}
             </div>
           )}
 
-          <div className="text-xs text-slate-500">
+          <div className="text-caption text-muted">
             {t.exactCoordsNote}
           </div>
         </div>

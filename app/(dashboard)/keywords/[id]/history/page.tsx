@@ -9,6 +9,10 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
+import StatTile from '@/components/ui/StatTile'
+import EmptyState from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { SearchX } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -49,15 +53,23 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-400">
-        <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        {common.loading}
+      <div role="status" aria-busy="true" className="space-y-6">
+        <span className="sr-only">{common.loading}</span>
+        <Skeleton className="h-9 w-64" />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}
+        </div>
+        <Skeleton className="h-72 rounded-card" />
       </div>
     )
   }
 
   if (!target) {
-    return <div className="text-center py-20 text-slate-400">{t.keywordNotFound}</div>
+    return (
+      <Card padding={false}>
+        <EmptyState icon={<SearchX />} title={t.keywordNotFound} action={<Link href="/keywords"><Button variant="outline">{t.backToKeywords}</Button></Link>} />
+      </Card>
+    )
   }
 
   const foundResults = results.filter((r) => r.found && r.position !== null)
@@ -84,41 +96,21 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         }
       />
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.engine}</div>
-          <EngineBadge engine={target.engine_type} />
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.currentPosition}</div>
-          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-            {latestResult?.found ? `#${latestResult.position}` : '—'}
-          </div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.bestPosition}</div>
-          <div className="text-2xl font-bold text-green-600">
-            {bestPosition !== null ? `#${bestPosition}` : '—'}
-          </div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.worstPosition}</div>
-          <div className="text-2xl font-bold text-red-500">
-            {worstPosition !== null ? `#${worstPosition}` : '—'}
-          </div>
-        </Card>
-        <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.average}</div>
-          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-            {avgPosition !== null ? `#${avgPosition}` : '—'}
-          </div>
-        </Card>
+      {/* Summary: the same tile as every other screen. */}
+      <div className="list-enter mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
+        <div className="flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-card sm:p-5">
+          <span className="text-caption font-medium text-muted">{t.engine}</span>
+          <div className="mt-2"><EngineBadge engine={target.engine_type} /></div>
+        </div>
+        <StatTile label={t.currentPosition} value={latestResult?.found ? `#${latestResult.position}` : '—'} />
+        <StatTile label={t.bestPosition} value={<span className="text-ok">{bestPosition !== null ? `#${bestPosition}` : '—'}</span>} />
+        <StatTile label={t.worstPosition} value={<span className="text-bad">{worstPosition !== null ? `#${worstPosition}` : '—'}</span>} />
+        <StatTile label={t.average} value={avgPosition !== null ? `#${avgPosition}` : '—'} />
       </div>
 
       {/* History Table */}
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+        <h2 className="text-section font-semibold text-ink">
           {t.historyLabel} ({results.length} {t.checks})
         </h2>
       </div>
@@ -144,14 +136,14 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
               <Td>{formatDateTime(result.checked_at)}</Td>
               <Td>
                 {result.found && result.position !== null ? (
-                  <span className="font-bold text-slate-800 dark:text-slate-100">#{result.position}</span>
+                  <span className="font-semibold text-ink">#{result.position}</span>
                 ) : (
-                  <span className="text-slate-400 dark:text-slate-500">—</span>
+                  <span className="text-muted">—</span>
                 )}
               </Td>
               <Td>
                 {result.previous_position !== null ? (
-                  <span className="text-slate-500 dark:text-slate-400">#{result.previous_position}</span>
+                  <span className="text-muted">#{result.previous_position}</span>
                 ) : '—'}
               </Td>
               <Td>
@@ -168,14 +160,15 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
                     href={result.result_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline text-xs truncate max-w-48 block"
+                    dir="ltr"
+                    className="block max-w-48 truncate text-caption text-action hover:underline"
                   >
                     {result.result_url}
                   </a>
                 ) : '—'}
               </Td>
               <Td>
-                <span className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-40 block">
+                <span className="text-caption text-body truncate max-w-40 block">
                   {result.result_title || result.result_address || '—'}
                 </span>
               </Td>

@@ -317,10 +317,10 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         <div
           role="alert"
           aria-live="polite"
-          className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md sm:w-auto z-[100] animate-pop-in"
+          className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md sm:w-auto z-[100] motion-safe:animate-pop-in"
         >
           <div
-            className={`p-3 pr-2 rounded-control text-sm flex items-center gap-2 shadow-pop border ${
+            className={`p-3 pr-2 rounded-control text-copy flex items-center gap-2 shadow-pop border ${
               scanError ? 'bg-bad-soft border-bad/20 text-bad' : 'bg-ok-soft border-ok/20 text-ok'
             }`}
           >
@@ -360,13 +360,13 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
             placeholder={kp.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full max-w-xs rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full max-w-xs rounded-control border border-line bg-surface px-3 py-2 text-copy text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-action"
           />
           <select
             value={engineFilter}
             onChange={(e) => setEngineFilter(e.target.value)}
             aria-label={k.table.scanType}
-            className="rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-action"
+            className="rounded-control border border-line bg-surface px-3 py-2 text-copy text-ink focus:outline-none focus:ring-2 focus:ring-action"
           >
             <option value="">{kp.allEngines}</option>
             <option value="google_search">{kp.engineGoogleSearch}</option>
@@ -398,7 +398,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
       <GscKeywordsNotice projectId={id} view={gscKeywords} className="mb-3" />
 
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
-        <p className="rounded-card border border-line bg-surface px-4 py-10 text-center text-sm text-muted">{kp.noMatches}</p>
+        <p className="rounded-card border border-line bg-surface px-4 py-10 text-center text-copy text-muted">{kp.noMatches}</p>
       ) : (
         <TrackingTargetsTable
           targets={visibleTargets}
@@ -448,7 +448,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   return (
     <div className="min-w-0 bg-surface px-4 py-3">
       <dt className="text-caption text-muted">{label}</dt>
-      <dd className="mt-1 truncate text-sm font-medium text-ink">{children}</dd>
+      <dd className="mt-1 truncate text-copy font-medium text-ink">{children}</dd>
     </div>
   )
 }

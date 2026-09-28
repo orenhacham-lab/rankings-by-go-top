@@ -19,6 +19,9 @@ import { usePathname } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Header from '@/components/layout/Header'
+import EmptyState from '@/components/ui/EmptyState'
+import { ScreenSkeleton } from '@/components/ui/Skeleton'
+import { FolderOpen, FolderPlus, RotateCw } from 'lucide-react'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import ContentHubSetup from '@/components/content/ContentHubSetup'
 import { ToastHost } from '@/components/content/Toast'
@@ -56,20 +59,16 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
       {/* The accessible-project list FAILED to load — never rendered as "you have
           no projects", which is a different fact and offers no way forward. */}
       {projectsResolved && projectsError ? (
-        <Card className="p-10 text-center">
-          <p className="text-sm text-body mb-4">{t.projectsLoadError}</p>
-          <Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>
+        <Card padding={false}>
+          <EmptyState icon={<RotateCw />} title={t.projectsLoadError} action={<Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>} />
         </Card>
       ) : !projectsResolved ? (
         /* Still resolving — do NOT flash an empty state at a user who has projects. */
-        <Card className="p-10 text-center">
-          <p className="text-sm text-muted">{t.projectsLoading}</p>
-        </Card>
+        <ScreenSkeleton label={t.projectsLoading} />
       ) : /* No projects → empty state */
       !loading && projects.length === 0 ? (
-        <Card className="p-10 text-center">
-          <p className="text-sm text-body mb-4">{t.noProjectsTitle}</p>
-          <Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>
+        <Card padding={false}>
+          <EmptyState icon={<FolderPlus />} title={t.noProjectsTitle} action={<Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>} />
         </Card>
       ) : (
         <>
@@ -80,8 +79,8 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
 
           {/* No project selected yet (multi-project) */}
           {!projectId ? (
-            <Card className="p-10 text-center text-muted">
-              {t.selectProjectMessage}
+            <Card padding={false}>
+              <EmptyState icon={<FolderOpen />} title={t.selectProjectMessage} />
             </Card>
           ) : (
             children

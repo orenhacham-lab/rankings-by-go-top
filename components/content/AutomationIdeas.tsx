@@ -13,6 +13,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { CheckCircle2, Sparkles, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
 import { buildEngineRejectionLines } from '@/lib/content/recommendations/engine-rejection-line'
@@ -121,6 +123,9 @@ export default function AutomationIdeas({
   proFirst?: boolean
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
+  // The intent is stored as a code ('informational'); the card says it in words.
+  const intents = getDashboardDictionary(language).contentHub.brief.intents as Record<string, string>
+  const intentText = (code: string) => (intents[code] ?? code).split(' — ')[0]
   const isHebrew = language === 'he'
   // The exact per-topic queue payload to RETRY (links already saved; only the enqueue
   // step failed) — re-sent to the authoritative approve-and-queue route.
@@ -261,7 +266,7 @@ export default function AutomationIdeas({
   // Part 1 — only these states carry a useful customer action/positive note. Internal-processing
   // states (evaluated_none_accepted / eligible_not_consumed / no_eligible / disabled) render NOTHING.
   const GSC_CUSTOMER_VISIBLE = new Set<GscRunState>(['supported', 'not_connected', 'no_property', 'never_synced', 'read_failed'])
-  const gscStatusColor = (state: GscRunState) => (GSC_AMBER_STATES.has(state) ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400')
+  const gscStatusColor = (state: GscRunState) => (GSC_AMBER_STATES.has(state) ? 'text-warn' : 'text-muted')
 
   // Monotonic request id: only the latest generate() call is allowed to write
   // state, so a slow earlier response can never overwrite a newer one.
@@ -779,53 +784,54 @@ export default function AutomationIdeas({
   }
 
   return (
-    <Card className="hover:translate-y-0">
-      <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.intro}</p>
+    <Card>
+      <h3 className="text-section font-semibold text-ink">{t.title}</h3>
+      <p className="mt-1 mb-4 max-w-prose text-copy text-muted">{t.intro}</p>
 
       {/* Onboarding / chronology block (Phase 3F.3.3a) — more visible, explains
           the two-step flow (approve → add to publishing queue). */}
-      <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-500/10 px-4 py-3">
-        <div className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">{t.onboardTitle}</div>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{t.onboardBody}</p>
-        <ol className="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">1.</span> {t.onboardStep1}</li>
-          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">2.</span> {t.onboardStep2}</li>
-          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">3.</span> {t.onboardStep3}</li>
-          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">4.</span> {t.onboardStep4}</li>
-          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">5.</span> {t.onboardStep5}</li>
+      <div className="mb-4 rounded-inset border border-action/30 bg-action-soft px-4 py-3">
+        <div className="text-copy font-semibold text-ink">{t.onboardTitle}</div>
+        <p className="mt-1 text-caption text-body">{t.onboardBody}</p>
+        <ol className="mt-3 grid gap-x-4 gap-y-2 text-caption text-body sm:grid-cols-2">
+          {[t.onboardStep1, t.onboardStep2, t.onboardStep3, t.onboardStep4, t.onboardStep5].map((step, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-pill bg-surface text-overline font-semibold tabular-nums text-action ring-1 ring-action/30">{i + 1}</span>
+              <span className="pt-0.5"><span className="sr-only">{i + 1}. </span>{step}</span>
+            </li>
+          ))}
         </ol>
-        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{t.onboardHelperNote}</p>
+        <p className="mt-2 text-caption text-muted">{t.onboardHelperNote}</p>
       </div>
 
       {/* Phase 3F.3.7g — prominent, dismissible success confirmation after enqueue. */}
       {queueSuccess && (
-        <div ref={successRef} className="mb-4 rounded-xl border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3 scroll-mt-4">
-          <div className="flex items-start gap-2">
-            <span className="text-lg leading-none text-emerald-600 dark:text-emerald-400">✓</span>
+        <div ref={successRef} role="status" className="mb-4 scroll-mt-4 rounded-inset border border-ok/30 bg-ok-soft px-4 py-3 motion-safe:animate-pop-in">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 size={18} aria-hidden className="mt-0.5 shrink-0 text-ok" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{queueSuccess.count > 1 ? t.queueSuccessTitleMany : t.queueSuccessTitleOne}</div>
-              <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{queueSuccess.count > 1 ? t.queueSuccessBodyMany : t.queueSuccessBodyOne}</p>
-              {queueSuccess.links && <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queueSuccessLinksNote}</p>}
+              <div className="text-copy font-semibold text-ok">{queueSuccess.count > 1 ? t.queueSuccessTitleMany : t.queueSuccessTitleOne}</div>
+              <p className="mt-0.5 text-caption text-ok">{queueSuccess.count > 1 ? t.queueSuccessBodyMany : t.queueSuccessBodyOne}</p>
+              {queueSuccess.links && <p className="mt-1 text-caption text-ok">{t.queueSuccessLinksNote}</p>}
               {onGoToQueue && (
                 <div className="mt-2">
                   <Button size="sm" onClick={() => { setQueueSuccess(null); onGoToQueue() }}>{t.goToQueue}</Button>
                 </div>
               )}
             </div>
-            <button type="button" onClick={() => setQueueSuccess(null)} className="text-emerald-700/70 dark:text-emerald-300/70 hover:text-emerald-900 dark:hover:text-emerald-100 text-xs" aria-label={t.dismiss}>✕</button>
+            <button type="button" onClick={() => setQueueSuccess(null)} className="rounded-control p-1 text-ok transition-colors hover:bg-surface/70" aria-label={t.dismiss}><X size={14} aria-hidden /></button>
           </div>
         </div>
       )}
 
       {/* Part 1 — one smart combined scan. No source selector, no keyword input. */}
-      <div className="mb-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 px-4 py-3">
-        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.smartScanTitle}</div>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{t.smartScanExplain}</p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <Button onClick={generate} loading={loading} disabled={loading}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-inset border border-line bg-sunk/60 px-4 py-3">
+        <div className="min-w-0 flex-1 basis-64">
+          <div className="text-copy font-semibold text-ink">{t.smartScanTitle}</div>
+          <p className="mt-1 text-caption text-body">{t.smartScanExplain}</p>
+        </div>
+        <Button onClick={generate} loading={loading} disabled={loading} className="shrink-0">
+          {!loading && <Sparkles size={16} aria-hidden />}
           {loading ? t.generating : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
       </div>
@@ -836,7 +842,7 @@ export default function AutomationIdeas({
           Stage D: HIDDEN entirely when the global Pro-first controller is active. */}
       {!PRO_FIRST && (
       <div className="mb-3" data-testid="reco-quality-selector">
-        <span id="reco-quality-label" className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">{t.qualityChooseLabel}</span>
+        <span id="reco-quality-label" className="block text-caption font-medium text-muted mb-1">{t.qualityChooseLabel}</span>
         <div role="radiogroup" aria-labelledby="reco-quality-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {([
             { m: 'standard' as const, label: t.qualityFastLabel, desc: t.qualityFastDesc },
@@ -850,15 +856,17 @@ export default function AutomationIdeas({
               aria-label={m === 'premium' ? `${label} — Gemini Pro` : `${label} — Gemini Flash`}
               onClick={() => chooseQuality(m)}
               disabled={loading}
-              className={`text-start rounded-lg border px-3 py-2 transition-colors disabled:opacity-60 ${qualityMode === m
-                ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/50'
-                : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}
+              className={`text-start rounded-inset border px-3 py-2.5 transition-[border-color,background-color] duration-150 disabled:opacity-60 ${qualityMode === m
+                ? 'border-action bg-action-soft'
+                : 'border-line bg-surface hover:border-line-strong'}`}
             >
-              <span className={`flex items-center gap-1.5 text-sm font-medium ${qualityMode === m ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-200'}`}>
-                <span className={`inline-block h-3.5 w-3.5 rounded-full border-2 ${qualityMode === m ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'}`} aria-hidden />
+              <span className={`flex items-center gap-1.5 text-copy font-medium ${qualityMode === m ? 'text-ink' : 'text-body'}`}>
+                <span className={`inline-flex size-4 items-center justify-center rounded-pill border-2 transition-colors duration-150 ${qualityMode === m ? 'border-action' : 'border-line-strong'}`} aria-hidden>
+                  {qualityMode === m && <span className="size-2 rounded-pill bg-action motion-safe:animate-pop-in" />}
+                </span>
                 {label}
               </span>
-              <span className="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{desc}</span>
+              <span className="mt-0.5 block text-caption leading-snug text-muted">{desc}</span>
             </button>
           ))}
         </div>
@@ -869,7 +877,7 @@ export default function AutomationIdeas({
           Model name / tier / downgrade state stay out of the normal UI (QA/admin only).
           Stage D: also hidden whenever the Pro-first controller is active. */}
       {modelPath && QUALITY_SELECTOR_ENABLED && !PRO_FIRST && !loading && (
-        <p className={`text-[11px] mb-2 ${modelPath.downgraded ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`} data-testid="reco-model-path">
+        <p className={`text-caption mb-2 ${modelPath.downgraded ? 'text-warn' : 'text-muted'}`} data-testid="reco-model-path">
           {modelPath.downgraded
             ? t.qualityDowngraded.replace('{model}', String(modelPath.model ?? '—'))
             : t.qualityModelUsed.replace('{model}', String(modelPath.model ?? '—'))}
@@ -877,45 +885,45 @@ export default function AutomationIdeas({
       )}
 
       {message && (
-        <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
+        <p className={`text-caption mb-2 ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>
       )}
       {/* Accurate per-run summary: NEW additions this run vs TOTAL saved shown —
           never labels the total as "new". */}
       {meta && suggestions.length > 0 && (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+        <p className="text-caption text-muted mb-1">
           {t.runSummary.replace('{new}', String(meta.newlyAdded)).replace('{total}', String(suggestions.length))}
         </p>
       )}
       {/* Part 3 — customer-safe sources-analyzed line (only sources that actually contributed). */}
       {meta?.scanSources && !loading && sourcesAnalyzedText(meta.scanSources) && (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+        <p className="text-caption text-muted mb-1">
           {t.sourcesAnalyzedLabel}: {sourcesAnalyzedText(meta.scanSources)}
         </p>
       )}
       {/* Part 4 — one Search Console run status. Only supported + the actionable connection/sync/
           read-failure states render; internal-processing states show nothing. */}
       {meta?.gscRunSummary && GSC_CUSTOMER_VISIBLE.has(meta.gscRunSummary.state) && !loading && (
-        <p className={`text-[11px] mb-2 ${gscStatusColor(meta.gscRunSummary.state)}`}>
+        <p className={`text-caption mb-2 ${gscStatusColor(meta.gscRunSummary.state)}`}>
           {gscStatusText(meta.gscRunSummary)}
         </p>
       )}
       {/* Preview/operator-only low-yield diagnostic — present in the response ONLY when isolation
           diagnostics are on and this is not Production. Small muted text; existing counts only. */}
       {meta?.operatorRunDiag && !loading && (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-1" dir="rtl">
+        <p className="text-caption text-muted mb-1" dir="rtl">
           {t.opDiag.label}: {t.opDiag.pool} {meta.operatorRunDiag.pool ?? '—'} · {t.opDiag.evaluated} {meta.operatorRunDiag.evaluated ?? '—'} · {meta.operatorRunDiag.remainingPool != null ? `${t.opDiag.remaining} ${meta.operatorRunDiag.remainingPool} · ` : ''}{t.opDiag.generated} {meta.operatorRunDiag.generated} · {t.opDiag.engine} {meta.operatorRunDiag.engineAccepted} · {t.opDiag.final} {meta.operatorRunDiag.finalReady} · {t.opDiag.saved} {meta.operatorRunDiag.persisted}{meta.operatorRunDiag.synthesisRounds != null ? ` · ${t.opDiag.rounds} ${meta.operatorRunDiag.synthesisRounds}` : ''} · {t.opDiag.refill} {meta.operatorRunDiag.thirdRefillUsed ? '✓' : meta.operatorRunDiag.thirdRefillEligible ? '~' : '✗'} · {t.opDiag.gscConsumed} {meta.operatorRunDiag.gscConsumed} · {t.opDiag.gscSupported} {meta.operatorRunDiag.gscSupported}{meta.operatorRunDiag.callsRemaining != null ? ` · ${t.opDiag.callsLeft} ${meta.operatorRunDiag.callsRemaining}` : ''}{meta.operatorRunDiag.stopReason ? ` · ${t.opDiag.stop}: ${meta.operatorRunDiag.stopReason}` : ''}
         </p>
       )}
       {/* Part 2 — Preview/operator-only top rejection reasons (count-only, deterministic). */}
       {meta?.operatorRunDiag?.topRejectionReasons && meta.operatorRunDiag.topRejectionReasons.length > 0 && !loading && (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2" dir="rtl">
+        <p className="text-caption text-muted mb-2" dir="rtl">
           {t.opDiag.topRejections}: {meta.operatorRunDiag.topRejectionReasons.map((r) => `${r.reason} ${r.count}`).join(' · ')}
         </p>
       )}
       {/* Preview/operator-only FINAL-CALL strategy line — rendered ONLY when the fallback slot was
           evaluated (strategy !== 'not_used'). Count-only; no queries/ids/prompts/model output. */}
       {meta?.operatorRunDiag && !loading && meta.operatorRunDiag.thirdCallStrategy && meta.operatorRunDiag.thirdCallStrategy !== 'not_used' && (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2" dir="rtl">
+        <p className="text-caption text-muted mb-2" dir="rtl">
           {meta.operatorRunDiag.thirdCallStrategy === 'low_yield_discovery_synthesis' && meta.operatorRunDiag.lowYieldFallback
             ? `${t.opDiag.strategyLabel}: ${t.opDiag.strategyLowYield} · ${t.opDiag.call} ${meta.operatorRunDiag.lowYieldFallback.callOrdinal ?? '—'} · ${t.opDiag.rawSeeds} ${meta.operatorRunDiag.lowYieldFallback.rawSeedCount} · ${t.opDiag.eligibleSeeds} ${meta.operatorRunDiag.lowYieldFallback.eligibleSeedCount} · ${t.opDiag.sentSeeds} ${meta.operatorRunDiag.lowYieldFallback.seedsSent} · ${t.opDiag.generated} ${meta.operatorRunDiag.lowYieldFallback.emitted} · ${t.opDiag.engine} ${meta.operatorRunDiag.lowYieldFallback.engineAccepted} · ${t.opDiag.final} ${meta.operatorRunDiag.lowYieldFallback.finalReady} · ${t.opDiag.saved} ${meta.operatorRunDiag.lowYieldFallback.persisted}`
             : meta.operatorRunDiag.thirdCallStrategy === 'normal_refill'
@@ -926,9 +934,9 @@ export default function AutomationIdeas({
       {/* Phase 4C — hybrid per-provider transparency: which sources ran, and a
           clear "X unavailable" for any that failed (the run never fails wholesale). */}
       {meta?.providers && meta.providers.length > 0 && !loading && (
-        <p className="text-[11px] mb-2">
+        <p className="text-caption mb-2">
           {meta.providers.map((p, i) => (
-            <span key={p.source} className={p.ok ? 'text-slate-500 dark:text-slate-400' : 'text-amber-700 dark:text-amber-400'}>
+            <span key={p.source} className={p.ok ? 'text-muted' : 'text-warn'}>
               {i > 0 && ' · '}
               {p.ok ? `${sourceBadge(p.source)}: ${p.count}` : t.hybridProviderUnavailable.replace('{s}', sourceBadge(p.source))}
             </span>
@@ -938,7 +946,7 @@ export default function AutomationIdeas({
       {/* When this run added nothing new, explain WHY (existing keywords / all
           known / keyword-research exhausted) — total pending stays visible above. */}
       {meta && suggestions.length > 0 && meta.newlyAdded === 0 && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+        <p className="text-caption text-warn mb-2">
           {meta.reason === 'kr_exhausted'
             ? t.krExhausted
             : meta.reason === 'covered_by_existing'
@@ -957,7 +965,7 @@ export default function AutomationIdeas({
       )}
       {/* Nothing to show at all — helpful empty reason. */}
       {meta && suggestions.length === 0 && !loading && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+        <p className="text-caption text-warn mb-2">
           {meta.reason === 'no_scan'
             ? t.noScan
             : meta.reason === 'insufficient_data'
@@ -991,7 +999,7 @@ export default function AutomationIdeas({
           the filters). The old `generated > 0` gate hid the line in exactly
           that case. */}
       {meta?.funnel && meta.newlyAdded === 0 && !loading && (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
+        <p className="text-caption text-muted mb-2">
           {t.funnelLine
             .replace('{g}', String(meta.funnel.generated))
             .replace('{e}', String(meta.funnel.engineFiltered ?? 0))
@@ -1008,7 +1016,7 @@ export default function AutomationIdeas({
           Reason CODES never reach the screen: each one is looked up in the
           dictionary, and anything unmapped falls back to a localized sentence. */}
       {meta?.funnel && !loading && buildEngineRejectionLines(meta.funnel, t).length > 0 && (
-        <div className="mb-2 text-[11px] text-slate-500 dark:text-slate-400" data-testid="engine-rejections">
+        <div className="mb-2 text-caption text-muted" data-testid="engine-rejections">
           {buildEngineRejectionLines(meta.funnel, t).map((line, i) => (<p key={i}>{line}</p>))}
         </div>
       )}
@@ -1016,17 +1024,17 @@ export default function AutomationIdeas({
           keywords: which existing row (source/status/keyword) killed each idea.
           Collapsible tech details; rendered only when the API returned evidence. */}
       {meta?.keywordMatches && meta.keywordMatches.length > 0 && meta.newlyAdded === 0 && !loading && (
-        <details className="mb-2 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-2 py-1.5">
-          <summary className="cursor-pointer text-[11px] font-medium text-slate-600 dark:text-slate-300">
+        <details className="mb-2 rounded border border-line bg-sunk px-2 py-1.5">
+          <summary className="cursor-pointer text-caption font-medium text-body">
             {t.kwMatchTitle.replace('{n}', String(meta.keywordMatches.length))}
           </summary>
           <ul className="mt-1.5 space-y-1.5">
             {meta.keywordMatches.map((m, i) => (
-              <li key={i} className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 border-t border-slate-200/70 dark:border-slate-700/70 pt-1.5 first:border-t-0 first:pt-0">
-                <span className="font-medium text-slate-700 dark:text-slate-300">{m.ideaTitle}</span>
+              <li key={i} className="text-caption leading-relaxed text-body border-t border-line/70 pt-1.5 first:border-t-0 first:pt-0">
+                <span className="font-medium text-body">{m.ideaTitle}</span>
                 {' · '}{t.kwMatchKeyword}: „{m.ideaPrimaryKeyword}”
                 <br />
-                {t.kwMatchBlockedBy}:{' '}
+                {t.kwMatchBlockedBy}:{''}
                 {m.matches.map((x, j) => (
                   <span key={j}>
                     {j > 0 && ' · '}
@@ -1036,7 +1044,7 @@ export default function AutomationIdeas({
                     {x.detail ? ` — ${x.detail}` : ''}
                   </span>
                 ))}
-                {m.ideaSourceContext ? <><br /><span className="text-slate-500 dark:text-slate-500">{m.ideaSourceContext}</span></> : null}
+                {m.ideaSourceContext ? <><br /><span className="text-muted">{m.ideaSourceContext}</span></> : null}
               </li>
             ))}
           </ul>
@@ -1044,23 +1052,23 @@ export default function AutomationIdeas({
       )}
       {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}
       {initialLoaded && !loading && !meta && suggestions.length === 0 && (
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.noSavedIdeas}</p>
+        <p className="text-caption text-muted mb-2">{t.noSavedIdeas}</p>
       )}
       {lastQueueTopics.length > 0 && (
-        <div ref={ctaRef} className="mb-3 rounded-lg border-2 border-indigo-400 dark:border-indigo-500/60 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-3 scroll-mt-4">
-          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{t.ctaTitle}</p>
-          <p className="mt-0.5 text-xs text-indigo-800/90 dark:text-indigo-200/90">{t.ctaBody}</p>
+        <div ref={ctaRef} className="mb-4 scroll-mt-4 rounded-inset border border-action/40 bg-action-soft px-4 py-3 shadow-card motion-safe:animate-pop-in">
+          <p className="text-copy font-semibold text-ink">{t.ctaTitle}</p>
+          <p className="mt-0.5 text-caption text-ink">{t.ctaBody}</p>
           {/* Link-status summary: none / some / all of the topics being queued. */}
-          <p className="mt-1 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
+          <p className="mt-1 text-caption text-action">
             {(() => { const withLinks = lastQueueTopics.filter((x) => x.expectsLinks).length; return withLinks === 0 ? t.linkSummaryNone : withLinks >= lastQueueTopics.length ? t.linkSummaryAll : t.linkSummaryMixed })()}
           </p>
           {planSavedHint && (
-            <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{t.planSavedNote}</p>
+            <p className="mt-1 text-caption font-medium text-ok">{t.planSavedNote}</p>
           )}
           {/* Phase 3F.3.6 (Part F/H) — the ONLY action here is add-to-queue. The
               review flow already ran on the first click; a duplicate "review/edit
               links" button is intentionally NOT rendered. */}
-          <p className="mt-1 text-[11px] text-indigo-800/80 dark:text-indigo-200/80">{t.reviewEditHelper}</p>
+          <p className="mt-1 text-caption text-ink">{t.reviewEditHelper}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
           </div>
@@ -1073,8 +1081,9 @@ export default function AutomationIdeas({
         <>
           {/* Part F — one clear instruction: pick topics, optionally check links,
               then one primary button adds them straight to the publishing queue. */}
-          <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">{t.approveQueueHelper}</p>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
+          <div className="mb-3 border-t border-line pt-4">
+          <p className="mb-2 text-copy text-body">{t.approveQueueHelper}</p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost" onClick={selectAll} disabled={creating}>{t.selectAll}</Button>
             <Button size="sm" variant="ghost" onClick={clearSel} disabled={creating}>{t.clear}</Button>
             <div className="flex-1" />
@@ -1090,16 +1099,24 @@ export default function AutomationIdeas({
               {creating && busyAction === 'review' ? t.creating : t.reviewEditBeforeBtn}
             </Button>
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.linksOptionalNote}</p>
+          <p className="text-caption text-muted">{t.linksOptionalNote}</p>
+          </div>
 
-          <div className="space-y-2">
+          <div className="list-enter space-y-2">
+            {loading && [0, 1].map((i) => (
+              <div key={`skeleton-${i}`} aria-hidden className="rounded-inset border border-line bg-surface p-4">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="mt-2.5 h-3 w-1/3" />
+                <Skeleton className="mt-2 h-3 w-1/2" />
+              </div>
+            ))}
             {suggestions.slice(0, visibleCount).map((s) => (
-              <div key={s.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
-                <label className="flex items-start gap-2">
-                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="mt-1 h-4 w-4 accent-indigo-600" />
+              <div key={s.id} className={`rounded-inset border p-4 transition-[border-color,background-color] duration-150 ${selected.has(s.id) ? 'border-action/50 bg-action-soft/50' : 'border-line bg-surface hover:border-line-strong'}`}>
+                <label className="flex items-start gap-3">
+                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="mt-0.5 size-4 shrink-0 cursor-pointer accent-action" />
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.title}</span>
+                      <span className="text-copy font-semibold text-ink">{s.title}</span>
                       {/* Per-item "improved with Pro" marker (survives reload). */}
                       {s.improvedWithPro && (
                         <Badge variant="success" data-testid="reco-improved-badge">{t.improvedWithProBadge}</Badge>
@@ -1122,7 +1139,7 @@ export default function AutomationIdeas({
                         <Badge variant="info">{t.basedOnGsc}</Badge>
                       )}
                       {typeof s.suggestionScore === 'number' && (
-                        <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>
+                        <span className="text-caption text-muted">{Math.round(s.suggestionScore * 100)}%</span>
                       )}
                       <span className="ms-auto flex items-center gap-2">
                         {/* Optional per-item Pro polish — refines only this item's wording. */}
@@ -1131,7 +1148,7 @@ export default function AutomationIdeas({
                           onClick={(e) => { e.preventDefault(); improveOne(s) }}
                           disabled={improvingId === s.id || !!improvingId}
                           data-testid="reco-improve-one"
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-50"
+                          className="inline-flex h-7 items-center gap-1 rounded-pill px-2.5 text-caption font-semibold text-action transition-colors hover:bg-action-soft disabled:opacity-50"
                         >
                           {improvingId === s.id ? t.improvingWithPro : t.improveWithPro}
                         </button>
@@ -1139,71 +1156,71 @@ export default function AutomationIdeas({
                           type="button"
                           onClick={(e) => { e.preventDefault(); rejectOne(s.id) }}
                           disabled={rejectingId === s.id}
-                          className="text-[11px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                          className="inline-flex h-7 items-center rounded-pill px-2.5 text-caption font-medium text-muted transition-colors hover:bg-bad-soft hover:text-bad disabled:opacity-50"
                         >
                           {rejectingId === s.id ? t.rejecting : t.reject}
                         </button>
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
+                    <div className="text-caption text-body mt-1">
                       {t.keywordLabel}: <span className="font-medium">{s.primaryKeyword}</span>
-                      {s.searchIntent ? <> · {t.intentLabel}: {s.searchIntent}</> : null}
+                      {s.searchIntent ? <> · {t.intentLabel}: {intentText(s.searchIntent)}</> : null}
                     </div>
                     {s.secondaryKeywords.length > 0 && (
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.secondaryLabel}: {s.secondaryKeywords.join(' · ')}</div>
+                      <div className="text-caption text-muted mt-0.5">{t.secondaryLabel}: {s.secondaryKeywords.join(' · ')}</div>
                     )}
                     {s.suggestionReason && (
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
+                      <div className="text-caption text-muted mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
                     )}
                     {s.suggestedInternalLinks.length > 0 && (() => {
                       // P0 — render role sections from the CANONICAL linkPlan (roles are
                       // NEVER re-inferred here). Fallback to the legacy money/supporting
                       // split for old rows without a link_plan.
                       const linkRow = (l: { url: string; anchor: string }) => (
-                        <label key={l.url} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
-                          <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
-                          <span className="text-slate-600 dark:text-slate-300 break-words">{l.anchor || l.url}</span>
+                        <label key={l.url} className="flex items-start gap-1.5 text-caption cursor-pointer">
+                          <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 size-3.5 shrink-0 accent-action" />
+                          <span className="text-body break-words">{l.anchor || l.url}</span>
                         </label>
                       )
                       const asRow = (x: { url: string; title: string }) => linkRow({ url: x.url, anchor: x.title })
                       const lp = s.linkPlan
                       const section = (label: string, items: { url: string; title: string }[], cls: string) => items.length > 0 && (
                         <div className="mt-1.5">
-                          <div className={`text-[10px] font-semibold ${cls}`}>{label}</div>
+                          <div className={`text-caption font-semibold ${cls}`}>{label}</div>
                           <div className="mt-0.5 space-y-0.5">{items.map(asRow)}</div>
                         </div>
                       )
                       return (
-                        <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
-                          <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.internalLinksLabel}</div>
+                        <div className="mt-3 rounded-control border border-line bg-sunk/60 px-3 py-2.5" dir={isHebrew ? 'rtl' : 'ltr'}>
+                          <div className="text-caption font-medium text-body">{t.internalLinksLabel}</div>
                           {lp ? (
                             <>
                               {lp.primaryCommercialTarget
                                 ? <div className="mt-1">
-                                    <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div>
+                                    <div className="text-caption font-semibold text-ok">{t.primaryCommercialLink}</div>
                                     <div className="mt-0.5">{asRow(lp.primaryCommercialTarget)}</div>
                                   </div>
-                                : <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
-                              {section(t.secondaryCommercialLinks, lp.secondaryCommercialTargets, 'text-teal-700 dark:text-teal-300')}
-                              {section(t.supportingLinks, lp.supportingInformationalLinks, 'text-slate-500 dark:text-slate-400')}
-                              {section(t.sourceReferencesLabel, lp.sourceReferences, 'text-slate-400 dark:text-slate-500')}
+                                : <p className="mt-0.5 text-caption text-warn">{t.noMoneyTargetNote}</p>}
+                              {section(t.secondaryCommercialLinks, lp.secondaryCommercialTargets, 'text-info')}
+                              {section(t.supportingLinks, lp.supportingInformationalLinks, 'text-muted')}
+                              {section(t.sourceReferencesLabel, lp.sourceReferences, 'text-muted')}
                             </>
                           ) : (() => {
                             const money = s.moneyTargetUrl ? s.suggestedInternalLinks.find((l) => l.url === s.moneyTargetUrl) : null
                             const supporting = s.suggestedInternalLinks.filter((l) => !money || l.url !== money.url)
                             return (<>
                               {money
-                                ? <div className="mt-1"><div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div><div className="mt-0.5">{linkRow(money)}</div></div>
-                                : <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
-                              {supporting.length > 0 && <div className="mt-1.5"><div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t.supportingLinks}</div><div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div></div>}
+                                ? <div className="mt-1"><div className="text-caption font-semibold text-ok">{t.primaryCommercialLink}</div><div className="mt-0.5">{linkRow(money)}</div></div>
+                                : <p className="mt-0.5 text-caption text-warn">{t.noMoneyTargetNote}</p>}
+                              {supporting.length > 0 && <div className="mt-1.5"><div className="text-caption font-semibold text-muted">{t.supportingLinks}</div><div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div></div>}
                             </>)
                           })()}
-                          <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
+                          <p className="mt-0.5 text-caption text-muted">{t.linksSelectHint}</p>
                         </div>
                       )
                     })()}
                     {s.suggestedInternalLinks.length === 0 && (
-                      <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                      <div className="mt-2 text-caption text-muted">
                         {s.linkPreviewReason === 'low_confidence_only' ? t.linkReasonLowConf
                           : s.linkPreviewReason === 'stale_index' ? t.linkReasonStale
                             : (s.linkPreviewReason === 'valid_no_match' || s.linkPreviewReason === 'target_type_gap' || s.linkPreviewReason === 'already_linked_or_duplicate') ? t.noPreciseLink
@@ -1220,12 +1237,12 @@ export default function AutomationIdeas({
                 cleanly on mobile. The rendered list is actually sliced (above) — no
                 hidden-via-CSS cards. */}
             {suggestions.length > INITIAL_VISIBLE && visibleCount < suggestions.length && (
-              <div className="pt-1 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 pt-2">
                 <button
                   type="button"
                   data-testid="ideas-show-more"
                   onClick={() => setVisibleCount((v) => Math.min(suggestions.length, v + PAGE_STEP))}
-                  className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
                 >
                   {`${t.showMoreIdeas} (${Math.min(PAGE_STEP, suggestions.length - visibleCount)})`}
                 </button>
@@ -1233,7 +1250,7 @@ export default function AutomationIdeas({
                   type="button"
                   data-testid="ideas-show-all"
                   onClick={() => setVisibleCount(suggestions.length)}
-                  className="inline-flex items-center justify-center gap-1 rounded-full border border-slate-200 dark:border-slate-600 px-3.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-pill px-3.5 text-caption font-semibold text-body transition-colors hover:bg-sunk hover:text-ink"
                 >
                   {`${t.showAllIdeas} (${suggestions.length})`}
                 </button>
@@ -1241,7 +1258,7 @@ export default function AutomationIdeas({
             )}
           </div>
 
-          <p className="text-[11px] text-slate-400 mt-3">{t.nextStepHint}</p>
+          <p className="mt-4 text-caption text-muted">{t.nextStepHint}</p>
         </>
       )}
     </Card>

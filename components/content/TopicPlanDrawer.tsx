@@ -424,18 +424,18 @@ export default function TopicPlanDrawer({
 
   const statusHe = (s: string) => (t.linkStatus as Record<string, string>)[s] ?? s
   const linkRow = (l: SavedLink) => (
-    <div key={l.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
+    <div key={l.id} className="rounded-control border border-line p-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{l.anchor_text || '—'}</span>
+        <span className="text-copy font-medium text-ink">{l.anchor_text || '—'}</span>
         <Badge variant={l.status === 'approved' ? 'success' : l.status === 'rejected' ? 'danger' : 'neutral'}>{statusHe(l.status)}</Badge>
-        <span className="text-[10px] text-slate-400">{t.confidence} {l.confidence ?? '—'}</span>
+        <span className="text-caption text-muted">{t.confidence} {l.confidence ?? '—'}</span>
         <div className="flex items-center gap-1 ms-auto">
           <Button size="sm" variant="outline" onClick={() => setLinkStatus(l.id, 'approved')} disabled={busyLink === l.id || l.status === 'approved' || l.status === 'superseded'}>{t.approve}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setLinkStatus(l.id, 'rejected')} disabled={busyLink === l.id || l.status === 'rejected' || l.status === 'superseded'} className="text-red-600 dark:text-red-400">{t.reject}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setLinkStatus(l.id, 'rejected')} disabled={busyLink === l.id || l.status === 'rejected' || l.status === 'superseded'} className="text-bad">{t.reject}</Button>
         </div>
       </div>
-      <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-        <a href={l.target_url} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-indigo-600 dark:text-indigo-400 hover:underline">{l.target_title || l.target_url}</a>
+      <div className="mt-1 text-caption text-muted">
+        <a href={l.target_url} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-action hover:underline">{l.target_title || l.target_url}</a>
         <span> · {l.target_priority}</span>
         {l.anchor_source ? <span> · {l.anchor_source}</span> : null}
       </div>
@@ -465,31 +465,31 @@ export default function TopicPlanDrawer({
     const k = dmkey(d)
     const inPlan = savedKeys.has(k)
     return (
-      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex flex-wrap items-start gap-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-900/10 p-2 text-[11px] cursor-pointer">
-        <input type="checkbox" checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })} className="mt-0.5 accent-emerald-600" />
+      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex flex-wrap items-start gap-2 rounded-control border border-ok/30 bg-ok-soft p-2 text-caption cursor-pointer">
+        <input type="checkbox" checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} className="mt-0.5 accent-action" />
         <span className="flex-1 min-w-0">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{d.anchorText || '—'}</span>
+            <span className="font-medium text-ink break-words">{d.anchorText || '—'}</span>
             <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
             {inPlan ? <Badge variant="success">{t.alreadyInPlan}</Badge> : null}
-            <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+            <span className="text-muted">{t.confidence} {d.confidence}</span>
           </span>
-          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-action hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
         </span>
       </label>
     )
   }
 
   const dryItemRow = (d: DryItem, rejected: boolean) => (
-    <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2 text-[11px]">
+    <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-control border border-line p-2 text-caption">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-slate-800 dark:text-slate-100 font-medium">{d.anchorText || '—'}</span>
+        <span className="text-ink font-medium">{d.anchorText || '—'}</span>
         <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
-        <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+        <span className="text-muted">{t.confidence} {d.confidence}</span>
       </div>
-      <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+      <div className="mt-0.5 text-muted">
         <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:underline">{d.targetTitle || d.targetUrl}</a>
-        {rejected && d.rejectedReasons?.length ? <span className="text-amber-700 dark:text-amber-400"> · {d.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
+        {rejected && d.rejectedReasons?.length ? <span className="text-warn"> · {d.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
       </div>
     </div>
   )
@@ -497,16 +497,16 @@ export default function TopicPlanDrawer({
   return (
     <Modal open={open} onClose={onClose} title={t.drawerTitle} size="lg">
       <div dir={language === 'he' ? 'rtl' : 'ltr'}>
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{topic.topic}</p>
-        {topic.primary_keyword && <p className="text-xs text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {topic.primary_keyword}</p>}
+        <p className="text-copy font-medium text-ink">{topic.topic}</p>
+        {topic.primary_keyword && <p className="text-caption text-muted">{t.primaryKeyword}: {topic.primary_keyword}</p>}
 
         {/* Persistent completion state after a successful save (Phase 3F.3.3f) —
             placed at the top so it is always visible, and stays until the user
             returns / keeps editing / closes / starts a new search. */}
         {justSaved && (
-          <div className="mt-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-3">
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">✓ {t.savedOk}</p>
-            <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.savedBody}</p>
+          <div className="mt-3 rounded-inset border border-ok/30 bg-ok-soft motion-safe:animate-pop-in px-3 py-3">
+            <p className="text-copy font-semibold text-ok">✓ {t.savedOk}</p>
+            <p className="mt-0.5 text-caption text-ok">{t.savedBody}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => { onReturnToQueue?.(); onClose() }}>{t.returnToQueue}</Button>
               <Button size="sm" variant="outline" onClick={() => setJustSaved(false)}>{t.keepEditing}</Button>
@@ -516,10 +516,10 @@ export default function TopicPlanDrawer({
 
         {/* Purpose + step hint (hidden once saved, to keep the completion clear). */}
         {!justSaved && (
-          <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
-            <p className="text-xs text-slate-600 dark:text-slate-300">{t.drawerIntro1}</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.drawerIntro2}</p>
-            <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="mt-2 rounded-control border border-line bg-sunk/60 px-3 py-2">
+            <p className="text-caption text-body">{t.drawerIntro1}</p>
+            <p className="text-caption text-muted">{t.drawerIntro2}</p>
+            <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-caption text-muted">
               <li>1. {t.step1}</li>
               <li>2. {t.step2}</li>
               <li>3. {t.step3}</li>
@@ -529,11 +529,11 @@ export default function TopicPlanDrawer({
         )}
 
         {/* Warnings */}
-        {saved?.stale && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.staleWarn}{saved.staleReasons.length ? ` (${saved.staleReasons.join(', ')})` : ''}</p>}
-        {dry?.cacheState === 'missing' && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.cacheMissing}</p>}
-        {dry?.warnings?.includes('cache_stale') && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{t.cacheStale}</p>}
-        {dry?.warnings?.includes('cache_version_stale') && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{t.versionStale}</p>}
-        {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {saved?.stale && <p className="mt-2 text-caption text-warn">{t.staleWarn}{saved.staleReasons.length ? ` (${saved.staleReasons.join(', ')})` : ''}</p>}
+        {dry?.cacheState === 'missing' && <p className="mt-2 text-caption text-warn">{t.cacheMissing}</p>}
+        {dry?.warnings?.includes('cache_stale') && <p className="mt-1 text-caption text-warn">{t.cacheStale}</p>}
+        {dry?.warnings?.includes('cache_version_stale') && <p className="mt-1 text-caption text-warn">{t.versionStale}</p>}
+        {error && <p className="mt-2 text-caption text-bad">{error}</p>}
 
         {/* Actions — all manual */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -554,20 +554,20 @@ export default function TopicPlanDrawer({
               {savingQueue ? t.savingQueue : queueDecision.canQueue && !queueDecision.expectsLinks ? t.queueWithoutLinks : t.saveAndQueue}
             </Button>
           )}
-          {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
+          {hasUnsavedChanges && <span className="text-caption font-medium text-warn">{t.unsavedChanges}</span>}
         </div>
 
         {loading ? (
-          <div className="py-4"><span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="py-4"><span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <>
             {/* Saved plan */}
             <div className="mt-4">
-              <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.plannedLinksTitle}</div>
+              <div className="text-caption font-medium text-body mb-1">{t.plannedLinksTitle}</div>
               {!saved?.exists ? (
-                <p className="text-xs text-slate-400">{t.noSavedPlan}</p>
+                <p className="text-caption text-muted">{t.noSavedPlan}</p>
               ) : saved.links.length === 0 ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
+                <p className="text-caption text-muted">{t.zeroLink}</p>
               ) : (
                 <div className="space-y-2">{saved.links.map(linkRow)}</div>
               )}
@@ -581,12 +581,12 @@ export default function TopicPlanDrawer({
               const blocked = dry.rejected.filter((r) => r.reviewability !== 'reviewable' && r.displayBlocked !== false)
               return (
               <div className="mt-4">
-                <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.recommendedTitle}</div>
+                <div className="text-caption font-medium text-body mb-1">{t.recommendedTitle}</div>
                 {dry.selected.length === 0 ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
+                  <p className="text-caption text-muted">{t.zeroLink}</p>
                 ) : (
                   <>
-                    <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{t.recommendedCheckNote}</p>
+                    <p className="mb-1 text-caption text-muted">{t.recommendedCheckNote}</p>
                     {(() => {
                       // Phase 3F.3.6 — primary commercial link first, supporting below.
                       const money = dry.moneyTargetUrl ? dry.selected.find((d) => d.targetUrl === dry.moneyTargetUrl) : null
@@ -595,14 +595,14 @@ export default function TopicPlanDrawer({
                         <>
                           {money && (
                             <div className="mb-2">
-                              <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 mb-0.5">{t.primaryCommercialLink}</div>
+                              <div className="text-caption font-semibold text-ok mb-0.5">{t.primaryCommercialLink}</div>
                               {recommendedRow(money)}
                             </div>
                           )}
-                          {!money && <p className="mb-1 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                          {!money && <p className="mb-1 text-caption text-warn">{t.noMoneyTargetNote}</p>}
                           {supporting.length > 0 && (
                             <>
-                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{t.supportingLinks}</div>
+                              <div className="text-caption font-semibold text-muted mb-0.5">{t.supportingLinks}</div>
                               <div className="space-y-1.5">{supporting.map((d) => recommendedRow(d))}</div>
                             </>
                           )}
@@ -615,23 +615,23 @@ export default function TopicPlanDrawer({
                 {/* Reviewable — manual-override candidates */}
                 {reviewable.length > 0 && (
                   <details className="mt-3" open={dry.selected.length === 0}>
-                    <summary className="cursor-pointer select-none text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</summary>
-                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableNote}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableSelectNote}</p>
+                    <summary className="cursor-pointer select-none text-caption font-medium text-action">{t.reviewableTitle} ({reviewable.length})</summary>
+                    <p className="mt-1 text-caption text-muted">{t.reviewableNote}</p>
+                    <p className="text-caption text-muted">{t.reviewableSelectNote}</p>
                     <div className="mt-1.5 space-y-1.5">
                       {reviewable.map((d, i) => {
                         const k = dmkey(d)
                         return (
-                          <label key={`${d.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
-                            <input type="checkbox" checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })} className="mt-0.5 accent-indigo-600" />
+                          <label key={`${d.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-control border border-action/30 p-2 text-caption cursor-pointer">
+                            <input type="checkbox" checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} className="mt-0.5 accent-action" />
                             <span className="flex-1 min-w-0">
                               <span className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{d.anchorText || '—'}</span>
+                                <span className="font-medium text-ink break-words">{d.anchorText || '—'}</span>
                                 <Badge variant="neutral">{t.manualBadge}</Badge>
-                                <span className="text-amber-700 dark:text-amber-400">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
-                                <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+                                <span className="text-warn">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
+                                <span className="text-muted">{t.confidence} {d.confidence}</span>
                               </span>
-                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-action hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
                             </span>
                           </label>
                         )
@@ -643,13 +643,13 @@ export default function TopicPlanDrawer({
                 {/* Phase 3G.7 — honest empty state: no manual alternatives passed
                     the quality filter (instead of looking broken/empty). */}
                 {reviewable.length === 0 && dry.selected.length > 0 && (
-                  <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t.noManualOptions}</p>
+                  <p className="mt-2 text-caption text-muted">{t.noManualOptions}</p>
                 )}
 
                 {/* Blocked — advanced diagnostics, not selectable */}
                 {blocked.length > 0 && (
                   <details className="mt-2">
-                    <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.blockedTitle} ({blocked.length})</summary>
+                    <summary className="cursor-pointer select-none text-caption text-muted">{t.blockedTitle} ({blocked.length})</summary>
                     <div className="mt-1.5 space-y-1.5 opacity-70">{blocked.slice(0, 30).map((d) => dryItemRow(d, true))}</div>
                   </details>
                 )}
@@ -660,8 +660,8 @@ export default function TopicPlanDrawer({
             {/* Advanced diagnostics */}
             {(saved?.exists || dry) && (
               <details className="mt-3">
-                <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.techDetails}</summary>
-                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+                <summary className="cursor-pointer select-none text-caption text-muted">{t.techDetails}</summary>
+                <div className="mt-1 text-caption text-muted space-y-0.5">
                   {saved?.batch && <div>{t.savedStatus}: {statusHe(saved.batch.status)} · {saved.batch.linkCount} · cache: {saved.batch.cacheState ?? '—'}</div>}
                   {saved?.staleReasons?.length ? <div>stale: {saved.staleReasons.join(', ')}</div> : null}
                   {dry && <div>dry-run cache: {dry.cacheState}{dry.warnings.length ? ` · ${dry.warnings.join(', ')}` : ''}</div>}

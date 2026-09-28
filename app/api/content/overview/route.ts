@@ -20,6 +20,7 @@ import { resolveActivePlatform, siteConnectionState } from '@/lib/content/platfo
 import { isMissingRelation, SITE_TABLE } from '@/lib/site-platforms/store'
 import { loadActiveAlerts } from '@/lib/content/automation/load-active-alerts'
 import type { ActiveAlert } from '@/lib/content/automation/alert-read-model'
+import { queueItemsNotYetCounted } from '@/lib/content/overview-counts'
 
 const EMPTY_COUNTS = {
   total: 0,
@@ -129,9 +130,11 @@ export async function GET(request: Request) {
   // failed / quality_check_failed / paused so finished or halted work is never
   // shown as "scheduled". Tolerates the automation table not existing yet.
   const PENDING_QUEUE_STATUSES = ['queued', 'scheduled', 'generating', 'generated', 'publishing']
-  const { count: queueCount, error: queueError } = await supabase
+  // A queue item whose article is already counted as scheduled above is the
+  // same work, so it is skipped (the tile used to show 2 for one article).
+  const { data: queueRows, count: queueCount, error: queueError } = await supabase
     .from('article_pool_items')
-    .select('id', { count: 'exact', head: true })
+    .select('article_id', { count: 'exact' })
     .eq('project_id', projectId)
     .in('status', PENDING_QUEUE_STATUSES)
   if (queueError) {
@@ -139,7 +142,8 @@ export async function GET(request: Request) {
       console.error('[content overview] pool items count failed:', queueError.message)
     }
   } else {
-    counts.scheduled += queueCount ?? 0
+    const queueArticleIds = ((queueRows || []) as Array<{ article_id?: string | null }>).map((r) => r.article_id ?? null)
+    counts.scheduled += queueItemsNotYetCounted(queueCount ?? queueArticleIds.length, queueArticleIds, articles)
   }
 
   // WordPress connection status — SAFE FIELDS ONLY. The encrypted password

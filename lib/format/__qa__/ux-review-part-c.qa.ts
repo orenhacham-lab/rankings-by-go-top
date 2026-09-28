@@ -160,7 +160,8 @@ console.log('P1-18 content: one line for the setup, no project column')
     (raw) => raw.replace(/<div\s+role="note"/, '<Card role="note"'))
   guard('P1-18: the articles table has no "project" column (it is always the current project)', 'components/content/workspace/ArticlesScreen.tsx',
     (s) => !/t\.table\.project\b/.test(s) && !/selectedProject/.test(s),
-    (raw) => raw.replace(/<Th>\{t\.table\.status\}<\/Th>/, '<Th>{t.table.project}</Th><Th>{t.table.status}</Th>'))
+    // The status header carries a priority-column class since the phone layout.
+    (raw) => raw.replace(/<Th( className="[^"]*")?>\{t\.table\.status\}<\/Th>/, '<Th>{t.table.project}</Th><Th$1>{t.table.status}</Th>'))
 }
 
 console.log('P1-19 settings: the right section marked, one save')

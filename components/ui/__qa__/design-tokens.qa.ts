@@ -9,7 +9,10 @@
  *      logical sides only (start/end), never left/right;
  *   D) motion honours prefers-reduced-motion;
  *   E) fonts load through next/font (self-hosted, no layout shift), never a
- *      Google Fonts <link>.
+ *      Google Fonts <link>;
+ *   G) the screens that still wore the old look (existing content, articles, one
+ *      article, keywords, the strategy list view) are on the tokens, and their
+ *      motion is reduced-motion safe.
  * Every check has a mutation control: the same predicate run on a broken copy
  * must fail. Run:
  *   npx tsx components/ui/__qa__/design-tokens.qa.ts
@@ -218,6 +221,107 @@ async function main() {
     check('F3: the brand blue is never a background (it fails AA under text)', onBrand(sources).length === 0, onBrand(sources).join(', '))
     check('MUT: a button filled with bg-brand fails F3', onBrand([...sources, ['x.tsx', '<button className="bg-brand text-white">']]).length > 0)
     check('F4: white on the brand blue really is under AA (why F3 exists)', ratio('#ffffff', light.brand) < 4.5)
+  }
+
+  console.log('\nG) the screens that still wore the old look are on the tokens')
+  {
+    // The existing content tab, the articles, one article, the keywords and the
+    // content strategy's list view (the automation and topics screens it renders).
+    const MIGRATED = [
+      'components/content/workspace/AutomationScreen.tsx', 'components/content/AutomationIdeas.tsx',
+      'components/content/AutomationSchedule.tsx', 'components/content/workspace/TopicsScreen.tsx',
+      'components/content/TopicsList.tsx', 'components/content/TopicPlanBadge.tsx', 'components/content/TopicPlanDrawer.tsx',
+      'components/content/NewTopicsLinkPlanPanel.tsx', 'components/content/InternalLinkIndexStatus.tsx',
+      'components/content/GscRecommendations.tsx', 'components/content/workspace/ArticlesScreen.tsx',
+      'components/content/workspace/ContentWorkspaceShell.tsx', 'components/content/ArticleBriefModal.tsx',
+      'components/content/ContentHubPlatformCard.tsx', 'components/content/ShopifyDestinationSection.tsx',
+      'components/content/ContentNotAvailable.tsx', 'app/(dashboard)/content/articles/[id]/page.tsx',
+      'components/content/ArticleContentEditor.tsx', 'components/content/ArticleInlineImagesPanel.tsx',
+      'components/content/ArticleBodyPreview.tsx', 'components/content/ArticleEditorPublishGate.tsx',
+      'components/content/ArticleInternalLinkApplyPanel.tsx', 'components/content/WordPressPublishSettings.tsx',
+      'components/content/ShopifyPublishSettings.tsx', 'components/content/ArticleSchemaPanel.tsx',
+      'components/content/ArticleAiVisibilityCard.tsx', 'components/content/workspace/ExistingContentScreen.tsx',
+      'app/(dashboard)/keywords/page.tsx', 'app/(dashboard)/keywords/[id]/history/page.tsx',
+      'components/keywords/ProjectKeywordsPanel.tsx', 'components/keywords/TrackingTargetForm.tsx',
+      'components/keywords/TrackingTargetsTable.tsx', 'components/content/ArticleReadView.tsx',
+      'components/projects/ProjectsTable.tsx', 'app/(dashboard)/projects/page.tsx',
+    ]
+    const PALETTE = 'slate|gray|zinc|neutral|stone|indigo|blue|sky|cyan|teal|violet|purple|fuchsia|pink|rose|red|orange|amber|yellow|lime|green|emerald'
+    const RAW = new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:bg|text|border(?:-[trblxyse])?|divide|ring|outline|accent|placeholder|from|via|to|fill|stroke|decoration|shadow|caret)-(?:${PALETTE})-\\d{2,3}\\b`)
+    const LEGACY = /(?<![\w-])(?:[\w-]+:)*(?:bg|text|border|ring)-(?:slate|indigo|gray|blue)-\d{2,3}\b/g
+    const files: [string, string][] = MIGRATED.map((f) => [f, strip(read(f))])
+    const rawIn = (fs: [string, string][]) => fs.filter(([, src]) => RAW.test(src)).map(([f, src]) => `${f}: ${RAW.exec(src)?.[0]}`)
+    check(`G1: ${MIGRATED.length} migrated files use no raw Tailwind palette colour`, rawIn(files).length === 0, rawIn(files).join(', '))
+    const legacyCount = (fs: [string, string][]) => fs.reduce((n, [, src]) => n + (src.match(LEGACY)?.length ?? 0), 0)
+    check('G1b: not one slate/indigo/gray/blue class is left in them (1093 before)', legacyCount(files) === 0, String(legacyCount(files)))
+    const idx = MIGRATED.indexOf('components/content/AutomationIdeas.tsx')
+    const brokenIdeas = files.map(([f, src], i): [string, string] => [f, i === idx ? src.replace('className="text-section font-semibold text-ink"', 'className="text-slate-800 dark:text-slate-100"') : src])
+    check('MUT: an old slate heading back in the ideas card fails G1', rawIn(brokenIdeas).length > 0 && legacyCount(brokenIdeas) === 2)
+    const brokenForm = files.map(([f, src]): [string, string] => [f, f.endsWith('TrackingTargetForm.tsx') ? `${src}\n<p className="bg-emerald-50" />` : src])
+    check('MUT: a raw emerald notice in the keyword form fails G1', rawIn(brokenForm).length > 0)
+
+    // G2: their motion is the app's own and honours reduced motion: the list entrance
+    // and pop-in exist only with no-preference, no looping pulse is left, and a list
+    // entrance is never put on table rows.
+    const motionOffenders = (fs: [string, string][], cssSrc: string): string[] => {
+      const out: string[] = []
+      for (const [f, src] of fs) {
+        if (/(?<![\w:-])animate-pop-in\b/.test(src)) out.push(`${f}: pop-in without motion-safe`)
+        if (/(?<![\w-])animate-pulse\b(?![^"'`]*motion-reduce:animate-none)/.test(src)) out.push(`${f}: pulse`)
+        if (/<(?:tbody|TableBody|tr|TableRow)\b[^>]*list-enter/.test(src)) out.push(`${f}: list-enter on rows`)
+      }
+      const flat = cssSrc.replace(/\/\*[\s\S]*?\*\//g, '')
+      const gatedBlocks = [...flat.matchAll(/@media \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]).join('\n')
+      const outside = flat.replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n\}/g, '')
+      if (!/\.list-enter > \* \{\s*animation: tab-in 180ms var\(--ease-snappy\) backwards;/.test(gatedBlocks)) out.push('css: list-enter missing from no-preference')
+      if (/\.list-enter[^{]*\{[^}]*animation/.test(outside)) out.push('css: list-enter outside no-preference')
+      if (/list-enter[^{]*\b(tr|tbody)\b/.test(flat)) out.push('css: list-enter on rows')
+      return out
+    }
+    check('G2: list entrances and pop-ins are reduced-motion safe, never on table rows', motionOffenders(files, css).length === 0, motionOffenders(files, css).join(', '))
+    const loudCss = `${css}\n.list-enter > * { animation: tab-in 180ms var(--ease-snappy) backwards; }`
+    check('MUT: a list entrance outside the media query fails G2', motionOffenders(files, loudCss).length > 0)
+    const rowEnter = files.map(([f, src]): [string, string] => [f, f.endsWith('TopicsList.tsx') ? src.replace('<TableBody>', '<TableBody className="list-enter">') : src])
+    check('MUT: a list entrance on the topics table rows fails G2', motionOffenders(rowEnter, css).length > 0)
+    const bareePop = files.map(([f, src]): [string, string] => [f, f.endsWith('AutomationScreen.tsx') ? src.replace('motion-safe:animate-pop-in', 'animate-pop-in') : src])
+    check('MUT: a pop-in that ignores reduced motion fails G2', motionOffenders(bareePop, css).length > 0)
+    const pulse = files.map(([f, src]): [string, string] => [f, f.endsWith('TopicPlanBadge.tsx') ? src.replace('motion-safe:animate-pop-in', 'animate-pulse') : src])
+    check('MUT: a looping pulse back on the plan badge fails G2', motionOffenders(pulse, css).length > 0)
+
+    // G3: loading is a skeleton in the shape of what comes, not a sentence or a spinner.
+    const shell = strip(read('components/content/workspace/ContentWorkspaceShell.tsx'))
+    const skeletonLoad = (src: string) => /!projectsResolved \? \(\s*(?:\/\*[\s\S]*?\*\/\s*)?<ScreenSkeleton label=\{t\.projectsLoading\} \/>/.test(src)
+    check('G3: the content workspace loads as a screen skeleton', skeletonLoad(shell))
+    check('MUT: the old "loading…" card fails G3', !skeletonLoad(shell.replace('<ScreenSkeleton label={t.projectsLoading} />', '<Card className="p-10 text-center"><p>{t.projectsLoading}</p></Card>')))
+    // G4: on a phone (390px) the keywords and articles tables keep what matters
+    // in view (position; title and status) and drop the rest by priority, with
+    // every hidden header matched by a cell hidden at the same breakpoint.
+    const kwTable = strip(read('components/keywords/TrackingTargetsTable.tsx'))
+    const artTable = strip(read('components/content/workspace/ArticlesScreen.tsx'))
+    const projTable = strip(read('components/projects/ProjectsTable.tsx'))
+    const hiddenAt = (src: string, tag: 'Th' | 'Td') =>
+      [...src.matchAll(new RegExp(`<${tag} className="hidden (?:whitespace-nowrap )?(sm|md|lg|xl):table-cell"`, 'g'))].map((m) => m[1]).sort().join(',')
+    const phoneFits = (kw: string, art: string, proj = projTable): string[] => {
+      const out: string[] = []
+      if (!/<Th>\s*<button type="button" onClick=\{\(\) => handleSort\('position'\)\}/.test(kw)) out.push('keywords: position header is not always shown')
+      if (!/<Th className="hidden md:table-cell">\{k\.scanType\}<\/Th>/.test(kw)) out.push('keywords: scan type still on a phone')
+      if (!/<Th className="hidden lg:table-cell">\s*<button[\s\S]{0,60}handleSort\('date'\)/.test(kw)) out.push('keywords: last check still on a phone')
+      if (!/<span className="sm:hidden"><PositionChange\b/.test(kw)) out.push('keywords: change is not under the position on a phone')
+      if (!/<Th className="hidden md:table-cell">\{t\.table\.created\}<\/Th>/.test(art)) out.push('articles: dates still on a phone')
+      if (!/<div className="mt-1 sm:hidden"><Badge variant=\{STATUS_TONE\[a\.status\]/.test(art)) out.push('articles: status is not under the title on a phone')
+      if (!/<p dir="ltr" className="[^"]*md:hidden">\{project\.target_domain\}<\/p>/.test(proj)) out.push('projects: domain is not under the name on a phone')
+      for (const [name, src] of [['keywords', kw], ['articles', art], ['projects', proj]] as const) {
+        if (hiddenAt(src, 'Th') !== hiddenAt(src, 'Td')) out.push(`${name}: headers hidden at ${hiddenAt(src, 'Th')} but cells at ${hiddenAt(src, 'Td')}`)
+      }
+      return out
+    }
+    check('G4: the keywords and articles tables fit a phone by priority columns', phoneFits(kwTable, artTable).length === 0, phoneFits(kwTable, artTable).join('; '))
+    check('MUT: scan type shown again on a phone fails G4', phoneFits(kwTable.replace('<Th className="hidden md:table-cell">{k.scanType}</Th>', '<Th>{k.scanType}</Th>'), artTable).length > 0)
+    check('MUT: a header and its cells hidden at different widths fails G4',
+      phoneFits(kwTable, artTable.replace('<Td className="hidden md:table-cell"><span', '<Td className="hidden lg:table-cell"><span')).length > 0)
+    check('MUT: a projects column hidden only in its header fails G4',
+      phoneFits(kwTable, artTable, projTable.replace('<Td className="hidden lg:table-cell">', '<Td>')).length > 0)
+    check('MUT: the status badge dropped from under the title fails G4', phoneFits(kwTable, artTable.replace('<div className="mt-1 sm:hidden">', '<div className="mt-1">')).length > 0)
   }
 
   console.log('\nE) fonts')

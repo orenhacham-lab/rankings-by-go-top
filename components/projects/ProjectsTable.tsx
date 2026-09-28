@@ -5,8 +5,11 @@ import { Project, Client } from '@/lib/supabase/types'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
+import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
+import { PauseCircle, Pencil, PlayCircle, Search, Trash2 } from 'lucide-react'
 import ProjectForm from './ProjectForm'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { formatDate } from '@/lib/utils'
@@ -65,96 +68,96 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
 
   return (
     <>
-      <div className="mb-4">
+      <div className="relative mb-4 w-full max-w-sm">
+        <Search size={16} aria-hidden className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted" />
         <input
-          type="text"
+          type="search"
           placeholder={dict.projects.searchPlaceholder}
+          aria-label={dict.projects.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          className={cn(FIELD_CLASSES, 'h-10 ps-9')}
         />
       </div>
 
+      {/* PRIORITY COLUMNS: a phone shows the project (its domain under the name),
+          its status and the actions; client, cadence and last check return as the
+          screen widens. The domain has its own column from md up. */}
       <Table>
         <TableHead>
-          <tr>
+          <tr className="max-sm:[&>th]:px-2.5">
             <Th>{dict.projects.table.projectName}</Th>
-            {showClient && <Th>{dict.projects.table.client}</Th>}
-            <Th>{dict.projects.table.domain}</Th>
-            <Th>{dict.projects.table.frequency}</Th>
-            <Th>{dict.projects.table.lastScan}</Th>
+            {showClient && <Th className="hidden md:table-cell">{dict.projects.table.client}</Th>}
+            <Th className="hidden md:table-cell">{dict.projects.table.domain}</Th>
+            <Th className="hidden lg:table-cell">{dict.projects.table.frequency}</Th>
+            <Th className="hidden md:table-cell">{dict.projects.table.lastScan}</Th>
             <Th>{dict.projects.table.status}</Th>
-            <Th>{dict.projects.table.actions}</Th>
+            <Th><span className="sr-only">{dict.projects.table.actions}</span></Th>
           </tr>
         </TableHead>
         <TableBody>
           {filtered.length === 0 && (
             <EmptyRow colSpan={showClient ? 7 : 6} message={dict.projects.table.emptyState} />
           )}
-          {filtered.map((project) => (
-            <TableRow key={project.id}>
-              <Td>
+          {filtered.map((project) => {
+            // The same three actions as before, behind "⋯" like every other table:
+            // delete only opens the confirmation dialog.
+            const menu: RowMenuItem[] = [
+              { key: 'edit', label: dict.projects.actions.edit, icon: <Pencil size={15} aria-hidden="true" />, onSelect: () => setEditingProject(project) },
+              {
+                key: 'toggle', label: project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate,
+                disabled: togglingId === project.id,
+                icon: project.is_active ? <PauseCircle size={15} aria-hidden="true" /> : <PlayCircle size={15} aria-hidden="true" />,
+                onSelect: () => { void handleToggleActive(project) },
+              },
+              { key: 'delete', label: dict.projects.actions.delete, danger: true, icon: <Trash2 size={15} aria-hidden="true" />, onSelect: () => setDeletingProject(project) },
+            ]
+            return (
+            <TableRow key={project.id} className="max-sm:[&>td]:px-2.5">
+              <Td className="min-w-[10rem]">
                 {/* A project opens as the current project, on its dashboard. An
                     inactive one has no workspace to open until it is reactivated. */}
                 {project.is_active ? (
                   <Link
                     href={`/dashboard?projectId=${encodeURIComponent(project.id)}`}
-                    className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    className="font-semibold text-ink hover:text-action hover:underline"
                   >
                     {project.name}
                   </Link>
                 ) : (
                   <span className="font-semibold text-muted">{project.name}</span>
                 )}
+                <p dir="ltr" className="mt-0.5 max-w-[12rem] truncate text-start text-caption text-muted md:hidden">{project.target_domain}</p>
               </Td>
               {showClient && (
-                <Td>
+                <Td className="hidden md:table-cell">
                   {project.clients ? (
-                    <Link href={`/clients/${project.clients.id}`} className="text-slate-600 dark:text-slate-300 hover:underline text-sm">
+                    <Link href={`/clients/${project.clients.id}`} className="text-copy text-body hover:text-action hover:underline">
                       {project.clients.name}
                     </Link>
-                  ) : '—'}
+                  ) : <span className="text-muted">—</span>}
                 </Td>
               )}
-              <Td className="font-mono text-xs text-slate-600 dark:text-slate-300">{project.target_domain}</Td>
-              <Td>
+              <Td className="hidden md:table-cell"><span dir="ltr" className="font-mono text-caption text-body">{project.target_domain}</span></Td>
+              <Td className="hidden lg:table-cell">
                 <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
                   {localizedFrequency(project.scan_frequency)}
                 </Badge>
               </Td>
-              <Td>{project.last_scan_at ? formatDate(project.last_scan_at, language) : '—'}</Td>
+              <Td className="hidden md:table-cell">
+                <span className="whitespace-nowrap text-caption text-muted">
+                  {project.last_scan_at ? formatDate(project.last_scan_at, language) : dict.projects.table.neverScanned}
+                </span>
+              </Td>
               <Td>
                 <ActiveBadge active={project.is_active} />
               </Td>
-              <Td>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingProject(project)}
-                  >
-                    {dict.projects.actions.edit}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    loading={togglingId === project.id}
-                    onClick={() => handleToggleActive(project)}
-                  >
-                    {project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-600 dark:text-red-400"
-                    onClick={() => setDeletingProject(project)}
-                  >
-                    {dict.projects.actions.delete}
-                  </Button>
-                </div>
+              <Td className="w-12">
+                <RowMenu label={dict.projects.table.moreActions(project.name)} items={menu} />
               </Td>
             </TableRow>
-          ))}
+            )
+          })}
         </TableBody>
       </Table>
 

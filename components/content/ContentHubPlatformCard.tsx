@@ -26,6 +26,7 @@ import { AlertTriangle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
@@ -108,9 +109,13 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   //   Shopify only       → the Shopify status card below
   if (loading) {
     return (
-      <Card className="hover:translate-y-0">
-        <div className="flex items-center gap-2 text-sm text-muted py-3">
-          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-full animate-spin" />
+      <Card>
+        <div role="status" aria-busy="true" className="space-y-3">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-56" />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-14 rounded-inset" />)}
+          </div>
         </div>
       </Card>
     )
@@ -118,13 +123,13 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   if (wpConnected && shopify) {
     // Unexpected dual connection — surface a conflict, delete nothing.
     return (
-      <Card className="hover:translate-y-0 border-warn/40">
+      <Card className="border-warn/40">
         <div className="flex items-start gap-2">
           <AlertTriangle size={18} className="text-warn mt-0.5 shrink-0" />
           <div>
             <div className="font-semibold text-warn">{cs.conflictTitle}</div>
-            <p className="text-sm text-warn">{cs.conflictBody}</p>
-            <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-xs text-action hover:underline">
+            <p className="text-copy text-warn">{cs.conflictBody}</p>
+            <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-caption text-action hover:underline">
               {cs.title} →
             </Link>
           </div>
@@ -137,9 +142,9 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
     // Neither connected → compact platform choice. Connection forms live in the
     // project's settings (reuse), so these navigate there instead of duplicating them.
     return (
-      <Card className="hover:translate-y-0">
-        <h3 className="text-base font-semibold text-ink mb-1">{cs.platformChoiceTitle}</h3>
-        <p className="text-sm text-muted mb-3">{cs.platformChoiceHint}</p>
+      <Card>
+        <h3 className="mb-1 text-section font-semibold text-ink">{cs.platformChoiceTitle}</h3>
+        <p className="text-copy text-muted mb-3">{cs.platformChoiceHint}</p>
         <div className="flex flex-wrap gap-2">
           <Link href={platformSetupHref(projectId)}><Button size="sm">{cs.connectWordPress}</Button></Link>
           <Link href={platformSetupHref(projectId)}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
@@ -152,31 +157,31 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   const statusLabel = shopify.connection_status === 'connected' ? t.connected : shopify.connection_status === 'failed' ? t.failed : t.untested
 
   return (
-    <Card className="hover:translate-y-0">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-base font-semibold text-ink">{t.title}</h3>
+    <Card>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={variant}>{statusLabel}</Badge>
       </div>
 
-      <div className="text-sm text-body mb-2">
+      <div className="text-copy text-body mb-2">
         <div className="font-medium">{shopify.shop_domain}</div>
-        {shopify.storefront_domain && <div className="text-xs text-muted">{shopify.storefront_domain}</div>}
+        {shopify.storefront_domain && <div className="text-caption text-muted">{shopify.storefront_domain}</div>}
       </div>
 
-      <div className="grid grid-cols-5 gap-1 text-center mb-2">
+      <div className="list-enter mb-3 grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
         {(['product', 'collection', 'page', 'blog', 'article'] as const).map((k) => (
-          <div key={k} className="rounded-md bg-sunk py-1.5">
-            <div className="text-base font-bold text-ink">{counts[k]}</div>
-            <div className="text-[10px] text-muted">{t.counts[k]}</div>
+          <div key={k} className="rounded-inset border border-line bg-sunk/60 px-2 py-2.5">
+            <div className="text-section font-semibold tabular-nums text-ink">{counts[k]}</div>
+            <div className="text-caption text-muted">{t.counts[k]}</div>
           </div>
         ))}
       </div>
 
-      <div className="text-xs text-muted mb-2">
+      <div className="text-caption text-muted mb-2">
         {shopify.last_synced_at ? `${t.lastSync}: ${formatDateTime(shopify.last_synced_at, language)}` : t.neverSynced}
       </div>
       {shopify.last_error && (
-        <div className={`text-xs mb-2 ${shopify.connection_status === 'failed' ? 'text-bad' : 'text-warn'}`}>{shopify.last_error}</div>
+        <div className={`text-caption mb-2 ${shopify.connection_status === 'failed' ? 'text-bad' : 'text-warn'}`}>{shopify.last_error}</div>
       )}
 
       <ShopifyDestinationSection
@@ -191,7 +196,7 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
         <Button size="sm" variant="outline" onClick={test} loading={testing} disabled={testing || syncing}>{t.testConnection}</Button>
       </div>
 
-      {message && <p className={`mt-2 text-xs ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>}
+      {message && <p className={`mt-2 text-caption ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>}
     </Card>
   )
 }

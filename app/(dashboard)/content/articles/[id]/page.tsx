@@ -12,10 +12,14 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Textarea from '@/components/ui/Textarea'
+import EmptyState from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
+import ArticleReadView from '@/components/content/ArticleReadView'
 import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
 import ArticleEditorPublishGate, { usePublishPlatform } from '@/components/content/ArticleEditorPublishGate'
 import ArticleTopBar, { type ArticleViewerTab } from '@/components/content/ArticleTopBar'
@@ -32,7 +36,7 @@ import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/li
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Eye, FileQuestion } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
 type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
@@ -112,6 +116,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   // C1 / C3 / C9 — the top bar's tab, copy/download state, and the article's
   // publication facts (live URL, dates, stored AI citations, suggested question).
   const [tab, setTab] = useState<ArticleViewerTab>('article')
+  // The article opens as the reader sees it; the edit form is one click away
+  // and stays mounted (hidden) so its panels and unsaved edits survive.
+  const [editing, setEditing] = useState(false)
   const [copying, setCopying] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [visibility, setVisibility] = useState<(ArticleVisibilityData & {
@@ -431,22 +438,25 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   if (!enabled) {
-    return <div className="py-20 text-center text-slate-400 text-sm">{getDashboardDictionary(language).common.notAvailable}</div>
+    return <div className="py-20 text-center text-muted text-copy">{getDashboardDictionary(language).common.notAvailable}</div>
   }
   if (loading) {
-    return <div className="py-20 text-center text-slate-400 text-sm">{e.loading}</div>
-  }
-  if (notFound) {
     return (
-      <div className="py-20 text-center text-slate-500">
-        <p className="mb-4">{e.notFound}</p>
-        <Link href={backHref}><Button variant="outline">{e.back}</Button></Link>
+      <div role="status" aria-busy="true" className="space-y-4">
+        <span className="sr-only">{e.loading}</span>
+        <Skeleton className="h-16 rounded-card" />
+        <Skeleton className="h-44 rounded-card" />
+        <Skeleton className="h-72 rounded-card" />
       </div>
     )
   }
-
-  const inputCls =
-    'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+  if (notFound) {
+    return (
+      <Card padding={false}>
+        <EmptyState icon={<FileQuestion />} title={e.notFound} action={<Link href={backHref}><Button variant="outline">{e.back}</Button></Link>} />
+      </Card>
+    )
+  }
 
   const publishedUrl = visibility?.publishedUrl ?? (isPublished ? (shopifyArticleUrl || wpPostUrl) : null)
   const schemaInput: StructuredDataInput = {
@@ -485,7 +495,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       />
 
       {message && (
-        <div className={`mb-4 text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+        <div role={message.ok ? 'status' : 'alert'} className={`mb-4 rounded-inset border px-4 py-3 text-copy motion-safe:animate-pop-in ${message.ok ? 'bg-ok-soft border-ok/30 text-ok' : 'bg-bad-soft border-bad/30 text-bad'}`}>
           {message.text}
         </div>
       )}
@@ -517,34 +527,34 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       )}
 
       {audit && (
-        <Card className="mb-4 hover:translate-y-0">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.auditTitle}</h3>
-            <div className="flex items-center gap-2">
-              <span className={`text-lg font-bold ${audit.score >= 80 ? 'text-green-600 dark:text-green-400' : audit.score >= 55 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{audit.score}</span>
-              <span className="text-xs text-slate-400">/ 100</span>
+        <Card className="mb-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-section font-semibold text-ink">{e.auditTitle}</h3>
+            <div className={`inline-flex items-baseline gap-1 rounded-pill px-3 py-1 ${audit.score >= 80 ? 'bg-ok-soft text-ok' : audit.score >= 55 || isPublished ? 'bg-warn-soft text-warn' : 'bg-bad-soft text-bad'}`}>
+              <span className="text-section font-semibold tabular-nums">{audit.score}</span>
+              <span className="text-caption">/ 100</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 mb-3 text-center">
+          <div className="list-enter mb-4 grid grid-cols-3 gap-2 text-center sm:grid-cols-7">
             {[
               { l: e.auditWords, v: audit.counts.words },
-              { l: 'H2', v: audit.counts.h2 },
-              { l: 'H3', v: audit.counts.h3 },
+              { l: e.auditH2, v: audit.counts.h2 },
+              { l: e.auditH3, v: audit.counts.h3 },
               { l: e.auditParagraphs, v: audit.counts.p },
-              { l: 'FAQ', v: audit.counts.faq },
+              { l: e.auditFaq, v: audit.counts.faq },
               { l: e.auditTables, v: audit.counts.tables },
               { l: e.auditLists, v: audit.counts.lists },
             ].map((c) => (
-              <div key={c.l} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-2">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400">{c.l}</div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{c.v}</div>
+              <div key={c.l} className="rounded-inset border border-line bg-sunk/60 px-2 py-2.5">
+                <div className="text-section font-semibold tabular-nums text-ink">{c.v}</div>
+                <div className="text-caption text-muted">{c.l}</div>
               </div>
             ))}
           </div>
 
-          <div className="mb-3 text-xs">
-            <span className={audit.tocReady ? 'text-green-700 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}>
+          <div className="mb-3 text-caption">
+            <span className={audit.tocReady ? 'text-ok' : 'text-muted'}>
               {audit.tocReady ? `✓ ${e.tocReady}` : e.tocNotReady}
             </span>
           </div>
@@ -554,42 +564,70 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             const isBlock = aq.anchorTooEarly || aq.mechanicalAnchorPhrase
             const isWarn = aq.anchorsTooClose || aq.anchorsInSameParagraph
             const msg = aq.anchorTooEarly ? e.anchorEarly : aq.mechanicalAnchorPhrase ? e.anchorMechanical : isWarn ? e.anchorTooCloseMsg : e.anchorQualityOk
-            const cls = isBlock ? 'text-red-700 dark:text-red-400' : isWarn ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'
+            const cls = isBlock && !isPublished ? 'text-bad' : isBlock || isWarn ? 'text-warn' : 'text-ok'
             return (
-              <div className="mb-3 text-xs">
+              <div className="mb-3 text-caption">
                 <span className={cls}>{`${e.anchorQualityLabel}: ${msg}`}</span>
                 {aq.firstAnchorWordIndex >= 0 && (
-                  <span className="text-slate-400 dark:text-slate-500"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
+                  <span className="text-muted"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
                 )}
               </div>
             )
           })()}
 
           {audit.blockers.length > 0 && (
-            <div className="mb-2">
-              <div className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400 mb-1">
-                <AlertTriangle size={14} /> {e.auditBlockers}
+            // On a published article nothing is blocked any more: the same items
+            // read as advice, in the warning tone, not as a red "must fix".
+            <div className={`mb-3 rounded-inset border px-4 py-3 ${isPublished ? 'border-warn/30 bg-warn-soft' : 'border-bad/30 bg-bad-soft'}`}>
+              <div className={`mb-1 flex items-center gap-1.5 text-copy font-semibold ${isPublished ? 'text-warn' : 'text-bad'}`}>
+                <AlertTriangle size={14} aria-hidden /> {isPublished ? e.auditBlockersPublished : e.auditBlockers}
               </div>
-              <ul className="text-xs text-red-600 dark:text-red-400 list-disc ps-5 space-y-0.5">
+              <ul className={`list-disc space-y-0.5 ps-5 text-caption ${isPublished ? 'text-warn' : 'text-bad'}`}>
                 {audit.blockers.map((b) => <li key={b}>{auditLabel(b)}</li>)}
               </ul>
             </div>
           )}
           {audit.warnings.length > 0 && (
-            <div>
-              <div className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-1">{e.auditWarnings}</div>
-              <ul className="text-xs text-amber-600 dark:text-amber-400 list-disc ps-5 space-y-0.5">
+            <div className="rounded-inset border border-warn/30 bg-warn-soft px-4 py-3">
+              <div className="mb-1 text-copy font-semibold text-warn">{e.auditWarnings}</div>
+              <ul className="list-disc space-y-0.5 ps-5 text-caption text-warn">
                 {audit.warnings.map((w) => <li key={w}>{auditLabel(w)}</li>)}
               </ul>
             </div>
           )}
           {audit.blockers.length === 0 && audit.warnings.length === 0 && (
-            <div className="text-sm text-green-700 dark:text-green-400">{e.auditAllGood}</div>
+            <div className="text-copy text-ok">{e.auditAllGood}</div>
           )}
         </Card>
       )}
 
+      {!editing ? (
+        <ArticleReadView
+          t={e.readView}
+          faqTitle={e.faqTitle}
+          title={title}
+          metaTitle={metaTitle}
+          metaDescription={metaDescription}
+          slug={slug}
+          publishedUrl={publishedUrl}
+          featuredImageUrl={featuredImageUrl}
+          html={contentHtml}
+          images={inlineImages}
+          faq={faq}
+          dir={isHebrew ? 'rtl' : 'ltr'}
+          onEdit={() => setEditing(true)}
+        />
+      ) : (
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-inset border border-action/30 bg-action-soft px-4 py-3 motion-safe:animate-pop-in">
+          <p className="text-copy text-ink">{e.readView.editingNote}</p>
+          <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+            <Eye size={15} aria-hidden /> {e.readView.done}
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-4">
+        <div hidden={!editing} className="space-y-4">
         <Card>
           <div className="space-y-3">
             <Input label={e.title} value={title} onChange={(ev) => setTitle(ev.target.value)} />
@@ -597,66 +635,59 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <div>
               <Input label={e.metaTitle} value={metaTitle} onChange={(ev) => setMetaTitle(ev.target.value)} hint={`${metaTitle.length}/60 · ${e.metaTitleHint}`} />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{e.metaDescription}</label>
-              <textarea value={metaDescription} onChange={(ev) => setMetaDescription(ev.target.value)} rows={2} className={inputCls} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">{metaDescription.length}/155 · {e.metaDescriptionHint}</p>
+            <div className="flex flex-col gap-1.5">
+              <Textarea id="article-meta-description" label={e.metaDescription} value={metaDescription} onChange={(ev) => setMetaDescription(ev.target.value)} rows={2} />
+              <p className="text-caption text-muted">{metaDescription.length}/155 · {e.metaDescriptionHint}</p>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{e.excerpt}</label>
-              <textarea value={excerpt} onChange={(ev) => setExcerpt(ev.target.value)} rows={2} className={inputCls} />
-            </div>
+            <Textarea id="article-excerpt" label={e.excerpt} value={excerpt} onChange={(ev) => setExcerpt(ev.target.value)} rows={2} />
           </div>
         </Card>
 
         <Card>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{e.content}</label>
+          <h3 className="mb-3 text-section font-semibold text-ink">{e.content}</h3>
           <ArticleContentEditor value={contentHtml} onChange={setContentHtml} dir={isHebrew ? 'rtl' : 'ltr'} />
         </Card>
 
         <Card>
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.faqTitle}</h3>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <h3 className="text-section font-semibold text-ink">{e.faqTitle}</h3>
             <Button size="sm" variant="outline" onClick={() => setFaq((p) => [...p, { question: '', answer: '' }])}>{e.addFaq}</Button>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{e.faqSchemaReadyHint}</p>
-          <div className="space-y-3">
+          <p className="text-caption text-muted mb-3">{e.faqSchemaReadyHint}</p>
+          <div className="list-enter space-y-3">
             {faq.map((f, i) => (
-              <div key={i} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+              <div key={i} className="space-y-3 rounded-inset border border-line bg-sunk/40 p-4">
                 <Input label={e.faqQuestion} value={f.question} onChange={(ev) => setFaq((p) => p.map((x, idx) => idx === i ? { ...x, question: ev.target.value } : x))} />
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{e.faqAnswer}</label>
-                  <textarea value={f.answer} onChange={(ev) => setFaq((p) => p.map((x, idx) => idx === i ? { ...x, answer: ev.target.value } : x))} rows={2} className={inputCls} />
-                </div>
-                <button type="button" onClick={() => setFaq((p) => p.filter((_, idx) => idx !== i))} className="text-xs text-red-600 dark:text-red-400 hover:underline">{e.removeFaq}</button>
+                <Textarea id={`article-faq-answer-${i}`} label={e.faqAnswer} value={f.answer} onChange={(ev) => setFaq((p) => p.map((x, idx) => idx === i ? { ...x, answer: ev.target.value } : x))} rows={2} />
+                <Button type="button" size="sm" variant="ghost" onClick={() => setFaq((p) => p.filter((_, idx) => idx !== i))} className="text-bad hover:bg-bad-soft hover:text-bad">{e.removeFaq}</Button>
               </div>
             ))}
           </div>
         </Card>
 
-        <Card className="hover:translate-y-0">
+        <Card>
           <Input label={e.imagePrompt} value={imagePrompt} onChange={(ev) => setImagePrompt(ev.target.value)} hint={e.imagePromptHint} />
         </Card>
 
         {/* Featured image — generate/regenerate/remove. */}
-        <Card className="hover:translate-y-0">
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.imageTitle}</h3>
+        <Card>
+          <h3 className="text-section font-semibold text-ink mb-2">{e.imageTitle}</h3>
           {featuredImageUrl ? (
             <div className="space-y-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={featuredImageUrl} alt={title} className="w-full max-h-72 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+              <img src={featuredImageUrl} alt={title} className="w-full max-h-72 object-cover rounded-control border border-line" />
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageRegenerate}</Button>
-                <Button size="sm" variant="ghost" onClick={removeImage} disabled={imageBusy} className="text-red-600 dark:text-red-400">{e.imageRemove}</Button>
+                <Button size="sm" variant="ghost" onClick={removeImage} disabled={imageBusy} className="text-bad">{e.imageRemove}</Button>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{e.imageHint}</p>
+              <p className="text-caption text-muted">{e.imageHint}</p>
               <Button size="sm" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
             </div>
           )}
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{e.imageSafetyNote}</p>
+          <p className="text-caption text-muted mt-2">{e.imageSafetyNote}</p>
         </Card>
 
         {/* Phase 4D — inline article images (in-body <figure>s, separate from the
@@ -673,7 +704,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         {/* Read-only body preview with inline figures composed in (content_html
             itself stays image-free). Refreshes on any image add/edit/move/etc. */}
         {inlineImages.length > 0 && (
-          <Card className="hover:translate-y-0">
+          <Card>
             <ArticleBodyPreview
               html={contentHtml}
               images={inlineImages}
@@ -683,6 +714,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             />
           </Card>
         )}
+
+        </div>
 
         {/* Phase 4F.1 — platform gate: WordPress publishing controls render only
             for a WordPress project. A Shopify project sees an info card; neither
@@ -721,9 +754,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* WordPress export — draft (safe) or publish now (confirmed). */}
-          <Card className="hover:translate-y-0">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.wpTitle}</h3>
-            {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNoImageWarn}</p>}
+          <Card>
+            <h3 className="text-section font-semibold text-ink mb-2">{e.wpTitle}</h3>
+            {!featuredImageUrl && <p className="text-caption text-warn mb-2">{e.wpNoImageWarn}</p>}
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
                 {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
@@ -732,9 +765,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                 {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
               </Button>
               {wpPostId && wpPostUrl && (
-                <span className="inline-flex items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-2 text-copy">
                   <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>
-                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-action hover:underline">
                     {wpStatus === 'publish' ? e.wpOpenLive : e.wpOpenDraft}
                   </a>
                 </span>
@@ -744,14 +777,15 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         </ArticleEditorPublishGate>
         </section>
 
+        <div hidden={!editing} className="space-y-4">
         {/* Planned internal links — QA/insertion only. Hidden entirely when the
             article has no planned links (no ad-hoc suggestions here anymore). */}
         {plannedLinks.length > 0 && (
-          <Card className="hover:translate-y-0">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.internal.planQaTitle}</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.planQaHint}</p>
+          <Card>
+            <h3 className="text-section font-semibold text-ink">{e.internal.planQaTitle}</h3>
+            <p className="text-caption text-muted mb-2">{e.internal.planQaHint}</p>
             {isPublished && (
-              <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.internal.publishedNote}</p>
+              <p className="text-caption text-warn mb-2">{e.internal.publishedNote}</p>
             )}
             <div className="space-y-2">
               {plannedLinks.map((link) => {
@@ -759,14 +793,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                 const done = addedLinks.has(key)
                 const st = done ? 'linked' : plannedStatus(link)
                 return (
-                  <div key={key} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-1.5">
+                  <div key={key} className="space-y-1.5 rounded-inset border border-line p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="flex-1 min-w-[12rem]">
-                        <div className="text-sm text-slate-800 dark:text-slate-100">{link.targetTitle}</div>
-                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200 mt-1">
+                        <div className="text-copy text-ink">{link.targetTitle}</div>
+                        <span className="inline-flex items-center rounded-control bg-sunk px-2 py-0.5 text-caption text-body mt-1">
                           {e.internal.anchorLabel}: {link.anchorText}
                         </span>
-                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetUrl}</a>
+                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-caption text-action hover:underline break-all">{link.targetUrl}</a>
                       </div>
                       {st === 'linked' && <Badge variant="success">{e.internal.statusLinked}</Badge>}
                       {st === 'ready' && (
@@ -776,7 +810,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                         <Button size="sm" variant="ghost" onClick={() => copyAnchor(link.anchorText)}>{e.internal.copy}</Button>
                       )}
                     </div>
-                    <p className={`text-[11px] ${st === 'missing' ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <p className={`text-caption ${st === 'missing' ? 'text-warn' : 'text-muted'}`}>
                       {st === 'ready' ? e.internal.statusReady : st === 'linked' ? e.internal.statusLinked : e.internal.statusMissing}
                     </p>
                   </div>
@@ -807,7 +841,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           />
         )}
 
-        <div className="pb-8">
+        <div className="rounded-card border border-line bg-surface p-4 shadow-card">
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
             {/* Hidden once the article is published to WordPress — "ready" must not
@@ -815,17 +849,19 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             {!isPublished && (
               <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
             )}
-            <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
+            <Button variant="ghost" onClick={deleteArticle} className="text-bad">{c.deleteArticle}</Button>
           </div>
           {/* Client-side neutral hint — no fetch. Nudges a manual preview before
               marking ready when the planning feature is on and nothing was applied. */}
           {linkPlanningOn && !isPublished && status === 'draft' && !ilpApplyOutcome && (
-            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{c.editor.linkApply.readyHint}</p>
+            <p className="mt-2 text-caption text-muted">{c.editor.linkApply.readyHint}</p>
           )}
         </div>
 
+        </div>
+
         {/* Single, prominent return to the Content Hub for this project. */}
-        <div className="pb-10">
+        <div className="pt-4 pb-10">
           <Link href={backHref} className="block">
             <Button variant="outline" className="w-full sm:w-auto">{e.backToHub}</Button>
           </Link>

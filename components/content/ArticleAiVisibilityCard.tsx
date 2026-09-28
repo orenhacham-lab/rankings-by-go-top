@@ -85,7 +85,7 @@ export default function ArticleAiVisibilityCard({ t, language, projectId, data, 
   }
 
   return (
-    <Card className="hover:translate-y-0">
+    <Card>
       <div className="mb-2 flex items-center gap-2">
         <Sparkles size={16} aria-hidden className="text-action" />
         <h3 className="text-section font-semibold text-ink">{t.title}</h3>

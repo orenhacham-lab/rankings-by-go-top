@@ -173,6 +173,7 @@
        a menu pops in       160ms
        the phone drawer     240ms, its scrim 200ms
        the active tab pill  200ms, sliding between entries
+       a list's items enter 180ms, 30ms apart for the first four (.list-enter)
        a skeleton shimmers  1.2s, the ONLY loop, gone when the data arrives
      Never on table rows, never on scroll, nothing over 300ms between tabs. */
   --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
@@ -207,6 +208,18 @@
   .tab-enter > * > :nth-child(2) { animation-delay: 30ms; }
   .tab-enter > * > :nth-child(3) { animation-delay: 60ms; }
   .tab-enter > * > :nth-child(n + 4) { animation-delay: 90ms; }
+}
+
+/* A list's items (idea cards, queue entries, stat tiles) enter the same way when the
+   list first renders or grows: the same 180ms rise, 30ms apart for the first four.
+   Never on table rows (a <tbody> is not a list here, see design-tokens D4). */
+@media (prefers-reduced-motion: no-preference) {
+  .list-enter > * {
+    animation: tab-in 180ms var(--ease-snappy) backwards;
+  }
+  .list-enter > :nth-child(2) { animation-delay: 30ms; }
+  .list-enter > :nth-child(3) { animation-delay: 60ms; }
+  .list-enter > :nth-child(n + 4) { animation-delay: 90ms; }
 }
 
 /* A KPI counts up from 0 to its value once, when it first renders. The real,
