@@ -250,6 +250,8 @@ export default function KeywordResearchPage() {
   const firstAnswerPending = !projectsResolved || scanView.kind === 'loading'
   const scanKeywords = scanOn?.kind === 'seeded' ? scanOn.research.keywords : NO_SCAN_KEYWORDS
   const scanTracked = scanOn ? scanOn.tracked : NO_TRACKED
+  // What the site's pages are about (w8-relevance): the research ranks by it and sets the unrelated apart.
+  const scanSiteTopics = scanOn?.kind === 'seeded' ? scanOn.research.siteTopics ?? null : null
   const unseeded = scanView.kind === 'unseeded'
   // What the scan's summary says about the market (competitors, audiences, the site's icon); absent before the scan.
   const seedLandscape = scan.landscape ?? NO_LANDSCAPE
@@ -278,8 +280,9 @@ export default function KeywordResearchPage() {
       manual: results.length > 0 && (manualActive || scanKeywords.length === 0) ? results : null,
       google: googleFigures,
       chip,
+      siteTopics: scanSiteTopics,
     }),
-    [scanKeywords, scanTracked, manualActive, results, googleFigures, chip],
+    [scanKeywords, scanTracked, manualActive, results, googleFigures, chip, scanSiteTopics],
   )
   // The table's rows: the active chip's, with the scan's research on screen; otherwise the results, as always.
   const tableSource: KeywordIdeaResult[] = scanMode && model.mode ? model.chipRows : results
@@ -1152,6 +1155,7 @@ export default function KeywordResearchPage() {
           adding={trackingKeys}
           onTrack={trackKeyword}
           onShowAll={model.mode === 'scan' ? showSuggestions : undefined}
+          lessRelated={scanSiteTopics ? model.lessRelatedWins : undefined}
         />
         </div>
       )}

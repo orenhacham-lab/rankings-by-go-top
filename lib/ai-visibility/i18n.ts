@@ -367,6 +367,7 @@ const STRINGS = {
   worth_rel_brand: { he: 'שאלה על העסק עצמו', en: 'About the business itself' },
   worth_rel_keyword: { he: 'קשורה ל„{term}״ שאתם עוקבים אחריה', en: 'Tied to "{term}", which you track' },
   worth_rel_business: { he: 'בדיוק בתחום של העסק', en: 'Right in the business\'s field' },
+  worth_rel_gap: { he: 'האתר כבר כותב על „{term}״, ואין עדיין עמוד שעונה על זה', en: 'Your site covers "{term}", and no page answers this yet' },
   worth_value_buy: { he: 'מי ששואל עומד לקנות או להזמין', en: 'The asker is about to buy or book' },
   worth_value_choose: { he: 'מבקשים המלצה, ו-AI עונה בשמות של עסקים', en: 'They ask for a recommendation, and AI answers with names' },
   worth_value_compare: { he: 'משווים אפשרויות לפני החלטה', en: 'They compare options before deciding' },

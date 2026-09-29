@@ -13,6 +13,7 @@
  */
 import type { SeedResearchOrigin, SeedResearchRow } from '@/lib/seed-scan/research'
 import { variantKey } from '@/lib/content/strategy/insights'
+import type { SiteTopics } from '@/lib/ai-visibility/site-topics'
 
 /**
  * Where a keyword of the research came from: one of the scan's seeds, or
@@ -71,6 +72,12 @@ export interface ScanResearch {
    * Absent from an older answer, which only ever carried the scan's rows.
    */
   sources?: { scan: boolean; manualAt: string | null }
+  /**
+   * What the site's own pages are about (lib/ai-visibility/site-topics.ts), for
+   * ranking the keywords by how related they are to it. Absent when the site's
+   * pages say too little: every keyword then counts as related.
+   */
+  siteTopics?: SiteTopics
 }
 
 export const SCAN_RESEARCH_ERROR_CODES = ['unauthorized', 'not_found', 'invalid_request', 'internal', 'unavailable'] as const

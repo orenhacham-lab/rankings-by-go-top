@@ -37,12 +37,19 @@ import { getLatestSeedRun } from '@/lib/seed-scan/store'
 import { readSummary } from '@/lib/seed-scan/summary'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { mergeSeedResearch, readIdea, type ScanKeyword, type ScanResearchErrorCode, type ScanResearchResponse, type TrackedKeyword } from './scan-research'
+import { researchSiteTopics, type SiteTopics } from './site-relevance'
 
 export type ScanRouteDeps = {
   session: () => Promise<{ userId: string | null; db: SupabaseClient }>
   admin: () => ServiceRoleClient
   /** The engine's site vocabulary (lib/content/recommendations/engine.ts buildSiteVocabulary). */
   vocabulary: (admin: ServiceRoleClient, projectId: string, extras: string[], userId: string) => Promise<Set<string>>
+  /**
+   * The site's page titles, read as the owner (site-relevance.ts readSiteTitles),
+   * for how related each keyword is to the site's content. Absent: no profile,
+   * and the answer is exactly what it was.
+   */
+  siteTitles?: (db: SupabaseClient, scope: Scope) => Promise<string[]>
 }
 
 /** Tracked keywords read per project: well above any plan's keyword quota. */
@@ -132,6 +139,7 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
 
     const merged = mergeSeedResearch(rows)
     let keywords: ScanKeyword[] = []
+    let siteTopics: SiteTopics | null = null
     if (merged.keywords.length > 0) {
       const run = await getLatestSeedRun(session.db, scope)
       const summary = run && run !== 'error' ? readSummary(run.summary) : null
@@ -146,6 +154,21 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
       }
       const brandTokens = tokens(name)
       keywords = merged.keywords.map((k) => ({ ...k, relevant: researchKeywordIssue(k.keyword, { brandTokens, vocab }) === null }))
+      // SITE CONTENT (w8-relevance): what the site's pages are about, so the screen can rank
+      // the keywords by it and set apart the ones unrelated to the site (never removed).
+      if (deps.siteTitles) {
+        try {
+          siteTopics = researchSiteTopics({
+            titles: await deps.siteTitles(session.db, scope),
+            niche: summary?.business?.niche ?? null,
+            businessName: name || null,
+            domain: summary?.domain ?? null,
+            terms: [...seeds, ...tracked.map((t) => t.keyword)],
+          })
+        } catch {
+          siteTopics = null
+        }
+      }
     }
 
     const body: ScanResearchResponse = {
@@ -156,6 +179,7 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
       truncated: merged.truncated,
       tracked,
       sources: researchSources(rows, merged.market),
+      ...(siteTopics ? { siteTopics } : {}),
     }
     return Response.json(body, { status: 200, headers: NO_STORE })
   } catch (err) {
