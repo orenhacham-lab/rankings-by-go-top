@@ -562,6 +562,8 @@ export async function GET(request: Request) {
       completedAt: run.completed_at,
       status: run.status,
       provider: run.provider,
+      // 'scheduled' marks the automatic monthly check; the tab tags it "Automatic".
+      triggeredBy: run.triggered_by ?? null,
       totalCreditsUsed: run.total_credits_used,
       errorMessage: run.error_message,
       results: runResults.map((r) => {

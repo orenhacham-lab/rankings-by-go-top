@@ -340,13 +340,22 @@ async function main() {
       /const SUPPORTED_ENGINES = SCORED_ENGINES\b/.test(section) && /export const OVERVIEW_ENGINES = SCORED_ENGINES\b/.test(code('components/ai-visibility/overview-model.ts'))
       && JSON.stringify(M.OVERVIEW_ENGINES) === '["chatgpt","perplexity","gemini","copilot","grok","google_ai_mode"]')
 
-    // Opening the tab spends nothing: the new code only reads.
+    // Opening the tab spends nothing: the new code only reads. (Updated 2026-09-29
+    // for the approved monthly check: the page's only writes are the owner's own
+    // presses on "run now" and the monthly setting, to /api/ai-visibility/monthly.)
     const NEW = [PAGE, 'components/ai-visibility/OverviewRows.tsx', 'components/ai-visibility/ReadinessCard.tsx', 'components/ai-visibility/CompetitorsReadOnly.tsx', 'components/ai-visibility/useSeedPageState.ts', 'components/ai-visibility/overview-model.ts']
+    const writeCalls = (p: string) => [...code(p).matchAll(/fetch\(\s*['"`]([^'"`]+)['"`],\s*\{\s*method:\s*['"](POST|PUT|PATCH|DELETE)['"]/g)].map((m) => `${m[2]} ${m[1]}`)
     const writes = NEW.filter((p) => /method:\s*['"](POST|PUT|PATCH|DELETE)['"]/.test(code(p)))
-    check('none of the new code sends a write (no POST/PUT/PATCH/DELETE)', writes.length === 0, writes.join(', '))
+    const pageWrites = writeCalls(PAGE)
+    check('the only writes are the monthly check\'s run-now and setting, from the page, on a press',
+      writes.length === 1 && writes[0] === PAGE && JSON.stringify(pageWrites) === JSON.stringify(['POST /api/ai-visibility/monthly', 'PUT /api/ai-visibility/monthly'])
+      && /const runMonthlyNow = useCallback\(/.test(code(PAGE)) && /onRunMonthlyNow=\{runMonthlyNow\}/.test(code(PAGE)), `${writes.join(', ')} | ${pageWrites.join(', ')}`)
+    check('MUT a write on load (a POST in an effect) fails that rule',
+      JSON.stringify(writeCalls(PAGE).concat(['POST /api/ai-visibility/runs'])) !== JSON.stringify(['POST /api/ai-visibility/monthly', 'PUT /api/ai-visibility/monthly']))
     const fetched = NEW.flatMap((p) => [...code(p).matchAll(/fetch\(\s*`([^`]+)`/g)].map((m) => m[1]))
-    check('the only reads are the seed run and the competitors list',
-      fetched.length === 2 && fetched.some((u) => /\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed$/.test(u)) && fetched.some((u) => /\/ai-visibility\/competitors$/.test(u)), fetched.join(' | '))
+    check('the only reads are the seed run, the competitors list and the monthly check\'s status',
+      fetched.length === 3 && fetched.some((u) => /\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed$/.test(u)) && fetched.some((u) => /\/ai-visibility\/competitors$/.test(u))
+      && fetched.some((u) => /^\/api\/ai-visibility\/monthly\?projectId=/.test(u)), fetched.join(' | '))
     check('no model, dispatch or rescan route is named by the new code',
       !NEW.some((p) => /enriched-suggestions|generate-ai-questions|\/api\/ai-visibility\/runs|action:\s*'start'/.test(code(p))))
 

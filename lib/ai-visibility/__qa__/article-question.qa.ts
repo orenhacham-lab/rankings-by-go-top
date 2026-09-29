@@ -178,8 +178,13 @@ async function main() {
       }
     }
     walk('app'); walk('lib')
-    check('D3: the only caller of runAIVisibilityScan is POST /api/ai-visibility/runs (the owner\'s click)',
-      show(callers.filter((c) => c !== 'lib/ai-visibility/index.ts')) === show(['app/api/ai-visibility/runs/route.ts']), show(callers))
+    // Updated 2026-09-29: the owner approved ONE automatic caller, the monthly AI
+    // check (lib/ai-visibility/monthly-check/runner.ts). Nothing else may call.
+    const allowed = show(['app/api/ai-visibility/runs/route.ts', 'lib/ai-visibility/monthly-check/runner.ts'])
+    check('D3: runAIVisibilityScan is called only by the owner\'s click route and the approved monthly check',
+      show(callers.filter((c) => c !== 'lib/ai-visibility/index.ts').sort()) === allowed, show(callers))
+    check('D3b: MUT a third caller fails D3',
+      show([...callers.filter((c) => c !== 'lib/ai-visibility/index.ts'), 'lib/content/automation/runner.ts'].sort()) !== allowed)
     const crons = (JSON.parse(read('vercel.json')).crons as { path: string }[]).map((c) => c.path)
     check('D4: no cron path is an AI-visibility route', crons.length > 0 && !crons.some((p) => /ai-visibility/.test(p)), show(crons))
     const gen = strip(read('lib/content/article-generation.ts'))

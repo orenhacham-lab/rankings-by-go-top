@@ -20,12 +20,17 @@
  *     article, and this change adds no migration. The card finds its question by
  *     that text (sameQuestion), which is the whole link.
  *
- * WHAT IT NEVER DOES. It runs no check and calls no provider: a question costs
- * nothing until the owner presses an engine on it (POST /api/ai-visibility/runs,
- * one prompt x one engine per click, quota-checked there). No cron, queue or
- * automation dispatches a check (the only caller of runAIVisibilityScan is that
- * route). It writes one row, owner-filtered, and never throws: a failure is an
- * outcome, and generation carries on.
+ * WHAT IT NEVER DOES. It runs no check and calls no provider: adding a question
+ * costs nothing by itself. A question is checked when the owner starts a check
+ * (POST /api/ai-visibility/runs, one prompt x one engine per check,
+ * quota-checked there), or by the ONE automatic call the owner approved on
+ * 2026-09-29: the monthly AI check (lib/ai-visibility/monthly-check), which
+ * checks a few top-worth tracked questions once per usage period from the 06:00
+ * schedule cron, reserved through the same allowance as a manual check. No
+ * other cron, queue or automation dispatches a check, and nothing here does
+ * (runAIVisibilityScan has exactly those two callers). It writes one row,
+ * owner-filtered, and never throws: a failure is an outcome, and generation
+ * carries on.
  *
  * LIMITS. The plans have no maximum number of questions (lib/subscription.ts
  * PlanLimits counts checks, not questions). Automatic questions still stop at

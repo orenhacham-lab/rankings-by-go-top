@@ -150,6 +150,8 @@ export type OverviewRun = {
   status: string | null
   createdAt: string | null
   completedAt: string | null
+  /** Started by the automatic monthly check (ai_scan_runs.triggered_by 'scheduled'). */
+  automatic?: boolean
   results: OverviewResult[]
 }
 
@@ -167,6 +169,7 @@ export function readRuns(raw: unknown): OverviewRun[] {
       status: str(r.status),
       createdAt: str(r.createdAt),
       completedAt: str(r.completedAt),
+      automatic: r.triggeredBy === 'scheduled',
       results: results.filter(isRecord).map((x) => ({
         engine: str(x.engine) ?? '',
         promptId: str(x.promptId),
@@ -186,7 +189,7 @@ export function readRuns(raw: unknown): OverviewRun[] {
 const runTime = (r: OverviewRun) => Date.parse(r.completedAt ?? r.createdAt ?? '') || 0
 
 export type RecentOutcome = 'cited' | 'mentioned' | 'not_mentioned' | 'failed' | 'running'
-export type RecentItem = { id: string; at: string | null; engine: string | null; question: string | null; outcome: RecentOutcome }
+export type RecentItem = { id: string; at: string | null; engine: string | null; question: string | null; outcome: RecentOutcome; automatic?: boolean }
 
 export type AiOverview = {
   /** Engines with at least one successful answer, in the tool's order. */
@@ -293,6 +296,7 @@ export function buildOverview(runs: OverviewRun[]): AiOverview {
       engine: run.results[0]?.engine || null,
       question: run.results.find((r) => r.promptText)?.promptText ?? null,
       outcome: outcomeOf(run),
+      automatic: run.automatic === true,
     })),
   }
 }

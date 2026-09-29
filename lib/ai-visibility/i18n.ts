@@ -171,10 +171,21 @@ const STRINGS = {
   // reviewer looking for a "Run" action found only the delete icon. A visible
   // instruction above them, and an accessible name that says what the click
   // does, is what makes an existing control discoverable.
+  // The automatic monthly check (UX review B): the customer no longer picks an
+  // engine. One button checks a question on the three main engines; single
+  // engines (all six) sit in the question's ⋯ menu.
   run_a_check_hint: {
-    he: 'כדי לבדוק שאלה, לחצו על שם של מנוע לידה (למשל ChatGPT). תוך כדקה תראו מה הוא ענה ואם הזכיר אתכם. כל בדיקה נספרת במכסה.',
-    en: 'To check a question, click an engine name next to it (for example ChatGPT). Within about a minute you see what it answered and whether it mentioned you. Each check counts toward your allowance.',
+    he: 'כל שאלה נבדקת ב-ChatGPT, ב-Gemini וב-Google AI בלחיצה אחת. מנוע בודד, כולל שאר המנועים, נמצא בתפריט ⋯ של השאלה. כל בדיקה נספרת במכסה.',
+    en: 'Each question is checked on ChatGPT, Gemini and Google AI in one click. A single engine, including the others, is in the ⋯ menu of the question. Each check counts toward your allowance.',
   },
+  check_question_all: { he: 'בדיקה עכשיו ({n} בדיקות)', en: 'Check now ({n} checks)' },
+  recheck_question_all: { he: 'בדיקה חוזרת ({n} בדיקות)', en: 'Recheck ({n} checks)' },
+  recheck_not_enough: { he: 'אין מספיק בדיקות החודש', en: 'Not enough checks left this month' },
+  recheck_running: { he: 'בודקים… {done}/{n}', en: 'Checking… {done}/{n}' },
+  recheck_partial_failed: { he: 'חלק מהבדיקות לא הושלמו. אפשר לנסות שוב בעוד רגע.', en: 'Some of the checks did not finish. You can try again in a moment.' },
+  check_on_engine_menu: { he: 'בדיקה ב-{engine}', en: 'Check on {engine}' },
+  engine_status_label: { he: '{engine}: {status}', en: '{engine}: {status}' },
+  run_tag_automatic: { he: 'אוטומטית', en: 'Automatic' },
   run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
   rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ' },
   engines_show_rest: { he: 'הצגת כל המנועים (עוד {n})', en: 'Show all engines ({n} more)' },
