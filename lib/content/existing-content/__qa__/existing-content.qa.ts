@@ -17,7 +17,7 @@
  * Run: npx tsx lib/content/existing-content/__qa__/existing-content.qa.ts
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
@@ -102,9 +102,9 @@ async function main() {
     check('A5: the same query in another case or with spaces is the same query', r.A5)
     check('A6: a page in two shared queries carries the one with more impressions', r.A6)
     // A custom domain on the store and the myshopify host in Search Console: matched by path.
-    const items = REAL_MODEL.itemsFromShopify([
+    const items = REAL_MODEL.mergeSources([REAL_MODEL.sourceFromShopify([
       { shopify_gid: 'gid://shopify/Collection/1', entity_type: 'collection', title: 'Running', handle: 'running', canonical_url: 'https://acme.myshopify.com/collections/running', is_active: true },
-    ])
+    ])])
     const annotated = REAL_MODEL.annotate(items, { gscRows: A_ROWS.two, ownership: null, plannedKeys: null })
     check('A7: the flag and the figures reach the store\'s item by path, whatever the host',
       annotated[0].cannibalization?.query === 'running shoes' && annotated[0].metrics?.impressions === 500 && annotated[0].metrics?.topQuery === 'running shoes')
@@ -163,7 +163,7 @@ async function main() {
       B2: article?.origin === 'site',
       B3: trail?.supportTopicPlanned === false,
       B4: trail?.metrics?.impressions === 300 && trail?.metrics?.clicks === 12,
-      B5: p.source === 'shopify' && !p.partial && p.counts.all === 2 && p.counts.commerce === 1 && p.counts.content === 1,
+      B5: p.source === 'shopify' && !p.partial && p.counts.all === 2 && p.counts.product === 1 && p.counts.article === 1,
       titles: titles.join(', '),
     }
   }
@@ -173,7 +173,7 @@ async function main() {
     check('B2: another owner\'s generated article does not make a page "ours"', r.B2)
     check('B3: another owner\'s topic does not mark a product as planned', r.B3)
     check('B4: another project\'s Search Console row under the same run id is not summed in', r.B4)
-    check('B5: the counts are of what is listed', r.B5)
+    check('B5: the counts are of what is listed, per kind', r.B5)
     const own = await REAL_LOAD.loadExistingContent(new FakeAdmin({
       shopify_entities: [{ project_id: P, user_id: U, shopify_gid: 'gid://shopify/Article/7', entity_type: 'article', title: 'Ours', canonical_url: `${SITE}/blogs/news/ours`, is_active: true }],
       generated_articles: [{ project_id: P, user_id: U, shopify_article_id: 'gid://shopify/Article/7' }],
@@ -218,7 +218,8 @@ async function main() {
     return {
       C1: crawl.source === 'crawl' && crawl.partial && crawl.partialReason === 'crawl',
       C2: crawl.items.length === 3 && !crawl.items.some((i) => i.title === 'Contact') && crawl.items.find((i) => i.title === 'Boots')?.group === 'commerce',
-      C3: shop.source === 'shopify' && !shop.partial && shop.partialReason === null,
+      // The crawl no longer hides behind the store: its page the store does not list joins the list.
+      C3: shop.source === 'shopify' && !shop.partial && shop.partialReason === null && shop.items.some((i) => i.key === '/x') && shop.items.length === 3,
       C4: wpDone.source === 'wordpress' && !wpDone.partial && wpDone.items[0]?.origin === 'ours' && wpDone.resync === 'wordpress',
       C5: wpCut.partial && wpCut.partialReason === 'index_partial',
       C6: empty.source === 'none' && !empty.partial && empty.items.length === 0 && empty.resync === null && empty.gsc.state === 'not_connected',
@@ -228,18 +229,18 @@ async function main() {
     const r = await partialChecks(REAL_LOAD)
     check('C1: a crawl-only project is listed from the crawl, and flagged partial', r.C1)
     check('C2: the crawl\'s utility pages are left out; a product category is a collection', r.C2)
-    check('C3: a store with synced entities reads its entities, never the crawl, and is not partial', r.C3)
+    check('C3: a store with synced entities is not partial; the crawl only adds the pages the store does not list', r.C3)
     check('C4: a connected WordPress index is complete; its matched article is "ours"; resync is its refresh', r.C4)
     check('C5: a WordPress scan that was cut short says so', r.C5)
     check('C6: a project with nothing is "none": no items, no resync, not partial', r.C6)
-    const m = mutant<Load>('lib/content/existing-content/load.ts', "indexedAt = crawl.scan_completed_at; partialReason = 'crawl'", 'indexedAt = crawl.scan_completed_at')
+    const m = mutant<Load>('lib/content/existing-content/load.ts', "else if (sources.wordpress === 0 && sources.crawl > 0) partialReason = 'crawl'", '')
     const rm = m.mod ? await partialChecks(m.mod) : null
     check('MUTATION CONTROL: a loader that forgets to flag the crawl as partial is caught by C1', m.found && !!rm && !rm.C1)
 
     const screen = strip(read('components/content/workspace/ExistingContentScreen.tsx'))
-    const saysPartial = (s: string) => /\{payload\.partial && \(/.test(s) && /x\.partialCrawlBody/.test(s) && /x\.partialTitle/.test(s)
+    const saysPartial = (s: string) => /\{payload\.partial && mapIdle && \(/.test(s) && /x\.partialCrawlBody/.test(s) && /x\.partialTitle/.test(s)
     check('C7: the screen states the partial list in words whenever the payload says partial', saysPartial(screen))
-    check('MUTATION CONTROL: a screen that drops the partial note is caught', !saysPartial(screen.replace('{payload.partial && (', '{false && (')))
+    check('MUTATION CONTROL: a screen that drops the partial note is caught', !saysPartial(screen.replace('{payload.partial && mapIdle && (', '{false && (')))
   }
 
   console.log('\nD) the route, the actions and the copy')
@@ -275,18 +276,20 @@ async function main() {
     check('MUTATION CONTROL: a route returning the error message is caught', !noRaw(route.replace("error: 'existing_content_read_failed'", 'error: (e as Error).message')))
 
     const screen = strip(read('components/content/workspace/ExistingContentScreen.tsx'))
-    const ALLOWED = ['/api/content/existing', '/api/shopify/sync', '/api/content/automation/internal-links/index/refresh', '/api/content/topics']
-    const fetched = (s: string) => [...s.matchAll(/fetch\(\s*[`'"]([^`'"?$]+)/g)].map((m) => m[1])
+    const ALLOWED = ['/api/content/existing', '/api/content/existing/map', '/api/shopify/sync', '/api/content/automation/internal-links/index/refresh', '/api/content/topics']
+    // fetch('…') and the screen's post('…') helper alike.
+    const fetched = (s: string) => [...s.matchAll(/\b(?:fetch|post)\(\s*[`'"]([^`'"?$]+)/g)].map((m) => m[1])
     const onlyExisting = (s: string) => fetched(s).length > 0 && fetched(s).every((u) => ALLOWED.includes(u))
     check(`D7: the screen calls only existing routes (${fetched(screen).join(', ')})`, onlyExisting(screen))
     check('MUTATION CONTROL: a screen that calls a Shopify product API of its own is caught',
       !onlyExisting(screen + "\nfetch('/api/shopify/products')"))
+    check('MUTATION CONTROL: …also through the post() helper', !onlyExisting(screen + "\npost('/api/shopify/products', {})"))
     const noModel = (s: string) => !/recommendations|gemini|generate|improve/i.test(s.match(/const writeSupport[\s\S]*?\n {2}\}, \[/)?.[0] ?? 'generate')
     check('D8: "write a supporting article" posts a topic and calls no model', noModel(screen) && /fetch\('\/api\/content\/topics'/.test(screen))
     check('MUTATION CONTROL: a click that asks the recommendation engine is caught',
       !noModel(screen.replace("fetch('/api/content/topics'", "fetch('/api/content/automation/recommendations'")))
 
-    const item = { title: 'Trail Runner 2', url: `${SITE}/products/trail-runner-2`, metrics: { clicks: 1, impressions: 10, topQuery: 'trail runner' } }
+    const item = { title: 'Trail Runner 2', url: `${SITE}/products/trail-runner-2`, metrics: { clicks: 1, impressions: 10, position: 12, topQuery: 'trail runner', topQueryPosition: 12 } }
     const bodyHe = REAL_MODEL.supportTopicBody(item, P, 'he', getDashboardDictionary('he').existingContent.supportTopic)
     const v = validateTopicBrief(bodyHe)
     const anchor = 'value' in v ? v.value.anchors_json[0] : null
@@ -316,7 +319,9 @@ async function main() {
       getDashboardDictionary('he').contentHub.screens.existing === 'תוכן קיים' && (getDashboardDictionary('en').contentHub.screens.existing as string) === 'Existing content')
 
     const rawColor = (s: string) => /\b(?:text|bg|border|ring)-(?:slate|blue|gray|zinc|neutral|red|green|amber|yellow)-\d/.test(s)
-    check('D14: the screen uses the design tokens only', !rawColor(screen))
+    const partsDir = 'components/content/workspace/existing'
+    const withParts = [screen, ...readdirSync(join(ROOT, partsDir)).map((f) => strip(read(`${partsDir}/${f}`)))].join('\n')
+    check('D14: the screen and its parts use the design tokens only', !rawColor(withParts))
     check('MUTATION CONTROL: a raw slate colour is caught', rawColor(screen + '\n<p className="text-slate-500" />'))
     check('D15: no "no supporting article" flag is claimed — the link plans cannot see the merchant\'s own posts',
       !/noSupport|unsupported/i.test(screen) && !/noSupport/i.test(JSON.stringify(he)))

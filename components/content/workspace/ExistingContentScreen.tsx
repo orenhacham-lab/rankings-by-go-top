@@ -1,131 +1,242 @@
 'use client'
 
 /**
- * The existing-content screen: what is already on the merchant's site.
+ * The existing-content screen: every page already on the merchant's site.
  *
- * Read-only. It lists the pages the app already holds for the active project (the
- * store's synced entities, the WordPress index, or the seeding crawl), with Search
- * Console's 28-day figures, and flags two things: a cannibalization RISK (two or
- * more of the site's pages get impressions for one query) and whether an article
- * is ours or was on the site before. The data and every rule behind it are
- * server-side (GET /api/content/existing, lib/content/existing-content).
+ * What the merchant learns here, top to bottom:
+ *   1. how big the site is and what it is made of: the TRUE total per kind
+ *      (products, articles, pages, categories), and what Google says about it
+ *      (existing/SiteSummary.tsx);
+ *   2. one tab per kind with that same total on the tab ("מוצרים 912"), even
+ *      when the list shows only its first rows: the list is paged, searched
+ *      and sorted on the server (GET /api/content/existing), 50 rows at a time;
+ *   3. per page: its address, when it was updated, Search Console's clicks,
+ *      impressions and position, the keyword it ranks for, and the one action
+ *      worth taking — only when the figures give a reason, with the reason.
  *
- * Two actions, both through routes that already exist:
+ * THE FULL-SITE MAPPING runs in the background (POST /api/content/existing/map):
+ * the sitemaps, then the platform's own lists. The screen starts it on the first
+ * visit and when it is a week old, polls its progress while it runs, and reloads
+ * the list when it ends. Nothing waits for it: the list shows what the app
+ * already holds meanwhile. While the table does not exist yet (its migration not
+ * applied) the mapping is simply not offered.
+ *
+ * Actions, all through routes that already exist:
  *   - "write a supporting article" creates a topic through /api/content/topics,
- *     with the product or collection as a required internal link. No model call.
- *   - "resync" calls the existing Shopify sync, or the WordPress index refresh.
+ *     with the page as a required internal link. No model call.
+ *   - "improve the article" opens our own article (/content/articles/<id>).
+ *   - "update the list" starts the mapping, plus the existing Shopify sync or
+ *     WordPress index refresh where one applies.
  *
  * There is no "no supporting article" flag. The only record of what links to a
- * product is the internal-link plans, and those cover the articles WE write, not
- * the merchant's own posts: a product their blog already links to would be
- * flagged as unsupported. The action is offered on every product and collection
- * instead, and a product that already has a planned topic says so.
+ * page is the internal-link plans, and those cover the articles WE write, not
+ * the merchant's own posts.
+ *
+ * Presentation lives in ./existing/*, apart from this file's data flow, so the
+ * screen can take the new shared visual pieces without touching the logic.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ExternalLink, FileText, Layers, Library, RefreshCw, ShoppingBag } from 'lucide-react'
+import { Library, Search } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Notice from '@/components/ui/Notice'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
-import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
-import { Skeleton } from '@/components/ui/Skeleton'
-import { Table, TableBody, TableHead, TableRow, Td, Th, EmptyRow } from '@/components/ui/Table'
+import Select from '@/components/ui/Select'
+import { FIELD_CLASSES } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
-import { formatDate, EMPTY_DATE } from '@/lib/format/date'
+import { formatDate } from '@/lib/format/date'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
-import { strategyHref, STRATEGY_ANCHORS } from '@/lib/content/strategy/view'
 import {
-  filterItems, supportTopicBody, topicLanguage,
-  type ExistingContentFilter, type ExistingContentItem, type ExistingContentPayload,
+  supportTopicBody, topicLanguage, PAGE_LIMIT_DEFAULT,
+  type ExistingContentItem, type ExistingContentPayload, type ExistingContentSort, type ExistingContentTab, type SiteMapStatus,
 } from '@/lib/content/existing-content/model'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
+import SiteSummary, { MappingProgress } from './existing/SiteSummary'
+import KindTabs from './existing/KindTabs'
+import ContentTable from './existing/ContentTable'
+import ExistingSkeleton from './existing/ExistingSkeleton'
+import { fill } from './existing/format'
 
-const PAGE_SIZE = 50
-const FILTERS: readonly ExistingContentFilter[] = ['all', 'content', 'commerce']
-const FILTER_ICONS: Record<ExistingContentFilter, React.ReactNode> = {
-  all: <Layers />, content: <FileText />, commerce: <ShoppingBag />,
+const PAGE_SIZE = PAGE_LIMIT_DEFAULT
+const POLL_MS = 2500
+const SEARCH_DEBOUNCE_MS = 300
+/** A finished mapping older than this is refreshed on the next visit. */
+const MAP_STALE_MS = 7 * 24 * 3600_000
+const PANEL_ID = 'existing-content-panel'
+
+interface View { tab: ExistingContentTab; q: string; sort: ExistingContentSort | null; risk: boolean }
+const FIRST_VIEW: View = { tab: 'all', q: '', sort: null, risk: false }
+
+/** The mapping should (re)start by itself: never mapped, or mapped long ago. */
+function mapDue(m: SiteMapStatus, now: number): boolean {
+  if (m.state === 'never') return true
+  if ((m.state === 'completed' || m.state === 'partial' || m.state === 'failed') && m.finishedAt) return now - Date.parse(m.finishedAt) > MAP_STALE_MS
+  return false
 }
-
-/** Eight columns fit a 1440 screen beside the sidebar with a tighter gutter. */
-const CELL = 'px-4'
-/**
- * On a phone the table reads as stacked rows (final review R15): the title with a
- * meta line under it (type, clicks, the one flag that matters) and the row's action.
- * The secondary columns return as the screen widens, instead of the last ones being
- * cut off inside the card.
- */
-const FROM_SM = 'hidden sm:table-cell'
-const FROM_MD = 'hidden md:table-cell'
-const FROM_LG = 'hidden lg:table-cell'
-
-/** Every page is on the same site, so the path is what tells two rows apart. */
-function displayPath(url: string): string {
-  try {
-    const u = new URL(url)
-    const path = decodeURIComponent(u.pathname)
-    return path === '/' ? u.host : path
-  } catch {
-    return url
-  }
-}
-
-const fill = (s: string, vars: Record<string, string | number>) =>
-  Object.entries(vars).reduce((acc, [k, v]) => acc.split(`{${k}}`).join(String(v)), s)
 
 export default function ExistingContentScreen() {
   const { projectId, selectedProject, language, isHebrew, toast, loadTopics, data: overview, overviewSettled } = useContentWorkspace()
   const x = useMemo(() => getDashboardDictionary(language).existingContent, [language])
-  const num = useMemo(() => new Intl.NumberFormat(isHebrew ? 'he-IL' : 'en-US'), [isHebrew])
+  const locale = isHebrew ? 'he-IL' : 'en-US'
+  const num = useMemo(() => new Intl.NumberFormat(locale), [locale])
+  const pos = useMemo(() => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }), [locale])
   const day = useCallback((iso: string | null) => (iso ? formatDate(iso, language) : null), [language])
+  // The toast object is new on every render of the workspace; its functions are
+  // stable. Depending on the object would refetch (and flash the skeleton) each time.
+  const toastError = toast.error
+  const toastSuccess = toast.success
+  const loadErrorText = useRef(x.loadError)
+  useEffect(() => { loadErrorText.current = x.loadError }, [x.loadError])
 
   const [payload, setPayload] = useState<ExistingContentPayload | null>(null)
+  const [rows, setRows] = useState<ExistingContentItem[]>([])
   const [loadFailed, setLoadFailed] = useState(false)
-  const [filter, setFilter] = useState<ExistingContentFilter>('all')
-  const [onlyRisk, setOnlyRisk] = useState(false)
-  const [shown, setShown] = useState(PAGE_SIZE)
-  const [syncing, setSyncing] = useState(false)
+  const [view, setView] = useState<View>(FIRST_VIEW)
+  const [queryText, setQueryText] = useState('')
+  const [loading, setLoading] = useState<'none' | 'view' | 'more'>('none')
+  const [refreshing, setRefreshing] = useState(false)
   const [creating, setCreating] = useState<string | null>(null)
   const [plannedNow, setPlannedNow] = useState<Set<string>>(() => new Set())
+  const reqId = useRef(0)
+  const hasPayload = useRef(false)
+  const autoStarted = useRef<string | null>(null)
+  // The first mapping starts by itself; until it could not, "never mapped" reads as "mapping".
+  const [autoFailed, setAutoFailed] = useState(false)
+  const viewRef = useRef(view)
+  useEffect(() => { viewRef.current = view }, [view])
 
-  const load = useCallback(async () => {
+  const fetchList = useCallback(async (v: View, offset: number): Promise<void> => {
     if (!projectId) return
-    setLoadFailed(false)
+    const id = ++reqId.current
+    const params = new URLSearchParams({ projectId, tab: v.tab, offset: String(offset), limit: String(PAGE_SIZE) })
+    if (v.q.trim()) params.set('q', v.q.trim())
+    if (v.sort) params.set('sort', v.sort)
+    if (v.risk) params.set('risk', '1')
     try {
-      const res = await fetch(`/api/content/existing?projectId=${encodeURIComponent(projectId)}`)
+      const res = await fetch(`/api/content/existing?${params.toString()}`)
       const body = await res.json().catch(() => null)
-      if (!res.ok || !body?.ok) { setLoadFailed(true); return }
-      setPayload(body as ExistingContentPayload)
+      if (id !== reqId.current) return
+      if (!res.ok || !body?.ok) throw new Error('load')
+      const next = body as ExistingContentPayload
+      hasPayload.current = true
+      setPayload(next)
+      setRows((prev) => (offset > 0 ? [...prev, ...next.items] : next.items))
+      setLoadFailed(false)
     } catch {
-      setLoadFailed(true)
-    }
-  }, [projectId])
-
-  useEffect(() => {
-    setPayload(null); setFilter('all'); setOnlyRisk(false); setShown(PAGE_SIZE); setPlannedNow(new Set())
-    void load()
-  }, [load])
-
-  const resync = useCallback(async () => {
-    if (!payload?.resync || syncing) return
-    setSyncing(true)
-    try {
-      const res = payload.resync === 'shopify'
-        ? await fetch('/api/shopify/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) })
-        : await fetch('/api/content/automation/internal-links/index/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, force: true }) })
-      if (res.status === 202) toast.success(x.resyncRunning)
-      else if (res.ok) { toast.success(x.resyncDone); await load() }
-      else toast.error(x.resyncFailed)
-    } catch {
-      toast.error(x.resyncFailed)
+      if (id !== reqId.current) return
+      // A first load that fails is a retry card; a later one keeps the list and says so.
+      if (hasPayload.current) toastError(loadErrorText.current)
+      else setLoadFailed(true)
     } finally {
-      setSyncing(false)
+      if (id === reqId.current) setLoading('none')
     }
-  }, [payload?.resync, syncing, projectId, toast, x, load])
+  }, [projectId, toastError])
 
+  // A new project: start over, skeleton first.
+  useEffect(() => {
+    hasPayload.current = false
+    autoStarted.current = null
+    viewRef.current = FIRST_VIEW
+    setPayload(null); setRows([]); setLoadFailed(false); setView(FIRST_VIEW); setQueryText(''); setPlannedNow(new Set()); setAutoFailed(false)
+    void fetchList(FIRST_VIEW, 0)
+  }, [fetchList])
+
+  const changeView = useCallback((patch: Partial<View>) => {
+    const next = { ...viewRef.current, ...patch }
+    viewRef.current = next
+    setView(next)
+    setLoading('view')
+    void fetchList(next, 0)
+  }, [fetchList])
+
+  // The search runs as the merchant types, a moment after the last key.
+  useEffect(() => {
+    if (queryText === viewRef.current.q) return
+    const t = setTimeout(() => changeView({ q: queryText }), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [queryText, changeView])
+
+  const showMore = useCallback(() => {
+    setLoading('more')
+    void fetchList(viewRef.current, rows.length)
+  }, [fetchList, rows.length])
+
+  // ── The full-site mapping ────────────────────────────────────────────────
+  const setMap = useCallback((map: SiteMapStatus) => setPayload((p) => (p ? { ...p, map } : p)), [])
+
+  const startMap = useCallback(async (quiet: boolean): Promise<'running' | 'recent' | 'failed'> => {
+    if (!projectId) return 'failed'
+    try {
+      const res = await fetch('/api/content/existing/map', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) })
+      const body = await res.json().catch(() => null)
+      if (res.status === 202) {
+        setPayload((p) => (p ? { ...p, map: { ...p.map, state: 'running', phase: p.map.state === 'running' ? p.map.phase : 'robots' } } : p))
+        return 'running'
+      }
+      if (res.ok && body?.state === 'recent') return 'recent'
+      if (!quiet) toastError(x.map.startFailed)
+      return 'failed'
+    } catch {
+      if (!quiet) toastError(x.map.startFailed)
+      return 'failed'
+    }
+  }, [projectId, toastError, x.map.startFailed])
+
+  // First visit, or a week-old mapping: start it once per project, quietly.
+  useEffect(() => {
+    if (!payload || !projectId || autoStarted.current === projectId) return
+    autoStarted.current = projectId
+    if (mapDue(payload.map, Date.now())) void startMap(true).then((r) => { if (r !== 'running') setAutoFailed(true) })
+  }, [payload, projectId, startMap])
+
+  // While it runs: its progress, and the list again when it ends.
+  const mapRunning = payload?.map.state === 'running'
+  useEffect(() => {
+    if (!mapRunning || !projectId) return
+    let stop = false
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/content/existing/map?projectId=${encodeURIComponent(projectId)}`)
+        const body = await res.json().catch(() => null)
+        if (stop || !res.ok || !body?.ok) return
+        const map = body.map as SiteMapStatus
+        if (map.state === 'running') { setMap(map); return }
+        stop = true
+        setMap(map)
+        void fetchList(viewRef.current, 0)
+      } catch { /* the next tick tries again */ }
+    }
+    const timer = setInterval(() => { void tick() }, POLL_MS)
+    return () => { stop = true; clearInterval(timer) }
+  }, [mapRunning, projectId, setMap, fetchList])
+
+  const refresh = useCallback(async () => {
+    if (!payload || refreshing) return
+    setRefreshing(true)
+    try {
+      const mapAvailable = payload.map.state !== 'unavailable' && payload.map.state !== 'no_site'
+      const post = (url: string, body: Record<string, unknown>) =>
+        fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then((r) => r.ok || r.status === 202).catch(() => false)
+      const [mapped, synced] = await Promise.all([
+        mapAvailable ? startMap(true) : Promise.resolve(null),
+        payload.resync === 'shopify' ? post('/api/shopify/sync', { projectId })
+          : payload.resync === 'wordpress' ? post('/api/content/automation/internal-links/index/refresh', { projectId, force: true })
+            : Promise.resolve(null),
+      ])
+      if (mapped === 'running') toastSuccess(x.map.started)
+      else if (mapped === 'recent') toastSuccess(x.map.recent)
+      else if (synced === true) { toastSuccess(x.map.started); void fetchList(viewRef.current, 0) }
+      else toastError(x.map.startFailed)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [payload, refreshing, startMap, projectId, toastSuccess, toastError, x.map, fetchList])
+
+  // ── "Write a supporting article" ─────────────────────────────────────────
   const writeSupport = useCallback(async (item: ExistingContentItem) => {
     if (creating) return
     setCreating(item.key)
@@ -134,24 +245,24 @@ export default function ExistingContentScreen() {
       const copy = getDashboardDictionary(lang).existingContent.supportTopic
       const res = await fetch('/api/content/topics', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(supportTopicBody(item, projectId, lang, copy)),
+        body: JSON.stringify(supportTopicBody({ ...item, title: item.isHome ? x.homePage : item.title }, projectId, lang, copy)),
       })
-      if (!res.ok) { toast.error(x.supportFailed); return }
+      if (!res.ok) { toastError(x.supportFailed); return }
       setPlannedNow((s) => new Set(s).add(item.key))
-      toast.success(x.supportCreated)
+      toastSuccess(x.supportCreated)
       void loadTopics()
     } catch {
-      toast.error(x.supportFailed)
+      toastError(x.supportFailed)
     } finally {
       setCreating(null)
     }
-  }, [creating, selectedProject?.language, projectId, toast, x, loadTopics])
+  }, [creating, selectedProject?.language, projectId, toastSuccess, toastError, x, loadTopics])
 
   if (loadFailed) {
     return (
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-copy text-body">{x.loadError}</p>
-        <Button variant="secondary" onClick={() => void load()}>{x.retry}</Button>
+        <Button variant="secondary" onClick={() => { setLoadFailed(false); void fetchList(viewRef.current, 0) }}>{x.retry}</Button>
       </Card>
     )
   }
@@ -159,38 +270,33 @@ export default function ExistingContentScreen() {
   // With nothing indexed, which empty state is right depends on whether a platform is
   // connected, which the workspace overview says: until it has, the skeleton stays,
   // instead of "connect your site" to a merchant whose site is connected.
-  if (!payload || (payload.source === 'none' && !overviewSettled)) {
-    return (
-      <div role="status" aria-label={x.loading} className="space-y-4">
-        <div className="grid grid-cols-3 gap-4 sm:gap-5" aria-hidden>
-          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 rounded-card" />)}
-        </div>
-        <Skeleton className="h-64 rounded-card" />
-      </div>
-    )
-  }
+  if (!payload || (payload.source === 'none' && !overviewSettled)) return <ExistingSkeleton label={x.loading} />
 
   // A site is "connected" when any publishing platform is (the overview resolves it),
   // or when the store / WordPress connection this screen reads is.
   const platform = overview?.platform?.platform ?? 'none'
   const siteConnected = platform !== 'none' || payload.connections.shopify || payload.connections.wordpress
+  const mapAvailable = payload.map.state !== 'unavailable' && payload.map.state !== 'no_site'
+  const canRefresh = mapAvailable || !!payload.resync
 
-  const resyncButton = payload.resync ? (
-    <Button variant="secondary" size="sm" onClick={() => void resync()} loading={syncing}>
-      {!syncing && <RefreshCw aria-hidden="true" className="size-4" />}
-      {syncing ? x.resyncing : x.resync}
-    </Button>
-  ) : null
+  // Never mapped: the start is already on its way (above), so this is "mapping", not "nothing".
+  const mapStarting = payload.map.state === 'never' && !autoFailed
+  const mapIdle = payload.map.state !== 'running' && !mapStarting
 
-  if (payload.source === 'none') {
+  if (payload.counts.all === 0) {
     return (
       <Card padding={false}>
-        {siteConnected ? (
+        {!mapIdle ? (
+          <div data-existing-empty="mapping">
+            <EmptyState icon={<Library />} title={x.empty.noDataTitle} body={x.empty.noDataBody} />
+            <MappingProgress x={x} data={payload} num={num} />
+          </div>
+        ) : siteConnected || mapAvailable ? (
           <EmptyState
             icon={<Library />}
-            title={x.empty.noDataTitle}
-            body={payload.resync ? x.empty.noDataBody : x.empty.noDataBodyNoResync}
-            action={resyncButton}
+            title={x.empty.noConnectionTitle}
+            body={x.empty.noDataIdleBody}
+            action={canRefresh ? <Button onClick={() => void refresh()} loading={refreshing}>{x.map.refresh}</Button> : null}
           />
         ) : (
           <EmptyState
@@ -205,181 +311,109 @@ export default function ExistingContentScreen() {
   }
 
   const gscOk = payload.gsc.state === 'ok'
-  const showUpdated = payload.items.some((it) => !!it.updatedAt)
-  const riskCount = payload.items.filter((it) => !!it.cannibalization).length
-  const visible = filterItems(payload.items, filter, onlyRisk)
-  const page = visible.slice(0, shown)
-  const colCount = 4 + (showUpdated ? 1 : 0) + (gscOk ? 3 : 0)
-  const indexedAt = day(payload.indexedAt)
   const gscNote = payload.gsc.state === 'not_connected' || payload.gsc.state === 'not_synced' || payload.gsc.state === 'unavailable'
     ? x.gscNote[payload.gsc.state] : null
+  const showUpdated = rows.some((it) => !!it.updatedAt)
+  const sortOptions = (gscOk ? (['impressions', 'clicks', 'position', 'updated', 'title'] as const) : (['updated', 'title'] as const))
+    .map((s) => ({ value: s, label: x.sorts[s] }))
+  const mapNote = !mapIdle ? null
+    : payload.map.state === 'failed' ? x.map.failed
+    : payload.map.stopReason === 'robots_unreadable' ? x.map.blocked
+    : payload.map.stopReason === 'no_sitemap' ? x.map.noSitemap
+    : null
+  const partialBody = payload.partialReason === 'crawl' ? x.partialCrawlBody
+    : payload.partialReason === 'map_capped' ? fill(x.map.capped, { n: num.format(payload.map.found) })
+    : payload.partialReason === 'gsc_only' ? x.partialGscBody
+    : x.partialIndexBody
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-caption text-muted">
-          {x.sourceLine[payload.source]}
-          {indexedAt && <> · {fill(x.indexedAt, { date: indexedAt })}</>}
-        </p>
-        {resyncButton}
-      </div>
+    <div className="space-y-6">
+      <SiteSummary
+        x={x}
+        data={payload}
+        tab={view.tab}
+        onTab={(tab) => changeView({ tab })}
+        risk={view.risk}
+        onRisk={() => changeView({ risk: !view.risk })}
+        num={num}
+        day={day}
+        refresh={{ show: canRefresh, busy: refreshing, onClick: () => void refresh() }}
+      />
 
-      {payload.partial && (
+      {payload.partial && mapIdle && (
         <Notice tone="warn">
           <div className="flex flex-wrap items-start gap-3">
             <div role="note" className="min-w-0 flex-1 basis-56 space-y-1">
               <p className="font-semibold text-ink">{x.partialTitle}</p>
-              <p className="max-w-prose text-body">{payload.partialReason === 'crawl' ? x.partialCrawlBody : x.partialIndexBody}</p>
+              <p className="max-w-prose text-body">{partialBody}</p>
             </div>
-            {payload.partialReason === 'crawl' && !siteConnected && (
+            {payload.partialReason === 'crawl' && !siteConnected && !mapAvailable && (
               <Link href={platformSetupHref(projectId)} className="shrink-0"><Button size="sm" variant="secondary">{x.connectSite}</Button></Link>
             )}
           </div>
         </Notice>
       )}
+      {mapNote && <p className="text-caption text-muted">{mapNote}</p>}
 
-      <div role="group" aria-label={x.tilesLabel} className="list-enter grid grid-cols-3 gap-4 sm:gap-5">
-        {FILTERS.map((f) => {
-          const active = filter === f
-          return (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={active}
-              onClick={() => { setFilter(f); setShown(PAGE_SIZE) }}
-              className="rounded-card text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
-            >
-              <StatTile
-                label={x.tiles[f]}
-                value={num.format(payload.counts[f])}
-                source={x.tileSource[payload.source]}
-                icon={FILTER_ICONS[f]}
-                className={cn('transition-colors duration-150 ease-snappy', active ? 'border-action ring-1 ring-action' : 'hover:border-line-strong')}
-              />
-            </button>
-          )
-        })}
-      </div>
+      <section aria-label={x.tableLabel} className="space-y-4">
+        <KindTabs x={x} counts={payload.counts} capped={payload.map.capped} value={view.tab} onChange={(tab) => changeView({ tab })} num={num} panelId={PANEL_ID} />
 
-      {payload.truncated && <p className="text-caption text-muted">{fill(x.truncatedNote, { n: num.format(payload.items.length) })}</p>}
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative min-w-0 flex-1 basis-64 sm:max-w-md">
+            <span className="sr-only">{x.searchLabel}</span>
+            <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
+              placeholder={x.searchPlaceholder}
+              className={cn(FIELD_CLASSES, 'h-10 ps-9')}
+            />
+          </label>
+          <div className="w-full sm:w-56">
+            <Select aria-label={x.sortLabel} value={payload.view.sort} options={sortOptions} onChange={(e) => changeView({ sort: e.target.value as ExistingContentSort })} />
+          </div>
+          <p className="text-caption text-muted tabular-nums sm:ms-auto" aria-live="polite">
+            {loading === 'view' ? x.updatingList : fill(x.shownOf, { shown: num.format(rows.length), total: num.format(payload.matching) })}
+          </p>
+        </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {riskCount > 0 ? (
-          <button
-            type="button"
-            aria-pressed={onlyRisk}
-            onClick={() => { setOnlyRisk((v) => !v); setShown(PAGE_SIZE) }}
-            className={cn(
-              'inline-flex h-8 items-center gap-1.5 rounded-pill border px-3 text-caption font-semibold transition-colors duration-150 ease-snappy',
-              'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
-              onlyRisk ? 'border-action bg-action-soft text-action' : 'border-line bg-surface text-body hover:border-line-strong',
-            )}
-          >
-            <AlertTriangle aria-hidden="true" className="size-4" />
-            {fill(x.onlyRisk, { n: num.format(riskCount) })}
-          </button>
-        ) : <span />}
+        {payload.truncated && <p className="text-caption text-muted">{fill(x.truncatedNote, { n: num.format(payload.sources.shopify) })}</p>}
+        {/* Only why the figures are missing: the setup row above this screen already
+            links to the Search Console settings, so a second link here would repeat it. */}
+        {gscNote && <p className="text-caption text-muted">{gscNote}</p>}
         {gscOk && payload.gsc.startDate && payload.gsc.endDate && (
           <p className="text-overline text-muted" title={x.gscRowsNote}>
             <bdi>{x.gscBrand}</bdi> · {fill(x.gscWindow, { start: day(payload.gsc.startDate) ?? '', end: day(payload.gsc.endDate) ?? '' })}
           </p>
         )}
-      </div>
 
-      {/* Only why the figures are missing: the setup row above this screen already
-          links to the Search Console settings, so a second link here would repeat it. */}
-      {gscNote && <p className="text-caption text-muted">{gscNote}</p>}
+        <ContentTable
+          x={x}
+          items={rows}
+          tab={view.tab}
+          gscOk={gscOk}
+          showUpdated={showUpdated}
+          num={num}
+          pos={pos}
+          day={day}
+          creating={creating}
+          plannedNow={plannedNow}
+          onSupport={(it) => void writeSupport(it)}
+          emptyMessage={view.q.trim() ? x.empty.searchEmpty : x.empty.filterEmpty}
+          busy={loading === 'view'}
+          panelId={PANEL_ID}
+        />
 
-      <Table>
-        <caption className="sr-only">{x.tableLabel}</caption>
-        <TableHead>
-          <tr>
-            <Th className={CELL}>{x.columns.title}</Th>
-            <Th className={cn(CELL, FROM_MD)}>{x.columns.type}</Th>
-            {showUpdated && <Th className={cn(CELL, FROM_LG)}>{x.columns.updated}</Th>}
-            {gscOk && <Th className={cn(CELL, FROM_SM, 'text-end')}>{x.columns.clicks}</Th>}
-            {gscOk && <Th className={cn(CELL, FROM_MD, 'text-end')}>{x.columns.impressions}</Th>}
-            {gscOk && <Th className={cn(CELL, FROM_LG)}>{x.columns.topQuery}</Th>}
-            <Th className={cn(CELL, FROM_SM)}>{x.columns.flags}</Th>
-            <Th className={CELL}><span className="sr-only">{x.columns.action}</span></Th>
-          </tr>
-        </TableHead>
-        <TableBody>
-          {page.length === 0 ? (
-            <EmptyRow colSpan={colCount} message={x.empty.filterEmpty} />
-          ) : page.map((it) => {
-            const planned = it.supportTopicPlanned || plannedNow.has(it.key)
-            // Only the exceptions carry a badge (final review R24): an article WE wrote,
-            // and a cannibalization risk. "Was on the site" is every other page's normal
-            // state, so it is not stamped on each row.
-            const flags = (it.group === 'content' && it.origin === 'ours') || it.cannibalization ? (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {it.group === 'content' && it.origin === 'ours' && <Badge variant="info">{x.origin.ours}</Badge>}
-                {it.cannibalization && <Badge variant="warning" dot>{x.cannibal}</Badge>}
-              </div>
-            ) : null
-            return (
-              <TableRow key={it.key}>
-                <Td className={cn(CELL, 'max-w-40 sm:max-w-64')}>
-                  <p className="truncate font-medium text-ink" title={it.title}>{it.title}</p>
-                  <a
-                    href={it.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={fill(x.openPage, { title: it.title })}
-                    className="mt-0.5 inline-flex max-w-full items-center gap-1 text-caption text-muted hover:text-action hover:underline"
-                  >
-                    <span dir="ltr" className="truncate">{displayPath(it.url)}</span>
-                    <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
-                  </a>
-                  {/* The phone's meta line: what the hidden columns would have said. */}
-                  <p data-existing-meta="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted md:hidden">
-                    <span>{x.types[it.type]}</span>
-                    {gscOk && it.metrics && <span className="tabular-nums sm:hidden">· {num.format(it.metrics.clicks)} {x.columns.clicks}</span>}
-                  </p>
-                  {flags && <div className="mt-1.5 sm:hidden">{flags}</div>}
-                </Td>
-                <Td className={cn(CELL, FROM_MD, 'whitespace-nowrap')}>{x.types[it.type]}</Td>
-                {showUpdated && <Td className={cn(CELL, FROM_LG, 'whitespace-nowrap text-muted')}>{day(it.updatedAt) ?? EMPTY_DATE}</Td>}
-                {gscOk && <Td className={cn(CELL, FROM_SM, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.clicks) : EMPTY_DATE}</Td>}
-                {gscOk && <Td className={cn(CELL, FROM_MD, 'text-end tabular-nums')}>{it.metrics ? num.format(it.metrics.impressions) : EMPTY_DATE}</Td>}
-                {gscOk && (
-                  <Td className={cn(CELL, FROM_LG, 'max-w-36')}>
-                    {it.metrics?.topQuery ? <span className="block truncate" title={it.metrics.topQuery}>{it.metrics.topQuery}</span> : <span className="text-muted">{EMPTY_DATE}</span>}
-                  </Td>
-                )}
-                <Td className={cn(CELL, FROM_SM, 'min-w-36')}>
-                  {flags}
-                  {it.cannibalization && (
-                    <p className="mt-1 max-w-48 text-caption text-muted">
-                      {fill(x.cannibalDetail, { n: num.format(it.cannibalization.pages), query: it.cannibalization.query })}
-                    </p>
-                  )}
-                </Td>
-                <Td className={cn(CELL, 'whitespace-nowrap text-end')}>
-                  {it.group === 'commerce' && (planned ? (
-                    <Link href={strategyHref('list', STRATEGY_ANCHORS.topics)} className="rounded-control text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
-                      {x.supportPlanned}
-                    </Link>
-                  ) : (
-                    <Button size="sm" variant="secondary" loading={creating === it.key} disabled={!!creating && creating !== it.key} onClick={() => void writeSupport(it)}>
-                      {x.writeSupport}
-                    </Button>
-                  ))}
-                </Td>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-
-      {visible.length > shown && (
-        <div className="flex justify-center">
-          <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + PAGE_SIZE)}>
-            {fill(x.showMore, { n: num.format(Math.min(PAGE_SIZE, visible.length - shown)) })}
-          </Button>
-        </div>
-      )}
+        {payload.matching > rows.length && (
+          <div className="flex flex-col items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={showMore} loading={loading === 'more'} disabled={loading !== 'none'}>
+              {loading === 'more' ? x.loadingMore : fill(x.showMore, { n: num.format(Math.min(PAGE_SIZE, payload.matching - rows.length)) })}
+            </Button>
+            <p className="text-caption text-muted tabular-nums">{fill(x.shownOf, { shown: num.format(rows.length), total: num.format(payload.matching) })}</p>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
