@@ -31,6 +31,7 @@ import {
   Menu,
   X,
   Waypoints,
+  MapPinned,
 } from 'lucide-react'
 import {
   CONTENT_SCREENS,
@@ -124,6 +125,16 @@ const aiVisibilityNavItems: readonly NavItem[] =
  * There is no Scans entry: its history is a section of Keywords and of Reports
  * (UX review, decision 5), and /scans redirects there.
  */
+/**
+ * Posts on Google Maps (lib/gbp), behind the same build-time mirror of the server
+ * flag. Off everywhere until Google approves API access; the page itself 404s
+ * without GBP_POSTS_ENABLED, so the entry never leads to nothing.
+ */
+const mapsPostsNavItems: readonly NavItem[] =
+  process.env.NEXT_PUBLIC_GBP_POSTS_ENABLED === 'true'
+    ? [{ href: '/maps-posts', labelKey: 'mapsPosts', icon: MapPinned }]
+    : []
+
 const navGroupKeys: readonly NavGroup[] = [
   {
     groupKey: 'groupMain',
@@ -138,6 +149,7 @@ const navGroupKeys: readonly NavGroup[] = [
       { href: '/keywords', labelKey: 'keywords', icon: TrendingUp },
       ...contentNavItems,
       { href: '/site-links', labelKey: 'siteLinks', icon: Waypoints },
+      ...mapsPostsNavItems,
     ],
   },
   {
