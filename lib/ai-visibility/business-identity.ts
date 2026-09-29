@@ -34,7 +34,12 @@ import {
 } from './prompt-templates'
 
 /** What the site scan stored about the business (project_profiles). */
-export type ScanBusiness = { niche: string | null; description: string | null }
+export type ScanBusiness = {
+  niche: string | null
+  description: string | null
+  /** The scan's audiences and seed keywords (question-worth.ts reads them). */
+  terms?: string[]
+}
 
 export type BusinessIdentitySource = 'manual' | 'scan' | 'site' | 'keywords' | 'unknown'
 

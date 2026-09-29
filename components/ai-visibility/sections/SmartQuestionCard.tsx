@@ -1,16 +1,48 @@
 'use client'
 
-import { Check, Plus } from 'lucide-react'
+import Link from 'next/link'
+import { Check, FileText, PenLine, Plus, Quote, Send, Wrench } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
-import Button from '@/components/ui/Button'
+import Button, { buttonClasses } from '@/components/ui/Button'
 import type { PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
+import type { QuestionWorth } from '@/lib/ai-visibility/question-worth'
+import type { QuestionArticleStatus } from '@/lib/ai-visibility/question-article'
 import type { I18nKey, PromptRow, T } from './types'
+
+/** The article action on a suggested question (content module on); null hides it. */
+export type QuestionArticleAction = {
+  status: QuestionArticleStatus
+  busy: boolean
+  failed: boolean
+  onWrite: () => void
+  /** The content strategy's topic list. */
+  topicHref: string
+  /** The article itself, once one was written. */
+  articleHref: string | null
+  /** The existing-content screen, for a page that already answers the question. */
+  existingHref: string
+}
+
+/** Why this question, in one plain line: what ties it to the business, and what the asker is about to do. */
+export function worthReason(worth: QuestionWorth, t: T): string {
+  const r = worth.why.relevance
+  const first = r.kind === 'brand'
+    ? t('worth_rel_brand')
+    : r.kind === 'keyword'
+      ? t('worth_rel_keyword').replace('{term}', r.term)
+      : t('worth_rel_business')
+  const second = t(`worth_value_${worth.why.value}` as I18nKey)
+  return `${first} · ${second}`
+}
+
+const STATUS_ICON = { topic: FileText, written: PenLine, published: Send, cited: Quote } as const
 
 export function SmartQuestionCard({
   question,
   onAdd,
   t,
   isAlreadyTracked,
+  article = null,
 }: {
   question: PromptSuggestion
   onAdd: () => void
@@ -18,104 +50,79 @@ export function SmartQuestionCard({
   /** Unused by the card; kept so the caller's props stay as they were. */
   allPrompts?: PromptRow[]
   isAlreadyTracked?: boolean
+  article?: QuestionArticleAction | null
 }) {
-  const intentTone: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
-    brand: 'info',
-    comparison: 'warning',
-    local: 'success',
-    transactional: 'warning',
-    recommendation: 'info',
-    informational: 'neutral',
-    commercial: 'warning',
-    alternatives: 'neutral',
-    pre_purchase: 'info',
-    gift: 'success',
-  }
-
-  // Intent label follows dashboard UI language, not the project's scan language.
-  const label =
-    (
-      {
-        brand: t('intent_brand'),
-        comparison: t('intent_comparison'),
-        commercial: t('intent_commercial'),
-        local: t('intent_local'),
-        transactional: t('intent_transactional'),
-        recommendation: t('intent_recommendation'),
-        informational: t('intent_informational'),
-        alternatives: t('intent_alternatives'),
-        pre_purchase: t('intent_pre_purchase'),
-        gift: t('intent_gift'),
-      } as Record<string, string>
-    )[question.intent] ||
-    question.intent
-
-  // Confidence tier display (replaces numeric score)
-  const confidenceTierLabel = (tier: string): string => {
-    switch (tier) {
-      case 'high': return t('confidence_high')
-      case 'good': return t('confidence_good')
-      case 'medium': return t('confidence_medium')
-      case 'opportunity': return t('confidence_opportunity')
-      case 'experimental': return t('confidence_experimental')
-      // A tier with no words of its own (starter: its chip already says so;
-      // insufficient_context) shows no badge, never the raw English identifier.
-      default: return ''
-    }
-  }
-
-  const confidenceTierColor = (tier: string): 'success' | 'info' | 'warning' | 'neutral' | 'danger' => {
-    switch (tier) {
-      case 'high': return 'success'
-      case 'good': return 'info'
-      case 'medium': return 'warning'
-      case 'opportunity': return 'warning'
-      case 'experimental': return 'neutral'
-      default: return 'neutral'
-    }
-  }
-
-  const chipLabel = (chip: string): string => {
-    return t(chip as I18nKey) || chip
-  }
-
-  const reasonLine =
-    ('valueReason' in question && question.valueReason) ||
-    question.reason ||
-    ('chips' in question && question.chips && question.chips.length > 0 ? question.chips.map(chipLabel).join(' · ') : '')
+  // Why this question, said once: the worth scorer's sentence when the question was
+  // ranked, else the scorer's own sentence, else the template's reason.
+  const chipLabel = (chip: string): string => t(chip as I18nKey) || chip
+  const reasonLine = question.worth
+    ? worthReason(question.worth, t)
+    : ('valueReason' in question && question.valueReason) ||
+      question.reason ||
+      ('chips' in question && question.chips && question.chips.length > 0 ? question.chips.map(chipLabel).join(' · ') : '')
+  const page = question.worth?.answeringPage ?? null
+  const status = article?.status ?? 'none'
+  const StatusIcon = status !== 'none' ? STATUS_ICON[status] : null
 
   return (
-    <div className="flex items-start gap-3 rounded-inset border border-line bg-surface p-4">
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <p className="line-clamp-2 text-copy font-medium text-ink">{question.prompt}</p>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={intentTone[question.intent] || 'neutral'}>{label}</Badge>
-          {'confidenceTier' in question && confidenceTierLabel(question.confidenceTier) && (
-            <Badge variant={confidenceTierColor(question.confidenceTier)}>
-              {confidenceTierLabel(question.confidenceTier)}
-            </Badge>
-          )}
+    <div className="flex flex-col gap-3 rounded-inset border border-line bg-surface p-4 transition-colors duration-150 ease-snappy hover:border-line-strong" data-question-card="">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="line-clamp-2 text-copy font-medium text-ink">{question.prompt}</p>
+          {reasonLine && <p className="line-clamp-2 text-caption text-muted" data-question-reason="">{reasonLine}</p>}
         </div>
-        {/* Why this question, said once: the scorer's own sentence when it wrote one, else the
-            template's reason, else its chips. The three used to stack and repeat each other. */}
-        {reasonLine && <p className="line-clamp-2 text-caption text-muted" data-question-reason="">{reasonLine}</p>}
+        {isAlreadyTracked ? (
+          <Badge variant="success" className="shrink-0">
+            <Check aria-hidden="true" className="size-3.5" />
+            {t('already_tracked')}
+          </Badge>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onAdd}
+            className="size-8 shrink-0 px-0"
+            aria-label={t('add_question_label')}
+            title={t('add_question_label')}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+          </Button>
+        )}
       </div>
-      {isAlreadyTracked ? (
-        <Badge variant="success" className="shrink-0">
-          <Check aria-hidden="true" className="size-3.5" />
-          {t('already_tracked')}
-        </Badge>
-      ) : (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onAdd}
-          className="size-8 shrink-0 px-0"
-          aria-label={t('add_question_label')}
-          title={t('add_question_label')}
-        >
-          <Plus aria-hidden="true" className="size-4" />
-        </Button>
+
+      {article && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3" data-question-article={status}>
+          {StatusIcon ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-caption font-medium text-ok">
+                <StatusIcon aria-hidden="true" className="size-4" />
+                {t(`qa_status_${status}` as I18nKey)}
+              </span>
+              <Link
+                href={article.articleHref ?? article.topicHref}
+                className="text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 rounded-control"
+              >
+                {article.articleHref ? t('qa_open_article') : t('qa_open_topic')}
+              </Link>
+            </>
+          ) : page ? (
+            <>
+              <span className="min-w-0 flex-1 basis-40 truncate text-caption text-body" title={page.title}>
+                {t('qa_page_answers').replace('{title}', page.title)}
+              </span>
+              <Link href={article.existingHref} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                <Wrench aria-hidden="true" className="size-4" />
+                {t('qa_improve_page')}
+              </Link>
+            </>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={article.onWrite} loading={article.busy} disabled={article.busy}>
+              {!article.busy && <PenLine aria-hidden="true" className="size-4" />}
+              {t('qa_write_article')}
+            </Button>
+          )}
+          {article.failed && <span role="alert" className="text-caption text-bad">{t('qa_write_failed')}</span>}
+        </div>
       )}
     </div>
   )

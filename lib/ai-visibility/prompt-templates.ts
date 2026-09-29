@@ -44,6 +44,8 @@ export type PromptIntent =
   | 'pre_purchase'
   | 'gift'
 
+import type { QuestionWorth } from './question-worth'
+
 export type BusinessCategory =
   | 'agency'
   | 'ecommerce'
@@ -97,6 +99,8 @@ export type PromptSuggestion = {
   reason: string
   chips: string[] // signal-based, e.g. 'chip_commercial_phrase', 'chip_competitor_gap'
   valueReason: string // localized 1-line explanation of business value
+  /** Set by rankByWorth (question-worth.ts): why this question, and whether a page already answers it. */
+  worth?: QuestionWorth
 }
 
 type TemplateContext = {
@@ -1640,6 +1644,11 @@ const CATEGORY_PROFILES: Record<BusinessCategory, CategoryProfile> = {
     secondaryOfferings: [],
     excludedTopics: [],
   },
+}
+
+/** The words a category's business offers (CATEGORY_PROFILES), for relevance scoring. */
+export function categoryOfferings(category: BusinessCategory): readonly string[] {
+  return (CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.generic).primaryOfferings
 }
 
 /**

@@ -37,6 +37,9 @@ import {
 import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
 import { resolveBusinessIdentity, type ScanBusiness } from '@/lib/ai-visibility/business-identity'
+import { rankByWorth, type WorthContext, type WorthPage } from '@/lib/ai-visibility/question-worth'
+import { questionArticleStatus, topicBriefForQuestion, normalizeQuestion, type ContextTopic } from '@/lib/ai-visibility/question-article'
+import { strategyHref, STRATEGY_ANCHORS } from '@/lib/content/strategy/view'
 import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
@@ -178,8 +181,16 @@ export default function AIVisibilitySection({
   // (lib/ai-visibility/question-relevance.ts): read through a ref so every
   // commit uses the latest ones.
   const vocabularyRef = useRef<ProjectVocabulary>({})
+  // WORTH GATE (question-worth.ts): every list of suggestions, whatever made it
+  // (templates, the cache, the model), keeps only the questions this business
+  // can win, best first, each with its reason. The last raw list is kept so the
+  // ranking can run again when the site's pages and topics arrive.
+  const worthRef = useRef<WorthContext | null>(null)
+  const rawSuggestionsRef = useRef<PromptSuggestion[] | null>(null)
   const commitSuggestedQuestions = useCallback((list: PromptSuggestion[]) => {
-    setSuggestedQuestions(dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current))
+    rawSuggestionsRef.current = list
+    const onTopic = dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current)
+    setSuggestedQuestions(worthRef.current ? rankByWorth(onTopic, worthRef.current) : onTopic)
   }, [])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
   // Tracks normalized prompt text of every suggestion shown across all batches
@@ -234,6 +245,66 @@ export default function AIVisibilitySection({
     [manualProfile, scanBusiness, projectBrandName, projectDomain, projectKeywords],
   )
   const identityCategory = identity.category
+
+  // The site's pages and planned topics (question-context route): a question a
+  // page answers says "improve that page"; one written about shows its status.
+  const [questionContext, setQuestionContext] = useState<{ contentEnabled: boolean; pages: WorthPage[]; topics: ContextTopic[] } | null>(null)
+  const loadQuestionContext = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai-visibility/question-context?projectId=${encodeURIComponent(projectId)}`)
+      if (!res.ok) return
+      const body = await res.json()
+      setQuestionContext({
+        contentEnabled: body?.contentEnabled === true,
+        pages: Array.isArray(body?.pages) ? body.pages : [],
+        topics: Array.isArray(body?.topics) ? body.topics : [],
+      })
+    } catch {
+      // Scored without pages and topics; the article action stays hidden.
+    }
+  }, [projectId])
+  useEffect(() => { void loadQuestionContext() }, [loadQuestionContext])
+  const worthContext = useMemo<WorthContext>(() => ({
+    businessName: projectBrandName,
+    identityLabel: identity.label,
+    category: identity.category,
+    keywords: projectKeywords ?? [],
+    scanTerms: scanBusiness?.terms ?? [],
+    pages: questionContext?.pages ?? [],
+    plannedTopics: (questionContext?.topics ?? []).map((t) => t.topic),
+  }), [projectBrandName, identity.label, identity.category, projectKeywords, scanBusiness, questionContext])
+  worthRef.current = identityReady ? worthContext : null
+  useEffect(() => {
+    if (identityReady && rawSuggestionsRef.current) commitSuggestedQuestions(rawSuggestionsRef.current)
+  }, [worthContext, identityReady, commitSuggestedQuestions])
+  // Questions an AI engine has cited the site for (the tracked copy of the question).
+  const citedQuestions = useMemo(
+    () => new Set(allResults.filter((r) => r.displayCited && r.promptText).map((r) => normalizeQuestion(r.promptText))),
+    [allResults],
+  )
+  const [writingArticleFor, setWritingArticleFor] = useState<string | null>(null)
+  const [articleErrorFor, setArticleErrorFor] = useState<string | null>(null)
+  const writeArticleFor = useCallback(async (q: PromptSuggestion) => {
+    setWritingArticleFor(q.id)
+    setArticleErrorFor(null)
+    try {
+      const lang = normalizeLanguage(projectLanguage)
+      const res = await fetch('/api/content/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(topicBriefForQuestion({
+          projectId, question: q.prompt, intent: q.intent, language: lang, worth: q.worth,
+          note: createI18n(lang)('article_brief_note').replace('{q}', q.prompt),
+        })),
+      })
+      if (!res.ok) throw new Error('topic')
+      await loadQuestionContext()
+    } catch {
+      setArticleErrorFor(q.id)
+    } finally {
+      setWritingArticleFor(null)
+    }
+  }, [projectId, projectLanguage, loadQuestionContext])
   vocabularyRef.current = {
     keywords: projectKeywords ?? [],
     offerings: manualProfile?.mode === 'manual' ? [manualProfile.primaryCategory, ...manualProfile.secondaryCategories] : [],
@@ -2246,22 +2317,6 @@ export default function AIVisibilitySection({
                   <div className="min-w-0 flex-1">
                     <h3 id="ai-smart-questions-title" className="flex items-center gap-1.5 text-section font-semibold text-ink">
                       {t('smart_questions_title')}
-                      <span className="group relative inline-flex items-center">
-                        <span
-                          className="cursor-help text-action inline-flex rounded-pill focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
-                          role="img"
-                          tabIndex={0}
-                          aria-label={t('priority_tag_help_label')}
-                        >
-                          <Info aria-hidden="true" className="size-4" />
-                        </span>
-                        <span
-                          role="tooltip"
-                          className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 hidden w-max max-w-[200px] rounded-control bg-contrast px-2 py-1.5 text-caption font-medium text-contrast-ink shadow-pop group-focus-within:block group-hover:block"
-                        >
-                          {t('priority_tag_help')}
-                        </span>
-                      </span>
                     </h3>
                     <p className="mt-0.5 text-caption text-muted">
                       {t('smart_questions_subtitle')}
@@ -2284,7 +2339,10 @@ export default function AIVisibilitySection({
                 </div>
 
                 {/* EMPTY STATE: Show when no suggestions available and not refreshing */}
-                {availableSuggestions.length === 0 && !refreshingSuggestions && (
+                {availableSuggestions.length === 0 && !refreshingSuggestions && identity.source === 'unknown' && (
+                  <EmptyState icon={<Sparkles />} title={t('worth_ask_business')} className="py-8" />
+                )}
+                {availableSuggestions.length === 0 && !refreshingSuggestions && identity.source !== 'unknown' && (
                   <EmptyState
                     icon={<Sparkles />}
                     title={t('no_recommended_yet')}
@@ -2327,6 +2385,18 @@ export default function AIVisibilitySection({
                           question={q}
                           isAlreadyTracked={false}
                           allPrompts={allPrompts}
+                          article={questionContext?.contentEnabled ? (() => {
+                            const { status, topic } = questionArticleStatus(q.prompt, questionContext.topics, citedQuestions)
+                            return {
+                              status,
+                              busy: writingArticleFor === q.id,
+                              failed: articleErrorFor === q.id,
+                              onWrite: () => { void writeArticleFor(q) },
+                              topicHref: strategyHref('list', STRATEGY_ANCHORS.topics),
+                              articleHref: topic?.article ? `/content/articles/${encodeURIComponent(topic.article.id)}` : null,
+                              existingHref: '/content/existing',
+                            }
+                          })() : null}
                           onAdd={async () => {
                             try {
                               const res = await fetch('/api/ai-visibility/prompts', {
@@ -2464,6 +2534,7 @@ export default function AIVisibilitySection({
         keywords={projectKeywords}
         manualProfile={manualProfile}
         category={identityCategory}
+        worthContext={identityReady ? worthContext : null}
         onAdded={loadAllResults}
       />
 

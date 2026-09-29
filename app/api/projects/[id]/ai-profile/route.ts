@@ -29,6 +29,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
 import type { ScanBusiness } from '@/lib/ai-visibility/business-identity'
+import { readSeedScopeTerms } from '@/lib/ai-visibility/seed-scope'
 
 type AIBusinessProfile = {
   mode: 'auto' | 'manual'
@@ -149,7 +150,9 @@ async function readScanBusiness(
     const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
     const niche = text(row.niche, 200)
     const description = text(row.description, 600)
-    return niche || description ? { niche, description } : null
+    if (!niche && !description) return null
+    const seed = await readSeedScopeTerms(admin, projectId, userId)
+    return { niche, description, terms: [...seed.audiences, ...seed.keywords].slice(0, 20) }
   } catch {
     return null
   }
