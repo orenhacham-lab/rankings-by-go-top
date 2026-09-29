@@ -147,6 +147,26 @@ console.log('\nD) the wiring')
   check('D11: MUT a run call in the card\'s handlers fails D10', !addsOnly(section.replace('<SmartQuestionCard', "<SmartQuestionCard x={fetch('/api/ai-visibility/runs')}")))
 }
 
+console.log('\nE) the tab walk: one way to each thing')
+{
+  const section = code('components/ai-visibility/AIVisibilitySection.tsx')
+  const oneWay = (s: string) => /allPrompts\.length > 0 && \(\s*<Button variant="secondary" onClick=\{\(\) => \{[\s\S]{0,200}?setShowSuggestions\(true\)/.test(s) &&
+    /action=\{<Button onClick=\{pickRecommended\}>\{t\('no_queries_pick'\)\}/.test(s) && /id="ai-recommended-questions"/.test(s)
+  check('E1: with no tracked question there is one way to pick (the list on the page), no extra window button', oneWay(section))
+  check('E2: MUT the empty state opening the window again fails E1', !oneWay(section.replace('onClick={pickRecommended}', 'onClick={() => setShowSuggestions(true)}')))
+  const howGated = (s: string) => /\{allPrompts\.length > 0 && \(\s*<details/.test(s)
+  check('E3: "how it works" (the chip legend) shows only once there are questions with chips', howGated(section))
+  check('E4: MUT an always-on disclosure fails E3', !howGated(section.replace('{allPrompts.length > 0 && (\n          <details', '{(\n          <details')))
+  const panel = code('components/ai-visibility/AIBusinessProfilePanel.tsx')
+  check('E5: the profile card has no "auto/manual" badge beside the source line', !/t\('(auto|manual)_badge'\)/.test(panel) && /t\(sourceKey\)/.test(panel))
+  const noBadge = (s: string) => !/t\('(auto|manual)_badge'\)/.test(s) && /t\(sourceKey\)/.test(s)
+  check('E5b: MUT the badge back fails E5', !noBadge(panel.replace('{t(sourceKey)}', "{t(sourceKey)}{t('auto_badge')}")))
+  const rows = code('components/ai-visibility/OverviewRows.tsx')
+  const noEmptyActivity = (s: string) => /if \(data && data\.recent\.length === 0\) return null/.test(s) && !/c\.activityEmpty/.test(s)
+  check('E6: no empty "recent activity" card before the first check', noEmptyActivity(rows))
+  check('E7: MUT bringing the empty card back fails E6', !noEmptyActivity(rows.replace('if (data && data.recent.length === 0) return null', '')))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)
 export {}

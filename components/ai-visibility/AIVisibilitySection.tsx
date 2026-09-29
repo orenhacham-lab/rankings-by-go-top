@@ -162,6 +162,14 @@ export default function AIVisibilitySection({
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  // The empty list's "pick a suggested question" goes to the recommended
+  // list on this page (the same questions, with why and the article action);
+  // the window is the fallback only when that list is not there.
+  const pickRecommended = useCallback(() => {
+    const list = typeof document !== 'undefined' ? document.getElementById('ai-recommended-questions') : null
+    if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else setShowSuggestions(true)
+  }, [])
   const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [deletePromptId, setDeletePromptId] = useState<string | null>(null)
@@ -2033,11 +2041,16 @@ export default function AIVisibilitySection({
               <h3 className="text-section font-semibold text-ink">{t('ai_queries')}</h3>
               <Badge variant="neutral">{allPrompts.length}</Badge>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
-                <Sparkles aria-hidden="true" className="size-4" />
-                {t('recommend_questions')}
-              </Button>
+            {/* Tab walk: with no tracked question the empty state and the
+                recommended list below already offer the same choice, so a third
+                button that opens the same questions in a window only confused. */}
+            <div className={allPrompts.length > 0 ? 'grid grid-cols-2 gap-2 sm:flex' : 'grid grid-cols-1 gap-2 sm:flex'}>
+              {allPrompts.length > 0 && (
+                <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  {t('recommend_questions')}
+                </Button>
+              )}
               <Button onClick={() => setShowNewPrompt(true)}>
                 <Plus aria-hidden="true" className="size-4" />
                 {t('new_query')}
@@ -2047,6 +2060,7 @@ export default function AIVisibilitySection({
 
           {/* How it works: the long explanations fold away; the one line that
               says what to do (and the allowance) stays in view. */}
+          {allPrompts.length > 0 && (
           <details className="group rounded-inset border border-line bg-surface">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-inset px-4 py-3 text-copy font-semibold text-ink transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
               <span className="inline-flex items-center gap-2">
@@ -2060,6 +2074,7 @@ export default function AIVisibilitySection({
               <p className="text-caption text-muted" data-ai-chip-legend="">{t('chip_legend')}</p>
             </div>
           </details>
+          )}
           {allPrompts.length > 0 ? (
             <>
               {/* THE CONTROL EXISTS — say so. The engine chips below dispatch a
@@ -2231,7 +2246,7 @@ export default function AIVisibilitySection({
                 icon={<MessageSquareText />}
                 title={t('no_queries_title')}
                 body={t('no_queries_body')}
-                action={<Button onClick={() => setShowSuggestions(true)}>{t('no_queries_pick')}</Button>}
+                action={<Button onClick={pickRecommended}>{t('no_queries_pick')}</Button>}
                 secondary={
                   <button
                     type="button"
@@ -2312,7 +2327,7 @@ export default function AIVisibilitySection({
             // in the background (useEffect at line 437) will populate them.
             // If truly empty, show empty state with button to manually generate.
             return (
-              <section aria-labelledby="ai-smart-questions-title" className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+              <section id="ai-recommended-questions" aria-labelledby="ai-smart-questions-title" className="scroll-mt-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h3 id="ai-smart-questions-title" className="flex items-center gap-1.5 text-section font-semibold text-ink">

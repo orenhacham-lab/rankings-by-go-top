@@ -23,7 +23,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
 import Notice from '@/components/ui/Notice'
 import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import { ChevronDown, HelpCircle, Pencil, ScanSearch, X } from 'lucide-react'
@@ -274,11 +273,6 @@ export default function AIBusinessProfilePanel({
           <div className="min-w-0 flex-1 basis-48">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-overline font-semibold uppercase tracking-wide text-muted">{t('ai_business_profile')}</h3>
-              {ready && !isUnknown && (
-                <Badge variant={mode === 'manual' ? 'warning' : 'info'}>
-                  {mode === 'manual' ? t('manual_badge') : t('auto_badge')}
-                </Badge>
-              )}
             </div>
             {!ready ? (
               <div className="mt-2" aria-busy="true" aria-label={t('profile_loading')}>
