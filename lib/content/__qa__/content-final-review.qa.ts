@@ -121,9 +121,13 @@ console.log('\nR15) content tables read at 390')
   guard('TopicsList hides its secondary columns below md/lg and repeats keyword+status in the title cell', src('components/content/TopicsList.tsx'),
     (s) => /hidden md:table-cell/.test(s) && /hidden lg:table-cell/.test(s) && /data-topic-meta=""[^>]*md:hidden/.test(s),
     (s) => s.replace(/hidden (md|lg):table-cell/g, ''))
-  guard('ExistingContentScreen hides secondary columns and keeps the meta line on phones', src('components/content/workspace/ExistingContentScreen.tsx'),
-    (s) => /FROM_MD = 'hidden md:table-cell'/.test(s) && /FROM_SM = 'hidden sm:table-cell'/.test(s) && /data-existing-meta=""/.test(s),
-    (s) => s.replace("FROM_MD = 'hidden md:table-cell'", "FROM_MD = ''"))
+  // The existing-content list moved into its own part (existing/ContentTable): the
+  // table stacks on a phone, the secondary figures drop below md, and the title
+  // cell keeps the page's short address under its name.
+  guard('existing content: the table stacks on phones, hides secondary columns and keeps the address under the title', src('components/content/workspace/existing/ContentTable.tsx'),
+    (s) => /<Table stackBelowSm>/.test(s) && /<Th hideBelow="md"/.test(s) && /<Td hideBelow="md"/.test(s)
+      && /<Td stack="title"[\s\S]{0,900}displayPath\(it\.url\)/.test(s),
+    (s) => s.replace('<Table stackBelowSm>', '<Table>'))
 }
 
 console.log('\nR17) the topic plan is a side sheet with one primary')
@@ -147,9 +151,9 @@ console.log('\nR24) no per-row noise')
   guard('articles: no per-row "connect to publish"; not-sent is a quiet dash', articles,
     (s) => !/connectToPublish/.test(s) && /function NotSent\(/.test(s) && !/<Badge[^>]*>\{[^}]*notSent\}<\/Badge>/.test(s),
     (s) => s.replace("const inline = a.status !== 'published' && rowCta.kind === 'grant_scope'", "const inline = a.status !== 'published' && rowCta.kind === 'connect' ? <span>{t.editor.topBar.connectToPublish}</span> : a.status !== 'published' && rowCta.kind === 'grant_scope'"))
-  guard('existing content: only the exception badges (ours / cannibal), not "was on the site"', src('components/content/workspace/ExistingContentScreen.tsx'),
-    (s) => !/badgeSite|flags\.site\b|t\.existing\.site\b/.test(s) && /const flags = /.test(s),
-    (s) => s.replace('const flags = ', 'const badgeSite = 1; const flags = '))
+  guard('existing content: only the exception badges (ours / cannibal), not "was on the site"', src('components/content/workspace/existing/ContentTable.tsx'),
+    (s) => !/badgeSite|origin\.site\b|origin === 'site'/.test(s) && /it\.origin === 'ours' && <Badge/.test(s) && /it\.cannibalization && \(/.test(s),
+    (s) => s.replace("{it.origin === 'ours' && ", "{it.origin === 'site' && <Badge>{x.origin.site}</Badge>}{it.origin === 'ours' && "))
 }
 
 console.log('\nR28) an empty strategy is one EmptyState with "create topic"')
