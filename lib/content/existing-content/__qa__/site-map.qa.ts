@@ -505,6 +505,12 @@ async function main() {
     check('U7: a site never mapped reads as "mapping" until its start fails (no flash of the empty state)', noIdleFlash(screen))
     check('MUTATION CONTROL: a screen that shows the idle empty state while the first start is on its way is caught',
       !noIdleFlash(screen.replace("payload.map.state !== 'running' && !mapStarting", "payload.map.state !== 'running'")))
+    // The list loads once per project: fetchList must not depend on the workspace's toast
+    // OBJECT (new on every render), or each render refetches and flashes the skeleton.
+    const stableLoad = (s: string) => /const fetchList = useCallback\([\s\S]*?\}, \[projectId, toastError\]\)/.test(s) && !/\[[^\]]*\btoast\b[,\]]/.test(s)
+    check('U8: the list is fetched once per project, not on every render of the workspace', stableLoad(screen))
+    check('MUTATION CONTROL: a fetch that depends on the toast object is caught',
+      !stableLoad(screen.replace('}, [projectId, toastError])', '}, [projectId, toast])')))
     const reasoned = (s: string) => /if \(a\?\.kind === 'improve'\)/.test(s) && /if \(a\?\.kind === 'support' && !planned\)/.test(s) && /actions\.improveWhy/.test(s) && /actions\.supportWhy/.test(s)
     check('U4: a row shows an action only when the model gave it one, with the reason under it', reasoned(table))
     check('MUTATION CONTROL: a support button on every row is caught', !reasoned(table.replace("if (a?.kind === 'support' && !planned)", 'if (!planned)')))

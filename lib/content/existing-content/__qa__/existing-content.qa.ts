@@ -289,7 +289,7 @@ async function main() {
     check('MUTATION CONTROL: a click that asks the recommendation engine is caught',
       !noModel(screen.replace("fetch('/api/content/topics'", "fetch('/api/content/automation/recommendations'")))
 
-    const item = { title: 'Trail Runner 2', url: `${SITE}/products/trail-runner-2`, metrics: { clicks: 1, impressions: 10, topQuery: 'trail runner' } }
+    const item = { title: 'Trail Runner 2', url: `${SITE}/products/trail-runner-2`, metrics: { clicks: 1, impressions: 10, position: 12, topQuery: 'trail runner', topQueryPosition: 12 } }
     const bodyHe = REAL_MODEL.supportTopicBody(item, P, 'he', getDashboardDictionary('he').existingContent.supportTopic)
     const v = validateTopicBrief(bodyHe)
     const anchor = 'value' in v ? v.value.anchors_json[0] : null

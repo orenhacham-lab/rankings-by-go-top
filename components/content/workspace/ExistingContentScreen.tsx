@@ -84,6 +84,12 @@ export default function ExistingContentScreen() {
   const num = useMemo(() => new Intl.NumberFormat(locale), [locale])
   const pos = useMemo(() => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }), [locale])
   const day = useCallback((iso: string | null) => (iso ? formatDate(iso, language) : null), [language])
+  // The toast object is new on every render of the workspace; its functions are
+  // stable. Depending on the object would refetch (and flash the skeleton) each time.
+  const toastError = toast.error
+  const toastSuccess = toast.success
+  const loadErrorText = useRef(x.loadError)
+  useEffect(() => { loadErrorText.current = x.loadError }, [x.loadError])
 
   const [payload, setPayload] = useState<ExistingContentPayload | null>(null)
   const [rows, setRows] = useState<ExistingContentItem[]>([])
@@ -122,12 +128,12 @@ export default function ExistingContentScreen() {
     } catch {
       if (id !== reqId.current) return
       // A first load that fails is a retry card; a later one keeps the list and says so.
-      if (hasPayload.current) toast.error(x.loadError)
+      if (hasPayload.current) toastError(loadErrorText.current)
       else setLoadFailed(true)
     } finally {
       if (id === reqId.current) setLoading('none')
     }
-  }, [projectId, toast, x.loadError])
+  }, [projectId, toastError])
 
   // A new project: start over, skeleton first.
   useEffect(() => {
@@ -171,13 +177,13 @@ export default function ExistingContentScreen() {
         return 'running'
       }
       if (res.ok && body?.state === 'recent') return 'recent'
-      if (!quiet) toast.error(x.map.startFailed)
+      if (!quiet) toastError(x.map.startFailed)
       return 'failed'
     } catch {
-      if (!quiet) toast.error(x.map.startFailed)
+      if (!quiet) toastError(x.map.startFailed)
       return 'failed'
     }
-  }, [projectId, toast, x.map.startFailed])
+  }, [projectId, toastError, x.map.startFailed])
 
   // First visit, or a week-old mapping: start it once per project, quietly.
   useEffect(() => {
@@ -221,14 +227,14 @@ export default function ExistingContentScreen() {
           : payload.resync === 'wordpress' ? post('/api/content/automation/internal-links/index/refresh', { projectId, force: true })
             : Promise.resolve(null),
       ])
-      if (mapped === 'running') toast.success(x.map.started)
-      else if (mapped === 'recent') toast.success(x.map.recent)
-      else if (synced === true) { toast.success(x.map.started); void fetchList(viewRef.current, 0) }
-      else toast.error(x.map.startFailed)
+      if (mapped === 'running') toastSuccess(x.map.started)
+      else if (mapped === 'recent') toastSuccess(x.map.recent)
+      else if (synced === true) { toastSuccess(x.map.started); void fetchList(viewRef.current, 0) }
+      else toastError(x.map.startFailed)
     } finally {
       setRefreshing(false)
     }
-  }, [payload, refreshing, startMap, projectId, toast, x.map, fetchList])
+  }, [payload, refreshing, startMap, projectId, toastSuccess, toastError, x.map, fetchList])
 
   // ── "Write a supporting article" ─────────────────────────────────────────
   const writeSupport = useCallback(async (item: ExistingContentItem) => {
@@ -241,16 +247,16 @@ export default function ExistingContentScreen() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(supportTopicBody({ ...item, title: item.isHome ? x.homePage : item.title }, projectId, lang, copy)),
       })
-      if (!res.ok) { toast.error(x.supportFailed); return }
+      if (!res.ok) { toastError(x.supportFailed); return }
       setPlannedNow((s) => new Set(s).add(item.key))
-      toast.success(x.supportCreated)
+      toastSuccess(x.supportCreated)
       void loadTopics()
     } catch {
-      toast.error(x.supportFailed)
+      toastError(x.supportFailed)
     } finally {
       setCreating(null)
     }
-  }, [creating, selectedProject?.language, projectId, toast, x, loadTopics])
+  }, [creating, selectedProject?.language, projectId, toastSuccess, toastError, x, loadTopics])
 
   if (loadFailed) {
     return (
