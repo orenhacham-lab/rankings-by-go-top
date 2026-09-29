@@ -4,6 +4,7 @@ export const he = {
     pricing: 'מחירים',
     features: 'יכולות המערכת',
     articles: 'מאמרים',
+    freeCheck: 'בדיקה חינמית',
     about: 'אודות',
     login: 'התחברות',
     startFree: 'התחל חינם',
