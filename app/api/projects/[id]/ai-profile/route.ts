@@ -1,7 +1,11 @@
 /**
  * /api/projects/[id]/ai-profile
  *
- * GET    → return the project's saved AI Business Profile (null if not set)
+ * GET    → return the project's saved AI Business Profile (null if not set),
+ *          and what the site scan says the business is (project_profiles
+ *          niche + description, `scanBusiness`, null without a scan). The
+ *          questions tab takes the business type from these two first
+ *          (lib/ai-visibility/business-identity.ts), not from tracked keywords.
  * PATCH  → save a manual AI Business Profile (mode='manual')
  * DELETE → reset to auto-detection (clears the column)
  *
@@ -24,6 +28,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
+import type { ScanBusiness } from '@/lib/ai-visibility/business-identity'
 
 type AIBusinessProfile = {
   mode: 'auto' | 'manual'
@@ -121,13 +126,45 @@ async function readProfile(
   return { profile, columnMissing: false }
 }
 
+/**
+ * The site scan's own statement of the business. Service role, so it is filtered
+ * by the owner as well as the project. A missing table (a database without the
+ * seed-scan migration) or any read error is "no scan": the tab then falls back
+ * to the name, the domain and the keyword majority.
+ */
+async function readScanBusiness(
+  admin: ReturnType<typeof createAdminClient>,
+  projectId: string,
+  userId: string,
+): Promise<ScanBusiness | null> {
+  try {
+    const { data, error } = await admin
+      .from('project_profiles')
+      .select('niche, description')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (error || !data) return null
+    const row = data as { niche?: unknown; description?: unknown }
+    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
+    const niche = text(row.niche, 200)
+    const description = text(row.description, 600)
+    return niche || description ? { niche, description } : null
+  } catch {
+    return null
+  }
+}
+
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const auth = await authAndProject(id)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  const { profile, columnMissing } = await readProfile(auth.admin, auth.projectId)
-  return Response.json({ profile, columnMissing })
+  const [{ profile, columnMissing }, scanBusiness] = await Promise.all([
+    readProfile(auth.admin, auth.projectId),
+    readScanBusiness(auth.admin, auth.projectId, auth.user.id),
+  ])
+  return Response.json({ profile, columnMissing, scanBusiness })
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -337,6 +337,32 @@ const STRINGS = {
   open_ai_profile: { he: 'פתח הגדרות פרופיל', en: 'Open profile settings' },
   close_panel: { he: 'סגור', en: 'Close' },
   category_suggestions: { he: 'הצעות', en: 'Suggestions' },
+  // What the business is (business-identity.ts): one line on the questions tab, editable.
+  profile_identified_as: { he: 'העסק זוהה כ־', en: 'Identified as' },
+  profile_source_manual: { he: 'הגדרתם בעצמכם', en: 'Set by you' },
+  profile_source_scan: { he: 'לפי סריקת האתר', en: 'From the site scan' },
+  profile_source_site: { he: 'לפי שם העסק והדומיין', en: 'From the business name and domain' },
+  profile_source_keywords: { he: 'לפי רוב מילות המפתח במעקב', en: 'From most of your tracked keywords' },
+  profile_change: { he: 'שינוי', en: 'Change' },
+  profile_unknown_title: { he: 'עוד לא ברור לנו במה העסק עוסק', en: 'We are not sure yet what the business does' },
+  profile_unknown_help: {
+    he: 'כתבו במילים שלכם במה העסק עוסק, והשאלות המוצעות יתאימו לעסק במקום לניחוש.',
+    en: 'Say in your own words what the business does, so the suggested questions fit it instead of a guess.',
+  },
+  profile_set: { he: 'הגדרת העסק', en: 'Describe the business' },
+  profile_scan_found: { he: 'מה הסריקה מצאה באתר', en: 'What the site scan found' },
+  profile_what_business: { he: 'במה העסק עוסק?', en: 'What does the business do?' },
+  profile_what_business_placeholder: {
+    he: 'לדוגמה: מדריך טיולים ליפן, משלוחי פרחים, ניקיון משרדים',
+    en: 'e.g. Japan travel guide, flower delivery, office cleaning',
+  },
+  profile_more_topics: { he: 'תחומים נוספים ונושאים לא רצויים', en: 'More topics and excluded topics' },
+  profile_saved_questions: {
+    he: 'הפרופיל נשמר והשאלות המוצעות עודכנו לפי העסק.',
+    en: 'Profile saved. The suggested questions now follow it.',
+  },
+  profile_regenerate: { he: 'יצירת שאלות חדשות', en: 'Generate new questions' },
+  profile_loading: { he: 'בודקים במה העסק עוסק', en: 'Checking what the business does' },
 
   // Misc UI labels
   show_all: { he: 'הצג הכל', en: 'Show all' },
@@ -400,6 +426,7 @@ const STRINGS = {
   cat_beauty: { he: 'יופי וטיפוח', en: 'Beauty & wellness' },
   cat_education: { he: 'הכשרה והוראה', en: 'Education' },
   cat_second_hand_fashion: { he: 'בגדי יד שנייה לנשים', en: 'Second-hand women\'s fashion' },
+  cat_travel: { he: 'תיירות וטיולים', en: 'Travel & tourism' },
   cat_generic: { he: 'אחר', en: 'Other' },
 
   // Competitors panel (Phase 1)

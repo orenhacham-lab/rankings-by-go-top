@@ -20,7 +20,7 @@ import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Pencil, RefreshCw, Sparkles } from 'lucide-react'
 import { dropOffTopicSuggestions } from '@/lib/ai-visibility/question-relevance'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile, type BusinessCategory } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
@@ -49,6 +49,7 @@ export default function PromptSuggestions({
   language,
   keywords,
   manualProfile = null,
+  category,
   onAdded,
 }: {
   open: boolean
@@ -61,6 +62,8 @@ export default function PromptSuggestions({
   language: string | null
   keywords?: string[]
   manualProfile?: ManualAIProfile | null
+  /** The business category resolved by the section (lib/ai-visibility/business-identity.ts). */
+  category: BusinessCategory
   onAdded: () => void
 }) {
   // UI follows dashboard language; scan parameters (language/country) remain separate
@@ -196,7 +199,7 @@ export default function PromptSuggestions({
         loadModalRecommendationPool({ allowGenerate: true })
       })
     }
-  }, [open, projectId, language, country, businessName, domain, city, keywords, manualProfile])
+  }, [open, projectId, language, country, businessName, domain, city, keywords, manualProfile, category])
 
   // Normalize prompt text for dedup comparison — must match the generator's
   // internal normalizer so excludePrompts/previousSet are recognized.
@@ -259,7 +262,6 @@ export default function PromptSuggestions({
     source: string,
     forceRefresh: boolean
   ): PromptSuggestion[] {
-    const category = detectCategory(businessName || '', domain || '', keywords || [])
     const result = applyDisplayQualityGate(items, {
       businessName,
       domain,
@@ -285,7 +287,6 @@ export default function PromptSuggestions({
   // Gemini is unavailable / returns nothing and the cache is empty.
   function buildModalFallback(): PromptSuggestion[] {
     const lang = normalizeLanguage(language)
-    const category = detectCategory(businessName || '', domain || '', keywords || [])
     const fb = buildFallbackSuggestions(
       businessName,
       null, // projectName not available here
@@ -310,7 +311,7 @@ export default function PromptSuggestions({
   const MIN_MODAL_POOL = 8
   async function loadModalRecommendationPool({ allowGenerate }: { allowGenerate: boolean }) {
     const normalizedLang = normalizeLanguage(language)
-    const detectedCategory = detectCategory(businessName || '', domain || '', keywords || [])
+    const detectedCategory = category
     console.log('[ai-question-suggestions] inner button clicked', { projectId, via: 'recommend_modal' })
     console.log('[ai-question-suggestions] generate clicked', {
       projectId,
@@ -582,6 +583,7 @@ export default function PromptSuggestions({
       language: normalizedLang,
       keywords,
       manualProfile,
+      category,
       diversify: true,
       excludePrompts: allExcluded,
       previousSet: lastShownPromptsRef.current,

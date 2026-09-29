@@ -195,9 +195,10 @@ function main() {
     check('F10: the mapping placeholder is an EmptyState (no still skeleton bars, no dashed box)', empty(ph))
     check('F11: MUT a dashed box back fails F10', !empty(ph + '<div className="border border-dashed" />'))
     const prof = code('components/ai-visibility/AIBusinessProfilePanel.tsx')
-    const hideOther = (s: string) => /const showDetected = !!displayedCategoryLabel && !\(mode === 'auto' && displayedCategoryLabel === t\('cat_generic'\)\)/.test(s) && /\{showDetected && \(/.test(s)
-    check('F12: an auto-detected "Other" profile line is not shown', hideOther(prof))
-    check('F13: MUT always showing the line fails F12', !hideOther(prof.replace('{showDetected && (', '{true && (')))
+    // W7: "Other" is never shown as what the business is; the panel asks instead (business-identity.qa.ts C9).
+    const hideOther = (s: string) => /const isUnknown = identity\.source === 'unknown' \|\| !identifiedLabel \|\| identifiedLabel === t\('cat_generic'\)/.test(s) && /\) : isUnknown \? \(/.test(s)
+    check('F12: an auto-detected "Other" profile line is not shown (the panel asks instead)', hideOther(prof))
+    check('F13: MUT always showing the line fails F12', !hideOther(prof.replace(') : isUnknown ? (', ') : false ? (')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
