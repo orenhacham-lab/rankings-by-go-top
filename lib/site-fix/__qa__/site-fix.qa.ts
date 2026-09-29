@@ -106,12 +106,13 @@ const link = (status: 'connected' | 'disconnected' | 'pending', user = U) => ({
   project_id: P, user_id: user, site_url: SITE, key_id: 'gtk_0123456789abcdef', secret_encrypted: 'enc:secret', secret_hint: '••••abcd',
   status, plugin_version: '2.0.0', seo_plugin: 'yoast', last_seen_at: null, last_error_code: null,
 })
-const rows = (over: Record<string, unknown[]> = {}) => ({
+type Row = Record<string, unknown>
+const rows = (over: Record<string, Row[]> = {}): Record<string, Row[]> => ({
   projects: [{ id: P, user_id: U, target_domain: 'shop.example.org', business_name: 'Boot Shop', name: 'Boots' }],
   project_profiles: [{ project_id: P, user_id: U, detected_platform: 'wordpress' }],
   site_fix_plugin_links: [link('connected')],
-  site_fix_jobs: [] as unknown[],
-  site_fix_audit: [] as unknown[],
+  site_fix_jobs: [] as Row[],
+  site_fix_audit: [] as Row[],
   ...over,
 })
 const MISSING = { select: () => ({ code: '42P01', message: 'relation "site_fix_jobs" does not exist' }) }

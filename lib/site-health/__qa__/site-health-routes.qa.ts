@@ -176,7 +176,7 @@ async function main() {
   const MISSING = { select: () => ({ code: '42P01', message: 'relation does not exist' }) }
   const fixRun = async (A: Api, body: Record<string, unknown>, rows = baseRows(), wp = fakeWp(), userId: string | null = U, queue = false) => {
     const decrypted: string[] = []
-    const hooks = queue ? {} : { site_fix_jobs: MISSING, site_fix_audit: MISSING }
+    const hooks: Record<string, typeof MISSING> = queue ? {} : { site_fix_jobs: MISSING, site_fix_audit: MISSING }
     const answer = await A.handleFix(body, { userId, admin: new FakeAdmin(rows, hooks) as never, decrypt: (s) => { decrypted.push(s); return 'app-pass' }, wp: wp.deps })
     return { answer, decrypted, wp }
   }

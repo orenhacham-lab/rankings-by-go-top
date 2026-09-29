@@ -95,6 +95,8 @@ export default function ApproveFixModal({
   const [brokenMode, setBrokenMode] = useState<'replace' | 'unlink'>('replace')
   const [busy, setBusy] = useState(false)
   const [undoError, setUndoError] = useState<FixErrorCode | null>(null)
+  /** A value the whitelist refused: the form stays as typed, with the reason above the button. */
+  const [formError, setFormError] = useState<FixErrorCode | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -148,12 +150,15 @@ export default function ApproveFixModal({
         : p.type === 'broken_link' ? p.href
           : p.type === 'internal_link' ? p.sentence : null
     const via = 'via' in p && (p.via === 'seo_plugin' || p.via === 'wp_title') ? p.via : null
-    setBusy(true)
+    setBusy(true); setFormError(null)
     const r = await postFix<{ job: FixJobView }>('/api/site-health/fixes', {
       projectId, action: 'approve', approved: true, kind: finding.id, pageUrl, fix, expected: p.expected, via, before,
     })
     setBusy(false)
-    if (!r.ok) { setPhase({ kind: 'error', code: r.code }); return }
+    if (!r.ok) {
+      if (r.code === 'value_invalid' || r.code === 'off_site') { setFormError(r.code); return }
+      setPhase({ kind: 'error', code: r.code }); return
+    }
     onJob(r.job)
     if (r.job.status === 'applied' || r.job.status === 'sent') onFixed(true)
     setPhase({ kind: 'done', job: r.job })
@@ -495,6 +500,7 @@ export default function ApproveFixModal({
             {editor}
             {viaNote}
             {sentence}
+            {formError && <Notice tone="warn">{a.errors[formError]}</Notice>}
           </>
         )}
 
