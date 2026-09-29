@@ -6,9 +6,12 @@
 -- grants (including the default privileges every NEW table in public gets) and
 -- the projects isolation policy as it stands after the OWASP hardening. Then:
 --
---   'after'     the owner reads their own membership; a placement is read by
---               the owner of either side and by nobody else (another user, an
---               admin who owns neither side, anon); no browser role writes;
+--   'after'     the owner reads their own membership; a placement is read
+--               directly by the owner of the GIVING side only, and never its
+--               account-id columns; the receiving side reads nothing of the row
+--               (not source_user_id, source_article_id or source_domain: the
+--               route shows it what it may see); nobody else reads it (another
+--               user, an admin who owns neither side, anon); no browser role writes;
 --               service_role writes; the settings row is invisible to browsers.
 --               The hard rules hold: never reciprocal, never self, never the
 --               same owner, one placed link per article.
@@ -152,8 +155,22 @@ BEGIN
   PERFORM chk(ph, 'owner reads own membership (1) -> ' || r, r = 'ok:1');
   r := try_as('authenticated', V, $q$ SELECT count(*)::text FROM public.link_network_placements WHERE source_project_id = 'a1111111-1111-1111-1111-111111111111' $q$);
   PERFORM chk(ph, 'giving side reads the placement it gave (1) -> ' || r, r = 'ok:1');
+  r := try_as('authenticated', V, $q$ SELECT source_article_id::text FROM public.link_network_placements WHERE id = 'f0000000-0000-0000-0000-000000000001' $q$);
+  PERFORM chk(ph, 'giving side reads its own row''s article id -> ' || r, r = 'ok:e1111111-0000-0000-0000-000000000001');
+
+  -- ISOLATION: the receiving side learns nothing about the giver from the table.
   r := try_as('authenticated', W, $q$ SELECT count(*)::text FROM public.link_network_placements WHERE target_project_id = 'a2222222-2222-2222-2222-222222222222' $q$);
-  PERFORM chk(ph, 'receiving side reads the placement it received (1) -> ' || r, r = 'ok:1');
+  PERFORM chk(ph, 'receiving side reads no placement row directly (0) -> ' || r, (r = 'ok:0') <> broken);
+  r := try_as('authenticated', W, $q$ SELECT source_user_id::text FROM public.link_network_placements WHERE target_project_id = 'a2222222-2222-2222-2222-222222222222' LIMIT 1 $q$);
+  PERFORM chk(ph, 'receiving side cannot select source_user_id -> ' || r, (r IS DISTINCT FROM 'ok:11111111-1111-1111-1111-111111111111') <> broken);
+  r := try_as('authenticated', W, $q$ SELECT source_article_id::text FROM public.link_network_placements WHERE target_project_id = 'a2222222-2222-2222-2222-222222222222' LIMIT 1 $q$);
+  PERFORM chk(ph, 'receiving side cannot select source_article_id -> ' || r, (r IS DISTINCT FROM 'ok:e1111111-0000-0000-0000-000000000001') <> broken);
+  r := try_as('authenticated', W, $q$ SELECT source_domain FROM public.link_network_placements WHERE target_project_id = 'a2222222-2222-2222-2222-222222222222' LIMIT 1 $q$);
+  PERFORM chk(ph, 'receiving side cannot learn the giving site of a draft (source_domain) -> ' || r, (r IS DISTINCT FROM 'ok:v-site.co.il') <> broken);
+  r := try_as('authenticated', W, $q$ SELECT source_user_id::text FROM public.link_network_placements LIMIT 1 $q$);
+  PERFORM chk(ph, 'the account-id column is not granted to browser roles at all -> ' || r, (r = 'denied:42501') <> broken);
+  r := try_as('authenticated', V, $q$ SELECT target_user_id::text FROM public.link_network_placements WHERE id = 'f0000000-0000-0000-0000-000000000001' $q$);
+  PERFORM chk(ph, 'giving side cannot select the receiver''s account id (target_user_id) -> ' || r, (r = 'denied:42501') <> broken);
 
   -- ISOLATION: reads.
   r := try_as('authenticated', W, $q$ SELECT count(*)::text FROM public.link_network_members $q$);
@@ -211,7 +228,8 @@ SELECT run_checks('after');
 -- MUTATION CONTROL: permissive policies, Supabase's default grants back, no reciprocity trigger.
 DROP POLICY link_network_members_owner_select ON public.link_network_members;
 CREATE POLICY link_network_members_owner_select ON public.link_network_members FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY link_network_placements_sides_select ON public.link_network_placements;
+DROP POLICY IF EXISTS link_network_placements_source_select ON public.link_network_placements;
+DROP POLICY IF EXISTS link_network_placements_sides_select ON public.link_network_placements;
 CREATE POLICY link_network_placements_sides_select ON public.link_network_placements FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY link_network_settings_open ON public.link_network_settings FOR ALL USING (true) WITH CHECK (true);
 GRANT ALL ON TABLE public.link_network_members TO anon, authenticated;

@@ -6,9 +6,10 @@
  * gave. A link it gave that is still in an unpublished draft can be taken out
  * here ("הסרה"), after a confirmation; the words stay, the link goes.
  *
- * A received link shows the giving site's address and, once that article is
- * live, the published page and the sentence around the link. Nothing of another
- * customer's draft is shown.
+ * A received link shows, once that article is live, the giving site's domain,
+ * the published page and the sentence around the link. Nothing of another
+ * customer's draft is shown (not even which site it is), and a link the giver
+ * removed before publishing is not listed.
  */
 import { useMemo, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, FileText, Inbox, Send } from 'lucide-react'
@@ -152,7 +153,7 @@ function ReceivedRow({ item, copy, language, newTab }: { item: ReceivedItem; cop
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-copy font-semibold text-ink">{copy.fromSite(item.sourceDomain)}</p>
+          <p className="text-copy font-semibold text-ink">{item.sourceDomain ? copy.fromSite(item.sourceDomain) : copy.fromNetworkSite}</p>
           <Badge variant={STATE_BADGE[item.state]}>{copy.states[item.state]}</Badge>
         </div>
         {item.context && <p className="mt-1.5 max-w-prose text-copy text-body text-pretty"><Context text={item.context} anchor={item.anchor} /></p>}

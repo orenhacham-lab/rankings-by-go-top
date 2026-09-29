@@ -2895,6 +2895,7 @@ export const dashboardEn = {
       switch: {
         label: 'Take part in the link network',
         offDescription: 'Off. It turns on only after you accept the terms.',
+        domainUnverified: 'To join the network, connect your site (WordPress or Search Console) so we know the site is yours.',
         onDescription: (date: string) => `In the network since ${date}. You can leave at any time.`,
         leftDescription: (date: string) => `You left the network on ${date}. Links already placed stay in the log.`,
       },
@@ -2922,6 +2923,7 @@ export const dashboardEn = {
       readiness: {
         thin_or_new: 'Your site is in the network but does not take part in placements yet: it needs at least three published articles or ten scanned pages, one finished scan, and two weeks in the app.',
         category_unknown: 'Your site is in the network, but we do not know its business field yet, so we will not place links from it or to it. You can add the field in the project settings.',
+        domain_unverified: 'Your site is in the network but does not take part in placements: its connection (WordPress or Search Console) is missing, so we cannot confirm the site is yours. Connect it again to take part.',
       },
       caps: (received: number, cap: number) => `This month you received ${received} of ${cap} possible links. The allowance rises gradually in your first months in the network.`,
       log: {
@@ -2931,6 +2933,7 @@ export const dashboardEn = {
         received: 'Received',
         given: 'Given',
         fromSite: (domain: string) => `From ${domain}`,
+        fromNetworkSite: 'From a site in the network (its address shows once the article is published)',
         inArticle: (title: string) => `In the article "${title}"`,
         articleGone: 'The article was deleted',
         toPage: 'To the page',

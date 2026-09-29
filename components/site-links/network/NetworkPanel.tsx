@@ -49,6 +49,9 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
   const [busy, setBusy] = useState(false)
 
   const active = data.membership.active
+  // Only a site whose owner proved it is theirs (a WordPress or Search Console
+  // connection on that domain) can join; the server refuses too.
+  const cannotJoin = !active && data.readiness === 'domain_unverified'
   const nf = new Intl.NumberFormat(language === 'he' ? 'he-IL' : 'en-US')
 
   async function join() {
@@ -76,12 +79,15 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
   // confirmed. Pressing it while off opens (or closes) the consent panel.
   function onSwitch(next: boolean) {
     if (active) { if (!next) void leave(); return }
+    if (cannotJoin) return
     if (consentOpen) { setConsentOpen(false); setAgreed(false); return }
     setConsentOpen(true)
   }
 
   const switchDescription = active
     ? copy.switch.onDescription(formatDay(data.membership.since, language))
+    : cannotJoin
+      ? copy.switch.domainUnverified
     : data.membership.leftAt
       ? copy.switch.leftDescription(formatDay(data.membership.leftAt, language))
       : copy.switch.offDescription
@@ -104,7 +110,7 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
             <Switch
               checked={active}
               onChange={onSwitch}
-              disabled={busy}
+              disabled={busy || cannotJoin}
               label={<span className="font-semibold">{copy.switch.label}</span>}
               description={switchDescription}
             />
@@ -114,7 +120,7 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
           </div>
         </div>
 
-        {consentOpen && !active && (
+        {consentOpen && !active && !cannotJoin && (
           <div className="relative border-t border-line bg-sunk/50 p-5 sm:p-6 lg:px-8 motion-safe:animate-pop-in" data-link-network="consent">
             <h3 className="text-section font-semibold text-ink">{copy.consent.title}</h3>
             <p className="mt-1 text-copy text-body">{copy.consent.intro}</p>

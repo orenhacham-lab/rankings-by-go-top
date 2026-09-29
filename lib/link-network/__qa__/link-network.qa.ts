@@ -2,7 +2,10 @@
  * THE LINK NETWORK ("רשת הקישורים"): the guards. Every rule has a MUTATION
  * CONTROL: the same check on a deliberately broken copy of the code must fail.
  *
- *   A  matching rules (rules.ts): never reciprocal, no short loops, never a
+ *   A  matching rules (rules.ts): only a site whose domain the owner proved
+ *      (a live WordPress / GO TOP plugin connection on that exact host, or a
+ *      verified Search Console property covering it; never a Wix / webhook
+ *      address, which the owner types), never reciprocal, no short loops, never a
  *      competitor (either side's list), never the same category, never the same
  *      owner / client / server address, not thin or new, not Shopify, caps per
  *      target (with the ramp for new members) and per source, exact anchors rare.
@@ -16,7 +19,9 @@
  *      database's reciprocal refusal handled.
  *   E  the routes (http.ts): owner filter, consent required, leave, Shopify and
  *      missing tables hidden, reject before publish only and only by the giver,
- *      nothing of another customer's draft reaches the receiving side.
+ *      nothing of another customer's draft reaches the receiving side (not even
+ *      the giving site), rejected links are not listed for it, and the table
+ *      grants it nothing of the giver's ids.
  *   F  the one call site in article generation, which never throws.
  *   G  the screen: hidden → the old view; no confirm()/alert(); no literal text.
  *
@@ -26,12 +31,13 @@
 import { readFileSync, writeFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import {
-  eligibleTargets, exactAnchorAllowed, exclusionFor, receivedCapFor, sameCategory, siteQualifies, sourceExclusion,
+  eligibleTargets, exactAnchorAllowed, exclusionFor, provenDomains, receivedCapFor, sameCategory, siteQualifies, sourceExclusion,
   type Edge, type NetworkSite,
 } from '../rules'
 import { bodyParagraphs, classifyAnchor, insertLink, linkContext, linkPresent, removeLink, validAnchor } from '../anchor'
 import { readChoice, type CandidateTarget } from '../choose'
 import { placeNetworkLink, type PlaceDeps } from '../place'
+import { loadSites, readDomainProof } from '../store'
 import { runLinkNetworkStep } from '../step'
 import { handleMembershipPost, handleNetworkGet, handleRejectPost, type NetworkDeps } from '../http'
 import { LINK_NETWORK_CONSENT_VERSION } from '../consent'
@@ -68,7 +74,7 @@ const NOW = new Date('2026-09-20T12:00:00Z')
 const OLD = '2026-03-01T00:00:00Z'
 function site(id: string, over: Partial<NetworkSite> = {}): NetworkSite {
   return {
-    projectId: id, userId: `u-${id}`, clientId: null, domains: [`${id}.co.il`], language: 'he', category: `קטגוריה ${id}`,
+    projectId: id, userId: `u-${id}`, clientId: null, domains: [`${id}.co.il`], verifiedDomains: [`${id}.co.il`], language: 'he', category: `קטגוריה ${id}`,
     competitors: [], addresses: [], shopify: false, active: true, memberSince: '2026-05-01T00:00:00Z', createdAt: OLD,
     scanned: true, publishedArticles: 5, indexedPages: 0, linkedDomains: [], ...over,
   }
@@ -137,6 +143,27 @@ function partA() {
   check('never Shopify, as a target', exclusionFor(A, { ...B, shopify: true }, [], NOW) === 'shopify')
   check('never Shopify, as a source', sourceExclusion({ ...A, shopify: true }, [], NOW) === 'shopify')
   check('never a site that left (not active)', exclusionFor(A, { ...B, active: false }, [], NOW) === 'not_member')
+
+  // Domain control: typing a domain into a project proves nothing.
+  check('a site without proof of its domain never qualifies (giving or receiving)', siteQualifies({ ...B, verifiedDomains: [] }, NOW) === 'domain_unverified'
+    && exclusionFor(A, { ...B, verifiedDomains: [] }, [], NOW) === 'domain_unverified' && sourceExclusion({ ...A, verifiedDomains: [] }, [], NOW) === 'domain_unverified')
+  check('an alias proven, the site\'s own domain not: still unverified', siteQualifies({ ...B, domains: ['b.co.il', 'b-alias.co.il'], verifiedDomains: ['b-alias.co.il'] }, NOW) === 'domain_unverified')
+  const domMut = withMutant(RULES, (s) => s.replace("if (site.domains.length > 0 && !site.verifiedDomains.includes(site.domains[0])) return 'domain_unverified'", ''), (m) => m.siteQualifies({ ...B, verifiedDomains: [] }, NOW))
+  check('MUTATION CONTROL: domain-control check removed → a stranger\'s domain qualifies → caught', domMut === null, String(domMut))
+  const noProof = { hosts: [], gscProperties: [] }
+  check('provenDomains: a connected site on the exact host (www aside) proves it', provenDomains(['b.co.il'], { ...noProof, hosts: ['https://www.b.co.il/'] }).join() === 'b.co.il')
+  check('provenDomains: a lookalike or a parent/sub host proves nothing', provenDomains(['b.co.il'], { ...noProof, hosts: ['https://notb.co.il/', 'https://blog.b.co.il/', 'https://co.il/'] }).length === 0)
+  check('provenDomains: a verified Search Console property covering the domain proves it (domain and URL-prefix)',
+    provenDomains(['b.co.il'], { ...noProof, gscProperties: [{ siteUrl: 'sc-domain:b.co.il', permissionLevel: 'siteOwner' }] }).length === 1
+    && provenDomains(['b.co.il'], { ...noProof, gscProperties: [{ siteUrl: 'https://www.b.co.il/', permissionLevel: 'siteFullUser' }] }).length === 1)
+  check('provenDomains: an unverified property, or one for another site, proves nothing',
+    provenDomains(['b.co.il'], { ...noProof, gscProperties: [{ siteUrl: 'sc-domain:b.co.il', permissionLevel: 'siteUnverifiedUser' }, { siteUrl: 'sc-domain:x.co.il', permissionLevel: 'siteOwner' }] }).length === 0)
+  const unvMut = withMutant(RULES, (s) => s.replace('p.siteUrl && !isUnverifiedPermission(p.permissionLevel)', 'p.siteUrl'),
+    (m) => m.provenDomains(['b.co.il'], { ...noProof, gscProperties: [{ siteUrl: 'sc-domain:b.co.il', permissionLevel: 'siteUnverifiedUser' }] }).length)
+  check('MUTATION CONTROL: unverified Search Console property accepted → caught', unvMut === 1, String(unvMut))
+  const hostMut = withMutant(RULES, (s) => s.replace('return hosts.has(bare) ||', 'return [...hosts].some((h) => h.endsWith(bare)) ||'),
+    (m) => m.provenDomains(['b.co.il'], { ...noProof, hosts: ['https://notb.co.il/'] }).length)
+  check('MUTATION CONTROL: host matched by suffix, not exactly → a lookalike proves it → caught', hostMut === 1, String(hostMut))
 
   // Caps and the ramp.
   const newcomer = { ...B, memberSince: '2026-09-03T00:00:00Z' }
@@ -259,7 +286,7 @@ const P = {
 }
 const ART = 'e0000000-0000-0000-0000-000000000001'
 const ids = Object.values(P)
-function networkDb(over: { hooks?: Record<string, any>; sourceMember?: boolean; articleStatus?: string } = {}) {
+function networkDb(over: { hooks?: Record<string, any>; sourceMember?: boolean; articleStatus?: string; unconnected?: string[] } = {}) {
   const user = (id: string) => (id === P.S ? U_S : `20000000-0000-0000-0000-00000000000${ids.indexOf(id)}`)
   const cat: Record<string, string> = { [P.S]: 'עיצוב פנים', [P.OK]: 'השכרת אוהלים לאירועים', [P.SAME]: 'עיצוב פנים לבתים', [P.COMP]: 'נגרות', [P.SHOP]: 'כלי בית', [P.REC]: 'צילום', [P.NEW]: 'פרחים' }
   const domain = (id: string) => `site${ids.indexOf(id)}.co.il`
@@ -286,6 +313,8 @@ function networkDb(over: { hooks?: Record<string, any>; sourceMember?: boolean; 
     ],
     tracking_targets: [{ project_id: P.OK, keyword: 'השכרת אוהלים לאירועים' }, { project_id: P.OK, keyword: 'תפריט קייטרינג לאירועים' }],
     link_network_placements: [],
+    // Proof of domain control: a tested WordPress connection on each site's own host.
+    wordpress_connections: ids.filter((id) => !(over.unconnected ?? []).includes(id)).map((id) => ({ project_id: id, user_id: user(id), site_url: `https://www.${domain(id)}`, connection_status: 'connected' })),
   }, over.hooks ?? {})
   return db
 }
@@ -393,8 +422,29 @@ async function partE() {
   check('the link type in force is part of the answer', own.linkRel === 'follow')
 
   const recv = await (await handleNetworkGet(P.OK, routeDeps(U_OK, db))).json() as any
-  check('the receiver sees the link: from which site, on which words, to which page, when', recv.received.length === 1
-    && recv.received[0].sourceDomain === 'site0.co.il' && recv.received[0].anchor === 'עיצוב פנים של אוהל האירוע' && recv.received[0].placedAt === NOW.toISOString())
+  check('the receiver sees the link: on which words, to which page, when', recv.received.length === 1
+    && recv.received[0].anchor === 'עיצוב פנים של אוהל האירוע' && recv.received[0].placedAt === NOW.toISOString())
+  check('…but not which site gives it while the article is a draft (sourceDomain null)', recv.received[0].state === 'waiting' && recv.received[0].sourceDomain === null
+    && !JSON.stringify(recv).includes('site0.co.il'), JSON.stringify(recv.received[0]))
+  const domMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("sourceDomain: state === 'published' ? p.source_domain : null,", 'sourceDomain: p.source_domain,'),
+    async (m) => (await (await m.handleNetworkGet(P.OK, routeDeps(U_OK, db))).json()).received[0].sourceDomain)
+  check('MUTATION CONTROL: the giving site shown for a draft → caught', domMut === 'site0.co.il', String(domMut))
+  check('the giver\'s account id and article id never reach the receiver', !JSON.stringify(recv).includes(U_S) && !JSON.stringify(recv).includes(ART))
+  const livePub = networkDbWithPlacement()
+  const liveArt = livePub.tables.generated_articles.find((a: any) => a.id === ART) as any
+  liveArt.status = 'published'; liveArt.wp_post_url = 'https://site0.co.il/tent/'
+  const U_OK2 = (livePub.tables.projects.find((p: any) => p.id === P.OK) as any).user_id as string
+  const liveRecv = (await (await handleNetworkGet(P.OK, routeDeps(U_OK2, livePub))).json() as any).received[0]
+  check('once the giving article is live: the giving site, the page and the sentence', liveRecv?.state === 'published' && liveRecv.sourceDomain === 'site0.co.il'
+    && liveRecv.liveUrl === 'https://site0.co.il/tent/' && (liveRecv.context ?? '').length > 0, JSON.stringify(liveRecv))
+  const rejDb = networkDbWithPlacement()
+  ;(rejDb.tables.link_network_placements[0] as any).status = 'rejected'
+  ;(rejDb.tables.link_network_placements[0] as any).rejected_at = NOW.toISOString()
+  const rejRecv = (await (await handleNetworkGet(P.OK, routeDeps(U_OK2, rejDb))).json() as any)
+  check('a link the giver rejected is not in the receiver\'s list', rejRecv.received.length === 0 && !JSON.stringify(rejRecv).includes('site0.co.il'), JSON.stringify(rejRecv.received))
+  const rejMutR = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("receivedRows.filter((p) => p.status !== 'rejected').map(", 'receivedRows.map('),
+    async (m) => (await (await m.handleNetworkGet(P.OK, routeDeps(U_OK2, rejDb))).json()).received.length)
+  check('MUTATION CONTROL: rejected rows listed for the receiver → caught', rejMutR === 1, String(rejMutR))
   check('nothing of the giver\'s draft reaches the receiver (no title, no sentence, no address)', recv.received[0].context === null && recv.received[0].liveUrl === null
     && !JSON.stringify(recv).includes('איך מעצבים אוהל לחתונה'))
   const leakMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("context: state === 'published' && a ? linkContext(a.content_html, p.target_url) : null,", 'context: a ? linkContext(a.content_html, p.target_url) : null,'),
@@ -461,6 +511,18 @@ async function partE() {
   const nt = await handleNetworkGet(P.S, routeDeps(U_S, noTables))
   check('without the tables: 200 { available: false } (hidden, not an error)', nt.status === 200 && ((await nt.json()) as any).available === false)
   check('without the tables: joining is 409', (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.S, routeDeps(U_S, noTables))).status === 409)
+  // The table itself: the receiving side cannot read the giver's ids through PostgREST
+  // (executed proof: supabase/migrations/__qa__/link-network.probe.sql).
+  const mig = read('supabase/migrations/20260929010000_link_network.sql').replace(/--.*$/gm, '')
+  const placementsGrantOk = (sql: string) => {
+    const tableWide = /GRANT\s+SELECT\s+ON\s+TABLE\s+public\.link_network_placements\s+TO\s+authenticated/i.test(sql)
+    const cols = /GRANT\s+SELECT\s*\(([^)]*)\)\s*ON\s+TABLE\s+public\.link_network_placements\s+TO\s+authenticated/i.exec(sql)?.[1] ?? ''
+    const policy = /CREATE POLICY link_network_placements_\w+ ON public\.link_network_placements[\s\S]*?;/i.exec(sql)?.[0] ?? ''
+    return !tableWide && !!cols && !/source_user_id|target_user_id|rejected_by/.test(cols) && !/target_project_id/.test(policy)
+  }
+  check('migration: placements are granted to browsers by column, no account ids, and the receiver has no read policy', placementsGrantOk(mig))
+  check('MUTATION CONTROL: the old table-wide grant → caught', !placementsGrantOk(mig.replace(/GRANT SELECT \([^)]*\)\s*ON TABLE public\.link_network_placements TO authenticated/, 'GRANT SELECT ON TABLE public.link_network_placements TO authenticated')))
+  check('MUTATION CONTROL: the target-side read clause back → caught', !placementsGrantOk(mig.replace("USING (source_project_id IN", "USING (target_project_id IN (SELECT 1) OR source_project_id IN")))
   const errText = JSON.stringify(await (await handleNetworkGet(P.S, routeDeps(U_S, networkDb({ hooks: { link_network_placements: { select: () => ({ code: 'XX000', message: 'relation secret exploded' }) } } })))).json())
   check('a database failure answers a code, never the database text', /"code":"internal"/.test(errText) && !/secret|exploded/.test(errText))
 }
@@ -514,6 +576,104 @@ function partG() {
   check('the terms carry a marked draft section for the network, in both languages', /id="link-network"/.test(terms) && /טיוטה/.test(terms) && /id="link-network"/.test(termsEn) && /draft/i.test(termsEn))
 }
 
+// ── H. domain control, from the stored connections ─────────────────────────
+async function partH() {
+  console.log('\nH. domain control')
+  const STORE = 'lib/link-network/store.ts'
+  const input = { projectId: P.S, userId: U_S, articleId: ART }
+  const user = (id: string) => (id === P.S ? U_S : `20000000-0000-0000-0000-00000000000${ids.indexOf(id)}`)
+  const proofOf = async (db: any, id: string) => (await readDomainProof(db, [{ id, user_id: user(id) }])).get(id)
+  const verified = async (db: any, id: string) => (await loadSites(db, [id])).get(id)!.site.verifiedDomains
+
+  // What counts, from the tables that already exist.
+  check('a tested WordPress connection on the site\'s host proves it', (await verified(networkDb(), P.OK)).join() === 'site1.co.il')
+  const failed = networkDb(); (failed.tables.wordpress_connections.find((r: any) => r.project_id === P.OK) as any).connection_status = 'failed'
+  check('a WordPress connection that failed its test proves nothing', (await verified(failed, P.OK)).length === 0)
+  const stMut = await withMutantAsync(STORE, (s) => s.replace(".in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)),\n    rows<OwnedSiteRow>(db.from('site_fix_plugin_links')", ".in('project_id', ids).limit(ids.length)),\n    rows<OwnedSiteRow>(db.from('site_fix_plugin_links')"),
+    async (m) => (await m.loadSites(failed, [P.OK])).get(P.OK).site.verifiedDomains.length)
+  check('MUTATION CONTROL: WordPress status not checked → a failed connection proves it → caught', stMut === 1, String(stMut))
+  const foreign = networkDb(); (foreign.tables.wordpress_connections.find((r: any) => r.project_id === P.OK) as any).user_id = U_S
+  check('a connection row of another account proves nothing', (await verified(foreign, P.OK)).length === 0)
+  const ownMut = await withMutantAsync(STORE, (s) => s.replace(' || r.user_id !== ownerOf.get(r.project_id)) continue', ') continue'),
+    async (m) => (await m.loadSites(foreign, [P.OK])).get(P.OK).site.verifiedDomains.length)
+  check('MUTATION CONTROL: connection owner not checked → caught', ownMut === 1, String(ownMut))
+  const other = networkDb(); (other.tables.wordpress_connections.find((r: any) => r.project_id === P.OK) as any).site_url = 'https://another-site.co.il'
+  check('a connection to a different site proves nothing for this domain', (await verified(other, P.OK)).length === 0)
+
+  const plug = networkDb({ unconnected: [P.OK] })
+  plug.tables.site_fix_plugin_links = [{ project_id: P.OK, user_id: user(P.OK), site_url: 'https://site1.co.il', status: 'connected' }]
+  check('the GO TOP plugin link (connected) proves it', (await verified(plug, P.OK)).join() === 'site1.co.il')
+  plug.tables.site_fix_plugin_links[0].status = 'pending'
+  check('…a plugin code issued but never answered proves nothing', (await verified(plug, P.OK)).length === 0)
+  // A Wix / custom-site (webhook) address is typed by the owner and never checked: no proof.
+  const wix = networkDb({ unconnected: [P.OK] })
+  wix.tables.site_platform_connections = [{ project_id: P.OK, user_id: user(P.OK), platform: 'webhook', site_url: 'https://site1.co.il/', endpoint_url: 'https://site1.co.il/hook', connection_status: 'connected' }]
+  check('a webhook / Wix connection alone proves nothing (typed address)', (await verified(wix, P.OK)).length === 0)
+  const U_WIX = user(P.OK)
+  const wixAns = await (await handleNetworkGet(P.OK, routeDeps(U_WIX, wix))).json() as any
+  check('…so a webhook / Wix-only project is domain_unverified and cannot join', wixAns.readiness === 'domain_unverified'
+    && (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.OK, routeDeps(U_WIX, wix))).status === 409, String(wixAns.readiness))
+  const wixMut = await withMutantAsync(STORE, (s) => s.replace('  for (const r of [...wp, ...plugin]) {',
+    "  for (const r of [...wp, ...plugin, ...(await rows<OwnedSiteRow>(db.from('site_platform_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)))]) {"),
+    async (m) => (await m.loadSites(wix, [P.OK])).get(P.OK).site.verifiedDomains.length)
+  check('MUTATION CONTROL: Wix / webhook site_url accepted as proof → caught', wixMut === 1, String(wixMut))
+
+  const gsc = networkDb({ unconnected: [P.OK] })
+  gsc.tables.project_gsc_properties = [{ project_id: P.OK, connection_id: 'g1', site_url: 'sc-domain:site1.co.il', permission_level: 'siteOwner' }]
+  gsc.tables.gsc_connections = [{ id: 'g1', user_id: user(P.OK), status: 'connected' }]
+  check('a verified Search Console property of the owner\'s live Google connection proves it', (await verified(gsc, P.OK)).join() === 'site1.co.il')
+  ;(gsc.tables.gsc_connections[0] as any).status = 'revoked'
+  check('…not once that Google connection is revoked', (await verified(gsc, P.OK)).length === 0)
+  const gscMut = await withMutantAsync(STORE, (s) => s.replace(".in('id', connIds).eq('status', 'connected')", ".in('id', connIds)"),
+    async (m) => (await m.loadSites(gsc, [P.OK])).get(P.OK).site.verifiedDomains.length)
+  check('MUTATION CONTROL: Google connection status not checked → caught', gscMut === 1, String(gscMut))
+  ;(gsc.tables.gsc_connections[0] as any).status = 'connected'; (gsc.tables.gsc_connections[0] as any).user_id = U_S
+  check('…nor when the Google connection belongs to another account', (await verified(gsc, P.OK)).length === 0)
+  check('no connection at all: no proof', (await proofOf(networkDb({ unconnected: [P.OK] }), P.OK)) === undefined)
+
+  // The rule reaches the placement step: an unconnected member is never offered.
+  const unconnected = networkDb({ unconnected: [P.OK] })
+  const deps = placeDeps(goodAnswer)
+  const r = await placeNetworkLink(unconnected as any, input, deps)
+  check('a member that never connected its site receives no link (not even offered to the model)', r.outcome === 'skipped' && !deps.prompts.some((p) => p.includes('site1.co.il')), JSON.stringify(r))
+  const srcUnc = await placeNetworkLink(networkDb({ unconnected: [P.S] }) as any, input, placeDeps(goodAnswer))
+  check('a member that never connected its site gives no link', srcUnc.outcome === 'skipped' && srcUnc.reason === 'source_domain_unverified', JSON.stringify(srcUnc))
+  // Pages we link to are on a proven domain only.
+  const alias = networkDb()
+  const okProject = alias.tables.projects.find((p: any) => p.id === P.OK) as any
+  okProject.domain_aliases = ['typed-in.co.il']
+  alias.tables.generated_articles.push({ id: 'e0000000-0000-0000-0000-00000000aaaa', project_id: P.OK, user_id: user(P.OK), title: 'עמוד על דומיין שלא הוכח', status: 'published', wp_post_url: 'https://typed-in.co.il/page/', content_html: '<p>x</p>' })
+  const pages = (await loadSites(alias, [P.OK])).get(P.OK)!.extras.pages.map((p) => p.url)
+  check('a page on a domain that was only typed in (an unproven alias) is never a link target', pages.length > 0 && !pages.some((u) => u.includes('typed-in.co.il')), pages.join(', '))
+  const pageMut = await withMutantAsync(STORE, (s) => s.replace('const u = ownPage(url, verifiedDomains)', 'const u = ownPage(url, domains)'),
+    async (m) => (await m.loadSites(alias, [P.OK])).get(P.OK).extras.pages.some((p: any) => p.url.includes('typed-in.co.il')))
+  check('MUTATION CONTROL: pages from every typed domain → caught', pageMut === true)
+
+  // The routes: the switch cannot be turned on, and the server refuses too.
+  const U_OK = user(P.OK)
+  const fresh = networkDb({ unconnected: [P.OK] })
+  fresh.tables.link_network_members = fresh.tables.link_network_members.filter((m: any) => m.project_id !== P.OK)
+  const ans = await (await handleNetworkGet(P.OK, routeDeps(U_OK, fresh))).json() as any
+  check('GET says why the switch cannot be turned on (readiness domain_unverified)', ans.available === true && ans.readiness === 'domain_unverified', String(ans.readiness))
+  const joinReq = () => jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION })
+  const refused = await handleMembershipPost(joinReq(), P.OK, routeDeps(U_OK, fresh))
+  check('joining without a proven domain is refused (409 domain_unverified), nothing written', refused.status === 409 && ((await refused.json()) as any).code === 'domain_unverified'
+    && !fresh.tables.link_network_members.some((m: any) => m.project_id === P.OK))
+  const joinMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("if (siteQualifies({ ...me.site, active: true }, deps.now()) === 'domain_unverified') return refuse(409, 'domain_unverified')", ''),
+    async (m) => (await m.handleMembershipPost(joinReq(), P.OK, routeDeps(U_OK, networkDb({ unconnected: [P.OK] })))).status)
+  check('MUTATION CONTROL: join refusal removed → an unconnected site joins → caught', joinMut === 200, String(joinMut))
+  check('leaving is always allowed', (await handleMembershipPost(jsonReq({ join: false }), P.OK, routeDeps(U_OK, networkDb({ unconnected: [P.OK] })))).status === 200)
+
+  // The screen: the switch is disabled with the reason, in both languages.
+  const panel = strip(read('components/site-links/network/NetworkPanel.tsx'))
+  const panelOk = (src: string) => /const cannotJoin = !active && data\.readiness === 'domain_unverified'/.test(src) && /disabled=\{busy \|\| cannotJoin\}/.test(src) && /copy\.switch\.domainUnverified/.test(src)
+  check('the switch is disabled and says why when the site is not connected', panelOk(panel))
+  check('MUTATION CONTROL: the switch left enabled → caught', !panelOk(panel.replace('disabled={busy || cannotJoin}', 'disabled={busy}')))
+  const he = read('lib/i18n/dashboard/he.ts'), en = read('lib/i18n/dashboard/en.ts')
+  check('the reason is in both dictionaries', /domainUnverified: 'כדי להצטרף לרשת צריך לחבר את האתר \(WordPress או Search Console\), כדי שנדע שהאתר שלכם\.'/.test(he)
+    && /domainUnverified: 'To join the network, connect your site/.test(en) && /domain_unverified: '/.test(he) && /domain_unverified: '/.test(en))
+}
+
 async function main() {
   partA()
   partB()
@@ -522,6 +682,7 @@ async function main() {
   await partE()
   partF()
   partG()
+  await partH()
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

@@ -6,7 +6,8 @@
  *        the network's size (shown before joining too), the switch, the link
  *        type in force, this month's caps, and the placement log of both sides.
  *   POST /api/projects/[id]/link-network/membership  { join, consent, consentVersion }
- *        join (only with explicit consent to the current text) or leave.
+ *        join (only with explicit consent to the current text, and only for a
+ *        site whose domain the owner proved: rules.ts provenDomains) or leave.
  *   POST /api/projects/[id]/link-network/placements/[placementId]/reject
  *        the giving side takes a link out of a draft before it is published.
  *
@@ -14,8 +15,10 @@
  * proves ownership itself. OWNER FILTER: every read of this owner's rows is
  * filtered by the verified project AND owner; the only reads beyond this owner
  * are the member count (a number), the network's link type, and, for a link
- * this project RECEIVED, whether the giving article is live (its address and the
- * sentence around the link once it is published; nothing of a draft).
+ * this project RECEIVED, whether the giving article is live (the giving site's
+ * domain, its address and the sentence around the link once it is published;
+ * nothing of a draft, and a link the giver rejected is not listed at all).
+ * The giver's account and article ids never leave the server.
  *
  * Hidden, not an error: without the network's tables (migration not applied),
  * and for a Shopify project, GET answers { available: false } and the POSTs 409.
@@ -53,7 +56,8 @@ export interface GivenItem {
 
 export interface ReceivedItem {
   id: string
-  sourceDomain: string
+  /** The giving site, only once its article is live (null while it is a draft or the link is gone). */
+  sourceDomain: string | null
   targetUrl: string
   anchor: string
   placedAt: string
@@ -62,7 +66,8 @@ export interface ReceivedItem {
   context: string | null
 }
 
-export type Readiness = 'ready' | 'thin_or_new' | 'category_unknown'
+/** domain_unverified: the site is not connected (WordPress or Search Console), so the switch cannot be turned on. */
+export type Readiness = 'ready' | 'domain_unverified' | 'thin_or_new' | 'category_unknown'
 
 export type NetworkAnswer =
   | { ok: true; available: false }
@@ -189,18 +194,19 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
         canReject: state === 'waiting',
       }
     })
-    const received: ReceivedItem[] = receivedRows.map((p) => {
+    // A link the giver rejected never existed for the receiver: not listed.
+    const received: ReceivedItem[] = receivedRows.filter((p) => p.status !== 'rejected').map((p) => {
       const found = p.source_article_id ? recvById.get(p.source_article_id) : undefined
       const a = found && found.project_id === p.source_project_id ? found : undefined
       const state = stateOf(p, a)
       return {
         id: p.id,
-        sourceDomain: p.source_domain,
+        // Nothing of another customer's draft: who is giving only once it is live.
+        sourceDomain: state === 'published' ? p.source_domain : null,
         targetUrl: safeExternalUrl(p.target_url) ?? '',
         anchor: p.anchor_text,
         placedAt: p.placed_at,
         state,
-        // Nothing of another customer's draft: the address and sentence only once it is live.
         liveUrl: state === 'published' ? safeExternalUrl(a?.wp_post_url) : null,
         context: state === 'published' && a ? linkContext(a.content_html, p.target_url) : null,
       }
@@ -215,7 +221,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
       linkRel: g.rel!,
       consentVersion: LINK_NETWORK_CONSENT_VERSION,
       membership: { active: !!member?.active, since: member?.active ? member.consented_at : null, leftAt: member?.left_at ?? null },
-      readiness: readinessReason ? 'thin_or_new' : me.site.category ? 'ready' : 'category_unknown',
+      readiness: readinessReason === 'domain_unverified' ? 'domain_unverified' : readinessReason ? 'thin_or_new' : me.site.category ? 'ready' : 'category_unknown',
       caps: {
         receivedThisMonth: receivedRows.filter((p) => p.status === 'placed' && monthOf(p.placed_at) === month).length,
         receivedCap: receivedCapFor({ memberSince: member?.active ? member.consented_at : null }, now),
@@ -263,6 +269,8 @@ export async function handleMembershipPost(request: Request, projectId: string, 
     if (!me || me.site.shopify) return refuse(409, 'unavailable')
     if (body.join) {
       if (body.consent !== true || body.consentVersion !== LINK_NETWORK_CONSENT_VERSION) return refuse(400, 'consent_required')
+      // Only a site whose owner proved control of its domain may join (leaving is always allowed).
+      if (siteQualifies({ ...me.site, active: true }, deps.now()) === 'domain_unverified') return refuse(409, 'domain_unverified')
       const { error } = await db.from('link_network_members').upsert({
         project_id: project.id,
         user_id: userId,
