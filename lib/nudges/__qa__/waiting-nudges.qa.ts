@@ -7,8 +7,9 @@
  *   B) the card's rows: fixed priority, at most three, hidden at 0, one internal link each,
  *      "the queue runs dry" only with fewer than 2 approved topics and a known date
  *   C) the rail's pills: the same numbers, hidden at 0, 99+
- *   D) safe fixes: counted from the last scan kept in the browser, only the safe kinds,
- *      never the home page or a fixed page, at most 25
+ *   D) safe fixes: counted from the last scan kept in the browser with the health screen's own
+ *      rule (lib/site-fix/bulk.ts bulkCandidates): only the safe kinds, never the home page or a
+ *      fixed page, at most 25; the copy says "up to" (the fix queue is not read here)
  *   E) the words: exact Hebrew and English copy from the UX decisions (E)
  *   F) the screens: the card sits under the hero and renders nothing when empty; the rail draws
  *      a labelled pill only above 0; the articles screen opens filtered only on "ready";
@@ -225,16 +226,29 @@ async function main() {
     check('D2: no scan, junk or another version: 0', safeFixCountFromScan(null) === 0 && safeFixCountFromScan('{') === 0 && safeFixCountFromScan(JSON.stringify({ v: 2, report: { findings: [] } })) === 0)
     const many = scan([{ id: 'title_long', pages: Array.from({ length: 40 }, (_, i) => page(`https://s.co/p${i}`)) }])
     check('D3: a batch never exceeds 25 pages', safeFixCountFromScan(many) === 25)
-    const mut = await withMutant<{ safeFixCountFromScan: typeof safeFixCountFromScan }, boolean>('lib/nudges/rows.ts', [["'images_alt',\n])", "'images_alt', 'canonical_missing', 'h1_multiple',\n])"], ["p.kind === 'home'", 'false']], (m) => m.safeFixCountFromScan(one) !== 3)
-    check('D-MUT: counting canonical / h1 findings and the home page fails D1', mut)
+    const mut = await withMutant<{ safeFixCountFromScan: typeof safeFixCountFromScan }, boolean>('lib/nudges/rows.ts', [["fixable: (id, url) => byKey.get(`${id}|${url}`) === true && !fixed.has(`${id}|${url}`),", 'fixable: () => true,']], (m) => m.safeFixCountFromScan(one) !== 3)
+    check('D-MUT: counting unfixable or already-fixed pages fails D1', mut)
+    // One rule with the site-health screen's "Fix {n} safe items" button (w8 merge): the count IS
+    // bulkCandidates over the kept report, never a second list of safe kinds.
+    const rowsSrc = strip(code('lib/nudges/rows.ts'))
+    const oneRule = (src: string) => /import \{ bulkCandidates \} from '@\/lib\/site-fix\/bulk'/.test(src) && /return bulkCandidates\(findings, \{/.test(src) && !/SAFE_FINDINGS|'title_long'|'images_alt'/.test(src)
+    check('D4: the nudge counts with lib/site-fix/bulk.ts bulkCandidates (the button\'s own rule), no list of its own', oneRule(rowsSrc))
+    check('D4-MUT: a separate list of safe kinds is caught', !oneRule(rowsSrc.replace('return bulkCandidates(findings, {', "const SAFE_FINDINGS = new Set(['title_long'])\n  return bulkCandidates(findings, {")))
+    const { bulkCandidates } = await import('@/lib/site-fix/bulk')
+    const { FIX_TYPE } = await import('@/lib/site-health/rules')
+    const parsed = JSON.parse(one) as { report: { findings: { id: string; pages: { url: string; kind: string; fixable: boolean }[] }[] }; fixed: string[] }
+    const direct = bulkCandidates(parsed.report.findings.map((f) => ({ ...f, fixType: FIX_TYPE[f.id as keyof typeof FIX_TYPE] ?? null })), {
+      fixable: (id, url) => !!parsed.report.findings.find((f) => f.id === id)?.pages.find((p) => p.url === url)?.fixable && !parsed.fixed.includes(`${id}|${url}`), jobs: [], now: Date.now(),
+    }).length
+    check('D5: same report, no queue: the nudge count equals the button\'s bulkCandidates count', direct === safeFixCountFromScan(one) && direct === 3, { direct, nudge: safeFixCountFromScan(one) })
   }
 
   // ── E) the words ──────────────────────────────────────────────────────────
   console.log('\nE) The copy (UX decisions, E)')
   {
     const h = dashboardHe.waitingCard, e = dashboardEn.waitingCard
-    check('E1: Hebrew card title and rows', h.title === 'מחכה לכם' && h.connection === 'החיבור לאתר נותק, ולכן מאמרים ותיקונים לא עולים' && h.connectionAction === 'חיבור מחדש' && h.articles(1) === 'מאמר אחד כתוב ומחכה לאישור שלכם' && h.articles(4) === '4 מאמרים כתובים ומחכים לאישור שלכם' && h.articlesAction === 'לאישור המאמרים' && h.topics(3) === '3 נושאים חדשים מחכים לאישור' && h.topicsAction === 'לאישור הנושאים' && h.queueDry('05.10.2026') === 'בלי אישור, התור יתרוקן ב-05.10.2026' && h.fixes(6) === '6 תיקונים בטוחים מוכנים לאתר' && h.fixesAction === 'לתיקונים')
-    check('E2: English card title and rows', e.title === 'Waiting for you' && e.connection === "The site connection dropped, so articles and fixes can't go live" && e.connectionAction === 'Reconnect' && e.articles(1) === '1 article is written and waiting for your OK' && e.articles(4) === '4 articles are written and waiting for your OK' && e.articlesAction === 'Review articles' && e.topics(3) === '3 new topics await approval' && e.topicsAction === 'Review topics' && e.queueDry('Oct 5, 2026') === 'Without approval the queue runs dry on Oct 5, 2026' && e.fixes(6) === '6 safe fixes are ready for your site' && e.fixesAction === 'See fixes')
+    check('E1: Hebrew card title and rows', h.title === 'מחכה לכם' && h.connection === 'החיבור לאתר נותק, ולכן מאמרים ותיקונים לא עולים' && h.connectionAction === 'חיבור מחדש' && h.articles(1) === 'מאמר אחד כתוב ומחכה לאישור שלכם' && h.articles(4) === '4 מאמרים כתובים ומחכים לאישור שלכם' && h.articlesAction === 'לאישור המאמרים' && h.topics(3) === '3 נושאים חדשים מחכים לאישור' && h.topicsAction === 'לאישור הנושאים' && h.queueDry('05.10.2026') === 'בלי אישור, התור יתרוקן ב-05.10.2026' && h.fixes(6) === 'עד 6 תיקונים בטוחים מוכנים לאתר' && h.fixes(1) === 'ייתכן שתיקון בטוח אחד מוכן לאתר' && h.fixesAction === 'לתיקונים')
+    check('E2: English card title and rows', e.title === 'Waiting for you' && e.connection === "The site connection dropped, so articles and fixes can't go live" && e.connectionAction === 'Reconnect' && e.articles(1) === '1 article is written and waiting for your OK' && e.articles(4) === '4 articles are written and waiting for your OK' && e.articlesAction === 'Review articles' && e.topics(3) === '3 new topics await approval' && e.topicsAction === 'Review topics' && e.queueDry('Oct 5, 2026') === 'Without approval the queue runs dry on Oct 5, 2026' && e.fixes(6) === 'Up to 6 safe fixes are ready for your site' && e.fixes(1) === 'A safe fix may be ready for your site' && e.fixesAction === 'See fixes')
     check('E3: the rail’s aria-label', dashboardHe.railWaiting.aria(3) === '3 ממתינים' && dashboardEn.railWaiting.aria(3) === '3 waiting')
     const hs = dashboardHe.reminders, es = dashboardEn.reminders
     check('E4: the settings switch label', hs.settingsLabel === 'תזכורות במייל כשמשהו מחכה לכם' && es.settingsLabel === 'Email me when something is waiting for me')

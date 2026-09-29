@@ -10,6 +10,10 @@
 import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { strategyHref } from '@/lib/content/strategy/view'
+import { FIX_TYPE } from '@/lib/site-health/rules'
+import type { FindingKind } from '@/lib/site-health/types'
+import { bulkCandidates } from '@/lib/site-fix/bulk'
+import type { FixType } from '@/lib/site-fix/types'
 import { LOW_QUEUE, type WaitingAnswer } from './waiting'
 
 export const MAX_WAITING_ROWS = 3
@@ -69,25 +73,21 @@ export const pillText = (n: number): string => (n > 99 ? '99+' : String(n))
 
 // ── Safe fixes, from the last site scan kept in this browser ───────────────────
 
-/** Fix types that only change what search engines read, never what visitors see. */
-const SAFE_FINDINGS: ReadonlySet<string> = new Set([
-  'title_missing', 'title_long', 'title_short', 'title_duplicate',
-  'description_missing', 'description_length', 'description_duplicate',
-  'images_alt',
-])
-/** A batch never holds more than this many pages. */
-export const SAFE_BATCH_MAX = 25
-
 interface CachedScan {
   v?: number
-  report?: { findings?: Array<{ id?: unknown; pages?: Array<{ url?: unknown; kind?: unknown; fixable?: unknown }> }> }
+  report?: { findings?: Array<{ id?: unknown; fixType?: unknown; pages?: Array<{ url?: unknown; kind?: unknown; fixable?: unknown }> }> }
   fixed?: unknown
 }
 
 /**
- * How many pages the last scan found a safe, one-click fix for: a title, a description or an
- * image description; not the home page; not already fixed. A LOWER BOUND, read from the report
- * this browser kept (nothing is stored on the server); the site-health screen has the exact list.
+ * How many safe fixes the last scan found, by the SAME rule as the site-health screen's
+ * "Fix {n} safe items for me" button: lib/site-fix/bulk.ts `bulkCandidates` (Google title,
+ * Google description and image alt text only; never the home page; at most 25 pages).
+ *
+ * AN ESTIMATE, AND THE COPY SAYS SO ("up to"). The scan report lives only in this browser (nothing
+ * is stored on the server), and the screen's button also leaves out pages the fix queue already
+ * holds and checks the plugin's channel per type; neither is read here. So this is the button's
+ * count before the queue is taken into account: the same or higher, never lower.
  */
 export function safeFixCountFromScan(raw: string | null): number {
   if (!raw) return 0
@@ -95,14 +95,18 @@ export function safeFixCountFromScan(raw: string | null): number {
   try { parsed = JSON.parse(raw) as CachedScan } catch { return 0 }
   if (!parsed || parsed.v !== 1 || !parsed.report || !Array.isArray(parsed.report.findings)) return 0
   const fixed = new Set(Array.isArray(parsed.fixed) ? parsed.fixed.filter((v): v is string => typeof v === 'string') : [])
-  const pages = new Set<string>()
+  const findings: { id: string; fixType: FixType | null; pages: { url: string; kind: string; fixable: boolean }[] }[] = []
   for (const f of parsed.report.findings) {
-    if (typeof f.id !== 'string' || !SAFE_FINDINGS.has(f.id) || !Array.isArray(f.pages)) continue
-    for (const p of f.pages) {
-      if (typeof p.url !== 'string' || p.fixable !== true || p.kind === 'home') continue
-      if (fixed.has(`${f.id}|${p.url}`)) continue
-      pages.add(`${f.id}|${p.url}`)
-    }
+    if (typeof f.id !== 'string' || !Array.isArray(f.pages)) continue
+    // A report kept from before the fix queue has no fix type: take it from the scan's own rules, as the screen does.
+    const fixType = typeof f.fixType === 'string' ? f.fixType as FixType : FIX_TYPE[f.id as FindingKind] ?? null
+    const pages = f.pages.flatMap((p) => typeof p.url === 'string' ? [{ url: p.url, kind: typeof p.kind === 'string' ? p.kind : '', fixable: p.fixable === true }] : [])
+    findings.push({ id: f.id, fixType, pages })
   }
-  return Math.min(pages.size, SAFE_BATCH_MAX)
+  const byKey = new Map(findings.flatMap((f) => f.pages.map((p) => [`${f.id}|${p.url}`, p.fixable] as const)))
+  return bulkCandidates(findings, {
+    fixable: (id, url) => byKey.get(`${id}|${url}`) === true && !fixed.has(`${id}|${url}`),
+    jobs: [],
+    now: Date.now(),
+  }).length
 }

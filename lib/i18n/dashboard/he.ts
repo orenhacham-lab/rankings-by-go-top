@@ -6073,7 +6073,8 @@ export const dashboardHe = {
     topics: (n: number) => `${n} נושאים חדשים מחכים לאישור`,
     topicsAction: 'לאישור הנושאים',
     queueDry: (date: string) => `בלי אישור, התור יתרוקן ב-${date}`,
-    fixes: (n: number) => `${n} תיקונים בטוחים מוכנים לאתר`,
+    // An estimate from the scan kept in this browser (lib/nudges/rows.ts): "up to", never a promise.
+    fixes: (n: number) => (n === 1 ? 'ייתכן שתיקון בטוח אחד מוכן לאתר' : `עד ${n} תיקונים בטוחים מוכנים לאתר`),
     fixesAction: 'לתיקונים',
   },
   railWaiting: {

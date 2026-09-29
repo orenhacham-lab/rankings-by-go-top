@@ -6048,7 +6048,8 @@ export const dashboardEn = {
     topics: (n: number) => (n === 1 ? '1 new topic awaits approval' : `${n} new topics await approval`),
     topicsAction: 'Review topics',
     queueDry: (date: string) => `Without approval the queue runs dry on ${date}`,
-    fixes: (n: number) => (n === 1 ? '1 safe fix is ready for your site' : `${n} safe fixes are ready for your site`),
+    // An estimate from the scan kept in this browser (lib/nudges/rows.ts): "up to", never a promise.
+    fixes: (n: number) => (n === 1 ? 'A safe fix may be ready for your site' : `Up to ${n} safe fixes are ready for your site`),
     fixesAction: 'See fixes',
   },
   railWaiting: {
