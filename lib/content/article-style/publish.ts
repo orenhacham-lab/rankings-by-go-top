@@ -1,6 +1,7 @@
 /**
- * The article body as it goes to a site: the project's design applied on the
- * way out (./html.ts). One call per publisher:
+ * The article body as it goes to a site: the project's design and its call to
+ * action applied on the way out, by designForSite (./render.ts), the function
+ * the settings preview and the article view draw with. One call per publisher:
  *   - WordPress (lib/content/wordpress-publish.ts), after the inline images
  *     are composed with their WordPress media URLs;
  *   - a custom site's webhook (lib/site-platforms/publish.ts), with the inline
@@ -12,9 +13,9 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
-import { styleArticleHtml } from './html'
-import { readArticleStyleForArticle } from './store'
-import { effectiveDesign, type DesignPlatform } from './types'
+import { designForSite } from './render'
+import { readArticleCtaForArticle, readArticleStyleForArticle } from './store'
+import type { DesignPlatform } from './types'
 
 export async function applyArticleDesign(
   admin: SupabaseClient,
@@ -24,10 +25,11 @@ export async function applyArticleDesign(
 ): Promise<string> {
   if (!articleId) return html
   try {
-    const { style } = await readArticleStyleForArticle(admin, articleId)
-    const design = effectiveDesign(style, platform)
-    if (design !== 'formatted') return html
-    return styleArticleHtml(html, { design, colors: style.brandColors })
+    if (platform === 'shopify' || platform === 'wix') return html
+    const { style, projectId } = await readArticleStyleForArticle(admin, articleId)
+    const cta = await readArticleCtaForArticle(admin, projectId)
+    // The same function the preview and the article view draw with (./render.ts).
+    return designForSite(html, { style, cta, platform })
   } catch {
     console.warn('[article-style] design skipped', { platform })
     return html

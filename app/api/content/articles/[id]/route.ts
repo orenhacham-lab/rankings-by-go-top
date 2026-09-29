@@ -10,6 +10,7 @@
  * NOT modify wp_post_id/wp_post_url (no publish here).
  */
 
+import { autoEntries } from '@/lib/content/auto-internal-links/entries'
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, slugify } from '@/lib/content/article-html'
@@ -116,6 +117,9 @@ function sanitizeArticleRow(a: Record<string, unknown>) {
     shopify_published_at: a.shopify_published_at ?? null,
     shopify_last_error: a.shopify_last_error ?? null,
     shopify_last_synced_at: a.shopify_last_synced_at ?? null,
+    // Wave 8 — the internal links the automatic step added (lib/content/auto-internal-links),
+    // for the article view's list. Only those entries, not the whole anchor bank.
+    auto_internal_links: autoEntries(a.internal_links_json),
     created_at: a.created_at,
     updated_at: a.updated_at,
   }

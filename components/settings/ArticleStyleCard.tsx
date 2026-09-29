@@ -1,13 +1,15 @@
 'use client'
 
-import { useId, useState } from 'react'
-import { Check, LayoutTemplate, Palette, Plus, RectangleHorizontal, RefreshCw, Square, Star, X } from 'lucide-react'
+import { useId, useMemo, useState } from 'react'
+import { Check, LayoutTemplate, Megaphone, Palette, Plus, RectangleHorizontal, RefreshCw, Square, Star, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import Notice from '@/components/ui/Notice'
 import Segmented from '@/components/ui/Segmented'
 import Switch from '@/components/ui/Switch'
 import { saveArticleStyleAction } from '@/app/(dashboard)/settings/article-style-actions'
 import type { ArticleStyleView } from '@/lib/content/article-style/data'
+import { CTA_LIMITS, isCompleteCta, sameArticleCta, suggestArticleCta, type ArticleCta, type CtaField } from '@/lib/content/article-style/cta'
 import {
   ARTICLE_DESIGNS,
   IMAGE_STYLES,
@@ -109,7 +111,20 @@ export default function ArticleStyleCard({
 }) {
   const a = t.articleStyle
   const ids = useId()
-  const { draft, dirty, setDraft, discard, commit } = useDraft<ArticleStyle>(view.style, sameArticleStyle)
+  const style = useDraft<ArticleStyle>(view.style, sameArticleStyle)
+  const { draft, setDraft } = style
+  // The call to action: the saved one, or (never saved) a suggestion from the business details, off.
+  const suggestion = useMemo(
+    () => suggestArticleCta({ business: subject?.business, niche: subject?.niche, domain: view.domain }, a.cta.suggestion),
+    [subject?.business, subject?.niche, view.domain, a.cta.suggestion],
+  )
+  const ctaBase = view.ctaSaved ? view.cta : suggestion
+  const ctaDraft = useDraft<ArticleCta>(ctaBase, sameArticleCta)
+  const cta = ctaDraft.draft
+  const [ctaErrors, setCtaErrors] = useState<CtaField[]>([])
+  const ctaLocked = !view.ctaEditable
+  const dirty = style.dirty || (!ctaLocked && ctaDraft.dirty)
+  const discard = () => { style.discard(); ctaDraft.discard(); setCtaErrors([]) }
   const [state, setState] = useState<SaveState>({ kind: 'idle' })
   const [hexInput, setHexInput] = useState('')
   const [hexError, setHexError] = useState<string | null>(null)
@@ -118,6 +133,11 @@ export default function ArticleStyleCard({
 
   const edit = (update: Partial<ArticleStyle>) => {
     setDraft((d) => ({ ...d, ...update }))
+    if (state.kind !== 'saving') setState({ kind: 'idle' })
+  }
+  const editCta = (update: Partial<ArticleCta>) => {
+    ctaDraft.setDraft((d) => ({ ...d, ...update }))
+    setCtaErrors((e) => e.filter((f) => !(f in update)))
     if (state.kind !== 'saving') setState({ kind: 'idle' })
   }
 
@@ -134,12 +154,19 @@ export default function ArticleStyleCard({
 
   async function save() {
     setState({ kind: 'saving' })
-    const res = await saveArticleStyleAction(projectId, draft).catch(() => null)
+    const res = await saveArticleStyleAction(projectId, ctaLocked ? draft : { ...draft, cta }).catch(() => null)
     if (!res || !res.ok) {
+      if (res && !res.ok && res.code === 'invalid_cta' && 'invalid' in res) {
+        setCtaErrors(res.invalid)
+        setState({ kind: 'error', code: 'invalid_request' })
+        return
+      }
       setState({ kind: 'error', code: res && !res.ok ? res.code : 'save_failed' })
       return
     }
-    commit(res.data.style)
+    style.commit(res.data.style)
+    if (res.data.ctaSaved) ctaDraft.commit(res.data.cta)
+    setCtaErrors([])
     onData(res.data)
     setState({ kind: 'saved' })
   }
@@ -154,7 +181,7 @@ export default function ArticleStyleCard({
       title={a.title}
       description={a.body}
       footer={!locked && showSaveBar(dirty, state) ? (
-        <SaveBar dirty={dirty} state={state} onSave={() => void save()} onDiscard={() => { discard(); setState({ kind: 'idle' }) }} t={t} />
+        <SaveBar dirty={dirty} state={state} onSave={() => void save()} onDiscard={() => { discard(); setState({ kind: 'idle' }) }} t={t} note={ctaErrors.length ? a.cta.errors[ctaErrors[0]!] : null} />
       ) : undefined}
     >
       <div className="space-y-5">
@@ -376,11 +403,77 @@ export default function ArticleStyleCard({
                 />
               </div>
             </section>
+
+            {/* The project's own call to action (off until turned on) */}
+            <section aria-labelledby={`${ids}-cta`} className="space-y-3" data-cta-section={cta.enabled ? 'on' : 'off'}>
+              <div className="flex items-start gap-2">
+                <Megaphone aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
+                <div>
+                  <h3 id={`${ids}-cta`} className="text-copy font-semibold text-ink">{a.cta.label}</h3>
+                  <p className="mt-0.5 text-caption text-muted">{a.cta.hint}</p>
+                </div>
+              </div>
+              {ctaLocked && !locked && <Notice tone="info">{a.cta.readOnly}</Notice>}
+              {(view.platform === 'shopify' || view.platform === 'wix') && <Notice tone="info">{a.cta.platformNote}</Notice>}
+              <div className="rounded-inset border border-line p-3 sm:p-4">
+                <Switch
+                  checked={cta.enabled}
+                  onChange={(v) => editCta({ enabled: v })}
+                  disabled={locked || ctaLocked}
+                  label={a.cta.toggle}
+                  description={a.cta.toggleHint}
+                  data-cta-toggle=""
+                />
+              </div>
+              <fieldset disabled={locked || ctaLocked} className="grid gap-3 sm:grid-cols-2" data-cta-fields="">
+                {!view.ctaSaved && !ctaLocked && <p className="text-caption text-muted sm:col-span-2">{a.cta.suggested}</p>}
+                <div className="sm:col-span-2">
+                  <Input
+                    id={`${ids}-cta-heading`}
+                    label={a.cta.heading}
+                    value={cta.heading}
+                    maxLength={CTA_LIMITS.heading}
+                    onChange={(e) => editCta({ heading: e.target.value })}
+                    error={ctaErrors.includes('heading') ? a.cta.errors.heading : undefined}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Input
+                    id={`${ids}-cta-text`}
+                    label={a.cta.text}
+                    value={cta.text}
+                    maxLength={CTA_LIMITS.text}
+                    onChange={(e) => editCta({ text: e.target.value })}
+                    error={ctaErrors.includes('text') ? a.cta.errors.text : undefined}
+                  />
+                </div>
+                <Input
+                  id={`${ids}-cta-label`}
+                  label={a.cta.buttonLabel}
+                  value={cta.buttonLabel}
+                  maxLength={CTA_LIMITS.buttonLabel}
+                  onChange={(e) => editCta({ buttonLabel: e.target.value })}
+                  error={ctaErrors.includes('buttonLabel') ? a.cta.errors.buttonLabel : undefined}
+                />
+                <Input
+                  id={`${ids}-cta-url`}
+                  type="url"
+                  label={a.cta.buttonUrl}
+                  value={cta.buttonUrl}
+                  inputMode="url"
+                  maxLength={CTA_LIMITS.buttonUrl}
+                 
+                  onChange={(e) => editCta({ buttonUrl: e.target.value })}
+                  hint={a.cta.urlHint}
+                  error={ctaErrors.includes('buttonUrl') ? a.cta.errors.buttonUrl : undefined}
+                />
+              </fieldset>
+            </section>
           </fieldset>
 
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             <p className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{a.preview.label}</p>
-            <ArticleStylePreview style={draft} platform={view.platform} domain={view.domain} t={a} locale={locale} subject={subject} />
+            <ArticleStylePreview style={draft} cta={isCompleteCta(cta) ? cta : null} platform={view.platform} domain={view.domain} t={a} locale={locale} subject={subject} />
             <p className="mt-2 text-caption text-muted">{a.preview.caption}</p>
           </div>
         </div>

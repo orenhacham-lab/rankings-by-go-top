@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react'
 import { ImageOff } from 'lucide-react'
-import { styleArticleHtml } from '@/lib/content/article-style/html'
+import type { ArticleCta } from '@/lib/content/article-style/cta'
+import { designForSite } from '@/lib/content/article-style/render'
 import { effectiveDesign, type ArticleStyle, type DesignPlatform } from '@/lib/content/article-style/types'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
@@ -35,12 +36,20 @@ export function sampleCopy(p: Copy['preview'], subject?: PreviewSubject | null):
   return {
     ...p,
     title: put(n.title), lead: put(n.lead), intro: n.intro, h1: n.h1, p1: n.p1, h2: n.h2, p2: n.p2,
-    th1: n.th1, th2: n.th2, r1a: n.r1a, r1b: n.r1b, r2a: n.r2a, r2b: n.r2b, h3: n.h3, p3: n.p3,
+    th1: n.th1, th2: n.th2, r1a: n.r1a, r1b: n.r1b, r2a: n.r2a, r2b: n.r2b, h3: n.h3,
+    // The business is named in the text itself (the sample no longer closes on a linked call to action).
+    p3: business ? put(n.p3Business) : n.p3,
     cta: business ? put(n.cta) : n.ctaGeneric, faqQ: put(n.faqQ), faqA: n.faqA,
   }
 }
 
-/** A short sample article in the dashboard's language, shaped the way the generator writes one. */
+/**
+ * A short sample article in the dashboard's language, shaped the way the generator writes one.
+ * It ends without a link, like a generated article: the sample used to close on "want help?
+ * talk to us" with a link, which the design turns into a call-to-action box, so the preview
+ * showed a box that published articles did not have (wave 8). The box now comes only from
+ * the project's own call to action, drawn the same way here and on the site.
+ */
 export function sampleArticleHtml(p: SampleWords): string {
   return [
     `<p><strong>${esc(p.lead)}</strong></p>`,
@@ -50,7 +59,6 @@ export function sampleArticleHtml(p: SampleWords): string {
     `<table><thead><tr><th>${esc(p.th1)}</th><th>${esc(p.th2)}</th></tr></thead><tbody>`,
     `<tr><td>${esc(p.r1a)}</td><td>${esc(p.r1b)}</td></tr><tr><td>${esc(p.r2a)}</td><td>${esc(p.r2b)}</td></tr></tbody></table>`,
     `<h2 id="pv-s3">${esc(p.h3)}</h2><p>${esc(p.p3)}</p>`,
-    `<p>${esc(p.cta)} <a href="https://example.com/contact">${esc(p.ctaLink)}</a></p>`,
     `<h2 id="faq">${esc(p.faqTitle)}</h2><h3 id="faq-q-1">${esc(p.faqQ)}</h3><p>${esc(p.faqA)}</p>`,
   ].join('')
 }
@@ -58,7 +66,7 @@ export function sampleArticleHtml(p: SampleWords): string {
 /**
  * The live preview beside the card's choices: a sample article drawn by the
  * same function that styles real articles on their way to the site
- * (styleArticleHtml), inside a neutral "site" frame, with the chosen image
+ * (designForSite, lib/content/article-style/render.ts), inside a neutral "site" frame, with the chosen image
  * style in the hero and the inline-image slots. What the owner sees here is
  * what the formatted design produces, not a mock-up of it.
  */
@@ -69,19 +77,23 @@ export default function ArticleStylePreview({
   t,
   locale,
   subject,
+  cta,
 }: {
   style: ArticleStyle
+  /** The call to action as the owner is editing it; drawn only when it is on and complete. */
+  cta?: ArticleCta | null
   platform: DesignPlatform
   domain: string | null
   t: Copy
   locale: Locale
   subject?: PreviewSubject | null
 }) {
+  const language = locale === 'he' ? 'he' : 'en'
   const design = effectiveDesign(style, platform)
   const words = useMemo(() => sampleCopy(t.preview, subject), [t.preview, subject])
   const html = useMemo(
-    () => styleArticleHtml(sampleArticleHtml(words), { design, colors: style.brandColors, language: locale === 'he' ? 'he' : 'en' }),
-    [words, design, style.brandColors, locale],
+    () => designForSite(sampleArticleHtml(words), { style, cta, platform, language }),
+    [words, style, cta, platform, language],
   )
 
   // The inline images sit after the first paragraph of a section, like the real composer.

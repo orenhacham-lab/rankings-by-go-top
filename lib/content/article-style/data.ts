@@ -20,7 +20,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sampleSiteColors, type SampledColor } from './colors'
 import { cleanProfiles, detectProfilesFromHtml, parseProfilesInput, type OfficialProfiles, type ProfileNetwork } from './profiles'
-import { ARTICLE_STYLE_COLUMNS, ARTICLE_STYLE_TABLE, isMissingRelation } from './store'
+import { ARTICLE_CTA_COLUMN, ARTICLE_STYLE_COLUMNS, ARTICLE_STYLE_TABLE, isMissingRelation, readProjectArticleCta } from './store'
+import { DEFAULT_ARTICLE_CTA, parseArticleCtaInput, toCtaRow, type ArticleCta, type CtaField } from './cta'
 import {
   DEFAULT_ARTICLE_STYLE,
   parseArticleStyleInput,
@@ -50,11 +51,17 @@ export type ArticleStyleView = {
   domain: string | null
   /** The business's official profiles (structured-data sameAs). */
   profiles: OfficialProfiles
+  /** The project's call to action at the end of its articles (off until the owner turns it on). */
+  cta: ArticleCta
+  /** True once the owner saved a call to action (on or off); until then the card offers a suggestion. */
+  ctaSaved: boolean
+  /** False while its column does not exist yet (the migration is not applied): the section is read-only. */
+  ctaEditable: boolean
 }
 
 export type ArticleStyleErrorCode = 'unauthorized' | 'not_found' | 'invalid_request' | 'unavailable' | 'save_failed'
 export type LoadStyleResult = { ok: true; data: ArticleStyleView } | { ok: false; code: ArticleStyleErrorCode }
-export type SaveStyleResult = LoadStyleResult
+export type SaveStyleResult = LoadStyleResult | { ok: false; code: 'invalid_cta'; invalid: CtaField[] }
 export type SaveProfilesResult = LoadStyleResult | { ok: false; code: 'invalid_profiles'; invalid: ProfileNetwork[] }
 /** What the home page says about the business: its colours and the profiles it links to. */
 export type SiteSignalsResult =
@@ -102,15 +109,31 @@ async function readView(deps: ArticleStyleDeps, o: Extract<Owner, { ok: true }>)
     .eq('user_id', o.userId)
     .maybeSingle()
   const platform = await platformOf(deps, o.projectId)
+  const off = { cta: { ...DEFAULT_ARTICLE_CTA }, ctaSaved: false, ctaEditable: false }
   if (error) {
     if (!isMissingRelation(error)) return { ok: false, code: 'unavailable' }
-    return { ok: true, data: { style: { ...DEFAULT_ARTICLE_STYLE, brandColors: [] }, editable: false, saved: false, platform, domain: o.domain, profiles: {} } }
+    return { ok: true, data: { style: { ...DEFAULT_ARTICLE_STYLE, brandColors: [] }, editable: false, saved: false, platform, domain: o.domain, profiles: {}, ...off } }
   }
   const row = data as Record<string, unknown> | null
   const saved = !!row && row.project_id === o.projectId && row.user_id === o.userId
+  // Read on its own, so a missing column never takes the design settings down with it.
+  const ctaRead = saved ? await readProjectArticleCta(o.db, o.projectId, o.userId) : null
+  const cta = ctaRead
+    ? { cta: ctaRead.cta, ctaSaved: ctaRead.state === 'saved', ctaEditable: ctaRead.state === 'saved' || ctaRead.state === 'default' }
+    : { cta: { ...DEFAULT_ARTICLE_CTA }, ctaSaved: false, ctaEditable: await ctaColumnExists(o) }
   return {
     ok: true,
-    data: { style: toArticleStyle(saved ? row : null), editable: true, saved, platform, domain: o.domain, profiles: cleanProfiles(saved ? row?.official_profiles : null) },
+    data: { style: toArticleStyle(saved ? row : null), editable: true, saved, platform, domain: o.domain, profiles: cleanProfiles(saved ? row?.official_profiles : null), ...cta },
+  }
+}
+
+/** With no row yet, whether the call-to-action column exists (the owner's own RLS read; no row is fine). */
+async function ctaColumnExists(o: Extract<Owner, { ok: true }>): Promise<boolean> {
+  try {
+    const { error } = await o.db.from(ARTICLE_STYLE_TABLE).select(`project_id, ${ARTICLE_CTA_COLUMN}`).eq('project_id', o.projectId).eq('user_id', o.userId).limit(1)
+    return !error
+  } catch {
+    return false
   }
 }
 
@@ -125,9 +148,22 @@ export async function saveArticleStyle(deps: ArticleStyleDeps, projectId: unknow
   if (!o.ok) return o
   const style = parseArticleStyleInput(input)
   if (!style) return { ok: false, code: 'invalid_request' }
+  // The call to action rides along only when the card sends it (its column exists); one upsert, so
+  // the design and the call to action are saved together or not at all.
+  const rawCta = (input as { cta?: unknown }).cta
+  let ctaRow: Record<string, unknown> | null = null
+  if (rawCta !== undefined) {
+    const parsed = parseArticleCtaInput(rawCta)
+    if (!parsed.ok) return parsed.invalid.length ? { ok: false, code: 'invalid_cta', invalid: parsed.invalid } : { ok: false, code: 'invalid_request' }
+    ctaRow = toCtaRow(parsed.cta)
+  }
   const { error } = await o.db
     .from(ARTICLE_STYLE_TABLE)
-    .upsert({ project_id: o.projectId, user_id: o.userId, ...toRow(style), updated_at: new Date().toISOString() }, { onConflict: 'project_id' })
+    .upsert({
+      project_id: o.projectId, user_id: o.userId, ...toRow(style),
+      ...(ctaRow ? { [ARTICLE_CTA_COLUMN]: ctaRow } : {}),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'project_id' })
   if (error) return { ok: false, code: isMissingRelation(error) ? 'unavailable' : 'save_failed' }
   return readView(deps, o)
 }
