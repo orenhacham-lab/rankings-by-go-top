@@ -12,6 +12,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_ARTICLE_STYLE, toArticleStyle, type ArticleStyle } from './types'
+import { DEFAULT_ARTICLE_CTA, toArticleCta, type ArticleCta } from './cta'
 import { sameAsList } from './profiles'
 
 export const ARTICLE_STYLE_TABLE = 'project_article_styles'
@@ -45,6 +46,35 @@ export async function readProjectArticleStyle(db: SupabaseClient, projectId: str
   }
 }
 
+/**
+ * The column that holds the project's call to action
+ * (supabase/migrations/20260929120000_project_article_cta.sql). Read on its
+ * own, never inside ARTICLE_STYLE_COLUMNS: until that migration is applied the
+ * column does not exist, and the design settings must go on reading as before.
+ */
+export const ARTICLE_CTA_COLUMN = 'article_cta'
+
+export type CtaRead = { state: 'saved' | 'default' | 'missing_column' | 'error'; cta: ArticleCta }
+
+/** The project's call to action, read for its owner. Off on any failure (today's behaviour). */
+export async function readProjectArticleCta(db: SupabaseClient, projectId: string, ownerId: string): Promise<CtaRead> {
+  const off = (): ArticleCta => ({ ...DEFAULT_ARTICLE_CTA })
+  try {
+    const { data, error } = await db
+      .from(ARTICLE_STYLE_TABLE)
+      .select(`project_id, user_id, ${ARTICLE_CTA_COLUMN}`)
+      .eq('project_id', projectId)
+      .eq('user_id', ownerId)
+      .maybeSingle()
+    if (error) return { state: isMissingRelation(error) ? 'missing_column' : 'error', cta: off() }
+    const row = data as Record<string, unknown> | null
+    if (!row || row.project_id !== projectId || row.user_id !== ownerId || !row[ARTICLE_CTA_COLUMN]) return { state: 'default', cta: off() }
+    return { state: 'saved', cta: toArticleCta(row[ARTICLE_CTA_COLUMN]) }
+  } catch {
+    return { state: 'error', cta: off() }
+  }
+}
+
 /** The style of the project an article belongs to: the article names the project, the project names its owner. */
 export async function readArticleStyleForArticle(admin: SupabaseClient, articleId: string): Promise<StyleRead & { projectId: string | null }> {
   try {
@@ -58,6 +88,14 @@ export async function readArticleStyleForArticle(admin: SupabaseClient, articleI
   } catch {
     return { state: 'error', style: defaults(), projectId: null }
   }
+}
+
+/** The call to action of the project an article belongs to (its owner's row). Off on any failure. */
+export async function readArticleCtaForArticle(admin: SupabaseClient, projectId: string | null): Promise<ArticleCta> {
+  if (!projectId) return { ...DEFAULT_ARTICLE_CTA }
+  const owner = await projectOwner(admin, projectId)
+  if (!owner) return { ...DEFAULT_ARTICLE_CTA }
+  return (await readProjectArticleCta(admin, projectId, owner)).cta
 }
 
 export async function projectOwner(admin: SupabaseClient, projectId: string): Promise<string | null> {

@@ -33,6 +33,7 @@ import sanitizeHtml from 'sanitize-html'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import { articlePalette, mix, type ArticlePalette } from './colors'
 import { ARTICLE_STYLE_LABELS, articleLanguage, type ArticleLanguage } from './labels'
+import { isCompleteCta, type ArticleCta } from './cta'
 import type { ArticleDesign } from './types'
 
 const HEX = /^#[0-9a-f]{6}$/
@@ -79,6 +80,7 @@ type Role =
   | 'takeaways' | 'takeaways-label' | 'takeaways-list' | 'takeaway'
   | 'faq' | 'faq-title' | 'faq-item' | 'faq-q' | 'faq-a'
   | 'cta' | 'cta-text' | 'cta-link'
+  | 'pcta' | 'pcta-title' | 'pcta-text' | 'pcta-action' | 'pcta-button'
   | 'table-wrap'
 
 const stripTags = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
@@ -122,9 +124,31 @@ export function keyTakeaways(html: string): string[] {
 }
 
 const tag = (name: string, role: Role, inner: string) => `<${name} data-as="${role}">${inner}</${name}>`
+const escAttr = (s: string) => escText(s).replace(/"/g, '&quot;')
+
+/**
+ * The project's call to action (./cta.ts) as bare structure: a heading, the
+ * optional line of text and one button. Every text is escaped here; the link
+ * is the validated https address, escaped as an attribute. The formatted
+ * design styles it by role; the minimal design keeps it plain (the site's own
+ * styles apply), so the markers are dropped there.
+ */
+function ctaBlock(cta: ArticleCta): string {
+  return tag('div', 'pcta',
+    tag('p', 'pcta-title', `<strong>${escText(cta.heading)}</strong>`) +
+    (cta.text ? tag('p', 'pcta-text', escText(cta.text)) : '') +
+    tag('p', 'pcta-action', `<a data-as="pcta-button" href="${escAttr(cta.buttonUrl)}">${escText(cta.buttonLabel)}</a>`))
+}
+
+/** Where the call to action goes: right before the FAQ block, or at the end of the body. */
+function withCta(body: string, cta: ArticleCta): string {
+  const at = faqStart(body)
+  const block = ctaBlock(cta)
+  return at >= 0 ? body.slice(0, at) + block + body.slice(at) : body + block
+}
 
 /** The boxes, as bare structure marked with data-as; styling comes after. */
-function structure(html: string, lang: ArticleLanguage): string {
+function structure(html: string, lang: ArticleLanguage, cta: ArticleCta | null): string {
   const labels = ARTICLE_STYLE_LABELS[lang]
   const takeaways = keyTakeaways(html)
   let body = html
@@ -145,11 +169,16 @@ function structure(html: string, lang: ArticleLanguage): string {
     body = body.slice(0, faqAt) + '\u0000FAQ\u0000' + body.slice(end)
   }
 
-  // The closing call to action: the body's last paragraph, when it links somewhere.
+  // The project's own call to action takes the FAQ's place in the flow (right before it).
+  if (cta) body = body.replace('\u0000FAQ\u0000', ctaBlock(cta) + '\u0000FAQ\u0000')
+  if (cta && !body.includes('\u0000FAQ\u0000')) body += ctaBlock(cta)
+
+  // The closing call to action: the body's last paragraph, when it links somewhere
+  // (only while the project has no call to action of its own: never two).
   const beforeFaq = body.indexOf('\u0000FAQ\u0000') >= 0 ? body.slice(0, body.indexOf('\u0000FAQ\u0000')) : body
   const paras = [...beforeFaq.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p>/gi)]
   const last = paras[paras.length - 1]
-  if (last && last.index !== undefined && paras.length > 1 && !/article-table-title/.test(last[1] ?? '') && /<a\b[^>]*href=/i.test(last[2] ?? '')) {
+  if (!cta && last && last.index !== undefined && paras.length > 1 && !/article-table-title/.test(last[1] ?? '') && /<a\b[^>]*href=/i.test(last[2] ?? '')) {
     const trailing = beforeFaq.slice(last.index + last[0].length)
     if (!/<(?:p|h2|h3|ul|ol|table|figure)\b/i.test(trailing)) {
       const inner = (last[2] ?? '').replace(/<a\b/gi, '<a data-as="cta-link"')
@@ -196,6 +225,11 @@ function stylesFor(p: ArticlePalette, lang: ArticleLanguage) {
     'cta-text': `margin:0;font-size:17px;line-height:1.6;font-weight:600;color:${p.brandInk}`,
     'cta-link': `color:${p.brandInk};font-weight:700;text-decoration:underline`,
     'table-wrap': `margin:24px 0;overflow:auto;border:1px solid ${p.line};border-radius:12px`,
+    'pcta': `margin:40px 0;padding:24px 26px;background-color:${p.brand};border-radius:16px;text-align:${start}`,
+    'pcta-title': `margin:0 0 6px;font-size:20px;line-height:1.3;font-weight:700;color:${p.brandInk}`,
+    'pcta-text': `margin:0 0 16px;font-size:17px;line-height:1.6;color:${p.brandInk}`,
+    'pcta-action': 'margin:0',
+    'pcta-button': `padding:10px 20px;background-color:${p.brandInk};color:${p.brand};border-radius:10px;font-weight:700;text-decoration:underline`,
   }
   const byTag: Record<string, string> = {
     h2: `margin:36px 0 14px;padding:0;padding-${start}:12px;border:0;border-${start}:4px solid ${p.brand};line-height:1.3;color:${p.ink}`,
@@ -259,7 +293,12 @@ export type ArticleDesignOptions = {
   colors: readonly string[]
   /** The article's language; read off the text when not given. */
   language?: ArticleLanguage
+  /** The project's own call to action (./cta.ts), when it is on; drawn in both designs. */
+  cta?: ArticleCta | null
 }
+
+/** The minimal design's plain call to action: the same structure, no role markers, no style. */
+const plainCta = (html: string) => html.replace(/ data-as="[a-z-]+"/g, '')
 
 /**
  * The article body in the chosen design. `minimal` is the sanitized body as it
@@ -269,8 +308,10 @@ export type ArticleDesignOptions = {
  */
 export function styleArticleHtml(html: string, opts: ArticleDesignOptions): string {
   const base = sanitizeArticleHtml(String(html ?? ''))
-  if (opts.design !== 'formatted' || !base) return base
+  const cta = isCompleteCta(opts.cta) ? opts.cta : null
+  if (!base) return base
+  if (opts.design !== 'formatted') return cta ? sanitizeArticleHtml(plainCta(withCta(base, cta))) : base
   const lang = opts.language ?? articleLanguage(base)
   const palette = articlePalette(opts.colors)
-  return sanitizeHtml(structure(base, lang), designSanitizerOptions(palette, lang)).trim()
+  return sanitizeHtml(structure(base, lang, cta), designSanitizerOptions(palette, lang)).trim()
 }
