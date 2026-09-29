@@ -14,8 +14,8 @@
  *      hero's buttons; from md the notice is a corner card (WhatsApp steps
  *      aside), and from 1400px it sits in the top end margin beside the centred
  *      hero instead of over its product frame (final review R27).
- *   E) the landing's five-reason grid leaves no card alone on a row: the first
- *      is a wide lead card, so the rows fill at two and three columns (R27).
+ *   E) the landing's feature rows alternate text and picture (wave 7; the old
+ *      five-reason grid's rule moved to landing-page.qa.ts, group C).
  * Each group ends with a MUTATION CONTROL: the same check run on a deliberately
  * broken copy of the source must fail.
  *
@@ -187,33 +187,21 @@ function main() {
     check('MUTATION CONTROL: the long desktop sentence in the phone sheet is caught', !shortOk('אנו משתמשים בעוגיות כדי לשפר את חוויית הגלישה. המשך השימוש באתר מהווה הסכמה לשימוש בהן בהתאם ל', short('en')))
   }
 
-  console.log('\nE) the five-reason grid leaves no card alone on a row')
-  /** Fills a CSS grid row by row (spans capped at the column count); true when the last row is full. */
-  const lastRowFull = (spans: number[], cols: number) => {
-    let used = 0
-    for (const span of spans) { const sp = Math.min(span, cols); if (used + sp > cols) used = 0; used += sp }
-    return used === cols
-  }
-  const whyOk = (landing: string, count: number) => {
-    const s = strip(landing)
-    const grid = /<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3" data-why-grid>/.test(s)
-    const lead = /className=\{i === 0 \? 'h-full sm:col-span-2' : 'h-full'\}/.test(s)
-    const spans = Array.from({ length: count }, (_, i) => (i === 0 && lead ? 2 : 1))
-    return grid && lastRowFull(spans, 2) && lastRowFull(spans, 3)
+  console.log('\nE) the landing page\'s feature rows alternate their picture side (wave 7)')
+  // The old five-reason grid is gone; its "no card alone on a row" rule now
+  // guards the outcomes bento in landing-page.qa.ts (group C).
+  const alternates = (src: string) => {
+    const s = strip(src)
+    return /<Rise className=\{cn\(i % 2 === 1 && 'lg:order-2'\)\}>/.test(s) && /<Rise delay=\{120\} className=\{cn\(i % 2 === 1 && 'lg:order-1'\)\}>\{visual\}<\/Rise>/.test(s)
+      && /grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14/.test(s)
   }
   {
     const landing = read('components/public/LandingPage.tsx')
-    const count = (page: string) => {
-      const why = strip(read(page)).split(/\n  why: \{/)[1]?.split(/\n  pricing: \{/)[0] ?? ''
-      return (why.match(/\{ title: /g) ?? []).length
-    }
-    const he = count('app/page.tsx'), en = count('app/(public)/en/page.tsx')
-    check(`E1: ${he} (he) and ${en} (en) reasons fill every row at two and three columns`, he === en && he > 0 && whyOk(landing, he))
-    check('MUTATION CONTROL: the old even grid (3 + 2) is caught', !whyOk(landing.replace("className={i === 0 ? 'h-full sm:col-span-2' : 'h-full'}", "className={i === 0 ? 'h-full' : 'h-full'}"), he))
-    check('MUTATION CONTROL: a sixth reason with the lead card left in is caught', !whyOk(landing, he + 1))
+    check('E1: text and picture swap sides on every other feature row (from lg), stacked on a phone', alternates(landing))
+    check('MUTATION CONTROL: rows that all put the picture on the same side are caught', !alternates(landing.replace("className={cn(i % 2 === 1 && 'lg:order-2')}", 'className=""')))
     const noRail = (src: string) => !/border-s-\[?\d/.test(strip(src))
     check('E2: no start rail bends round a landing card', noRail(landing))
-    check('MUTATION CONTROL: the old rail on the "with Go Top" card is caught', !noRail(landing.replace('rounded-card border border-line bg-surface p-6 shadow-card sm:p-8', 'rounded-card border border-line border-s-[3px] border-s-action bg-surface p-6 shadow-card sm:p-8')))
+    check('MUTATION CONTROL: a rail on the "with Go Top" card is caught', !noRail(landing.replace('rounded-card border border-line bg-surface p-5 shadow-pop sm:p-6', 'rounded-card border border-line border-s-[3px] border-s-action bg-surface p-5 shadow-pop sm:p-6')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

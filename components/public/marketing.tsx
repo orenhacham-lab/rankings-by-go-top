@@ -25,7 +25,7 @@
  */
 import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
-import { Check, ChevronDown, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export const CONTAINER = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8'
@@ -48,7 +48,7 @@ export function buttonClasses(variant: ButtonVariant = 'primary', size: ButtonSi
 }
 
 export function ButtonLink({
-  href, variant = 'primary', size = 'md', className, children, onClick,
+  href, variant = 'primary', size = 'md', className, children, onClick, arrow = false,
 }: {
   href: string
   variant?: ButtonVariant
@@ -56,11 +56,26 @@ export function ButtonLink({
   className?: string
   children: React.ReactNode
   onClick?: () => void
+  /**
+   * A forward arrow that nudges ahead on hover and a press on click: the
+   * call-to-action micro-interaction. Transform only, never looping. (The
+   * landing page adds its light sweep through `className`.)
+   */
+  arrow?: boolean
 }) {
-  const cls = buttonClasses(variant, size, className)
+  const cls = buttonClasses(variant, size, cn(arrow && 'group active:translate-y-px', className))
+  const content = arrow ? (
+    <>
+      {children}
+      <ArrowRight
+        className="size-4 transition-transform duration-150 ease-snappy rtl:-scale-x-100 group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5"
+        aria-hidden="true"
+      />
+    </>
+  ) : children
   // mailto:/tel: are not routes; next/link would try to prefetch them.
-  if (/^(mailto|tel):/.test(href)) return <a href={href} className={cls} onClick={onClick}>{children}</a>
-  return <Link href={href} className={cls} onClick={onClick}>{children}</Link>
+  if (/^(mailto|tel):/.test(href)) return <a href={href} className={cls} onClick={onClick}>{content}</a>
+  return <Link href={href} className={cls} onClick={onClick}>{content}</Link>
 }
 
 export function IconSquircle({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
