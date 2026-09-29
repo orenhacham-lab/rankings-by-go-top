@@ -4003,6 +4003,7 @@ export const dashboardEn = {
         },
         keep: 'The previous value is kept, and you can undo the fix from the fix queue.',
         keepSent: 'The previous value is sent with the change, so it can be restored.',
+        keepManual: 'Your site does not change. The fix stays in the queue, and you can cancel it there at any time.',
         record: 'Your approval is recorded: who approved, when, and from which IP address.',
         button: 'Approve fix',
         cancel: 'Cancel',

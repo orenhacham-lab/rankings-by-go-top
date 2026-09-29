@@ -222,7 +222,7 @@ export default function ApproveFixModal({
         <ul className="mt-3 space-y-1.5 text-caption text-muted" role="list">
           <li className="flex gap-2">
             <Undo2 size={14} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 rtl:-scale-x-100" />
-            {phase.channel === 'webhook' ? t.keepSent : t.keep}
+            {phase.channel === 'webhook' ? t.keepSent : phase.channel === 'plugin' || phase.channel === 'app_password' ? t.keep : t.keepManual}
           </li>
           <li className="flex gap-2">
             <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0" />
