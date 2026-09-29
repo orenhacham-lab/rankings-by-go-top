@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { THUMB_CLASSES, useSlidingThumb } from '@/components/ui/motion'
 
 export type NavSection = { id: string; label: string }
 
@@ -18,6 +19,8 @@ function reducedMotion(): boolean {
 export default function SectionNav({ sections, label }: { sections: readonly NavSection[]; label: string }) {
   const [active, setActive] = useState<string | null>(sections[0]?.id ?? null)
   const ids = sections.map((s) => s.id).join(' ')
+  // The marked section's fill is one pill sliding along the bar (components/ui/motion.tsx).
+  const { containerRef, thumbRef } = useSlidingThumb<HTMLUListElement>('a[aria-current="true"]', [active, ids])
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return
@@ -44,7 +47,8 @@ export default function SectionNav({ sections, label }: { sections: readonly Nav
 
   return (
     <nav aria-label={label} data-research-nav="" className="sticky top-2 z-20 mb-6 flex justify-center">
-      <ul className="flex max-w-full gap-1 overflow-x-auto rounded-pill border border-line bg-surface/95 p-1 shadow-card backdrop-blur [scrollbar-width:none]">
+      <ul ref={containerRef} className="group/thumb relative flex max-w-full gap-1 overflow-x-auto rounded-pill border border-line bg-surface/90 p-1 shadow-card backdrop-blur-md backdrop-saturate-150 [scrollbar-width:none]">
+        <li aria-hidden="true" className="contents"><span ref={thumbRef} className={cn(THUMB_CLASSES, 'rounded-pill bg-action shadow-glow')} /></li>
         {sections.map((s) => {
           const on = s.id === active
           return (
@@ -54,8 +58,8 @@ export default function SectionNav({ sections, label }: { sections: readonly Nav
                 aria-current={on ? 'true' : undefined}
                 onClick={(e) => { e.preventDefault(); go(s.id) }}
                 className={cn(
-                  'inline-flex h-8 items-center rounded-pill px-3.5 text-caption font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
-                  on ? 'bg-ink text-canvas' : 'text-muted hover:bg-sunk hover:text-ink',
+                  'relative inline-flex h-8 items-center rounded-pill px-3.5 text-caption font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action',
+                  on ? 'bg-action text-action-ink group-data-[thumb=on]/thumb:bg-transparent' : 'text-muted hover:bg-sunk hover:text-ink',
                 )}
               >
                 {s.label}

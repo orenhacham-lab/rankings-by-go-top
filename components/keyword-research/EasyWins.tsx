@@ -60,7 +60,7 @@ export default function EasyWins({
               <span>{t.potential}</span>
               <span />
             </div>
-            <ol className="divide-y divide-line">
+            <ol className="stagger-in divide-y divide-line">
               {wins.map(({ row, win }, i) => {
                 const key = keywordKey(row.keyword)
                 const why = t.why({
@@ -70,12 +70,12 @@ export default function EasyWins({
                   cpcHigh: win.cpcAboveAverage,
                 })
                 return (
-                  <li key={key} data-easy-win={row.keyword} className={cn('group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-sunk/40 sm:px-6', GRID)}>
+                  <li key={key} data-easy-win={row.keyword} className={cn('group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3.5 transition-colors duration-150 ease-snappy hover:bg-action-soft/40 sm:px-6', GRID)}>
                     <div className="flex min-w-0 items-start gap-3 @3xl:items-center">
                       <span
                         className={cn(
                           'grid size-6 shrink-0 place-items-center rounded-pill text-caption font-bold tabular-nums',
-                          i < 3 ? 'bg-action-soft text-action' : 'bg-sunk text-muted',
+                          i === 0 ? 'bg-action text-action-ink shadow-control' : i < 3 ? 'bg-action-soft text-action ring-1 ring-inset ring-action/20' : 'bg-sunk text-muted',
                         )}
                         aria-hidden="true"
                       >
@@ -101,7 +101,7 @@ export default function EasyWins({
                     </span>
                     <span className="col-span-2 flex items-center gap-2 ps-9 @3xl:col-span-1 @3xl:ps-0" role="img" aria-label={t.potentialOf(String(win.score))}>
                       <span className="h-2 w-24 overflow-hidden rounded-pill bg-sunk @3xl:w-full">
-                        <span className="block h-full rounded-pill bg-action" style={{ width: `${win.score}%` }} />
+                        <span className="grow-x block h-full rounded-pill bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-action)_55%,transparent),var(--color-action))] rtl:bg-[linear-gradient(270deg,color-mix(in_srgb,var(--color-action)_55%,transparent),var(--color-action))]" style={{ width: `${win.score}%`, '--grow-delay': `${200 + i * 60}ms` } as React.CSSProperties} />
                       </span>
                       <span className="w-7 shrink-0 text-copy font-bold text-ink tabular-nums">{win.score}</span>
                     </span>

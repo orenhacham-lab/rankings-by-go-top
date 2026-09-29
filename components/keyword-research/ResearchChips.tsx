@@ -10,7 +10,8 @@
  * nothing; with Search Console switched off on the server it is not there at all.
  */
 import { cn } from '@/lib/utils'
-import { SEGMENTED_ITEM_CLASSES, SEGMENTED_TRACK_CLASSES } from '@/components/ui/Segmented'
+import { SEGMENTED_ITEM_CLASSES, SEGMENTED_THUMB_CLASSES, SEGMENTED_TRACK_CLASSES } from '@/components/ui/Segmented'
+import { useSlidingThumb } from '@/components/ui/motion'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCount } from '@/components/gsc/format'
@@ -29,6 +30,7 @@ export default function ResearchChips({
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan.chips
   const chips = RESEARCH_CHIPS.filter((c) => c !== 'google' || google !== 'hidden')
+  const { containerRef, thumbRef } = useSlidingThumb('[aria-checked="true"]', [active, chips.length])
   // The one segmented control's look (design contract §5: a sunk pill, the chosen
   // item lifted onto the surface, never the black "all" chip), drawn here so each
   // item keeps its data-chip and its count; a radiogroup, one tab stop, arrow keys.
@@ -44,7 +46,8 @@ export default function ResearchChips({
   }
   return (
     <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-1">
-      <div role="radiogroup" aria-label={t.label} data-research-chips="" className={cn(SEGMENTED_TRACK_CLASSES, 'flex-nowrap md:flex-wrap md:rounded-card')}>
+      <div ref={containerRef} role="radiogroup" aria-label={t.label} data-research-chips="" className={cn(SEGMENTED_TRACK_CLASSES, 'flex-nowrap md:flex-wrap md:rounded-card')}>
+        <span ref={thumbRef} aria-hidden="true" className={SEGMENTED_THUMB_CLASSES} />
         {chips.map((chip, i) => {
           const on = chip === active
           const loading = chip === 'google' && google === 'loading'

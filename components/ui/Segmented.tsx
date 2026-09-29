@@ -3,6 +3,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { THUMB_CLASSES, useSlidingThumb } from './motion'
 
 /**
  * The one segmented control (design contract §5): a sunk pill holding a few
@@ -33,13 +34,17 @@ export interface SegmentedProps<T extends string> {
   fill?: boolean
 }
 
-export const SEGMENTED_TRACK_CLASSES = 'inline-flex items-center gap-0.5 rounded-pill bg-sunk p-1'
+export const SEGMENTED_TRACK_CLASSES = 'group/thumb relative inline-flex items-center gap-0.5 rounded-pill bg-sunk p-1 ring-1 ring-inset ring-line/60'
 export const SEGMENTED_ITEM_CLASSES =
-  'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill px-3 text-caption font-semibold text-muted ' +
-  'transition-[background-color,color,box-shadow] duration-150 ease-snappy hover:text-ink ' +
+  'relative inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill px-3 text-caption font-semibold text-muted ' +
+  'transition-[background-color,color,box-shadow] duration-200 ease-snappy hover:text-ink ' +
   'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
-  'aria-checked:bg-surface aria-checked:text-ink aria-checked:shadow-control'
+  'aria-checked:bg-surface aria-checked:text-ink aria-checked:shadow-control ' +
+  // Once the sliding thumb has placed itself, it draws the chosen item's fill.
+  'group-data-[thumb=on]/thumb:aria-checked:bg-transparent group-data-[thumb=on]/thumb:aria-checked:shadow-none'
+/** The chosen item's fill, one element sliding between items (components/ui/motion.tsx). */
+export const SEGMENTED_THUMB_CLASSES = `${THUMB_CLASSES} rounded-pill bg-surface shadow-control ring-1 ring-line/70`
 
 export default function Segmented<T extends string>({ options, value, onChange, ariaLabel, className, fill }: SegmentedProps<T>) {
   const refs = useRef<(HTMLButtonElement | null)[]>([])
@@ -47,6 +52,7 @@ export default function Segmented<T extends string>({ options, value, onChange, 
   // One tab stop: the chosen item, or the first enabled one when none is chosen.
   const chosen = options.findIndex((o) => o.value === value)
   const tabStop = chosen >= 0 ? chosen : enabled[0]
+  const { containerRef, thumbRef } = useSlidingThumb('[aria-checked="true"]', [value, options.length])
 
   function move(e: KeyboardEvent<HTMLButtonElement>, from: number) {
     const rtl = getComputedStyle(e.currentTarget).direction === 'rtl'
@@ -65,7 +71,8 @@ export default function Segmented<T extends string>({ options, value, onChange, 
   }
 
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className={cn(SEGMENTED_TRACK_CLASSES, fill && 'flex w-full', className)}>
+    <div ref={containerRef} role="radiogroup" aria-label={ariaLabel} className={cn(SEGMENTED_TRACK_CLASSES, fill && 'flex w-full', className)}>
+      <span ref={thumbRef} aria-hidden="true" className={SEGMENTED_THUMB_CLASSES} />
       {options.map((o, i) => {
         const on = o.value === value
         const Icon = o.icon

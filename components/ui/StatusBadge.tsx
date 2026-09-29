@@ -1,5 +1,6 @@
 'use client'
 
+import { MapPin, Search } from 'lucide-react'
 import Badge from './Badge'
 import ChangeArrow, { ChangeSign } from './ChangeArrow'
 import { cn } from '@/lib/utils'
@@ -70,6 +71,30 @@ export function PositionChange({ change }: { change: number | null }) {
       <ChangeArrow direction={direction} />
       <ChangeSign direction={direction} />
       {direction === 'flat' ? <span className="sr-only">0</span> : Math.abs(change)}
+    </span>
+  )
+}
+
+/**
+ * The engine as a quiet line (an icon and its words), for a table where every row
+ * has one: a coloured badge on each row was noise that competed with the positions.
+ */
+export function EngineLabel({ engine, device }: { engine: string; device?: string | null }) {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const maps = engine === 'google_maps'
+  const label = maps
+    ? dict.common.engineGoogleMaps
+    : engine === 'google_search'
+      ? (device === 'mobile' ? dict.common.searchTypeGoogleMobile : dict.common.searchTypeGoogleDesktop)
+      : engine
+  const Icon = maps ? MapPin : Search
+  return (
+    <span data-engine={engine} className="inline-flex items-center gap-1.5 text-caption text-muted">
+      <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-control bg-sunk text-body ring-1 ring-inset ring-line">
+        <Icon className="size-3.5" strokeWidth={2} />
+      </span>
+      {label}
     </span>
   )
 }

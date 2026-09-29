@@ -151,6 +151,15 @@
   --shadow-card: 0 1px 2px rgba(28, 25, 18, 0.04), 0 4px 14px -8px rgba(28, 25, 18, 0.08);
   --shadow-control: 0 1px 1px rgba(28, 25, 18, 0.05);
   --shadow-pop: 0 18px 44px -14px rgba(22, 20, 15, 0.28), 0 2px 6px rgba(22, 20, 15, 0.06);
+  /* `lift` is a card answering the pointer: a softer, longer shadow than pop. */
+  --shadow-lift: 0 14px 32px -16px rgba(22, 20, 15, 0.22), 0 2px 6px rgba(22, 20, 15, 0.05);
+  /* `glow` is the one lit thing on a screen (the active tab, the hero's primary):
+     a soft halo of the brand blue under it. `edge-ltr` / `edge-rtl` is the 3px
+     action bar on a row's start edge (hover, selected); the start is the left in
+     English and the right in Hebrew, so each direction names its own. */
+  --shadow-glow: 0 10px 24px -10px color-mix(in srgb, var(--color-brand) 85%, transparent);
+  --shadow-edge-ltr: inset 3px 0 0 var(--color-action);
+  --shadow-edge-rtl: inset -3px 0 0 var(--color-action);
 
   /* Type rhythm. Each step has its own line height, and nothing sits between them:
        display  — the one big number of a context card
@@ -180,21 +189,35 @@
   --text-overline: 0.6875rem;
   --text-overline--line-height: 1rem;
 
-  /* Motion — short, and out of the way: an ease that arrives quickly and settles.
-     The whole budget (UX review, decision 4), and nothing else moves:
-       tab content enters   180ms, 30ms apart for the first four blocks
-       a KPI counts up      600ms, once, when first on screen (never on a refetch)
+  /* Motion — alive, and out of the way: an ease that arrives quickly and settles.
+     The budget (UX review decision 4, widened in wave 7 at the owner's request:
+     "where is the animation?" — the first pass was too quiet to be noticed):
+       tab content enters   340ms, 50ms apart for the first six blocks
+       a KPI counts up      600ms (.count-up) or 900ms (AnimatedNumber), once, when first on screen (never on a refetch)
        a dashboard card     280ms, once, when first on screen, 40ms apart
        a score ring draws   700ms
        a menu pops in       160ms
+       a dialog springs in  420ms, its backdrop fades 240ms
        the phone drawer     240ms, its scrim 200ms
-       the active tab pill  200ms, sliding between entries
+       the active tab pill  320ms, sliding between entries on a soft spring
+       a segmented thumb    320ms, sliding to the chosen item
        a list's items enter 180ms, 30ms apart for the first four (.list-enter)
+       a block's items rise 480ms, 55ms apart for the first eight (.stagger-in)
+       a table's rows enter 420ms, 32ms apart for the first twelve, ONCE, on the
+                            first data only (.rows-enter; never on sort, filter or refetch)
+       a bar grows          900ms from its start edge (.grow-x)
+       a line draws itself  1100ms (.draw-line)
+       content replaces its skeleton: 320ms crossfade (.fade-in / .fade-out)
+       a card lifts         220ms, 3px, only where it is a link or a button (.lift)
+       a hero's glow drifts 18s, a slow loop, opacity only in its own layer
        a skeleton shimmers  1.2s, a loop, gone when the data arrives
        a long action's bar  1.4s, a loop, gone when the action ends
-     Never on table rows, never replayed on scroll, nothing over 300ms between
-     tabs. One helper drives the on-screen ones: components/ui/motion.tsx. */
+     Never replayed on scroll, nothing over 400ms between tabs, and every one of
+     them exists only with prefers-reduced-motion: no-preference. One helper
+     drives the on-screen ones: components/ui/motion.tsx. */
   --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
   --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -219,13 +242,18 @@
 @keyframes tab-in {
   from { opacity: 0; transform: translateY(8px); }
 }
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(14px); }
+}
 @media (prefers-reduced-motion: no-preference) {
   .tab-enter > * > * {
-    animation: tab-in 180ms var(--ease-snappy) backwards;
+    animation: page-in 340ms var(--ease-out-expo) backwards;
   }
-  .tab-enter > * > :nth-child(2) { animation-delay: 30ms; }
-  .tab-enter > * > :nth-child(3) { animation-delay: 60ms; }
-  .tab-enter > * > :nth-child(n + 4) { animation-delay: 90ms; }
+  .tab-enter > * > :nth-child(2) { animation-delay: 50ms; }
+  .tab-enter > * > :nth-child(3) { animation-delay: 100ms; }
+  .tab-enter > * > :nth-child(4) { animation-delay: 150ms; }
+  .tab-enter > * > :nth-child(5) { animation-delay: 200ms; }
+  .tab-enter > * > :nth-child(n + 6) { animation-delay: 250ms; }
 }
 
 /* A list's items (idea cards, queue entries, stat tiles) enter the same way when the
@@ -333,6 +361,103 @@
   .scrim-in { animation: scrim-in 200ms ease-out; }
 }
 
+/* ── Motion layer (wave 7): the app's shared movement ─────────────────────
+   Every class below animates ONLY under no-preference; with reduced motion each
+   element is simply there, in its final state. All use `backwards` fill (never
+   `forwards`/`both`), so no transform is left behind once they land; the one
+   exception is `.fade-out`, the skeleton leaving, which is removed right after. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+@keyframes draw-line {
+  from { stroke-dashoffset: 1; }
+}
+@keyframes dialog-spring {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+}
+@keyframes glow-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+  50% { transform: translate3d(-4%, 3%, 0) scale(1.08); opacity: 0.8; }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes dot-ping {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Where a bar grows from: its start edge, which is the right in Hebrew. */
+.grow-x { transform-origin: left center; }
+[dir='rtl'] .grow-x { transform-origin: right center; }
+/* A line that draws itself needs pathLength="1" on the path. */
+.draw-line { stroke-dasharray: 1; stroke-dashoffset: 0; }
+/* The crossfade's outgoing skeleton sits over the content that replaces it. */
+.fade-out { pointer-events: none; }
+
+/* A card that is a link or a button answers the pointer by rising a little. */
+.lift {
+  transition: transform 220ms var(--ease-out-expo), box-shadow 220ms var(--ease-out-expo), border-color 150ms var(--ease-snappy);
+}
+@media (hover: hover) {
+  .lift:hover { box-shadow: var(--shadow-lift); border-color: var(--color-line-strong); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-in > * { animation: rise-in 480ms var(--ease-out-expo) backwards; }
+  .stagger-in > :nth-child(2) { animation-delay: 55ms; }
+  .stagger-in > :nth-child(3) { animation-delay: 110ms; }
+  .stagger-in > :nth-child(4) { animation-delay: 165ms; }
+  .stagger-in > :nth-child(5) { animation-delay: 220ms; }
+  .stagger-in > :nth-child(6) { animation-delay: 275ms; }
+  .stagger-in > :nth-child(7) { animation-delay: 330ms; }
+  .stagger-in > :nth-child(n + 8) { animation-delay: 385ms; }
+
+  .rows-enter > tr { animation: row-in 420ms var(--ease-out-expo) backwards; }
+  .rows-enter > tr:nth-child(2) { animation-delay: 32ms; }
+  .rows-enter > tr:nth-child(3) { animation-delay: 64ms; }
+  .rows-enter > tr:nth-child(4) { animation-delay: 96ms; }
+  .rows-enter > tr:nth-child(5) { animation-delay: 128ms; }
+  .rows-enter > tr:nth-child(6) { animation-delay: 160ms; }
+  .rows-enter > tr:nth-child(7) { animation-delay: 192ms; }
+  .rows-enter > tr:nth-child(8) { animation-delay: 224ms; }
+  .rows-enter > tr:nth-child(9) { animation-delay: 256ms; }
+  .rows-enter > tr:nth-child(10) { animation-delay: 288ms; }
+  .rows-enter > tr:nth-child(11) { animation-delay: 320ms; }
+  .rows-enter > tr:nth-child(n + 12) { animation-delay: 352ms; }
+
+  .fade-in { animation: fade-in 320ms ease-out backwards; }
+  .fade-out { animation: fade-out 320ms ease-out forwards; }
+  .grow-x { animation: grow-x 900ms var(--ease-out-expo) backwards; animation-delay: var(--grow-delay, 120ms); }
+  .draw-line { animation: draw-line 1100ms var(--ease-out-expo) backwards; animation-delay: var(--draw-delay, 150ms); }
+
+  dialog.dialog-spring[open] { animation: dialog-spring 420ms var(--ease-spring); }
+  dialog.dialog-spring[open]::backdrop { animation: backdrop-in 240ms ease-out; }
+
+  .glow-drift { animation: glow-drift 18s ease-in-out infinite; }
+  .float-y { animation: float-y 6s ease-in-out infinite; animation-delay: var(--float-delay, 0ms); }
+  .dot-ping { animation: dot-ping 1.8s var(--ease-out-expo) infinite; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lift:hover { transform: translateY(-3px); }
+}
+
 /* A loading placeholder. The shimmer is the one animation allowed to loop, and
    it stops by construction: the skeleton is replaced when the data arrives. */
 .skeleton {
@@ -408,6 +533,7 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px -10px rgba(0, 0, 0, 0.5);
   --shadow-control: 0 1px 1px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 18px 44px -12px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lift: 0 14px 32px -14px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* Base: one focus ring for everything that does not draw its own, the selection

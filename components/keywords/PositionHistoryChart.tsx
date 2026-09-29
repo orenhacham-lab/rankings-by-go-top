@@ -9,7 +9,8 @@
  * In Hebrew time runs right to left.
  */
 import { useEffect, useState } from 'react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { useReducedMotion } from '@/components/ui/motion'
 import type { ScanResult } from '@/lib/supabase/types'
 
 export interface PositionPoint { at: string; label: string; full: string; position: number | null }
@@ -76,10 +77,18 @@ export default function PositionHistoryChart({ points, isRTL, label, positionAt,
   const count = narrow ? 3 : 5
   const yTicks = [...new Set(Array.from({ length: count }, (_, i) => Math.round(1 + ((worst - 1) * i) / (count - 1))))]
   const tick = { fontSize: 12, fill: 'var(--color-muted)' }
+  // The line draws itself once (1.1s) unless the merchant asked for less motion.
+  const reduced = useReducedMotion()
   return (
     <figure data-position-chart="" role="img" aria-label={label} className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={points} margin={{ top: 12, right: 8, bottom: 4, left: 8 }}>
+        <ComposedChart data={points} margin={{ top: 12, right: 8, bottom: 4, left: 8 }}>
+          <defs>
+            <linearGradient id="position-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-action)" stopOpacity={0.18} />
+              <stop offset="100%" stopColor="var(--color-action)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--color-line)" />
           <XAxis dataKey="at" tickFormatter={(at: string) => labelOf.get(at) ?? ''} reversed={isRTL} tickLine={false} axisLine={false}
             interval="preserveStartEnd" minTickGap={narrow ? 56 : 24} tickMargin={8} tick={tick} padding={{ left: 16, right: 16 }} />
@@ -92,20 +101,25 @@ export default function PositionHistoryChart({ points, isRTL, label, positionAt,
             axisLine={false} width={40} ticks={yTicks} interval={0} tickFormatter={(v: number) => `#${v}`} tick={{ ...tick, direction: 'ltr' }} />
           <Tooltip cursor={{ stroke: 'var(--color-line-strong)', strokeDasharray: '4 4' }}
             content={<ChartTooltip positionAt={positionAt} notFound={notFound} />} />
+          {/* A soft wash under the line, down to the lowest position. */}
+          <Area type="monotone" dataKey="position" baseValue="dataMax" stroke="none" fill="url(#position-area)" connectNulls={false}
+            isAnimationActive={!reduced} animationDuration={1100} animationEasing="ease-out" activeDot={false} tooltipType="none" />
           <Line
             type="monotone"
             dataKey="position"
             stroke="var(--color-action)"
             strokeWidth={2}
             connectNulls={false}
-            isAnimationActive={false}
+            isAnimationActive={!reduced}
+            animationDuration={1100}
+            animationEasing="ease-out"
             dot={(p: { cx?: number; cy?: number; index?: number }) =>
               p.index === last && p.cx !== undefined && p.cy !== undefined
                 ? <circle key="last" cx={p.cx} cy={p.cy} r={3} fill="var(--color-action)" />
                 : <g key={`p${p.index}`} />}
             activeDot={{ r: 4, fill: 'var(--color-action)', stroke: 'var(--color-surface)', strokeWidth: 2 }}
           />
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </figure>
   )

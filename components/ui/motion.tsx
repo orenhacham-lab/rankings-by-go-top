@@ -16,7 +16,7 @@
  * (an old browser, a server render) everything counts as in view at once, so a
  * block can never stay hidden.
  */
-import { useCallback, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 const REDUCED = '(prefers-reduced-motion: reduce)'
@@ -87,6 +87,175 @@ export function Reveal({ children, index = 0, className, ...rest }: {
       style={{ '--reveal-delay': `${revealDelay(index)}ms` } as CSSProperties}
     >
       {children}
+    </div>
+  )
+}
+
+/* ── Wave 7: the motion layer's React side ───────────────────────────────── */
+
+/**
+ * A figure that counts up from 0 to its value (900ms, ease-out), once, the first
+ * time it is on screen. Unlike the CSS `.count-up` (whole numbers 1-999 only) it
+ * takes any finite number and draws it through `format`, so "34,880", "₪11.65" and
+ * "8.4" all count in their own format.
+ *
+ * The real, formatted value is in the DOM the whole time (held transparent while
+ * the count draws over it, so it also reserves the final width): screen readers,
+ * copy and print always get the true figure. A later change of value (a refetch)
+ * shows the new figure at once; nothing replays. With reduced motion, or for a
+ * zero, it is simply the value.
+ */
+export function AnimatedNumber({ value, format, duration = 900, className }: {
+  value: number
+  format: (n: number) => string
+  duration?: number
+  className?: string
+}) {
+  const reduced = useReducedMotion()
+  const [ref, seen] = useInView<HTMLSpanElement>({ threshold: 0.3, rootMargin: '0px' })
+  // null: show the value itself. A number: the frame being drawn.
+  const [frame, setFrame] = useState<number | null>(null)
+  const [phase, setPhase] = useState<'idle' | 'wait' | 'run' | 'done'>('idle')
+  const target = Number.isFinite(value) ? value : 0
+
+  // Before paint, hold the figure at 0 until it is seen (no flash of the final value).
+  useIsoLayoutEffect(() => {
+    if (phase !== 'idle') return
+    if (reduced || target === 0) { setPhase('done'); return }
+    setPhase('wait')
+    setFrame(0)
+  }, [phase, reduced, target])
+
+  // Seen: start counting. (A separate effect from the frames below, so that changing
+  // the phase does not cancel the frame loop it starts.)
+  useEffect(() => {
+    if (phase === 'wait' && seen) setPhase('run')
+  }, [phase, seen])
+
+  useEffect(() => {
+    if (phase !== 'run') return
+    const start = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      // A frame's timestamp can precede `start` by a hair: clamp, or the first frame is below 0.
+      const t = Math.min(1, Math.max(0, (now - start) / duration))
+      const eased = 1 - Math.pow(1 - t, 4)
+      if (t < 1) {
+        setFrame(target * eased)
+        raf = requestAnimationFrame(tick)
+      } else {
+        setFrame(null)
+        setPhase('done')
+      }
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // `target` is read once, when the count starts: a later value is shown as it is.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, duration])
+
+  const counting = frame !== null && phase !== 'done'
+  return (
+    <span ref={ref} className={cn('relative inline-block tabular-nums', className)} data-animated-number={phase}>
+      <span style={counting ? { color: 'transparent' } : undefined}>{format(value)}</span>
+      {counting && (
+        <span aria-hidden="true" className="absolute inset-y-0 start-0 whitespace-nowrap">{format(frame)}</span>
+      )}
+    </span>
+  )
+}
+
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/**
+ * True for the first render(s) after `ready` first turns true, then false for good
+ * (after `ms`). Drives an entrance that must play once, on the first data only: a
+ * table's rows (.rows-enter) enter when the list first arrives, and a sort, a
+ * filter or a refetch afterwards shows the rows at once.
+ */
+export function useFirstEntrance(ready: boolean, ms = 900): boolean {
+  const [state, setState] = useState<'before' | 'on' | 'off'>('before')
+  // The first data: on, in the same render (React's "adjust state while rendering").
+  if (state === 'before' && ready) setState('on')
+  useEffect(() => {
+    if (state !== 'on') return
+    const t = setTimeout(() => setState('off'), ms)
+    return () => clearTimeout(t)
+  }, [state, ms])
+  return state === 'on' || (state === 'before' && ready)
+}
+
+/**
+ * A sliding "thumb" behind the chosen item of a group (a segmented control, chips,
+ * a section bar): one absolutely placed element that moves to the chosen item's box
+ * on a soft spring (320ms). Placed from the DOM in a layout effect, so the first
+ * placement jumps instead of sliding in from a corner; the container gets
+ * data-thumb="on" once it is placed, which lets the items drop their own fill.
+ *
+ *   const { containerRef, thumbRef } = useSlidingThumb('[aria-checked="true"]', [value])
+ */
+export function useSlidingThumb<C extends HTMLElement = HTMLDivElement>(selector: string, deps: readonly unknown[]) {
+  const containerRef = useRef<C>(null)
+  const thumbRef = useRef<HTMLSpanElement>(null)
+  const place = useCallback(() => {
+    const box = containerRef.current
+    const thumb = thumbRef.current
+    if (!box || !thumb) return
+    const on = box.querySelector<HTMLElement>(selector)
+    if (!on || on.offsetWidth === 0) { box.dataset.thumb = 'off'; return }
+    thumb.style.width = `${on.offsetWidth}px`
+    thumb.style.height = `${on.offsetHeight}px`
+    thumb.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`
+    box.dataset.thumb = 'on'
+  }, [selector])
+  useIsoLayoutEffect(() => {
+    place()
+    const thumb = thumbRef.current
+    const frame = requestAnimationFrame(() => { if (thumb) thumb.dataset.slide = 'on' })
+    return () => cancelAnimationFrame(frame)
+  }, [place, ...deps])
+  useEffect(() => {
+    const box = containerRef.current
+    if (!box || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => place())
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [place])
+  return { containerRef, thumbRef }
+}
+
+/** The thumb's own classes: absolutely placed at the container's top-left, sliding once placed. */
+export const THUMB_CLASSES =
+  'pointer-events-none absolute left-0 top-0 hidden group-data-[thumb=on]/thumb:block ' +
+  'data-[slide=on]:transition-[transform,width,height] data-[slide=on]:duration-300 data-[slide=on]:ease-spring motion-reduce:transition-none'
+
+/**
+ * Skeleton to content, as a crossfade: while `loading` the skeleton is the block;
+ * when the content arrives it fades in (320ms) while the skeleton, laid over it,
+ * fades out and is then removed. With reduced motion the content simply replaces it.
+ */
+export function Crossfade({ loading, skeleton, children, className }: {
+  loading: boolean
+  skeleton: ReactNode
+  children: ReactNode
+  className?: string
+}) {
+  const [leaving, setLeaving] = useState(false)
+  const [wasLoading, setWasLoading] = useState(loading)
+  if (wasLoading !== loading) {
+    setWasLoading(loading)
+    if (!loading) setLeaving(true)
+  }
+  useEffect(() => {
+    if (!leaving) return
+    const t = setTimeout(() => setLeaving(false), 340)
+    return () => clearTimeout(t)
+  }, [leaving])
+  if (loading) return <div className={className}>{skeleton}</div>
+  return (
+    <div className={cn('relative', className)}>
+      <div className={leaving ? 'fade-in' : undefined}>{children}</div>
+      {leaving && <div aria-hidden="true" className="fade-out absolute inset-x-0 top-0">{skeleton}</div>}
     </div>
   )
 }

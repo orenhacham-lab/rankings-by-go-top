@@ -13,13 +13,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, RefreshCw, Search, SearchX } from 'lucide-react'
+import { BarChart3, FileText, KeyRound, Plus, Search, SearchX, Telescope } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
-import { formatDateTime } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
@@ -27,13 +26,18 @@ import Segmented from '@/components/ui/Segmented'
 import { FIELD_CLASSES } from '@/components/ui/Input'
 import { useToasts, ToastHost } from '@/components/ui/Toast'
 import Modal from '@/components/ui/Modal'
-import Badge from '@/components/ui/Badge'
+import { ContextCardSkeleton } from '@/components/ui/Skeleton'
+import { Crossfade } from '@/components/ui/motion'
+import KeywordsHero, { keywordStanding } from '@/components/keywords/KeywordsHero'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import CompetitorSummary from '@/components/competitors/CompetitorSummary'
 import { useCompetitorComparison, type CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import type { OwnCheck } from '@/lib/competitors/comparison'
 import { GscKeywordsNotice, useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
+
+/** How many of a keyword's checks its row's trend line shows. */
+const TREND_CHECKS = 8
 
 export default function ProjectKeywordsPanel({ project }: { project: Project }) {
   const id = project.id
@@ -44,6 +48,9 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
 
   const [targets, setTargets] = useState<TrackingTarget[]>([])
   const [latestResults, setLatestResults] = useState<Record<string, ScanResult>>({})
+  /** Each keyword's last checks, oldest first (its position, or null where it was not
+   *  found): the row's trend line. From the same read as the latest result. */
+  const [positionHistory, setPositionHistory] = useState<Record<string, (number | null)[]>>({})
   /** The keyword table's own data. Reported on the table, never by the page. */
   const [targetsLoading, setTargetsLoading] = useState(true)
   const [targetsError, setTargetsError] = useState(false)
@@ -93,12 +100,19 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         supabase.from('scan_results').select('*').in('tracking_target_id', targetIds).order('checked_at', { ascending: false }))
       // Keep only the latest result per target
       const latest: Record<string, ScanResult> = {}
+      const history: Record<string, (number | null)[]> = {}
       for (const result of resultsRes?.data || []) {
         if (!latest[result.tracking_target_id]) latest[result.tracking_target_id] = result
+        // The same rows, newest first: the last TREND_CHECKS positions of each keyword.
+        const line = (history[result.tracking_target_id] ??= [])
+        if (line.length < TREND_CHECKS) line.push(result.found ? result.position : null)
       }
+      for (const line of Object.values(history)) line.reverse()
       setLatestResults(latest)
+      setPositionHistory(history)
     } else {
       setLatestResults({})
+      setPositionHistory({})
     }
     setTargetsLoading(false)
   }, [id])
@@ -312,79 +326,110 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const targetsKey = useMemo(() => targets.map((t) => t.id).join(','), [targets])
   const gscKeywords = useGscKeywordFigures(id, targetsKey)
 
+  const standing = useMemo(() => keywordStanding(targets, latestResults), [targets, latestResults])
+  // A project with no keywords yet (known, not still loading): one invitation, not an empty toolbar and table.
+  const empty = targets.length === 0 && !targetsLoading && !targetsError
+
   return (
-    <div>
-      {/* What every scan of this project is measured against: the facts that used
-          to be the project page's summary row. */}
-      <dl className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line lg:grid-cols-4">
-        <Fact label={k.summary.domain}><span dir="ltr">{project.target_domain}</span></Fact>
-        <Fact label={k.summary.lastScan}>{project.last_scan_at ? formatDateTime(project.last_scan_at, language) : '—'}</Fact>
-        <Fact label={k.summary.frequency}>
-          <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>{facts.frequency}</Badge>
-        </Fact>
-        <Fact label={k.summary.scanParameters}>
-          <span className="block min-w-0 truncate text-caption" title={facts.line}>{facts.line}</span>
-        </Fact>
-      </dl>
+    <div className="stagger-in">
+      {/* Where the keywords stand: the tab's context card, from the rows below. Its
+          skeleton crossfades into it when the list arrives. */}
+      {!empty && !(targetsError && targets.length === 0) && (
+        <Crossfade loading={targetsLoading && targets.length === 0} skeleton={<ContextCardSkeleton className="mb-6 min-h-[22rem]" />}>
+          <KeywordsHero
+            project={project}
+            standing={standing}
+            marketLine={facts.line}
+            frequency={facts.frequency}
+            scanning={scanning}
+            onScanAll={handleScanAll}
+            canScan={activeTargets.length > 0}
+          />
+        </Crossfade>
+      )}
 
-      <CompetitorSummary view={competitorView} variant="full" className="mb-6" />
+      {empty && (
+        <Card padding={false} className="relative mb-6 overflow-hidden">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(40rem_16rem_at_50%_0%,color-mix(in_srgb,var(--color-action)_7%,transparent),transparent_70%)]" />
+          <EmptyState
+            className="relative py-16"
+            icon={<KeyRound />}
+            title={kp.empty.title}
+            body={kp.empty.body}
+            action={(
+              <Button size="lg" onClick={() => setShowAddTarget(true)}>
+                <Plus aria-hidden="true" className="size-4" />
+                {k.keywordsSection.addKeywordButton}
+              </Button>
+            )}
+            secondary={(
+              <Link href="/keyword-research" className="inline-flex items-center gap-1.5 font-semibold text-action transition-colors hover:text-action-hover">
+                <Telescope aria-hidden="true" className="size-4" />
+                {kp.empty.research}
+              </Link>
+            )}
+          />
+        </Card>
+      )}
 
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        {/* Narrowing the table: a search field and the engine as one segmented control. */}
-        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:max-w-xs">
-            <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              placeholder={kp.searchPlaceholder}
-              aria-label={kp.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={`${FIELD_CLASSES} h-9 ps-9`}
+      <CompetitorSummary view={competitorView} variant="full" className="mb-6 shadow-card" />
+
+      {!empty && (
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Narrowing the table: a search field and the engine as one segmented control. */}
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:max-w-xs">
+              <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                placeholder={kp.searchPlaceholder}
+                aria-label={kp.searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className={`${FIELD_CLASSES} h-10 rounded-pill ps-9 shadow-control`}
+              />
+            </div>
+            <Segmented
+              ariaLabel={k.table.scanType}
+              value={engineFilter as '' | 'google_search' | 'google_maps'}
+              onChange={(v) => setEngineFilter(v)}
+              className="max-w-full self-start overflow-x-auto sm:self-auto"
+              options={[
+                { value: '', label: kp.allEngines },
+                { value: 'google_search', label: kp.engineGoogleSearch },
+                { value: 'google_maps', label: kp.engineGoogleMaps },
+              ]}
             />
           </div>
-          <Segmented
-            ariaLabel={k.table.scanType}
-            value={engineFilter as '' | 'google_search' | 'google_maps'}
-            onChange={(v) => setEngineFilter(v)}
-            className="max-w-full self-start overflow-x-auto sm:self-auto"
-            options={[
-              { value: '', label: kp.allEngines },
-              { value: 'google_search', label: kp.engineGoogleSearch },
-              { value: 'google_maps', label: kp.engineGoogleMaps },
-            ]}
-          />
+          {/* The primary (check every keyword) is on the card above; these are quiet. */}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setShowAddTarget(true)}>
+              <Plus aria-hidden="true" className="size-4" />
+              {k.keywordsSection.addKeywordButton}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleUpdateVolumes} loading={updatingVolumes} disabled={targets.length === 0}>
+              {!updatingVolumes && <BarChart3 aria-hidden="true" className="size-4" />}
+              {updatingVolumes ? k.keywordsSection.updatingVolumes : k.keywordsSection.updateVolumesButton}
+            </Button>
+            <Link href="/reports" className="inline-flex h-8 items-center gap-1.5 rounded-control px-3 text-caption font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+              <FileText aria-hidden="true" className="size-4" />
+              {k.keywordsSection.reportButton}
+            </Link>
+          </div>
         </div>
-        {/* One primary (check every keyword now); the rest are quiet. */}
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={handleScanAll} loading={scanning} disabled={activeTargets.length === 0} size="sm">
-            {!scanning && <RefreshCw aria-hidden="true" className="size-4" />}
-            {scanning ? k.keywordsSection.scanning : k.keywordsSection.scanAllButton}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowAddTarget(true)}>
-            <Plus aria-hidden="true" className="size-4" />
-            {k.keywordsSection.addKeywordButton}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleUpdateVolumes} loading={updatingVolumes} disabled={targets.length === 0}>
-            {updatingVolumes ? k.keywordsSection.updatingVolumes : k.keywordsSection.updateVolumesButton}
-          </Button>
-          <Link href="/reports" className="inline-flex h-8 items-center gap-1.5 rounded-control px-3 text-caption font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
-            <FileText aria-hidden="true" className="size-4" />
-            {k.keywordsSection.reportButton}
-          </Link>
-        </div>
-      </div>
+      )}
 
       {/* What the line under each search volume is, or, before Search Console is set
           up, what it will be and the one step that is missing. */}
       <GscKeywordsNotice projectId={id} view={gscKeywords} className="mb-3" />
 
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
-        <Card padding={false}><EmptyState icon={<SearchX />} title={kp.noMatches} /></Card>
-      ) : (
+        <Card padding={false}><EmptyState compact icon={<SearchX />} title={kp.noMatches} /></Card>
+      ) : empty ? null : (
         <TrackingTargetsTable
           targets={visibleTargets}
           latestResults={latestResults}
+          positionHistory={positionHistory}
           projectId={id}
           projectCity={project.city}
           projectCountry={project.country}
@@ -429,15 +474,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         />
       </Modal>
       <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
-    </div>
-  )
-}
-
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0 bg-surface px-4 py-3">
-      <dt className="text-caption text-muted">{label}</dt>
-      <dd className="mt-1 truncate text-copy font-medium text-ink">{children}</dd>
     </div>
   )
 }

@@ -16,7 +16,7 @@ const twMerge = extendTailwindMerge({
     theme: {
       text: ['display', 'title', 'metric', 'section', 'lead', 'copy', 'caption', 'overline'],
       radius: ['card', 'inset', 'control', 'pill'],
-      shadow: ['card', 'control', 'pop'],
+      shadow: ['card', 'control', 'pop', 'lift', 'glow', 'edge-ltr', 'edge-rtl'],
     },
   },
 })

@@ -145,11 +145,16 @@ async function main() {
     check('D1: prefers-reduced-motion cuts animations and transitions', honours(css))
     check('MUT: without the media rule it fails', !honours(css.replace('prefers-reduced-motion: reduce', 'min-width: 1px')))
 
-    // D2: the motion budget (UX review, decision 4), each figure where it is set.
+    // D2: the motion budget (UX review, decision 4, widened in wave 7 at the owner's
+    // request), each figure where it is set.
     const budget = (src: string): string[] => {
       const out: string[] = []
       const want: [string, RegExp][] = [
-        ['tab content 180ms', /\.tab-enter > \* > \* \{\s*animation: tab-in 180ms var\(--ease-snappy\) backwards;/],
+        ['tab content 340ms', /\.tab-enter > \* > \* \{\s*animation: page-in 340ms var\(--ease-out-expo\) backwards;/],
+        ['items rise 480ms', /\.stagger-in > \* \{ animation: rise-in 480ms var\(--ease-out-expo\) backwards; \}/],
+        ['rows enter 420ms', /\.rows-enter > tr \{ animation: row-in 420ms var\(--ease-out-expo\) backwards; \}/],
+        ['last row waits 352ms', /\.rows-enter > tr:nth-child\(n \+ 12\) \{ animation-delay: 352ms; \}/],
+        ['dialog 420ms', /dialog\.dialog-spring\[open\] \{ animation: dialog-spring 420ms var\(--ease-spring\); \}/],
         ['stagger 30ms', /:nth-child\(2\) \{ animation-delay: 30ms; \}/],
         ['count-up 600ms', /animation: count-up 600ms ease-out forwards;/],
         ['ring 700ms', /\.ring-draw \{ animation: ring-draw 700ms var\(--ease-snappy\) backwards; \}/],
@@ -159,13 +164,16 @@ async function main() {
         ['shimmer 1.2s', /\.skeleton \{ animation: shimmer 1\.2s linear infinite; \}/],
       ]
       for (const [name, re] of want) if (!re.test(src)) out.push(name)
-      // Nothing between tabs takes longer than 300ms.
-      const tab = /animation: tab-in (\d+)ms/.exec(src)
-      if (!tab || Number(tab[1]) > 300) out.push('tab over 300ms')
+      // Nothing between tabs takes longer than 400ms, and no row waits past 400ms.
+      const tab = /\.tab-enter > \* > \* \{\s*animation: \S+ (\d+)ms/.exec(src)
+      if (!tab || Number(tab[1]) > 400) out.push('tab over 400ms')
+      const rowWait = [...src.matchAll(/\.rows-enter > tr:nth-child\([^)]*\) \{ animation-delay: (\d+)ms; \}/g)].map((m) => Number(m[1]))
+      if (rowWait.length === 0 || Math.max(...rowWait) > 400) out.push('a row waits over 400ms')
       return out
     }
     check('D2: every animation has the budgeted duration', budget(css).length === 0, budget(css).join(', '))
-    check('MUT: a 400ms tab transition fails D2', budget(css.replace('tab-in 180ms', 'tab-in 400ms')).length > 0)
+    check('MUT: a 600ms tab transition fails D2', budget(css.replace('page-in 340ms', 'page-in 600ms')).length > 0)
+    check('MUT: a row that waits 800ms fails D2', budget(css.replace('tr:nth-child(n + 12) { animation-delay: 352ms; }', 'tr:nth-child(n + 12) { animation-delay: 800ms; }')).length > 0)
 
     // D3: every animation utility exists ONLY with no-preference, so reduced motion
     // gets none of them (not even their 1ms version).
@@ -173,19 +181,42 @@ async function main() {
       const flat = src.replace(/\/\*[\s\S]*?\*\//g, '')
       const blocks = [...flat.matchAll(/@media \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]).join('\n')
       const outside = flat.replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n\}/g, '')
-      const names = ['tab-in', 'count-up 600ms', 'count-up-hold', 'ring-draw 700ms', 'drawer-in-ltr 240ms', 'scrim-in 200ms', 'shimmer 1.2s']
+      const names = ['page-in', 'tab-in', 'count-up 600ms', 'count-up-hold', 'ring-draw 700ms', 'drawer-in-ltr 240ms', 'scrim-in 200ms', 'shimmer 1.2s',
+        // The wave 7 motion layer.
+        'rise-in', 'row-in', 'fade-in', 'fade-out', 'grow-x', 'draw-line', 'dialog-spring', 'backdrop-in', 'glow-drift', 'float-y', 'dot-ping']
       return names.filter((n) => !blocks.includes(`animation: ${n}`) || new RegExp(`animation:\\s*${n.replace('.', '\\.')}`).test(outside))
     }
-    check('D3: the tab, count-up, ring, drawer, scrim and shimmer animations are no-preference only', gated(css).length === 0, gated(css).join(', '))
+    check('D3: the tab, count-up, ring, drawer, scrim, shimmer and wave 7 motion-layer animations are no-preference only', gated(css).length === 0, gated(css).join(', '))
     check('MUT: a shimmer outside the media query fails D3',
       gated(`${css}\n.skeleton-loud { animation: shimmer 1.2s linear infinite; }`).length > 0)
+    check('MUT: a row entrance outside the media query fails D3',
+      gated(`${css}\n.rows-loud > tr { animation: row-in 420ms ease-out backwards; }`).length > 0)
 
-    // D4: never on table rows: no animation utility in the table primitive, and the
-    // tab stagger stops at the screen's blocks (it never reaches a row).
+    // D4: table rows enter ONCE, on the first data only (wave 7; until then, never).
+    // The table primitive has no animation utility of its own: its rows move only
+    // through `.rows-enter` on the tbody, which the caller asks for with `enter`
+    // (off by default) and drives with useFirstEntrance, so a sort, a filter or a
+    // refetch shows the rows at once. The tab stagger still stops at the screen's
+    // blocks (it never reaches a row), and the row itself only changes colour.
     const table = strip(read('components/ui/Table.tsx'))
-    const noRows = (tableSrc: string, cssSrc: string) => !/animate-|tab-enter|count-up/.test(tableSrc) && !/tab-enter[^{]*\b(tr|tbody|li)\b/.test(cssSrc)
-    check('D4: no animation on table rows', noRows(table, css))
-    check('MUT: a row that animates in fails D4', !noRows(table.replace("'bg-surface hover:bg-sunk/50", "'animate-pop-in bg-surface hover:bg-sunk/50"), css))
+    const rowsOnce = (tableSrc: string, cssSrc: string) =>
+      !/animate-|tab-enter|count-up|stagger-in/.test(tableSrc)
+      && /TableBody\(\{ children, enter = false \}/.test(tableSrc)
+      && /<tbody className=\{cn\([^)]*enter && 'rows-enter'\)\}/.test(tableSrc)
+      && (tableSrc.match(/rows-enter/g) ?? []).length === 1
+      && !/tab-enter[^{]*\b(tr|tbody|li)\b/.test(cssSrc)
+    check('D4: table rows enter only through rows-enter, asked for by the caller (off by default)', rowsOnce(table, css))
+    check('MUT: a row that animates in fails D4', !rowsOnce(table.replace("'bg-surface transition-colors", "'animate-pop-in bg-surface transition-colors"), css))
+    check('MUT: rows that always enter fail D4', !rowsOnce(table.replace('enter = false', 'enter = true'), css))
+    check('MUT: a tab stagger that reaches the rows fails D4', !rowsOnce(table, `${css}\n.tab-enter tbody > tr { animation: page-in 340ms; }`))
+    // The callers: every table that enters drives it with useFirstEntrance (once).
+    const callers = [...walkTsx('app'), ...walkTsx('components')].filter((f) => !f.includes('__qa__')).map((f) => [f, strip(read(f))] as [string, string])
+    const enterNotOnce = (files: [string, string][]) => files
+      .filter(([, src]) => /<TableBody enter=|rows-enter/.test(src))
+      .filter(([f, src]) => !f.endsWith('components/ui/Table.tsx') && !/useFirstEntrance\(/.test(src))
+      .map(([f]) => f)
+    check('D4b: every table that enters its rows plays it once (useFirstEntrance)', enterNotOnce(callers).length === 0, enterNotOnce(callers).join(', '))
+    check('MUT: a table whose rows enter on every render fails D4b', enterNotOnce([['x.tsx', '<TableBody enter={true}>']]).length === 1)
   }
 
   console.log('\nF) the Go Top palette')

@@ -11,7 +11,9 @@
  * (fixtures/legacy-screen.json) where it is still the screen: with no project in
  * view (the hook's 'none'). That capture was taken again when the screen's header
  * became the shared one (components/layout/Header, the design tokens); everything
- * under it is the page as it was at f44468d. It is the REAL page's first render,
+ * under it is the page as it was at f44468d, restyled in wave 7 (rows that enter
+ * once, a hover start bar, a volume bar under each figure: the same elements and
+ * text once classes, styles and that decorative bar are set aside). It is the REAL page's first render,
  * in both languages, in nine states (empty, results, rows selected with the
  * opportunities panel open, a keyword added, add and AI errors, a search error,
  * the keyword+URL form while searching, few results, filtered and sorted). Each

@@ -39,7 +39,7 @@ export function IntentBar({ mix, label }: { mix: readonly IntentShare[]; label: 
   return (
     <span role="img" aria-label={label} className="flex h-3 w-full overflow-hidden rounded-pill bg-sunk">
       {total > 0 && mix.map((m) => (
-        <span key={m.intent} className={cn('h-full transition-[width] duration-700 ease-snappy motion-reduce:transition-none', INTENT_TONE[m.intent].bar)} style={{ width: `${(m.searches / total) * 100}%` }} />
+        <span key={m.intent} className={cn('grow-x h-full transition-[width] duration-700 ease-snappy motion-reduce:transition-none', INTENT_TONE[m.intent].bar)} style={{ width: `${(m.searches / total) * 100}%` }} />
       ))}
     </span>
   )

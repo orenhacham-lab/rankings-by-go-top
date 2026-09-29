@@ -12,6 +12,7 @@
  */
 import { Search, Telescope } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { EmptyArt } from '@/components/ui/EmptyState'
 import Button from '@/components/ui/Button'
 import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import { MappingNotice, MappingSteps } from '@/components/mapping/MappingBanner'
@@ -36,13 +37,14 @@ export default function ResearchStart({
   const offered = mapping?.mapping.available === true && mapping.mapping.state !== 'done' ? mapping : null
   return (
     <section data-research-start="" className="mb-8">
-      <Card>
-        <div className="flex items-start gap-4">
-          <span className="grid size-11 shrink-0 place-items-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+      <Card padding={false} className="relative overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(36rem_18rem_at_12%_0%,color-mix(in_srgb,var(--color-action)_9%,transparent),transparent_70%)]" />
+        <div className="relative flex items-start gap-4 p-5 sm:p-8">
+          <span className="grid size-11 shrink-0 place-items-center rounded-inset bg-action-soft text-action md:hidden" aria-hidden="true">
             <Search size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-section font-semibold text-ink">{m.researchEmptyTitle}</h2>
+            <h2 className="text-section font-semibold text-ink text-balance">{m.researchEmptyTitle}</h2>
             <p className="mt-1 max-w-2xl text-copy text-muted">{m.researchEmptyBody}</p>
             <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -54,10 +56,11 @@ export default function ResearchStart({
                   onChange={(e) => onKeyword(e.target.value)}
                   placeholder={m.researchInputPlaceholder}
                   autoComplete="off"
-                  className={`${FIELD_CLASSES} h-11`}
+                  className={`${FIELD_CLASSES} h-12 text-lead shadow-control`}
                 />
               </div>
-              <Button type="submit" size="lg" loading={loading} disabled={loading || !keyword.trim()}>
+              <Button type="submit" size="lg" loading={loading} disabled={loading || !keyword.trim()} className="h-12 sm:min-w-40">
+                {!loading && <Search aria-hidden="true" className="size-4" />}
                 {m.researchSubmit}
               </Button>
             </form>
@@ -87,6 +90,8 @@ export default function ResearchStart({
               </div>
             )}
           </div>
+          {/* The composition beside the form: what a research turns into, drawn in tokens. */}
+          <EmptyArt icon={<Telescope />} className="mx-6 hidden shrink-0 self-center md:grid lg:mx-12" />
         </div>
       </Card>
     </section>
