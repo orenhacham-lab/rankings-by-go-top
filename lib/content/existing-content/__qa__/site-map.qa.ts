@@ -494,9 +494,13 @@ async function main() {
     const paged = (s: string) => /limit: String\(PAGE_SIZE\)/.test(s) && /offset: String\(offset\)/.test(s) && /fetchList\(viewRef\.current, rows\.length\)/.test(s)
     check('U2: the list is paged on the server ("show more" asks for the next offset)', paged(screen))
     check('MUTATION CONTROL: a screen that loads everything at once is caught', !paged(screen.replace('limit: String(PAGE_SIZE)', "limit: '100000'")))
-    const skeletonFirst = (s: string) => /if \(!payload\) return <ExistingSkeleton/.test(s) && s.indexOf('if (!payload) return <ExistingSkeleton') < s.indexOf('payload.counts.all === 0')
+    // The skeleton also holds while nothing is indexed and the workspace overview has not
+    // said whether a platform is connected (the flash guard D3 pins that half).
+    const SKELETON_LINE = "if (!payload || (payload.source === 'none' && !overviewSettled)) return <ExistingSkeleton label={x.loading} />"
+    const skeletonFirst = (s: string) => s.includes(SKELETON_LINE) && s.indexOf(SKELETON_LINE) < s.indexOf('payload.counts.all === 0')
     check('U3: a skeleton comes before any data-dependent state (no "0 pages" flash)', skeletonFirst(screen))
-    check('MUTATION CONTROL: a screen that shows the empty state before the data is caught', !skeletonFirst(screen.replace('if (!payload) return <ExistingSkeleton label={x.loading} />', '')))
+    check('MUTATION CONTROL: a screen that shows the empty state before the data is caught', !skeletonFirst(screen.replace(SKELETON_LINE, '')))
+    check('MUTATION CONTROL: a skeleton that no longer waits for the data is caught', !skeletonFirst(screen.replace(SKELETON_LINE, SKELETON_LINE.replace('!payload || ', ''))))
     // Never mapped: the start is already on its way, so the empty "nothing collected" state
     // (with its button) must not flash before the mapping takes over.
     const noIdleFlash = (s: string) => /const mapStarting = payload\.map\.state === 'never' && !autoFailed/.test(s)
