@@ -47,6 +47,7 @@ import ResearchLandscape, { LANDSCAPE_IDS } from '@/components/keyword-research/
 import SectionNav from '@/components/keyword-research/SectionNav'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import { NO_LANDSCAPE } from '@/components/keyword-research/landscape'
+import CompetitiveResearch, { COMPETITIVE_ID } from '@/components/keyword-research/competitive/CompetitiveResearch'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -980,6 +981,7 @@ export default function KeywordResearchPage() {
             { id: 'research-wins', label: ti.nav.wins },
             { id: LANDSCAPE_IDS.rivals, label: ti.nav.rivals },
             { id: LANDSCAPE_IDS.audiences, label: ti.nav.audiences },
+            { id: COMPETITIVE_ID, label: dict.researchCompetitive.nav },
             { id: 'research-table', label: ti.nav.keywords },
           ]}
         />
@@ -1131,9 +1133,18 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
-      {/* Who the site competes with, and who searches for it (only with the scan's research on screen). */}
+      {/* Who the site competes with, and who searches for it (only with the scan's research on screen),
+          then where it stands against them. One slot, so the screen without a scan keeps its exact markup. */}
       {landscapeOn && scanOn?.kind === 'seeded' && activeProjectId && (
-        <ResearchLandscape projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} domain={ownDomain} />
+        <>
+          <ResearchLandscape projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} domain={ownDomain} />
+          <CompetitiveResearch
+            projectId={activeProjectId}
+            siteIcon={seedLandscape.siteIcon}
+            suggested={seedLandscape.competitors.filter((c) => c.validated).map((c) => c.domain)}
+            onTracked={scan.reloadTracked}
+          />
+        </>
       )}
 
       {/* Search Console's source, where there is no table for it to sit in. */}

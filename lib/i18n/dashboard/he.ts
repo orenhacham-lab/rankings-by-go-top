@@ -1,4 +1,5 @@
 import { planLimitLines } from '@/lib/plans/features'
+import { researchCompetitiveHe } from './research-competitive'
 export const dashboardHe = {
   sidebar: {
     logoAlt: 'הלוגו של Go Top',
@@ -4644,6 +4645,8 @@ export const dashboardHe = {
     tracking: 'מוסיף',
     tracked: 'במעקב',
   },
+  // The research tab's competitive view (lib/i18n/dashboard/research-competitive.ts).
+  researchCompetitive: researchCompetitiveHe,
   billing: {
     title: 'תוכניות מנויים',
     subtitle: 'בחרו את התוכנית שמתאימה לכם',

@@ -1,5 +1,6 @@
 import { planLimitLines } from '@/lib/plans/features'
 import type { DashboardDictionary } from './he'
+import { researchCompetitiveEn } from './research-competitive'
 
 export const dashboardEn = {
   sidebar: {
@@ -4625,6 +4626,8 @@ export const dashboardEn = {
     tracking: 'Adding',
     tracked: 'Tracked',
   },
+  // The research tab's competitive view (lib/i18n/dashboard/research-competitive.ts).
+  researchCompetitive: researchCompetitiveEn,
   billing: {
     title: 'Subscription Plans',
     subtitle: 'Choose the plan that suits you',
