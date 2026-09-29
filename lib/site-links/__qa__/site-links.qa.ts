@@ -368,9 +368,11 @@ function partG() {
   check('the title comes from the sidebar entry (DocumentTitle reads navItemKeys)', /navItemKeys/.test(read('components/layout/DocumentTitle.tsx')))
 }
 
-// ── H. nothing here places, trades or sells links ───────────────────────────
+// ── H. the opportunities view only reads ────────────────────────────────────
+// (The link network, which does write, lives in lib/link-network and is guarded
+// by lib/link-network/__qa__/link-network.qa.ts.)
 function partH() {
-  console.log('\nH. no link exchange')
+  console.log('\nH. the opportunities view only reads')
   const files = ['lib/site-links/http.ts', 'lib/site-links/model.ts', 'lib/site-links/classify.ts',
     'components/site-links/SiteLinksView.tsx', 'components/site-links/OpportunityList.tsx', 'components/site-links/InternalLinksSection.tsx']
   const writes = (src: string) => /method:\s*'(POST|PUT|PATCH|DELETE)'|\.(insert|update|upsert|delete)\(|\/api\/(?!projects\/\$\{)/.test(strip(src))
