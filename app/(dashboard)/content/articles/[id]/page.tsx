@@ -31,6 +31,8 @@ import { injectInlineImages } from '@/lib/content/inline-images-compose'
 import type { StructuredDataInput } from '@/lib/content/structured-data'
 import ShopifyPublishSettings from '@/components/content/ShopifyPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
+import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
+import { autoLinksShown, hasAutoLinks } from '@/lib/content/auto-internal-links/entries'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -108,6 +110,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   // insert its link. Planning/selection happens pre-generation in the brief.
   const [addedLinks, setAddedLinks] = useState<Set<string>>(new Set())
   const [plannedLinks, setPlannedLinks] = useState<PlannedInternalLink[]>([])
+  // Wave 8 — the links the automatic step added at generation (internal_links_json,
+  // source 'auto'). An article that has them does not need the older planned-link
+  // panels below: those stay for older articles only.
+  const [linksJson, setLinksJson] = useState<unknown>(null)
+  const autoLinked = hasAutoLinks(linksJson)
 
   // Phase 2E.3 apply-panel SESSION state, lifted here so a successful apply's
   // outcome + session rollback survive the contentHtml resync re-render (the
@@ -149,6 +156,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setMetaDescription(a.meta_description ?? '')
       setExcerpt(a.excerpt ?? '')
       setContentHtml(a.content_html ?? '')
+      setLinksJson(Array.isArray(a.auto_internal_links) ? a.auto_internal_links : null)
       setImagePrompt(a.image_prompt ?? '')
       setFaq(Array.isArray(a.faq_json) ? a.faq_json : [])
       setStatus(a.status === 'ready' ? 'ready' : 'draft')
@@ -242,7 +250,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     // Client-side guard only (does NOT change ready/publish backend behavior):
     // if the last manual preview this session found approved links not yet
     // applied, confirm before marking ready. Never triggers a fetch.
-    if (nextStatus === 'ready' && linkPlanningOn && ilpPreviewSummary && ilpPreviewSummary.wouldInsert > 0) {
+    if (nextStatus === 'ready' && linkPlanningOn && !autoLinked && ilpPreviewSummary && ilpPreviewSummary.wouldInsert > 0) {
       if (!(await confirm({ title: cf.readyTitle, body: c.editor.linkApply.readyHasUnappliedConfirm, confirmLabel: e.markReady }))) return
     }
     setSaving(true)
@@ -641,9 +649,18 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               projectId={projectId}
             />
           </div>
-          {(audit || aiCard) && (
+          {(audit || aiCard || autoLinksShown(linksJson, contentHtml).length > 0) && (
             <aside aria-label={e.sidePanelLabel} className="mb-4 space-y-4 lg:sticky lg:top-24" data-article-side="">
               {audit && renderAudit(true)}
+              <ArticleAutoLinksCard
+                t={e.autoLinks}
+                articleId={id}
+                linksJson={linksJson}
+                html={contentHtml}
+                isPublished={isPublished}
+                onRemoved={(next) => { setContentHtml(next.html); setLinksJson(next.linksJson) }}
+                onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+              />
               {aiCard}
             </aside>
           )}
@@ -820,7 +837,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         <div hidden={!editing} className="space-y-4">
         {/* Planned internal links — QA/insertion only. Hidden entirely when the
             article has no planned links (no ad-hoc suggestions here anymore). */}
-        {plannedLinks.length > 0 && (
+        {plannedLinks.length > 0 && !autoLinked && (
           <Card>
             <h3 className="text-section font-semibold text-ink">{e.internal.planQaTitle}</h3>
             <p className="text-caption text-muted mb-2">{e.internal.planQaHint}</p>
@@ -862,7 +879,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
         {/* Phase 2E.3 — automation/draft apply flow (distinct from the QA card
             above). Flag-gated, collapsed by default, draft-only, manual only. */}
-        {linkPlanningOn && projectId && (
+        {linkPlanningOn && projectId && !autoLinked && (
           <ArticleInternalLinkApplyPanel
             projectId={projectId}
             generatedArticleId={id}
@@ -897,7 +914,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           </div>
           {/* Client-side neutral hint — no fetch. Nudges a manual preview before
               marking ready when the planning feature is on and nothing was applied. */}
-          {linkPlanningOn && !isPublished && status === 'draft' && !ilpApplyOutcome && (
+          {linkPlanningOn && !autoLinked && !isPublished && status === 'draft' && !ilpApplyOutcome && (
             <p className="mt-2 text-caption text-muted">{c.editor.linkApply.readyHint}</p>
           )}
         </div>

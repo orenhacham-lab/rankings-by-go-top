@@ -462,7 +462,7 @@ export default function ArticleStyleCard({
                   value={cta.buttonUrl}
                   inputMode="url"
                   maxLength={CTA_LIMITS.buttonUrl}
-                  placeholder="https://"
+                 
                   onChange={(e) => editCta({ buttonUrl: e.target.value })}
                   hint={a.cta.urlHint}
                   error={ctaErrors.includes('buttonUrl') ? a.cta.errors.buttonUrl : undefined}

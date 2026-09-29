@@ -222,6 +222,11 @@ async function main() {
   check('E4: a save without the call to action keeps it', styleOnly.ok && styleOnly.data.cta.enabled && JSON.stringify((db.tables.project_article_styles as Record<string, unknown>[])[0]?.article_cta) === JSON.stringify(ctaRow(CTA)))
   const theirs = await saveArticleStyle(mkDeps(db), 'b1111111-2222-3333-4444-555555555555', { ...styleInput, cta: CTA })
   check('E5: another user\'s project is not_found', !theirs.ok && theirs.code === 'not_found')
+  const dbEmpty = new FakeAdmin({ projects: [{ id: PROJECT, user_id: OWNER, target_domain: 'japan4u.co.il' }], project_article_styles: [{ project_id: PROJECT, user_id: OWNER, design: 'formatted', brand_colors: ['#c60035'], article_cta: {} }] })
+  const emptyRow = await loadArticleStyle(mkDeps(dbEmpty), PROJECT)
+  check('E7: a saved design whose call to action is the column default {} counts as never saved (the card offers its suggestion)', emptyRow.ok && emptyRow.data.saved && !emptyRow.data.ctaSaved && emptyRow.data.ctaEditable && !emptyRow.data.cta.enabled)
+  const emptyAsSaved = await mutant<typeof import('../store')>('lib/content/article-style/store.ts', (src) => src.replace(" || Object.keys(stored as object).length === 0) return { state: 'default'", ") return { state: 'default'"))
+  check('MUTATION CONTROL: without the empty-default rule {} reads as a saved call to action (so E7 would fail)', (await emptyAsSaved.readProjectArticleCta(dbEmpty as never, PROJECT, OWNER)).state === 'saved')
   const missingCol = await loadArticleStyle(mkDeps(noColumnDb(db)), PROJECT)
   check('E6: the column missing: the design still loads and saves; only the call to action is read-only', missingCol.ok && missingCol.data.editable && missingCol.data.saved && !missingCol.data.ctaEditable && !missingCol.data.cta.enabled)
 

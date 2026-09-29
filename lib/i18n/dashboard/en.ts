@@ -1917,6 +1917,17 @@ export const dashboardEn = {
       anchorMechanical: 'A link is placed in a generic/mechanical sentence',
       anchorFirstPos: 'First link position (words)',
       backToHub: 'Back to articles',
+      autoLinks: {
+        title: 'Internal links we added',
+        hint: 'We picked pages from your own site that match this article\'s topic and linked them from words already in the text. Approving the article approves them too.',
+        count: '{n} links',
+        anchor: 'In the text: "{anchor}"',
+        remove: 'Remove',
+        removeLabel: 'Remove the link to {title}',
+        removed: 'The link was removed. The words stay in the article.',
+        removeFailed: 'We could not remove the link. Please try again.',
+        publishedNote: 'This article is already published: the removal reaches your site with the article\'s next update.',
+      },
       internal: {
         title: 'Internal links',
         hint: 'Suggestions to link from this article to other already-published articles in the project. Insertion is manual — nothing is written until you save.',

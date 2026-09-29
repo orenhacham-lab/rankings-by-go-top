@@ -68,7 +68,10 @@ export async function readProjectArticleCta(db: SupabaseClient, projectId: strin
       .maybeSingle()
     if (error) return { state: isMissingRelation(error) ? 'missing_column' : 'error', cta: off() }
     const row = data as Record<string, unknown> | null
-    if (!row || row.project_id !== projectId || row.user_id !== ownerId || !row[ARTICLE_CTA_COLUMN]) return { state: 'default', cta: off() }
+    if (!row || row.project_id !== projectId || row.user_id !== ownerId) return { state: 'default', cta: off() }
+    // The column's default is {}: nothing was ever saved, so the card offers its suggestion.
+    const stored = row[ARTICLE_CTA_COLUMN]
+    if (!stored || typeof stored !== 'object' || Object.keys(stored as object).length === 0) return { state: 'default', cta: off() }
     return { state: 'saved', cta: toArticleCta(row[ARTICLE_CTA_COLUMN]) }
   } catch {
     return { state: 'error', cta: off() }
