@@ -2520,11 +2520,11 @@ export const dashboardEn = {
   // The existing-content screen (/content/existing, lib/content/existing-content):
   // what is already on the site, read-only.
   // The Links tab (app/(dashboard)/site-links, lib/site-links). Links from the open
-  // web the owner can earn, and the links between the site's own pages. Never a
-  // network of customers' sites linking to each other.
+  // web the owner can earn, the links between the site's own pages, and the
+  // opt-in link network among our customers (lib/link-network).
   siteLinks: {
     title: 'Links',
-    subtitle: 'Where it is worth being linked from, how to ask, and what is missing between your own pages.',
+    subtitle: 'Who links to you, where else you can earn links, and what is missing between your own pages.',
     loading: 'Loading your links…',
     loadError: 'We could not load this. Try again in a moment.',
     retry: 'Try again',
@@ -2647,9 +2647,122 @@ export const dashboardEn = {
       error: 'We could not load the links between your pages.',
     },
     policy: {
-      title: 'Why we do not trade links between customers',
-      body: 'Some services plant links between their customers’ sites. Google calls that a link scheme, and a site caught in one can drop in the rankings. So we do not do it. A link from a directory, an article or an association that chose you is worth more, and it lasts.',
+      title: 'A link you earned is worth more',
+      body: 'Google treats links built only to influence rankings as a link scheme, and a site caught in one can drop in the rankings. A link from a directory, an article or an association that chose you is the safest and strongest kind, and it lasts.',
       link: 'Google’s spam policies',
+    },
+    // The link network, lib/link-network. Opt-in, both ways.
+    network: {
+      tabs: { label: 'Show', network: 'Link network', opportunities: 'Link opportunities' },
+      loading: 'Loading the link network…',
+      loadError: 'We could not load the link network. Try again in a moment.',
+      stats: {
+        members: 'Sites in the network',
+        membersSource: 'Businesses that joined so far',
+        received: 'Links you received',
+        given: 'Links you gave',
+        sinceJoining: 'Since you joined',
+        notJoined: 'You have not joined yet',
+      },
+      hero: {
+        overline: 'Link network',
+        title: 'Natural links from sites of complementary businesses',
+        body: 'Businesses that write their content with us link to each other inside their articles, only where the link really helps the reader. No outreach, no swaps, and no competitors.',
+      },
+      how: {
+        title: 'How it works',
+        steps: [
+          'When we write an article for a complementary business in the network, it can include a natural link to a relevant page of yours, inside a sentence that is already there.',
+          'When we write an article for you, it can include one link to a page of a complementary business. You see it here before it is published, and you can remove it.',
+          'No link swaps: a site that gets a link from you does not link back, and a competitor never gets a link from you.',
+        ],
+      },
+      rules: {
+        title: 'The rules that protect you',
+        items: [
+          'Never a competitor, and never a business in the same field.',
+          'Never reciprocal links, and no short loops between three sites.',
+          'Never between sites of the same owner or on the same server.',
+          'At most one link per article, inside a body paragraph. Never in a footer, a list of links or an author box.',
+          'Few links each month, rising gradually in the first months. No anchors that repeat the keyword.',
+          'No placement when the fit is weak, and none to new or thin sites.',
+        ],
+      },
+      linkType: {
+        follow: 'Network links are regular (follow) links, which Google counts as a recommendation.',
+        nofollow: 'Network links are marked nofollow: Google does not count them as a ranking recommendation.',
+      },
+      switch: {
+        label: 'Take part in the link network',
+        offDescription: 'Off. It turns on only after you accept the terms.',
+        onDescription: (date: string) => `In the network since ${date}. You can leave at any time.`,
+        leftDescription: (date: string) => `You left the network on ${date}. Links already placed stay in the log.`,
+      },
+      consent: {
+        title: 'Before you join',
+        intro: 'Joining works both ways. While the switch is on:',
+        points: [
+          'Articles we write for you may include one outgoing link to a page of another complementary business in the network, inside an existing sentence.',
+          'Articles we write for other businesses in the network may include links to pages of your site.',
+          'Every link is logged for both sides. A link you gave shows here before the article is published, and you can remove it.',
+          'You can leave at any time. Leaving stops new links; links already published stay on the sites and in the log.',
+        ],
+        checkbox: 'We have read and accept the link network terms',
+        terms: 'Full wording in the terms of use',
+        join: 'Join the network',
+        cancel: 'Not now',
+        error: 'We could not save this. Try again in a moment.',
+      },
+      leave: {
+        title: 'Leave the link network?',
+        body: 'We will not place new links from your articles or to your site. Links already published stay on the sites and in the log.',
+        confirm: 'Leave the network',
+        error: 'We could not take you out of the network. Try again in a moment.',
+      },
+      readiness: {
+        thin_or_new: 'Your site is in the network but does not take part in placements yet: it needs at least three published articles or ten scanned pages, one finished scan, and two weeks in the app.',
+        category_unknown: 'Your site is in the network, but we do not know its business field yet, so we will not place links from it or to it. You can add the field in the project settings.',
+      },
+      caps: (received: number, cap: number) => `This month you received ${received} of ${cap} possible links. The allowance rises gradually in your first months in the network.`,
+      log: {
+        title: 'Placement log',
+        description: 'Every link written, on both sides: where, on which words and when.',
+        segmentLabel: 'Which side',
+        received: 'Received',
+        given: 'Given',
+        fromSite: (domain: string) => `From ${domain}`,
+        inArticle: (title: string) => `In the article "${title}"`,
+        articleGone: 'The article was deleted',
+        toPage: 'To the page',
+        anchor: 'On the words',
+        placedOn: (date: string) => `Placed on ${date}`,
+        states: {
+          waiting: 'Waiting to be published',
+          published: 'Published',
+          rejected: 'Removed before publishing',
+          removed: 'No longer in the article',
+        },
+        openLive: 'Open the published page',
+        openArticle: 'Open the article',
+        remove: 'Remove',
+        removeConfirm: {
+          title: 'Remove the link from the article?',
+          body: 'The link comes out of the draft and the words stay exactly as they are. No other link is placed instead.',
+          confirm: 'Remove the link',
+        },
+        removed: 'The link was removed from the article.',
+        removeError: 'We could not remove the link. Try again in a moment.',
+        removePublished: 'The article is already published, so the link cannot be removed from here.',
+        emptyReceived: {
+          title: 'No links received yet',
+          body: 'When we write an article for a complementary business that a page of yours fits, you will see here where the link appeared.',
+        },
+        emptyGiven: {
+          title: 'No links given yet',
+          body: 'When we place a link in one of your articles, it shows here before publishing, and you can remove it.',
+        },
+        notJoined: 'Once you join, every link you receive or give shows here.',
+      },
     },
   },
   existingContent: {

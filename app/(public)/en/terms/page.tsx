@@ -204,6 +204,61 @@ export default function EnglishTermsPage() {
         </p>
       </section>
 
+      {/* DRAFT, NEW SECTION (link network, lib/link-network) — wording for the owner's review before publishing. */}
+      <section id="link-network">
+        <h2>15A. Link Network (draft wording, under review)</h2>
+        <p>
+          The link network is an optional service in which the Service may place a link between the
+          sites of customers who joined it, inside articles the Service writes for them. It is off by
+          default and is not available for Shopify stores.
+        </p>
+        <ul>
+          <li>
+            <strong>Joining and consent.</strong> Each project joins separately, only by its owner, after
+            explicitly accepting the network terms on screen. Consent works both ways: to an outgoing link
+            in articles written for you, and to links to your site in articles written for other
+            customers in the network. We keep who accepted, when, the wording accepted and the link type
+            in force at the time.
+          </li>
+          <li>
+            <strong>Closed scope.</strong> At most one outgoing link per article, inside a sentence already
+            in the body of the article, on words already in it. The Service changes no words, adds no text
+            and touches no other content on your site.
+          </li>
+          <li>
+            <strong>Link type.</strong> The link type (regular or nofollow) is set for the whole network and
+            shown on screen and when joining. A change of link type is shown on screen and applies to new
+            links only.
+          </li>
+          <li>
+            <strong>Placement rules.</strong> No link is placed between competitors or businesses in the same
+            field, between sites of the same owner, or between sites that already link to each other; no
+            reciprocal links are placed; the number of links is capped per article and per site each
+            month; and a link is placed only where the page is relevant to the paragraph.
+          </li>
+          <li>
+            <strong>Transparency and control.</strong> Every placement is logged and shown to both sides. A
+            link added to your article is shown before the article is published and can be removed. Once
+            published, the article is on your site and under your control.
+          </li>
+          <li>
+            <strong>Leaving.</strong> You can leave the network at any time. Leaving stops new placements;
+            links already published stay as they are unless you remove them from your site.
+          </li>
+          <li>
+            <strong>Privacy.</strong> The Company does not publish a list of network members. The receiving
+            side sees the address of the site that links to it and, once published, the page where the link
+            appeared.
+          </li>
+          <li>
+            <strong>No guaranteed results.</strong> The Company does not commit to a number of links, to a
+            ranking improvement or to how search engines treat the links, and may pause or end the service.
+            The site owner is responsible for the site&rsquo;s content and for following search engine
+            guidelines.
+          </li>
+        </ul>
+      </section>
+
       <section>
         <h2>16. Privacy</h2>
         <p>

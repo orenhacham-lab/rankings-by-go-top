@@ -15,6 +15,7 @@
  */
 
 import { trackArticleQuestion } from '@/lib/ai-visibility/article-question'
+import { runLinkNetworkStep } from '@/lib/link-network/step'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
@@ -399,6 +400,10 @@ export async function generateArticleForTopic(
       snapshotId: autoInternalLinks.snapshotId,
     })
   }
+
+  // Link network (lib/link-network): at most one link to a complementary member,
+  // only for a project that joined. One delimited, best-effort step; never throws.
+  await runLinkNetworkStep(admin, { projectId, userId, articleId: inserted.id })
 
   // Auto-generate a brand-neutral featured image (default ON). Best-effort.
   let imageGenerated = false
