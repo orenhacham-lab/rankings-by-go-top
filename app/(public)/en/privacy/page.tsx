@@ -37,6 +37,8 @@ export default function EnglishPrivacyPage() {
           <li><strong>Profile information:</strong> plan details and subscription information</li>
           <li><strong>Business information:</strong> company name, domain, keywords, ranking data</li>
           <li><strong>Technical information:</strong> IP address, browser type, referring page</li>
+          <li><strong>Google account data:</strong> only if you choose to sign in with Google or to connect
+          Google Search Console or Google Business Profile — see &ldquo;Data We Receive from Google&rdquo; below</li>
           <li><strong>Payment information:</strong> we do not store your payment instrument. For
           accounts whose billing authority is Shopify — including merchants who installed the app
           through Shopify — payment is processed by Shopify under Shopify App Pricing, and we never
@@ -67,8 +69,127 @@ export default function EnglishPrivacyPage() {
           <li><strong>Supabase:</strong> for secure data storage</li>
           <li><strong>Serper:</strong> for Google search queries</li>
           <li><strong>Vercel:</strong> for site hosting</li>
-          <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below</li>
+          <li><strong>Google (Gemini API):</strong> our AI provider for generating text and images — see &ldquo;AI Providers&rdquo; below</li>
+          <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
+          <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below.
+          Data we receive from Google APIs is never shared with Meta or used for advertising</li>
           <li>When required by law</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Data We Receive from Google</h2>
+        <p>
+          Rankings by Go Top can connect to your Google account in three optional ways. Each one asks for its own
+          permission on Google&rsquo;s consent screen, and we request only the access described here.
+        </p>
+
+        <h3>Sign in with Google</h3>
+        <p>
+          If you choose &ldquo;Continue with Google&rdquo;, Google shares your name, email address and profile picture
+          with us through Supabase Auth. We use them only to create your account and sign you in.
+        </p>
+
+        <h3>Google Search Console</h3>
+        <p>
+          Permission: read-only access to Search Console (<strong>webmasters.readonly</strong>). We never ask for
+          permission to change anything in your Search Console account.
+        </p>
+        <ul>
+          <li><strong>What we read:</strong> the list of Search Console properties your Google account can access, so
+          you can choose one for each project; and, for the property you choose, its search performance data: search
+          queries and pages with their clicks, impressions, click-through rate and average position, and the
+          property&rsquo;s totals.</li>
+          <li><strong>What we store:</strong> the property assigned to each project and your permission level on it,
+          and the performance data of each sync (the last 28 and 90 days). Data is synced when you press sync and
+          automatically about once a week.</li>
+          <li><strong>How we use it:</strong> to show you your site&rsquo;s search performance, to find content
+          opportunities, to include search figures in your reports, and to suggest article topics. For topic
+          suggestions, search queries from this data may be sent to Google&rsquo;s Gemini model (see &ldquo;AI
+          Providers&rdquo; below).</li>
+        </ul>
+
+        <h3>Google Business Profile (Posts on Google Maps)</h3>
+        <p>
+          Permission: <strong>business.manage</strong>, requested in a separate consent only when you connect this
+          feature. Google offers no narrower permission that allows creating posts.
+        </p>
+        <ul>
+          <li><strong>What we read:</strong> the Business Profile accounts you manage and their business locations:
+          business name, address, website and Google Maps link.</li>
+          <li><strong>What we store:</strong> the location you choose for a project (its Google identifiers, name,
+          address, website and Maps link), and each post you create: its text, button, photo, scheduled time, and
+          Google&rsquo;s post identifier, link and review status.</li>
+          <li><strong>What we do with it:</strong> we create a post only when you press publish, or at the time you
+          scheduled it, and then read that post back from Google to show you whether it is live. We do not change
+          your business information and we do not read or reply to reviews.</li>
+          <li><strong>AI drafts:</strong> if you ask for a draft, the business name and the article or topic you
+          chose are sent to Google&rsquo;s Gemini model. A draft is never published until you review it and press
+          publish.</li>
+        </ul>
+
+        <h3>Limited Use</h3>
+        <p>
+          Rankings by Go Top&rsquo;s use and transfer of information received from Google APIs to any other app will
+          adhere to the{' '}
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements. In particular:
+        </p>
+        <ul>
+          <li>We use Google user data only to provide the features described above, which you see and use in the app.</li>
+          <li>We do not sell Google user data, and we do not use or transfer it for advertising, including
+          retargeting and personalised or interest-based ads.</li>
+          <li>We do not use Google user data to develop, improve or train generalised AI or machine-learning models.
+          We send parts of it to an AI provider only to produce the result you asked for, as described in
+          &ldquo;AI Providers&rdquo; below.</li>
+          <li>We do not allow people to read this data, unless you give us permission (for example, when you ask
+          for support), it is necessary for security purposes such as investigating abuse, it is required to comply
+          with applicable law, or the data is aggregated and anonymised for internal operations.</li>
+        </ul>
+
+        <h3>How We Protect Google Data</h3>
+        <ul>
+          <li>The Google OAuth refresh tokens that let us access Search Console and Business Profile are encrypted
+          with AES-256-GCM before we store them, and are decrypted only on our servers at the moment of use. We do
+          not store access tokens.</li>
+          <li>Google data is stored in our Supabase database, and the app shows it only to your own account.</li>
+        </ul>
+
+        <h3>Disconnecting, Retention and Deletion</h3>
+        <ul>
+          <li><strong>Search Console:</strong> &ldquo;Disconnect property from project&rdquo; removes the property
+          from that project and stops syncing it. &ldquo;Revoke Google access for the whole account&rdquo; is
+          available once no project uses the connection: it asks Google to revoke our access and deletes the stored
+          token. In both cases, data already synced is kept.</li>
+          <li><strong>Business Profile:</strong> &ldquo;Disconnect&rdquo; asks Google to revoke our access and
+          deletes the stored token and the saved business location. Your post history stays in the app, and
+          published posts stay on Google until you remove them there.</li>
+          <li><strong>Retention:</strong> synced Search Console data and your post history are kept for as long as
+          your account exists, unless you ask us to delete them.</li>
+          <li><strong>Deletion:</strong> to delete your account or the Google data stored with it, email us at{' '}
+          <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>.</li>
+          <li><strong>Revoking access at Google:</strong> you can also remove our access at any time at{' '}
+          <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">
+            myaccount.google.com/permissions
+          </a>
+          . After that we can no longer read from or post to your Google account. Data we already stored stays
+          until you disconnect in the app or ask us to delete it.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>AI Providers</h2>
+        <p>Some features send data to the following AI services to produce the result you asked for:</p>
+        <ul>
+          <li><strong>Google Gemini (Gemini API):</strong> generates article topic ideas, articles, images, and
+          Google Business Profile post drafts. We send the details a request needs, such as your business name,
+          website, keywords and topics and, as described above, Search Console search queries and your Business
+          Profile name.</li>
+          <li><strong>ScrapeLLM:</strong> for AI visibility tracking, sends questions built from your business name,
+          location and tracked keywords to AI assistants (ChatGPT, Perplexity, Gemini, Microsoft Copilot, Grok and
+          Google AI Mode) and returns their answers to us. It does not receive data from your Google account.</li>
         </ul>
       </section>
 
@@ -206,7 +327,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated in June 2026
+          This policy was last updated in September 2026
         </p>
       </section>
     </LegalDoc>
