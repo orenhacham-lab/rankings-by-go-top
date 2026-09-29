@@ -1,12 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Privacy Policy | Rankings by Go Top',
-  description: 'Privacy policy for Rankings by Go Top — how we collect, use and protect your data.',
+  title: 'Privacy Policy | GO TOP',
+  description: 'Privacy policy for GO TOP — how we collect, use and protect your data.',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'Privacy Policy | Rankings by Go Top',
-    description: 'Privacy policy for Rankings by Go Top',
+    title: 'Privacy Policy | GO TOP',
+    description: 'Privacy policy for GO TOP',
     url: 'https://www.gotopseo.com/en/privacy',
     locale: 'en_US',
   },
@@ -18,12 +18,12 @@ export default function EnglishPrivacyPage() {
       locale="en"
       breadcrumbs={[{ label: 'Privacy Policy', href: '/en/privacy' }]}
       title="Privacy Policy"
-      subtitle="Privacy policy for Rankings by Go Top"
+      subtitle="Privacy policy for GO TOP"
     >
       <section>
         <h2>Introduction</h2>
         <p>
-          Go Top Digital Marketing &amp; Advertising Ltd. (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Rankings by Go Top service
+          Go Top Digital Marketing &amp; Advertising Ltd. (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the GO TOP service
           at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
           use, and disclosure of personal information when you use our Service.
         </p>
@@ -39,6 +39,17 @@ export default function EnglishPrivacyPage() {
           <li><strong>Technical information:</strong> IP address, browser type, referring page</li>
           <li><strong>Google account data:</strong> only if you choose to sign in with Google or to connect
           Google Search Console or Google Business Profile — see &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Information from your site:</strong> public pages, robots.txt, the sitemap and llms.txt
+          read in the free site check and the onboarding scan, and the findings derived from them — see
+          &ldquo;Site Scanning&rdquo; below</li>
+          <li><strong>WordPress connection:</strong> the site address, a username and Application Password and the
+          plugin&rsquo;s signing key (both stored encrypted), and the log of fixes on the site — see &ldquo;WordPress
+          Connection&rdquo; below</li>
+          <li><strong>Link network:</strong> your joining consent (who accepted, when, the wording and the link
+          type) and the placement log — see &ldquo;Link Network&rdquo; below</li>
+          <li><strong>Results and content:</strong> AI visibility check results, and content generated for you:
+          topics, questions and articles</li>
+          <li><strong>Email preferences:</strong> which messages you receive, and unsubscribes from reminders</li>
           <li><strong>Payment information:</strong> we do not store your payment instrument. For
           accounts whose billing authority is Shopify — including merchants who installed the app
           through Shopify — payment is processed by Shopify under Shopify App Pricing, and we never
@@ -52,6 +63,8 @@ export default function EnglishPrivacyPage() {
         <p>We use your information to:</p>
         <ul>
           <li>Provide the rank tracking service</li>
+          <li>Run scans and AI visibility checks, generate content and apply the site fixes you approve</li>
+          <li>Send reminders and progress reports, and answer your enquiries</li>
           <li>Authenticate users and manage accounts</li>
           <li>Process payments</li>
           <li>Send service updates and news</li>
@@ -67,10 +80,12 @@ export default function EnglishPrivacyPage() {
           <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
           <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
           <li><strong>Supabase:</strong> for secure data storage</li>
-          <li><strong>Serper:</strong> for Google search queries</li>
-          <li><strong>Vercel:</strong> for site hosting</li>
-          <li><strong>Google (Gemini API):</strong> our AI provider for generating text and images — see &ldquo;AI Providers&rdquo; below</li>
+          <li><strong>Serper:</strong> for Google search queries and rank checks</li>
+          <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
+          <li><strong>Vercel:</strong> for hosting the site and the Service</li>
+          <li><strong>Google (Gemini API, Search Console, Business Profile):</strong> our AI provider for generating text and images, and the connections you choose to make — see &ldquo;AI Providers&rdquo; and &ldquo;Data We Receive from Google&rdquo; below</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
+          <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below.
           Data we receive from Google APIs is never shared with Meta or used for advertising</li>
           <li>When required by law</li>
@@ -80,7 +95,7 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>Data We Receive from Google</h2>
         <p>
-          Rankings by Go Top can connect to your Google account in three optional ways. Each one asks for its own
+          GO TOP can connect to your Google account in three optional ways. Each one asks for its own
           permission on Google&rsquo;s consent screen, and we request only the access described here.
         </p>
 
@@ -130,7 +145,7 @@ export default function EnglishPrivacyPage() {
 
         <h3>Limited Use</h3>
         <p>
-          Rankings by Go Top&rsquo;s use and transfer of information received from Google APIs to any other app will
+          GO TOP&rsquo;s use and transfer of information received from Google APIs to any other app will
           adhere to the{' '}
           <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
             Google API Services User Data Policy
@@ -180,16 +195,94 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Site Scanning (Free Check and Onboarding Scan)</h2>
+        <p>
+          In the free site check, which you can run before signing up, and in the onboarding scan after a project
+          is created, we access the site address you entered and read public pages on it, and its robots.txt,
+          sitemap and llms.txt files. Reading is done without signing in, without cookies and without access to
+          protected areas, and the onboarding scan reads a page only if robots.txt allows it.
+        </p>
+        <ul>
+          <li><strong>What we store:</strong> the site address, the findings derived from the pages (such as
+          titles, descriptions, site structure and SEO signals), and a business summary generated from them. The result of a free check is also
+          stored so it can be shown again and to limit misuse of the check.</li>
+          <li><strong>How we use it:</strong> to show you the findings, to tailor the Service to your site and to
+          suggest topics and fixes. Some of the text may be sent to Google&rsquo;s Gemini model to produce the
+          summary (see &ldquo;AI Providers&rdquo;).</li>
+          <li><strong>Deletion:</strong> you can email us to ask for stored results to be deleted.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>WordPress Connection and the GO TOP SEO Bridge Plugin</h2>
+        <p>
+          When you connect a WordPress site, we store the site address, the username and Application Password you
+          created, and the signing key that authenticates requests between us and the plugin. Both are stored
+          encrypted and decrypted only on our servers at the moment of use. With your consent, and your approval of
+          each fix, the GO TOP SEO Bridge plugin applies to the site only fixes from a closed list (SEO title, meta
+          description, canonical address, focus keyphrase, image alt text, an FAQ block, JSON-LD schema, internal
+          links, repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt).
+        </p>
+        <ul>
+          <li><strong>Fix log:</strong> every fix is recorded in our log with the previous value and the time it was
+          applied, so it can be shown and undone. The log is kept as long as the project exists.</li>
+          <li><strong>Disconnecting and removal:</strong> &ldquo;Disconnect&rdquo; deletes the stored connection
+          details and the signing key, after which we can no longer reach the site. You can also remove the plugin
+          from your WordPress admin at any time. Fixes already applied stay on the site unless you undid them.</li>
+          <li><strong>What we do not do:</strong> we do not delete content, and we do not touch your site&rsquo;s
+          prices, products, theme, other plugins, settings or users.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Link Network</h2>
+        <p>
+          Joining the link network is optional, is done for each project separately, is off by default, and is not
+          available for Shopify stores. Whoever joins agrees to both directions: that a link from their articles may
+          point to another network member&rsquo;s site, and that links to their site may be placed in other
+          members&rsquo; articles.
+        </p>
+        <ul>
+          <li><strong>What we store:</strong> who accepted the joining, when, the wording of the terms accepted and
+          the link type, and each placement made, on both sides.</li>
+          <li><strong>What another member sees:</strong> the Company does not publish a member list. The receiving
+          side sees the address of the site that links to it and, once published, the page where the link
+          appeared. A published link is a public link on the site.</li>
+          <li><strong>Leaving:</strong> you can leave the network at any time. Leaving stops new placements; links
+          already published stay unless you remove them from your site, and placements stay in the log.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>AI Providers</h2>
         <p>Some features send data to the following AI services to produce the result you asked for:</p>
         <ul>
-          <li><strong>Google Gemini (Gemini API):</strong> generates article topic ideas, articles, images, and
+          <li><strong>Google Gemini (Gemini API):</strong> generates article topic ideas, questions, articles, images, and
           Google Business Profile post drafts. We send the details a request needs, such as your business name,
           website, keywords and topics and, as described above, Search Console search queries and your Business
           Profile name.</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking, sends questions built from your business name,
           location and tracked keywords to AI assistants (ChatGPT, Perplexity, Gemini, Microsoft Copilot, Grok and
-          Google AI Mode) and returns their answers to us. It does not receive data from your Google account.</li>
+          Google AI Mode) and returns their answers to us. It does not receive data from your Google account. In addition to checks you start
+          yourself, an automatic monthly check runs for the project; it counts toward your plan&rsquo;s allowance of checks
+          and can be turned off in the project settings.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Email Messages</h2>
+        <p>
+          We send email through the sending provider Resend, which receives your email address and the content of the
+          message in order to deliver it.
+        </p>
+        <ul>
+          <li><strong>Account and service messages:</strong> sign-up, verification, billing and updates about using the
+          Service.</li>
+          <li><strong>Reminders:</strong> when content is waiting for your approval, a reminder may be sent. Every
+          reminder has a one-click unsubscribe link, with no sign-in needed, and unsubscribing stops these reminders.
+          Your preference is stored with us.</li>
+          <li><strong>Monthly progress report:</strong> a monthly summary of the project, for projects where you turned it
+          on in the settings.</li>
         </ul>
       </section>
 
@@ -327,7 +420,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated in September 2026
+          This policy was last updated on September 29, 2026
         </p>
       </section>
     </LegalDoc>
