@@ -5,10 +5,12 @@ import { cn } from '@/lib/utils'
 
 /**
  * A small trend line for a table row or a tile: the values in time order, oldest
- * first. Time runs toward the reading direction's end, as in the keyword history
- * chart: left to right in English, right to left in Hebrew (the svg is mirrored).
- * `invert` is for positions, where a smaller number is better, so "up" means
- * better. A missing value (a check where the site was not found) is skipped.
+ * first. Time runs left to right in BOTH languages, as on every chart in the app:
+ * mirrored for Hebrew, an improving keyword (#4 → #2) drew a line falling from
+ * left to right beside its green up arrow, and owners read it as a decline.
+ * `invert` is for positions, where a smaller number is better: position 1 is at
+ * the top, so a line that rises always means better. A missing value (a check
+ * where the site was not found) is skipped.
  *
  * The line draws itself once (.draw-line, 1100ms) and its soft area fades in; with
  * reduced motion it is simply there. The last point carries the only dot (§10).
@@ -52,7 +54,7 @@ export default function Sparkline({
       viewBox={`0 0 ${width} ${height}`}
       width={width}
       height={height}
-      className={cn('shrink-0 overflow-visible rtl:-scale-x-100', className)}
+      className={cn('shrink-0 overflow-visible', className)}
       data-sparkline=""
     >
       <defs>

@@ -90,7 +90,9 @@ export default function PositionHistoryChart({ points, isRTL, label, positionAt,
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--color-line)" />
-          <XAxis dataKey="at" tickFormatter={(at: string) => labelOf.get(at) ?? ''} reversed={isRTL} tickLine={false} axisLine={false}
+          {/* Time runs left to right in both languages and #1 is at the top, so a line that
+              rises is a keyword that improved (mirrored for Hebrew, a climb read as a fall). */}
+          <XAxis dataKey="at" tickFormatter={(at: string) => labelOf.get(at) ?? ''} tickLine={false} axisLine={false}
             interval="preserveStartEnd" minTickGap={narrow ? 56 : 24} tickMargin={8} tick={tick} padding={{ left: 16, right: 16 }} />
           {/* The date axis is padded at both ends, so the lowest position's tick (#14) keeps
               clear of the line's first point: at 390 they used to collide in the corner. No

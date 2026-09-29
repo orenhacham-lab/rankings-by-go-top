@@ -18,6 +18,9 @@
  *      skeleton fading out, and only when it WAS loading (a later render never fades);
  *  M5) the position chip buckets a position as Google's pages do (1-3, 4-10,
  *      11-20, beyond, not found), and the sparkline draws nothing from one point;
+ *  M7) a keyword that improved draws a line that RISES, left to right, in both
+ *      languages: time is never mirrored and position 1 is at the top (sparklines,
+ *      the history chart; the search-volume trend runs the same way);
  *  M6) the keywords hero's figures come from the rows the table shows: tracked,
  *      checked, per-page buckets, the average of the positions found, what moved.
  *
@@ -115,8 +118,60 @@ console.log('\nM5) position chips and sparklines')
   check('M5: a position is bucketed as Google\'s pages are', wrong(positionBucket).length === 0, wrong(positionBucket).join(', '))
   check('MUT: page one ending at 9 fails M5', wrong((p, f = true) => (!f || p == null || p <= 0 ? 'none' : p <= 3 ? 'top3' : p <= 9 ? 'page1' : p <= 20 ? 'page2' : 'beyond')).length > 0)
   const spark = (values: (number | null)[]) => renderToStaticMarkup(createElement(Sparkline, { values, invert: true, label: 'x' }))
-  check('M5b: one point draws nothing; two draw a line that flips for Hebrew', spark([4]) === '' && /data-sparkline/.test(spark([9, 4])) && /rtl:-scale-x-100/.test(spark([9, 4])))
-  check('MUT: a line that does not flip for Hebrew fails M5b', !/rtl:-scale-x-100/.test(spark([9, 4]).replace('rtl:-scale-x-100', '')))
+  check('M5b: one point draws nothing; two draw a line', spark([4]) === '' && /data-sparkline/.test(spark([9, 4])))
+}
+
+console.log('\nM7) a keyword that improved draws a line that rises, left to right, in both languages')
+{
+  // The owner read the Hebrew trend lines as declines: mirrored for RTL, #4 → #2 fell
+  // from left to right beside its green up arrow. Time runs left to right everywhere
+  // and position 1 is at the top, so on screen the line climbs toward the right.
+  /** The line's points as drawn on screen: [x, y] with y growing downward. */
+  const onScreen = (html: string): [number, number][] => {
+    const d = /<path d="(M[^"]+)" fill="none"/.exec(html)?.[1] ?? ''
+    const pts = [...d.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as [number, number])
+    const cls = /<svg[^>]*class="([^"]*)"/.exec(html)?.[1] ?? ''
+    // A mirror in either language would flip x on screen; say so rather than guess.
+    return /scale-x-100|-scale-x|scale-x-\[-1\]|rotate-y/.test(cls) ? pts.map(([x, y]) => [-x, y]) : pts
+  }
+  const rises = (html: string) => {
+    const pts = onScreen(html)
+    if (pts.length < 2) return false
+    const [first, last] = [pts[0], pts[pts.length - 1]]
+    return last[0] > first[0] && last[1] < first[1]
+  }
+  const improved = renderToStaticMarkup(createElement(Sparkline, { values: [9, 6, 4, 2], invert: true, label: 'x' }))
+  const dropped = renderToStaticMarkup(createElement(Sparkline, { values: [2, 4, 6, 9], invert: true, label: 'x' }))
+  check('M7: #9 → #2 draws a line rising to the right; #2 → #9 does not', rises(improved) && !rises(dropped))
+  check('MUT: mirroring the line for Hebrew (the reported bug) fails M7', !rises(improved.replace('class="shrink-0 overflow-visible', 'class="shrink-0 overflow-visible rtl:-scale-x-100')))
+  const src = strip(read('components/ui/Sparkline.tsx'))
+  const upright = (code: string) => /return invert \? pad \+ t \* \(height - pad \* 2\) : height - pad - t \* \(height - pad \* 2\)/.test(code)
+    && !/scale-x|rotate-y/.test(code)
+  check('M7b: the sparkline puts the best position at the top and never mirrors', upright(src))
+  check('MUT: position 1 at the bottom fails M7b', !upright(src.replace('return invert ? pad + t * (height - pad * 2) : height - pad - t * (height - pad * 2)', 'return height - pad - t * (height - pad * 2)')))
+  check('MUT: an rtl mirror on the sparkline fails M7b', !upright(src.replace("'shrink-0 overflow-visible'", "'shrink-0 overflow-visible rtl:-scale-x-100'")))
+
+  // The charts: the history chart (positions) and the search-volume trend. Time is
+  // never reversed, and the position axis is (#1 at the top).
+  const charts = {
+    history: strip(read('components/keywords/PositionHistoryChart.tsx')),
+    volume: strip(read('components/keyword-research/TrendModal.tsx')),
+  }
+  const axes = (c: typeof charts): string[] => {
+    const out: string[] = []
+    for (const [name, code] of Object.entries(c)) {
+      const x = /<XAxis\b[^>]*>/.exec(code)?.[0] ?? ''
+      if (!x) out.push(`${name}: no time axis`)
+      else if (/\breversed\b/.test(x)) out.push(`${name}: time runs backwards`)
+    }
+    const y = /<YAxis\b[^>]*>/.exec(c.history)?.[0] ?? ''
+    if (!/<YAxis reversed\b/.test(y)) out.push('history: position 1 is not at the top')
+    return out
+  }
+  check('M7c: the history and trend charts run time left to right, and #1 is at the top of the history', axes(charts).length === 0, axes(charts).join(', '))
+  check('MUT: the history chart reversed for Hebrew fails M7c', axes({ ...charts, history: charts.history.replace('<XAxis dataKey="at"', '<XAxis reversed={isRTL} dataKey="at"') }).length > 0)
+  check('MUT: the history chart with #1 at the bottom fails M7c', axes({ ...charts, history: charts.history.replace('<YAxis reversed ', '<YAxis ') }).length > 0)
+  check('MUT: the volume trend reversed for Hebrew fails M7c', axes({ ...charts, volume: charts.volume.replace('<XAxis dataKey="label"', '<XAxis dataKey="label" reversed={isRTL}') }).length > 0)
 }
 
 console.log('\nM6) the keywords hero counts what the table shows')
