@@ -162,8 +162,16 @@ async function main() {
   check('W1: wpCreatePost runs the schema step once, for a publish, after the post exists', wired(wp))
   check('W2: nothing script-like is added to the post content', !/content\s*(\+?=)[^\n]*ld\+json|<script/i.test(wp))
   check('MUTATION CONTROL: the step moved before the post is created is caught', !wired(wp.replace("if (status === 'publish' && article.id)", "if (article.id)")))
-  const shopifyDiff = spawnSync('git', ['diff', '--name-only', '8b468a8', '--', 'lib/shopify', 'app/api/shopify', 'wordpress-plugin'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim()
-  check('W3: Shopify code and the plugin files are untouched', shopifyDiff === '', shopifyDiff)
+  const changed = (base: string, ...paths: string[]) => spawnSync('git', ['diff', '--name-only', base, '--', ...paths], { cwd: ROOT, encoding: 'utf8' }).stdout.trim()
+  const shopifyDiff = changed('8b468a8', 'lib/shopify', 'app/api/shopify')
+  check('W3: Shopify code is untouched', shopifyDiff === '', shopifyDiff)
+  // Wave 8 merge: the plugin's only change is site health's 2.1.0 (w8-health, 2a1492b: h1 and
+  // llms.txt). The article schema rides the existing /fix schema_jsonld and adds nothing to it.
+  const pluginDiff = changed('2a1492b', 'wordpress-plugin')
+  check('W3b: the plugin is exactly site health\'s 2.1.0; the article work adds nothing to it', pluginDiff === '', pluginDiff)
+  // Mutation control without touching a file: against the pre-wave base the same check sees the
+  // plugin's changed files, so a plugin change is caught.
+  check('MUTATION CONTROL: a plugin change is caught', changed('8b468a8', 'wordpress-plugin').includes('wordpress-plugin/gotop-seo-bridge/'))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exitCode = 1
