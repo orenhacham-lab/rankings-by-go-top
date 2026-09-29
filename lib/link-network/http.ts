@@ -31,6 +31,7 @@ import { linkContext, linkPresent, removeLink, type LinkRel } from './anchor'
 import { LINK_NETWORK_CONSENT_VERSION } from './consent'
 import { LINK_NETWORK_RULES, receivedCapFor, siteQualifies } from './rules'
 import { loadSites, networkRows, NetworkUnavailable, readLinkRel, rows, type MemberRow, type NetworkDb, type PlacementRow } from './store'
+import { linkCount } from './counting'
 
 export interface NetworkDeps {
   session: () => Promise<{ userId: string | null }>
@@ -229,10 +230,8 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
         givenCap: LINK_NETWORK_RULES.maxGivenPerMonth,
         perArticle: LINK_NETWORK_RULES.maxLinksPerArticle,
       },
-      totals: {
-        received: received.filter((r) => r.state === 'published' || r.state === 'waiting').length,
-        given: given.filter((r) => r.state === 'published' || r.state === 'waiting').length,
-      },
+      // One definition of "a link" (./counting.ts): the log's tab counts use the same.
+      totals: { received: linkCount(received), given: linkCount(given) },
       received,
       given,
     }

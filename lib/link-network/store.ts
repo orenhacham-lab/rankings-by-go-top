@@ -105,6 +105,20 @@ type ProjectRow = {
   ai_business_profile: { primaryCategory?: unknown } | null
 }
 type IndexRow = { project_id: string; targets: unknown; scan_status?: string | null }
+type PageMapRow = { project_id: string; user_id: string | null; status: string | null; counts: unknown }
+
+/**
+ * How many pages the full-site mapping (site_page_map, the "existing content" screen) found: its
+ * `counts.all`, else the sum of its tabs. Only a run that read the site counts (completed or
+ * partial); a running or failed one is no evidence yet.
+ */
+export function pageMapCount(row: Pick<PageMapRow, 'status' | 'counts'> | null | undefined): number {
+  if (!row || (row.status !== 'completed' && row.status !== 'partial')) return 0
+  const c = row.counts && typeof row.counts === 'object' ? (row.counts as Record<string, unknown>) : {}
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0)
+  const all = n(c.all)
+  return all > 0 ? all : n(c.page) + n(c.article) + n(c.product) + n(c.category)
+}
 type OwnedSiteRow = { project_id: string; user_id: string | null; site_url: string | null }
 type GscPropertyRow = { project_id: string; connection_id: string | null; site_url: string | null; permission_level: string | null }
 
@@ -160,7 +174,7 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
     .in('id', ids).limit(ids.length))
   if (!projects.length) return out
   const userIds = [...new Set(projects.map((p) => p.user_id))]
-  const [members, profiles, shopify, governance, competitors, seedRuns, crawl, wpIndex, published, proof] = await Promise.all([
+  const [members, profiles, shopify, governance, competitors, seedRuns, crawl, wpIndex, published, proof, pageMaps] = await Promise.all([
     networkRows<MemberRow>(db.from('link_network_members').select('project_id, user_id, active, consent_version, consented_at, consent_link_rel, left_at').in('project_id', ids).limit(ids.length)),
     rows<{ project_id: string; niche: string | null; description: string | null; detected_platform: string | null }>(
       db.from('project_profiles').select('project_id, niche, description, detected_platform').in('project_id', ids).limit(ids.length)),
@@ -174,6 +188,8 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
     rows<{ project_id: string; title: string | null; wp_post_url: string | null }>(
       db.from('generated_articles').select('project_id, title, wp_post_url').in('project_id', ids).eq('status', 'published').limit(ids.length * 30)),
     readDomainProof(db, projects),
+    // The full-site mapping (sitemaps + platform lists): counts only, never its entries.
+    rows<PageMapRow>(db.from('site_page_map').select('project_id, user_id, status, counts').in('project_id', ids).limit(ids.length)),
   ])
   const by = <T extends { project_id: string }>(list: T[]) => {
     const m = new Map<string, T[]>()
@@ -185,6 +201,9 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
   const shopifyIds = new Set(shopify.map((s) => s.project_id))
   const shopifyBilled = new Set(governance.filter((g) => g.billing_authority === 'shopify').map((g) => g.user_id))
   const compOf = by(competitors), runsOf = by(seedRuns), crawlOf = by(crawl), wpOf = by(wpIndex), pubOf = by(published)
+  const ownerOfProject = new Map(projects.map((p) => [p.id, p.user_id]))
+  // The service role bypasses RLS: a mapping counts only when it belongs to the project's own owner.
+  const mapOf = new Map(pageMaps.filter((m) => m.user_id && m.user_id === ownerOfProject.get(m.project_id)).map((m) => [m.project_id, m]))
 
   for (const p of projects) {
     const domains = domainsOf(p)
@@ -230,9 +249,12 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
       active: !!member?.active && p.is_active !== false,
       memberSince: member?.active ? member.consented_at : null,
       createdAt: p.created_at,
-      scanned: runs.some((r) => r.status === 'done' || r.status === 'partial') || crawlRow?.scan_status === 'completed' || crawlRow?.scan_status === 'partial',
+      scanned: runs.some((r) => r.status === 'done' || r.status === 'partial') || crawlRow?.scan_status === 'completed' || crawlRow?.scan_status === 'partial'
+        || pageMapCount(mapOf.get(p.id)) > 0,
       publishedArticles: (pubOf.get(p.id) ?? []).length,
-      indexedPages: index.length,
+      // The site's pages as the app knows them: the link index, or the full-site mapping when it
+      // found more (the index lists only the pages it could read; the mapping reads the sitemaps).
+      indexedPages: Math.max(index.length, pageMapCount(mapOf.get(p.id))),
       linkedDomains: [],
     }
     out.set(p.id, { site, extras: { businessName: str(p.business_name, 120), description: str(profile?.description, 400), pages } })

@@ -2978,6 +2978,7 @@ export const dashboardEn = {
           body: 'When we place a link in one of your articles, it shows here before publishing, and you can remove it.',
         },
         notJoined: 'Once you join, every link you receive or give shows here.',
+        history: (n: number) => (n === 1 ? 'One link no longer in its article' : `${n} links no longer in their articles`),
       },
     },
   },

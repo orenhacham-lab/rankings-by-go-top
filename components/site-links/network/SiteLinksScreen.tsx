@@ -1,9 +1,10 @@
 'use client'
 
 /**
- * The Links screen for one project: the link network ("רשת הקישורים") first, the
- * earlier work (link opportunities from the open web and the links between the
- * site's own pages, SiteLinksView) as the second view.
+ * The Links screen for one project: link opportunities from the open web and the
+ * links between the site's own pages (SiteLinksView, free for everyone) first, the
+ * link network ("רשת הקישורים", opt-in) second. A project that already joined the
+ * network opens on it; every other project opens on the opportunities.
  *
  * The network exists only where the server says so: without its tables (the
  * migration is not applied yet), for a Shopify project, or when the read fails,
@@ -33,7 +34,8 @@ export default function SiteLinksScreen({ projectId }: { projectId: string }) {
   const { language } = useDashboardLanguage()
   const copy = getDashboardDictionary(language).siteLinks
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
-  const [view, setView] = useState<View>('network')
+  // Unset until the person picks a tab: the default follows membership (see the header).
+  const [picked, setPicked] = useState<View | null>(null)
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -59,15 +61,16 @@ export default function SiteLinksScreen({ projectId }: { projectId: string }) {
   if (load.kind === 'hidden') return <SiteLinksView projectId={projectId} />
 
   const t = copy.network.tabs
+  const view: View = picked ?? (load.data.membership.active ? 'network' : 'opportunities')
   return (
     <div className="space-y-8" data-link-network="screen">
       <Segmented<View>
         ariaLabel={t.label}
         value={view}
-        onChange={setView}
+        onChange={setPicked}
         options={[
-          { value: 'network', label: t.network, icon: Network },
           { value: 'opportunities', label: t.opportunities, icon: Telescope },
+          { value: 'network', label: t.network, icon: Network },
         ]}
       />
       <div key={view} className="tab-enter">
