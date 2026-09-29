@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
  * open with (one per screen — it stops meaning "read this first" if repeated).
  *
  * `interactive` is for a card that IS a link or a button: only then does it
- * answer the pointer, with a stronger border (never a lift or a deeper shadow). A card
+ * answer the pointer, with a stronger border and (wave 7) a 3px lift. A card
  * that cannot be clicked does not pretend it can.
  */
 interface CardProps {
@@ -32,8 +32,9 @@ export function Card({ children, className, padding = true, tone = 'default', in
         // The context card: deep ink with one quiet cobalt glow in its top corner,
         // drawn on the card itself so it needs no extra element.
         tone === 'ink' && 'overflow-hidden bg-contrast text-contrast-ink border-contrast-ink/5 shadow-card bg-[radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--color-brand)_20%,transparent),transparent_55%)] rtl:bg-[radial-gradient(120%_140%_at_0%_0%,color-mix(in_srgb,var(--color-brand)_20%,transparent),transparent_55%)]',
-        // Answering the pointer is the border only (contract §4: no card lift).
-        interactive && 'cursor-pointer hover:border-line-strong',
+        // A card that is a link or a button rises 3px under the pointer and its
+        // shadow softens out (.lift, wave 7); with reduced motion only the shadow and border answer.
+        interactive && 'lift cursor-pointer hover:border-line-strong',
         padding && 'p-6',
         className
       )}

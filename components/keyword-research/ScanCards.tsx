@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { Skeleton } from '@/components/ui/Skeleton'
+import HeroPanel, { HeroBadge } from '@/components/ui/HeroPanel'
 import type { EmptyReason, ProgressStep } from '@/lib/keyword-research/scan-state'
 
 /**
@@ -39,11 +40,7 @@ export function ScanLoadingSkeleton() {
   return (
     <section data-scan-state="loading" role="status" aria-busy="true" className="mb-8">
       <span className="sr-only">{t.pending}</span>
-      <Card tone="ink" padding={false} className="relative isolate overflow-hidden shadow-pop">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-10%,color-mix(in_srgb,var(--color-action)_38%,transparent),transparent_70%),radial-gradient(28rem_14rem_at_0%_110%,color-mix(in_srgb,var(--color-commit)_16%,transparent),transparent_70%)]"
-        />
+      <HeroPanel>
         <div aria-hidden="true" className="flex items-center justify-between gap-6 px-5 pb-16 pt-5 sm:px-8 sm:pb-20 sm:pt-7">
           <div className="min-w-0 flex-1">
             <Skeleton className={cn('h-6 w-28 rounded-pill', onInk)} />
@@ -52,7 +49,7 @@ export function ScanLoadingSkeleton() {
           </div>
           <span className="hidden size-32 shrink-0 rounded-pill border-[10px] border-contrast-ink/10 md:block" />
         </div>
-      </Card>
+      </HeroPanel>
       <div aria-hidden="true" className="relative z-10 -mt-11 grid grid-cols-2 gap-3 px-2 sm:-mt-12 sm:px-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="rounded-card border border-line bg-surface p-4 shadow-pop">
@@ -78,16 +75,12 @@ export function ScanPendingCard() {
   const t = getDashboardDictionary(language).keywordResearchScan
   return (
     <section data-scan-state="pending" className="mb-6" aria-busy="true">
-      <Card tone="ink" className="relative isolate overflow-hidden p-5 shadow-pop sm:p-8">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-10%,color-mix(in_srgb,var(--color-action)_38%,transparent),transparent_70%),radial-gradient(28rem_14rem_at_0%_110%,color-mix(in_srgb,var(--color-commit)_16%,transparent),transparent_70%)]"
-        />
+      <HeroPanel className="p-5 sm:p-8">
         <span className="block h-5 w-28 rounded-pill bg-contrast-ink/10" aria-hidden="true" />
         <span className="mt-5 block h-8 w-3/4 max-w-xl rounded-control bg-contrast-ink/10" aria-hidden="true" />
         <span className="mt-3 block h-4 w-1/3 rounded-control bg-contrast-ink/10" aria-hidden="true" />
         <span className="sr-only">{t.pending}</span>
-      </Card>
+      </HeroPanel>
     </section>
   )
 }
@@ -97,17 +90,10 @@ export function ScanRunningCard({ seedKeywords, steps }: { seedKeywords: string[
   const t = getDashboardDictionary(language).keywordResearchScan.running
   return (
     <section data-scan-state="running" className="mb-6">
-      <Card tone="ink" className="relative isolate overflow-hidden p-5 shadow-pop sm:p-8">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_18rem_at_85%_-10%,color-mix(in_srgb,var(--color-action)_38%,transparent),transparent_70%),radial-gradient(28rem_14rem_at_0%_110%,color-mix(in_srgb,var(--color-commit)_16%,transparent),transparent_70%)]"
-        />
-        <span className="inline-flex items-center gap-2 rounded-pill bg-contrast-ink/10 px-2.5 py-1 text-caption font-semibold ring-1 ring-contrast-ink/10">
-          <span className="size-1.5 rounded-pill bg-commit" aria-hidden="true" />
-          {t.badge}
-        </span>
+      <HeroPanel className="p-5 sm:p-8">
+        <HeroBadge tone="commit" live>{t.badge}</HeroBadge>
         <h2 className="mt-5 text-title font-bold tracking-tight">{t.title}</h2>
-        <ol className="mt-5 grid gap-2 sm:grid-cols-3">
+        <ol className="stagger-in mt-5 grid gap-2 sm:grid-cols-3">
           {steps.map((s) => (
             <li
               key={s.step}
@@ -141,7 +127,7 @@ export function ScanRunningCard({ seedKeywords, steps }: { seedKeywords: string[
             <p className="mt-2 text-copy text-contrast-ink/80">{t.noSeeds}</p>
           )}
         </div>
-      </Card>
+      </HeroPanel>
     </section>
   )
 }

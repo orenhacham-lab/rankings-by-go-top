@@ -36,14 +36,14 @@ export default function StatTile({ label, value, source, delta, icon, empty, cla
       <div className="flex items-start justify-between gap-2">
         <span className="text-caption font-medium text-muted">{label}</span>
         {icon && (
-          <span className="-mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-control bg-sunk text-muted [&_svg]:size-4" aria-hidden="true">
+          <span className="-mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-control bg-action-soft text-action ring-1 ring-inset ring-action/10 [&_svg]:size-4" aria-hidden="true">
             {icon}
           </span>
         )}
       </div>
       {hasValue ? (
         <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-metric font-semibold tracking-tight text-ink tabular-nums">{value}</span>
+          <span className="text-metric font-bold tracking-tight text-ink tabular-nums">{value}</span>
           {delta && (
             <span
               className={cn(

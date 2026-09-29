@@ -85,9 +85,15 @@ export function TableHead({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function TableBody({ children }: { children: React.ReactNode }) {
+/**
+ * `enter` plays the rows' entrance (.rows-enter: 420ms rise, 32ms apart for the
+ * first twelve). Pass it from useFirstEntrance (components/ui/motion.tsx) so it
+ * plays ONCE, when the first data arrives, and never on a sort, a filter or a
+ * refetch. Only with no-preference; with reduced motion the rows are simply there.
+ */
+export function TableBody({ children, enter = false }: { children: React.ReactNode; enter?: boolean }) {
   const stacked = useContext(StackContext)
-  return <tbody className={cn('divide-y divide-line', stacked && 'max-sm:block')}>{children}</tbody>
+  return <tbody className={cn('divide-y divide-line', stacked && 'max-sm:block', enter && 'rows-enter')}>{children}</tbody>
 }
 
 /**
@@ -112,7 +118,10 @@ export function TableRow({
   return (
     <tr
       className={cn(
-        'bg-surface hover:bg-sunk/50 transition-colors duration-150',
+        // The row under the pointer: a faint cobalt wash and a 3px bar on its start edge.
+        'bg-surface transition-colors duration-150 ease-snappy hover:bg-action-soft/45',
+        '[&>td:first-child]:transition-shadow [&>td:first-child]:duration-150',
+        'ltr:hover:[&>td:first-child]:shadow-edge-ltr rtl:hover:[&>td:first-child]:shadow-edge-rtl',
         stacked && STACKED_ROW,
         onClick && 'cursor-pointer',
         className

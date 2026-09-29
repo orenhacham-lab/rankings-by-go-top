@@ -96,8 +96,8 @@ function RivalCard({ c, max, index }: { c: CompetitorInsight; max: number; index
       {c.found > 0 && (
         <div className="mt-4">
           <span role="img" aria-label={t.overlapLabel(n(c.shared), n(c.gaps))} className="flex h-2 w-full overflow-hidden rounded-pill bg-sunk">
-            <span className="h-full bg-action" style={{ width: `${sharedPct}%` }} />
-            <span className="h-full bg-action/35" style={{ width: `${100 - sharedPct}%` }} />
+            <span className="grow-x h-full bg-action" style={{ width: `${sharedPct}%`, '--grow-delay': `${200 + index * 60}ms` } as React.CSSProperties} />
+            <span className="grow-x h-full bg-action/35" style={{ width: `${100 - sharedPct}%`, '--grow-delay': `${320 + index * 60}ms` } as React.CSSProperties} />
           </span>
           <p className="mt-1.5 flex flex-wrap gap-x-3 text-caption text-muted" aria-hidden="true">
             <span className="inline-flex items-center gap-1"><span className="size-2 rounded-pill bg-action" />{t.shared(n(c.shared))}</span>

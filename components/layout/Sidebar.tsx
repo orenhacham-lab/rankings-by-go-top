@@ -226,7 +226,7 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
         {...NAV_ICON}
         aria-hidden="true"
         className={cn(
-          'shrink-0 transition-colors duration-150',
+          'shrink-0 transition-[color,transform] duration-200 ease-snappy motion-safe:group-hover:-translate-y-px',
           isActive ? 'text-rail-active-ink' : 'text-rail-muted group-hover:text-rail-ink'
         )}
       />
@@ -483,8 +483,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             <span
               ref={pillRef}
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 hidden rounded-control bg-rail-active group-data-[pill=on]/nav:block data-[slide=on]:transition-transform data-[slide=on]:duration-200 data-[slide=on]:ease-snappy"
-            />
+              className="pointer-events-none absolute inset-x-0 top-0 hidden rounded-control bg-[linear-gradient(90deg,var(--color-rail-active),color-mix(in_srgb,var(--color-rail-active)_78%,var(--color-brand)))] shadow-glow ring-1 ring-inset ring-rail-ink/10 group-data-[pill=on]/nav:block data-[slide=on]:transition-[transform,height] data-[slide=on]:duration-300 data-[slide=on]:ease-spring motion-reduce:transition-none"
+            >
+              {/* A lit edge on the pill's start side, so the active entry reads at a glance. */}
+              <span className="absolute inset-y-2 start-0 w-[3px] rounded-pill bg-rail-tagline" />
+            </span>
             <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} />
           </div>
         </nav>

@@ -62,7 +62,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       onCancel={handleCancel}
       // No onClose binding here — we manage state ourselves
       className={cn(
-        'rounded-card shadow-pop border border-line p-0 m-auto bg-surface text-body max-w-[calc(100vw-2rem)] open:animate-pop-in',
+        'rounded-card shadow-pop border border-line p-0 m-auto bg-surface text-body max-w-[calc(100vw-2rem)] dialog-spring',
         // The backdrop is the one `backdrop` token (globals.css), dimmer in dark mode.
         'backdrop:bg-backdrop backdrop:backdrop-blur-[3px]',
         {

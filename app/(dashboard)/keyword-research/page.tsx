@@ -46,6 +46,7 @@ import { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import ResearchLandscape, { LANDSCAPE_IDS } from '@/components/keyword-research/ResearchLandscape'
 import SectionNav from '@/components/keyword-research/SectionNav'
 import SiteAvatar from '@/components/ui/SiteAvatar'
+import { useFirstEntrance } from '@/components/ui/motion'
 import { NO_LANDSCAPE } from '@/components/keyword-research/landscape'
 
 interface KeywordIdeaResult {
@@ -817,6 +818,11 @@ export default function KeywordResearchPage() {
   }
 
   // Top opportunities computed from existing results — no extra API calls.
+  // The largest monthly searches in the table: each row's volume bar is measured against it.
+  const maxVolume = useMemo(() => Math.max(1, ...tableSource.map((r) => r.avgMonthlySearches ?? 0)), [tableSource])
+  // The rows rise in once, when the first research arrives; a chip, a sort or "show more" shows them at once.
+  const rowsEnter = useFirstEntrance(tableSource.length > 0)
+
   const topOpportunities = useMemo(() => {
     if (results.length === 0) return []
     const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
@@ -1245,13 +1251,13 @@ export default function KeywordResearchPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className={`divide-y divide-line${rowsEnter ? ' rows-enter' : ''}`}>
                 {sortedResults.slice(0, shownRows).map((result, idx) => {
                   const badge = getOpportunityBadgeInfo(result, t.results.potentialLevel)
                   const competition = competitionCell(result, t.results.competitionLevel, t.results.competitionIndex)
                   const selected = selectedKeywords.has(result.keyword)
                   return (
-                  <tr key={idx} data-selected={selected || undefined} className={`h-14 transition-colors duration-150 ease-snappy ${selected ? 'bg-action-soft' : 'hover:bg-sunk/60'}`}>
+                  <tr key={idx} data-selected={selected || undefined} className={`h-14 transition-[background-color,box-shadow] duration-150 ease-snappy [&>td:first-child]:transition-shadow ${selected ? 'bg-action-soft ltr:[&>td:first-child]:shadow-edge-ltr rtl:[&>td:first-child]:shadow-edge-rtl' : 'hover:bg-action-soft/40 ltr:hover:[&>td:first-child]:shadow-edge-ltr rtl:hover:[&>td:first-child]:shadow-edge-rtl'}`}>
                     <td className="w-10 ps-4 pe-1 sm:ps-6 sm:pe-2">
                       <Checkbox
                         checked={selected}
@@ -1267,7 +1273,15 @@ export default function KeywordResearchPage() {
                       )}
                     </td>
                     <td className="px-2.5 py-3 text-end tabular-nums text-body sm:px-4">
-                      {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? formatCount(result.avgMonthlySearches, language) : '—'}
+                      {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? (
+                        <span className="inline-flex flex-col items-end gap-1">
+                          <span className="font-semibold text-ink">{formatCount(result.avgMonthlySearches, language)}</span>
+                          {/* The row's searches against the table's largest: a quiet bar under the figure. */}
+                          <span aria-hidden="true" className="hidden h-1 w-16 overflow-hidden rounded-pill bg-sunk sm:block">
+                            <span className="grow-x block h-full rounded-pill bg-action/60" style={{ width: `${Math.max(4, Math.round((result.avgMonthlySearches / maxVolume) * 100))}%` }} />
+                          </span>
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="hidden px-4 py-3 text-start md:table-cell">
                       <Badge variant={badge.variant}>{badge.label}</Badge>

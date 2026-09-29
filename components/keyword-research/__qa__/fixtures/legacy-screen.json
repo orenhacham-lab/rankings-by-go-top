@@ -1,77 +1,77 @@
 {
-  "capturedFrom": "preview merge: wave 6",
+  "capturedFrom": "wave 7 (w7-app): rows enter once, hover start bar, volume bars",
   "scenarios": {
     "he/initial": {
-      "sha256": "94abe65ebbcf96c06c73e793c1278e1afd1958ac0ffa6336d58854c89241efc6",
-      "length": 8767
+      "sha256": "fb6a8fd0edf5abe92e0deeaf47b7b8abe74ec3046679be7cc1d60e0ce393bb01",
+      "length": 10752
     },
     "he/results": {
-      "sha256": "7216918e8f2a77cfc626b05cd88c19bad38c72f456405f686e411301474b38d8",
-      "length": 32096
+      "sha256": "54c4e50d6d47d7fae19f23ea783d2ebd516878f5cd315209ddc6b6a0d5d7b63c",
+      "length": 35345
     },
     "he/selectedWithOpportunities": {
-      "sha256": "ec9321d196f7f787697515c5619f290647bc99fc59f3e0b1d326b8a0384eb96e",
-      "length": 44632
+      "sha256": "dda7b42ab1d3b853a228b0f8fb87ea10cd6dd0fdaf302c3790cdad48a12823cd",
+      "length": 48452
     },
     "he/added": {
-      "sha256": "6a2653be2537e723186f89acbcb91fd6be5c09a46d1a71e5da2d0db469cb4df6",
-      "length": 39321
+      "sha256": "c584715c639ebbb57c6d93024b23df53f752bdb0183352abe1a1882c4f9ae629",
+      "length": 43160
     },
     "he/addAndAiErrors": {
-      "sha256": "6c84452073b1d4d32d71302abc6276e8ee5cb44154a47ff71adae749307b4b31",
-      "length": 40646
+      "sha256": "ba2206c0d83d286a926c17797345f984c45f995c47c888c903164dea0b24c0d5",
+      "length": 44485
     },
     "he/error": {
-      "sha256": "f5b848906d246de62aa6bd8e5b3ff4537b5c6dfa7b27215136946966ce4292f5",
-      "length": 8823
+      "sha256": "78e396a4dfa6a3f9024f83bae41bf6b2020532326301a2e6e983b2cff5aa0562",
+      "length": 9550
     },
     "he/formKeywordUrlLoading": {
-      "sha256": "4bba334c0a979d5a21d301517f3ce64cd852a517f2f1bdae624c455602b4aa4e",
-      "length": 8678
+      "sha256": "dccc05d3fa9bfe9e32ea6d6fc85374cfd3a0527bd13bb7b5636d631f0dcc5c02",
+      "length": 9405
     },
     "he/fewResults": {
-      "sha256": "d4e2f489f710bf53fbb2c422f876536953dd12b7f0083d76a9b22c3ac28d3955",
-      "length": 18435
+      "sha256": "50883aa8cee445cb7efa18b5e6ffbce95d6780b920835470655ee70f537e55eb",
+      "length": 19641
     },
     "he/filteredSorted": {
-      "sha256": "23ae8377c75f42a5ecc917a9287b37f685be4dfce24befe4addbd89db482aa08",
-      "length": 32855
+      "sha256": "6e9b3e5a58f477906d37eeecf73570b2c03bd552b1adb5085e75bb4b9c5fe3ff",
+      "length": 36104
     },
     "en/initial": {
-      "sha256": "39651daa2f5618124ab1d503ded25976916599f3f113458c9317a307e6484881",
-      "length": 8825
+      "sha256": "8850180df58894f5752ee40f955bcbc1dd7925315bd21368b9d9e8fb57346afe",
+      "length": 10810
     },
     "en/results": {
-      "sha256": "c4b7d045c3d4c1e9658acc52c1497634cb9d6a37c7d606d95e6720d2c6284b56",
-      "length": 32176
+      "sha256": "6962dbef650c104da9dfece8df713919c6b4b1fb9ae6a1e40b0f35543c5c3a25",
+      "length": 35425
     },
     "en/selectedWithOpportunities": {
-      "sha256": "804bb337958df92d12b535b7933c5d9982cbd9e9c6a180b64f5c18776212bd87",
-      "length": 44819
+      "sha256": "27e6c3a7a80e7eddd65a6fef81f1c21c67bb4e6a145c7e0cac4e124ff3087859",
+      "length": 48639
     },
     "en/added": {
-      "sha256": "b82f8e44bbbf81a75c8879ff51f8ecff174761685588422341d68c0dd29b2621",
-      "length": 39443
+      "sha256": "3821b9942f52024c92dd25129c18dc51a653781064d301d17a62a0b32a330aa8",
+      "length": 43282
     },
     "en/addAndAiErrors": {
-      "sha256": "18b32d35119956703d3f8678b8f2c40b6b59dcadeb57c4f60ae320da24556603",
-      "length": 40760
+      "sha256": "a051009fb7da3f1a12ecae2a14747ddab13b836eb2c7962121583d0c162c45f0",
+      "length": 44599
     },
     "en/error": {
-      "sha256": "447bc20580f1f7e706efea7945246d136e708b26e84e583b35102ccfe83c46d1",
-      "length": 8879
+      "sha256": "e5f7804b4d3fdbd5a4e5bc26828773ca4eb879cfa2159a5f15fa0500eb26b27e",
+      "length": 9606
     },
     "en/formKeywordUrlLoading": {
-      "sha256": "9dff83448983a780e24236fc2154f583a8c7965dc019514314323686a1718405",
-      "length": 8721
+      "sha256": "453f5b35ab8909a9e71106b3c08a6241d7aff64a4912cf99fa9e3caa4523fc6e",
+      "length": 9448
     },
     "en/fewResults": {
-      "sha256": "a246d49b86af3c565427a3c2baccb029a569446ab01a8c14538603d51f17e1e6",
-      "length": 18570
+      "sha256": "027d1adba84820155db3e466654315817ab05dfbd88e8042a337677ade0a0c48",
+      "length": 19776
     },
     "en/filteredSorted": {
-      "sha256": "fff659699511ca6c7fac084fe72c848ea37ae1350c38d6e331fb3631e599f8ce",
-      "length": 32959
+      "sha256": "d00a35311df3b307deeb0651e2e14569686bba6e5bf1837136be2f9fa007c14d",
+      "length": 36208
     }
   }
 }

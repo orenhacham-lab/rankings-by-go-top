@@ -12,7 +12,10 @@ import PositionHistoryChart, { positionPoints } from '@/components/keywords/Posi
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { SearchX } from 'lucide-react'
+import { ArrowDownToLine, Crown, LineChart as LineChartIcon, SearchX, Sigma, Target } from 'lucide-react'
+import PositionChip from '@/components/ui/PositionChip'
+import { AnimatedNumber, useFirstEntrance } from '@/components/ui/motion'
+import { formatCount } from '@/components/gsc/format'
 import { formatDateTime } from '@/lib/utils'
 import { displayUrl } from '@/lib/format/display-url'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -27,6 +30,8 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
   const [target, setTarget] = useState<TrackingTarget & { projects?: { name: string; id: string } } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [loading, setLoading] = useState(true)
+  // The check rows rise in once, when they first arrive.
+  const rowsEnter = useFirstEntrance(!loading && results.length > 0)
 
   useEffect(() => {
     async function loadData() {
@@ -97,16 +102,21 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       </Header>
 
       {/* Summary: the same tile as every other screen, plain figures (ok/bad are for up/down only). */}
-      <div data-history-tiles="" className="list-enter mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-        <StatTile label={t.currentPosition} value={latestResult?.found ? `#${latestResult.position}` : '—'} />
-        <StatTile label={t.bestPosition} value={bestPosition !== null ? `#${bestPosition}` : '—'} />
-        <StatTile label={t.worstPosition} value={worstPosition !== null ? `#${worstPosition}` : '—'} />
-        <StatTile label={t.average} value={avgPosition !== null ? `#${avgPosition}` : '—'} />
+      <div data-history-tiles="" className="stagger-in mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+        <StatTile label={t.currentPosition} icon={<Target />} value={latestResult?.found && latestResult.position !== null ? <PositionFigure n={latestResult.position} /> : '—'}
+          source={latestResult ? formatDateTime(latestResult.checked_at, language) : undefined} />
+        <StatTile label={t.bestPosition} icon={<Crown />} value={bestPosition !== null ? <PositionFigure n={bestPosition} /> : '—'} />
+        <StatTile label={t.worstPosition} icon={<ArrowDownToLine />} value={worstPosition !== null ? <PositionFigure n={worstPosition} /> : '—'} />
+        <StatTile label={t.average} icon={<Sigma />} value={avgPosition !== null ? <PositionFigure n={avgPosition} /> : '—'}
+          source={`${formatCount(foundResults.length, language)} ${t.checks}`} />
       </div>
 
       {/* The position over time (§10), before the rows it is drawn from. */}
       <Card className="mb-8">
-        <h2 className="mb-4 text-section font-semibold text-ink">{t.chartTitle}</h2>
+        <div className="mb-4 flex items-center gap-3">
+          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action"><LineChartIcon className="size-5" /></span>
+          <h2 className="text-section font-semibold text-ink">{t.chartTitle}</h2>
+        </div>
         {chartable ? (
           <PositionHistoryChart points={points} isRTL={language === 'he'} label={t.chartLabel(target.keyword)} positionAt={t.positionAt} notFound={t.notFound} />
         ) : (
@@ -136,7 +146,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
             <Th className="hidden lg:table-cell">{t.resultTitle}</Th>
           </tr>
         </TableHead>
-        <TableBody>
+        <TableBody enter={rowsEnter}>
           {results.length === 0 && (
             <EmptyRow colSpan={6} message={t.noHistoryYet} />
           )}
@@ -145,11 +155,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
               <Td className="whitespace-nowrap">{formatDateTime(result.checked_at, language)}</Td>
               <Td>
                 <div className="flex flex-col items-start gap-0.5">
-                  {result.found && result.position !== null ? (
-                    <span className="font-semibold text-ink tabular-nums">#{result.position}</span>
-                  ) : (
-                    <span className="text-caption text-muted">{t.notFound}</span>
-                  )}
+                  <PositionChip position={result.position} found={result.found && result.position !== null} notFoundLabel={t.notFound} />
                   <span className="sm:hidden"><PositionChange change={result.change_value} /></span>
                 </div>
               </Td>
@@ -186,4 +192,9 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       </Table>
     </div>
   )
+}
+
+/** A position that counts up to itself once, the first time it is on screen: "#3". */
+function PositionFigure({ n }: { n: number }) {
+  return <AnimatedNumber value={n} format={(v) => `#${Math.round(v)}`} />
 }

@@ -4,8 +4,12 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
-import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
+import { Table, TableHead, TableBody, TableRow, Th, Td } from '@/components/ui/Table'
+import { EngineLabel, PositionChange } from '@/components/ui/StatusBadge'
+import PositionChip from '@/components/ui/PositionChip'
+import Sparkline from '@/components/ui/Sparkline'
+import { useFirstEntrance } from '@/components/ui/motion'
+import { formatCount } from '@/components/gsc/format'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
@@ -32,6 +36,8 @@ const SORT_BUTTON = 'inline-flex items-center gap-1 rounded-control font-semibol
 interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
   latestResults?: Record<string, ScanResult>
+  /** Each keyword's last checks, oldest first (null where it was not found): the trend line. */
+  positionHistory?: Record<string, (number | null)[]>
   projectId: string
   projectCity?: string | null
   projectCountry?: string
@@ -71,6 +77,7 @@ interface TrackingTargetsTableProps {
 export default function TrackingTargetsTable({
   targets,
   latestResults = {},
+  positionHistory = {},
   projectId,
   projectCity,
   projectCountry,
@@ -93,6 +100,7 @@ export default function TrackingTargetsTable({
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const k = dict.projectDetail.table
+  const kp = dict.keywordsPage
 
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -158,6 +166,9 @@ export default function TrackingTargetsTable({
     }
   }
 
+  // The rows rise in once, when the list first arrives; a sort or a refetch shows them at once.
+  const rowsEnter = useFirstEntrance(!targetsLoading && targets.length > 0)
+
   const confirmTarget = confirmDeleteId ? targets.find((t) => t.id === confirmDeleteId) ?? null : null
 
   // A project with no keywords yet: one empty state and its one action, not an empty table.
@@ -201,13 +212,27 @@ export default function TrackingTargetsTable({
             <Th>{k.actions}</Th>
           </tr>
         </TableHead>
-        <TableBody>
+        <TableBody enter={rowsEnter}>
           {/* THREE DISTINCT ANSWERS, never one. "Still loading", "could not be
               read — try again" and "there are none yet" mean different things
               to a merchant, and collapsing them into an empty table is how a
               failure reads as an empty project. */}
           {targets.length === 0 && targetsLoading && (
-            <EmptyRow colSpan={COLUMNS} message={k.keywordsLoading} />
+            // The rows' own shape while they load, which the rows then replace.
+            Array.from({ length: 5 }, (_, i) => (
+              <tr key={`loading-${i}`} aria-hidden={i > 0 || undefined}>
+                <td colSpan={COLUMNS} className="px-4 py-3.5">
+                  {i === 0 && <span role="status" className="sr-only">{k.keywordsLoading}</span>}
+                  <div className="flex items-center gap-6">
+                    <Skeleton className="h-3.5 w-1/4" />
+                    <Skeleton className="hidden h-3.5 w-16 sm:block" />
+                    <Skeleton className="h-8 w-12" />
+                    <Skeleton className="hidden h-6 w-20 md:block" />
+                    <Skeleton className="ms-auto h-3.5 w-24" />
+                  </div>
+                </td>
+              </tr>
+            ))
           )}
           {targets.length === 0 && !targetsLoading && targetsError && (
             <tr>
@@ -227,6 +252,7 @@ export default function TrackingTargetsTable({
           )}
           {sortedTargets.map((target) => {
             const result = latestResults[target.id]
+            const history = positionHistory[target.id] ?? []
             const isScanning = scanningTargets.has(target.id)
             // One row, about 56px on a desktop (UX review P1-17): the position check
             // stays in view as an icon, everything else is the same actions behind "⋯".
@@ -249,14 +275,14 @@ export default function TrackingTargetsTable({
             return (
               <TableRow key={target.id} className="[&>td]:py-2 max-sm:[&>td]:px-2.5">
                 <Td className="min-w-[7rem] sm:whitespace-nowrap">
-                  <span className="font-medium text-ink">{target.keyword}</span>
+                  <span className="font-semibold text-ink">{target.keyword}</span>
                   {!target.is_active && <Badge variant="neutral" className="ms-2 align-middle">{dict.common.inactive}</Badge>}
                   {target.notes && (
                     <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
                   )}
                 </Td>
                 <Td className="hidden whitespace-nowrap md:table-cell">
-                  <EngineBadge engine={target.engine_type} device={projectDevice} />
+                  <EngineLabel engine={target.engine_type} device={projectDevice} />
                 </Td>
                 <Td className="hidden sm:table-cell">
                   <GscVolumeCell view={gscKeywords} targetId={target.id}>
@@ -299,17 +325,11 @@ export default function TrackingTargetsTable({
                   </GscVolumeCell>
                 </Td>
                 <Td>
-                  <div className="flex flex-col items-start gap-0.5">
+                  <div className="flex flex-col items-start gap-1">
                     {result ? (
-                      result.found ? (
-                        <span className="text-copy font-bold leading-5 text-ink tabular-nums">
-                          #{result.position}
-                        </span>
-                      ) : (
-                        <span className="text-copy text-muted">{k.notFound}</span>
-                      )
+                      <PositionChip position={result.position} found={result.found} notFoundLabel={k.notFound} />
                     ) : (
-                      <span className="text-copy text-muted">—</span>
+                      <span className="inline-flex h-8 items-center text-copy text-muted">—</span>
                     )}
                     {result && <span className="sm:hidden"><PositionChange change={result.change_value} /></span>}
                     {competitorView && <TopCompetitorLine view={competitorView} targetId={target.id} />}
@@ -317,7 +337,15 @@ export default function TrackingTargetsTable({
                 </Td>
                 <Td className="hidden sm:table-cell">
                   {result ? (
-                    <PositionChange change={result.change_value} />
+                    <div className="flex items-center gap-3">
+                      <Sparkline
+                        values={history}
+                        invert
+                        label={kp.trendLabel(target.keyword, formatCount(history.length, language))}
+                        className="hidden md:block"
+                      />
+                      <PositionChange change={result.change_value} />
+                    </div>
                   ) : '—'}
                 </Td>
                 <Td className="hidden whitespace-nowrap lg:table-cell">
@@ -349,7 +377,7 @@ export default function TrackingTargetsTable({
                         aria-busy={isScanning || undefined}
                         aria-label={k.scanNow(target.keyword)}
                         title={k.scan}
-                        className="grid size-8 place-items-center rounded-control text-action transition-colors hover:bg-action-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:cursor-wait disabled:opacity-60"
+                        className="grid size-8 place-items-center rounded-control text-action transition-[background-color,transform] duration-200 ease-snappy hover:bg-action-soft motion-safe:hover:rotate-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:cursor-wait disabled:opacity-60"
                       >
                         <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={isScanning ? 'animate-spin motion-reduce:animate-none' : undefined} />
                       </button>

@@ -139,7 +139,9 @@ export default function TrendModal({ open, onClose, keyword, language, isRTL, lo
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
                   <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--color-line)" />
-                  <XAxis dataKey="label" reversed={isRTL} tickLine={false} axisLine={false}
+                  {/* Months run left to right in both languages, like the position charts: a
+                      rising line is always more searches. */}
+                  <XAxis dataKey="label" tickLine={false} axisLine={false}
                     interval="preserveStartEnd" minTickGap={20} tick={tick} />
                   <YAxis orientation={isRTL ? 'right' : 'left'} tickLine={false} axisLine={false} width={48}
                     tickFormatter={(v: number) => n(v)} tick={tick} />
