@@ -45,6 +45,8 @@ import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { SCORED_ENGINES, engineScores, latestAnswers, visibilityScore } from '@/lib/ai-visibility/score'
+import { monthlyEngines } from '@/lib/ai-visibility/monthly-check/config'
+import { engineSupportsCountry } from '@/lib/ai-visibility/providers/scrapellm'
 import { dropOffTopicSuggestions, type ProjectVocabulary } from '@/lib/ai-visibility/question-relevance'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { UserFacingError, apiErrorText, isUserFacingError } from '@/lib/i18n/user-facing-error'
@@ -102,6 +104,8 @@ export default function AIVisibilitySection({
   suggestionsRefreshKey = 0,
   requestedTab,
   onAllowanceOut,
+  onChecksRan,
+  resultsRefreshKey = 0,
 }: {
   projectId: string
   projectCountry: string | null
@@ -134,6 +138,10 @@ export default function AIVisibilitySection({
   requestedTab?: { tab: TabType; seq: number }
   /** Whether the allowance is read and nothing is left: the page's hero then offers the billing page, not more checks. */
   onAllowanceOut?: (out: boolean) => void
+  /** A check finished (or failed): the page re-reads what it shows about the allowance. */
+  onChecksRan?: () => void
+  /** Bumped when checks ran outside the tool (the monthly check's "run now"): reload results and the allowance. */
+  resultsRefreshKey?: number
 }) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
@@ -244,6 +252,8 @@ export default function AIVisibilitySection({
     }
   }, [])
   useEffect(() => { void loadAllowance() }, [loadAllowance])
+  const onChecksRanRef = useRef(onChecksRan)
+  onChecksRanRef.current = onChecksRan
   const onAllowanceOutRef = useRef(onAllowanceOut)
   onAllowanceOutRef.current = onAllowanceOut
   const allowanceOut = allowance != null && allowance.state === 'known' && allowance.remaining === 0
@@ -840,6 +850,11 @@ export default function AIVisibilitySection({
   useEffect(() => {
     loadAllResults()
   }, [loadAllResults])
+  useEffect(() => {
+    if (resultsRefreshKey === 0) return
+    void loadAllResults()
+    void loadAllowance()
+  }, [resultsRefreshKey, loadAllResults, loadAllowance])
 
   // Fetch competitor analysis (read-only) so we can build a competitor-leading
   // recommendation when a competitor has more mentions than the project.
@@ -1066,6 +1081,7 @@ export default function AIVisibilitySection({
         // The allowance moved (or did not) — re-read it either way, so what the
         // merchant sees is the ledger's answer and not an optimistic guess.
         void loadAllowance()
+        onChecksRanRef.current?.()
         setScanningKey(null)
         // Reset progress after fade
         setTimeout(() => {
@@ -1088,6 +1104,55 @@ export default function AIVisibilitySection({
       setHighlightResultId(null)
     }
   }, [allResults, highlightResultId, drawerOpen, openResultDrawer])
+
+  // RECHECK A QUESTION on the monthly check's engines (ChatGPT, Gemini, Google AI
+  // Mode; Perplexity where the country needs it): one button, one check per
+  // engine, each through the same dispatch route (and allowance) as a single one.
+  const recheckEngines = useMemo(() => monthlyEngines(projectCountry), [projectCountry])
+  const [recheck, setRecheck] = useState<{ promptId: string; done: number; total: number } | null>(null)
+  const recheckQuestion = useCallback(async (promptId: string) => {
+    const engines = recheckEngines
+    setRecheck({ promptId, done: 0, total: engines.length })
+    setError(null)
+    setScanStatus(t('scan_in_progress'))
+    let ok = 0
+    let refusal: string | null = null
+    await Promise.all(engines.map(async (engine) => {
+      try {
+        const res = await fetch('/api/ai-visibility/runs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, promptId, engine }),
+        })
+        if (res.ok) ok++
+        else {
+          const body = await res.json().catch(() => ({}))
+          // Only a refusal written for the merchant is shown as it is.
+          if (typeof body.errorEn === 'string' && body.errorEn) refusal = apiErrorText(body, isHebrew ? 'he' : 'en', body.errorEn)
+        }
+      } catch {
+        // counted below as not finished
+      } finally {
+        setRecheck((prev) => (prev && prev.promptId === promptId ? { ...prev, done: prev.done + 1 } : prev))
+      }
+    }))
+    await loadAllResults()
+    void loadAllowance()
+    onChecksRanRef.current?.()
+    setRecheck(null)
+    if (ok === engines.length) {
+      setScanStatus(t('scan_done'))
+      setCurrentTab('results')
+      setTimeout(() => setScanStatus(null), 3000)
+    } else {
+      setScanStatus(null)
+      setError(refusal ?? (ok > 0 ? t('recheck_partial_failed') : GENERIC_ERROR))
+    }
+  }, [recheckEngines, projectId, loadAllResults, loadAllowance, t, isHebrew])
+  /** One check at a time from this tab: a single engine, or one question's recheck. */
+  const busy = scanningKey !== null || recheck !== null
+  /** Checks left in the period, when the allowance is read (null: unmetered or not known). */
+  const knownLeft = allowance != null && allowance.state === 'known' ? allowance.remaining : null
 
   const deletePrompt = useCallback(async (promptId: string) => {
     setDeleting(true)
@@ -2124,7 +2189,7 @@ export default function AIVisibilitySection({
                   The allowance beside it comes from the usage ledger, so it can
                   never disagree with what the dispatcher enforces. */}
               <div className="flex flex-wrap items-center justify-between gap-2 text-caption">
-                <span className="text-body">{t('run_a_check_hint')}</span>
+                <span className="max-w-[80ch] text-body">{t('run_a_check_hint')}</span>
                 <span className="text-muted tabular-nums" data-testid="ai-allowance">
                   {allowance == null ? null
                     : allowance.state === 'unmetered' ? t('ai_allowance_unmetered')
@@ -2155,10 +2220,19 @@ export default function AIVisibilitySection({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <p className="line-clamp-2 flex-1 text-copy font-medium text-ink">{p.prompt}</p>
+                      {/* Single engines, all six the plan promises, one check each: the
+                          main surface no longer asks the customer to pick an engine. */}
                       <RowMenu
                         label={t('question_more_actions')}
                         className="-me-1.5 -mt-1 shrink-0"
                         items={[
+                          ...SUPPORTED_ENGINES.filter((e) => engineSupportsCountry(e, projectCountry)).map((engine) => ({
+                            key: `check-${engine}`,
+                            label: t('check_on_engine_menu').replace('{engine}', ENGINE_META[engine as keyof typeof ENGINE_META]?.name || engine),
+                            icon: <RefreshCw aria-hidden="true" className="size-4" />,
+                            disabled: busy || (knownLeft !== null && knownLeft < 1),
+                            onSelect: () => { if (!busy) void scanEngine(p.id, engine) },
+                          })),
                           { key: 'delete', label: t('delete'), danger: true, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => setDeletePromptId(p.id) },
                         ]}
                       />
@@ -2196,8 +2270,8 @@ export default function AIVisibilitySection({
                         const tooltip = scanning
                           ? t('scanning')
                           : scanned
-                          ? `${mentionedHere === true ? t('chip_mentioned') : t('chip_not_mentioned')}${scannedAt ? ` · ${t('scanned_at')}: ${formatDate(scannedAt)}` : ''} · ${t('rescan')}`
-                          : t('scan_this_engine')
+                          ? `${mentionedHere === true ? t('chip_mentioned') : t('chip_not_mentioned')}${scannedAt ? ` · ${t('scanned_at')}: ${formatDate(scannedAt)}` : ''}`
+                          : t('chip_not_checked')
                         // The ACCESSIBLE NAME says what the click does and to
                         // which engine. "ChatGPT ✓" named a status; "Run an AI
                         // check on ChatGPT" names an action, which is what a
@@ -2205,25 +2279,26 @@ export default function AIVisibilitySection({
                         // …and then what the last check found there.
                         const outcomeLabel = mentionedHere === true ? t('chip_mentioned')
                           : mentionedHere === false ? t('chip_not_mentioned') : t('chip_not_checked')
-                        const actionLabel = scanning
+                        // A STATUS, NOT A CONTROL (UX review B): what the latest check
+                        // on this engine found. Checks start from the recheck button
+                        // below or from the ⋯ menu.
+                        const statusLabel = scanning
                           ? t('scanning')
-                          : `${scanned ? t('rerun_check_on') : t('run_check_on')}${meta?.name || engine} (${outcomeLabel})`
+                          : t('engine_status_label').replace('{engine}', meta?.name || engine).replace('{status}', outcomeLabel)
                         return (
                           <div key={engine} className="group relative min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => !scanning && scanEngine(p.id, engine)}
-                                disabled={scanning}
-                                title={actionLabel}
-                                aria-label={actionLabel}
-                                className={`relative inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-control border px-2.5 text-caption font-medium transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${
+                              <span
+                                role="img"
+                                title={statusLabel}
+                                aria-label={statusLabel}
+                                className={`relative inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-control border px-2.5 text-caption font-medium focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${
                                   scanning
-                                    ? 'cursor-wait border-line bg-sunk text-body'
+                                    ? 'border-line bg-sunk text-body'
                                     : mentionedHere === true
-                                    ? 'cursor-pointer border-ok/40 bg-ok-soft text-ink hover:border-ok'
+                                    ? 'border-ok/40 bg-ok-soft text-ink'
                                     : mentionedHere === false
-                                    ? 'cursor-pointer border-line bg-sunk text-body hover:border-line-strong'
-                                    : 'cursor-pointer border-line bg-surface text-body hover:border-action hover:bg-action-soft'
+                                    ? 'border-line bg-sunk text-body'
+                                    : 'border-dashed border-line bg-surface text-muted'
                                 }`}
                                 data-chip-outcome={mentionedHere === true ? 'mentioned' : mentionedHere === false ? 'not_mentioned' : 'not_checked'}
                               >
@@ -2240,7 +2315,7 @@ export default function AIVisibilitySection({
                                 <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
                                 {!scanning && mentionedHere === true && <Check aria-hidden size={13} strokeWidth={3} className="relative z-10 text-ok" />}
                                 {!scanning && mentionedHere === false && <Minus aria-hidden size={13} strokeWidth={3} className="relative z-10 text-muted" />}
-                              </button>
+                              </span>
                               {/* Custom CSS tooltip — appears instantly on hover/focus, not delayed like native title */}
                               <span
                                 role="tooltip"
@@ -2265,6 +2340,37 @@ export default function AIVisibilitySection({
                       )}
                     </div>
                     )
+                    })()}
+                    {(() => {
+                      // ONE BUTTON PER QUESTION: the monthly engines, one check each.
+                      const n = recheckEngines.length
+                      const checkedBefore = recheckEngines.some((e) => scannedSet.has(`${p.id}:${e}`))
+                      const notEnough = knownLeft !== null && knownLeft < n
+                      const running = recheck?.promptId === p.id
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-ai-recheck-row="">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy || notEnough}
+                            onClick={() => { if (!busy && !notEnough) void recheckQuestion(p.id) }}
+                            data-ai-recheck={p.id}
+                            aria-describedby={notEnough ? `ai-recheck-note-${p.id}` : undefined}
+                          >
+                            {running
+                              ? <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+                              : <RefreshCw aria-hidden="true" className="size-4" />}
+                            {running
+                              ? t('recheck_running').replace('{done}', String(recheck?.done ?? 0)).replace('{n}', String(n))
+                              : t(checkedBefore ? 'recheck_question_all' : 'check_question_all').replace('{n}', String(n))}
+                          </Button>
+                          {notEnough && (
+                            <span id={`ai-recheck-note-${p.id}`} className="text-caption text-muted" data-ai-recheck-not-enough="">
+                              {t('recheck_not_enough')}
+                            </span>
+                          )}
+                        </div>
+                      )
                     })()}
                   </li>
                 ))}

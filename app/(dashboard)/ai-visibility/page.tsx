@@ -37,7 +37,7 @@ import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import AIVisibilitySection, { type AIVisibilityTab } from '@/components/ai-visibility/AIVisibilitySection'
 import CompetitorsReadOnly from '@/components/ai-visibility/CompetitorsReadOnly'
 import ReadinessCard from '@/components/ai-visibility/ReadinessCard'
-import { OverviewOpeningCard, OverviewStatusBar, RecentActivity, type OverviewData } from '@/components/ai-visibility/OverviewRows'
+import { OverviewOpeningCard, OverviewStatusBar, RecentActivity, type MonthlyView, type OverviewData } from '@/components/ai-visibility/OverviewRows'
 import { useSeedPageState } from '@/components/ai-visibility/useSeedPageState'
 import {
   buildOverview, competitorsSettingsHref, readinessView, readRuns, settingsHref, type OverviewRun,
@@ -114,6 +114,52 @@ function ProjectAIVisibility({ project }: { project: Project }) {
   const [allowanceOut, setAllowanceOut] = useState(false)
   const [tabRequest, setTabRequest] = useState<{ tab: AIVisibilityTab; seq: number } | undefined>(undefined)
   const toolRef = useRef<HTMLDivElement>(null)
+
+  // THE AUTOMATIC MONTHLY CHECK (lib/ai-visibility/monthly-check): what the hero
+  // says about it, re-read after every check. A failed read shows nothing extra.
+  const [monthly, setMonthly] = useState<MonthlyView>(null)
+  const [monthlyRunning, setMonthlyRunning] = useState(false)
+  const [monthlyError, setMonthlyError] = useState<string | null>(null)
+  const [resultsRefreshKey, setResultsRefreshKey] = useState(0)
+  const loadMonthly = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai-visibility/monthly?projectId=${encodeURIComponent(project.id)}`)
+      setMonthly(res.ok ? await res.json() : null)
+    } catch {
+      setMonthly(null)
+    }
+  }, [project.id])
+  useEffect(() => { void loadMonthly() }, [loadMonthly])
+  const overviewCopy = getDashboardDictionary(language).aiVisibilityOverview
+  const runMonthlyNow = useCallback(async () => {
+    setMonthlyRunning(true)
+    setMonthlyError(null)
+    try {
+      const res = await fetch('/api/ai-visibility/monthly', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id }),
+      })
+      if (!res.ok) setMonthlyError(overviewCopy.autoRunFailed)
+    } catch {
+      setMonthlyError(overviewCopy.autoRunFailed)
+    } finally {
+      setMonthlyRunning(false)
+      setResultsRefreshKey((n) => n + 1)
+      void loadMonthly()
+    }
+  }, [project.id, loadMonthly, overviewCopy])
+  const toggleMonthly = useCallback(async (enabled: boolean) => {
+    setMonthlyError(null)
+    try {
+      const res = await fetch('/api/ai-visibility/monthly', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, enabled }),
+      })
+      if (!res.ok) setMonthlyError(overviewCopy.autoSettingSaveFailed)
+    } catch {
+      setMonthlyError(overviewCopy.autoSettingSaveFailed)
+    } finally {
+      void loadMonthly()
+    }
+  }, [project.id, loadMonthly, overviewCopy])
   const chooseQuestions = useCallback(() => {
     setTabRequest((prev) => ({ tab: 'queries', seq: (prev?.seq ?? 0) + 1 }))
     toolRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -146,6 +192,8 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     suggestionsRefreshKey: questionsArrived,
     requestedTab: tabRequest,
     onAllowanceOut: setAllowanceOut,
+    onChecksRan: loadMonthly,
+    resultsRefreshKey,
     competitorsSlot: (
       <CompetitorsReadOnly
         projectId={project.id}
@@ -176,7 +224,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     // once, 8px, staggered, nothing at all under reduced motion).
     <div className="space-y-8" data-ai-page={seed.kind}>
       <Reveal index={0} data-ai-entrance="status">
-        <OverviewStatusBar overview={overview} questionsPending={questionsPending} />
+        <OverviewStatusBar overview={overview} questionsPending={questionsPending} monthly={monthly} />
       </Reveal>
       <Reveal index={1} data-ai-entrance="opening">
         <OverviewOpeningCard
@@ -186,6 +234,11 @@ function ProjectAIVisibility({ project }: { project: Project }) {
           questionsCount={questionsCount}
           allowanceOut={allowanceOut}
           onChooseQuestions={chooseQuestions}
+          monthly={monthly}
+          monthlyRunning={monthlyRunning}
+          monthlyError={monthlyError}
+          onRunMonthlyNow={runMonthlyNow}
+          onToggleMonthly={toggleMonthly}
         />
       </Reveal>
       <Reveal index={2} data-ai-entrance="tool">

@@ -24,6 +24,20 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import type { Locale } from '@/lib/i18n/locales'
 import { ENGINE_META } from './EngineIcon'
 import { OVERVIEW_ENGINES, type AiOverview, type RecentOutcome } from './overview-model'
+import Switch from '@/components/ui/Switch'
+import { MONTHLY_CORE_ENGINES, MONTHLY_SUBSTITUTE_ENGINE } from '@/lib/ai-visibility/monthly-check/config'
+import type { MonthlyStatus } from '@/lib/ai-visibility/monthly-check/runner'
+
+/** What GET /api/ai-visibility/monthly answered; null while it loads or when it could not be read. */
+export type MonthlyView = MonthlyStatus | null
+type MonthlyShown = Extract<MonthlyStatus, { engines: string[] }>
+const shownMonthly = (m: MonthlyView): MonthlyShown | null => (m && 'engines' in m ? m : null)
+
+/** The date of the next automatic check, when there is one to name. */
+export function monthlyNextDate(m: MonthlyView): string | null {
+  const s = shownMonthly(m)
+  return s && s.state !== 'off' && s.state !== 'no_questions' ? s.nextAt : null
+}
 
 type Copy = ReturnType<typeof getDashboardDictionary>['aiVisibilityOverview']
 export type OverviewData = AiOverview | null | 'error'
@@ -44,7 +58,7 @@ function useCopy() {
 
 // ── Row 1 ────────────────────────────────────────────────────────────────────
 
-export function OverviewStatusBar({ overview, questionsPending }: { overview: OverviewData; questionsPending: boolean }) {
+export function OverviewStatusBar({ overview, questionsPending, monthly = null }: { overview: OverviewData; questionsPending: boolean; monthly?: MonthlyView }) {
   const { c, language } = useCopy()
   const data = overview && overview !== 'error' ? overview : null
   const checked = new Set(data?.enginesChecked ?? [])
@@ -111,8 +125,8 @@ export function OverviewStatusBar({ overview, questionsPending }: { overview: Ov
           <dt className="text-caption text-muted">{c.nextCheck}</dt>
           {/* The hint rides on `title` and the screen-reader text: a positioned
               tooltip this close to the edge would widen the page on a phone. */}
-          <dd className="mt-1 flex items-center gap-1.5 text-copy font-medium text-ink" title={c.nextCheckManualHint}>
-            {c.nextCheckManual}
+          <dd className="mt-1 flex items-center gap-1.5 text-copy font-medium text-ink" title={c.nextCheckManualHint} data-ai-next-check={monthlyNextDate(monthly) ? 'auto' : 'manual'}>
+            {monthlyNextDate(monthly) ? formatWhen(monthlyNextDate(monthly), language, true) : c.nextCheckManual}
             <Info size={14} className="shrink-0 text-muted" aria-hidden="true" />
             <span className="sr-only">{c.nextCheckManualHint}</span>
           </dd>
@@ -138,6 +152,11 @@ export function OverviewOpeningCard({
   questionsCount = null,
   allowanceOut = false,
   onChooseQuestions,
+  monthly = null,
+  monthlyRunning = false,
+  monthlyError = null,
+  onRunMonthlyNow,
+  onToggleMonthly,
 }: {
   overview: OverviewData
   questionsPending: boolean
@@ -152,6 +171,13 @@ export function OverviewOpeningCard({
    */
   allowanceOut?: boolean
   onChooseQuestions: () => void
+  /** The automatic monthly check (UX review B): its meter, next date, a skipped month, the setting. */
+  monthly?: MonthlyView
+  monthlyRunning?: boolean
+  /** Our own sentence when "run now" or the setting failed. */
+  monthlyError?: string | null
+  onRunMonthlyNow?: () => void
+  onToggleMonthly?: (next: boolean) => void
 }) {
   const { c, language } = useCopy()
   const data = overview && overview !== 'error' ? overview : null
@@ -236,6 +262,9 @@ export function OverviewOpeningCard({
           )}
 
           {state === 'error' && <p className="mt-6 text-copy text-contrast-ink/75">{c.loadFailed}</p>}
+
+          <AutoCheckPanel c={c} language={language} monthly={monthly} running={monthlyRunning} error={monthlyError}
+            onRunNow={onRunMonthlyNow} onToggle={onToggleMonthly} />
         </div>
 
         {/* The figures only once there is something to count: before the first
@@ -296,7 +325,9 @@ export function OverviewOpeningCard({
  * checking". The figures beside it stay what they were.
  */
 export function nextStepKind(data: Pick<AiOverview, 'enginesChecked' | 'mentions'>): 'partial' | 'no_mentions' | 'keep_going' {
-  if (data.enginesChecked.length < OVERVIEW_ENGINES.length) return 'partial'
+  // Partial means the MAIN engines (the monthly check's, Perplexity standing in
+  // for one) are not all checked; the other engines are optional, one check each.
+  if (mainEnginesChecked(data.enginesChecked) < MONTHLY_CORE_ENGINES.length) return 'partial'
   if (data.mentions === 0) return 'no_mentions'
   return 'keep_going'
 }
@@ -304,7 +335,7 @@ export function nextStepKind(data: Pick<AiOverview, 'enginesChecked' | 'mentions
 function NextStep({ c, data, onRunMore, allowanceOut }: { c: Copy; data: AiOverview; onRunMore: () => void; allowanceOut: boolean }) {
   const kind = nextStepKind(data)
   const text = kind === 'partial'
-    ? c.nextStepPartial(data.enginesChecked.length, OVERVIEW_ENGINES.length)
+    ? c.nextStepPartial(mainEnginesChecked(data.enginesChecked), MONTHLY_CORE_ENGINES.length)
     : kind === 'no_mentions' ? c.nextStepNoMentions : c.nextStepKeepGoing
   return (
     <div data-ai-next-step={kind} className="mt-5 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
@@ -320,6 +351,72 @@ function NextStep({ c, data, onRunMore, allowanceOut }: { c: Copy; data: AiOverv
       ) : (
         <Button size="sm" variant="secondary" className="mt-3" onClick={onRunMore} data-ai-run-more="">{c.runMoreChecks}</Button>
       ))}
+    </div>
+  )
+}
+
+/** How many of the main engines are checked (Perplexity counts in place of a missing one). */
+export function mainEnginesChecked(engines: readonly string[]): number {
+  const core = MONTHLY_CORE_ENGINES.filter((e) => engines.includes(e)).length
+  const standIn = engines.includes(MONTHLY_SUBSTITUTE_ENGINE) ? 1 : 0
+  return Math.min(MONTHLY_CORE_ENGINES.length, core + standIn)
+}
+
+/**
+ * THE AUTOMATIC MONTHLY CHECK, inside the hero (UX review B): this period's
+ * meter (used of X, how many by the automatic check, left), the next date and
+ * engines, a skipped month with "run now", and the project's on/off setting.
+ * Nothing when the plan has no automatic check (trial, admin) or it could not
+ * be read: the rest of the card stands without it.
+ */
+function AutoCheckPanel({ c, language, monthly, running, error, onRunNow, onToggle }: {
+  c: Copy; language: Locale; monthly: MonthlyView; running: boolean; error: string | null
+  onRunNow?: () => void; onToggle?: (next: boolean) => void
+}) {
+  const m = shownMonthly(monthly)
+  if (!m) return null
+  const names = m.engines.map((e) => c.autoEngineNames[e] ?? e).join(', ')
+  const date = (iso: string | null) => formatWhen(iso, language, true)
+  const pct = (n: number) => (m.limit > 0 ? Math.min(100, Math.max(0, (n / m.limit) * 100)) : 0)
+  const labelId = 'ai-auto-check-label'
+  return (
+    <div data-ai-auto-check={m.state} className="mt-6 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
+      <p className="text-caption font-semibold text-contrast-ink/80">{c.autoMeterLabel}</p>
+      <p className="mt-0.5 text-copy tabular-nums text-contrast-ink" data-ai-auto-meter="">{c.autoMeter(m.used, m.limit, m.autoUsed, m.left)}</p>
+      {/* Used by the automatic check, then by manual checks, of X. */}
+      <div aria-hidden="true" className="mt-2 flex h-1.5 w-full max-w-[20rem] overflow-hidden rounded-pill bg-contrast-ink/15" dir="ltr">
+        <div className="h-full bg-contrast-ink/60" style={{ width: `${pct(m.autoUsed)}%` }} />
+        <div className="h-full bg-contrast-ink" style={{ width: `${pct(Math.max(0, m.used - m.autoUsed))}%` }} />
+      </div>
+      {(m.state === 'scheduled' || m.state === 'done') && m.nextAt && (
+        <p className="mt-2 text-caption text-contrast-ink/75" data-ai-auto-next="">{c.autoNext(date(m.nextAt), names)}</p>
+      )}
+      {m.state === 'allowance_low' && <p className="mt-2 text-caption text-contrast-ink/75">{c.autoAllowanceLow(date(m.nextAt))}</p>}
+      {m.state === 'no_questions' && <p className="mt-2 text-caption text-contrast-ink/75">{c.autoNoQuestions}</p>}
+      {m.state === 'off' && <p className="mt-2 text-caption text-contrast-ink/75" data-ai-auto-off="">{c.autoOff}</p>}
+      {m.state === 'skipped' && (
+        <div className="mt-2" data-ai-auto-skipped={m.skippedBecause ?? 'missed'}>
+          <p className="text-caption text-contrast-ink/80">
+            {m.skippedBecause === 'inactive' ? c.autoSkippedInactive(m.checks) : c.autoSkippedMissed(m.checks)}
+          </p>
+          {onRunNow && (
+            <Button size="sm" variant="secondary" className="mt-2" onClick={onRunNow} disabled={running} data-ai-auto-run-now="">
+              {running && <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+              {running ? c.autoRunning : c.autoRunNow}
+            </Button>
+          )}
+        </div>
+      )}
+      {error && <p role="alert" className="mt-2 text-caption text-contrast-ink/80">{error}</p>}
+      {onToggle && (
+        <div className="mt-3 flex items-start justify-between gap-4 border-t border-contrast-ink/10 pt-3">
+          <span className="min-w-0">
+            <span id={labelId} className="block text-caption font-semibold text-contrast-ink">{c.autoSettingLabel}</span>
+            <span className="mt-0.5 block text-caption text-contrast-ink/65">{c.autoSettingBody(m.limit)}</span>
+          </span>
+          <Switch checked={m.state !== 'off'} onChange={onToggle} aria-labelledby={labelId} disabled={running} data-ai-auto-toggle="" className="mt-0.5" />
+        </div>
+      )}
     </div>
   )
 }
@@ -507,6 +604,9 @@ export function RecentActivity({ overview }: { overview: OverviewData }) {
                       {c.outcome[item.outcome]}
                     </span>
                     <span>{meta?.name}</span>
+                    {item.automatic && (
+                      <span data-ai-run-automatic="" className="inline-flex items-center rounded-pill border border-line px-2 py-0.5 font-medium text-body">{c.autoTag}</span>
+                    )}
                     {item.at && <span aria-hidden="true">·</span>}
                     {item.at && <time dateTime={item.at}>{formatWhen(item.at, language)}</time>}
                   </p>
