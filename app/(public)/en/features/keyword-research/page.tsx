@@ -1,7 +1,9 @@
 import { Metadata } from 'next'
-import { Search, TrendingUp, Target, PieChart, Zap, Check, Info } from 'lucide-react'
+import { Coins, Info, Lightbulb, Plus, Sparkles, Target, TrendingUp, Search } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { KeywordIdeasVisual } from '@/components/public/feature-visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
   title: 'Keyword Research | Rankings by Go Top',
@@ -19,52 +21,83 @@ export default function KeywordResearchFeaturePage() {
   return <FeaturePage locale="en" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.en
+
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Keyword Research',
+    eyebrow: 'Keyword research',
     eyebrowIcon: Search,
-    title: 'Discover Keywords with Google Ads Data',
-    subtitle: 'Research keyword ideas, check search volume and competition, then add them directly to rank tracking or AI visibility questions.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
+    title: 'Write about what your customers',
+    accent: 'are actually searching for',
+    subtitle: 'Keyword ideas from Google Ads data, with monthly search volume, competition and cost-per-click estimates. Add the good ones to tracking, or turn them into AI questions in one click.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: (
+      <KeywordIdeasVisual
+        seed="ac installation"
+        headers={['Keyword', 'Monthly searches', 'Competition']}
+        rows={[
+          { keyword: 'mini split installation', volume: '1,900', competition: 'Medium', level: 'medium', added: true },
+          { keyword: 'ac installation cost', volume: '1,300', competition: 'Low', level: 'low' },
+          { keyword: 'central air installation', volume: '590', competition: 'High', level: 'high' },
+          { keyword: 'hvac repair round rock', volume: '320', competition: 'Low', level: 'low', added: true },
+        ]}
+      />
+    ),
   },
   sections: [
     {
       kind: 'cards',
-      title: 'What You Can Do',
+      tone: 'contrast',
+      eyebrow: 'Why start here',
+      title: 'A great article on a phrase nobody searches brings nobody',
+      intro: 'Research shows what people search for, how often, and how hard it is to compete, before a single word is written.',
       items: [
-        { icon: Search, title: 'Keyword Ideas', body: 'Find related keyword ideas based on your seed keyword using Google Ads API data.' },
-        { icon: TrendingUp, title: 'Search Volume', body: 'View estimated monthly search volume for each keyword to understand demand.' },
-        { icon: Target, title: 'Competition Data', body: 'Check competition levels (Low, Medium, High) and competitiveness index.' },
-        { icon: PieChart, title: 'CPC Estimates', body: 'See low and high top-of-page bid estimates to understand advertiser demand.' },
-        { icon: Zap, title: 'Quick Add to Projects', body: 'Add selected keywords directly to your projects for immediate rank tracking.' },
-        { icon: Check, title: 'Generate AI Questions', body: 'Turn keywords into natural language questions for AI visibility scanning.' },
+        { icon: TrendingUp, title: 'Real demand', body: 'Estimated monthly search volume for every phrase, from Google\'s data.' },
+        { icon: Target, title: 'Where you can win', body: 'Competition for every phrase, so you pick the ones you can actually rank for.' },
+        { icon: Coins, title: 'What a click is worth', body: 'What advertisers pay per click, a good sign of how much a phrase is worth to businesses.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'How It Works',
+      eyebrow: 'How it works',
+      title: 'From an idea to a work list',
       items: [
-        { title: 'Search Keywords', body: 'Enter a seed keyword and select your target country and language.' },
-        { title: 'Review Results', body: 'Browse keyword ideas with search volume, competition, and CPC data.' },
-        { title: 'Take Action', body: 'Add keywords to your project, or create AI questions from them.' },
+        { title: 'Start from a phrase or a site', body: 'Type a phrase or a site address, and choose country and language.' },
+        { title: 'Get ideas with data', body: 'A list of related phrases, with search volume, competition and cost-per-click estimates.' },
+        { title: 'Put them to work', body: 'Add phrases to rank tracking, or turn them into questions for AI tracking.' },
+      ],
+    },
+    {
+      kind: 'cards',
+      eyebrow: 'What you can do',
+      title: 'Everything you need to choose the right phrases',
+      items: [
+        { icon: Lightbulb, title: 'Ideas from a phrase or a site', body: 'Related phrases from a single phrase, or from a site\'s address.' },
+        { icon: TrendingUp, title: 'Search volume', body: 'How often each phrase is searched per month, as Google estimates it.' },
+        { icon: Target, title: 'Competition', body: 'Low, medium or high, for every phrase.' },
+        { icon: Coins, title: 'Cost-per-click estimate', body: 'The range of top-of-page bids in paid search.' },
+        { icon: Plus, title: 'Add to tracking in one click', body: 'A phrase you pick goes straight into rank tracking for the project.' },
+        { icon: Sparkles, title: 'Questions for AI tracking', body: 'Turn a phrase into a natural-language question to check whether AI engines recommend you.' },
       ],
     },
     {
       kind: 'callout',
       icon: Info,
-      title: 'About the Data',
+      title: 'About the data',
       body: (
         <>
-          <p>Keyword research data comes from Google Ads API. Search volumes, competition levels, and CPC estimates are approximate and based on Google&apos;s aggregated data. Actual performance may vary by campaign, targeting, and other factors.</p>
-          <p>Use this data as a starting point for your SEO and content strategy. Always validate with your own analytics and testing.</p>
+          <p>The data comes from the Google Ads API. Search volume, competition and cost per click are Google’s estimates, and they vary by field, season and location.</p>
+          <p>They’re a good starting point for choosing topics. The real result is measured in rank tracking.</p>
         </>
       ),
     },
   ],
   cta: {
-    title: 'Ready to Accelerate Your Keyword Research?',
-    body: 'Start your free 7-day trial today. No credit card required.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
+    title: 'Find the phrases worth writing about',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }

@@ -1,9 +1,10 @@
 import { Metadata } from 'next'
-import { FileText, BarChart2, TrendingUp, Share2, Clock, Zap, Award } from 'lucide-react'
+import { ArrowUpDown, ChartColumn, Clock, Eye, FileSpreadsheet, Handshake, History, Sparkles, TrendingUp } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
-import { ReportVisual } from '@/components/public/feature-visuals'
+import { ReportsVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
-import { authHref } from '@/lib/i18n/auth-href'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { landingHe } from '@/lib/i18n/public/landing-he'
 
 export const metadata: Metadata = {
   title: 'דוחות SEO/GEO מקצועיים | Rankings by Go Top',
@@ -21,74 +22,71 @@ export default function SEOGeoReportsFeaturePage() {
   return <FeaturePage locale="he" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.he
+
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'דוחות מקצועיים בשנייה',
-    eyebrowIcon: FileText,
-    title: 'דוחות SEO/GEO שלקוחות אוהבים לראות',
-    subtitle: 'כל חודש, בלחיצת כפתור. דוחות PDF וExcel מקצועיים שמראים בדיוק מה קרה והיכן אתה מובילים את הלקוח.',
-    primary: { label: 'התחילו ניסיון חינם', href: authHref('signup', 'he') },
-    secondary: { label: 'צפו במחירים', href: '/pricing' },
-    visual: (
-      <ReportVisual
-        title="דוח חודשי - מאי 2025"
-        stats={[
-          { label: 'דירוגים בעלייה', value: '+12' },
-          { label: 'ביטויים בתצוגה', value: '847' },
-          { label: 'זמן בדירוג 1', value: '18' },
-          { label: 'משכנתא ממוצע', value: '4.2' },
-        ]}
-        breakdownTitle="עמודי חצי בדירוג 1-3"
-        breakdown={['מילות מפתח: 12', 'דיוור: 8', 'נראות: 6']}
-      />
-    ),
+    eyebrow: 'דוחות',
+    eyebrowIcon: ChartColumn,
+    title: 'דוח שמראה מה השתנה,',
+    accent: 'בלחיצה אחת',
+    subtitle: 'מיקומים בגוגל ובמפות ונראות במנועי AI, בדוח PDF או Excel שמוכן לשליחה ללקוח, למנהל, או לעצמכם.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: <ReportsVisual copy={landingHe.features.reports.visual} />,
   },
   sections: [
     {
       kind: 'cards',
-      title: 'למה דוחות מקצועיים חיוניים?',
-      intro: 'דוחות הם דרך לאמור ללקוח: "זה מה שעשיתי לך." זה ההבדל בין שירות טוב לשירות מעולה.',
+      tone: 'contrast',
+      eyebrow: 'למה דוח',
+      title: 'עבודה טובה צריכה להיראות',
+      intro: 'דוח ברור חוסך הסברים, ומראה שהאתר מתקדם.',
       items: [
-        { icon: Share2, title: 'הצגת ערך', body: 'דוח ברור מראה ללקוח בדיוק מה השינוי בדירוגים, בתנועה, ובביצוע כללי.' },
-        { icon: Clock, title: 'חיסכון בזמן', body: 'במקום להסביר בדברים, אתה משלח דוח. לקוח רואה, מבין, ופוקוס משנה לתוכנית הבאה.' },
-        { icon: Zap, title: 'בניית אמון', body: 'דוח חודשי אומר: "אני כאן, אני עובד, אני רואה תוצאות." זה בוזר דברים קטנים שבנו אמון.' },
+        { icon: Eye, title: 'התמונה המלאה', body: 'גוגל, מפות ו-AI במקום אחד, במקום צילומי מסך מכמה כלים.' },
+        { icon: Clock, title: 'בלי להרכיב ידנית', body: 'הנתונים כבר במערכת. הדוח נוצר מהם בלחיצה.' },
+        { icon: Handshake, title: 'אמון של לקוחות', body: 'לסוכנויות: דוח קבוע מראה ללקוח מה השתנה ולמה כדאי להמשיך.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'איך זה עובד',
+      eyebrow: 'איך זה עובד',
+      title: 'מנתונים לדוח בשלושה צעדים',
       items: [
-        { title: 'בחרו הגדרות דוח', body: 'בחרו אילו מדדים להוסיף לדוח: דירוגים, תחרות, AI, פרטים תרופאיים - הכל אפשרי.' },
-        { title: 'המערכת מייצרת את הדוח', body: 'אנחנו מהרים את הנתונים, מייצרים גרפים, וממלאים טמפלט פרופסיונלי.' },
-        { title: 'שלחו או הורידו', body: 'PDF או Excel בדקה. אתה משלח ללקוח או שמירה בלחיצת כפתור.' },
+        { title: 'בוחרים פרויקט', body: 'כל אתר מנוהל כפרויקט משלו, עם הדוחות שלו.' },
+        { title: 'מייצאים', body: 'PDF לשליחה, או Excel לעבודה עם הנתונים.' },
+        { title: 'שולחים', body: 'ללקוח, למנהל או לשותף, בלי לעצב שום דבר.' },
       ],
     },
     {
       kind: 'cards',
-      title: 'מה כלול בדוחות',
+      eyebrow: 'מה בדוח',
+      title: 'כל מה שחשוב, בלי מה שלא',
       items: [
-        { icon: BarChart2, title: 'סיכום דירוגים ומגמות', body: 'ניתוח משוקלל מלא של הדירוגים שלך. עלייה? ירידה? ניתוח מפורט של מהו השינוי.' },
-        { icon: TrendingUp, title: 'גרפים ותרשימים', body: 'גרפים בחודש לחודש. קל להבין מה קרה כי הוא ויזואלי.' },
-        { icon: FileText, title: 'רשימת מילים מפתח מלאה', body: 'לכל מילה מפתח: דירוג נוכחי, דירוג עבר, שינוי, URL, וציון.' },
-        { icon: Award, title: 'ניתוח תחרויות', body: 'איפה אתה עומד לעומת התחרות. מי בשלוש ראשונות? מי מקדימים?' },
-        { icon: Share2, title: 'אפשרויות עיצוב וברנדינג', body: 'הוסיפו לוגו שלכם. בחרו צבעים. עשו את הדוח שלכם.' },
-        { icon: Clock, title: 'דוח חודשי אוטומטי', body: 'הגדירו וקבלו דוח בעצמו חודש. אפילו לא צריך לדעת.' },
+        { icon: TrendingUp, title: 'מיקומים ושינויים', body: 'לכל ביטוי: המיקום היום, המיקום הקודם והשינוי ביניהם.' },
+        { icon: ArrowUpDown, title: 'העמוד שמופיע', body: 'איזה עמוד באתר מופיע בתוצאות לכל ביטוי.' },
+        { icon: ChartColumn, title: 'תנועה משוערת', body: 'הערכה של הביקורים מגוגל, לפי נפח החיפוש והמיקום הנוכחי.' },
+        { icon: Sparkles, title: 'נראות ב-AI', body: 'אזכורים וציטוטים של האתר, לכל מנוע AI בנפרד.' },
+        { icon: History, title: 'היסטוריה מלאה', body: 'בקובץ ה-Excel: כל הבדיקות לאורך זמן, לא רק האחרונה.' },
+        { icon: FileSpreadsheet, title: 'PDF ו-Excel', body: 'PDF מסודר לשליחה, ו-Excel למי שרוצה לעבוד עם המספרים.' },
       ],
     },
     {
-      kind: 'audiences',
-      title: 'למי זה החיוני',
+      kind: 'faq',
+      eyebrow: 'שאלות',
+      title: 'מה ששואלים על הדוחות',
       items: [
-        { title: 'סוכנויות דיגיטל', body: 'אתה עובד עם מספר לקוחות וכל אחד רוצה לדעת: איך הם לקוחות שלי עושים?', bullets: ['דוחות אוטומטיים לכל לקוח', 'עדויות לערך השירות שלך', 'אמון וחידוש עם לקוחות'] },
-        { title: 'עסקים בעצמם', body: 'אתה עוקב אחרי דירוגים שלך וצריך להציג למנהלים התוצאות.', bullets: ['דוחות כל חודש', 'הוכחת השקעות בSEO', 'תכנוני תחזוקה עתידיים'] },
-        { title: 'מקדמי תוכן', body: 'אתה משתמש בRankings by Go Top לעקיבה, ותוכל לשתף דוחות עם צוות שלך.', bullets: ['דוחות לחודשיים לצוות', 'יעדים ברורים לכל כותב', 'דוקומנטציה של השפעת תוכן'] },
-        { title: 'עסקים עם צוותי שיווק', body: 'צוות השיווק שלך צריך לדעת: האם הקמפיין שלנו עובד?', bullets: ['ROI ברור מSEO', 'משוואה עם מקורות אחרים', 'תוכניות שיפור עתידיות'] },
+        { q: 'הדוחות בעברית?', a: 'כן. אפשר להפיק דוח בעברית או באנגלית.' },
+        { q: 'אפשר להפיק דוח לכל לקוח בנפרד?', a: 'כן. כל אתר הוא פרויקט נפרד, וכל פרויקט מקבל דוח משלו. מספר הפרויקטים בכל תוכנית מופיע בעמוד המחירים.' },
+        { q: 'הדוח כלול בכל תוכנית?', a: 'כן. דוחות PDF ו-Excel כלולים בכל התוכניות.' },
       ],
     },
   ],
   cta: {
-    title: 'התחילו לייצר דוחות מקצועיים',
-    body: 'דוח ראשון בדקה אחת. שם קורה ההבדל.',
-    primary: { label: 'התחילו ניסיון חינם', href: authHref('signup', 'he') },
+    title: 'הדוח הראשון שלכם במרחק כמה ימים',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }

@@ -1,8 +1,9 @@
 import { Metadata } from 'next'
-import { Search, TrendingUp, Target, PieChart, Zap, Check, Info } from 'lucide-react'
+import { Coins, Info, Lightbulb, Plus, Sparkles, Target, TrendingUp, Search } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { KeywordIdeasVisual } from '@/components/public/feature-visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
-import { authHref } from '@/lib/i18n/auth-href'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
   title: 'מחקר ביטויים | Rankings by Go Top',
@@ -20,52 +21,83 @@ export default function KeywordResearchFeaturePage() {
   return <FeaturePage locale="he" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.he
+
 const CONTENT: FeaturePageContent = {
   hero: {
     eyebrow: 'מחקר ביטויים',
     eyebrowIcon: Search,
-    title: 'גלו ביטויים עם נתוני Google Ads',
-    subtitle: 'חפשו רעיונות לביטויים, בדקו נפח חיפוש ותחרות, והוסיפו אותם ישירות למעקב דירוגים או לשאלות נראות AI.',
-    primary: { label: 'להתנסות בחינם', href: authHref('signup', 'he') },
-    secondary: { label: 'צפייה בתמחור', href: '/pricing' },
+    title: 'תכתבו על מה שהלקוחות',
+    accent: 'באמת מחפשים',
+    subtitle: 'רעיונות לביטויים מנתוני Google Ads, עם נפח חיפוש חודשי, רמת תחרות והערכת עלות לקליק. את הטובים מוסיפים למעקב או הופכים לשאלות AI בלחיצה.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: (
+      <KeywordIdeasVisual
+        seed="התקנת מזגנים"
+        headers={['ביטוי', 'חיפושים בחודש', 'תחרות']}
+        rows={[
+          { keyword: 'התקנת מזגן עילי', volume: '1,900', competition: 'בינונית', level: 'medium', added: true },
+          { keyword: 'מחיר התקנת מזגן', volume: '1,300', competition: 'נמוכה', level: 'low' },
+          { keyword: 'התקנת מיני מרכזי', volume: '590', competition: 'גבוהה', level: 'high' },
+          { keyword: 'טכנאי מזגנים בחיפה', volume: '320', competition: 'נמוכה', level: 'low', added: true },
+        ]}
+      />
+    ),
   },
   sections: [
     {
       kind: 'cards',
-      title: 'מה אפשר לעשות במערכת',
+      tone: 'contrast',
+      eyebrow: 'למה להתחיל כאן',
+      title: 'מאמר מצוין על ביטוי שאף אחד לא מחפש, לא מביא אף אחד',
+      intro: 'המחקר מראה מה מחפשים, כמה מחפשים, וכמה קשה להתחרות, עוד לפני שנכתבת מילה.',
       items: [
-        { icon: Search, title: 'רעיונות לביטויים', body: 'קבלו רעיונות לביטויים רלוונטיים בהתבסס על ביטוי זרע או כתובת אתר, באמצעות נתונים מ-Google Ads API.' },
-        { icon: TrendingUp, title: 'נפח חיפוש', body: 'צפו בנפח חיפוש חודשי משוער לכל ביטוי כדי להבין את גודל הביקוש.' },
-        { icon: Target, title: 'נתוני תחרות', body: 'בדקו את רמת התחרות (נמוכה, בינונית או גבוהה) ואת מדד התחרותיות לכל ביטוי.' },
-        { icon: PieChart, title: 'הערכות CPC', body: 'ראו הערכות של הצעת מחיר מינימלית ומקסימלית בראש העמוד, להבנת עלות הקליק.' },
-        { icon: Zap, title: 'הוספה מהירה לפרויקטים', body: 'הוסיפו ביטויים נבחרים ישירות לפרויקטים שלכם למעקב דירוגים מיידי.' },
-        { icon: Check, title: 'יצירת שאלות AI', body: 'הפכו ביטויים לשאלות בשפה טבעית למעקב נראות במנועי AI.' },
+        { icon: TrendingUp, title: 'ביקוש אמיתי', body: 'נפח חיפוש חודשי משוער לכל ביטוי, מנתוני Google.' },
+        { icon: Target, title: 'איפה אפשר לנצח', body: 'רמת תחרות לכל ביטוי, כדי לבחור ביטויים שאפשר באמת להגיע בהם למעלה.' },
+        { icon: Coins, title: 'כמה שווה קליק', body: 'הערכת המחיר שמפרסמים משלמים על קליק, סימן טוב לכמה הביטוי שווה לעסקים.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'איך זה עובד',
+      eyebrow: 'איך זה עובד',
+      title: 'מרעיון לרשימת עבודה',
       items: [
-        { title: 'חפשו ביטויים', body: 'הזינו ביטוי זרע או כתובת אתר, ובחרו מדינה ושפה.' },
-        { title: 'בדקו תוצאות', body: 'עיינו ברעיונות שמוצגים יחד עם נפח חיפוש, רמת תחרות והערכות CPC.' },
-        { title: 'פעלו לפי הנתונים', body: 'הוסיפו ביטויים לפרויקט קיים או הפכו אותם לשאלות AI בלחיצה אחת.' },
+        { title: 'מתחילים מביטוי או מאתר', body: 'מקלידים ביטוי או כתובת אתר, ובוחרים מדינה ושפה.' },
+        { title: 'מקבלים רעיונות עם נתונים', body: 'רשימת ביטויים קשורים, עם נפח חיפוש, תחרות והערכת עלות לקליק.' },
+        { title: 'מעבירים לעבודה', body: 'מוסיפים ביטויים למעקב המיקומים, או הופכים אותם לשאלות למעקב ה-AI.' },
+      ],
+    },
+    {
+      kind: 'cards',
+      eyebrow: 'מה אפשר לעשות',
+      title: 'כל מה שצריך כדי לבחור ביטויים נכון',
+      items: [
+        { icon: Lightbulb, title: 'רעיונות מביטוי או מאתר', body: 'ביטויים קשורים מתוך ביטוי אחד, או מתוך כתובת של אתר.' },
+        { icon: TrendingUp, title: 'נפח חיפוש', body: 'כמה מחפשים כל ביטוי בחודש, בהערכה של Google.' },
+        { icon: Target, title: 'רמת תחרות', body: 'נמוכה, בינונית או גבוהה, לכל ביטוי.' },
+        { icon: Coins, title: 'הערכת עלות לקליק', body: 'טווח ההצעות בפרסום ממומן לראש העמוד.' },
+        { icon: Plus, title: 'הוספה למעקב בלחיצה', body: 'ביטוי שנבחר נכנס ישר למעקב המיקומים בפרויקט.' },
+        { icon: Sparkles, title: 'שאלות למעקב AI', body: 'הופכים ביטוי לשאלה בשפה טבעית, כדי לבדוק אם מנועי AI ממליצים עליכם.' },
       ],
     },
     {
       kind: 'callout',
       icon: Info,
-      title: 'על מקורות הנתונים',
+      title: 'על הנתונים',
       body: (
         <>
-          <p>נתוני מחקר הביטויים מתקבלים מ-Google Ads API. נפחי חיפוש, רמות תחרות והערכות CPC הם משוערים ומבוססים על נתונים מצטברים של Google. ביצועים בפועל עשויים להשתנות בהתאם לקמפיין, לתחום ולשאר נסיבות.</p>
-          <p>השתמשו בנתונים הללו כנקודת פתיחה לאסטרטגיית ה-SEO והתוכן שלכם, ואמתו אותם תמיד מול נתוני המעקב והניתוח שלכם בפועל.</p>
+          <p>הנתונים מגיעים מ-Google Ads API. נפח חיפוש, תחרות ועלות לקליק הם הערכות של Google, ומשתנים לפי תחום, עונה ומיקום.</p>
+          <p>הם נקודת פתיחה טובה לבחירת נושאים. את התוצאה בפועל מודדים במעקב המיקומים.</p>
         </>
       ),
     },
   ],
   cta: {
-    title: 'מוכנים להאיץ את מחקר הביטויים?',
-    body: 'התחילו ניסיון חינם ל-7 ימים, ללא צורך בכרטיס אשראי.',
-    primary: { label: 'להתנסות בחינם', href: authHref('signup', 'he') },
+    title: 'תמצאו את הביטויים ששווה לכתוב עליהם',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }

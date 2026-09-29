@@ -1,8 +1,9 @@
 import { Metadata } from 'next'
-import { MapPin, Users, Phone, Star, Navigation, Award } from 'lucide-react'
+import { FileSpreadsheet, History, MapPin, Navigation, Phone, Search, Store, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
 import { MapsVisual } from '@/components/public/feature-visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
   title: 'Google Maps Rank Tracking | Rankings by Go Top',
@@ -20,28 +21,32 @@ export default function GoogleMapsFeaturePage() {
   return <FeaturePage locale="en" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.en
+
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Local SEO - Google Maps',
+    eyebrow: 'Google Maps',
     eyebrowIcon: MapPin,
-    title: 'Dominate Your Local Market on Google Maps',
-    subtitle: "Local customers search Google Maps first. If you're not in the top 3, they find your competitors. Know where you rank.",
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
+    title: 'When people search for a business like yours nearby,',
+    accent: 'know where you are on the map',
+    subtitle: 'Track your Google Maps position by phrase and by area: a city, or an exact point on the map. See who ranks ahead of you, and how your position moves over time.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
     visual: (
       <MapsVisual
-        positionLabel="Your Position"
-        position="#3"
-        positionSub='in New York - "Italian Restaurant"'
-        changeLabel="Monthly Change"
-        change="1"
-        changeSub="Improving"
+        positionLabel="Your position"
+        position="3"
+        positionSub='in Austin, "ac installation"'
+        changeLabel="This month"
+        change="2"
+        changeSub="places up"
         reviewsLabel="reviews"
         rows={[
-          { rank: 1, name: 'La Bella Restaurant', stars: 4.8, reviews: 234 },
-          { rank: 2, name: 'Pizza Prima', stars: 4.6, reviews: 189 },
-          { rank: 3, name: 'Your Restaurant', stars: 4.5, reviews: 156, highlight: true },
-          { rank: 4, name: 'Al-Tafoul', stars: 4.4, reviews: 142 },
+          { rank: 1, name: 'Cool Plus HVAC', stars: 4.8, reviews: 212 },
+          { rank: 2, name: 'Fresh Air Co.', stars: 4.6, reviews: 174 },
+          { rank: 3, name: 'Your business', stars: 4.7, reviews: 131, highlight: true },
+          { rank: 4, name: 'Bayside Cooling', stars: 4.4, reviews: 98 },
         ]}
       />
     ),
@@ -49,49 +54,54 @@ const CONTENT: FeaturePageContent = {
   sections: [
     {
       kind: 'cards',
-      title: 'Why Google Maps Ranking Is Critical',
-      intro: 'When someone searches "restaurant near me," they go to Google Maps, not Google search.',
+      tone: 'contrast',
+      eyebrow: 'Why the map',
+      title: 'In local search, the map is the shop window',
+      intro: 'When someone looks for a service nearby, Google shows a few businesses on the map first. That\'s where they decide who to call.',
       items: [
-        { icon: Users, title: 'First Stop for Local Customers', body: "Local customers don't play games. If you're not in the top 3 on Google Maps, they find someone else." },
-        { icon: Phone, title: 'Direct Calls & Store Visits', body: 'High ranking on Google Maps = direct phone calls and visits to your location. Measurable results.' },
-        { icon: Star, title: 'Reviews & Reputation', body: 'High Google Maps ranking can lead to more positive reviews and build your local reputation.' },
+        { icon: Phone, title: 'That\'s where they call from', body: 'From the map results, people call, get directions or visit your site in one tap.' },
+        { icon: Users, title: 'Few spots, many competitors', body: 'Only a handful of businesses get the top spots. You need to know whether you\'re one of them.' },
+        { icon: MapPin, title: 'Every area is a different race', body: 'You can be first in one city and missing in the next. Tracking by area shows it.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'How Tracking Works',
+      eyebrow: 'How it works',
+      title: 'Three steps to a clear map',
       items: [
-        { title: 'Set Up Your Business', body: 'Add your business address from Google Maps. If you have multiple locations, add them all.' },
-        { title: 'Choose Search Terms', body: 'Select the search terms customers use. For example: "restaurant in New York" or "dentist near me".' },
-        { title: 'Tracking Begins', body: 'Run a scan on demand whenever you want, or turn on automatic monthly checks on Google Maps. See how your ranking changes and impacts visits.' },
+        { title: 'Set up your business', body: 'Add your business and the area you serve.' },
+        { title: 'Pick phrases and areas', body: 'For example "ac installation" in Austin, or from an exact point on the map.' },
+        { title: 'Track over time', body: 'Scan manually anytime or automatically once a month, with a history of every change.' },
       ],
     },
     {
       kind: 'cards',
-      title: 'Google Maps Tracking Capabilities',
+      eyebrow: 'What you get',
+      title: 'Your place on the map, without guessing',
       items: [
-        { icon: MapPin, title: 'Track by Postal Code', body: 'Track rankings by exact postal code or neighborhood. Each area can be different.' },
-        { icon: Navigation, title: 'GPS Coordinate Tracking', body: 'Set precise coordinates for tracking. Perfect for competitive analysis.' },
-        { icon: Award, title: 'Ranking History Over Time', body: 'See how your Google Maps position has changed from scan to scan, and spot upward or downward trends.' },
-        { icon: Users, title: 'Multi-Location Support', body: 'Track multiple locations or franchises in one dashboard.' },
-        { icon: Star, title: 'Competitor Tracking', body: 'See where competitors rank for the same local search terms.' },
-        { icon: Phone, title: 'Accurate Business Matching', body: 'The system identifies your business among the results by name and domain, so the ranking you see is always accurate.' },
+        { icon: MapPin, title: 'By city or area', body: 'Check each phrase in the area where your customers are.' },
+        { icon: Navigation, title: 'An exact point on the map', body: 'Check from coordinates you choose, to see what a customer standing there sees.' },
+        { icon: Store, title: 'Who ranks ahead of you', body: 'The businesses above you in the results, with their Google rating.' },
+        { icon: History, title: 'Position history', body: 'See how your position changed from one scan to the next.' },
+        { icon: Search, title: 'Regular search too', body: 'Track the same phrases in Google\'s regular results.' },
+        { icon: FileSpreadsheet, title: 'PDF and Excel reports', body: 'Your Maps positions go into a report you can pass along.' },
       ],
     },
     {
-      kind: 'audiences',
-      title: "Who It's Critical For",
+      kind: 'faq',
+      eyebrow: 'Questions',
+      title: 'What people ask about Maps tracking',
       items: [
-        { title: 'Local Businesses with Physical Locations', body: 'Restaurants, stores, clinics, services - any business customers search from a specific location.', bullets: ['Google Maps rank = direct customers', 'Monitor local competitors', 'Spot ranking changes over time'] },
-        { title: 'Multi-Location Chains', body: 'Multiple stores, franchises, or service areas - centralized tracking for all locations.', bullets: ['Monitor all locations together', 'Compare performance across sites', 'Ensure quality standards everywhere'] },
-        { title: 'Local Digital Agencies', body: 'Working with local clients? They need to know: where are we on Google Maps?', bullets: ['Clear client reports', 'Proof of your service value', 'Competitive benchmarking'] },
-        { title: 'Seasonal or Time-Dependent Businesses', body: 'Hotels, resorts, shops - businesses where demand changes with season or time.', bullets: ['Track demand patterns', 'Adjust marketing spend strategically', 'Watch for ranking drops'] },
+        { q: 'Do I need a Google Business Profile?', a: 'To appear in Maps, you need a Google Business Profile. Tracking shows where your profile appears, or whether it appears at all.' },
+        { q: 'How often is my position checked?', a: 'Every time you run a manual scan, and you can also turn on an automatic monthly scan. There\'s no daily or weekly automatic scan at the moment.' },
+        { q: 'Does each Maps phrase count as a separate check?', a: 'Yes. One Google check is one phrase in one place, so the same phrase in regular search and in Maps counts as two checks.' },
       ],
     },
   ],
   cta: {
-    title: 'Master Your Local Google Maps Ranking',
-    body: 'Start tracking today. Discover where your business ranks right now.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
+    title: 'Find out who gets the calls in your area',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }

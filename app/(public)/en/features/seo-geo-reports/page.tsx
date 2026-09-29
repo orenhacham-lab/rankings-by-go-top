@@ -1,8 +1,10 @@
 import { Metadata } from 'next'
-import { FileText, BarChart2, TrendingUp, Share2, Clock, Zap, Award } from 'lucide-react'
+import { ArrowUpDown, ChartColumn, Clock, Eye, FileSpreadsheet, Handshake, History, Sparkles, TrendingUp } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
-import { ReportVisual } from '@/components/public/feature-visuals'
+import { ReportsVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
   title: 'SEO/GEO Reports | Rankings by Go Top',
@@ -20,74 +22,71 @@ export default function SEOGeoReportsFeaturePage() {
   return <FeaturePage locale="en" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.en
+
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Professional Reports in Seconds',
-    eyebrowIcon: FileText,
-    title: 'Reports Your Clients Will Actually Read',
-    subtitle: "Every month with one click. Professional PDF and Excel reports that show exactly what you achieved and where you're heading.",
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
-    visual: (
-      <ReportVisual
-        title="Monthly Report - May 2025"
-        stats={[
-          { label: 'Rankings Up', value: '+12' },
-          { label: 'Keywords Tracking', value: '847' },
-          { label: 'Top 3 Rankings', value: '18' },
-          { label: 'Avg Position', value: '4.2' },
-        ]}
-        breakdownTitle="Top Performing Pages"
-        breakdown={['Keywords in Top 3: 12', 'Pages in Top 10: 8', 'New Rankings: 6']}
-      />
-    ),
+    eyebrow: 'Reports',
+    eyebrowIcon: ChartColumn,
+    title: 'A report that shows what changed,',
+    accent: 'in one click',
+    subtitle: 'Rankings in Google and Maps and visibility in AI engines, in a PDF or Excel report ready to send to a client, a manager, or yourself.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: <ReportsVisual copy={landingEn.features.reports.visual} />,
   },
   sections: [
     {
       kind: 'cards',
-      title: 'Why Reports Matter So Much',
-      intro: 'A good report says: "Here\'s what I did for you." That\'s the difference between good service and great service.',
+      tone: 'contrast',
+      eyebrow: 'Why a report',
+      title: 'Good work needs to be seen',
+      intro: 'A clear report saves explaining, and shows the site is moving forward.',
       items: [
-        { icon: Share2, title: 'Demonstrate Value', body: "A clear report shows your client exactly what rankings changed and how you're improving their business." },
-        { icon: Clock, title: 'Save Time', body: 'Instead of explaining verbally, send a report. Your client reads it, understands, and moves to the next steps.' },
-        { icon: Zap, title: 'Build Trust', body: 'Monthly reports say: "I\'m here, I\'m working, I see results." This builds the kind of trust that keeps clients.' },
+        { icon: Eye, title: 'The full picture', body: 'Google, Maps and AI in one place, instead of screenshots from several tools.' },
+        { icon: Clock, title: 'No manual assembly', body: 'The data is already in the platform. The report is built from it in a click.' },
+        { icon: Handshake, title: 'Client trust', body: 'For agencies: a regular report shows the client what changed and why to keep going.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'How It Works',
+      eyebrow: 'How it works',
+      title: 'From data to report in three steps',
       items: [
-        { title: 'Configure Your Report', body: 'Choose which metrics to include: rankings, competitors, AI visibility, trends - full control.' },
-        { title: 'System Generates', body: 'We compile data, create charts, and fill the professional template automatically.' },
-        { title: 'Download or Send', body: 'PDF or Excel in seconds. Send to client or save. That easy.' },
+        { title: 'Pick a project', body: 'Each site is its own project, with its own reports.' },
+        { title: 'Export', body: 'PDF to send, or Excel to work with the data.' },
+        { title: 'Send it', body: 'To a client, a manager or a partner, with nothing to format.' },
       ],
     },
     {
       kind: 'cards',
-      title: "What's Included in Reports",
+      eyebrow: 'What\'s in the report',
+      title: 'Everything that matters, nothing that doesn\'t',
       items: [
-        { icon: BarChart2, title: 'Rankings Summary & Trends', body: 'Full analysis of your rankings. Up, down, or stable. Detailed breakdown of what changed.' },
-        { icon: TrendingUp, title: 'Charts & Graphs', body: 'Month-over-month visuals. Easy to understand trends at a glance.' },
-        { icon: FileText, title: 'Complete Keyword List', body: 'Every keyword: current ranking, previous ranking, change, URL, and score.' },
-        { icon: Award, title: 'Competitor Analysis', body: "Where you stand vs competitors. Who's in the top 3? Where can you gain ground?" },
-        { icon: Share2, title: 'Custom Branding', body: 'Add your logo, choose colors, make it yours.' },
-        { icon: Clock, title: 'Automated Monthly', body: 'Set it and forget it. Get reports automatically every month.' },
+        { icon: TrendingUp, title: 'Rankings and changes', body: 'For every phrase: today\'s position, the previous one, and the change between them.' },
+        { icon: ArrowUpDown, title: 'The ranking page', body: 'Which page on your site shows up for each phrase.' },
+        { icon: ChartColumn, title: 'Estimated traffic', body: 'An estimate of visits from Google, based on search volume and current position.' },
+        { icon: Sparkles, title: 'AI visibility', body: 'Mentions and citations of your site, for each AI engine separately.' },
+        { icon: History, title: 'Full history', body: 'In the Excel file: every check over time, not just the latest.' },
+        { icon: FileSpreadsheet, title: 'PDF and Excel', body: 'A tidy PDF to send, and Excel for anyone who wants to work with the numbers.' },
       ],
     },
     {
-      kind: 'audiences',
-      title: 'Who Needs These Reports',
+      kind: 'faq',
+      eyebrow: 'Questions',
+      title: 'What people ask about reports',
       items: [
-        { title: 'Digital Agencies', body: 'Multiple clients, all asking: "How is my SEO?" Automate with reports.', bullets: ['Automated client reports', 'Proof of service value', 'Client renewals & growth'] },
-        { title: 'In-House SEO Teams', body: 'You track rankings yourself. Now show leadership the results monthly.', bullets: ['Executive reports', 'Prove SEO investment value', 'Plan future strategies'] },
-        { title: 'Content Teams', body: 'Using Rankings by Go Top to track content performance? Share monthly wins.', bullets: ['Monthly team reports', 'Clear targets for writers', 'Content impact proof'] },
-        { title: 'Marketing Teams', body: 'Need to show ROI from SEO? Reports make it clear and measurable.', bullets: ['ROI clarity from SEO', 'Compare to other channels', 'Future planning data'] },
+        { q: 'What languages are reports in?', a: 'You can export a report in English or Hebrew.' },
+        { q: 'Can I make a separate report for each client?', a: 'Yes. Each site is its own project, and each project gets its own report. The number of projects in each plan is on the pricing page.' },
+        { q: 'Are reports included in every plan?', a: 'Yes. PDF and Excel reports are included in every plan.' },
       ],
     },
   ],
   cta: {
-    title: 'Generate Your First Professional Report',
-    body: "One click. That's all it takes. See your first report in minutes.",
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
+    title: 'Your first report is days away',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }

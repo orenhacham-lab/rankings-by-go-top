@@ -1,19 +1,11 @@
 import { Metadata } from 'next'
-import {
-  FileText,
-  Wand2,
-  Edit3,
-  CalendarClock,
-  Send,
-  Users,
-  Image as ImageIcon,
-  Link2,
-  Search,
-  Brain,
-  Layers,
-} from 'lucide-react'
+import { FileCheck2, FileText, Globe, Image as ImageIcon, Link2, ListChecks, PenLine, Search, Send, ShieldCheck, ShoppingBag } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { ContentVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { TRIAL_CATALOG } from '@/lib/plans/catalog'
+import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
   title: 'SEO/GEO Content Creation, Scheduling & Publishing | Rankings by Go Top',
@@ -32,134 +24,105 @@ export default function SeoGeoContentPublishingFeaturePage() {
   return <FeaturePage locale="en" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.en
+
 const faqs = [
   {
-    q: 'How does the article allowance work, and when does it reset?',
-    a: 'Every subscription plan includes a set number of AI-generated articles per billing period. The allowance is shared across all projects on the account, resets at the start of each new billing period, and unused articles do not roll over.',
+    q: 'Do I have to edit every article before it goes live?',
+    a: 'You don\'t have to, but you always can. Only topics you approved get written, every article passes a quality check before publishing, and you can read, edit and approve it before it goes live.',
   },
   {
-    q: 'What happens if I run out of articles partway through the period?',
-    a: 'Once you reach your current plan\'s article limit, you can upgrade to a plan with a larger allowance to keep generating articles within the same billing period.',
+    q: 'Which sites can I publish to?',
+    a: 'Direct publishing works with WordPress and Shopify. Connect your site once, and approved articles go straight to it.',
   },
   {
-    q: 'Do I have to edit the article before it publishes?',
-    a: 'No, but you always have the chance to. Every generated article is a draft — you can read it, edit any part of it, and only then approve it for publishing or scheduling.',
+    q: 'How does scheduling work?',
+    a: 'Once you approve an article, publish it right away or pick a date and time. The platform publishes it on its own when that time comes.',
   },
   {
-    q: 'Which platforms can I publish to?',
-    a: 'Direct publishing is supported for WordPress and Shopify. Connect your project to one of them, and approved articles publish straight there.',
+    q: 'Do articles come with images and SEO titles?',
+    a: 'Yes. Every article comes with a featured image and in-text images, a meta title and a meta description, and all of them can be edited before publishing.',
   },
   {
-    q: 'How does publish scheduling work?',
-    a: 'Once you approve an article, you can publish it immediately or set a future date and time. The system publishes it automatically at the time you chose.',
+    q: 'How does the article allowance work?',
+    a: 'Every plan includes a number of articles per billing period. The allowance is per account, resets every period, and unused articles don\'t roll over. Creating an article uses one; editing, scheduling and publishing use nothing.',
   },
   {
-    q: 'How do we split the allowance across multiple client sites?',
-    a: 'The allowance lives at the account level and is shared across every project on it. An agency managing several client sites decides for itself, month to month, how many of the available articles go to each project.',
+    q: 'What if I run out mid-month?',
+    a: 'Upgrade to a plan with more articles and keep going in the same billing period.',
   },
   {
-    q: 'Do articles come with a featured image and SEO titles automatically?',
-    a: 'Yes — every generated article includes a featured image along with an SEO-ready meta title and description, and you can edit all of them before publishing.',
-  },
-  {
-    q: 'Is there a free trial?',
-    a: 'Yes, there\'s a free 7-day trial with no credit card required, which includes generating a sample article so you can see the workflow for yourself.',
+    q: 'Can I try it before paying?',
+    a: `Yes. A ${TRIAL_CATALOG.days}-day trial with no credit card, including one article so you can see the whole process through to publishing.`,
   },
 ]
 
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Content Creation & Publishing',
+    eyebrow: 'Writing and publishing',
     eyebrowIcon: FileText,
-    title: 'SEO/GEO Content Creation, Scheduling & Publishing',
-    subtitle: 'From topic to published article, without bouncing between a separate research tool, a writing tool, and a publishing tool. It all happens in one place — and every draft is yours to review before it goes anywhere.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
+    title: 'Articles written and published on your site,',
+    accent: 'without a content team',
+    subtitle: 'Plan topics, approve them, and get a complete article with images, a Q&A section and internal links. Edit if you like, and publish to WordPress or Shopify, now or on a date you choose.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: <ContentVisual copy={landingEn.features.content.visual} />,
   },
   sections: [
     {
       kind: 'cards',
-      title: 'Why content usually turns into a chore',
-      intro: 'Publishing a single article typically means jumping between several disconnected tools — which is exactly why regular content is the first thing to slip.',
+      tone: 'contrast',
+      eyebrow: 'Why content stalls',
+      title: 'Content gets put off because it\'s really three jobs',
+      intro: 'Find a topic, write it, and get it onto the site. Each one takes time, so it slips to next month. Here all three happen in one place.',
       items: [
-        { icon: Search, title: 'Topic research, on its own', body: "Figuring out what's worth writing about, checking what competitors already cover, and making sure it actually matters to your business." },
-        { icon: Edit3, title: 'Writing and editing, somewhere else', body: 'A solid first draft takes real time to write, and then still needs another pass to edit, tighten, and make sure it says what you meant.' },
-        { icon: Send, title: 'Publishing, manually, in a third tool', body: "Then comes copying it into your site, adding an image, filling in SEO fields, and remembering when it's even supposed to go live." },
+        { icon: Search, title: 'Finding what to write about', body: 'Checking what people search for, what competitors already cover, and what your site is missing.' },
+        { icon: PenLine, title: 'Writing it well', body: 'A good draft takes hours, followed by more editing and checking.' },
+        { icon: Send, title: 'Getting it on the site', body: 'Copying, uploading images, filling in SEO fields, and remembering to hit publish.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'How it works',
-      intro: 'Five steps, from planning a topic to an article live on your site.',
+      eyebrow: 'How it works',
+      title: 'From topic to live article in five steps',
       items: [
-        { title: 'Plan a topic', body: 'The system helps you plan relevant topics for your business, based on your keywords and niche.' },
-        { title: 'Approve it', body: 'Look through the suggested topics and pick the ones that fit what you need right now.' },
-        { title: 'Get an AI-generated draft', body: 'From the approved topic, the system writes a complete article — title, body, subheadings, and SEO fields.' },
-        { title: 'Review and edit', body: 'Every article starts as a draft. Read it, edit whatever you need to, and approve it only once it reads the way you want.' },
-        { title: 'Schedule or publish', body: 'Set a future date and time, or publish right away — straight to WordPress or Shopify.' },
+        { title: 'Plan topics', body: 'The platform suggests topics based on your business\'s keywords and field.' },
+        { title: 'Approve', body: 'Pick the topics that fit right now. Only those get written.' },
+        { title: 'Get a complete article', body: 'Title, body, subheadings, images, a Q&A section and internal links.' },
+        { title: 'Review and edit', body: 'Read it, change as much as you want, and approve when it\'s ready.' },
+        { title: 'Schedule or publish', body: 'Now, or on a date and time you choose, straight to WordPress or Shopify.' },
       ],
     },
     {
       kind: 'cards',
-      title: "What's included in every article",
-      intro: 'Every draft comes with everything needed to publish a complete article — not just raw text.',
+      eyebrow: 'In every article',
+      title: 'A complete article, not raw text',
       items: [
-        { icon: Wand2, title: 'A complete article draft', body: 'From the topic you approved, the AI writes a full article — not just an outline or a summary.' },
-        { icon: Edit3, title: 'Free editing before publishing', body: 'Change anything in the draft — title, body, structure — until it reads exactly how you want.' },
-        { icon: Search, title: 'SEO title and description', body: 'Every article comes with a meta title and meta description already written — and you can edit those too.' },
-        { icon: ImageIcon, title: 'A featured image for every article', body: "Each article includes a featured image, so you're not hunting one down or uploading it separately." },
-        { icon: Link2, title: 'Suggested internal links', body: 'The system can suggest relevant internal links from your own site, and you decide which ones actually go in the article.' },
-        { icon: CalendarClock, title: 'Publish scheduling', body: 'Set when an approved article should go live, and let the system publish it at the time you picked.' },
+        { icon: FileText, title: 'A full article', body: 'The topic you approved becomes a complete article, not a summary or an outline.' },
+        { icon: ImageIcon, title: 'Images', body: 'A featured image and in-text images, without hunting for them and uploading them yourself.' },
+        { icon: ListChecks, title: 'Q&A and structured data', body: 'A Q&A section and structured data that Google and AI engines can read.' },
+        { icon: Link2, title: 'Internal links', body: 'Suggested links to other pages on your site, and you approve which ones go in.' },
+        { icon: FileCheck2, title: 'Meta title and description', body: 'Written for search, and editable like everything else.' },
+        { icon: ShieldCheck, title: 'A quality check before publishing', body: 'Every article is checked before it goes live, so nothing half-finished gets published.' },
       ],
     },
     {
       kind: 'cards',
-      title: 'Direct publishing to WordPress and Shopify',
-      intro: 'Connect your WordPress site or Shopify store, and an approved article goes straight there — no copy-pasting, no extra publishing tool.',
+      eyebrow: 'Direct publishing',
+      title: 'Connect once, publish without copy and paste',
+      intro: 'An article you approved goes straight to your site, with its images and SEO fields.',
       items: [
-        { title: 'WordPress', body: 'Connect your WordPress site and publish articles directly to it, including SEO fields and the featured image.' },
-        { title: 'Shopify', body: 'Connect your Shopify store and publish blog articles directly from the system.' },
+        { icon: Globe, title: 'WordPress', body: 'Connect your WordPress site and publish articles to it now or on a schedule.' },
+        { icon: ShoppingBag, title: 'Shopify', body: 'Connect your Shopify store and publish blog articles straight from the platform.' },
       ],
     },
-    {
-      kind: 'callout',
-      icon: Layers,
-      title: "How your account's article allowance works",
-      heading: 'h3',
-      body: (
-        <>
-          <p>Every subscription plan includes a set number of AI-generated articles per billing period. The exact number is shown on the pricing page, but the important part is this: the allowance belongs to the account, not to any single project.</p>
-          <p>That means every article your account gets each billing period is shared across all the projects and sites managed under it — you decide how many go to each site.</p>
-        </>
-      ),
-    },
-    {
-      kind: 'cards',
-      title: 'How this supports both SEO and GEO',
-      intro: 'Consistent, well-planned content is the foundation for both ranking on Google and showing up in AI-generated answers — two different goals worth building for at once.',
-      items: [
-        { icon: Search, title: 'SEO — traditional Google search', body: "Articles with clear structure, meta titles and descriptions, and content that actually answers what people are searching for — all of that helps Google understand and rank your pages. We can't promise a specific ranking, but consistent, well-structured content is the baseline for improving one." },
-        { icon: Brain, title: 'GEO — showing up in AI answers', body: 'More people ask ChatGPT, Gemini, and other AI tools questions directly. Clear, consistent, relevant content increases the chance your articles get used as a source — with no guarantee any specific question will surface a mention.' },
-      ],
-    },
-    {
-      kind: 'callout',
-      icon: Users,
-      title: 'For agencies: splitting the shared allowance across clients',
-      heading: 'h2',
-      body: (
-        <>
-          <p>Because the article allowance sits at the account level and is shared across every project, an agency running several client sites from one account decides for itself, each month, how many of the available articles go to which client.</p>
-          <p>There&apos;s no need for a separate subscription per client — just prioritize whichever projects need content this month, and adjust the split again next month as priorities change.</p>
-        </>
-      ),
-    },
-    { kind: 'faq', eyebrow: 'FAQ', title: 'Questions about content creation and publishing', items: faqs },
+    { kind: 'faq', eyebrow: 'Questions', title: 'What people ask about writing and publishing', items: faqs },
   ],
   cta: {
-    title: 'Ready to stop juggling separate content tools?',
-    body: 'Start your free 7-day trial today. No credit card required.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
+    title: 'Your next article could be written today',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }
