@@ -174,8 +174,8 @@ console.log('P1-19 settings: the right section marked, one save')
   check('at the end of the page the last section is marked, even when short', activeSection(tops([-2000, -900, 300, 700]), true) === 's3')
   check('no sections: nothing marked', activeSection([], false) === null)
   guard('P1-19: the index follows the reading line, not "the first section in the upper half"', 'components/settings/SettingsIndex.tsx',
-    (s) => /activeSection\(tops, atEnd\)/.test(s) && !/IntersectionObserver/.test(s),
-    (raw) => raw.replace('setActive(activeSection(tops, atEnd))', "setActive(tops[0]?.id ?? null); new IntersectionObserver(() => {})"))
+    (s) => /activeSection\(tops, atEnd(, readingLineFor\(window\.innerHeight\))?\)/.test(s) && !/IntersectionObserver/.test(s),
+    (raw) => raw.replace('setActive(activeSection(tops, atEnd, readingLineFor(window.innerHeight)))', "setActive(tops[0]?.id ?? null); new IntersectionObserver(() => {})"))
   check('the save bar shows only while there is something to save or to say',
     !showSaveBar(false, { kind: 'idle' }) && showSaveBar(true, { kind: 'idle' }) && showSaveBar(false, { kind: 'saved' }) && showSaveBar(false, { kind: 'saving' }))
   for (const f of ['components/settings/ProfileCard.tsx', 'components/settings/AudienceCard.tsx']) {

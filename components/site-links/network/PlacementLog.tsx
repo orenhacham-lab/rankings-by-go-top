@@ -23,6 +23,7 @@ import { ToastHost, useToasts } from '@/components/ui/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { GivenItem, PlacementState, ReceivedItem } from '@/lib/link-network/http'
+import { countsAsLink, linkCount } from '@/lib/link-network/counting'
 import ExternalLink from '../ExternalLink'
 import LinkButton from '../LinkButton'
 import { formatDay, networkUrl, type AvailableNetwork } from './shared'
@@ -83,8 +84,16 @@ export default function PlacementLog({ projectId, data, onChanged }: { projectId
     }
   }
 
-  const list = side === 'received' ? data.received : given
+  // The list and its tab counts use the KPI's definition of a link (lib/link-network/counting.ts):
+  // live or waiting. Links taken out, or no longer in the article, are kept apart as history.
+  const all: (ReceivedItem | GivenItem)[] = side === 'received' ? data.received : given
+  const list = all.filter((i) => countsAsLink(i.state))
+  const history = all.filter((i) => !countsAsLink(i.state))
   const empty = side === 'received' ? copy.emptyReceived : copy.emptyGiven
+  const row = (item: ReceivedItem | GivenItem) => (side === 'received'
+    ? <ReceivedRow key={item.id} item={item as ReceivedItem} copy={copy} language={language} newTab={newTab} />
+    : <GivenRow key={item.id} item={item as GivenItem} copy={copy} language={language} newTab={newTab}
+      busy={removing === item.id} onRemove={() => void remove(item as GivenItem)} />)
 
   return (
     <section aria-label={copy.title} data-link-network="log">
@@ -97,8 +106,8 @@ export default function PlacementLog({ projectId, data, onChanged }: { projectId
             value={side}
             onChange={setSide}
             options={[
-              { value: 'received', label: copy.received, icon: ArrowDownLeft, count: data.received.length },
-              { value: 'given', label: copy.given, icon: ArrowUpRight, count: data.given.length },
+              { value: 'received', label: copy.received, icon: ArrowDownLeft, count: linkCount(data.received) },
+              { value: 'given', label: copy.given, icon: ArrowUpRight, count: linkCount(given) },
             ]}
           />
         }
@@ -113,13 +122,18 @@ export default function PlacementLog({ projectId, data, onChanged }: { projectId
         </div>
       ) : (
         <ul className="list-enter divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-card" data-link-network-list={side}>
-          {side === 'received'
-            ? data.received.map((item) => <ReceivedRow key={item.id} item={item} copy={copy} language={language} newTab={newTab} />)
-            : given.map((item) => (
-              <GivenRow key={item.id} item={item} copy={copy} language={language} newTab={newTab}
-                busy={removing === item.id} onRemove={() => void remove(item)} />
-            ))}
+          {list.map(row)}
         </ul>
+      )}
+      {history.length > 0 && (
+        <details className="group mt-4" data-link-network-history={side}>
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-control text-caption font-semibold text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action [&::-webkit-details-marker]:hidden">
+            {copy.history(history.length)}
+          </summary>
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface opacity-80 shadow-card">
+            {history.map(row)}
+          </ul>
+        </details>
       )}
       {dialog}
       <ToastHost toasts={toasts} dismiss={dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />

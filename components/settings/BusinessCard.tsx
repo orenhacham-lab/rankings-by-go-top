@@ -18,7 +18,7 @@ import { RedetectButton, RedetectNoticeView, SuggestionsPanel, type SuggestionRo
 import SettingsCard from './SettingsCard'
 import SourceChip from './SourceChip'
 import { SECTION } from './anchors'
-import { useRedetect } from './useRedetect'
+import { useChainTurn, useRedetect, type RedetectChain } from './useRedetect'
 
 type Copy = DashboardDictionary['projectSettings']
 
@@ -42,6 +42,7 @@ export default function BusinessCard({
   onSaved,
   t,
   locale,
+  chain,
 }: {
   project: Project
   clients: Client[]
@@ -54,6 +55,8 @@ export default function BusinessCard({
   onSaved: () => void
   t: Copy
   locale: Locale
+  /** The group's one "detect again" (./useRedetect.ts); this card leads it. */
+  chain?: RedetectChain
 }) {
   const redetect = useRedetect(project.id, 'business')
   const [applied, setApplied] = useState<{ values: BusinessSuggestion; fields: BusinessField[] } | null>(null)
@@ -96,6 +99,12 @@ export default function BusinessCard({
     if (neverScanned) redetect.preempt({ kind: 'scan_required' })
     else void redetect.run(locale)
   }
+  useChainTurn(chain, async () => {
+    setSaved(false)
+    if (neverScanned) { redetect.preempt({ kind: 'scan_required' }); return true }
+    await redetect.run(locale)
+    return false
+  })
 
   const s = redetect.suggestions
   const rows: SuggestionRow[] = s
@@ -137,9 +146,11 @@ export default function BusinessCard({
               {t.saved}
             </span>
           )}
-          {seedFeatures && (
+          {seedFeatures && (chain ? chain.lead && (
+            <RedetectButton working={chain.lead.working} busyScan={scanBusy} onClick={chain.lead.start} t={t} />
+          ) : (
             <RedetectButton working={redetect.working} busyScan={scanBusy} onClick={detect} t={t} />
-          )}
+          ))}
         </>
       }
     >

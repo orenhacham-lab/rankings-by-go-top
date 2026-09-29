@@ -20,7 +20,7 @@
  * (settingsVisibility): otherwise the screen is the business card, the
  * sections whose tables can be read, and the connections, as before.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plug } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
@@ -32,6 +32,8 @@ import CompetitorsCard from '@/components/settings/CompetitorsCard'
 import ArticleStyleCard from '@/components/settings/ArticleStyleCard'
 import OfficialProfilesCard from '@/components/settings/OfficialProfilesCard'
 import { useArticleSettings } from '@/components/settings/useArticleSettings'
+import type { RedetectChain } from '@/components/settings/useRedetect'
+import type { RedetectSection } from '@/lib/project-settings/types'
 import DangerZone from '@/components/settings/DangerZone'
 import Notice from '@/components/settings/Notice'
 import ProfileCard from '@/components/settings/ProfileCard'
@@ -77,6 +79,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const t = dict.projectSettings
+  const [redetectChain, setRedetectChain] = useState<{ step: number; n: number } | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [competitorsShown, setCompetitorsShown] = useState(true)
   // A rename shows in the top bar's switcher too, so a save reloads its list.
@@ -172,11 +175,28 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   const neverScanned = rescan?.latest === null
   const profile = data?.profile.state === 'ok' ? data.profile.value : null
   const audiences = data?.audiences.state === 'ok' ? data.audiences.value : []
+  // The article-design preview is about this business, not a stock example (review P2-4).
+  const niche = profile?.niche ?? null
+  const previewSubject = useMemo(() => ({ niche, business: project.business_name ?? project.name ?? null }), [niche, project.business_name, project.name])
   const detected = visibility.seedFeatures ? platformHint(profile?.detected_platform) : null
   const platform = detected && {
     label: fill(detected.connect ? t.platformDetected : t.platformDetectedOther, { platform: detected.name }),
     preferred: detected.connect,
   }
+  // One "detect again with AI" for the business group (business, description, niche and audiences):
+  // the cards run one after another, the first card carries the only button (review P2-6).
+  const chainOrder: RedetectSection[] = ['business', ...(visibility.profileCard ? ['profile' as const] : []), ...(visibility.audienceCard ? ['audience' as const] : [])]
+  const chainFor = (section: RedetectSection): RedetectChain => ({
+    turn: redetectChain && chainOrder[redetectChain.step] === section ? redetectChain.n + redetectChain.step : 0,
+    done: (stop) => setRedetectChain((c) => {
+      if (!c || chainOrder[c.step] !== section) return c
+      const next = c.step + 1
+      return stop || next >= chainOrder.length ? null : { ...c, step: next }
+    }),
+    lead: section === 'business'
+      ? { working: !!redetectChain, start: () => setRedetectChain((c) => c ?? { step: 0, n: Date.now() }) }
+      : null,
+  })
   const cardProps = {
     projectId: project.id,
     seedFeatures: visibility.seedFeatures,
@@ -218,14 +238,15 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
 
             <BusinessCard
               {...cardProps}
+              chain={visibility.seedFeatures ? chainFor('business') : undefined}
               project={project}
               clients={clients}
               data={data}
               onSaved={() => { reload(); reloadProjects() }}
             />
 
-            {visibility.profileCard && <ProfileCard {...cardProps} profile={profile} />}
-            {visibility.audienceCard && <AudienceCard {...cardProps} profile={profile} audiences={audiences} />}
+            {visibility.profileCard && <ProfileCard {...cardProps} profile={profile} chain={visibility.seedFeatures ? chainFor('profile') : undefined} />}
+            {visibility.audienceCard && <AudienceCard {...cardProps} profile={profile} audiences={audiences} chain={visibility.seedFeatures ? chainFor('audience') : undefined} />}
 
             <CompetitorsCard
               projectId={project.id}
@@ -247,6 +268,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
                   onData={article.setData}
                   t={t}
                   locale={language}
+                  subject={previewSubject}
                 />
                 <OfficialProfilesCard
                   projectId={project.id}

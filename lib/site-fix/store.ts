@@ -147,6 +147,18 @@ export async function listJobs(admin: Admin, scope: Scope, limit = 50): Promise<
   return (data ?? []) as FixJobRow[]
 }
 
+/** The jobs of one fix type that are done or on their way (see HOLDING_STATUSES in ./job-match). */
+export async function listHoldingJobs(admin: Admin, scope: Scope, type: FixType, statuses: readonly JobStatus[]): Promise<FixJobRow[]> {
+  const { data, error } = await admin.from('site_fix_jobs').select(JOB_COLUMNS)
+    .eq('project_id', scope.projectId).eq('user_id', scope.userId).eq('fix_type', type)
+    .in('status', [...statuses]).limit(500)
+  if (error) {
+    if (isMissingTable(error)) return []
+    throw new FixStoreError()
+  }
+  return (data ?? []) as FixJobRow[]
+}
+
 // ── The audit trail (append only) ───────────────────────────────────────────
 
 export async function appendAudit(admin: Admin, scope: Scope, row: {

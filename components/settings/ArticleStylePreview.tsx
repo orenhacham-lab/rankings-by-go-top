@@ -14,8 +14,34 @@ type Copy = DashboardDictionary['projectSettings']['articleStyle']
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+/** What the sample is about: the project's own line of business and name, when known. */
+export type PreviewSubject = { niche: string | null; business: string | null }
+
+type SampleKey = 'title' | 'lead' | 'intro' | 'h1' | 'p1' | 'h2' | 'p2' | 'th1' | 'th2' | 'r1a' | 'r1b' | 'r2a' | 'r2b' | 'h3' | 'p3'
+  | 'cta' | 'ctaLink' | 'faqTitle' | 'faqQ' | 'faqA'
+/** The words the sample article is made of. */
+export type SampleWords = Record<SampleKey, string>
+
+/**
+ * The sample's words: about the project's own line of business when it is known (review P2-4: a
+ * plumber was shown an article about mattresses), the neutral sample otherwise.
+ */
+export function sampleCopy(p: Copy['preview'], subject?: PreviewSubject | null): SampleWords {
+  const niche = subject?.niche?.trim().slice(0, 60) || ''
+  if (!niche) return p
+  const business = subject?.business?.trim().slice(0, 60) || ''
+  const n = p.forNiche
+  const put = (s: string) => fill(s, { niche, business })
+  return {
+    ...p,
+    title: put(n.title), lead: put(n.lead), intro: n.intro, h1: n.h1, p1: n.p1, h2: n.h2, p2: n.p2,
+    th1: n.th1, th2: n.th2, r1a: n.r1a, r1b: n.r1b, r2a: n.r2a, r2b: n.r2b, h3: n.h3, p3: n.p3,
+    cta: business ? put(n.cta) : n.ctaGeneric, faqQ: put(n.faqQ), faqA: n.faqA,
+  }
+}
+
 /** A short sample article in the dashboard's language, shaped the way the generator writes one. */
-export function sampleArticleHtml(p: Copy['preview']): string {
+export function sampleArticleHtml(p: SampleWords): string {
   return [
     `<p><strong>${esc(p.lead)}</strong></p>`,
     `<p>${esc(p.intro)}</p>`,
@@ -42,17 +68,20 @@ export default function ArticleStylePreview({
   domain,
   t,
   locale,
+  subject,
 }: {
   style: ArticleStyle
   platform: DesignPlatform
   domain: string | null
   t: Copy
   locale: Locale
+  subject?: PreviewSubject | null
 }) {
   const design = effectiveDesign(style, platform)
+  const words = useMemo(() => sampleCopy(t.preview, subject), [t.preview, subject])
   const html = useMemo(
-    () => styleArticleHtml(sampleArticleHtml(t.preview), { design, colors: style.brandColors, language: locale === 'he' ? 'he' : 'en' }),
-    [t.preview, design, style.brandColors, locale],
+    () => styleArticleHtml(sampleArticleHtml(words), { design, colors: style.brandColors, language: locale === 'he' ? 'he' : 'en' }),
+    [words, design, style.brandColors, locale],
   )
 
   // The inline images sit after the first paragraph of a section, like the real composer.
@@ -92,7 +121,7 @@ export default function ArticleStylePreview({
         </span>
       </div>
       <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="max-h-[36rem] overflow-y-auto px-4 py-5 sm:px-5">
-        <h3 className="mb-3 text-section font-bold leading-snug text-ink">{t.preview.title}</h3>
+        <h3 className="mb-3 text-section font-bold leading-snug text-ink">{words.title}</h3>
         {style.ownImagesOnly ? (
           <div className="mb-4 flex aspect-video items-center justify-center gap-2 rounded-inset border border-dashed border-line-strong bg-sunk text-caption text-muted">
             <ImageOff aria-hidden className="size-4" /> {t.preview.noImages}

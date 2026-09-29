@@ -86,6 +86,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpPostUrl, setWpPostUrl] = useState<string | null>(null)
   const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
   const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
+  /** The article is a live post on the WordPress site (not a draft there). */
+  const wpLive = !!wpPostId && wpStatus === 'publish'
   // Phase 4D — current inline-image rows (emitted by the panel) so the body
   // preview composes figures without mutating stored content_html.
   const [inlineImages, setInlineImages] = useState<ComposableInlineImage[]>([])
@@ -325,8 +327,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
   async function exportWordPress(status: 'draft' | 'publish') {
     if (wpBusy) return // one export at a time
-    // Publishing goes live → confirm. Draft needs no dangerous confirmation.
-    if (status === 'publish' && !(await confirm({ title: cf.publishTitle, body: e.wpPublishConfirm, confirmLabel: cf.publishAction }))) return
+    // A live post: "publish" updates it in place and keeps it live; "draft" would take it OFF the
+    // site, so it is never a quiet click (the card offers no draft button for a live post at all).
+    const wasLive = wpLive
+    if (wasLive && status === 'draft') {
+      if (!(await confirm({ title: e.wpUnpublishTitle, body: e.wpUnpublishConfirm, confirmLabel: e.wpUnpublishAction, tone: 'danger' }))) return
+    } else if (wasLive) {
+      if (!(await confirm({ title: e.wpUpdateLiveTitle, body: e.wpUpdateLiveConfirm, confirmLabel: e.wpUpdateLiveAction }))) return
+    } else if (status === 'publish' && !(await confirm({ title: cf.publishTitle, body: e.wpPublishConfirm, confirmLabel: cf.publishAction }))) return
     // Phase 4E — once exported, a re-export UPDATES the same post in place
     // (idempotent: no duplicate post/taxonomy). A brand-new separate post is no
     // longer the default; the existing post is reconciled by wp_post_id.
@@ -337,7 +345,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}) }),
+        body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}), ...(wasLive && status === 'draft' ? { unpublish: true } : {}) }),
       })
       // F — read content-type + parse the JSON body EVEN on a non-ok response, so a
       // typed { error, message, diagnosticId } is surfaced instead of a generic 500.
@@ -360,7 +368,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           invalidCategoryIds: data.taxonomy?.invalidCategoryIds,
           invalidTagIds: data.taxonomy?.invalidTagIds,
         })
-        let base: string = status === 'publish' ? e.wpPublished : e.wpExported
+        let base: string = wasLive && status === 'publish' ? e.wpUpdated : status === 'publish' ? e.wpPublished : e.wpExported
         if (data.imageWarning) base = `${base} · ${e.wpImageWarn}`
         if (data.taxonomyWarning) base = `${base} · ${e.wpTax.taxonomyWarning}`
         if (data.seoStatus && data.seoStatus !== 'verified') base = `${base} · ${e.wpTax.seoMetaWarn}`
@@ -368,8 +376,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         if (status === 'publish' && data.keywordAdded) base = `${base} · ${e.wpKeywordAdded}`
         setMessage({ text: base, ok: true })
         toast.success(base)
-        // Publish returns to the hub; draft keeps the user here to review/open.
-        if (status === 'publish') setTimeout(() => router.push(backHref), 900)
+        // A first publish returns to the hub; a draft or an update of the live post keeps the user here.
+        if (status === 'publish' && !wasLive) setTimeout(() => router.push(backHref), 900)
         return
       }
       if (res.status === 409 && data.reason === 'already_exported') {
@@ -477,6 +485,92 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     faq,
   }
 
+  /** The AI visibility card (a published article with visibility data). */
+  const aiCard = isPublished && visibility ? (
+    <div className={editing ? 'mb-4' : ''}>
+      <ArticleAiVisibilityCard
+        t={e.aiVisibility}
+        language={language}
+        projectId={projectId}
+        data={visibility}
+        onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+        onTracked={() => void loadVisibility()}
+      />
+    </div>
+  ) : null
+
+  /** The quality checks: on top while editing, beside the article (side panel) while reading. */
+  const renderAudit = (side: boolean) => audit && (
+    <Card className={side ? '' : 'mb-4'} data-audit-card={side ? 'side' : 'top'}>
+      <div className={`${side ? 'mb-2' : 'mb-4'} flex items-center justify-between gap-3`}>
+        <h3 className="text-section font-semibold text-ink">{e.auditTitle}</h3>
+        <div className={`inline-flex items-baseline gap-1 rounded-pill px-3 py-1 ${audit.score >= 80 ? 'bg-ok-soft text-ok' : audit.score >= 55 || isPublished ? 'bg-warn-soft text-warn' : 'bg-bad-soft text-bad'}`}>
+          <span className="text-section font-semibold tabular-nums">{audit.score}</span>
+          <span className="text-caption">/ 100</span>
+        </div>
+      </div>
+
+      {/* The article's anatomy as one compact definition list (final review R23):
+          seven grey tiles made a count of lists look as weighty as the score. */}
+      {/* In the side panel the score explains itself first: it measures structure, not the writing. */}
+      {side && <p className="mb-3 text-caption text-muted text-pretty" data-audit-explain="">{e.auditExplain}</p>}
+      <dl data-audit-counts="" className={`mb-4 grid grid-cols-2 gap-x-6 border-y border-line py-3 ${side ? '' : 'sm:grid-cols-4 lg:grid-cols-7'}`}>
+        {[
+          { l: e.auditWords, v: audit.counts.words },
+          { l: e.auditH2, v: audit.counts.h2 },
+          { l: e.auditH3, v: audit.counts.h3 },
+          { l: e.auditParagraphs, v: audit.counts.p },
+          { l: e.auditFaq, v: audit.counts.faq },
+          { l: e.auditTables, v: audit.counts.tables },
+          { l: e.auditLists, v: audit.counts.lists },
+        ].map((c) => (
+          <div key={c.l} className={`flex items-baseline justify-between gap-3 py-1.5 ${side ? '' : 'lg:flex-col lg:items-start lg:gap-0.5'}`}>
+            <dt className="text-caption text-muted">{c.l}</dt>
+            <dd className="text-copy font-semibold tabular-nums text-ink">{c.v.toLocaleString(language)}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <p className={`mb-3 inline-flex items-center gap-1.5 text-caption ${audit.tocReady ? 'text-ok' : 'text-muted'}`}>
+        {audit.tocReady && <Check aria-hidden="true" className="size-4 shrink-0" />}
+        {audit.tocReady ? e.tocReady : e.tocNotReady}
+      </p>
+
+      {audit.anchorQuality && audit.anchorQuality.count > 0 && (() => {
+        const aq = audit.anchorQuality
+        const isBlock = aq.anchorTooEarly || aq.mechanicalAnchorPhrase
+        const isWarn = aq.anchorsTooClose || aq.anchorsInSameParagraph
+        const msg = aq.anchorTooEarly ? e.anchorEarly : aq.mechanicalAnchorPhrase ? e.anchorMechanical : isWarn ? e.anchorTooCloseMsg : e.anchorQualityOk
+        const cls = isBlock && !isPublished ? 'text-bad' : isBlock || isWarn ? 'text-warn' : 'text-ok'
+        return (
+          <div className="mb-3 text-caption">
+            <span className={cls}>{`${e.anchorQualityLabel}: ${msg}`}</span>
+            {aq.firstAnchorWordIndex >= 0 && (
+              <span className="text-muted"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
+            )}
+          </div>
+        )
+      })()}
+
+      {audit.blockers.length > 0 && (
+        // On a published article nothing is blocked any more: the same items
+        // read as advice, in the warning tone, not as a red "must fix".
+        <AuditList
+          tone={isPublished ? 'warn' : 'bad'}
+          title={isPublished ? e.auditBlockersPublished : e.auditBlockers}
+          items={audit.blockers.map((b) => auditLabel(b))}
+          moreLabel={getDashboardDictionary(language).uiKit.noticeMore}
+        />
+      )}
+      {audit.warnings.length > 0 && (
+        <AuditList tone="warn" title={e.auditWarnings} items={audit.warnings.map((w) => auditLabel(w))} moreLabel={getDashboardDictionary(language).uiKit.noticeMore} />
+      )}
+      {audit.blockers.length === 0 && audit.warnings.length === 0 && (
+        <Notice tone="ok">{e.auditAllGood}</Notice>
+      )}
+    </Card>
+  )
+
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
       <ArticleTopBar
@@ -520,105 +614,40 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div id="article-panel-article" role="tabpanel" aria-labelledby="article-tab-article" hidden={tab !== 'article'}>
-      {isPublished && visibility && (
-        <div className="mb-4">
-          <ArticleAiVisibilityCard
-            t={e.aiVisibility}
-            language={language}
-            projectId={projectId}
-            data={visibility}
-            onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
-            onTracked={() => void loadVisibility()}
-          />
-        </div>
-      )}
-
-      {audit && (
-        <Card className="mb-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-section font-semibold text-ink">{e.auditTitle}</h3>
-            <div className={`inline-flex items-baseline gap-1 rounded-pill px-3 py-1 ${audit.score >= 80 ? 'bg-ok-soft text-ok' : audit.score >= 55 || isPublished ? 'bg-warn-soft text-warn' : 'bg-bad-soft text-bad'}`}>
-              <span className="text-section font-semibold tabular-nums">{audit.score}</span>
-              <span className="text-caption">/ 100</span>
-            </div>
-          </div>
-
-          {/* The article's anatomy as one compact definition list (final review R23):
-              seven grey tiles made a count of lists look as weighty as the score. */}
-          <dl data-audit-counts="" className="mb-4 grid grid-cols-2 gap-x-6 border-y border-line py-3 sm:grid-cols-4 lg:grid-cols-7">
-            {[
-              { l: e.auditWords, v: audit.counts.words },
-              { l: e.auditH2, v: audit.counts.h2 },
-              { l: e.auditH3, v: audit.counts.h3 },
-              { l: e.auditParagraphs, v: audit.counts.p },
-              { l: e.auditFaq, v: audit.counts.faq },
-              { l: e.auditTables, v: audit.counts.tables },
-              { l: e.auditLists, v: audit.counts.lists },
-            ].map((c) => (
-              <div key={c.l} className="flex items-baseline justify-between gap-3 py-1.5 lg:flex-col lg:items-start lg:gap-0.5">
-                <dt className="text-caption text-muted">{c.l}</dt>
-                <dd className="text-copy font-semibold tabular-nums text-ink">{c.v.toLocaleString(language)}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <p className={`mb-3 inline-flex items-center gap-1.5 text-caption ${audit.tocReady ? 'text-ok' : 'text-muted'}`}>
-            {audit.tocReady && <Check aria-hidden="true" className="size-4 shrink-0" />}
-            {audit.tocReady ? e.tocReady : e.tocNotReady}
-          </p>
-
-          {audit.anchorQuality && audit.anchorQuality.count > 0 && (() => {
-            const aq = audit.anchorQuality
-            const isBlock = aq.anchorTooEarly || aq.mechanicalAnchorPhrase
-            const isWarn = aq.anchorsTooClose || aq.anchorsInSameParagraph
-            const msg = aq.anchorTooEarly ? e.anchorEarly : aq.mechanicalAnchorPhrase ? e.anchorMechanical : isWarn ? e.anchorTooCloseMsg : e.anchorQualityOk
-            const cls = isBlock && !isPublished ? 'text-bad' : isBlock || isWarn ? 'text-warn' : 'text-ok'
-            return (
-              <div className="mb-3 text-caption">
-                <span className={cls}>{`${e.anchorQualityLabel}: ${msg}`}</span>
-                {aq.firstAnchorWordIndex >= 0 && (
-                  <span className="text-muted"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
-                )}
-              </div>
-            )
-          })()}
-
-          {audit.blockers.length > 0 && (
-            // On a published article nothing is blocked any more: the same items
-            // read as advice, in the warning tone, not as a red "must fix".
-            <AuditList
-              tone={isPublished ? 'warn' : 'bad'}
-              title={isPublished ? e.auditBlockersPublished : e.auditBlockers}
-              items={audit.blockers.map((b) => auditLabel(b))}
-              moreLabel={getDashboardDictionary(language).uiKit.noticeMore}
-            />
-          )}
-          {audit.warnings.length > 0 && (
-            <AuditList tone="warn" title={e.auditWarnings} items={audit.warnings.map((w) => auditLabel(w))} moreLabel={getDashboardDictionary(language).uiKit.noticeMore} />
-          )}
-          {audit.blockers.length === 0 && audit.warnings.length === 0 && (
-            <Notice tone="ok">{e.auditAllGood}</Notice>
-          )}
-        </Card>
-      )}
+      {/* Editing: the checks sit on top, as the list of what to fix while writing. */}
+      {editing && aiCard}
+      {editing && audit && renderAudit(false)}
 
       {!editing ? (
-        <ArticleReadView
-          t={e.readView}
-          faqTitle={e.faqTitle}
-          title={title}
-          metaTitle={metaTitle}
-          metaDescription={metaDescription}
-          slug={slug}
-          publishedUrl={publishedUrl}
-          featuredImageUrl={featuredImageUrl}
-          html={contentHtml}
-          images={inlineImages}
-          faq={faq}
-          dir={isHebrew ? 'rtl' : 'ltr'}
-          onEdit={() => setEditing(true)}
-          projectId={projectId}
-        />
+        // Reading: the article comes first. The quality checks and the AI card sit beside it on a
+        // wide screen and under it on a phone, where the score explains what it measures, so a low
+        // number is not read as "the article is bad" before the article itself was seen.
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6" data-article-layout="read">
+          <div className="min-w-0">
+            <ArticleReadView
+              t={e.readView}
+              faqTitle={e.faqTitle}
+              title={title}
+              metaTitle={metaTitle}
+              metaDescription={metaDescription}
+              slug={slug}
+              publishedUrl={publishedUrl}
+              featuredImageUrl={featuredImageUrl}
+              html={contentHtml}
+              images={inlineImages}
+              faq={faq}
+              dir={isHebrew ? 'rtl' : 'ltr'}
+              onEdit={() => setEditing(true)}
+              projectId={projectId}
+            />
+          </div>
+          {(audit || aiCard) && (
+            <aside aria-label={e.sidePanelLabel} className="mb-4 space-y-4 lg:sticky lg:top-24" data-article-side="">
+              {audit && renderAudit(true)}
+              {aiCard}
+            </aside>
+          )}
+        </div>
       ) : (
         <Notice tone="info" className="mb-4" action={{ label: e.readView.done, onClick: () => setEditing(false) }}>
           {e.readView.editingNote}
@@ -756,14 +785,25 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           <Card>
             <h3 className="text-section font-semibold text-ink mb-2">{e.wpTitle}</h3>
             {!featuredImageUrl && <Notice tone="warn" className="mb-3">{e.wpNoImageWarn}</Notice>}
+            {wpLive && <p className="mb-3 text-caption text-muted" data-wp-live-note="">{e.wpLiveNote}</p>}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Bordered: the top bar's publish call is the page's one primary, and it leads here. */}
-              <Button size="sm" variant="secondary" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
-                {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
-                {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
-              </Button>
+              {/* Bordered: the top bar's publish call is the page's one primary, and it leads here.
+                  A live post gets ONE action, "update the live post": sending a live post as a
+                  draft would take the page off the site. */}
+              {wpLive ? (
+                <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy} data-wp-update-live="">
+                  {wpBusy === 'publish' ? e.wpUpdatingLive : e.wpUpdateLive}
+                </Button>
+              ) : (
+                <>
+                  <Button size="sm" variant="secondary" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy} data-wp-send-draft="">
+                    {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy} data-wp-publish="">
+                    {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
+                  </Button>
+                </>
+              )}
               {wpPostId && wpPostUrl && (
                 <span className="inline-flex items-center gap-2 text-copy">
                   <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>

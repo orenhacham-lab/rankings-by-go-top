@@ -674,6 +674,72 @@ async function partH() {
     && /domainUnverified: 'To join the network, connect your site/.test(en) && /domain_unverified: '/.test(he) && /domain_unverified: '/.test(en))
 }
 
+// ── I. the page count reads the full-site mapping (review P1-8) ───────────
+async function partI() {
+  console.log('\nI. pages from the full-site mapping (site_page_map)')
+  const STORE = 'lib/link-network/store.ts'
+  const user = (id: string) => (id === P.S ? U_S : `20000000-0000-0000-0000-00000000000${ids.indexOf(id)}`)
+  /** P.OK with no published articles and an empty link index: only the mapping knows its pages. */
+  const onlyMapped = (map: Record<string, unknown> | null, over: { unconnected?: string[] } = {}) => {
+    const db = networkDb(over)
+    db.tables.generated_articles = db.tables.generated_articles.filter((a: any) => a.project_id !== P.OK)
+    db.tables.site_page_map = map ? [{ project_id: P.OK, user_id: user(P.OK), status: 'completed', counts: { all: 14, page: 9, article: 5 }, ...map }] : []
+    return db
+  }
+  const siteOf = async (db: any) => (await loadSites(db, [P.OK])).get(P.OK)!.site
+  const bare = await siteOf(onlyMapped(null))
+  check('without the mapping, a site with no articles and no index is thin (the old reading)', siteQualifies(bare, NOW) === 'thin_or_new' && bare.indexedPages === 0)
+  const mapped = await siteOf(onlyMapped({}))
+  check('with the mapping (14 pages), the site counts 14 pages and qualifies', mapped.indexedPages === 14 && siteQualifies(mapped, NOW) === null, `${mapped.indexedPages} ${siteQualifies(mapped, NOW)}`)
+  check('the larger of the link index and the mapping counts', (await siteOf(onlyMapped({ counts: { page: 7, article: 4 } }))).indexedPages === 11)
+  check('a mapping still running or failed is no evidence yet', (await siteOf(onlyMapped({ status: 'running' }))).indexedPages === 0 && (await siteOf(onlyMapped({ status: 'failed' }))).indexedPages === 0)
+  check('a partial mapping counts what it found', (await siteOf(onlyMapped({ status: 'partial' }))).indexedPages === 14)
+  check('a mapping row of another account never counts (owner filter)', (await siteOf(onlyMapped({ user_id: U_S }))).indexedPages === 0)
+  check('pages never replace domain control: an unconnected site with 14 mapped pages stays domain_unverified',
+    siteQualifies(await siteOf(onlyMapped({}, { unconnected: [P.OK] })), NOW) === 'domain_unverified')
+  const noTable = networkDb({ hooks: { site_page_map: { select: () => ({ code: '42P01', message: 'missing' }) } } })
+  check('a missing site_page_map table reads as no mapping (nothing breaks)', !!(await loadSites(noTable, [P.OK])).get(P.OK))
+  const countMut = await withMutantAsync(STORE, (s) => s.replace('indexedPages: Math.max(index.length, pageMapCount(mapOf.get(p.id))),', 'indexedPages: index.length,'),
+    async (m) => (await m.loadSites(onlyMapped({}), [P.OK])).get(P.OK).site.indexedPages)
+  check('MUTATION CONTROL: the mapping ignored (the old count) → caught', countMut === 0, String(countMut))
+  const ownerMut = await withMutantAsync(STORE, (s) => s.replace('pageMaps.filter((m) => m.user_id && m.user_id === ownerOfProject.get(m.project_id))', 'pageMaps'),
+    async (m) => (await m.loadSites(onlyMapped({ user_id: U_S }), [P.OK])).get(P.OK).site.indexedPages)
+  check('MUTATION CONTROL: mapping owner not checked → caught', ownerMut === 14, String(ownerMut))
+  const readsCountsOnly = (src: string) => /from\('site_page_map'\)\.select\('project_id, user_id, status, counts'\)/.test(src)
+  check('the mapping is read for its counts only, never its entries (up to 10 000 per site)', readsCountsOnly(strip(read(STORE))))
+  check('MUTATION CONTROL: entries read too → caught', !readsCountsOnly(strip(read(STORE)).replace("select('project_id, user_id, status, counts')", "select('project_id, user_id, status, counts, entries')")))
+}
+
+// ── J. one count, and the free tab first (review P2-8) ──────────────────────
+async function partJ() {
+  console.log('\nJ. one definition of a link; opportunities first')
+  const { linkCount, countsAsLink } = require('../counting') as typeof import('../counting')
+  check('a link is live or waiting; removed or taken out is history', countsAsLink('published') && countsAsLink('waiting') && !countsAsLink('removed') && !countsAsLink('rejected'))
+  const totalsOf = async (db: any) => {
+    const ans = await (await handleNetworkGet(P.S, routeDeps(U_S, db))).json() as any
+    return { kpi: ans.totals?.given, list: linkCount(ans.given ?? []), rows: (ans.given ?? []).length }
+  }
+  const live = await totalsOf(networkDbWithPlacement())
+  check('a link in the article: KPI 1, log count 1', live.kpi === 1 && live.list === 1, JSON.stringify(live))
+  const gone = networkDbWithPlacement()
+  ;(gone.tables.generated_articles.find((a: any) => a.id === ART) as any).content_html = ARTICLE
+  const g = await totalsOf(gone)
+  check('a link no longer in the article: KPI 0 and log count 0 (the row is kept as history)', g.kpi === 0 && g.list === 0 && g.rows === 1, JSON.stringify(g))
+  const mut = await withMutantAsync('lib/link-network/http.ts', (src) => src.replace('totals: { received: linkCount(received), given: linkCount(given) },', 'totals: { received: received.length, given: given.length },'),
+    async (m) => (await (await m.handleNetworkGet(P.S, routeDeps(U_S, gone))).json() as any).totals.given)
+  check('MUTATION CONTROL: KPI counts every row again → the numbers disagree → caught', mut === 1 && g.list === 0, String(mut))
+  const log = strip(read('components/site-links/network/PlacementLog.tsx'))
+  const logOk = (src: string) => /count: linkCount\(data\.received\)/.test(src) && /count: linkCount\(given\)/.test(src) && /const list = all\.filter\(\(i\) => countsAsLink\(i\.state\)\)/.test(src)
+  check('the log\'s tab counts and list use the same definition as the KPI', logOk(log))
+  check('MUTATION CONTROL: tab count back to every row → caught', !logOk(log.replace('count: linkCount(data.received)', 'count: data.received.length')))
+  const screen = strip(read('components/site-links/network/SiteLinksScreen.tsx'))
+  const defOk = (src: string) => /const view: View = picked \?\? \(load\.data\.membership\.active \? 'network' : 'opportunities'\)/.test(src)
+    && src.indexOf("value: 'opportunities'") < src.indexOf("value: 'network'")
+  check('the free opportunities tab is first and the default; a member opens on the network', defOk(screen))
+  check('MUTATION CONTROL: the network as everyone\'s default → caught', !defOk(screen.replace("? 'network' : 'opportunities'", "? 'network' : 'network'")))
+  check('the history line is in both dictionaries', /history: \(n: number\) =>/.test(read('lib/i18n/dashboard/he.ts')) && /history: \(n: number\) =>/.test(read('lib/i18n/dashboard/en.ts')))
+}
+
 async function main() {
   partA()
   partB()
@@ -683,6 +749,8 @@ async function main() {
   partF()
   partG()
   await partH()
+  await partI()
+  await partJ()
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

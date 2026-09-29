@@ -12,12 +12,24 @@ export const READING_LINE = 96
  * (in screen order): the last one whose top has passed READING_LINE; at the end of
  * the page, the last one; before the first has passed, the first. Pure, for the QA.
  */
-export function activeSection(tops: readonly { id: string; top: number }[], atEnd: boolean): string | null {
+export function activeSection(tops: readonly { id: string; top: number }[], atEnd: boolean, line: number = READING_LINE): string | null {
   if (tops.length === 0) return null
   if (atEnd) return tops[tops.length - 1].id
   let current = tops[0].id
-  for (const s of tops) if (s.top <= READING_LINE) current = s.id
+  for (const s of tops) if (s.top <= line) current = s.id
   return current
+}
+
+/**
+ * Where the eye reads on this window: a third of the way down (never above READING_LINE, never
+ * below 320px). With the line pinned at the scroll margin, a section whose heading sat just under
+ * the sticky bar, filling the screen, stayed unmarked while the previous one, all but scrolled
+ * away, was still marked (review P2-2). A click on the index lands a section at the scroll margin,
+ * above this line, so a click always marks the section it went to.
+ */
+export function readingLineFor(viewportHeight: number): number {
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return READING_LINE
+  return Math.round(Math.min(320, Math.max(READING_LINE, viewportHeight * 0.33)))
 }
 
 /**
@@ -46,7 +58,7 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
       }
       const doc = document.documentElement
       const atEnd = window.scrollY > 0 && window.innerHeight + window.scrollY >= doc.scrollHeight - 2
-      setActive(activeSection(tops, atEnd))
+      setActive(activeSection(tops, atEnd, readingLineFor(window.innerHeight)))
     }
     const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(pick) }
     pick()
@@ -93,7 +105,8 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
                   aria-hidden
                   className={cn(
                     'grid size-5 shrink-0 place-items-center rounded-pill text-overline font-bold tabular-nums transition-colors duration-150 ease-snappy',
-                    on ? 'bg-action text-action-ink' : passed ? 'bg-line-strong/70 text-ink' : 'bg-sunk text-muted group-hover:bg-line',
+                    // One marked section only: a section already read keeps a darker number, never a second fill.
+                    on ? 'bg-action text-action-ink' : passed ? 'bg-sunk text-ink' : 'bg-sunk text-muted group-hover:bg-line',
                   )}
                 >
                   {i + 1}

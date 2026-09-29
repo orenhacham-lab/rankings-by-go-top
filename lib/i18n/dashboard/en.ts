@@ -313,7 +313,7 @@ export const dashboardEn = {
         addLabel: 'New colour',
         placeholder: '#1f6feb',
         pick: 'Pick a colour',
-        invalid: 'Enter a HEX colour, for example #1f6feb.',
+        invalid: 'Enter a colour code: a # and six letters or digits, for example #1f6feb.',
         full: 'You can keep up to 6 colours.',
         empty: 'No brand colours yet. Without one, articles are styled in a calm blue.',
         fromSite: 'Colours from your site',
@@ -327,7 +327,7 @@ export const dashboardEn = {
       design: {
         label: 'Article layout',
         formatted: { label: 'Designed', hint: 'An "in short" box, key takeaways, framed tables, FAQ cards and a call to action, in your brand colours.' },
-        minimal: { label: 'Minimal', hint: 'Clean HTML that takes on your site\'s own design, as today.' },
+        minimal: { label: 'Minimal', hint: 'Plain text with no design of its own, so your site styles it, as today.' },
       },
       preview: {
         label: 'Preview',
@@ -357,6 +357,28 @@ export const dashboardEn = {
         faqTitle: 'Frequently asked questions',
         faqQ: 'How often should a mattress be replaced?',
         faqA: 'Usually every eight to ten years.',
+        // The same sample, about the project's own line of business ({niche}) and name ({business}).
+        forNiche: {
+          title: 'The complete guide to {niche}',
+          lead: 'The short answer: here is how to get good {niche} service, on time and with no surprises on the bill.',
+          intro: 'Before you book, it helps to know what really affects the result.',
+          h1: 'What to know before you book',
+          p1: 'Experience, a warranty and availability matter more than anything else, so start there. Then compare prices.',
+          h2: 'How to choose a professional',
+          p2: 'Ask for a detailed written quote and about the warranty. A good professional explains exactly what will be done and why.',
+          th1: 'What to check',
+          th2: 'Why it matters',
+          r1a: 'A written warranty',
+          r1b: 'Peace of mind afterwards',
+          r2a: 'A detailed quote',
+          r2b: 'No surprises on the bill',
+          h3: 'What it costs',
+          p3: 'The price depends on the size of the job and the materials. A detailed quote up front saves arguments at the end.',
+          cta: 'Want a quote from {business}?',
+          ctaGeneric: 'Want a quote?',
+          faqQ: 'How long does a {niche} job take?',
+          faqA: 'It depends on the size. Most small jobs are done the same day.',
+        },
       },
       images: {
         label: 'Image style',
@@ -395,7 +417,7 @@ export const dashboardEn = {
     officialProfiles: {
       title: 'Official business profiles',
       navLabel: 'Official profiles',
-      body: 'Links to the business\'s official pages on Google and social networks. Every article carries them in its structured data (Schema).',
+      body: 'Links to the business\'s official pages on Google and social networks. Every article carries them in the markup Google and AI assistants read, so they know it is one business.',
       whyTitle: 'Why does this help?',
       why: 'Google and AI assistants such as ChatGPT and Gemini piece together a picture of a business from many sources. When every article on your site points to the same official pages, it is easier for them to see that the site, the Google profile and the social pages are one business, and to show correct information about you. It does not guarantee a mention in answers, but it removes doubt about who you are.',
       readOnly: 'These fields are not open for editing on your account yet.',
@@ -409,7 +431,7 @@ export const dashboardEn = {
       detectNone: 'We found no profile links on your home page. You can paste them here.',
       detectFailed: 'We could not read your site right now. You can paste the links by hand.',
       invalid: 'This is not a link to a page on {network}. Paste a full https address, for example:',
-      count: '{n} of {max} connected',
+      count: '{n} of {max} filled in',
       networks: {
         google_business: { label: 'Google Business Profile', example: 'https://maps.app.goo.gl/…' },
         facebook: { label: 'Facebook', example: 'https://www.facebook.com/your-business' },
@@ -1681,7 +1703,7 @@ export const dashboardEn = {
         downloadFailed: 'We couldn’t download the image, so we opened it in a new tab.',
         tabsLabel: 'Article sections',
         tabArticle: 'Article',
-        tabSchema: 'Schema',
+        tabSchema: 'Google markup',
         publishPanelHint: 'Choose how to publish here:',
       },
       // C3 — the Schema tab (JSON-LD preview and copy).
@@ -1778,6 +1800,16 @@ export const dashboardEn = {
       wpPublishNow: 'Publish now to WordPress',
       wpPublishing: 'Publishing…',
       wpPublishConfirm: 'The article will be published live and visible to visitors. Continue?',
+      wpUpdateLive: 'Update the live post',
+      wpUpdatingLive: 'Updating the post…',
+      wpUpdateLiveTitle: 'Update the post on your site?',
+      wpUpdateLiveConfirm: 'Your changes appear on the live page right away. The page stays published.',
+      wpUpdateLiveAction: 'Update',
+      wpUpdated: 'The post was updated on your site.',
+      wpLiveNote: 'This post is live on your site. Updating replaces the page content and keeps it published.',
+      wpUnpublishTitle: 'Take the page off your site?',
+      wpUnpublishConfirm: 'This post is live. Sending it as a draft turns it back into a draft, and the page stops showing on your site and in Google until you publish it again.',
+      wpUnpublishAction: 'Take it offline',
       wpPublishNewConfirm: 'This article was already exported to WordPress. Publish it as a new, separate post?',
       wpDraftNewConfirm: 'This article was already exported to WordPress. Send a new, separate draft?',
       wpExported: 'The article was sent to WordPress as a draft.',
@@ -1793,6 +1825,7 @@ export const dashboardEn = {
       wpOpenLive: 'Open article on the site',
       wpErrors: {
         invalid_status: 'Invalid publish status.',
+        would_unpublish: 'This post is live on your site, so we did not turn it into a draft. You can update it instead.',
         no_wordpress_connection: 'No WordPress connection is set for this project. Set one up first.',
         wordpress_connection_error: 'Failed to load the WordPress connection.',
         image_unavailable: 'Couldn\'t load the article image. Regenerate it and try again.',
@@ -1825,6 +1858,8 @@ export const dashboardEn = {
       comingSoon: 'Coming soon',
       publishNextPhase: 'Publish to WordPress — next phase',
       auditTitle: 'SEO/GEO quality check',
+      auditExplain: 'The score checks the article’s structure: length, subheadings, FAQ, links and images. It does not judge the writing itself, and anything missing here can be added while editing.',
+      sidePanelLabel: 'Article checks and visibility',
       auditBlockers: 'Blockers (must fix)',
       auditBlockersPublished: 'Worth fixing',
       readView: {
@@ -2363,7 +2398,7 @@ export const dashboardEn = {
       failedTitle: 'The scan did not finish',
       failed: 'We could not read the whole site, so there are no findings yet. You can run the scan again from settings.',
       geo: {
-        schema: { title: 'Structured data (Schema)', why: 'Tells Google and AI engines for certain who the business is and what it does.' },
+        schema: { title: 'Markup for Google', why: 'Tells Google and AI engines for certain who the business is and what it does.' },
         faq: { title: 'Questions and answers', why: 'A page with questions and answers gives an AI engine a ready answer to quote.' },
         robots: { title: 'AI bot access', why: 'A bot blocked in robots.txt cannot read the site, so it cannot cite it either.' },
         llms: { title: 'llms.txt file', why: 'Hands AI engines a tidy map of the site. Most of the market has not done it yet.' },
@@ -2616,6 +2651,7 @@ export const dashboardEn = {
       scanFreqManual: 'Manual only',
       scanFreqMonthly: 'Monthly',
       autoScanLabel: 'Enable automatic scans',
+      autoScanOff: 'Automatic scans are off. You can scan manually at any time.',
       submitCreate: 'Create project',
       submitUpdate: 'Save changes',
       cancel: 'Cancel',
@@ -2978,6 +3014,7 @@ export const dashboardEn = {
           body: 'When we place a link in one of your articles, it shows here before publishing, and you can remove it.',
         },
         notJoined: 'Once you join, every link you receive or give shows here.',
+        history: (n: number) => (n === 1 ? 'One link no longer in its article' : `${n} links no longer in their articles`),
       },
     },
   },
@@ -3902,7 +3939,7 @@ export const dashboardEn = {
     rescanLink: 'Rescan in settings',
     checks: {
       schema: {
-        title: 'Structured data about your business (schema)',
+        title: 'Markup about your business',
         why: 'AI engines read JSON-LD markup to learn who you are, what you sell and what you are called. Without it they guess.',
         fix: 'Add Organization or LocalBusiness markup to your home page with your name, logo and links. Most themes and apps add it without code.',
       },
@@ -3912,7 +3949,7 @@ export const dashboardEn = {
         fix: 'Add a FAQ section with 5 to 8 real customer questions to a key page, and mark it up as FAQPage.',
       },
       robots: {
-        title: 'Access for AI crawlers (robots.txt)',
+        title: 'Access for AI crawlers',
         why: 'If robots.txt blocks GPTBot, PerplexityBot or Google-Extended, those engines cannot read your site and will not cite it.',
         fix: 'Remove the Disallow lines for AI crawlers from robots.txt, unless you blocked them on purpose.',
       },
@@ -4110,7 +4147,7 @@ export const dashboardEn = {
       totalKeywords: 'Total keywords',
       found: 'Found',
       notFound: 'Not found',
-      coverage: 'Coverage',
+      coverage: 'Found on Google',
       currentRankings: 'Current rankings',
       keyword: 'Keyword',
       engine: 'Engine',
@@ -4198,6 +4235,7 @@ export const dashboardEn = {
     openPage: 'Open the page',
     stepsTitle: 'How to fix it',
     fixedBadge: 'Fixed',
+    queuedBadge: 'In the fix queue',
     connectHint: {
       wordpress: 'Connect your WordPress site in settings and we can fix titles, descriptions, image descriptions and links in one click, after you see and approve every change.',
       shopify: 'On Shopify stores we never change anything in your store. Every finding has instructions, with a direct link to the page in your store admin.',
@@ -4292,6 +4330,11 @@ export const dashboardEn = {
           title: 'The plugin is not connected right now',
           body: 'We could not reach the plugin on your site. Until the connection is back, fixes you approve are marked for manual update and nothing is written to your site.',
         },
+        rekey: {
+          title: 'Connect the plugin again',
+          body: 'The plugin is installed on your site, but its connection needs renewing. Create a new pairing code and paste it into the plugin, that is all. Until then, fixes you approve are marked for manual update and nothing is written to your site.',
+        },
+        reconnect: 'Connect again',
         webhook: {
           title: 'Fixes are sent to your server',
           body: 'Your site is connected by webhook. Every fix you approve is sent to your server with the new and the previous value, and marked as "Sent". Your developer applies it on the site.',
@@ -4306,6 +4349,7 @@ export const dashboardEn = {
       plugin: {
         title: 'The Go Top plugin',
         intro: 'The plugin lets us write to your site only the fixes you approved, one at a time. It never deletes content, never touches prices or products, your theme, plugins, settings or users, and never publishes or hides a page.',
+        rekeyNotice: 'The plugin connection needs renewing. If the plugin is already installed, skip to step 3 and create a new pairing code.',
         step: (n: number) => `Step ${n}`,
         download: { title: 'Download the plugin', body: 'One zip file. No need to open it.', action: 'Download the plugin' },
         upload: { title: 'Install it on WordPress', body: 'In the dashboard: Plugins, Add New, Upload Plugin. Choose the file, click "Install Now" and then "Activate".', action: 'Open the upload page' },
@@ -4337,7 +4381,7 @@ export const dashboardEn = {
         title: {
           seo_title: 'A new title for Google',
           meta_description: 'A new description for Google',
-          canonical: 'A canonical address for the page',
+          canonical: 'An official address for the page',
           focus_keyphrase: 'A focus keyphrase for the page',
           image_alt: 'Image descriptions',
           faq_block: 'FAQs at the end of the page',
@@ -4359,7 +4403,7 @@ export const dashboardEn = {
         what: {
           seo_title: 'The page\'s SEO title will be:',
           meta_description: 'The description for Google will be:',
-          canonical: 'The page\'s canonical address will be:',
+          canonical: 'The page\'s official address will be:',
           focus_keyphrase: 'The page\'s focus keyphrase in the SEO plugin will be:',
           image_alt: (n: number) => (n === 1
             ? 'One image without a description gets the description you wrote. Images that already have one do not change.'
@@ -4381,7 +4425,7 @@ export const dashboardEn = {
         close: 'Close',
         undo: 'Undo the fix',
         labels: {
-          canonical: 'Canonical address',
+          canonical: 'The page\'s official address',
           canonicalHint: 'Usually the page\'s own address, without parameters. Only an address on your site.',
           focus: 'Focus keyphrase',
           focusHint: 'The words people type into Google to find this page, usually 2 to 4 words.',
@@ -4491,6 +4535,7 @@ export const dashboardEn = {
         changed_since_preview: 'The page changed since we read it, so we changed nothing. Open the fix again.',
         nothing_to_undo: 'We do not have what the page had before this fix, so it cannot be undone from here.',
         wrong_state: 'This fix changed in the meantime. Refresh the page.',
+        already_fixed: 'This fix was already approved for this page and is in the fix queue. We did not send it again.',
         write_not_confirmed: 'We sent the change, but your site did not return the new value. Check the page before trying again.',
         webhook_failed: 'Your server did not confirm it received the fix. Check the webhook connection in settings and try again.',
         store_failed: 'Something went wrong on our side. Try again in a moment.',
@@ -4515,7 +4560,7 @@ export const dashboardEn = {
       sitemap_missing: { title: 'We did not find a sitemap', why: 'A sitemap lists all your pages for Google. Without one, new pages are discovered more slowly.' },
       orphan_page: { title: 'Pages no other page links to', why: 'A page with no links from inside the site is hard for Google to reach and is treated as less important.' },
       no_viewport: { title: 'Pages not set up for phones', why: 'Without a mobile display setting the page looks tiny on a phone, and Google ranks by the mobile version.' },
-      canonical_missing: { title: 'Pages without a canonical address', why: 'A canonical address tells Google which address is the official one for the page. Without it Google may count several versions of the same page as separate pages.' },
+      canonical_missing: { title: 'Pages without an official address', why: 'The page\'s official address (canonical) tells Google which address is the official one for the page. Without it Google may count several versions of the same page as separate pages.' },
       schema_missing: { title: 'Pages without structured data', why: 'Structured data (schema) tells Google and AI assistants what the page is: a business, an article or a service. It helps you show up in rich results and AI answers.' },
       faq_missing: { title: 'Pages without FAQs', why: 'Short questions and answers match exactly what people type, and AI assistants tend to quote them. This is an addition worth considering, not a mistake.' },
     },

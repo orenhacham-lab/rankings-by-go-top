@@ -4,7 +4,6 @@ import { useId, useState } from 'react'
 import { BadgeCheck, Check, ChevronDown, Plus, Search } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Notice from '@/components/ui/Notice'
-import SiteAvatar from '@/components/ui/SiteAvatar'
 import { saveOfficialProfilesAction } from '@/app/(dashboard)/settings/article-style-actions'
 import type { ArticleStyleView } from '@/lib/content/article-style/data'
 import {
@@ -19,25 +18,13 @@ import { fill } from '@/lib/project-settings/view'
 import { cn } from '@/lib/utils'
 import SaveBar, { showSaveBar, type SaveState } from './SaveBar'
 import SettingsCard, { fieldClass } from './SettingsCard'
+import ProfileGlyph from './ProfileGlyph'
 import { SECTION } from './anchors'
 import { useDraft } from './useDraft'
 import type { SiteSignals } from './useArticleSettings'
 
 type Copy = DashboardDictionary['projectSettings']
 type Draft = Record<ProfileNetwork, string>
-
-/** Whose favicon stands for each network (the owner's browser loads it; a letter otherwise). */
-const NETWORK_SITE: Record<ProfileNetwork, string> = {
-  google_business: 'google.com',
-  facebook: 'facebook.com',
-  instagram: 'instagram.com',
-  linkedin: 'linkedin.com',
-  x: 'x.com',
-  youtube: 'youtube.com',
-  tiktok: 'tiktok.com',
-  wikidata: 'wikidata.org',
-  wikipedia: 'wikipedia.org',
-}
 
 const toDraft = (p: OfficialProfiles): Draft =>
   Object.fromEntries(PROFILE_NETWORKS.map((n) => [n, p[n] ?? ''])) as Draft
@@ -109,7 +96,8 @@ export default function OfficialProfilesCard({
     setState({ kind: 'saved' })
   }
 
-  const connected = PROFILE_NETWORKS.filter((n) => !!view.profiles[n]).length
+  // Filled in, not "connected": a typed address is not a connection to the network.
+  const filled = PROFILE_NETWORKS.filter((n) => !!view.profiles[n]).length
 
   return (
     <SettingsCard
@@ -166,7 +154,7 @@ export default function OfficialProfilesCard({
             <ul className="mt-3 divide-y divide-line">
               {offers.map((n) => (
                 <li key={n} className="flex items-center gap-3 py-2.5">
-                  <SiteAvatar domain={NETWORK_SITE[n]} size="sm" />
+                  <ProfileGlyph network={n} />
                   <div className="min-w-0 flex-1">
                     <p className="text-caption font-semibold text-ink">{p.networks[n].label}</p>
                     <p dir="ltr" className="truncate text-start text-caption text-muted" title={found[n]}>{found[n]}</p>
@@ -192,7 +180,7 @@ export default function OfficialProfilesCard({
             return (
               <div key={n} className="min-w-0" data-profile-field={n}>
                 <label htmlFor={fieldId} className="mb-1.5 flex items-center gap-2 text-copy font-semibold text-ink">
-                  <SiteAvatar domain={NETWORK_SITE[n]} size="sm" />
+                  <ProfileGlyph network={n} />
                   {p.networks[n].label}
                 </label>
                 <input
@@ -218,7 +206,7 @@ export default function OfficialProfilesCard({
             )
           })}
         </fieldset>
-        <p className="text-caption text-muted tabular-nums">{fill(p.count, { n: connected, max: PROFILE_NETWORKS.length })}</p>
+        <p className="text-caption text-muted tabular-nums">{fill(p.count, { n: filled, max: PROFILE_NETWORKS.length })}</p>
       </div>
     </SettingsCard>
   )

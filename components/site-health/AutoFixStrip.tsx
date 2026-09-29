@@ -16,11 +16,12 @@ import type { FixCapabilities, FixErrorCode } from '@/lib/site-fix/types'
 import { postFix } from './useSiteFixes'
 
 type Copy = DashboardDictionary['siteHealth']['autofix']
-type View = 'none' | 'appPassword' | 'pending' | 'connected' | 'disconnected' | 'webhook'
+type View = 'none' | 'appPassword' | 'pending' | 'connected' | 'disconnected' | 'rekey' | 'webhook'
 
 export function stripView(c: FixCapabilities): View {
   if (c.plugin.state === 'connected') return 'connected'
-  if (c.plugin.state === 'disconnected') return 'disconnected'
+  // The key cannot be read: checking again cannot help, only a new pairing code can ("connect again").
+  if (c.plugin.state === 'disconnected') return c.plugin.rekey ? 'rekey' : 'disconnected'
   if (c.plugin.state === 'pending') return 'pending'
   if (c.webhook && !c.wordpress) return 'webhook'
   return c.appPassword ? 'appPassword' : 'none'
@@ -52,7 +53,7 @@ export default function AutoFixStrip({
   }, [checking, projectId, onChanged])
 
   const Icon = view === 'connected' ? Plug : view === 'disconnected' ? TriangleAlert : view === 'webhook' ? Send : view === 'pending' ? PlugZap : Wrench
-  const warn = view === 'disconnected'
+  const warn = view === 'disconnected' || view === 'rekey'
 
   return (
     <section
@@ -95,7 +96,7 @@ export default function AutoFixStrip({
               onClick={onInstall}
               data-autofix-install=""
             >
-              {view === 'none' || view === 'appPassword' ? copy.connection.install : copy.connection.manage}
+              {view === 'none' || view === 'appPassword' ? copy.connection.install : view === 'rekey' ? copy.connection.reconnect : copy.connection.manage}
             </Button>
           )}
         </div>

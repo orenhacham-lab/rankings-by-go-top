@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Locale } from '@/lib/i18n/locales'
 import type { RedetectSection, RedetectSuggestions } from '@/lib/project-settings/types'
 import { knownRedetectCode, redetectNotice, retryAfterFrom, type RedetectNotice } from '@/lib/project-settings/view'
@@ -66,4 +66,32 @@ export function useRedetect<S extends RedetectSection>(projectId: string, sectio
   }, [])
 
   return { working, notice, suggestions, answer, run, preempt, clear }
+}
+
+/**
+ * One "detect again with AI" for the whole group of business cards (review P2-6: the same button
+ * three times read as three different things). The screen runs the cards one after another (the
+ * route allows one detection per project at a time); `turn` changes when it is this card's turn,
+ * and the card answers `done(stop)`, stop meaning "no scan yet: the others would say the same".
+ */
+export type RedetectChain = {
+  /** A new number each time it becomes this card's turn; 0 while it is not. */
+  turn: number
+  done: (stop: boolean) => void
+  /** Only the group's first card carries the button. */
+  lead: { working: boolean; start: () => void } | null
+}
+
+/** Run the card's own detection when the group reaches it. */
+export function useChainTurn(chain: RedetectChain | undefined, act: () => Promise<boolean>) {
+  const seen = useRef(0)
+  const latest = useRef({ chain, act })
+  useEffect(() => { latest.current = { chain, act } })
+  const turn = chain?.turn ?? 0
+  useEffect(() => {
+    if (!turn || turn === seen.current) return
+    seen.current = turn
+    const { chain: c, act: run } = latest.current
+    void run().then((stop) => c?.done(stop), () => c?.done(false))
+  }, [turn])
 }
