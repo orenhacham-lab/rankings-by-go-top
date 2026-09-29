@@ -443,6 +443,9 @@ const OUTCOME_STYLE: Record<RecentOutcome, { Icon: typeof CheckCircle2; classNam
 export function RecentActivity({ overview }: { overview: OverviewData }) {
   const { c, language } = useCopy()
   const data = overview && overview !== 'error' ? overview : null
+  // Tab walk: before the first check the opening card already says nothing
+  // was checked yet, so an empty "recent activity" card only repeated it.
+  if (data && data.recent.length === 0) return null
   return (
     <section
       aria-labelledby="ai-activity-title"
@@ -463,7 +466,6 @@ export function RecentActivity({ overview }: { overview: OverviewData }) {
         </ul>
       )}
       {overview === 'error' && <p className="mt-4 text-copy text-muted">{c.loadFailed}</p>}
-      {data && data.recent.length === 0 && <p className="mt-4 text-copy text-body">{c.activityEmpty}</p>}
       {data && data.recent.length > 0 && (
         <ol className="mt-3 divide-y divide-line">
           {data.recent.map((item) => {

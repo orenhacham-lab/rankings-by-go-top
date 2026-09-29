@@ -163,9 +163,12 @@ async function main() {
     const en = R.dropOffTopicSuggestions([{ prompt: 'How much does a kitchen remodel cost?' }, { prompt: 'Who is the best plumber near me?' }], { keywords: ['emergency plumber'] })
     check('D5: English too', show(en.map((x) => x.prompt)) === show(['Who is the best plumber near me?']), show(en))
     const s = code(SECTION), modal = code('components/ai-visibility/PromptSuggestions.tsx')
-    const wired = /setSuggestedQuestions\(dropOffTopicSuggestions\(/
-    check('D6: the tab and the suggestions dialog both filter every list they show', wired.test(s) && /setSuggestions\(dropOffTopicSuggestions\(/.test(modal))
-    check('D7: MUT the tab without the filter fails D6', !wired.test(s.replace('setSuggestedQuestions(dropOffTopicSuggestions(', 'setSuggestedQuestions((')))
+    // w7-ai-profile: the filtered list now also passes the worth gate, so the
+    // pin follows the filter into the one list both places show.
+    const wired = /const onTopic = dropOffTopicSuggestions\([\s\S]{0,200}?setSuggestedQuestions\(worthRef\.current \? rankByWorth\(onTopic, worthRef\.current\) : onTopic\)/
+    const modalWired = /const onTopic = dropOffTopicSuggestions\([\s\S]{0,400}?setSuggestions\(worthContext \? rankByWorth\(onTopic, worthContext\) : onTopic\)/
+    check('D6: the tab and the suggestions dialog both filter every list they show', wired.test(s) && modalWired.test(modal))
+    check('D7: MUT the tab without the filter fails D6', !wired.test(s.replace('const onTopic = dropOffTopicSuggestions(', 'const onTopic = (')))
     const src = read('lib/ai-visibility/question-relevance.ts')
     const noRule = src.replace('for (const trade of named) if (trades.has(trade)) return false\n  return true', 'return false')
     check('D8: MUT a filter that never drops would keep renovation for a plumber (the rule is load-bearing)', noRule !== src)

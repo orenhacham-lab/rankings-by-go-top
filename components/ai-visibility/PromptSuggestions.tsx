@@ -20,10 +20,12 @@ import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Pencil, RefreshCw, Sparkles } from 'lucide-react'
 import { dropOffTopicSuggestions } from '@/lib/ai-visibility/question-relevance'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile, type BusinessCategory } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
+import { rankByWorth, type WorthContext } from '@/lib/ai-visibility/question-worth'
+import { worthReason } from './sections/SmartQuestionCard'
 
 const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
   brand: 'info',
@@ -49,6 +51,8 @@ export default function PromptSuggestions({
   language,
   keywords,
   manualProfile = null,
+  category,
+  worthContext = null,
   onAdded,
 }: {
   open: boolean
@@ -61,6 +65,10 @@ export default function PromptSuggestions({
   language: string | null
   keywords?: string[]
   manualProfile?: ManualAIProfile | null
+  /** The business category resolved by the section (lib/ai-visibility/business-identity.ts). */
+  category: BusinessCategory
+  /** The section's worth context; the modal keeps the same questions the tab would. */
+  worthContext?: WorthContext | null
   onAdded: () => void
 }) {
   // UI follows dashboard language; scan parameters (language/country) remain separate
@@ -157,13 +165,15 @@ export default function PromptSuggestions({
   // displayed pool so a stale marker can't survive a regenerate.
   // …and a suggestion about another trade than the project's is not shown
   // either (lib/ai-visibility/question-relevance.ts).
+  // …and, like the tab's own list, only questions worth the business's time (question-worth.ts).
   function commitSuggestions(list: PromptSuggestion[]) {
-    setSuggestions(dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), {
+    const onTopic = dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), {
       keywords: keywords ?? [],
       offerings: manualProfile?.mode === 'manual' ? [manualProfile.primaryCategory, ...manualProfile.secondaryCategories] : [],
       businessName,
       domain,
-    }))
+    })
+    setSuggestions(worthContext ? rankByWorth(onTopic, worthContext) : onTopic)
   }
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -196,7 +206,10 @@ export default function PromptSuggestions({
         loadModalRecommendationPool({ allowGenerate: true })
       })
     }
-  }, [open, projectId, language, country, businessName, domain, city, keywords, manualProfile])
+    // Re-run only when the modal opens or its inputs change; the two loaders
+    // are plain functions recreated every render, so listing them would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, projectId, language, country, businessName, domain, city, keywords, manualProfile, category])
 
   // Normalize prompt text for dedup comparison — must match the generator's
   // internal normalizer so excludePrompts/previousSet are recognized.
@@ -259,7 +272,6 @@ export default function PromptSuggestions({
     source: string,
     forceRefresh: boolean
   ): PromptSuggestion[] {
-    const category = detectCategory(businessName || '', domain || '', keywords || [])
     const result = applyDisplayQualityGate(items, {
       businessName,
       domain,
@@ -285,7 +297,6 @@ export default function PromptSuggestions({
   // Gemini is unavailable / returns nothing and the cache is empty.
   function buildModalFallback(): PromptSuggestion[] {
     const lang = normalizeLanguage(language)
-    const category = detectCategory(businessName || '', domain || '', keywords || [])
     const fb = buildFallbackSuggestions(
       businessName,
       null, // projectName not available here
@@ -310,7 +321,7 @@ export default function PromptSuggestions({
   const MIN_MODAL_POOL = 8
   async function loadModalRecommendationPool({ allowGenerate }: { allowGenerate: boolean }) {
     const normalizedLang = normalizeLanguage(language)
-    const detectedCategory = detectCategory(businessName || '', domain || '', keywords || [])
+    const detectedCategory = category
     console.log('[ai-question-suggestions] inner button clicked', { projectId, via: 'recommend_modal' })
     console.log('[ai-question-suggestions] generate clicked', {
       projectId,
@@ -582,6 +593,7 @@ export default function PromptSuggestions({
       language: normalizedLang,
       keywords,
       manualProfile,
+      category,
       diversify: true,
       excludePrompts: allExcluded,
       previousSet: lastShownPromptsRef.current,
@@ -785,6 +797,10 @@ export default function PromptSuggestions({
                     ) : (
                       <p className="text-copy font-medium text-ink">{s.prompt}</p>
                     )}
+                    {s.worth ? (
+                      <p className="text-caption text-muted" data-question-reason="">{worthReason(s.worth, t)}</p>
+                    ) : (
+                    <>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Badge variant={INTENT_TONE[s.intent] || 'neutral'}>
                         {intentLabel(s.intent)}
@@ -803,6 +819,8 @@ export default function PromptSuggestions({
                     )}
                     {'chips' in s && s.chips && s.chips.length > 0 && (
                       <p className="text-caption text-muted">{s.chips.map(chipLabel).join(' · ')}</p>
+                    )}
+                    </>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">

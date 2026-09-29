@@ -36,6 +36,10 @@ import {
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
+import { resolveBusinessIdentity, type ScanBusiness } from '@/lib/ai-visibility/business-identity'
+import { rankByWorth, type WorthContext, type WorthPage } from '@/lib/ai-visibility/question-worth'
+import { questionArticleStatus, topicBriefForQuestion, normalizeQuestion, type ContextTopic } from '@/lib/ai-visibility/question-article'
+import { strategyHref, STRATEGY_ANCHORS } from '@/lib/content/strategy/view'
 import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
@@ -43,7 +47,7 @@ import { SCORED_ENGINES, engineScores, latestAnswers, visibilityScore } from '@/
 import { dropOffTopicSuggestions, type ProjectVocabulary } from '@/lib/ai-visibility/question-relevance'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { UserFacingError, apiErrorText, isUserFacingError } from '@/lib/i18n/user-facing-error'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
@@ -158,6 +162,14 @@ export default function AIVisibilitySection({
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  // The empty list's "pick a suggested question" goes to the recommended
+  // list on this page (the same questions, with why and the article action);
+  // the window is the fallback only when that list is not there.
+  const pickRecommended = useCallback(() => {
+    const list = typeof document !== 'undefined' ? document.getElementById('ai-recommended-questions') : null
+    if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else setShowSuggestions(true)
+  }, [])
   const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [deletePromptId, setDeletePromptId] = useState<string | null>(null)
@@ -177,8 +189,16 @@ export default function AIVisibilitySection({
   // (lib/ai-visibility/question-relevance.ts): read through a ref so every
   // commit uses the latest ones.
   const vocabularyRef = useRef<ProjectVocabulary>({})
+  // WORTH GATE (question-worth.ts): every list of suggestions, whatever made it
+  // (templates, the cache, the model), keeps only the questions this business
+  // can win, best first, each with its reason. The last raw list is kept so the
+  // ranking can run again when the site's pages and topics arrive.
+  const worthRef = useRef<WorthContext | null>(null)
+  const rawSuggestionsRef = useRef<PromptSuggestion[] | null>(null)
   const commitSuggestedQuestions = useCallback((list: PromptSuggestion[]) => {
-    setSuggestedQuestions(dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current))
+    rawSuggestionsRef.current = list
+    const onTopic = dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current)
+    setSuggestedQuestions(worthRef.current ? rankByWorth(onTopic, worthRef.current) : onTopic)
   }, [])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
   // Tracks normalized prompt text of every suggestion shown across all batches
@@ -217,6 +237,82 @@ export default function AIVisibilitySection({
   useEffect(() => { void loadAllowance() }, [loadAllowance])
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
+  // What the site scan says the business is, read with the saved profile.
+  const [scanBusiness, setScanBusiness] = useState<ScanBusiness | null>(null)
+  // The suggestions wait for that read, so they are built once, from the right
+  // business, and never flash questions for a type the business is not.
+  const [identityReady, setIdentityReady] = useState(false)
+  // THE BUSINESS TYPE comes from the owner's choice, then the site scan, then
+  // the name/domain, then a clear keyword majority (business-identity.ts). It
+  // used to come from every tracked keyword joined together, where one keyword
+  // ("אוכל רחוב יפן") turned a Japan travel site into a restaurant.
+  const identity = useMemo(
+    () => resolveBusinessIdentity({
+      manualProfile, scan: scanBusiness, businessName: projectBrandName, domain: projectDomain, keywords: projectKeywords,
+    }),
+    [manualProfile, scanBusiness, projectBrandName, projectDomain, projectKeywords],
+  )
+  const identityCategory = identity.category
+
+  // The site's pages and planned topics (question-context route): a question a
+  // page answers says "improve that page"; one written about shows its status.
+  const [questionContext, setQuestionContext] = useState<{ contentEnabled: boolean; pages: WorthPage[]; topics: ContextTopic[] } | null>(null)
+  const loadQuestionContext = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai-visibility/question-context?projectId=${encodeURIComponent(projectId)}`)
+      if (!res.ok) return
+      const body = await res.json()
+      setQuestionContext({
+        contentEnabled: body?.contentEnabled === true,
+        pages: Array.isArray(body?.pages) ? body.pages : [],
+        topics: Array.isArray(body?.topics) ? body.topics : [],
+      })
+    } catch {
+      // Scored without pages and topics; the article action stays hidden.
+    }
+  }, [projectId])
+  useEffect(() => { void loadQuestionContext() }, [loadQuestionContext])
+  const worthContext = useMemo<WorthContext>(() => ({
+    businessName: projectBrandName,
+    identityLabel: identity.label,
+    category: identity.category,
+    keywords: projectKeywords ?? [],
+    scanTerms: scanBusiness?.terms ?? [],
+    pages: questionContext?.pages ?? [],
+    plannedTopics: (questionContext?.topics ?? []).map((t) => t.topic),
+  }), [projectBrandName, identity.label, identity.category, projectKeywords, scanBusiness, questionContext])
+  worthRef.current = identityReady ? worthContext : null
+  useEffect(() => {
+    if (identityReady && rawSuggestionsRef.current) commitSuggestedQuestions(rawSuggestionsRef.current)
+  }, [worthContext, identityReady, commitSuggestedQuestions])
+  // Questions an AI engine has cited the site for (the tracked copy of the question).
+  const citedQuestions = useMemo(
+    () => new Set(allResults.filter((r) => r.displayCited && r.promptText).map((r) => normalizeQuestion(r.promptText))),
+    [allResults],
+  )
+  const [writingArticleFor, setWritingArticleFor] = useState<string | null>(null)
+  const [articleErrorFor, setArticleErrorFor] = useState<string | null>(null)
+  const writeArticleFor = useCallback(async (q: PromptSuggestion) => {
+    setWritingArticleFor(q.id)
+    setArticleErrorFor(null)
+    try {
+      const lang = normalizeLanguage(projectLanguage)
+      const res = await fetch('/api/content/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(topicBriefForQuestion({
+          projectId, question: q.prompt, intent: q.intent, language: lang, worth: q.worth,
+          note: createI18n(lang)('article_brief_note').replace('{q}', q.prompt),
+        })),
+      })
+      if (!res.ok) throw new Error('topic')
+      await loadQuestionContext()
+    } catch {
+      setArticleErrorFor(q.id)
+    } finally {
+      setWritingArticleFor(null)
+    }
+  }, [projectId, projectLanguage, loadQuestionContext])
   vocabularyRef.current = {
     keywords: projectKeywords ?? [],
     offerings: manualProfile?.mode === 'manual' ? [manualProfile.primaryCategory, ...manualProfile.secondaryCategories] : [],
@@ -405,10 +501,16 @@ export default function AIVisibilitySection({
     fetch(`/api/projects/${projectId}/ai-profile`)
       .then((r) => (r.ok ? r.json() : { profile: null }))
       .then((d) => {
-        if (!cancelled) setManualProfile(d.profile ?? null)
+        if (cancelled) return
+        setManualProfile(d.profile ?? null)
+        setScanBusiness(d.scanBusiness ?? null)
+        setIdentityReady(true)
       })
       .catch(() => {
-        if (!cancelled) setManualProfile(null)
+        if (cancelled) return
+        setManualProfile(null)
+        setScanBusiness(null)
+        setIdentityReady(true)
       })
     return () => {
       cancelled = true
@@ -416,6 +518,7 @@ export default function AIVisibilitySection({
   }, [projectId])
 
   useEffect(() => {
+    if (!identityReady) return
     let cancelled = false
 
     const suggestions = generatePromptSuggestions({
@@ -426,6 +529,7 @@ export default function AIVisibilitySection({
       language: projectLanguage,
       keywords: projectKeywords,
       manualProfile,
+      category: identityCategory,
       shuffle: false,
       limit: 8,
     })
@@ -445,7 +549,7 @@ export default function AIVisibilitySection({
     // No notice here — this is a passive load, not a failed AI attempt. Cached
     // Gemini questions (if any) replace these silently in the background below.
     if (vNextFiltered.length === 0) {
-      const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+      const category = identityCategory
       const fallback = buildFallbackSuggestions(
         projectBrandName,
         null, // projectName not available
@@ -631,7 +735,7 @@ export default function AIVisibilitySection({
         // DISPLAY QUALITY GATE: cached/vNext rows may have been generated by the
         // pre-intent-v2 engine. Drop legacy/weak phrasings and top up with the
         // new engine so what users actually see reflects the current logic.
-        const gateCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+        const gateCategory = identityCategory
         const gated = applyDisplayQualityGate(merged, {
           businessName: projectBrandName,
           domain: projectDomain,
@@ -690,7 +794,7 @@ export default function AIVisibilitySection({
     // must not re-run because a parent re-rendered. The parent now memoizes it
     // too; this makes the component immune to the next caller that forgets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, suggestionsRefreshKey, projectKeywordsKey, manualProfile, projectId])
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, suggestionsRefreshKey, projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId])
 
   useEffect(() => {
     loadAllResults()
@@ -974,7 +1078,7 @@ export default function AIVisibilitySection({
     // local fallback is required (so the user is never left with no questions).
     let geminiProducedQuestions = false
     const normalizedLang = normalizeLanguage(projectLanguage)
-    const detectedCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+    const detectedCategory = identityCategory
     if (trigger === 'top') console.log('[ai-question-suggestions] top button clicked', { projectId })
     else console.log('[ai-question-suggestions] inner button clicked', { projectId })
     console.log('[ai-question-suggestions] generate clicked', {
@@ -1052,6 +1156,7 @@ export default function AIVisibilitySection({
         language: projectLanguage,
         keywords: projectKeywords,
         manualProfile,
+        category: identityCategory,
         shuffle: true,
         diversify: true,
         limit: 40,
@@ -1349,7 +1454,7 @@ export default function AIVisibilitySection({
         // capped already contains the right PromptSuggestion objects with intent/labels from API
         // DISPLAY QUALITY GATE (force refresh): user explicitly asked for more
         // questions, so drop legacy/weak phrasings and top up with intent-v2.
-        const refreshGateCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+        const refreshGateCategory = identityCategory
         const refreshGate = applyDisplayQualityGate(capped, {
           businessName: projectBrandName,
           domain: projectDomain,
@@ -1550,6 +1655,7 @@ export default function AIVisibilitySection({
     projectLanguage,
     projectKeywords,
     manualProfile,
+    identityCategory,
     suggestedQuestions,
     allPrompts,
     excludedSuggestionKeys,
@@ -1903,14 +2009,18 @@ export default function AIVisibilitySection({
         <>
           <AIBusinessProfilePanel
             projectId={projectId}
-            businessName={projectBrandName}
-            domain={projectDomain}
-            keywords={projectKeywords || []}
+            identity={identity}
+            scanDescription={scanBusiness?.description ?? null}
+            ready={identityReady}
             initialProfile={manualProfile}
+            onRegenerate={() => { void refreshSuggestions('top') }}
             onChange={(profile) => {
               setManualProfile(profile)
               // Immediately refresh inline recommended questions with the
               // new profile — no page reload needed.
+              const next = resolveBusinessIdentity({
+                manualProfile: profile, scan: scanBusiness, businessName: projectBrandName, domain: projectDomain, keywords: projectKeywords,
+              })
               const refreshed = generatePromptSuggestions({
                 businessName: projectBrandName,
                 domain: projectDomain,
@@ -1919,6 +2029,7 @@ export default function AIVisibilitySection({
                 language: projectLanguage,
                 keywords: projectKeywords,
                 manualProfile: profile,
+                category: next.category,
                 shuffle: false,
                 limit: 20,
               })
@@ -1930,11 +2041,16 @@ export default function AIVisibilitySection({
               <h3 className="text-section font-semibold text-ink">{t('ai_queries')}</h3>
               <Badge variant="neutral">{allPrompts.length}</Badge>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
-                <Sparkles aria-hidden="true" className="size-4" />
-                {t('recommend_questions')}
-              </Button>
+            {/* Tab walk: with no tracked question the empty state and the
+                recommended list below already offer the same choice, so a third
+                button that opens the same questions in a window only confused. */}
+            <div className={allPrompts.length > 0 ? 'grid grid-cols-2 gap-2 sm:flex' : 'grid grid-cols-1 gap-2 sm:flex'}>
+              {allPrompts.length > 0 && (
+                <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  {t('recommend_questions')}
+                </Button>
+              )}
               <Button onClick={() => setShowNewPrompt(true)}>
                 <Plus aria-hidden="true" className="size-4" />
                 {t('new_query')}
@@ -1944,6 +2060,7 @@ export default function AIVisibilitySection({
 
           {/* How it works: the long explanations fold away; the one line that
               says what to do (and the allowance) stays in view. */}
+          {allPrompts.length > 0 && (
           <details className="group rounded-inset border border-line bg-surface">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-inset px-4 py-3 text-copy font-semibold text-ink transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
               <span className="inline-flex items-center gap-2">
@@ -1957,6 +2074,7 @@ export default function AIVisibilitySection({
               <p className="text-caption text-muted" data-ai-chip-legend="">{t('chip_legend')}</p>
             </div>
           </details>
+          )}
           {allPrompts.length > 0 ? (
             <>
               {/* THE CONTROL EXISTS — say so. The engine chips below dispatch a
@@ -2128,7 +2246,7 @@ export default function AIVisibilitySection({
                 icon={<MessageSquareText />}
                 title={t('no_queries_title')}
                 body={t('no_queries_body')}
-                action={<Button onClick={() => setShowSuggestions(true)}>{t('no_queries_pick')}</Button>}
+                action={<Button onClick={pickRecommended}>{t('no_queries_pick')}</Button>}
                 secondary={
                   <button
                     type="button"
@@ -2209,27 +2327,11 @@ export default function AIVisibilitySection({
             // in the background (useEffect at line 437) will populate them.
             // If truly empty, show empty state with button to manually generate.
             return (
-              <section aria-labelledby="ai-smart-questions-title" className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+              <section id="ai-recommended-questions" aria-labelledby="ai-smart-questions-title" className="scroll-mt-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h3 id="ai-smart-questions-title" className="flex items-center gap-1.5 text-section font-semibold text-ink">
                       {t('smart_questions_title')}
-                      <span className="group relative inline-flex items-center">
-                        <span
-                          className="cursor-help text-action inline-flex rounded-pill focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
-                          role="img"
-                          tabIndex={0}
-                          aria-label={t('priority_tag_help_label')}
-                        >
-                          <Info aria-hidden="true" className="size-4" />
-                        </span>
-                        <span
-                          role="tooltip"
-                          className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 hidden w-max max-w-[200px] rounded-control bg-contrast px-2 py-1.5 text-caption font-medium text-contrast-ink shadow-pop group-focus-within:block group-hover:block"
-                        >
-                          {t('priority_tag_help')}
-                        </span>
-                      </span>
                     </h3>
                     <p className="mt-0.5 text-caption text-muted">
                       {t('smart_questions_subtitle')}
@@ -2252,7 +2354,10 @@ export default function AIVisibilitySection({
                 </div>
 
                 {/* EMPTY STATE: Show when no suggestions available and not refreshing */}
-                {availableSuggestions.length === 0 && !refreshingSuggestions && (
+                {availableSuggestions.length === 0 && !refreshingSuggestions && identity.source === 'unknown' && (
+                  <EmptyState icon={<Sparkles />} title={t('worth_ask_business')} className="py-8" />
+                )}
+                {availableSuggestions.length === 0 && !refreshingSuggestions && identity.source !== 'unknown' && (
                   <EmptyState
                     icon={<Sparkles />}
                     title={t('no_recommended_yet')}
@@ -2295,6 +2400,18 @@ export default function AIVisibilitySection({
                           question={q}
                           isAlreadyTracked={false}
                           allPrompts={allPrompts}
+                          article={questionContext?.contentEnabled ? (() => {
+                            const { status, topic } = questionArticleStatus(q.prompt, questionContext.topics, citedQuestions)
+                            return {
+                              status,
+                              busy: writingArticleFor === q.id,
+                              failed: articleErrorFor === q.id,
+                              onWrite: () => { void writeArticleFor(q) },
+                              topicHref: strategyHref('list', STRATEGY_ANCHORS.topics),
+                              articleHref: topic?.article ? `/content/articles/${encodeURIComponent(topic.article.id)}` : null,
+                              existingHref: '/content/existing',
+                            }
+                          })() : null}
                           onAdd={async () => {
                             try {
                               const res = await fetch('/api/ai-visibility/prompts', {
@@ -2431,6 +2548,8 @@ export default function AIVisibilitySection({
         language={projectLanguage}
         keywords={projectKeywords}
         manualProfile={manualProfile}
+        category={identityCategory}
+        worthContext={identityReady ? worthContext : null}
         onAdded={loadAllResults}
       />
 

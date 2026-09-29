@@ -295,8 +295,11 @@ async function main() {
       rule.hooksFirst(aiPage), 'a hook after a conditional return is React error #310 — measured, not theorised')
     const ai = read('components/ai-visibility/AIVisibilitySection.tsx')
     check('B13: the suggestions effect is keyed by the keywords’ VALUE, not the array identity',
-      /projectKeywordsKey, manualProfile, projectId\]/.test(ai)
+      // w7-ai-profile: the effect also waits for the resolved business identity.
+      /projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId\]/.test(ai)
       && /const projectKeywordsKey = \(projectKeywords \|\| \[\]\)\.join/.test(ai))
+    check('B13b: MUT keying the effect by the array identity fails B13',
+      !/projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId\]/.test(ai.replace('projectKeywordsKey, manualProfile, identityCategory', 'projectKeywords, manualProfile, identityCategory')))
     check('B10: a failed read of the row is a terminal state, not a spinner', rule.failureIsTerminal(rowHook))
 
     // Mutation controls: each rule, broken on purpose, must fail.
