@@ -126,8 +126,8 @@ export default async function EnglishPricingPage() {
                     <p className={cn('mb-2 text-caption font-semibold', highlighted ? 'text-rail-tagline' : 'text-muted')}>{copy.plans.everyPlanLabel}</p>
                     <ul className={cn('space-y-1.5 text-caption', highlighted ? 'text-contrast-ink/70' : 'text-muted')}>
                       {copy.plans.everyPlan.map((line) => (
-                        <li key={line} className="flex items-center gap-2">
-                          <span className={cn('size-1 shrink-0 rounded-pill', highlighted ? 'bg-rail-tagline' : 'bg-line-strong')} aria-hidden="true" />
+                        <li key={line} className="flex items-start gap-2">
+                          <span className={cn('mt-2 size-1 shrink-0 rounded-pill', highlighted ? 'bg-rail-tagline' : 'bg-line-strong')} aria-hidden="true" />
                           {line}
                         </li>
                       ))}
