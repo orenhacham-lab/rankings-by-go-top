@@ -1,10 +1,16 @@
-import { Check, Gift, Info } from 'lucide-react'
+import { Check, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
-import { ButtonLink, Callout, CtaBand, FaqList, IconSquircle, PageHero, Section, SectionIntro } from '@/components/public/marketing'
-import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { ButtonLink, Section } from '@/components/public/marketing'
+import { MarketingHero } from '@/components/public/landing/MarketingHero'
+import styles from '@/components/public/landing/landing.module.css'
+import {
+  PricingClose, PricingFaq, PricingIncluded, PricingUnsure, PricingUsage, PricingValue,
+} from '@/components/public/pricing/PricingSections'
+import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
+import { pricingHe as copy } from '@/lib/i18n/public/pricing-he'
 import { cn } from '@/lib/utils'
 import { authHref } from '@/lib/i18n/auth-href'
 
@@ -28,49 +34,12 @@ function formatILS(amount: number): string {
   return `₪${amount.toLocaleString('he-IL')}`
 }
 
-const faqs = [
-  {
-    q: 'איך עובדת מכסת המאמרים?',
-    a: 'מכסת המאמרים משותפת לכל הפרויקטים בחשבון שלך ומתחדשת בכל מחזור חיוב. מאמרים שלא נוצלו לא עוברים למחזור הבא.',
-  },
-  {
-    q: 'איך נספרת "בדיקת AI"?',
-    a: 'בדיקת AI אחת היא בדיקה של שאילתה אחת במנוע AI אחד. אם אתה בודק את אותה שאילתה במספר מנועי AI (לדוגמה ChatGPT ו-Gemini), כל מנוע נספר כבדיקה נפרדת.',
-  },
-  {
-    q: 'איך נספרת "בדיקת גוגל"?',
-    a: 'בדיקת גוגל אחת היא בדיקה של מילת מפתח אחת ביעד אחד — גוגל אורגני או גוגל מפות. אם אתה בודק את אותה מילת מפתח גם באורגני וגם במפות, זה נספר כשתי בדיקות.',
-  },
-  {
-    q: 'מה ההבדל בין סריקה ידנית לסריקה אוטומטית?',
-    a: 'אפשר להריץ סריקה ידנית בכל רגע שתרצה, ואפשר גם להפעיל סריקה אוטומטית חודשית שרצה בעצמה בכל מחזור חיוב. אין כרגע אפשרות לסריקה אוטומטית יומית או שבועית — רק ידנית ואוטומטית חודשית.',
-  },
-  {
-    q: 'מה קורה כשאני יוצר מאמר חדש?',
-    a: 'יצירת מאמר חדש צורכת קרדיט אחד ממכסת המאמרים שלך. עריכה, תזמון או פרסום של מאמר קיים לא צורכים קרדיט נוסף.',
-  },
-  {
-    q: 'האם אפשר לתזמן ולפרסם מאמרים אוטומטית?',
-    a: 'כן. אפשר לתזמן מאמר לפרסום עתידי או לפרסם אותו ישירות לאתר וורדפרס או שופיפיי מחובר.',
-  },
-  {
-    q: 'האם אפשר לשדרג או להוריד תוכנית?',
-    a: 'כן, אפשר לעבור בין תוכניות בכל זמן. השינוי נכנס לתוקף והמגבלות החדשות חלות מרגע השינוי ואילך.',
-  },
-  {
-    q: 'איך עובד הניסיון החינם?',
-    a: `מקבלים ${TRIAL_CATALOG.days} ימי ניסיון חינם, ללא צורך בכרטיס אשראי, עם פרויקט אחד, עד ${TRIAL_CATALOG.maxKeywordsPerProject} מילות מפתח, עד ${TRIAL_CATALOG.maxGoogleChecksLifetime} בדיקות גוגל ועד ${TRIAL_CATALOG.maxAIChecksLifetime} בדיקות AI לכל אורך תקופת הניסיון, וכן מאמר אחד שנוצר על ידי AI כדי להתנסות בתהליך המלא.`,
-  },
-  {
-    q: 'איך אני מבטל את המנוי?',
-    a: 'הביטול פשוט ומיידי. אפשר לבטל את המנוי בכל זמן מתוך הדאשבורד שלך, ללא קנסות או דמי ביטול.',
-  },
-  {
-    q: 'האם הנתונים שלי מאובטחים?',
-    a: 'בהחלט. כל הנתונים מוצפנים, מאוחסנים בשרתים מאובטחים ולא משותפים עם צדדים שלישיים. הפרטיות שלך חשובה לנו.',
-  },
-]
-
+/**
+ * The words around the grid (hero, what every plan includes, why it pays, how
+ * usage is counted, the questions, the close) are in lib/i18n/public/pricing-he.ts
+ * and laid out by components/public/pricing/PricingSections.tsx, shared with
+ * the English page. The plan grid itself stays here.
+ */
 export default async function PricingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -80,94 +49,91 @@ export default async function PricingPage() {
       <PublicNav />
 
       <main className="flex-1">
-        <PageHero
+        <MarketingHero
           compact
-          eyebrow="תוכניות מחירים"
-          title="תוכניות שמתאימות לכל"
-          accent="גודל של עסק"
-          subtitle="מחירים שקופים, ללא הפתעות. התחל בניסיון חינם וגדל בהתאם לצרכים שלך."
+          eyebrow={copy.hero.eyebrow}
+          title={copy.hero.title}
+          accent={copy.hero.accent}
+          subtitle={copy.hero.subtitle}
+          trust={copy.hero.trust}
         />
 
-        <Section className="pt-10 sm:pt-12 lg:pt-14">
-          {/* Free trial — only for visitors who are not signed in */}
-          {!user && (
-            <div className="mx-auto mb-12 flex max-w-4xl flex-col items-start gap-4 rounded-card border border-line bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:gap-5 sm:p-6">
-              <IconSquircle icon={Gift} />
-              <div className="min-w-0 flex-1">
-                <h2 className="text-section font-semibold text-ink">רוצים לבדוק את המערכת לפני שמתחייבים?</h2>
-                <p className="mt-1 text-copy text-body">
-                  התחילו {TRIAL_CATALOG.days} ימי ניסיון בחינם — ללא כרטיס אשראי.
-                </p>
-              </div>
-              <ButtonLink href={authHref('signup', 'he')} variant="secondary" size="lg" className="w-full sm:w-auto">
-                התחל ניסיון חינם
-              </ButtonLink>
-            </div>
-          )}
-
+        <Section className="pt-12 sm:pt-14 lg:pt-16">
           {/* ONE row of four cards on a large screen, two columns on a tablet, one
               on a phone. The audience distinction is carried by a small label on
               each card rather than by full-width stacked sections, which pushed
               Premium and Agency below the fold. Static text — no toggle, no URL
               parameter, no cookie, no client state. The recommended plan is the
-              only card with the action border and the one primary button. */}
+              only navy card and carries the one primary button. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {PLAN_ORDER.map((code) => {
               const plan = PLAN_CATALOG[code]
               const highlighted = code === HIGHLIGHTED_PLAN
 
               // The five LIMIT lines come from the shared builder, so this card and
-              // the dashboard's billing card cannot disagree with the server.
+              // the dashboard's billing card cannot disagree with the server. What
+              // every plan shares is listed under them, from the page's copy.
               const features = [
                 ...planLimitLines(code, 'he'),
-                'מעקב Google Organic ו-Google Maps',
-                'מעקב נראות במנועי AI',
-                'יצירה, תזמון ופרסום מאמרים לוורדפרס ולשופיפיי',
-                'דוחות PDF ו-Excel',
-                'תמיכה אישית',
               ]
 
               return (
                 <div
                   key={code}
                   className={cn(
-                    'relative flex flex-col rounded-card border bg-surface p-6 shadow-card',
-                    highlighted ? 'border-action ring-1 ring-action' : 'border-line',
+                    'relative flex flex-col rounded-card border p-6 shadow-card transition-[transform,box-shadow] duration-200 ease-snappy hover:shadow-pop motion-safe:hover:-translate-y-1',
+                    highlighted ? cn(styles.stage, 'border-contrast text-contrast-ink') : 'border-line bg-surface',
                   )}
                 >
                   {highlighted && (
-                    <div className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center rounded-pill bg-action px-3 text-caption font-semibold text-action-ink shadow-control">
-                      הכי פופולרי
+                    <div className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center gap-1 rounded-pill bg-commit px-3 text-caption font-semibold text-commit-ink shadow-control">
+                      <Star className="size-3" fill="currentColor" aria-hidden="true" />
+                      {copy.plans.popular}
                     </div>
                   )}
 
                   <div className="mb-5">
-                    <p className="mb-1.5 text-caption font-semibold text-muted">
+                    <p className={cn(
+                      'mb-3 inline-flex h-6 items-center rounded-pill px-2.5 text-caption font-semibold',
+                      highlighted ? 'bg-white/10 text-rail-tagline' : 'bg-action-soft text-action',
+                    )}>
                       {PLAN_AUDIENCE_LABEL[code]['he']}
                     </p>
-                    <h3 className="text-section font-bold text-ink">
+                    <h3 className={cn('text-title font-bold tracking-tight', highlighted ? 'text-contrast-ink' : 'text-ink')}>
                       {PLAN_NAME[code]}
                     </h3>
-                    <p className="mt-1 text-copy text-body">
+                    <p className={cn('mt-1 text-copy md:min-h-12', highlighted ? 'text-contrast-ink/75' : 'text-body')}>
                       {PLAN_AUDIENCE_DESCRIPTION[code]['he']}
                     </p>
                   </div>
 
                   <div className="mb-6 flex items-baseline gap-1.5">
-                    <span className="text-display font-bold tracking-tight tabular-nums text-ink">
+                    <span className={cn('text-display font-bold tracking-tight tabular-nums', highlighted ? 'text-contrast-ink' : 'text-ink')}>
                       {formatILS(plan.priceILS)}
                     </span>
-                    <span className="text-copy text-muted">לחודש</span>
+                    <span className={cn('text-copy', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.perMonth}</span>
                   </div>
 
-                  <ul className="mb-8 flex-1 space-y-3 border-t border-line pt-5">
+                  <ul className={cn('space-y-3 border-t pt-5', highlighted ? 'border-white/10' : 'border-line')}>
                     {features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2.5 text-copy text-body">
-                        <Check className="mt-1 size-4 shrink-0 text-action" strokeWidth={2.5} aria-hidden="true" />
+                      <li key={feature} className={cn('flex items-start gap-2.5 text-copy', highlighted ? 'text-contrast-ink/90' : 'text-body')}>
+                        <Check className={cn('mt-1 size-4 shrink-0', highlighted ? 'text-rail-tagline' : 'text-action')} strokeWidth={2.5} aria-hidden="true" />
                         <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
+
+                  <div className={cn('mb-8 mt-5 flex-1 border-t pt-4', highlighted ? 'border-white/10' : 'border-line')}>
+                    <p className={cn('mb-2 text-caption font-semibold', highlighted ? 'text-rail-tagline' : 'text-muted')}>{copy.plans.everyPlanLabel}</p>
+                    <ul className={cn('space-y-1.5 text-caption', highlighted ? 'text-contrast-ink/70' : 'text-muted')}>
+                      {copy.plans.everyPlan.map((line) => (
+                        <li key={line} className="flex items-center gap-2">
+                          <span className={cn('size-1 shrink-0 rounded-pill', highlighted ? 'bg-rail-tagline' : 'bg-line-strong')} aria-hidden="true" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
                   <ButtonLink
                     href={user ? '/dashboard' : authHref('signup', 'he', { plan: code })}
@@ -175,42 +141,29 @@ export default async function PricingPage() {
                     size="lg"
                     className="w-full"
                   >
-                    להתנסות חינם
+                    {user ? copy.plans.dashboard : copy.plans.cta}
                   </ButtonLink>
+                  {!user && (
+                    <p className={cn('mt-2.5 text-center text-caption', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.noCard}</p>
+                  )}
                 </div>
               )
             })}
           </div>
 
-          {/* Usage clarification */}
-          <div className="mx-auto mt-12 max-w-4xl">
-            <Callout icon={Info}>
-              <p>בדיקת AI אחת היא בדיקה של שאילתה אחת במנוע AI אחד. בדיקת אותה שאילתה במספר מנועים תחושב בנפרד עבור כל מנוע. מכסת המאמרים משותפת לכל הפרויקטים בחשבון ומתחדשת בכל מחזור חיוב.</p>
-            </Callout>
-          </div>
-
-          {/* Comparison note */}
-          <p className="mx-auto mt-6 max-w-3xl text-center text-copy text-muted">
-            כל התוכניות כוללות מעקב Google Organic, Google Maps ונראות ב-AI, וכן יצירה ופרסום מאמרים. המכסות משתנות לפי התוכנית. ביטול בכל זמן ללא קנסות.
-          </p>
+          <PricingUnsure copy={copy} checkHref="/free-check" />
         </Section>
 
-        {/* FAQ */}
-        <Section tone="surface">
-          <div className="mx-auto max-w-3xl">
-            <SectionIntro eyebrow="שאלות נפוצות" title="יש לך שאלה? יש לנו תשובה" />
-            <FaqList items={faqs} />
-          </div>
-        </Section>
-
-        {/* CTA */}
-        <Section>
-          <CtaBand title="מוכן להתחיל?" body={`התחל ניסיון חינם של ${TRIAL_CATALOG.days} ימים ובדוק את היכולות בעצמך`}>
-            <ButtonLink href={user ? '/dashboard' : authHref('signup', 'he')} size="lg">
-              {user ? 'לדאשבורד שלי' : 'התחל ניסיון חינם'}
-            </ButtonLink>
-          </CtaBand>
-        </Section>
+        <PricingIncluded copy={copy} />
+        <PricingValue copy={copy} />
+        <PricingUsage copy={copy} />
+        <PricingFaq copy={copy} />
+        <PricingClose
+          copy={copy}
+          checkHref="/free-check"
+          startHref={user ? '/dashboard' : authHref('signup', 'he')}
+          signedIn={!!user}
+        />
       </main>
 
       <Footer />
