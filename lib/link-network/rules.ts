@@ -9,6 +9,11 @@
  *
  * The rules, in plain words (the report and the screen say the same):
  *   - only members who joined with explicit consent, both sides;
+ *   - only a site whose owner proved control of its domain in the app: a
+ *     connected WordPress (application password or the GO TOP plugin) or a
+ *     connected Wix / custom-site connection on that exact host, or a verified
+ *     Search Console property covering it (provenDomains). Typing a domain into
+ *     a project proves nothing, so a stranger's site can never enter the network;
  *   - never Shopify, never a site that is new or thin (too young, never scanned
  *     successfully, or with too little published content);
  *   - never a project to itself, to another project of the same owner or of the
@@ -30,6 +35,7 @@
  * lib/link-network/__qa__/link-network.qa.ts.
  */
 import { bareDomain, isCompetitorDomain } from '@/lib/site-links/classify'
+import { isUnverifiedPermission, propertyCoversProjectUrl } from '@/lib/gsc/property-match'
 
 export type AnchorKind = 'branded' | 'partial' | 'natural' | 'exact'
 
@@ -58,6 +64,8 @@ export interface NetworkSite {
   clientId: string | null
   /** Bare domains (target_domain and aliases). */
   domains: string[]
+  /** The subset of `domains` the owner proved control of (provenDomains). Links go only to these. */
+  verifiedDomains: string[]
   /** 'he' | 'en' | … as stored on the project. */
   language: string
   /** The business category, as stored (the seed scan's niche, or the owner's profile). null = unknown. */
@@ -91,7 +99,7 @@ export interface Edge {
 }
 
 export type Exclusion =
-  | 'not_member' | 'shopify' | 'thin_or_new'
+  | 'not_member' | 'shopify' | 'domain_unverified' | 'thin_or_new'
   | 'self' | 'same_owner' | 'same_client' | 'same_address'
   | 'language' | 'category_unknown' | 'same_category' | 'competitor'
   | 'reciprocal' | 'already_linked' | 'loop'
@@ -118,10 +126,36 @@ export function receivedCapFor(target: Pick<NetworkSite, 'memberSince'>, now: Da
   return ramp[Math.min(monthsInNetwork(target.memberSince, now), ramp.length - 1)]
 }
 
-/** Not new, not thin, scanned, not Shopify, a member. The same bar for giving and receiving. */
+/**
+ * What the app already knows proves control of a site, read from the project's
+ * own connections (never from what the owner typed as the project's domain):
+ *   hosts          site URLs of a CONNECTED WordPress (application password or
+ *                  the GO TOP plugin link) or Wix / custom-site connection;
+ *   gscProperties  Search Console properties assigned to the project, with the
+ *                  permission level Google gave (siteUnverifiedUser proves nothing).
+ */
+export interface DomainProof {
+  hosts: string[]
+  gscProperties: { siteUrl: string; permissionLevel: string | null }[]
+}
+
+/** The domains, of `domains`, whose control `proof` shows: the exact host (www aside), or a verified property covering it. */
+export function provenDomains(domains: readonly string[], proof: DomainProof): string[] {
+  const hosts = new Set(proof.hosts.map((h) => bareDomain(h)).filter(Boolean))
+  const properties = proof.gscProperties.filter((p) => p.siteUrl && !isUnverifiedPermission(p.permissionLevel))
+  return domains.filter((d) => {
+    const bare = bareDomain(d)
+    if (!bare) return false
+    return hosts.has(bare) || properties.some((p) => propertyCoversProjectUrl(p.siteUrl, bare))
+  })
+}
+
+/** Not new, not thin, scanned, not Shopify, a member, its domain proven. The same bar for giving and receiving. */
 export function siteQualifies(site: NetworkSite, now: Date): Exclusion | null {
   if (!site.active) return 'not_member'
   if (site.shopify) return 'shopify'
+  // The site's own domain (the first one: the project's target domain) must be proven.
+  if (site.domains.length > 0 && !site.verifiedDomains.includes(site.domains[0])) return 'domain_unverified'
   const created = new Date(site.createdAt).getTime()
   const young = !Number.isFinite(created) || now.getTime() - created < LINK_NETWORK_RULES.minProjectAgeDays * DAY
   const thin = site.publishedArticles < LINK_NETWORK_RULES.minPublishedArticles && site.indexedPages < LINK_NETWORK_RULES.minIndexedPages

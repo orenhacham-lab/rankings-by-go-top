@@ -12,7 +12,7 @@
  */
 import { bareDomain } from '@/lib/site-links/classify'
 import { safeExternalUrl } from '@/lib/site-links/model'
-import type { AnchorKind, Edge, NetworkSite } from './rules'
+import { provenDomains, type AnchorKind, type DomainProof, type Edge, type NetworkSite } from './rules'
 import type { LinkRel } from './anchor'
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- the service-role client or the QA fake */
@@ -105,6 +105,8 @@ type ProjectRow = {
   ai_business_profile: { primaryCategory?: unknown } | null
 }
 type IndexRow = { project_id: string; targets: unknown; scan_status?: string | null }
+type OwnedSiteRow = { project_id: string; user_id: string | null; site_url: string | null }
+type GscPropertyRow = { project_id: string; connection_id: string | null; site_url: string | null; permission_level: string | null }
 
 export interface SiteExtras {
   businessName: string | null
@@ -158,7 +160,7 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
     .in('id', ids).limit(ids.length))
   if (!projects.length) return out
   const userIds = [...new Set(projects.map((p) => p.user_id))]
-  const [members, profiles, shopify, governance, competitors, seedRuns, crawl, wpIndex, published] = await Promise.all([
+  const [members, profiles, shopify, governance, competitors, seedRuns, crawl, wpIndex, published, proof] = await Promise.all([
     networkRows<MemberRow>(db.from('link_network_members').select('project_id, user_id, active, consent_version, consented_at, consent_link_rel, left_at').in('project_id', ids).limit(ids.length)),
     rows<{ project_id: string; niche: string | null; description: string | null; detected_platform: string | null }>(
       db.from('project_profiles').select('project_id, niche, description, detected_platform').in('project_id', ids).limit(ids.length)),
@@ -171,6 +173,7 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
     rows<IndexRow>(db.from('wordpress_content_index').select('project_id, targets').in('project_id', ids).limit(ids.length)),
     rows<{ project_id: string; title: string | null; wp_post_url: string | null }>(
       db.from('generated_articles').select('project_id, title, wp_post_url').in('project_id', ids).eq('status', 'published').limit(ids.length * 30)),
+    readDomainProof(db, projects),
   ])
   const by = <T extends { project_id: string }>(list: T[]) => {
     const m = new Map<string, T[]>()
@@ -185,6 +188,7 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
 
   for (const p of projects) {
     const domains = domainsOf(p)
+    const verifiedDomains = provenDomains(domains, proof.get(p.id) ?? { hosts: [], gscProperties: [] })
     const profile = profileOf.get(p.id)
     const member = memberOf.get(p.id)
     const runs = runsOf.get(p.id) ?? []
@@ -193,8 +197,9 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
       ...(Array.isArray(crawlRow?.targets) ? (crawlRow!.targets as unknown[]) : [])]
     const pages: { url: string; title: string }[] = []
     const seen = new Set<string>()
+    // A page we may link to is on a domain the owner proved, never on one only typed in.
     const addPage = (url: unknown, title: unknown) => {
-      const u = ownPage(url, domains)
+      const u = ownPage(url, verifiedDomains)
       const t = str(title, 200)
       if (!u || !t || seen.has(u)) return
       seen.add(u)
@@ -213,6 +218,7 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
       userId: p.user_id,
       clientId: p.client_id ?? null,
       domains,
+      verifiedDomains,
       language: p.language ?? '',
       category,
       competitors: [...new Set([
@@ -230,6 +236,49 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
       linkedDomains: [],
     }
     out.set(p.id, { site, extras: { businessName: str(p.business_name, 120), description: str(profile?.description, 400), pages } })
+  }
+  return out
+}
+
+/**
+ * What proves each project's owner controls its site, from the connections the
+ * app already stores (no new table). Every row must belong to the project AND to
+ * the project's owner. A connection that is not live proves nothing:
+ *   wordpress_connections      connection_status 'connected' (application password tested)
+ *   site_fix_plugin_links      status 'connected' (the GO TOP plugin answered a signed call)
+ *   site_platform_connections  connection_status 'connected' (Wix pair tested / custom site)
+ *   project_gsc_properties     the assigned Search Console property, its Google
+ *                              connection still 'connected' and the owner's own.
+ * A missing table (not migrated yet) is no proof from it.
+ */
+export async function readDomainProof(db: NetworkDb, projects: { id: string; user_id: string }[]): Promise<Map<string, DomainProof>> {
+  const out = new Map<string, DomainProof>()
+  if (!projects.length) return out
+  const ids = projects.map((p) => p.id)
+  const ownerOf = new Map(projects.map((p) => [p.id, p.user_id]))
+  const [wp, plugin, platform, gsc] = await Promise.all([
+    rows<OwnedSiteRow>(db.from('wordpress_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)),
+    rows<OwnedSiteRow>(db.from('site_fix_plugin_links').select('project_id, user_id, site_url').in('project_id', ids).eq('status', 'connected').limit(ids.length)),
+    rows<OwnedSiteRow>(db.from('site_platform_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)),
+    rows<GscPropertyRow>(db.from('project_gsc_properties').select('project_id, connection_id, site_url, permission_level').in('project_id', ids).limit(ids.length)),
+  ])
+  const connIds = [...new Set(gsc.map((g) => g.connection_id).filter((id): id is string => !!id))]
+  const liveConns = connIds.length
+    ? await rows<{ id: string; user_id: string }>(db.from('gsc_connections').select('id, user_id').in('id', connIds).eq('status', 'connected').limit(connIds.length))
+    : []
+  const connOwner = new Map(liveConns.map((c) => [c.id, c.user_id]))
+  const entry = (projectId: string) => {
+    let e = out.get(projectId)
+    if (!e) out.set(projectId, (e = { hosts: [], gscProperties: [] }))
+    return e
+  }
+  for (const r of [...wp, ...plugin, ...platform]) {
+    if (!r.site_url || !ownerOf.has(r.project_id) || r.user_id !== ownerOf.get(r.project_id)) continue
+    entry(r.project_id).hosts.push(r.site_url)
+  }
+  for (const g of gsc) {
+    if (!g.site_url || !g.connection_id || !ownerOf.has(g.project_id) || connOwner.get(g.connection_id) !== ownerOf.get(g.project_id)) continue
+    entry(g.project_id).gscProperties.push({ siteUrl: g.site_url, permissionLevel: g.permission_level })
   }
   return out
 }
