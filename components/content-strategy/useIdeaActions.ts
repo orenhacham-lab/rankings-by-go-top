@@ -12,11 +12,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   applyIdeaOverrides, approveRequest, deferIdea, keywordRequest, normalizeKeyword, overrideSettled,
-  readApproveOutcome, readRejectOutcome, rejectRequest,
+  readApproveOutcome, readCreatedOverlap, readRejectOutcome, rejectRequest,
   type IdeaOutcome, type IdeaOverride, type IdeaRequest, type IdeaTarget,
 } from '@/lib/content/strategy/ideas'
 import { sameTopicKey, type StrategyData } from '@/lib/content/strategy/board'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { overlapMessage, type OverlapPayload } from '@/lib/content/cannibalization/client'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 type Copy = Dict['contentStrategy']['ideaActions']
@@ -68,6 +69,7 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged }
   onChanged: () => void
 }) {
   const a = dict.contentStrategy.ideaActions
+  const overlapCopy = useCallback((o: OverlapPayload) => dict.topicOverlap.addedWithOverlap.replace('{message}', overlapMessage(dict.topicOverlap, o)), [dict])
   const [state, setState] = useState<Scoped>(() => empty(projectId))
   const inFlight = useRef(new Set<string>())
   // Another project: nothing carries over (adjusted while rendering, not in an effect).
@@ -111,11 +113,13 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged }
       // "existing" and "covered" leave no topic of this title to wait for; a failure undoes it.
       ops.drop(t.key)
     }
-    say(outcomeCopy(a, outcome, a.approved, a.approveError), outcome === 'failed' ? 'error' : 'success')
+    // Approved, but the site already covers it (the cannibalization check): say so.
+    const overlap = outcome === 'created' ? readCreatedOverlap(req.url, body) : null
+    say(outcomeCopy(a, outcome, overlap ? overlapCopy(overlap) : a.approved, a.approveError), outcome === 'failed' ? 'error' : 'success')
     if (outcome !== 'failed') onChanged()
     ops.busy(t.key, null)
     inFlight.current.delete(t.key)
-  }, [projectId, automation, a, ops, say, onChanged])
+  }, [projectId, automation, a, ops, say, onChanged, overlapCopy])
 
   const reject = useCallback(async (t: IdeaTarget) => {
     if (!projectId || !t.ideaId || inFlight.current.has(t.key)) return

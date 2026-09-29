@@ -6,6 +6,10 @@
  * with its own `source: 'keyword'`, whose dedupe and keyword guard run on the server).
  * No model is asked, so it costs nothing. This is also where "new topic" from anywhere
  * in the workspace lands (the board with `?add=keyword`).
+ *
+ * Before adding, the cannibalization check asks whether the site already has a page
+ * on the keyword; when it does, the form offers improving that page first, and
+ * "create it anyway" adds it. A failed check never stops the add.
  */
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
@@ -14,6 +18,9 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { KEYWORD_MAX } from '@/lib/content/strategy/ideas'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import OverlapHint from '@/components/content/OverlapHint'
+import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
+import type { Locale } from '@/lib/i18n/locales'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 
@@ -25,16 +32,21 @@ export function AddKeywordButton({ dict, open, onOpen }: { dict: Dict; open: boo
   )
 }
 
-export default function AddKeywordForm({ dict, onAdd, onClose }: {
+export default function AddKeywordForm({ dict, onAdd, onClose, projectId = null, language = 'he' }: {
   dict: Dict
   onAdd: (keyword: string) => Promise<{ ok: boolean; error?: string }>
   onClose: () => void
+  /** The project the cannibalization check runs for; without it, no check. */
+  projectId?: string | null
+  language?: Locale
 }) {
   const a = dict.contentStrategy.ideaActions
   const id = useId()
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // What the check found, for which value (a changed value is checked again).
+  const [overlap, setOverlap] = useState<{ value: string; found: OverlapPayload } | null>(null)
   const ref = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -42,15 +54,24 @@ export default function AddKeywordForm({ dict, onAdd, onClose }: {
     ref.current?.querySelector('input')?.focus()
   }, [])
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
+  async function add(anyway: boolean) {
     if (saving) return
     setSaving(true)
     setError(null)
+    if (!anyway && projectId && value.trim()) {
+      const found = await fetchOverlap(projectId, value.trim(), value.trim())
+      if (found) { setOverlap({ value, found }); setSaving(false); return }
+    }
+    setOverlap(null)
     const r = await onAdd(value)
     setSaving(false)
     if (r.ok) { setValue(''); onClose() } else if (r.error) setError(r.error)
   }
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    void add(false)
+  }
+  const shownOverlap = overlap && overlap.value === value ? overlap.found : null
 
   return (
     <form ref={ref} onSubmit={submit} data-add-keyword-form
@@ -75,6 +96,7 @@ export default function AddKeywordForm({ dict, onAdd, onClose }: {
           <Button type="button" variant="ghost" onClick={onClose}>{a.keywordCancel}</Button>
         </div>
       </div>
+      {shownOverlap && <OverlapHint className="mt-3" overlap={shownOverlap} language={language} busy={saving} onCreateAnyway={() => void add(true)} />}
     </form>
   )
 }

@@ -19,6 +19,7 @@
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import type { StrategyArticle, StrategyData, StrategyIdea, StrategyTopic } from './board'
+import { TOPUP_SOURCE_CONTEXT } from '@/lib/content/automation/topup-provenance'
 
 type Row = Record<string, unknown>
 type QueryError = { code?: string; message?: string } | null
@@ -88,16 +89,20 @@ export async function handleStrategyGet(request: Request, deps: StrategyRouteDep
     const [ideaRows, approvedRows, topicRows, articleRows] = await Promise.all([
       rows(owned('content_topic_ideas', 'id, title, primary_keyword, suggestion_reason, score, source, created_at').eq('status', 'pending')),
       // An approved idea became a topic: its reason is that topic's "why".
-      rows(owned('content_topic_ideas', 'approved_topic_id, suggestion_reason').eq('status', 'approved')),
+      // source_context 'auto_topup' marks the topics the monthly top-up prepared.
+      rows(owned('content_topic_ideas', 'approved_topic_id, suggestion_reason, source, source_context, approved_at').eq('status', 'approved')),
       rows(owned('article_topics', 'id, topic, primary_keyword, status, source, suggestion_reason, created_at').neq('status', 'rejected')),
       rows(owned('generated_articles', 'id, topic_id, title, status, scheduled_at, published_at, created_at')),
     ])
 
     const approvedReason = new Map<string, string>()
+    const prepared = new Map<string, { at: string; source: string | null }>()
     for (const r of approvedRows) {
       const topicId = str(r.approved_topic_id, 64)
       const reason = str(r.suggestion_reason, 1_000)
       if (topicId && reason && !approvedReason.has(topicId)) approvedReason.set(topicId, reason)
+      const at = str(r.approved_at, 40)
+      if (topicId && at && r.source_context === TOPUP_SOURCE_CONTEXT) prepared.set(topicId, { at, source: str(r.source, 40) })
     }
 
     const ideas: StrategyIdea[] = []
@@ -116,6 +121,7 @@ export async function handleStrategyGet(request: Request, deps: StrategyRouteDep
         status: str(r.status, 20) ?? 'suggested', source: str(r.source, 40) ?? 'manual',
         reason: str(r.suggestion_reason, 1_000) ?? approvedReason.get(id) ?? null,
         createdAt,
+        ...(prepared.has(id) ? { autoPrepared: prepared.get(id) } : {}),
       })
     }
 
