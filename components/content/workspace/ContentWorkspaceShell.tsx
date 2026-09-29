@@ -43,12 +43,17 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
   // K5 — missing-connections onboarding (two independent setup cards, each hidden when
   // its dimension is ready; whole block hidden when both are). Its buttons LINK to the
   // screen that owns each connection.
-  const setup = projectId && data ? (
+  // Mounted as soon as the project is known, so its Search Console status is asked
+  // beside the overview; it draws nothing until both answered. The platform is known
+  // only from an overview of THIS project: the first overview is read before the
+  // project is resolved and has no platform, which used to read as "not connected".
+  const overview = data && projectId && data.selected === projectId ? data : null
+  const setup = projectId ? (
     <ContentHubSetup
       projectId={projectId}
-      platform={data.platform?.platform ?? 'none'}
-      platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed' || ((data.platform?.platform === 'wix' || data.platform?.platform === 'webhook') && data.platform?.siteActive === false)}
-      shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
+      platform={overview ? overview.platform?.platform ?? 'none' : null}
+      platformFailed={!!overview && (overview.wordpress?.status === 'failed' || overview.shopify?.status === 'failed' || ((overview.platform?.platform === 'wix' || overview.platform?.platform === 'webhook') && overview.platform?.siteActive === false))}
+      shopifyNeedsScope={!!overview?.platform?.shopifyNeedsScope}
     />
   ) : null
 

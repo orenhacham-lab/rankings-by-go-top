@@ -2363,6 +2363,12 @@ export const dashboardHe = {
   uiKit: {
     noticeMore: 'עוד {n}',
   },
+  // A connection's status that could not be read (lib/connection-status/known.ts):
+  // never "not connected", which is a different fact.
+  connectionStatus: {
+    loadFailed: 'לא הצלחנו לבדוק את מצב החיבור כרגע. זה לא אומר שהחיבור נותק.',
+    retry: 'נסו שוב',
+  },
   common: {
     close: 'סגור',
     menu: 'תפריט',

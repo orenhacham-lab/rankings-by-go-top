@@ -19,7 +19,7 @@
  * No WordPress behavior changes; no duplicated Shopify connect form.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { ArrowRight } from 'lucide-react'
@@ -32,6 +32,10 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
 import ShopifyDestinationSection from './ShopifyDestinationSection'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { connectionAnswer } from '@/lib/connection-status/known'
+import { readKnown } from '@/lib/connection-status/useKnownRead'
+import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
 
 // `can_publish` and `default_blog_id` are already returned by
 // /api/shopify/connection (sanitizeShopifyConnection) — this card simply never
@@ -61,21 +65,29 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   const [testing, setTesting] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      const [shRes, wpRes] = await Promise.all([
-        fetch(`/api/shopify/connection?projectId=${projectId}`),
-        fetch(`/api/wordpress/connection?projectId=${projectId}`),
-      ])
-      const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
-      const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
-      setShopify(sh.connection ?? null)
-      setCounts(sh.counts ?? ZERO)
-      setWpConnected(!!wp.connection)
-    } catch { /* fall back to children */ } finally { setLoading(false) }
+  // The connections could not be READ: said as that, never drawn as "none connected".
+  const [loadFailed, setLoadFailed] = useState(false)
+  const loadedRef = useRef(false)
+  const load = useCallback(async (fresh = true) => {
+    const urls = projectConnectionUrls(projectId)
+    const [shRes, wpRes] = await Promise.all([readKnown(urls.shopify, { fresh }), readKnown(urls.wordpress, { fresh })])
+    const sh = connectionAnswer<NonNullable<Conn>>(shRes)
+    const wp = connectionAnswer(wpRes)
+    if (sh.state === 'ready' && wp.state === 'ready') {
+      setShopify(sh.value.connection)
+      setCounts((sh.value.body.counts as Counts | undefined) ?? ZERO)
+      setWpConnected(!!wp.value.connection)
+      setLoadFailed(false)
+    } else {
+      // A re-read that failed keeps what is on screen; a first read that failed says so.
+      setLoadFailed((was) => was || loadedRef.current === false)
+    }
+    loadedRef.current = loadedRef.current || (sh.state === 'ready' && wp.state === 'ready')
+    setLoading(false)
   }, [projectId])
 
-  useEffect(() => { load() }, [load])
+  // The first read joins one the screen already started; later ones ask again.
+  useEffect(() => { void load(false) }, [load])
 
   async function sync() {
     setSyncing(true); setMessage(null)
@@ -121,6 +133,7 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
       </Card>
     )
   }
+  if (loadFailed) return <ConnectionLoadFailed onRetry={() => { setLoading(true); void load() }} />
   if (wpConnected && shopify) {
     // Unexpected dual connection — surface a conflict, delete nothing.
     return (

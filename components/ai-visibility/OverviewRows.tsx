@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { ArrowDownRight, ArrowUpRight, CheckCircle2, CircleDashed, Info, Loader2, Quote, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { Locale } from '@/lib/i18n/locales'
@@ -186,7 +187,18 @@ export function OverviewOpeningCard({
 
           {state === 'ready' && data && <NextStep c={c} data={data} onRunMore={onChooseQuestions} />}
 
-          {state === 'empty' && (
+          {/* The next step depends on whether the project tracks questions, which the
+              tool reports once its list loaded: until then the step's shape, not the
+              "pick a question" step shown for a second to a project that has eight. */}
+          {state === 'empty' && questionsCount === null && !questionsPending && (
+            <div className="mt-6 max-w-[56ch]" aria-busy="true" data-ai-empty-step="loading">
+              <p className="text-section font-semibold">{c.emptyTitle}</p>
+              <Skeleton tone="contrast" className="mt-2 h-4 w-full" />
+              <Skeleton tone="contrast" className="mt-2 h-4 w-2/3" />
+              <Skeleton tone="contrast" className="mt-4 h-10 w-40" />
+            </div>
+          )}
+          {state === 'empty' && (questionsCount !== null || questionsPending) && (
             <div className="mt-6 max-w-[56ch]">
               <p className="text-section font-semibold">{c.emptyTitle}</p>
               <p className="mt-1 text-copy text-contrast-ink/75" data-ai-empty-step={questionsCount ? 'check' : 'questions'}>

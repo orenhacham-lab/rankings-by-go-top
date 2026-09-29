@@ -21,6 +21,9 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableHead, TableBody, TableRow, Th, Td } from '@/components/ui/Table'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { gscStatusUrl, peekGscResponse, readGscResponse } from '@/components/gsc/gsc-data'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { gscStatusView } from '@/lib/gsc/widget-state'
 
 type WindowDays = 28 | 90
 const WINDOWS: WindowDays[] = [28, 90]
@@ -48,9 +51,19 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
 
-  const [statusLoading, setStatusLoading] = useState(true)
-  const [status, setStatus] = useState<StatusResponse | null>(null)
-  const [notFound, setNotFound] = useState(false)
+  // The status, read through the shared Search Console request (the panel above has
+  // usually just read it): drawn from the first render when it is in hand, and a
+  // failed read is an error with a retry, never "not connected".
+  const statusUrl = gscStatusUrl(projectId)
+  const [initialRead] = useState(() => peekGscResponse(statusUrl))
+  const initialState = initialRead ? gscStatusView(initialRead.status, initialRead.body).state : null
+  const [statusLoading, setStatusLoading] = useState(!initialRead)
+  const [status, setStatus] = useState<StatusResponse | null>(
+    initialRead && initialState !== 'error' && initialState !== 'disabled' ? (initialRead.body as StatusResponse) : null,
+  )
+  const [notFound, setNotFound] = useState(initialState === 'disabled')
+  const [statusFailed, setStatusFailed] = useState(initialState === 'error')
+  const [statusAttempt, setStatusAttempt] = useState(0)
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
   const [activeTab, setActiveTab] = useState<'queries' | 'opportunities' | 'multipage'>('queries')
@@ -62,19 +75,22 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   const [rowsError, setRowsError] = useState(false)
 
   useEffect(() => {
+    // Nothing to ask on the first render when the answer was already in hand.
+    if (initialRead && refreshKey === 0 && statusAttempt === 0) return
     let cancelled = false
-    setStatusLoading(true); setNotFound(false)
-    void (async () => {
-      try {
-        const res = await fetch(`/api/gsc/status?projectId=${encodeURIComponent(projectId)}`)
-        if (cancelled) return
-        if (res.status === 404) { setNotFound(true); setStatus(null); return }
-        setStatus(await res.json() as StatusResponse)
-      } catch { if (!cancelled) setStatus(null) } finally { if (!cancelled) setStatusLoading(false) }
-    })()
+    setStatusLoading(true); setNotFound(false); setStatusFailed(false)
+    void readGscResponse(statusUrl, refreshKey > 0 || statusAttempt > 0).then((res) => {
+      if (cancelled) return
+      const view = gscStatusView(res.status, res.body)
+      if (view.state === 'disabled') { setNotFound(true); setStatus(null) }
+      else if (view.state === 'error') { setStatusFailed(true); setStatus(null) }
+      else setStatus(res.body as StatusResponse)
+      setStatusLoading(false)
+    })
     return () => { cancelled = true }
     // refreshKey lets a parent (GscPanel) force a re-fetch after a sync / property change.
-  }, [projectId, refreshKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusUrl, refreshKey, statusAttempt])
 
   const connection = status?.connection ?? null
   const property = status?.property ?? null
@@ -94,8 +110,10 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   useEffect(() => { if (property) loadRows() }, [loadRows, property])
 
   // ── Connection/property states (read-only messages — setup lives in the GSC panel). ──
-  if (statusLoading) return <Skeleton className="h-24 w-full rounded-inset" />
-  if (notFound || !status?.connection) return <Note>{t.errors.not_connected}</Note>
+  if (statusLoading) return <div aria-busy="true" data-connection-loading="gsc-metrics"><Skeleton className="h-24 w-full rounded-inset" /></div>
+  if (notFound) return null
+  if (statusFailed) return <ConnectionLoadFailed onRetry={() => setStatusAttempt((n) => n + 1)} />
+  if (!status?.connection) return <Note>{t.errors.not_connected}</Note>
   if (connection?.status === 'reauth_required') return <Notice tone="warn">{t.statusReauthRequired} — {t.reauthHint}</Notice>
   if (connection?.status === 'revoked' || connection?.status === 'error') return <Note>{t.errors.not_connected}</Note>
   if (!property) return <Note>{t.noPropertyAssigned}</Note>

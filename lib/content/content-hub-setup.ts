@@ -8,6 +8,8 @@
  * so the six approved state combinations are unit-testable in isolation.
  */
 
+import type { GscStatusView } from '@/lib/gsc/widget-state'
+
 /** The settings screen's anchors for the project's two connections. The settings
  *  screen stamps these ids on the sections, so a link and its target cannot drift. */
 export const PROJECT_CONNECTION_ANCHOR = 'platform'
@@ -72,5 +74,34 @@ export function selectSetupCards(input: SetupInput): SetupSelection {
   else if (input.gscStatus === 'connected') { if (!input.gscHasProperty) gscCard = 'no_property' }
   else gscCard = 'none' // none / revoked / error → connect (from scratch)
 
+  return { platformCard, gscCard, showSetup: platformCard !== null || gscCard !== null }
+}
+
+/**
+ * The setup line's decision from what is KNOWN (lib/connection-status/known.ts).
+ *
+ * The line used to start from gscStatus 'none' and draw "Search Console is not
+ * connected" until the status answered, which a connected merchant read as a
+ * disconnection on every content screen (the owner's report, 2026-09-28). Now:
+ *   - the platform is unknown (null) until the overview for THIS project answered,
+ *     and Search Console until its status did: while either is unknown, 'loading'
+ *     and the line is not drawn at all;
+ *   - a Search Console status that failed, or Search Console switched off on the
+ *     server, is not "not connected": the line leaves Search Console out;
+ *   - only a real answer draws a card, the same cards as selectSetupCards.
+ */
+export function setupRowFromKnown(
+  platform: Omit<SetupInput, 'gscStatus' | 'gscHasProperty'> | null,
+  gsc: GscStatusView,
+): SetupSelection | 'loading' {
+  if (!platform || gsc.state === 'loading') return 'loading'
+  let gscCard: GscCard = null
+  switch (gsc.state) {
+    case 'not_connected': gscCard = 'none'; break
+    case 'reauth_required': gscCard = 'reauth'; break
+    case 'no_property': gscCard = 'no_property'; break
+    default: gscCard = null // ready, never_synced (connected), error, disabled
+  }
+  const { platformCard } = selectSetupCards({ ...platform, gscStatus: 'connected', gscHasProperty: true })
   return { platformCard, gscCard, showSetup: platformCard !== null || gscCard !== null }
 }

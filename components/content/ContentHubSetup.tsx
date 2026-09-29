@@ -14,22 +14,33 @@
  * used to scroll to panels further down the same page, which stopped meaning anything
  * once the content workspace became one screen per concern.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { Plug } from 'lucide-react'
-import { useGscEnabled } from '@/components/gsc/GscFeature'
+import { useGscStatus } from '@/components/gsc/gsc-data'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
-  selectSetupCards, platformSetupHref, settingsGscHref,
-  type PlatformState, type GscState,
+  setupRowFromKnown, platformSetupHref, settingsGscHref,
+  type PlatformState,
 } from '@/lib/content/content-hub-setup'
 
+/**
+ * NOTHING IS DRAWN UNTIL BOTH ANSWERS ARE IN. `platform` is null until the
+ * workspace's overview for this project answered; Search Console is read through
+ * the same shared status hook as every other Search Console widget (one request
+ * per screen, an explicit loading state, a failure never read as "not connected").
+ * It used to start from "none" and say "Search Console is not connected" for as
+ * long as its own request took, to merchants whose Search Console was connected.
+ * The component is mounted as soon as the project is known, so its status request
+ * runs beside the overview instead of after it.
+ */
 export default function ContentHubSetup({
   projectId, platform, platformFailed, shopifyNeedsScope,
 }: {
   projectId: string
-  platform: PlatformState
+  /** The project's publishing platform; null while it is not known yet. */
+  platform: PlatformState | null
   platformFailed?: boolean
   shopifyNeedsScope?: boolean
 }) {
@@ -37,29 +48,10 @@ export default function ContentHubSetup({
   const dict = useMemo(() => getDashboardDictionary(language), [language])
   const s = dict.contentHub.setup
 
-  // GSC readiness — read-only status (no OAuth logic here; the GscPanel owns the flow).
-  const [gscStatus, setGscStatus] = useState<GscState>('none')
-  const [gscHasProperty, setGscHasProperty] = useState(false)
-  const gscEnabled = useGscEnabled()
-  useEffect(() => {
-    // Search Console is off on this server: the route answers 404, so do not ask.
-    if (gscEnabled === false) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetch(`/api/gsc/status?projectId=${encodeURIComponent(projectId)}`)
-        if (!res.ok || cancelled) return
-        const d = await res.json().catch(() => ({}))
-        if (cancelled) return
-        setGscStatus((d?.connection?.status as GscState) ?? 'none')
-        setGscHasProperty(!!d?.property)
-      } catch { /* leave defaults (treated as not-connected) */ }
-    })()
-    return () => { cancelled = true }
-  }, [projectId, gscEnabled])
-
-  const { platformCard, gscCard, showSetup } = selectSetupCards({ platform, platformFailed, shopifyNeedsScope, gscStatus, gscHasProperty })
-  if (!showSetup) return null
+  const { view } = useGscStatus(projectId)
+  const row = setupRowFromKnown(platform === null ? null : { platform, platformFailed, shopifyNeedsScope }, view)
+  if (row === 'loading' || !row.showSetup) return null
+  const { platformCard, gscCard } = row
 
   // ONE LINE, NOT TWO CARDS (UX review P1-18). The two large cards used to repeat
   // on every content screen; the connections are set up in one place, the

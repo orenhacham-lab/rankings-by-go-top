@@ -47,7 +47,14 @@ import { withDeadline } from '@/lib/active-project/useProjectRow'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { PROJECT_CONNECTION_ANCHOR, SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
 import { fill, platformHint, settingsVisibility } from '@/lib/project-settings/view'
+import { gscStatusUrl, readGscResponse } from '@/components/gsc/gsc-data'
+import { useGscEnabled } from '@/components/gsc/GscFeature'
+import { readKnown } from '@/lib/connection-status/useKnownRead'
+import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
 import type { Project, Client } from '@/lib/supabase/types'
+
+/** How long the settings skeleton waits for the connection reads beyond the settings' own. */
+const CONNECTIONS_WAIT_MS = 3000
 
 export default function ProjectSettingsPage() {
   const { language } = useDashboardLanguage()
@@ -76,7 +83,29 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   // answered (or failed), so the cards appear in place instead of one by one.
   const settings = useProjectSettings(project.id)
   const data = settings.state.status === 'ready' ? settings.state.data : null
-  const ready = settings.state.status !== 'loading'
+  const settingsReady = settings.state.status !== 'loading'
+
+  // The connections section's reads start with the screen, beside the settings
+  // themselves: by the time the cards render, their answers are usually in hand and
+  // they draw their final state at once (lib/connection-status), instead of a
+  // skeleton, or worse, "not connected", while each asks on its own afterwards.
+  // The screen's skeleton waits for them too (up to CONNECTIONS_WAIT_MS), so the
+  // connections section opens in its final size instead of growing under the reader.
+  const gscEnabled = useGscEnabled()
+  const [connectionsRead, setConnectionsRead] = useState(false)
+  useEffect(() => {
+    const urls = projectConnectionUrls(project.id)
+    let done = false
+    const finish = () => { if (!done) { done = true; setConnectionsRead(true) } }
+    void Promise.allSettled([
+      readKnown(urls.wordpress), readKnown(urls.shopify), readKnown(urls.site),
+      gscEnabled !== false ? readGscResponse(gscStatusUrl(project.id)) : null,
+    ]).then(finish)
+    const cap = window.setTimeout(finish, CONNECTIONS_WAIT_MS)
+    return () => window.clearTimeout(cap)
+  }, [project.id, gscEnabled])
+
+  const ready = settingsReady && connectionsRead
   const visibility = settingsVisibility(data)
   const now = useClock()
 

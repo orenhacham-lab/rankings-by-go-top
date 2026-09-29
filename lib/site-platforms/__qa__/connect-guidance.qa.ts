@@ -42,11 +42,14 @@ function main() {
   console.log('A) a confirmed WordPress choice survives the re-read and opens the form')
   {
     const src = strip(read('components/content/ContentSection.tsx'))
-    const resetOnlyOnDisconnect = (x: string) => /if \(!wpc && !shc && !opts\?\.keepChoice\) setChoice\(null\)/.test(x)
+    // w7-flash: the re-read goes through apply(known, keepChoice); refresh forwards opts?.keepChoice.
+    const resetOnlyOnDisconnect = (x: string) => /if \(!wpc && !shc && !keepChoice\) setChoice\(null\)/.test(x)
+      && /apply\(await readConnections\(true\), opts\?\.keepChoice\)/.test(x)
     const confirmKeeps = (x: string) => /const onSwitched = [\s\S]*?void refresh\(\{ keepChoice: true \}\)/.test(x)
     const opensForm = (x: string) => /<WordPressConnectionPanel[\s\S]*?startWithForm=\{current !== 'wordpress'\}/.test(x)
     check('the re-read resets the choice only when it did not follow a confirmed choice', resetOnlyOnDisconnect(src))
-    check('MUT: the old unconditional reset is caught', !resetOnlyOnDisconnect(src.replace('if (!wpc && !shc && !opts?.keepChoice) setChoice(null)', 'if (!wpc && !shc) setChoice(null)')))
+    check('MUT: the old unconditional reset is caught', !resetOnlyOnDisconnect(src.replace('if (!wpc && !shc && !keepChoice) setChoice(null)', 'if (!wpc && !shc) setChoice(null)')))
+    check('MUT: a refresh that drops keepChoice is caught', !resetOnlyOnDisconnect(src.replace('apply(await readConnections(true), opts?.keepChoice)', 'apply(await readConnections(true))')))
     check('a confirmed switch re-reads with keepChoice', confirmKeeps(src))
     check('MUT: a confirmed switch that re-reads plainly is caught', !confirmKeeps(src.replace('void refresh({ keepChoice: true })', 'void refresh()')))
     check('the chosen WordPress panel opens with its form out; a connected one does not', opensForm(src))

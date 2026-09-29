@@ -14,7 +14,7 @@
  * screen passes it only while nothing is connected.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
@@ -28,6 +28,10 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
 import { wpErrorKey } from '@/lib/wordpress/error-copy'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { connectionAnswer } from '@/lib/connection-status/known'
+import { peekKnownRead, readKnown } from '@/lib/connection-status/useKnownRead'
+import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
 
 type SanitizedConnection = {
   id: string
@@ -51,8 +55,14 @@ export default function WordPressConnectionPanel({
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
 
-  const [loading, setLoading] = useState(true)
-  const [connection, setConnection] = useState<SanitizedConnection | null>(null)
+  // Known or not (lib/connection-status): the section above usually read this very
+  // URL a moment ago, so the first render has the answer and draws it directly.
+  const url = projectConnectionUrls(projectId).wordpress
+  const [initial] = useState(() => connectionAnswer<SanitizedConnection>(peekKnownRead(url) ?? null))
+  const [loading, setLoading] = useState(initial.state === 'loading')
+  // The connection could not be read: said as that, never as "not connected".
+  const [loadFailed, setLoadFailed] = useState(initial.state === 'error')
+  const [connection, setConnection] = useState<SanitizedConnection | null>(initial.state === 'ready' ? initial.value.connection : null)
   const [showForm, setShowForm] = useState(startWithForm)
   const { confirm, dialog } = useConfirm()
   const [guideOpen, setGuideOpen] = useState(false)
@@ -71,23 +81,23 @@ export default function WordPressConnectionPanel({
     return key === 'generic' ? t.genericError : t.wpErrors[key]
   }
 
-  const loadConnection = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/wordpress/connection?projectId=${projectId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setConnection(data.connection ?? null)
-      }
-    } catch {
-      // Leave as not-connected; the panel still renders the connect form.
-    } finally {
-      setLoading(false)
+  const loadingRef = useRef(initial.state === 'loading')
+  const loadConnection = useCallback(async (fresh = true) => {
+    const known = connectionAnswer<SanitizedConnection>(await readKnown(url, { fresh }))
+    if (known.state === 'ready') {
+      setConnection(known.value.connection)
+      setLoadFailed(false)
+    } else {
+      // A re-read that failed keeps what is on screen; a first read that failed says so.
+      setLoadFailed((was) => was || loadingRef.current)
     }
-  }, [projectId])
+    loadingRef.current = false
+    setLoading(false)
+  }, [url])
 
   useEffect(() => {
-    loadConnection()
-  }, [loadConnection])
+    if (initial.state === 'loading') void loadConnection(false)
+  }, [loadConnection, initial.state])
 
   function openForm() {
     setSiteUrl(connection?.site_url ?? '')
@@ -222,7 +232,9 @@ export default function WordPressConnectionPanel({
       <p className="mb-4 max-w-prose text-copy text-muted">{t.wpConnectionHelp}</p>
 
       {loading ? (
-        <Skeleton className="h-12 w-full rounded-inset" />
+        <div aria-busy="true" data-connection-loading="wordpress"><Skeleton className="h-12 w-full rounded-inset" /></div>
+      ) : loadFailed && !showForm ? (
+        <ConnectionLoadFailed onRetry={() => { loadingRef.current = true; setLoading(true); void loadConnection() }} />
       ) : !connection && !showForm ? (
         <div className="py-6 text-center">
           <p className="mb-3 text-copy text-body">{t.notConnected}</p>

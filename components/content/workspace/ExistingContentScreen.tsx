@@ -77,7 +77,7 @@ const fill = (s: string, vars: Record<string, string | number>) =>
   Object.entries(vars).reduce((acc, [k, v]) => acc.split(`{${k}}`).join(String(v)), s)
 
 export default function ExistingContentScreen() {
-  const { projectId, selectedProject, language, isHebrew, toast, loadTopics, data: overview } = useContentWorkspace()
+  const { projectId, selectedProject, language, isHebrew, toast, loadTopics, data: overview, overviewSettled } = useContentWorkspace()
   const x = useMemo(() => getDashboardDictionary(language).existingContent, [language])
   const num = useMemo(() => new Intl.NumberFormat(isHebrew ? 'he-IL' : 'en-US'), [isHebrew])
   const day = useCallback((iso: string | null) => (iso ? formatDate(iso, language) : null), [language])
@@ -156,7 +156,10 @@ export default function ExistingContentScreen() {
     )
   }
 
-  if (!payload) {
+  // With nothing indexed, which empty state is right depends on whether a platform is
+  // connected, which the workspace overview says: until it has, the skeleton stays,
+  // instead of "connect your site" to a merchant whose site is connected.
+  if (!payload || (payload.source === 'none' && !overviewSettled)) {
     return (
       <div role="status" aria-label={x.loading} className="space-y-4">
         <div className="grid grid-cols-3 gap-4 sm:gap-5" aria-hidden>

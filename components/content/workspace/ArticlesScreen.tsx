@@ -23,6 +23,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { cn, formatDate } from '@/lib/utils'
 import SectionHeading from '@/components/ui/SectionHeading'
 import EmptyState from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Checkbox from '@/components/ui/Checkbox'
@@ -43,7 +44,7 @@ const ARTICLES_PAGE = 25
 
 export default function ArticlesScreen() {
   const {
-    t, projectId, data, counts, toast,
+    t, projectId, data, overviewSettled, counts, toast,
     activePlatform, isShopify, isSite, exportedIdOf, load, loadTopics, patchArticle, shopifyPublishError,
     handleCreateTopic,
   } = useContentWorkspace()
@@ -408,7 +409,9 @@ export default function ArticlesScreen() {
           It is shown only once a platform IS connected. With none connected the
           setup card above already asks for exactly that, with the same links,
           and two cards asking one question is the clutter this split removes. */}
-      {activePlatform !== 'none' && (
+      {/* Only once this project's overview says which platform: until then the
+          platform is not known, and a guess drew the wrong card for a second. */}
+      {data && activePlatform !== 'none' && (
         <div className="mb-4">
           {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
@@ -434,7 +437,13 @@ export default function ArticlesScreen() {
         action={(data?.articles?.length ?? 0) > 0 ? <Button onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button> : undefined}
       />
 
-      {(data?.articles?.length ?? 0) === 0 ? (
+      {!overviewSettled ? (
+        // The list's shape while this project's articles are read: never
+        // "no articles yet" to a merchant whose articles are on their way.
+        <div className="mb-6" data-articles-loading="">
+          <TableSkeleton label={getDashboardDictionary(language).common.loading} rows={4} />
+        </div>
+      ) : (data?.articles?.length ?? 0) === 0 ? (
         <Card padding={false} className="mb-6">
           <EmptyState
             icon={<FileText />}
