@@ -31,6 +31,8 @@ import PluginInstallModal from './PluginInstallModal'
 import { fixKey, useSiteHealthScan, type ScanProgress } from './useSiteHealthScan'
 import { useSiteFixes } from './useSiteFixes'
 import type { FixType } from '@/lib/site-fix/types'
+import { rowStateFrom, rowTarget, type FixRowState } from '@/lib/site-fix/job-match'
+import { FIX_TYPE } from '@/lib/site-health/rules'
 
 type Copy = DashboardDictionary['siteHealth']
 type Filter = 'all' | 'fixable' | 'guide'
@@ -139,6 +141,16 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
    * With the fix queue live, what each page offers comes from where an approved fix would go
    * (lib/site-fix/channel.ts): fix it now, install the plugin first, or instructions only.
    */
+  /**
+   * Where a finding row stands in the fix queue (the server's jobs, not this browser's memory):
+   * applied or sent reads "fixed", pending or waiting for a manual update reads "in the queue",
+   * and neither offers "fix it for me" again.
+   */
+  const jobStateFor = useCallback((finding: Finding, page: FindingPage): FixRowState => {
+    if (!queueLive || !finding.fixType) return null
+    return rowStateFrom(fixes.jobs, rowTarget(finding.fixType, page))
+  }, [queueLive, fixes.jobs])
+
   const fixModeFor = useCallback((finding: Finding, page: FindingPage): 'fix' | 'install' | null => {
     if (!queueLive || !caps || !finding.fixType) return null
     const channel = caps.channelFor[finding.fixType]
@@ -149,10 +161,12 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     return 'fix'
   }, [queueLive, caps])
   const findings = useMemo(() => {
-    const list = report?.findings ?? []
+    // A report kept from before the fix queue has no fix type on its findings: take it from the
+    // same rules the scan uses, so the buttons show without a new scan.
+    const list = (report?.findings ?? []).map((f) => (f.fixType ? f : { ...f, fixType: FIX_TYPE[f.id] ?? null }))
     if (!queueLive) return list
-    return list.map((f) => ({ ...f, fixable: f.pages.some((p) => fixModeFor(f, p) === 'fix') }))
-  }, [report, queueLive, fixModeFor])
+    return list.map((f) => ({ ...f, fixable: f.pages.some((p) => fixModeFor(f, p) === 'fix' && !jobStateFor(f, p)) }))
+  }, [report, queueLive, fixModeFor, jobStateFor])
 
   const fixableCount = useMemo(() => findings.filter((f) => f.fixable).length, [findings])
   const visible = useMemo(() => {
@@ -165,7 +179,10 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   const onFix = useCallback((finding: Finding, page: FindingPage) => setTarget({ finding, page, type: finding.fixType ?? null }), [setTarget])
   const openInstall = useCallback(() => setInstallOpen(true), [setInstallOpen])
   const when = useCallback((iso: string) => formatDate(language).dateTime(iso), [language])
-  const closeFix = useCallback(() => setTarget(null), [setTarget])
+  // Closing the approval re-reads the queue, so a fix approved elsewhere (another tab, another
+  // person, or an "already approved" answer) shows on its row at once.
+  const reloadFixes = fixes.reload
+  const closeFix = useCallback(() => { setTarget(null); if (queueLive) void reloadFixes() }, [setTarget, queueLive, reloadFixes])
 
   const rescan = (
     <Button variant="secondary" onClick={() => void scan()} loading={scanning} disabled={scanning} data-scan-again="">
@@ -261,6 +278,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
                     fixed={fixed}
                     onFix={onFix}
                     fixModeFor={queueLive ? fixModeFor : null}
+                    jobStateFor={queueLive ? jobStateFor : null}
                     onInstall={openInstall}
                   />
                 </Reveal>

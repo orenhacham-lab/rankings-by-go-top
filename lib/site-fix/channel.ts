@@ -5,7 +5,8 @@
  *                      findings keep their step-by-step instructions.
  *   plugin connected   every fix type, through the Go Top plugin (signed).
  *   plugin dropped     every approval is recorded and marked for manual update, and the screen
- *                      says so; "retry" applies them once the plugin answers again.
+ *                      says so; "retry" applies them once the plugin answers again. A pairing whose
+ *                      key cannot be read counts as dropped too ("connect again"), never connected.
  *   app password only  what the WordPress REST API allows today: the post title, image alt
  *                      text, an internal link, a broken link, an FAQ block (content) and, with an
  *                      SEO plugin and the 1.x bridge, the meta description. Canonical, focus
@@ -83,16 +84,22 @@ export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: st
   }
 }
 
-export function pluginStateOf(row: PluginLinkRow | null): PluginState {
+/**
+ * The pairing as the screen sees it. `keyReadable` false (the stored key cannot be decrypted) never
+ * reads as connected: nothing can be signed with it and "check again" cannot help, so the screen
+ * gets one state, "connect again" (`rekey`), and every approval waits for a manual update.
+ */
+export function pluginStateOf(row: PluginLinkRow | null, keyReadable = true): PluginState {
   if (!row) return { state: 'none' }
   if (row.status === 'pending') return { state: 'pending', hint: row.secret_hint }
+  if (!keyReadable) return { state: 'disconnected', lastSeenAt: row.last_seen_at, rekey: true }
   if (row.status === 'connected') return { state: 'connected', version: row.plugin_version, seoPlugin: row.seo_plugin, lastSeenAt: row.last_seen_at }
   return { state: 'disconnected', lastSeenAt: row.last_seen_at }
 }
 
 /** Pure: the channel each fix type would take right now. */
 export function resolveCapabilities(ctx: FixContext, available: boolean): FixCapabilities {
-  const plugin = pluginStateOf(ctx.plugin)
+  const plugin = pluginStateOf(ctx.plugin, !ctx.plugin || !!ctx.pluginLink)
   const base = { available, plugin, appPassword: !!ctx.creds, webhook: !!ctx.webhook, wordpress: ctx.wordpressDetected }
   if (ctx.shopify) return { ...base, readOnly: true, channelFor: {} }
   const channelFor: FixCapabilities['channelFor'] = {}

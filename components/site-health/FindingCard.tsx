@@ -7,13 +7,14 @@
  * else (always one click away, also where a fix is offered).
  */
 import { useId, useState } from 'react'
-import { ArrowUpRight, Check, ChevronDown, ListChecks } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronDown, Clock, ListChecks } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { pathOf } from '@/lib/site-health/rules'
 import type { Finding, FindingPage, Severity, SitePlatform } from '@/lib/site-health/types'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
+import type { FixRowState } from '@/lib/site-fix/job-match'
 import { fixKey } from './useSiteHealthScan'
 
 type Copy = DashboardDictionary['siteHealth']
@@ -68,7 +69,7 @@ export function GuideSteps({ steps, title, id }: { steps: readonly string[]; tit
 }
 
 export default function FindingCard({
-  finding, copy, platform, fixed, onFix, fixModeFor, onInstall,
+  finding, copy, platform, fixed, onFix, fixModeFor, jobStateFor, onInstall,
 }: {
   finding: Finding
   copy: Copy
@@ -77,6 +78,8 @@ export default function FindingCard({
   onFix: (finding: Finding, page: FindingPage) => void
   /** With the fix queue live: whether this page can be fixed now, needs the plugin first, or neither. */
   fixModeFor?: ((finding: Finding, page: FindingPage) => 'fix' | 'install' | null) | null
+  /** With the fix queue live: whether an approved fix already covers this page (the server's queue decides). */
+  jobStateFor?: ((finding: Finding, page: FindingPage) => FixRowState) | null
   onInstall?: () => void
 }) {
   const [stepsOpen, setStepsOpen] = useState(false)
@@ -113,11 +116,14 @@ export default function FindingCard({
         {!siteWide && finding.pages.length > 0 && (
           <ul className="mt-5 divide-y divide-line overflow-hidden rounded-inset border border-line" role="list">
             {shown.map((page) => {
-              const done = fixed.has(fixKey(finding.id, page.url))
+              // With the queue live, the server's jobs decide; this browser's memory is only the fallback.
+              const held = jobStateFor ? jobStateFor(finding, page) : null
+              const done = jobStateFor ? held === 'applied' : fixed.has(fixKey(finding.id, page.url))
+              const queued = held === 'queued'
               const measure = measureOf(copy, finding, page)
               const mode = fixModeFor ? fixModeFor(finding, page) : page.fixable ? 'fix' : null
               return (
-                <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : mode === 'fix' ? 'fixable' : mode === 'install' ? 'install' : 'guide'}>
+                <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : queued ? 'queued' : mode === 'fix' ? 'fixable' : mode === 'install' ? 'install' : 'guide'}>
                   <div className="min-w-0">
                     {/* The address reads left to right, while the row keeps the page's own alignment. */}
                     <p className="truncate text-copy font-medium text-ink" title={page.url}>
@@ -132,6 +138,8 @@ export default function FindingCard({
                   <div className="flex shrink-0 items-center gap-2">
                     {done ? (
                       <Badge variant="success"><Check size={14} strokeWidth={2.4} aria-hidden="true" />{copy.fixedBadge}</Badge>
+                    ) : queued ? (
+                      <Badge variant="info"><Clock size={14} strokeWidth={2.2} aria-hidden="true" />{copy.queuedBadge}</Badge>
                     ) : mode === 'fix' ? (
                       <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.fixType && fixModeFor ? finding.fixType : finding.field ?? ''}>
                         {copy.fixForMe}

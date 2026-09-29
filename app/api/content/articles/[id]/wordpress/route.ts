@@ -188,7 +188,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw new Error('forced diagnostic throw (preview)')
     }
 
-    let body: { status?: string; force?: boolean; update?: boolean }
+    let body: { status?: string; force?: boolean; update?: boolean; unpublish?: boolean }
     try {
       body = await request.json()
     } catch {
@@ -261,6 +261,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         { error: 'already_exported', reason: 'already_exported', wp_post_id: a.wp_post_id, wp_post_url: a.wp_post_url ?? null },
         { status: 409 },
       )
+    }
+    // A live post is never quietly turned back into a draft: updating a published article with
+    // status 'draft' takes the page off the site, so it needs the explicit `unpublish: true` the
+    // editor sends only after its "take the page offline" confirmation.
+    if (a.wp_post_id && !force && wantUpdate && status === 'draft' && a.status === 'published' && body.unpublish !== true) {
+      return Response.json({ error: 'would_unpublish', reason: 'would_unpublish' }, { status: 409 })
     }
     // Update-in-place applies only when a post already exists and force wasn't asked.
     const existing = a.wp_post_id && !force

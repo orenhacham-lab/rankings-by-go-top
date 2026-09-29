@@ -62,6 +62,8 @@ export default function PluginInstallModal({
   const [error, setError] = useState<FixErrorCode | null>(null)
   const plugin = capabilities.plugin
   const connected = plugin.state === 'connected'
+  /** The stored key cannot be read: only a new pairing code helps, so "check" waits for one. */
+  const rekey = plugin.state === 'disconnected' && !!plugin.rekey
   const uploadUrl = `${siteUrl.replace(/\/+$/, '')}/wp-admin/plugin-install.php?tab=upload`
 
   const connectedNow = useCallback(async () => {
@@ -129,6 +131,8 @@ export default function PluginInstallModal({
           <p className="text-copy text-body text-pretty">{copy.plugin.intro}</p>
         </div>
 
+        {rekey && <Notice tone="warn">{copy.plugin.rekeyNotice}</Notice>}
+
         {connected ? (
           <div className="space-y-4">
             <Notice tone="ok">{copy.plugin.connected}</Notice>
@@ -194,7 +198,7 @@ export default function PluginInstallModal({
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button variant="ghost" onClick={onClose} disabled={!!busy}>{copy.plugin.close}</Button>
-            {!connected && plugin.state !== 'none' && (
+            {!connected && plugin.state !== 'none' && (!rekey || !!code) && (
               <Button onClick={check} loading={busy === 'check'} disabled={!!busy} data-plugin-check="">{copy.connection.check}</Button>
             )}
           </div>

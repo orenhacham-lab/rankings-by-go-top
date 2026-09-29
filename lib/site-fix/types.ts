@@ -83,6 +83,7 @@ export type FixErrorCode =
   | 'changed_since_preview'
   | 'nothing_to_undo'
   | 'wrong_state'
+  | 'already_fixed'
   | 'write_not_confirmed'
   | 'webhook_failed'
   | 'store_failed'
@@ -126,6 +127,12 @@ export interface FixJobView {
   approvedAt: string
   appliedAt: string | null
   revertedAt: string | null
+  /**
+   * The address the fix is about when it is not the page itself: the dead link for a broken
+   * link, the forgotten page for an internal link. The screen maps a job back to its finding
+   * row with it (lib/site-fix/job-match.ts).
+   */
+  subject: string | null
   canUndo: boolean
   canCancel: boolean
   canRetry: boolean
@@ -136,7 +143,11 @@ export type PluginState =
   | { state: 'none' }
   | { state: 'pending'; hint: string }
   | { state: 'connected'; version: string | null; seoPlugin: 'yoast' | 'rankmath' | 'none' | null; lastSeenAt: string | null }
-  | { state: 'disconnected'; lastSeenAt: string | null }
+  /**
+   * `rekey`: the pairing is on record but its key can no longer be read, so checking it again
+   * cannot help. The one way back is a new pairing code ("connect again").
+   */
+  | { state: 'disconnected'; lastSeenAt: string | null; rekey?: boolean }
 
 /** Where an approved fix goes for one project, and whether the queue exists at all. */
 export interface FixCapabilities {

@@ -13,6 +13,8 @@
  *      address is on THIS project's site                      400 not_allowed / value_invalid / off_site
  *   7. approve: `approved: true` (only the approval button sends it)      400 invalid_request
  *   8. approve: a channel exists for this type                409 needs_plugin / no_channel
+ *   9. approve / retry: no other job already holds the same place (applied, sent, pending or
+ *      waiting for a manual update; ./job-match.ts)             409 already_fixed
  *
  * One approval = one job = one element of one page. The approval is recorded (who, when, IP, the
  * previous and the new value) BEFORE anything is sent; every outcome is recorded after. Answers are
@@ -29,9 +31,10 @@ import { pairOverAppPassword, pluginFix, pluginStatus, pluginUndo, type PluginPo
 import { previewFixJob, type LivePage, type PreviewRequest } from './preview'
 import { applyViaRest, revertViaRest, type RestUndo } from './rest-apply'
 import {
-  appendAudit, deletePluginLink, FixStoreError, getJob, insertJob, listJobs, markPluginLink, queueAvailable, savePluginKey,
-  updateJob, type Scope,
+  appendAudit, deletePluginLink, FixStoreError, getJob, insertJob, listHoldingJobs, listJobs, markPluginLink, queueAvailable,
+  savePluginKey, updateJob, type Scope,
 } from './store'
+import { HOLDING_STATUSES, sameTarget, subjectOf, type FixTarget } from './job-match'
 import { FIX_TYPES, type FixCapabilities, type FixChannel, type FixErrorCode, type FixJobRow, type FixJobView, type FixType } from './types'
 import { buildFixPayload, sendFixWebhook, type FixWebhookDeps } from './webhook-fix'
 import { payloadFromJob, siteKeyOf, summaryOf, validateFix, valueOf } from './whitelist'
@@ -42,7 +45,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const FIX_HTTP_STATUS: Partial<Record<FixErrorCode, number>> = {
   unauthorized: 401, not_found: 404, invalid_request: 400, not_allowed: 400, value_invalid: 400, off_site: 400,
   queue_unavailable: 409, shopify_readonly: 409, needs_plugin: 409, no_channel: 409, wrong_state: 409,
-  changed_since_preview: 409, store_failed: 500,
+  changed_since_preview: 409, already_fixed: 409, store_failed: 500,
 }
 export const fixStatusFor = (code: FixErrorCode) => FIX_HTTP_STATUS[code] ?? 422
 
@@ -94,7 +97,7 @@ export function jobView(row: FixJobRow, caps: FixCapabilities): FixJobView {
   return {
     id: row.id, type: row.fix_type, findingKind: row.finding_kind, pageUrl: row.page_url, status: row.status, channel: row.channel,
     before: row.before_value, after: row.after_summary, errorCode: row.error_code, approvedAt: row.approved_at,
-    appliedAt: row.applied_at, revertedAt: row.reverted_at,
+    appliedAt: row.applied_at, revertedAt: row.reverted_at, subject: subjectOf(row.fix_type, row.payload),
     canUndo: (row.status === 'applied' && (row.channel === 'plugin' || row.channel === 'app_password') && !!row.undo)
       || (row.status === 'sent' && row.channel === 'webhook' && !!caps.webhook),
     canCancel: row.status === 'pending' || row.status === 'manual' || row.status === 'failed',
@@ -190,10 +193,15 @@ async function approve(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   const expected = typeof b.expected === 'string' && b.expected.length <= 200_000 ? b.expected : null
   const via = typeof b.via === 'string' && /^[a-z_]{1,20}$/.test(b.via) ? b.via : null
   const before = typeof b.before === 'string' ? b.before.slice(0, 60_000) : null
+  // One fix, one place: a fix already applied, sent or waiting in the queue is never approved twice.
+  const stored = valueOf(payload)
+  if (await heldElsewhere(deps, l, { type: payload.type, pageUrl: String(b.pageUrl).trim(), subject: subjectOf(payload.type, stored) }, null)) {
+    return refuse('already_fixed')
+  }
 
   const job = await insertJob(deps.admin, l.scope, {
     id: (deps.newId ?? crypto.randomUUID)(),
-    fixType: payload.type, findingKind: kind, pageUrl: String(b.pageUrl).trim(), payload: valueOf(payload),
+    fixType: payload.type, findingKind: kind, pageUrl: String(b.pageUrl).trim(), payload: stored,
     before, after: summaryOf(payload).slice(0, 4000), channel: channel as FixChannel,
     undo: { expected, via }, approvedBy: deps.userId as string, approvedIp: deps.ip,
   })
@@ -201,6 +209,12 @@ async function approve(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   await audit(deps, l, job, 'approved')
   const done = await execute(job, l, deps, { expected, via })
   return { status: 200, body: { ok: true, job: jobView(done, l.caps) } }
+}
+
+/** Another job (not `self`) already holds this place: done, sent, queued or waiting for a manual update. */
+async function heldElsewhere(deps: FixesDeps, l: Loaded, target: FixTarget, self: string | null): Promise<boolean> {
+  const held = await listHoldingJobs(deps.admin, l.scope, target.type, HOLDING_STATUSES)
+  return held.some((r) => r.id !== self && sameTarget({ type: r.fix_type, pageUrl: r.page_url, subject: subjectOf(r.fix_type, r.payload) }, target))
 }
 
 /** Apply one job through its channel; record the outcome on the job and in the trail. */
@@ -323,6 +337,9 @@ async function retry(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Pr
   const job = await ownJob(b, l, deps)
   if ('status' in job && 'body' in job) return job
   if (!jobView(job, l.caps).canRetry) return refuse('wrong_state')
+  if (await heldElsewhere(deps, l, { type: job.fix_type, pageUrl: job.page_url, subject: subjectOf(job.fix_type, job.payload) }, job.id)) {
+    return refuse('already_fixed')
+  }
   const channel = channelOf(l, job.fix_type) as FixChannel
   const stored = (job.undo ?? {}) as { expected?: string | null; via?: string | null }
   // The preview's compare value belongs to the channel it was read through; another channel writes without it.
