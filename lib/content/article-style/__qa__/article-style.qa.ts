@@ -14,7 +14,8 @@
  *      makes none; CONTENT_AUTO_FEATURED_IMAGE=false still turns the hero off;
  *   E) the owner data layer: another user's project is not_found; a missing
  *      table is read-only defaults; invalid input is rejected; saving the
- *      profiles never touches the design and vice versa;
+ *      profiles never touches the design and vice versa; the home-page reader
+ *      admits the stored domain (normalizeCheckUrl) before any request;
  *   F) publishing: WordPress and the webhook get the design; Shopify and Wix
  *      stay minimal; lib/shopify/** is untouched;
  *   G) official profiles: per-network URL rules (https, the network's host, a
@@ -38,6 +39,7 @@ import { loadArticleStyle, readSiteSignals, saveArticleStyle, saveOfficialProfil
 import { runArticleImageStep, spreadSections } from '../generation'
 import { STYLE_WHITELIST, keyTakeaways, styleArticleHtml } from '../html'
 import { detectProfilesFromHtml, normalizeProfileUrl, parseProfilesInput, sameAsList } from '../profiles'
+import { fetchHomeHtml } from '../site-home'
 import { applyArticleDesign, composeWebhookBody } from '../publish'
 import { FALLBACK_BRAND_COLOR, cleanBrandColors, effectiveDesign, normalizeHex, parseArticleStyleInput, toArticleStyle } from '../types'
 
@@ -286,6 +288,31 @@ async function main() {
       sig.ok && sig.colors.length >= 2 && sig.profiles.instagram === 'https://www.instagram.com/shop.il' && sig.profiles.facebook === 'https://facebook.com/shopil')
     const unreachable = await readSiteSignals(mkDeps(db, USER, null), PROJECT)
     check('E12: an unreachable site is a code, not an error text', !unreachable.ok && unreachable.code === 'site_unreachable')
+
+    // E13: the home-page reader admits the stored domain before the first request.
+    const asked: string[] = []
+    const fakeFetch = (async (u: URL) => { asked.push(u.toString()); return { ok: true, url: u.toString(), status: 200, html: '<html></html>' } }) as never
+    const HOSTILE = ['localhost', '127.0.0.1', '169.254.169.254', 'shop.example.com:8080', 'user:pw@shop.example.com', 'metadata.google.internal', '[::1]', 'intranet']
+    const hostile: (string | null)[] = []
+    for (const d of HOSTILE) hostile.push(await fetchHomeHtml(d, fakeFetch))
+    check('E13: an internal, IP, port or credentialed domain is refused before any request', hostile.every((h) => h === null) && asked.length === 0, asked.join(', '))
+    const fine = await fetchHomeHtml('shop.example.com', fakeFetch)
+    check('E14: a public domain is fetched at the admitted URL', fine === '<html></html>' && asked.join() === 'https://shop.example.com/', asked.join())
+    const noGuard = await mutant<typeof import('../site-home')>('site-home.ts', (src) => src.replace('if (!u.ok) return null', "if (!u.ok) return fetchHtml(new URL(`https://${domain}/`)).then((p) => (p.ok ? p.html : null)).catch(() => null)"))
+    asked.length = 0
+    for (const d of HOSTILE) await noGuard.fetchHomeHtml(d, fakeFetch)
+    check('MUTATION CONTROL: admission skipped → internal hosts are requested (so E13 would fail)', asked.length > 0, asked.join(', '))
+    const publicDb = new FakeAdmin({ projects: [{ id: PROJECT, user_id: USER, target_domain: 'www.shop-il.co.il' }], project_article_styles: [] })
+    const read15 = await readSiteSignals({ ...mkDeps(publicDb), fetchHome: (d) => fetchHomeHtml(d, fakeFetch) }, PROJECT)
+    check('E15: readSiteSignals over the admitted reader still reads a public site', read15.ok)
+    const internalDb = new FakeAdmin({ projects: [{ id: PROJECT, user_id: USER, target_domain: '127.0.0.1' }], project_article_styles: [] })
+    asked.length = 0
+    const internal = await readSiteSignals({ ...mkDeps(internalDb), fetchHome: (d) => fetchHomeHtml(d, fakeFetch) }, PROJECT)
+    check('E16: a project whose domain is internal answers the fixed code (site_unreachable), nothing fetched', !internal.ok && internal.code === 'site_unreachable' && asked.length === 0)
+    const actions = strip(read('app/(dashboard)/settings/article-style-actions.ts'))
+    const wired = (src: string) => /fetchHome:\s*\(domain\)\s*=>\s*fetchHomeHtml\(domain\)/.test(src) && !/fetchSiteHtml|new URL\(/.test(src)
+    check('E17: the live action reads the home page only through fetchHomeHtml', wired(actions))
+    check('MUTATION CONTROL: the old direct fetch back in the action → caught', !wired(actions.replace('fetchHome: (domain) => fetchHomeHtml(domain),', 'fetchHome: async (domain) => { const page = await fetchSiteHtml(new URL(`https://${domain}/`)); return page.ok ? page.html : null },')))
   }
 
   // ── F) publishing ─────────────────────────────────────────────────────────

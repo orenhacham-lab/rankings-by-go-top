@@ -21,7 +21,7 @@ import {
 } from '@/lib/content/article-style/data'
 import type { DesignPlatform } from '@/lib/content/article-style/types'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
-import { fetchSiteHtml } from '@/lib/free-check/site-fetch'
+import { fetchHomeHtml } from '@/lib/content/article-style/site-home'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -39,17 +39,8 @@ function liveDeps(): ArticleStyleDeps {
       if (r.platform === 'wordpress' || r.platform === 'wix' || r.platform === 'webhook') return r.platform
       return 'none'
     },
-    fetchHome: async (domain) => {
-      const host = domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '')
-      let url: URL
-      try {
-        url = new URL(`https://${host}/`)
-      } catch {
-        return null
-      }
-      const page = await fetchSiteHtml(url)
-      return page.ok ? page.html : null
-    },
+    // The URL admission runs before the first request (site-home.ts).
+    fetchHome: (domain) => fetchHomeHtml(domain),
   }
 }
 
