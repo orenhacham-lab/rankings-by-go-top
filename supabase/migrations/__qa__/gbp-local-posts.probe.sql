@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20260929000000_gbp_local_posts.sql
+-- EXECUTED PROBE — 20260929020000_gbp_local_posts.sql
 --
 -- Applies the migration file (via \i, twice, for idempotency) to a disposable
 -- PostgreSQL cluster that carries Supabase's roles, its default grants (every
@@ -16,13 +16,15 @@
 --               isolation check holds again.
 --
 -- Then the constraints (1,500 characters, button types, the URL rules, https,
--- encrypted token shape, error-code shape, published-needs-an-id) and cascades.
+-- encrypted token shape, error-code shape, published-needs-an-id) and cascades,
+-- including deleting the auth user (with a mutation control that drops the FK).
 -- NOT run against Supabase or Production; every row is fabricated here.
 -- Run:  bash scripts/qa/pg-probe.sh supabase/migrations/__qa__/gbp-local-posts.probe.sql
 -- ============================================================================
 \set QUIET on
 CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;
 CREATE SCHEMA auth;
+CREATE TABLE auth.users (id uuid PRIMARY KEY);
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
   $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
@@ -48,6 +50,10 @@ CREATE POLICY projects_isolation_policy ON public.projects FOR ALL TO authentica
   USING (is_admin(auth.uid()) OR user_id = auth.uid()) WITH CHECK (is_admin(auth.uid()) OR user_id = auth.uid());
 
 -- Fixture: owner V, other user A, admin M.
+INSERT INTO auth.users (id) VALUES
+  ('11111111-1111-1111-1111-111111111111'),
+  ('22222222-2222-2222-2222-222222222222'),
+  ('33333333-3333-3333-3333-333333333333');
 INSERT INTO public.profiles (id, role) VALUES
   ('11111111-1111-1111-1111-111111111111', 'user'),
   ('22222222-2222-2222-2222-222222222222', 'user'),
@@ -59,8 +65,8 @@ INSERT INTO public.projects VALUES
 INSERT INTO public.generated_articles (id, user_id, project_id, title) VALUES
   ('c1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'article');
 
-\i supabase/migrations/20260929000000_gbp_local_posts.sql
-\i supabase/migrations/20260929000000_gbp_local_posts.sql
+\i supabase/migrations/20260929020000_gbp_local_posts.sql
+\i supabase/migrations/20260929020000_gbp_local_posts.sql
 
 SET ROLE service_role;
 INSERT INTO public.gbp_connections (id, user_id, encrypted_refresh_token, granted_scope) VALUES
@@ -184,7 +190,7 @@ SELECT run_checks('mutated');
 
 -- RESTORE: the migration (plus dropping the planted extra policy, which it does not know about).
 DROP POLICY gbp_oauth_states_leak ON public.gbp_oauth_states;
-\i supabase/migrations/20260929000000_gbp_local_posts.sql
+\i supabase/migrations/20260929020000_gbp_local_posts.sql
 SELECT run_checks('restored');
 
 -- Constraints (service_role is the only writer).
@@ -251,6 +257,47 @@ BEGIN
   PERFORM chk('cascade', 'other users'' rows are untouched',
     (SELECT count(*) FROM public.gbp_posts WHERE project_id = 'a2222222-2222-2222-2222-222222222222') = 1
     AND (SELECT count(*) FROM public.project_gbp_locations WHERE project_id = 'a2222222-2222-2222-2222-222222222222') = 1);
+END $$;
+
+-- Deleting the account removes the user's Google rows: a deleted user's encrypted
+-- refresh token must not survive (every table's user_id references auth.users).
+DO $$
+DECLARE
+  A constant uuid := '22222222-2222-2222-2222-222222222222';
+  survived boolean;
+  drop_fk text;
+BEGIN
+  PERFORM chk('cascade', 'every GBP table''s user_id references auth.users ON DELETE CASCADE',
+    (SELECT count(DISTINCT c.conrelid) FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey) AND a.attname = 'user_id'
+      WHERE c.contype = 'f' AND c.confrelid = 'auth.users'::regclass AND c.confdeltype = 'c'
+        AND c.conrelid IN ('public.gbp_connections'::regclass, 'public.gbp_oauth_states'::regclass,
+                           'public.project_gbp_locations'::regclass, 'public.gbp_posts'::regclass)) = 4);
+  INSERT INTO public.gbp_oauth_states (state_hash, user_id, project_id, code_verifier_encrypted, expires_at)
+    VALUES (repeat('c', 64), A, 'a2222222-2222-2222-2222-222222222222', 'v1:04:05:06', now() + interval '10 minutes');
+
+  -- MUTATION CONTROL: without the foreign key, the deleted user's token row survives.
+  BEGIN
+    SELECT string_agg(format('ALTER TABLE %s DROP CONSTRAINT %I', c.conrelid::regclass, c.conname), '; ') INTO drop_fk
+      FROM pg_constraint c WHERE c.contype = 'f' AND c.confrelid = 'auth.users'::regclass
+       AND c.conrelid = 'public.gbp_connections'::regclass;
+    IF drop_fk IS NOT NULL THEN EXECUTE drop_fk; END IF;
+    DELETE FROM auth.users WHERE id = A;
+    survived := EXISTS (SELECT 1 FROM public.gbp_connections WHERE user_id = A);
+    RAISE EXCEPTION 'undo_mutation';  -- rolls the drop and the delete back
+  EXCEPTION WHEN raise_exception THEN NULL;
+  END;
+  PERFORM chk('cascade', 'MUTATION CONTROL: without the foreign key the deleted user''s token row survives', survived);
+
+  DELETE FROM auth.users WHERE id = A;
+  PERFORM chk('cascade', 'deleting the auth user removes their connection (encrypted token) row',
+    NOT EXISTS (SELECT 1 FROM public.gbp_connections WHERE user_id = A));
+  PERFORM chk('cascade', 'deleting the auth user removes their locations, posts and OAuth states',
+    NOT EXISTS (SELECT 1 FROM public.project_gbp_locations WHERE user_id = A)
+    AND NOT EXISTS (SELECT 1 FROM public.gbp_posts WHERE user_id = A)
+    AND NOT EXISTS (SELECT 1 FROM public.gbp_oauth_states WHERE user_id = A));
+  PERFORM chk('cascade', 'the other user''s project and article rows are untouched',
+    EXISTS (SELECT 1 FROM public.projects WHERE id = 'a2222222-2222-2222-2222-222222222222'));
 END $$;
 
 \set QUIET off

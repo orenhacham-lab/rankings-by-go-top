@@ -16,6 +16,9 @@
 --   gbp_posts              every post: text (<= 1,500 characters), button, image,
 --                          when to publish, and Google's answer as a stable code.
 --
+-- ACCOUNT DELETION. Every table's user_id references auth.users ON DELETE CASCADE,
+-- so deleting a user removes their encrypted refresh token and every GBP row.
+--
 -- ACCESS. Written ONLY by service-role server code, after the route proves the
 -- caller owns the project. The owner may SELECT their own rows (the connection
 -- without its token). anon has nothing. Pattern: 20260928000100_site_platform_connections.sql.
@@ -34,7 +37,7 @@ BEGIN;
 -- ── gbp_connections ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gbp_connections (
   id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id                  uuid NOT NULL,
+  user_id                  uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   encrypted_refresh_token  text NOT NULL,
   encryption_version       integer NOT NULL DEFAULT 1,
   granted_scope            text,
@@ -62,7 +65,7 @@ CREATE POLICY gbp_connections_owner_select ON public.gbp_connections
 -- ── gbp_oauth_states ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gbp_oauth_states (
   state_hash               text PRIMARY KEY,
-  user_id                  uuid NOT NULL,
+  user_id                  uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   project_id               uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   code_verifier_encrypted  text NOT NULL,
   created_at               timestamptz NOT NULL DEFAULT now(),
@@ -81,7 +84,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.gbp_oauth_states TO service
 -- ── project_gbp_locations ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.project_gbp_locations (
   project_id       uuid PRIMARY KEY REFERENCES public.projects(id) ON DELETE CASCADE,
-  user_id          uuid NOT NULL,
+  user_id          uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   connection_id    uuid NOT NULL REFERENCES public.gbp_connections(id) ON DELETE CASCADE,
   account_name     text NOT NULL,
   location_name    text NOT NULL,
@@ -112,7 +115,7 @@ CREATE POLICY project_gbp_locations_owner_select ON public.project_gbp_locations
 CREATE TABLE IF NOT EXISTS public.gbp_posts (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id         uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
-  user_id            uuid NOT NULL,
+  user_id            uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   source_article_id  uuid REFERENCES public.generated_articles(id) ON DELETE SET NULL,
   summary            text NOT NULL,
   cta_type           text,
