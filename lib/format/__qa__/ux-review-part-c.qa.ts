@@ -209,7 +209,7 @@ console.log('axe: names for selects and checkboxes; tokens, not raw palette colo
     (raw) => raw.replace("aria-label={t('filter_cited')}", '').replace("aria-label={t('filter_citation')}", ''))
   guard('AI visibility: no slate-400 text (2.6:1 on white)', 'components/ai-visibility/AIVisibilitySection.tsx',
     (s) => !/text-slate-400/.test(s),
-    (raw) => raw.replace('className="cursor-help text-action', 'className="cursor-help text-slate-400'))
+    (raw) => raw.replace('className="text-caption text-muted"', 'className="text-caption text-slate-400"'))
   const RAW = /\b(?:text|bg|border|ring|divide|from|to|via|accent|fill|stroke)-(?:slate|gray|zinc|neutral|blue|indigo|purple|green|red|amber|yellow)-\d{2,3}\b/
   for (const f of [
     'components/keywords/TrackingTargetsTable.tsx', 'components/content/workspace/ArticlesScreen.tsx',

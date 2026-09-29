@@ -206,6 +206,9 @@ export default function PromptSuggestions({
         loadModalRecommendationPool({ allowGenerate: true })
       })
     }
+    // Re-run only when the modal opens or its inputs change; the two loaders
+    // are plain functions recreated every render, so listing them would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectId, language, country, businessName, domain, city, keywords, manualProfile, category])
 
   // Normalize prompt text for dedup comparison — must match the generator's
