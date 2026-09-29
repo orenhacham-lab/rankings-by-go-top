@@ -553,7 +553,7 @@ export async function postToGoTopPlugin(
   body: string,
   opts: { headers?: Record<string, string>; creds?: WordPressCredentials },
 ): Promise<{ status: number; body: string }> {
-  if (!/^\/[a-z-]{2,20}$/.test(route)) throw new WordPressClientError('Invalid plugin route.')
+  if (!/^\/[a-z-]{2,20}$/.test(route)) throw new Error('postToGoTopPlugin: route must be a fixed /gotop/v1 path') // a programming error, never shown
   const origin = await assertSafeSiteUrl(siteUrl)
   const target = new URL(`${origin}/wp-json/gotop/v1${route}`)
   const auth = opts.creds ? buildAuthHeader(opts.creds) : null
