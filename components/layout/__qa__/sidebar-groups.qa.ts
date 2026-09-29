@@ -180,7 +180,7 @@ function main() {
     && (sidebar.match(/<NavLink\b/g) ?? []).length === 1
   check('the rail and the drawer render the shared NavGroups (and it the shared NavLink)', sharedGroups(src))
   check('MUT: a drawer with its own flat tile list fails that check',
-    !sharedGroups(src.replace(/<NavGroups dict=\{dict\} activeHref=\{activeHref\} isAdmin=\{isAdmin\} \/>/, '<ul>{navItemKeys.map((item) => <NavLink key={item.href} item={item} isActive={false} label="" />)}</ul>')))
+    !sharedGroups(src.replace(/<NavGroups dict=\{dict\} activeHref=\{activeHref\} isAdmin=\{isAdmin\} counts=\{counts\} \/>/, '<ul>{navItemKeys.map((item) => <NavLink key={item.href} item={item} isActive={false} label="" />)}</ul>')))
 
   // ── The content screens are entries of their own, derived from one list ───
   const iResearch = src.indexOf(`groupKey: 'groupResearch'`)

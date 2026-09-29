@@ -10,6 +10,9 @@ import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
+import { useWaiting } from '@/components/nudges/useWaiting'
+import { pillText, railCounts } from '@/lib/nudges/rows'
 import { NAV_DRAWER_EVENT, type NavDrawerRequest } from '@/lib/shell/nav-drawer'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -34,6 +37,8 @@ import {
   MapPinned,
 } from 'lucide-react'
 import {
+  CONTENT_ROOT_PATH,
+  CONTENT_STRATEGY_PATH,
   CONTENT_SCREENS,
   isContentScreenEnabled,
   type ContentScreenKey,
@@ -218,7 +223,7 @@ const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visibl
  * drawer, the entry carries the fill itself. Inactive entries: muted icon, text
  * white at 86%.
  */
-function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; label: string }) {
+function NavLink({ item, isActive, label, count = 0, countLabel }: { item: NavItem; isActive: boolean; label: string; count?: number; countLabel?: string }) {
   const IconComponent = item.icon
   return (
     <Link
@@ -243,15 +248,30 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
         )}
       />
       <span className="min-w-0 truncate">{label}</span>
+      {count > 0 && (
+        // What waits on this screen: hidden at 0 (lib/nudges/rows.ts), read by a screen reader as its own words.
+        <span
+          data-nav-count={count}
+          aria-label={countLabel}
+          className={cn(
+            'ms-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-pill bg-rail-ink px-1.5 text-overline font-semibold tabular-nums',
+            isActive ? 'text-rail-active' : 'text-rail'
+          )}
+        >
+          {pillText(count)}
+        </span>
+      )}
     </Link>
   )
 }
 
 /** The groups under their headings: the same list for the rail and the drawer. */
-function NavGroups({ dict, activeHref, isAdmin }: {
+function NavGroups({ dict, activeHref, isAdmin, counts }: {
   dict: ReturnType<typeof getDashboardDictionary>
   activeHref: string | null
   isAdmin: boolean
+  /** How many things wait on each entry's screen, by href; absent or 0 draws nothing. */
+  counts: Readonly<Record<string, number>>
 }) {
   const groups: { key: SidebarLabelKey; items: readonly NavItem[] }[] = [
     ...navGroupKeys.map((g) => ({ key: g.groupKey, items: g.items })),
@@ -268,7 +288,7 @@ function NavGroups({ dict, activeHref, isAdmin }: {
             <ul className="space-y-0.5">
               {group.items.map((item) => (
                 <li key={item.href}>
-                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
+                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} count={counts[item.href] ?? 0} countLabel={dict.railWaiting.aria(counts[item.href] ?? 0)} />
                 </li>
               ))}
             </ul>
@@ -349,6 +369,17 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const activeHref = activeNavHref(pathname, isAdmin ? [...navItemKeys, ...adminItemKeys] : navItemKeys)
+
+  // Count pills: what waits for the owner of the active project (the dashboard card's own
+  // read, so the two agree). Asked again when the screen changes; a failure draws nothing.
+  const { activeProjectId } = useActiveProject()
+  const { waiting, safeFixes } = useWaiting(activeProjectId, pathname)
+  const rail = railCounts(waiting, safeFixes)
+  const counts: Record<string, number> = {
+    [CONTENT_ROOT_PATH]: rail.articles,
+    [CONTENT_STRATEGY_PATH]: rail.strategy,
+    '/site-health': rail.siteHealth,
+  }
 
   // Phones: the nav is a drawer behind one button. It is open AT a pathname:
   // navigating anywhere closes it without an effect, because the pathname it was
@@ -479,7 +510,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               </div>
               <nav aria-label={dict.sidebar.navLabel} className="flex-1 overflow-y-auto px-3 py-4">
                 <div className="space-y-5">
-                  <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} />
+                  <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
                 </div>
               </nav>
               <div className="shrink-0 border-t border-rail-line px-3 py-3">
@@ -500,7 +531,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               {/* A lit edge on the pill's start side, so the active entry reads at a glance. */}
               <span className="absolute inset-y-2 start-0 w-[3px] rounded-pill bg-rail-tagline" />
             </span>
-            <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} />
+            <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
           </div>
         </nav>
 

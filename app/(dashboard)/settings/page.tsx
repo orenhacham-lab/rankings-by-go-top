@@ -38,6 +38,7 @@ import DangerZone from '@/components/settings/DangerZone'
 import Notice from '@/components/settings/Notice'
 import ProfileCard from '@/components/settings/ProfileCard'
 import WeeklyEmailCard from '@/components/reports/monthly/WeeklyEmailCard'
+import ReminderEmailsCard from '@/components/reminders/ReminderEmailsCard'
 import ScanBand from '@/components/settings/ScanBand'
 import SettingsIndex from '@/components/settings/SettingsIndex'
 import SettingsSkeleton from '@/components/settings/SettingsSkeleton'
@@ -315,6 +316,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
 
             {/* Monthly report: the weekly-email switch (off by default; nothing sends yet). */}
             <WeeklyEmailCard projectId={project.id} language={language} />
+            <ReminderEmailsCard projectId={project.id} language={language} />
 
             <DangerZone project={project} deleteLabels={dict.projects.deleteDialog} t={t} />
           </div>

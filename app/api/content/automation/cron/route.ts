@@ -23,6 +23,11 @@
  * (lib/seed-scan/resume.ts). That part is isolated: its own try/catch and its
  * own deadline inside what is left of maxDuration, and it never throws, so it
  * cannot change, delay or fail the runner's result.
+ *
+ * LAST, THE REMINDER EMAIL. After both, the "articles are waiting for your OK" reminder
+ * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
+ * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
+ * or fail anything above.
  */
 
 import { after } from 'next/server'
@@ -31,6 +36,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { runAutomation } from '@/lib/content/automation/runner'
 import { authorizeCronRequest } from '@/lib/auth/cron'
 import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/resume'
+import { runIsolatedReminders } from '@/lib/reminders/isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -61,6 +67,9 @@ async function handle(request: Request): Promise<Response> {
       (deadlineAt) => resumeStalledSeedRuns(createAdminClient(), { env: process.env, deadlineAt }),
       { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
     )
+    // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
+    // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
+    await runIsolatedReminders()
   })
   return Response.json({ ok: true, accepted: true, startedAt }, { status: 202 })
 }
