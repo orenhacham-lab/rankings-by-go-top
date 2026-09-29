@@ -1,12 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Accessibility | Rankings by Go Top',
-  description: 'Accessibility statement for Rankings by Go Top',
+  title: 'Accessibility | GO TOP',
+  description: 'Accessibility statement for GO TOP',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'Accessibility | Rankings by Go Top',
-    description: 'Accessibility statement for Rankings by Go Top',
+    title: 'Accessibility | GO TOP',
+    description: 'Accessibility statement for GO TOP',
     url: 'https://www.gotopseo.com/en/accessibility',
     locale: 'en_US',
   },
@@ -18,12 +18,12 @@ export default function EnglishAccessibilityPage() {
       locale="en"
       breadcrumbs={[{ label: 'Accessibility', href: '/en/accessibility' }]}
       title="Accessibility"
-      subtitle="Accessibility statement for Rankings by Go Top"
+      subtitle="Accessibility statement for GO TOP"
     >
       <section>
         <h2>Our Accessibility Commitment</h2>
         <p>
-          At Rankings by Go Top, we are committed to making our platform accessible to everyone, including people with
+          At GO TOP, we are committed to making our platform accessible to everyone, including people with
           disabilities. We strive to meet high standards of digital accessibility and to continuously improve.
         </p>
       </section>
@@ -42,9 +42,13 @@ export default function EnglishAccessibilityPage() {
           <li>Full screen reader support</li>
           <li>Keyboard-only navigation</li>
           <li>Descriptive labels for form fields</li>
-          <li>Sufficient color contrast for readable text</li>
+          <li>Level AA color contrast for text and interface components, in the platform&rsquo;s new design</li>
           <li>Large text sizes and adequate time for orientation</li>
-          <li>Smooth, non-disruptive transitions</li>
+          <li>Clear focus indication for keyboard navigation, and an accessibility menu on the site for adjusting text size, contrast and more</li>
+          <li>Support for the operating system&rsquo;s &ldquo;reduce motion&rdquo; preference (prefers-reduced-motion): animations and
+          transitions are reduced or removed for people who ask for it</li>
+          <li>Full support for Hebrew (right-to-left, RTL) and English (left-to-right, LTR), including text
+          direction, layout and navigation</li>
         </ul>
       </section>
 
@@ -105,7 +109,7 @@ export default function EnglishAccessibilityPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This page was last updated in May 2026
+          This page was last updated on September 29, 2026
         </p>
       </section>
     </LegalDoc>

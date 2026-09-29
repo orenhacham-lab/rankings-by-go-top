@@ -38,9 +38,9 @@ type Lang = 'en' | 'he'
 /** The Limited Use statement, as Google words it. */
 function limitedUseOk(text: string, lang: Lang): boolean {
   if (lang === 'en') {
-    return /Rankings by Go Top’s use and transfer of information received from Google APIs to any other app will adhere to the\s*Google API Services User Data Policy\s*, including the Limited Use requirements/.test(text)
+    return /GO TOP’s use and transfer of information received from Google APIs to any other app will adhere to the\s*Google API Services User Data Policy\s*, including the Limited Use requirements/.test(text)
   }
-  return /השימוש של Rankings by Go Top במידע שמתקבל מממשקי ה-API של Google, והעברתו לכל אפליקציה אחרת, יעמדו במדיניות\s*Google API Services User Data Policy\s*, כולל דרישות ה-Limited Use/.test(text)
+  return /השימוש של GO TOP במידע שמתקבל מממשקי ה-API של Google, והעברתו לכל אפליקציה אחרת, יעמדו במדיניות\s*Google API Services User Data Policy\s*, כולל דרישות ה-Limited Use/.test(text)
 }
 
 /** The Google data section: its heading, both scopes, what is read, and the commitments. */

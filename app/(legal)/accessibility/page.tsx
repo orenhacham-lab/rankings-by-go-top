@@ -1,8 +1,8 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'נגישות | Rankings by Go Top',
-  description: 'מידע על נגישות באתר Rankings by Go Top',
+  title: 'נגישות | GO TOP',
+  description: 'מידע על נגישות באתר GO TOP',
   robots: 'noindex, nofollow',
 }
 
@@ -12,12 +12,12 @@ export default function AccessibilityPage() {
       locale="he"
       breadcrumbs={[{ label: 'נגישות', href: '/accessibility' }]}
       title="נגישות"
-      subtitle="עמוד נגישות של Rankings by Go Top"
+      subtitle="עמוד נגישות של GO TOP"
     >
       <section>
         <h2>התחייבותנו לנגישות</h2>
         <p>
-          ב-Rankings by Go Top, אנו מחויבים להנגיש את המערכת שלנו לכולם, כולל אנשים עם מוגבלויות. אנו משתדלים לעמוד בתקנים גבוהים של נגישות דיגיטלית ולהמשיך להשתפר.
+          ב-GO TOP, אנו מחויבים להנגיש את המערכת שלנו לכולם, כולל אנשים עם מוגבלויות. אנו משתדלים לעמוד בתקנים גבוהים של נגישות דיגיטלית ולהמשיך להשתפר.
         </p>
       </section>
 
@@ -34,9 +34,13 @@ export default function AccessibilityPage() {
           <li>תמיכה מלאה בקורא מסך (Screen Reader)</li>
           <li>ניווט באמצעות לוח המקלדת בלבד</li>
           <li>תוויות תיאוריות למכשירים טפטופיים (form fields)</li>
-          <li>ניגודיות צבעים מספקת לקריאה טובה</li>
+          <li>ניגודיות צבעים בדרגה AA לטקסט ולרכיבי הממשק, בעיצוב החדש של האתר והמערכת</li>
           <li>גדלים גדולים של טקסט וזמן מספיק להתמצאות</li>
-          <li>מעברים שכן משבשים ונגישים</li>
+          <li>סימון פוקוס ברור בניווט במקלדת, ותפריט נגישות באתר להתאמת גודל הטקסט, הניגודיות ועוד</li>
+          <li>תמיכה בהעדפת &ldquo;הפחתת תנועה&rdquo; (prefers-reduced-motion) של מערכת ההפעלה: אנימציות ומעברים
+          מופחתים או מבוטלים למי שביקש זאת</li>
+          <li>תמיכה מלאה בעברית (כיוון מימין לשמאל, RTL) ובאנגלית (משמאל לימין, LTR), כולל כיוון הטקסט, הפריסה
+          והניווט</li>
         </ul>
       </section>
 
@@ -100,7 +104,7 @@ export default function AccessibilityPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          עמוד זה עודכן לאחרונה באפריל 2026
+          עמוד זה עודכן לאחרונה ב-29 בספטמבר 2026
         </p>
       </section>
     </LegalDoc>
