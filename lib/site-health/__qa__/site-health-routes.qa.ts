@@ -281,8 +281,21 @@ async function main() {
       return /\.tsx?$/.test(n) && /approved:\s*true/.test(strip(read(rel))) ? [rel] : []
     })
     const found = [...senders('components'), ...senders('app')]
-    const SENDERS = ['components/site-health/ApproveFixModal.tsx', 'components/site-health/FixPreviewModal.tsx']
-    check('P8: only the two approval modals (their approve and undo buttons) send approved: true', JSON.stringify([...found].sort()) === JSON.stringify(SENDERS), found.join(', '))
+    // w8: "Fix {n} safe items for me" (useSafeFixes) approves too, only after its own confirmation (P12).
+    const SENDERS = ['components/site-health/ApproveFixModal.tsx', 'components/site-health/FixPreviewModal.tsx', 'components/site-health/useSafeFixes.tsx']
+    check('P8: only the two approval modals and the confirmed safe batch send approved: true', JSON.stringify([...found].sort()) === JSON.stringify(SENDERS), found.join(', '))
+    const safe = strip(read('components/site-health/useSafeFixes.tsx'))
+    const afterConfirm = (src: string) => {
+      const asked = src.indexOf('await confirm(')
+      const gate = src.indexOf("if (!ok) { setPhase({ kind: 'idle' }); return }")
+      const sent = src.indexOf('approved: true')
+      return (src.match(/approved:\s*true/g) ?? []).length === 1 && asked >= 0 && gate > asked && sent > gate && /bulk: \{ batch \}/.test(src.slice(sent, sent + 400))
+    }
+    check('P12: the safe batch sends approved: true once, only after its confirmation says yes, and always as a bulk (batch) approval', afterConfirm(safe))
+    const eagerSafe = safe.replace("action: 'preview', type: row.type", "action: 'preview', approved: true, type: row.type")
+    check('MUTATION CONTROL: a safe batch that approves while it prepares is caught by P12', eagerSafe !== safe && !afterConfirm(eagerSafe))
+    const unbatched = safe.replace('bulk: { batch },', '')
+    check('MUTATION CONTROL: a safe batch that approves without the bulk checks is caught by P12', unbatched !== safe && !afterConfirm(unbatched))
     const modal = strip(read('components/site-health/FixPreviewModal.tsx'))
     const count = (modal.match(/approved:\s*true/g) ?? []).length
     const inApprove = modal.slice(modal.indexOf('const approve = useCallback'), modal.indexOf('const undo = useCallback'))

@@ -146,11 +146,20 @@ async function main() {
     const long = RULES.suggestTitle({ kind: 'title_long', current: 'Handmade leather boots for hiking and everyday wear in all seasons | Boot Shop Ltd', h1: null, siteName: 'Boot Shop', path: '/boots' })
     check('C1: a long title loses its "| site" suffix and fits 60 characters, whole words', long === 'Handmade leather boots for hiking and everyday wear in all' || (long.length <= 60 && !long.includes('|') && !/\s$/.test(long)), long)
     const short = RULES.suggestTitle({ kind: 'title_short', current: 'Boots', h1: 'Leather hiking boots', siteName: 'Boot Shop', path: '/boots' })
-    check('C2: a short title gets the page heading added', short === 'Boots | Leather hiking boots', short)
-    const missing = RULES.suggestTitle({ kind: 'title_missing', current: null, h1: 'Leather hiking boots', siteName: 'Boot Shop', path: '/boots' })
-    check('C3: a missing title becomes the page heading', missing === 'Leather hiking boots')
+    // w8 (owner): a "too short" fix must be longer, 50–60 characters with the page's main keyword, and
+    // never the current title; when the page's own words cannot make one, no automatic title (''),
+    // the model (lib/site-fix/suggest.ts) or the merchant writes it.
+    check('C2: a short title the page\'s words cannot lengthen to 50–60 gets no automatic title (never "Boots" again)', short === '', short)
+    const longer = RULES.suggestTitle({ kind: 'title_short', current: 'Boots', h1: 'Handmade leather hiking boots for every season', siteName: 'Boot Shop', path: '/boots' })
+    check('C2b: a short title becomes 50–60 characters with the main heading in it', longer === 'Handmade leather hiking boots for every season | Boot Shop', longer)
+    const missing = RULES.suggestTitle({ kind: 'title_missing', current: null, h1: 'Handmade leather hiking boots for every season', siteName: 'Boot Shop', path: '/boots' })
+    check('C3: a missing title is built from the page heading, 50–60 characters', missing === 'Handmade leather hiking boots for every season | Boot Shop', missing)
     const desc = RULES.suggestDescription(null, 'Our boots are handmade in Tel Aviv from full-grain leather. Each pair is resoled for free for two years. Order online and we ship in two days. More text that should not fit in the description at all because it is long.')
-    check('C4: a description is whole sentences from the page, 70–155 characters', !!desc && desc.length >= 70 && desc.length <= 155 && /\.$/.test(desc), desc ?? 'null')
+    // w8 (owner): descriptions are 120–140 characters; whole sentences when a run of them fits, else cut at a word.
+    check('C4: a description from the page is 120–140 characters', !!desc && desc.length >= 120 && desc.length <= 140 && desc.startsWith('Our boots are handmade'), desc ?? 'null')
+    const whole = RULES.suggestDescription(null, 'Our boots are handmade in Tel Aviv from full-grain leather by a small team. Each pair is resoled for free for two full years after you buy it. Order online and we ship in two days. More text that should not fit.')
+    check('C4b: …as whole sentences when a run of them fits 120–140', !!whole && whole.length >= 120 && whole.length <= 140 && /\.$/.test(whole), whole ?? 'null')
+    check('C4c: the suggestion is never the current description', RULES.suggestDescription(whole, 'Our boots are handmade in Tel Aviv from full-grain leather by a small team. Each pair is resoled for free for two full years after you buy it. Order online and we ship in two days. More text that should not fit.') !== whole)
     check('C5: too little text: no invented description (the merchant writes it)', RULES.suggestDescription(null, 'Hi there.') === null)
     check('C6: alt text from a meaningful file name', RULES.suggestAlt('https://x/wp-content/uploads/2024/05/red-running-shoes-1024x768.jpg', 'Page') === 'red running shoes')
     check('C7: a camera file name falls back to the page title', RULES.suggestAlt('https://x/uploads/IMG_4032.JPG', 'Summer sale') === 'Summer sale')
@@ -217,7 +226,7 @@ async function main() {
       ...Array.from({ length: 60 }, (_, i) => ({ url: `${SITE}/p${i}`, kind: 'page' as const, adminUrl: null })),
     ]
     const out = await S.scanSite({ siteUrl: SITE, candidates }, deps)
-    const pagesRead = calls.filter((c) => !/robots\.txt|sitemap/.test(c)).length
+    const pagesRead = calls.filter((c) => !/robots\.txt|sitemap|llms\.txt/.test(c)).length
     return {
       D1: calls[0] === `${SITE}/robots.txt`,
       D2: !calls.some((c) => c.includes('/private')),
@@ -227,6 +236,7 @@ async function main() {
       D6: out.ok && out.site.brokenLinks.some((b) => b.url.endsWith('/gone')),
       D7: out.ok && out.site.sitemapFound === false,
       D8: pagesRead <= S.MAX_PAGES + S.MAX_LINK_CHECKS,
+      D10: calls.filter((c) => c.endsWith('/llms.txt')).length <= 1 && out.ok && out.site.llmsFound === false,
       detail: `requests=${calls.length}, pages and links=${pagesRead}`,
     }
   }
@@ -239,7 +249,8 @@ async function main() {
     check('D5: a noindex page is found', r.D5)
     check('D6: a same-site link answering 404 is a broken link', r.D6)
     check('D7: no sitemap anywhere: sitemapFound is false', r.D7)
-    check('D8: total requests stay within MAX_PAGES + MAX_LINK_CHECKS (+ robots and sitemap)', r.D8, r.detail)
+    check('D8: total requests stay within MAX_PAGES + MAX_LINK_CHECKS (+ robots, sitemap and llms.txt)', r.D8, r.detail)
+    check('D10: llms.txt is read once, and a 404 reads as "no llms.txt"', r.D10, r.detail)
     const { deps, calls } = fakeSite({ '/robots.txt': { status: 503, body: '' }, '/': { status: 200, body: html('Home') } })
     const out = await SCAN.scanSite({ siteUrl: SITE, candidates: [] }, deps)
     check('D9: robots.txt unreadable (503): nothing else is read', out.ok && out.pages.length === 0 && calls.length === 1)

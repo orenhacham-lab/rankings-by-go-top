@@ -1,11 +1,13 @@
 <?php
 /**
- * The four changes that touch a page's own content, as plain string functions (no WordPress
+ * The five changes that touch a page's own content, as plain string functions (no WordPress
  * calls, so they are tested alone). None of them removes a word the merchant wrote:
  *   - alt text is added only to <img> tags that have none (or an empty one);
  *   - the FAQ block is appended after the last block;
  *   - a broken link gets a new address, or loses the link and keeps its words;
- *   - an internal link wraps words that are already there; nothing is added to the text.
+ *   - an internal link wraps words that are already there; nothing is added to the text;
+ *   - (2.1.0) an extra main heading (<h1>) becomes a subheading (<h2>): the tag's name and the
+ *     heading block's level change, its attributes and every word stay exactly as they were.
  */
 
 if (!defined('ABSPATH')) { exit; }
@@ -152,4 +154,94 @@ function gotop_seo_bridge_add_internal_link($content, $target, $anchor) {
         }
     }
     return null;
+}
+
+// ── 2.1.0: extra main headings become subheadings ───────────────────────────
+
+/** The words of an HTML fragment: comments and tags out, entities decoded, whitespace collapsed. */
+function gotop_seo_bridge_words($html) {
+    $t = preg_replace('/<!--.*?-->/s', ' ', (string) $html);
+    $t = preg_replace('/<[^>]*>/', ' ', $t);
+    $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $t = str_replace("\xC2\xA0", ' ', $t);
+    return trim(preg_replace('/\s+/u', ' ', $t));
+}
+
+/**
+ * The <h1> elements of a post's content, in order: array of array(offset, length, open tag, inner).
+ * null when the markup is not simple enough to be sure of (an <h1> without its end, or one inside
+ * another): then nothing is changed.
+ */
+function gotop_seo_bridge_h1_list($content) {
+    $opens = preg_match_all('/<h1\b/i', $content);
+    if (!preg_match_all('/<h1\b([^>]*)>(.*?)<\/h1\s*>/is', $content, $m, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
+        return $opens ? null : array();
+    }
+    if (count($m) !== $opens) { return null; }
+    $out = array();
+    foreach ($m as $one) {
+        if (preg_match('/<h1\b/i', $one[2][0])) { return null; }
+        $out[] = array('at' => $one[0][1], 'len' => strlen($one[0][0]), 'attrs' => $one[1][0], 'inner' => $one[2][0]);
+    }
+    return $out;
+}
+
+/**
+ * Demote the listed <h1> elements ($headings: array of array(n => place among the content's h1s,
+ * text => its words)) to <h2>. A heading block's comment right before the tag gets "level":2.
+ * Returns array('ok' => true, 'content' => the new content), or array('ok' => false, 'code' => ...):
+ * 'changed_since_preview' when a heading is no longer there with those words, 'no_safe_place' when
+ * the markup is not simple, 'value_invalid' when the words of the page would change (they never
+ * should: this is checked, not assumed). (Never a bare string: a content and a code must not be
+ * mistaken for each other.)
+ */
+function gotop_seo_bridge_demote_h1s($content, $headings) {
+    $list = gotop_seo_bridge_h1_list($content);
+    if ($list === null) { return array('ok' => false, 'code' => 'no_safe_place'); }
+    $want = array();
+    foreach ($headings as $h) {
+        if (!isset($list[$h['n']])) { return array('ok' => false, 'code' => 'changed_since_preview'); }
+        if (gotop_seo_bridge_words($list[$h['n']]['inner']) !== gotop_seo_bridge_plain($h['text'])) { return array('ok' => false, 'code' => 'changed_since_preview'); }
+        $want[$h['n']] = true;
+    }
+    // At least one main heading always stays in the content or the theme: never demote them all
+    // unless the app said so for each (it checked the live page has a heading of its own).
+    $out = $content;
+    // From the last to the first, so the earlier offsets stay right.
+    for ($i = count($list) - 1; $i >= 0; $i--) {
+        if (empty($want[$i])) { continue; }
+        $el = $list[$i];
+        $replacement = '<h2' . $el['attrs'] . '>' . $el['inner'] . '</h2>';
+        $before = substr($out, 0, $el['at']);
+        $after = substr($out, $el['at'] + $el['len']);
+        // The heading block's own comment, when it sits right before the tag.
+        if (preg_match('/<!--\s*wp:heading\s*(\{[^}]*\})?\s*-->\s*$/', $before, $bm, PREG_OFFSET_CAPTURE)) {
+            $comment = $bm[0][0];
+            $fixed = preg_replace('/"level"\s*:\s*1\b/', '"level":2', $comment, 1);
+            $before = substr($before, 0, $bm[0][1]) . $fixed;
+        }
+        $out = $before . $replacement . $after;
+    }
+    if (gotop_seo_bridge_words($out) !== gotop_seo_bridge_words($content)) { return array('ok' => false, 'code' => 'value_invalid'); }
+    return array('ok' => true, 'content' => $out);
+}
+
+/**
+ * A page built with a page builder: its builder renders from its own data (or its shortcodes), so
+ * a change to the content would not show, or would be lost on the next save. Such pages are never
+ * written by h1_demote.
+ */
+function gotop_seo_bridge_builder_page($post_id, $content) {
+    $flags = array(
+        '_elementor_edit_mode' => 'builder', '_et_pb_use_builder' => 'on', '_wpb_vc_js_status' => 'true',
+        '_bricks_editor_mode' => 'bricks',
+    );
+    foreach ($flags as $key => $on) {
+        if ((string) get_post_meta($post_id, $key, true) === $on) { return true; }
+    }
+    foreach (array('_fl_builder_enabled', 'ct_builder_shortcodes', '_ct_builder_shortcodes', '_breakdance_data', '_themify_builder_settings_json') as $key) {
+        $v = get_post_meta($post_id, $key, true);
+        if (!empty($v)) { return true; }
+    }
+    return (bool) preg_match('/\[(vc_row|et_pb_|fusion_|cs_content|fl_builder|elementor-template|themify_builder)/i', (string) $content);
 }

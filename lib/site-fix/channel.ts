@@ -3,7 +3,10 @@
  *
  *   Shopify            read-only: nothing is written (the live Shopify app is not changed); the
  *                      findings keep their step-by-step instructions.
- *   plugin connected   every fix type, through the Go Top plugin (signed).
+ *   plugin connected   every fix type the installed plugin knows, through the Go Top plugin (signed).
+ *                      A type newer than the plugin (PLUGIN_MIN_VERSION: h1_demote and llms_txt need
+ *                      2.1.0) reads `needs_update`: it is never sent to an older plugin, and the
+ *                      screen offers the update. A 2.0.0 install keeps every 2.0.0 type as before.
  *   plugin dropped     every approval is recorded and marked for manual update, and the screen
  *                      says so; "retry" applies them once the plugin answers again. A pairing whose
  *                      key cannot be read counts as dropped too ("connect again"), never connected.
@@ -13,6 +16,8 @@
  *                      keyphrase and schema need the plugin ("install the plugin to fix the rest").
  *   webhook            every fix type is SENT to the developer's endpoint.
  *   nothing            WordPress: install the plugin; other platforms: instructions only.
+ *   plugin-only types  h1_demote and llms_txt have no application-password or webhook path: without
+ *                      the plugin they are "install the plugin" (WordPress) or instructions.
  *
  * Every read carries the project AND owner filter (the service role bypasses RLS).
  */
@@ -20,7 +25,10 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import type { PluginLink } from './plugin-client'
 import { readPluginLink, type PluginLinkRow, type Scope } from './store'
-import { FIX_TYPES, type FixCapabilities, type FixChannel, type FixType, type PluginState } from './types'
+import {
+  FIX_TYPES, PLUGIN_LATEST_VERSION, PLUGIN_ONLY_TYPES, pluginSupports, type FixCapabilities, type FixChannel, type FixType,
+  type PluginState,
+} from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -100,15 +108,17 @@ export function pluginStateOf(row: PluginLinkRow | null, keyReadable = true): Pl
 /** Pure: the channel each fix type would take right now. */
 export function resolveCapabilities(ctx: FixContext, available: boolean): FixCapabilities {
   const plugin = pluginStateOf(ctx.plugin, !ctx.plugin || !!ctx.pluginLink)
-  const base = { available, plugin, appPassword: !!ctx.creds, webhook: !!ctx.webhook, wordpress: ctx.wordpressDetected }
+  const base = { available, plugin, appPassword: !!ctx.creds, webhook: !!ctx.webhook, wordpress: ctx.wordpressDetected, pluginLatest: PLUGIN_LATEST_VERSION }
   if (ctx.shopify) return { ...base, readOnly: true, channelFor: {} }
   const channelFor: FixCapabilities['channelFor'] = {}
+  const version = plugin.state === 'connected' ? plugin.version : ctx.plugin?.plugin_version ?? null
   for (const type of FIX_TYPES) {
-    let c: FixChannel | 'needs_plugin' | undefined
-    if (plugin.state === 'connected' && ctx.pluginLink) c = 'plugin'
+    let c: FixChannel | 'needs_plugin' | 'needs_update' | undefined
+    const pluginOnly = PLUGIN_ONLY_TYPES.includes(type)
+    if (plugin.state === 'connected' && ctx.pluginLink) c = pluginSupports(version, type) ? 'plugin' : 'needs_update'
     else if (plugin.state === 'disconnected') c = 'manual'
-    else if (ctx.creds && APP_PASSWORD_TYPES.includes(type)) c = 'app_password'
-    else if (ctx.webhook) c = 'webhook'
+    else if (!pluginOnly && ctx.creds && APP_PASSWORD_TYPES.includes(type)) c = 'app_password'
+    else if (!pluginOnly && ctx.webhook) c = 'webhook'
     else if (ctx.wordpressDetected) c = 'needs_plugin'
     if (c) channelFor[type] = c
   }

@@ -2,9 +2,9 @@
  * Site health auto-fix, the app side (lib/site-fix): the rules that decide what may be written to a
  * merchant's site, by whom, and how every write is recorded.
  *
- *   W) WHITELIST. `validateFix` is the only way a request becomes a fix: the nine types, their own
+ *   W) WHITELIST. `validateFix` is the only way a request becomes a fix: the eleven types, their own
  *      fields only, plain text, addresses on the project's own site, no Product schema. The app's
- *      list, the database CHECK and the plugin's list are the same nine names.
+ *      list, the database CHECK (its latest migration) and the plugin's list are the same eleven names.
  *   S) SIGNING. The TypeScript signer and verifier agree; a tampered body, another route, a stale
  *      time, another key and a replayed nonce are refused.
  *   O) OWNER FILTER. The service role bypasses RLS: every `.from()` in the store and the channel
@@ -147,8 +147,10 @@ async function main() {
     { type: 'schema_jsonld', schema: { '@context': 'https://schema.org', '@type': 'Organization', name: 'Boot Shop' } },
     { type: 'broken_link', href: `${SITE}/old/`, replacement: `${SITE}/new/` },
     { type: 'internal_link', target: `${SITE}/blog/care/`, anchor: 'leather care' },
+    { type: 'h1_demote', headings: [{ n: 1, text: 'Our story' }] },
+    { type: 'llms_txt', text: '# Boot Shop\n\n> Handmade leather boots from Haifa.\n\n## Pages\n\n- [About](https://www.shop.example.org/about/): who we are\n' },
   ]
-  check('W1: each of the nine fix types is accepted with its own fields', good.length === FIX_TYPES.length && good.every((g) => WL.validateFix(g, page, KEYS).ok))
+  check('W1: each of the eleven fix types is accepted with its own fields', good.length === FIX_TYPES.length && good.every((g) => WL.validateFix(g, page, KEYS).ok))
   const code = (x: unknown, p: unknown = page) => { const r = WL.validateFix(x, p, KEYS); return r.ok ? 'ok' : r.code }
   const refusals: [string, unknown, string][] = [
     ['an unknown type (delete_post)', { type: 'delete_post', value: 'x' }, 'not_allowed'],
@@ -167,17 +169,19 @@ async function main() {
   check('W3: the page written to must be on the project\'s site', code(good[0], 'https://evil.example.com/about/') === 'off_site')
   const dbTypes = (sql: string) => {
     const m = /CONSTRAINT site_fix_jobs_fix_type CHECK \(fix_type IN \(([^)]*)\)\)/.exec(sql)
-    return m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]) : []
+    return m ? [...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]) : []
   }
   const phpTypes = (php: string) => {
     const m = /function gotop_seo_bridge_fix_types\(\)[\s\S]*?array\(([\s\S]*?)\)/.exec(php)
-    return m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]) : []
+    return m ? [...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]) : []
   }
-  const MIG = read('supabase/migrations/20260928000300_site_fix_queue.sql')
+  // The CHECK as the LATEST migration that defines it leaves it (20260929100000 widened it for plugin 2.1.0).
+  const MIG = read('supabase/migrations/20260929100000_site_fix_h1_llms.sql')
   const PHP = read('wordpress-plugin/gotop-seo-bridge/includes/fixes.php')
   const same = (a: string[]) => JSON.stringify(a) === JSON.stringify([...FIX_TYPES])
-  check('W4: the database CHECK, the plugin and the app hold the same nine types', same(dbTypes(MIG)) && same(phpTypes(PHP)), `${dbTypes(MIG).join(',')} | ${phpTypes(PHP).join(',')}`)
-  check('MUTATION CONTROL: a tenth type in the database only is caught by W4', !same(dbTypes(MIG.replace("'internal_link'", "'internal_link', 'theme_switch'"))))
+  check('W4: the database CHECK, the plugin and the app hold the same eleven types', same(dbTypes(MIG)) && same(phpTypes(PHP)), `${dbTypes(MIG).join(',')} | ${phpTypes(PHP).join(',')}`)
+  check('MUTATION CONTROL: a twelfth type in the database only is caught by W4', !same(dbTypes(MIG.replace("'llms_txt'", "'llms_txt', 'theme_switch'"))))
+  check('MUTATION CONTROL: the plugin without h1_demote is caught by W4', !same(phpTypes(PHP.replace("'h1_demote',", ''))))
   {
     const m = mutant<typeof WL>('lib/site-fix/whitelist.ts', 'if (extra.length > 0) return bad(\'not_allowed\')', '')
     const got = m.mod ? m.mod.validateFix({ type: 'seo_title', value: 'Boots', post_status: 'draft' }, page, KEYS) : null

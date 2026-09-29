@@ -6,6 +6,11 @@
  * wp-admin, and connect — in one click when the site is already connected by
  * application password, otherwise with a one-time code pasted in the plugin's
  * settings page. Every answer is our own sentence (`siteHealth.autofix.errors`).
+ *
+ * Connected with an older version (2.0.0 before 2.1.0): the same modal becomes "update the plugin" —
+ * download the new zip, upload it over the current one ("Replace current with uploaded"; the
+ * pairing is kept in the site's options, so there is nothing to pair again), and check the
+ * connection, which reads the new version at once.
  */
 import { useCallback, useState } from 'react'
 import { ArrowUpRight, Check, Copy, Download, PlugZap, ShieldCheck, Unplug } from 'lucide-react'
@@ -16,9 +21,10 @@ import Badge from '@/components/ui/Badge'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-import type { FixCapabilities, FixErrorCode } from '@/lib/site-fix/types'
+import { versionAtLeast, type FixCapabilities, type FixErrorCode } from '@/lib/site-fix/types'
 import type { useToasts } from '@/components/ui/Toast'
 import { postFix } from './useSiteFixes'
+import { pluginUpdateFor } from './AutoFixStrip'
 
 type Copy = DashboardDictionary['siteHealth']['autofix']
 
@@ -65,6 +71,8 @@ export default function PluginInstallModal({
   /** The stored key cannot be read: only a new pairing code helps, so "check" waits for one. */
   const rekey = plugin.state === 'disconnected' && !!plugin.rekey
   const uploadUrl = `${siteUrl.replace(/\/+$/, '')}/wp-admin/plugin-install.php?tab=upload`
+  /** Connected with an older version: this modal walks through the update. */
+  const update = pluginUpdateFor(capabilities)
 
   const connectedNow = useCallback(async () => {
     await onChanged()
@@ -95,12 +103,18 @@ export default function PluginInstallModal({
   const check = useCallback(async () => {
     if (busy) return
     setBusy('check'); setError(null)
-    const r = await postFix<{ plugin: unknown }>('/api/site-health/plugin', { projectId, action: 'check' })
+    const r = await postFix<{ plugin?: { version?: string | null } }>('/api/site-health/plugin', { projectId, action: 'check' })
     setBusy(null)
     if (!r.ok) { setError(r.code); await onChanged(); return }
     setCode(null)
+    const version = r.plugin?.version ?? null
+    if (update && version && versionAtLeast(version, update)) {
+      await onChanged()
+      toasts.success(copy.plugin.update.done(version))
+      return
+    }
     await connectedNow()
-  }, [busy, projectId, onChanged, connectedNow])
+  }, [busy, projectId, onChanged, connectedNow, update, toasts, copy.plugin.update])
 
   const disconnect = useCallback(async () => {
     if (busy) return
@@ -124,7 +138,7 @@ export default function PluginInstallModal({
   }, [code])
 
   return (
-    <Modal open onClose={busy ? () => {} : onClose} title={copy.plugin.title} size="lg">
+    <Modal open onClose={busy ? () => {} : onClose} title={update ? copy.plugin.update.title : copy.plugin.title} size="lg">
       <div className="space-y-6" data-plugin-modal={plugin.state}>
         <div className="flex gap-3 rounded-inset border border-line bg-sunk/50 p-4">
           <ShieldCheck size={20} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0 text-action" />
@@ -133,7 +147,26 @@ export default function PluginInstallModal({
 
         {rekey && <Notice tone="warn">{copy.plugin.rekeyNotice}</Notice>}
 
-        {connected ? (
+        {connected && update ? (
+          <div className="space-y-5" data-plugin-update={update}>
+            <Notice tone="info">{copy.plugin.update.notice(plugin.state === 'connected' ? plugin.version ?? '2.0.0' : '2.0.0', update)}</Notice>
+            <ol className="space-y-6" role="list">
+              <Step n={1} label={copy.plugin.step(1)} title={copy.plugin.update.download.title} body={copy.plugin.update.download.body}>
+                <a href="/api/site-health/plugin-zip" download className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-download="">
+                  <Download size={16} strokeWidth={2} aria-hidden="true" />
+                  {`${copy.plugin.update.download.action} ${update}`}
+                </a>
+              </Step>
+              <Step n={2} label={copy.plugin.step(2)} title={copy.plugin.update.upload.title} body={copy.plugin.update.upload.body}>
+                <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-upload="">
+                  {copy.plugin.update.upload.action}
+                  <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" className="rtl:-scale-x-100" />
+                </a>
+              </Step>
+              <Step n={3} label={copy.plugin.step(3)} title={copy.plugin.update.check.title} body={copy.plugin.update.check.body} />
+            </ol>
+          </div>
+        ) : connected ? (
           <div className="space-y-4">
             <Notice tone="ok">{copy.plugin.connected}</Notice>
             <div className="flex flex-wrap items-center gap-2">
@@ -198,7 +231,7 @@ export default function PluginInstallModal({
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button variant="ghost" onClick={onClose} disabled={!!busy}>{copy.plugin.close}</Button>
-            {!connected && plugin.state !== 'none' && (!rekey || !!code) && (
+            {((!connected && plugin.state !== 'none' && (!rekey || !!code)) || (connected && !!update)) && (
               <Button onClick={check} loading={busy === 'check'} disabled={!!busy} data-plugin-check="">{copy.connection.check}</Button>
             )}
           </div>
