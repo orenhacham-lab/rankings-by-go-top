@@ -57,6 +57,7 @@ export default function ResetPasswordForm() {
   const expired = outcome === 'link_expired'
   return (
     <AuthShell
+      variant="recover"
       locale={lang}
       logoAlt={ui.logoAlt}
       subtitle={ui.subtitle}

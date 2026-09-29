@@ -19,7 +19,8 @@
  */
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CircleAlert, CircleCheck, Lock, RotateCcw } from 'lucide-react'
+import { ArrowRight, Building2, Check, CircleAlert, CircleCheck, Lock, RotateCcw, Sparkles, Wrench } from 'lucide-react'
+import HeroBackdrop from '@/components/public/HeroBackdrop'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -111,7 +112,8 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Local
   }, [phase])
 
   return (
-    <div dir={dir} className="min-h-[70vh]">
+    <div dir={dir} className="relative min-h-[70vh]">
+      <HeroBackdrop />
       {phase === 'form' && (
         <FormState
           copy={copy}
@@ -165,56 +167,88 @@ export function FormState({
 }) {
   const message = errorMessage ?? (error ? copy.form.errors[error] : null)
   return (
-    <section className="relative mx-auto max-w-3xl px-4 pb-20 pt-12 text-center sm:px-6 sm:pt-16">
-      <div className="mb-5">
-        <Eyebrow>{copy.page.badge}</Eyebrow>
-      </div>
-      <h1 className="text-title font-bold tracking-tight text-ink text-balance sm:text-display">
-        {copy.page.title}{' '}
-        <span className="text-action">{copy.page.titleAccent}</span>
-      </h1>
-      <p className="mx-auto mt-5 max-w-2xl text-section font-normal text-body text-pretty">{copy.page.subtitle}</p>
-
-      <form
-        className="mt-10 space-y-3 rounded-card border border-line bg-surface p-4 text-start shadow-card sm:p-5"
-        onSubmit={(e) => {
-          e.preventDefault()
-          onSubmit()
-        }}
-      >
-        <label htmlFor="free-check-url" className="sr-only">
-          {copy.form.label}
-        </label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="min-w-0 flex-1">
-            <Input
-              id="free-check-url"
-              name="url"
-              type="text"
-              inputMode="url"
-              autoComplete="url"
-              dir="ltr"
-              value={url}
-              onChange={(e) => onUrl(e.target.value)}
-              placeholder={copy.form.placeholder}
-              aria-invalid={message ? true : undefined}
-              className="h-11"
-            />
-          </div>
-          <Button type="submit" size="lg" className="shrink-0">
-            {copy.form.submit}
-          </Button>
+    <section className="relative mx-auto max-w-4xl px-4 pb-20 pt-12 text-center sm:px-6 sm:pt-20" data-free-check-form>
+      <div className="stagger-in">
+        <div className="mb-5">
+          <Eyebrow>{copy.page.badge}</Eyebrow>
         </div>
-        {message && (
-          <div role="alert">
-            <NoticeBox tone="bad" language={locale}>{message}</NoticeBox>
+        <h1 className="mx-auto max-w-3xl text-title font-bold tracking-tight text-ink text-balance sm:text-display">
+          {copy.page.title}
+          <span className="block text-action">{copy.page.titleAccent}</span>
+        </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-section font-normal text-body text-pretty">{copy.page.subtitle}</p>
+
+        {/* The landing hero's field: one well and one button on a raised card. */}
+        <form
+          className="mx-auto mt-10 max-w-2xl text-start"
+          onSubmit={(e) => {
+            e.preventDefault()
+            onSubmit()
+          }}
+        >
+          <label htmlFor="free-check-url" className="sr-only">
+            {copy.form.label}
+          </label>
+          <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-2 shadow-pop sm:flex-row">
+            <div className="min-w-0 flex-1">
+              <Input
+                id="free-check-url"
+                name="url"
+                type="text"
+                inputMode="url"
+                autoComplete="url"
+                dir="ltr"
+                value={url}
+                onChange={(e) => onUrl(e.target.value)}
+                placeholder={copy.form.placeholder}
+                aria-invalid={message ? true : undefined}
+                className="h-12 border-transparent bg-sunk/60 text-start shadow-none hover:border-line focus:bg-surface"
+              />
+            </div>
+            <Button type="submit" size="lg" className="h-12 shrink-0 px-6">
+              {copy.form.submit}
+              <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+            </Button>
           </div>
-        )}
-        <p className="text-caption text-muted">{copy.form.hint}</p>
-      </form>
+          {message && (
+            <div role="alert" className="mt-3">
+              <NoticeBox tone="bad" language={locale}>{message}</NoticeBox>
+            </div>
+          )}
+          <p className="mt-2.5 text-center text-caption text-muted">{copy.form.hint}</p>
+        </form>
+
+        <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-copy text-body" data-free-check-trust>
+          {copy.page.trust.map((line) => (
+            <li key={line} className="flex items-center gap-1.5">
+              <Check className="size-4 text-action" strokeWidth={2.5} aria-hidden="true" />
+              {line}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* What the check shows, so the visitor knows what they get for one address. */}
+      <ul className="stagger-in mt-14 grid gap-4 text-start sm:grid-cols-3" data-free-check-expect>
+        {copy.page.expect.map((item, i) => {
+          const Icon = EXPECT_ICONS[i] ?? Sparkles
+          return (
+            <li key={item.title} className="lift rounded-card border border-line bg-surface/80 p-5 shadow-card backdrop-blur-sm">
+              <span aria-hidden="true" className="mb-3 flex size-9 items-center justify-center rounded-inset bg-action-soft text-action">
+                <Icon className="size-4.5" />
+              </span>
+              <p className="text-copy font-semibold text-ink">{item.title}</p>
+              <p className="mt-1 text-caption text-body">{item.body}</p>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }
+
+/** One icon per "what you get" card, in the order of copy.page.expect. */
+const EXPECT_ICONS = [Building2, Wrench, Sparkles]
 
 function ScanningState({ copy, step }: { copy: Copy; step: number }) {
   const total = copy.loading.steps.length
@@ -222,7 +256,7 @@ function ScanningState({ copy, step }: { copy: Copy; step: number }) {
   // request, not the timer, decides when the scan is done.
   const progress = Math.round(((step + 0.5) / total) * 100)
   return (
-    <section className="mx-auto max-w-2xl px-4 pb-24 pt-12 sm:px-6 sm:pt-16" aria-live="polite" aria-busy="true">
+    <section className="relative mx-auto max-w-2xl px-4 pb-24 pt-12 sm:px-6 sm:pt-20" aria-live="polite" aria-busy="true">
       <div className="mb-10 h-1.5 w-full overflow-hidden rounded-pill bg-sunk">
         <div className="h-full rounded-pill bg-action transition-[width] duration-700 ease-snappy" style={{ width: `${progress}%` }} />
       </div>
@@ -282,12 +316,15 @@ function ResultsState({
 }) {
   const r = copy.results
   return (
-    <section className="mx-auto max-w-4xl space-y-8 px-4 pb-24 pt-10 sm:px-6 sm:pt-12">
+    <section className="stagger-in relative mx-auto max-w-4xl space-y-8 px-4 pb-24 pt-10 sm:px-6 sm:pt-16" data-free-check-results>
       <header className="text-center">
-        <h1 className="text-title font-bold tracking-tight text-ink">{r.heading}</h1>
-        <p className="mt-2 text-copy text-body">
+        <div className="mb-4">
+          <Eyebrow>{copy.page.badge}</Eyebrow>
+        </div>
+        <h1 className="text-title font-bold tracking-tight text-ink sm:text-display">{r.heading}</h1>
+        <p className="mt-3 text-copy text-body">
           {r.scanned}{' '}
-          <span dir="ltr" className="font-semibold text-ink">
+          <span dir="ltr" className="inline-flex h-7 items-center rounded-pill border border-line bg-surface px-3 font-semibold text-ink shadow-control">
             {result.domain}
           </span>
         </p>
@@ -431,11 +468,12 @@ function ResultsState({
         </Block>
       )}
 
-      <div className="relative overflow-hidden rounded-card bg-contrast p-6 text-contrast-ink shadow-card sm:p-10 bg-[radial-gradient(90%_120%_at_100%_0%,rgb(0_134_245/0.22),transparent_60%)] rtl:bg-[radial-gradient(90%_120%_at_0%_0%,rgb(0_134_245/0.22),transparent_60%)]">
-        <h2 className="text-title font-bold tracking-tight text-contrast-ink">{r.gateTitle}</h2>
-        <p className="mt-2 text-copy text-contrast-ink/75">{r.gateBody}</p>
-        <CheckList items={r.gateBullets} inverse className="mb-8 mt-6" />
-        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+      <div className="relative overflow-hidden rounded-card bg-contrast p-6 text-contrast-ink shadow-pop sm:p-10 bg-[radial-gradient(90%_120%_at_100%_0%,rgb(0_134_245/0.30),transparent_60%),radial-gradient(60%_80%_at_0%_100%,rgb(127_195_255/0.14),transparent_65%)] rtl:bg-[radial-gradient(90%_120%_at_0%_0%,rgb(0_134_245/0.30),transparent_60%),radial-gradient(60%_80%_at_100%_100%,rgb(127_195_255/0.14),transparent_65%)]" data-free-check-gate>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgb(255_255_255/0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.05)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:linear-gradient(to_bottom,#000,transparent_85%)]" />
+        <h2 className="relative text-title font-bold tracking-tight text-contrast-ink">{r.gateTitle}</h2>
+        <p className="relative mt-2 text-copy text-contrast-ink/75">{r.gateBody}</p>
+        <CheckList items={r.gateBullets} inverse className="relative mb-8 mt-6" />
+        <div className="relative flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
           <Link href={signupHref} className={buttonClasses('primary', 'lg')}>
             {r.gateCta}
           </Link>
@@ -443,7 +481,7 @@ function ResultsState({
             {r.gateSecondary}
           </Link>
         </div>
-        <p className="mt-4 text-caption text-contrast-ink/60">{r.gateTerms}</p>
+        <p className="relative mt-4 text-caption text-contrast-ink/60">{r.gateTerms}</p>
       </div>
 
       <div className="text-center">

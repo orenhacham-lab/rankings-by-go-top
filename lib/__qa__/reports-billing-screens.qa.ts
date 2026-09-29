@@ -117,7 +117,9 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
     const t = getDashboardDictionary(locale).billing
     const market = locale === 'he' ? 'ILS' : 'USD'
     const sym = market === 'USD' ? '$' : '₪'
-    const prices = market === 'USD' ? USD : ILS
+    const rawPrices = market === 'USD' ? USD : ILS
+    // w7 P2-13: grouped like the public pricing page (₪1,999, not ₪1999), in the screen's locale.
+    const prices = Object.fromEntries(Object.entries(rawPrices).map(([k, v]) => [k, Number(v).toLocaleString(locale === 'en' ? 'en-US' : 'he-IL')])) as Record<keyof typeof rawPrices, string>
     const html = render(locale, { market })
     const plansComplete = (h: string) => {
       const missing: string[] = []

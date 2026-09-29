@@ -197,6 +197,17 @@ async function main() {
     const hideOk = (active: string, expired: string) => /data-trial-hide/.test(active) && !/data-trial-hide/.test(expired)
     check('C8d: days left can be hidden for 24 hours; an ended trial cannot', hideOk(he, render({ kind: 'expired' }, 'he')))
     check('C8d-MUT: a hide button on the ended trial fails C8d', !hideOk(he, he))
+    // w7 P1-1: a bar the viewer hid is never painted, not even for the first frame.
+    const renderD = (state: TrialBarState, dismissed: boolean) =>
+      renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: 'he' }, createElement(TrialBar, { state, dismissed })))
+    const noFlash = (hidden: string, shown: string, ended: string) => hidden === '' && /data-trial-bar="active"/.test(shown) && /data-trial-bar="expired"/.test(ended)
+    check('C10 (w7 P1-1): dismissed on the server → the first paint has no bar; not dismissed → it does; an ended trial shows anyway',
+      noFlash(renderD({ kind: 'active', daysLeft: 5 }, true), renderD({ kind: 'active', daysLeft: 5 }, false), renderD({ kind: 'expired' }, true)))
+    const barSrc = strip(read('components/layout/TrialBar.tsx'))
+    const snapshotOk = (src: string) => /useSyncExternalStore\(subscribeHidden, readHidden, \(\) => dismissed\)/.test(src)
+      && /document\.cookie = `\$\{HIDE_KEY\}=\$\{until\}; Max-Age=\$\{maxAge\}; Path=\/; SameSite=Lax`/.test(src)
+    check('C11 (w7 P1-1): the server snapshot is the server\'s reading of the cookie, and hiding writes that cookie', snapshotOk(barSrc))
+    check('C11-MUT: the old "never hidden on the server" snapshot (the flash) fails C11', !snapshotOk(barSrc.replace('readHidden, () => dismissed)', 'readHidden, () => false)')))
     PATHNAME = '/billing'
     const onBilling = render({ kind: 'active', daysLeft: 5 }, 'he')
     check('C9: on the billing screen the sentence stays and the link goes', text(onBilling).includes('נותרו 5 ימים') && !onBilling.includes('data-trial-upgrade'))
@@ -210,6 +221,15 @@ async function main() {
     const layoutOk = (src: string) =>
       /<TrialBarSlot userId=\{user\.id\} \/>/.test(src) && /loadTrialBar\(admin, userId\)/.test(src) && /<Suspense fallback=\{null\}>\s*<TrialBarSlot/.test(src)
     check('D1: the layout reads the bar for the session user (user.id from auth.getUser), in its own Suspense', layoutOk(layout))
+    const cookieOk = (src: string) => /trialBarDismissed\(\(await cookies\(\)\)\.get\(TRIAL_BAR_HIDE_COOKIE\)\?\.value\)/.test(src)
+      && /<TrialBar state=\{await loadTrialBar\(admin, userId\)\} dismissed=\{dismissed\} \/>/.test(src)
+      // …from the plain module: a server component cannot call a 'use client' export.
+      && /import \{ TRIAL_BAR_HIDE_COOKIE, trialBarDismissed \} from '@\/lib\/billing\/trial-bar-dismissal'/.test(src)
+      && !/['"]use client['"]/.test(strip(read('lib/billing/trial-bar-dismissal.ts')))
+    check('D1b (w7 P1-1): the layout reads the dismissal cookie and hands it to the bar', cookieOk(layout))
+    check('MUTATION CONTROL: a layout that ignores the cookie is caught', !cookieOk(layout.replace(' dismissed={dismissed} />', ' />')))
+    check('MUTATION CONTROL: reading the cookie helper from the client component (a server crash) is caught',
+      !cookieOk(layout.replace("from '@/lib/billing/trial-bar-dismissal'", "from '@/components/layout/TrialBar'")))
     check('MUTATION CONTROL: a layout that passes any other id is caught', !layoutOk(layout.replace('<TrialBarSlot userId={user.id} />', '<TrialBarSlot userId={searchParams.user} />')))
 
     const mod = strip(read('lib/billing/trial-bar.ts'))

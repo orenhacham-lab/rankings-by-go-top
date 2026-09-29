@@ -4,9 +4,12 @@
  * server, the real AuthLocaleProvider and dictionaries) and from source:
  *   A) sign in, sign up, forgot and reset password (he + en) all draw the
  *      paper-canvas AuthShell: one surface card, the task as the one H1, no
- *      gradient, no raw colour, no glyph separators;
- *   B) their controls are the primitives: ui/Input, ui/Button, ui/Checkbox for
- *      the terms, ui/Notice for errors and confirmations (alert/status);
+ *      gradient utility, no raw colour, no glyph separators; since w7 (P1-9,
+ *      P2-17) in the landing's language: a navy brand panel beside the form
+ *      from lg, the landing's headline, and the shared CSS entrance;
+ *   B) sign-up asks for an email and a password only, with the terms as a
+ *      consent line (w7 P1-9); the controls are the primitives: ui/Input,
+ *      ui/Button, ui/Notice for errors and confirmations (alert/status);
  *   C) no public overlay (cookie banner, WhatsApp, accessibility button) on any
  *      auth route, in either language;
  *   D) 404, the dashboard error boundary and the global error page are branded,
@@ -81,7 +84,7 @@ const rendered = Object.fromEntries(Object.keys(PAGES).map((p) => [p, renderAuth
   check('MUT: the old gradient page fails A1', !shell(rendered['/login'].replace('bg-canvas', 'bg-gradient-to-br from-blue-50 to-slate-100')))
   const oneH1 = (s: string) => count(s, /<h1\b/) === 1 && /<h1 class="text-title font-bold tracking-tight text-ink"/.test(s)
   for (const [path, html] of Object.entries(rendered)) check(`A2 ${path}: one H1, on the title token`, oneH1(html))
-  check('MUT: the brand as a second H1 fails A2', !oneH1(rendered['/login'].replace('<p class="mt-3', '<h1 class="mt-3')))
+  check('MUT: the brand panel headline as a second H1 fails A2', !oneH1(rendered['/login'].replace('<p class="mt-5 text-title', '<h1 class="mt-5 text-title')))
   const language = (path: string, s: string) => (path.startsWith('/en') ? !HEBREW.test(s) && /dir="ltr"/.test(s) : HEBREW.test(s) && /<main[^>]*dir="rtl"/.test(s))
   check('A3: each page speaks its route\'s language and direction', Object.entries(rendered).every(([p, s]) => language(p, s)))
   check('MUT: an English page with Hebrew in it fails A3', !language('/en/login', rendered['/en/login'] + 'כניסה'))
@@ -92,17 +95,46 @@ const rendered = Object.fromEntries(Object.keys(PAGES).map((p) => [p, renderAuth
   const tokensOnly = (s: string) => !RAW.test(s) && !BANNED.test(s)
   check('A5: AuthShell source is tokens only', tokensOnly(src))
   check('MUT: a raw slate in AuthShell fails A5', !tokensOnly(src + ' text-slate-800'))
+
+  // w7 P1-9 / P2-17: the landing's design language, and the entrance motion.
+  const premium = (s: string) => /data-auth-brand/.test(s) && /class="[^"]*\bbg-contrast\b[^"]*\blg:flex\b/.test(s)
+    && /data-auth-trust/.test(s) && count(s, /class="stagger-in/) === 2
+    && /<div class="stagger-in"><div class="rounded-card border border-line bg-surface/.test(s)
+  for (const [path, html] of Object.entries(rendered)) check(`A6 ${path}: split layout (navy brand panel from lg, trust line below it) and the shared entrance`, premium(html))
+  check('MUT: the old single-card page (no brand panel) fails A6', !premium(rendered['/signup'].replace(/<aside[\s\S]*<\/aside>/, '')))
+  check('MUT: a shell without the entrance fails A6', !premium(rendered['/login'].split('class="stagger-in').join('class="')))
+  const heBrand = rendered['/signup'], enBrand = rendered['/en/signup']
+  const landingHe = require(join(ROOT, 'lib/i18n/public/landing-he.ts')).landingHe
+  const landingEn = require(join(ROOT, 'lib/i18n/public/landing-en.ts')).landingEn
+  const sameWords = (html: string, l: any) => html.includes(l.hero.title) && html.includes(l.hero.accent) && html.includes(l.demo.caption)
+  check('A7: the panel says the landing page\'s own headline and labels its glimpse as illustrative, in each language', sameWords(heBrand, landingHe) && sameWords(enBrand, landingEn))
+  check('MUT: an unlabelled glimpse fails A7', !sameWords(heBrand.replace(landingHe.demo.caption, ''), landingHe))
+  const css = read('app/globals.css').replace(/\/\*[\s\S]*?\*\//g, '')
+  const staggerSafe = (c: string) => {
+    const at = c.indexOf('.stagger-in > * {')
+    const media = c.lastIndexOf('@media (prefers-reduced-motion: no-preference)', at)
+    const between = c.slice(media, at)
+    // Still inside the media block: more braces opened than closed since it began.
+    return at > 0 && media > 0 && count(between, /\{/) - count(between, /\}/) >= 1
+  }
+  check('A8 (P2-17): the entrance exists only under prefers-reduced-motion: no-preference', staggerSafe(css))
+  check('MUT: the entrance outside the no-preference block fails A8', !staggerSafe(css.replace('.stagger-in > * {', '}\n.stagger-in > * {')))
 }
 
 // ── B) primitives ─────────────────────────────────────────────────────────────
 console.log('\nB) the controls are the primitives')
 {
-  const signupSrc = strip(read('app/(auth)/signup/page.tsx'))
-  const usesCheckbox = (s: string) => /<Checkbox\b[\s\S]*?id="terms"/.test(s) && !/<input\b[^>]*type="checkbox"/.test(s)
-  check('B1: the terms box is ui/Checkbox (id="terms" kept for the journeys)', usesCheckbox(signupSrc))
-  check('MUT: a native checkbox back fails B1', !usesCheckbox(signupSrc.replace('<Checkbox', '<input type="checkbox"')))
-  const box = rendered['/signup']
-  check('B2: …and it renders on tokens', /id="terms"[^>]*class="[^"]*appearance-none[^"]*border-line-strong/.test(box) || /class="[^"]*appearance-none[^"]*border-line-strong[^"]*"[^>]*id="terms"/.test(box) || (/id="terms"/.test(box) && /appearance-none/.test(box)))
+  // w7 P1-9: sign-up asks for what the account truly needs, an email and a password,
+  // and the terms are a consent line with both links right above the button.
+  const signupHtml = rendered['/signup']
+  const minimal = (s: string) => count(s, /<input\b/) === 2 && /<input[^>]*type="email"[^>]*autoComplete="email"|<input[^>]*autoComplete="email"[^>]*type="email"/i.test(s)
+    && /autoComplete="new-password"/i.test(s) && !/autoComplete="(?:name|organization|tel)"/i.test(s) && !/id="terms"/.test(s)
+  check('B1: sign-up has two fields, email and password, and nothing else', minimal(signupHtml))
+  check('MUT: a phone field back fails B1', !minimal(signupHtml.replace('</form>', '<input type="tel" autoComplete="tel"/></form>')))
+  check('MUT: a second password field back fails B1', !minimal(signupHtml.replace('</form>', '<input type="password" autoComplete="new-password"/></form>')))
+  const consent = (s: string) => /data-signup-consent[\s\S]*?href="\/terms"[\s\S]*?href="\/privacy"[\s\S]*?<\/p>\s*<button[^>]*type="submit"/.test(s)
+  check('B2: the consent line links the terms and the privacy policy, right above the button', consent(signupHtml) && consent(rendered['/en/signup'].replace('href="/en/terms"', 'href="/terms"').replace(/href="\/en\/privacy"([^>]*>Privacy Policy)/, 'href="/privacy"$1')))
+  check('MUT: a consent line without the terms link fails B2', !consent(signupHtml.replace('href="/terms"', 'href="/x"')))
   const err = renderAuth('/login', 'error=oauth')
   const alertNotice = (s: string) => /role="alert"[^>]*data-notice="bad"/.test(s) && /rounded-inset/.test(s)
   check('B3: a sign-in error is a bad ui/Notice (role=alert)', alertNotice(err))

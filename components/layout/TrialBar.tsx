@@ -10,8 +10,8 @@
  * day count in the warm trial badge and "Upgrade now" in the action colour, the
  * one filled button on it. In the last three days, on the last day and after
  * the trial ends, the strip turns the urgent dark red. The viewer can hide it
- * for 24 hours while days remain (a per-browser convenience, nothing is
- * saved anywhere else); an ended trial cannot be hidden.
+ * for 24 hours while days remain (a per-browser cookie, nothing is saved
+ * anywhere else); an ended trial cannot be hidden.
  *
  * On the billing screen itself the link would lead to the page already open, so
  * there it is left out and only the sentence stays.
@@ -21,6 +21,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Hourglass, X } from 'lucide-react'
 import type { TrialBarState } from '@/lib/billing/trial-bar'
+import { TRIAL_BAR_HIDE_COOKIE, trialBarDismissed } from '@/lib/billing/trial-bar-dismissal'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { cn } from '@/lib/utils'
@@ -30,9 +31,26 @@ export const BILLING_HREF = '/billing'
 /** Days left at or under which the strip turns urgent. */
 export const URGENT_DAYS = 3
 
-const HIDE_KEY = 'trial-bar-hidden-until'
+const HIDE_KEY = TRIAL_BAR_HIDE_COOKIE
 const HIDE_EVENT = 'trial-bar-hidden'
 const HIDE_MS = 24 * 60 * 60 * 1000
+
+/*
+ * The dismissal lives in a cookie (a per-browser convenience, like before), so
+ * the SERVER knows it too: the dashboard layout reads it and hands it down as
+ * `dismissed`, and a dismissed bar is never painted at all. It used to live in
+ * localStorage only, which the server cannot see: every page load painted the
+ * bar, hydration then removed it, and the page jumped up under it (w7 P1-1).
+ */
+
+function readCookie(): string | null {
+  try {
+    const hit = document.cookie.split('; ').find((c) => c.startsWith(`${HIDE_KEY}=`))
+    return hit ? decodeURIComponent(hit.slice(HIDE_KEY.length + 1)) : null
+  } catch {
+    return null
+  }
+}
 
 function subscribeHidden(onChange: () => void) {
   window.addEventListener('storage', onChange)
@@ -44,26 +62,49 @@ function subscribeHidden(onChange: () => void) {
 }
 
 function readHidden(): boolean {
+  if (trialBarDismissed(readCookie())) return true
+  // A dismissal made before the cookie existed (localStorage only): honour it,
+  // and copy it into the cookie so the next page load is decided on the server.
   try {
-    return Number(window.localStorage.getItem(HIDE_KEY) || 0) > Date.now()
+    const until = Number(window.localStorage.getItem(HIDE_KEY) || 0)
+    if (until > Date.now()) {
+      writeCookie(until)
+      return true
+    }
   } catch {
-    return false
+    // Storage blocked.
+  }
+  return false
+}
+
+function writeCookie(until: number) {
+  try {
+    const maxAge = Math.max(0, Math.round((until - Date.now()) / 1000))
+    document.cookie = `${HIDE_KEY}=${until}; Max-Age=${maxAge}; Path=/; SameSite=Lax`
+  } catch {
+    // Cookies blocked: the bar simply stays.
   }
 }
 
 function hideForADay() {
+  const until = Date.now() + HIDE_MS
+  writeCookie(until)
   try {
-    window.localStorage.setItem(HIDE_KEY, String(Date.now() + HIDE_MS))
+    window.localStorage.setItem(HIDE_KEY, String(until))
   } catch {
-    // Storage blocked: the bar simply stays.
+    // Storage blocked: the cookie is enough.
   }
   window.dispatchEvent(new Event(HIDE_EVENT))
 }
 
-export default function TrialBar({ state }: { state: TrialBarState }) {
+export default function TrialBar({ state, dismissed = false }: {
+  state: TrialBarState
+  /** The server's reading of the dismissal cookie: the first paint agrees with it. */
+  dismissed?: boolean
+}) {
   const { language } = useDashboardLanguage()
   const pathname = usePathname()
-  const hidden = useSyncExternalStore(subscribeHidden, readHidden, () => false)
+  const hidden = useSyncExternalStore(subscribeHidden, readHidden, () => dismissed)
   if (state.kind === 'hidden') return null
   const canHide = state.kind !== 'expired'
   if (canHide && hidden) return null

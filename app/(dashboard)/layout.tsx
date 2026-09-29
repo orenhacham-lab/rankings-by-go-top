@@ -5,6 +5,7 @@ import { MAIN_CONTENT_ID } from '@/components/layout/main-content'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
 import TrialBar from '@/components/layout/TrialBar'
+import { TRIAL_BAR_HIDE_COOKIE, trialBarDismissed } from '@/lib/billing/trial-bar-dismissal'
 import { loadTrialBar } from '@/lib/billing/trial-bar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
@@ -20,6 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { Suspense } from 'react'
 
 /**
@@ -29,7 +31,9 @@ import { Suspense } from 'react'
 async function TrialBarSlot({ userId }: { userId: string }) {
   let admin: ReturnType<typeof createAdminClient>
   try { admin = createAdminClient() } catch { return null }
-  return <TrialBar state={await loadTrialBar(admin, userId)} />
+  // The viewer's own "hide for a day", read here so a dismissed bar is never painted (w7 P1-1).
+  const dismissed = trialBarDismissed((await cookies()).get(TRIAL_BAR_HIDE_COOKIE)?.value)
+  return <TrialBar state={await loadTrialBar(admin, userId)} dismissed={dismissed} />
 }
 
 export default async function DashboardLayout({

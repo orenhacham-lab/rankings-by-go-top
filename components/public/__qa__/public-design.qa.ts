@@ -11,9 +11,10 @@
  *      slim sheet laid exactly over the contact bar's strip (with bottom padding
  *      for anything it needs beyond it), and both keep the start slot free for
  *      the accessibility button, which docks there instead of floating over the
- *      hero's buttons; from md the notice is a corner card (WhatsApp steps
- *      aside), and from 1400px it sits in the top end margin beside the centred
- *      hero instead of over its product frame (final review R27).
+ *      hero's buttons; from md the notice is one slim bar floating at the
+ *      bottom centre with the page padded for it (WhatsApp steps aside). The
+ *      earlier corner card sat on the English hero headline and on the free
+ *      check's first figures (w7 P2-10; final review R27 before it).
  *   E) the landing's feature rows alternate text and picture (wave 7; the old
  *      five-reason grid's rule moved to landing-page.qa.ts, group C).
  * Each group ends with a MUTATION CONTROL: the same check run on a deliberately
@@ -141,6 +142,7 @@ function main() {
 
   console.log('\nD) the overlays never sit on the hero')
   const SLOT = 'ps-[4.25rem]'
+  const SHEET_SLOT = 'ps-[4.75rem]'
   const DOCKED = "'bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-24'"
   const overlaysOk = (widgets: string, cookie: string, a11y: string, whatsapp: string, bar: string) => {
     const w = strip(widgets), c = strip(cookie), a = strip(a11y), wa = strip(whatsapp), b = strip(bar)
@@ -148,12 +150,13 @@ function main() {
       && /<AccessibilityWidget \/>/.test(w)
       && /<CookieConsent onOpenChange=\{setCookieOpen\} \/>/.test(w)
       // phone: a slim sheet over the contact bar's strip, the start slot left for the accessibility button
-      && /inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card/.test(c) && c.includes(SLOT) && /z-\[58\]/.test(c)
-      && /md:end-6/.test(c) && /md:max-\[1399px\]:bottom-6/.test(c)
-      // 1400px+: the top end margin beside the hero, not over its product frame
-      && /min-\[1400px\]:bottom-auto min-\[1400px\]:top-24/.test(c)
-      // bottom padding while the sheet shows, for what it needs beyond the bar
-      && /body\.style\.paddingBottom = phone \? `\$\{Math\.max\(0, sheet\.offsetHeight - barH\)\}px` : ''/.test(c)
+      // (w7 P2-10) a wider start slot in the sheet than in the bar, so the docked button never touches the sentence
+      && /inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card/.test(c) && c.includes(SHEET_SLOT) && /z-\[58\]/.test(c)
+      // md+ (w7 P2-10): one slim bar at the bottom centre, never a corner card over the hero headline or the first figures
+      && /md:start-\[4\.75rem\] md:end-6 md:bottom-5 md:mx-auto md:max-w-3xl/.test(c) && /lg:inset-x-6/.test(c)
+      && !/top-24|md:w-\[20rem\]|min-\[1400px\]/.test(c)
+      // bottom padding while it shows: on a phone what the sheet needs beyond the bar, from md the bar and its gap
+      && /body\.style\.paddingBottom = phone \? `\$\{Math\.max\(0, sheet\.offsetHeight - barH\)\}px` : `\$\{sheet\.offsetHeight \+ DESKTOP_GAP_PX\}px`/.test(c)
       && /onOpenChange\?\.\(/.test(c)
       // the accessibility button: 40px, start corner, docked in the strip below md, floating from md
       && /fixed start-4 z-\[60\] flex size-10/.test(a) && a.includes(DOCKED) && !/\braised\b/.test(a)
@@ -167,7 +170,7 @@ function main() {
     const a11y = read('components/public/AccessibilityWidget.tsx')
     const whatsapp = read('components/public/WhatsAppFloat.tsx')
     const bar = read('components/public/MobileContactBar.tsx')
-    check('D1: sheet, contact bar and accessibility button share one bottom strip; the desktop card clears the hero', overlaysOk(widgets, cookie, a11y, whatsapp, bar))
+    check('D1: sheet, contact bar and accessibility button share one bottom strip; from md one slim bottom bar clears the hero', overlaysOk(widgets, cookie, a11y, whatsapp, bar))
     check('D2: the contact bar stays under the cookie sheet (z-55 < z-58)', /z-\[55\]/.test(strip(bar)))
     check('MUTATION CONTROL: WhatsApp no longer stepping aside is caught',
       !overlaysOk(widgets.replace('<WhatsAppFloat hidden={cookieOpen} />', '<WhatsAppFloat />'), cookie, a11y, whatsapp, bar))
@@ -175,10 +178,16 @@ function main() {
       !overlaysOk(widgets, cookie, a11y.replace(DOCKED, "raised ? 'bottom-48 sm:bottom-24' : 'bottom-24'"), whatsapp, bar))
     check('MUTATION CONTROL: a contact bar that no longer keeps the slot free is caught',
       !overlaysOk(widgets, cookie, a11y, whatsapp, bar.replace(SLOT, 'px-4')))
-    check('MUTATION CONTROL: the desktop card back in the bottom corner over the hero frame is caught',
-      !overlaysOk(widgets, cookie.replace("'min-[1400px]:bottom-auto min-[1400px]:top-24',", ''), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w7 P2-10): the old top-corner card over the English hero headline is caught',
+      !overlaysOk(widgets, cookie.replace('lg:inset-x-6', 'min-[1400px]:bottom-auto min-[1400px]:top-24'), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w7 P2-10): the old corner card is caught',
+      !overlaysOk(widgets, cookie.replace('md:start-[4.75rem] md:end-6 md:bottom-5 md:mx-auto md:max-w-3xl', 'md:inset-x-auto md:end-6 md:w-[20rem] md:max-[1399px]:bottom-6'), a11y, whatsapp, bar))
     check('MUTATION CONTROL: no bottom padding while the sheet shows is caught',
       !overlaysOk(widgets, cookie.replace("body.style.paddingBottom = phone ?", 'void (phone ?'), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w7 P2-10): no bottom padding from md is caught',
+      !overlaysOk(widgets, cookie.replace('`${sheet.offsetHeight + DESKTOP_GAP_PX}px`', "''"), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w7 P2-10): the old narrow sheet slot the button sat against is caught',
+      !overlaysOk(widgets, cookie.replace(SHEET_SLOT, SLOT), a11y, whatsapp, bar))
     check('MUTATION CONTROL: a full-width phone banner without the sheet shape is caught',
       !overlaysOk(widgets, cookie.replace('rounded-t-card', 'rounded-none'), a11y, whatsapp, bar))
     const short = (l: 'he' | 'en') => (l === 'he' ? publicHe : publicEn).cookie.short

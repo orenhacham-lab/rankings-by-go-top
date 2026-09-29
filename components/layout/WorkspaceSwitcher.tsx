@@ -143,8 +143,24 @@ export default function WorkspaceSwitcher() {
     )
   }
 
+  // Still loading: a quiet pill the size and shape of the real one, so the bar
+  // neither says "loading projects…" on every page nor changes width when the
+  // name arrives (w7 P2-1). The words stay for screen readers only.
   if (!isResolved) {
-    return <span data-onboarding="workspace" className="text-copy text-muted">{t.loading}</span>
+    return (
+      <span
+        data-onboarding="workspace"
+        data-switcher-skeleton
+        role="status"
+        aria-busy="true"
+        className="inline-flex h-9 w-44 items-center gap-2.5 rounded-control border border-line bg-surface ps-1.5 pe-2.5 shadow-control sm:w-60"
+      >
+        <span aria-hidden="true" className="skeleton size-6 shrink-0 rounded-control" />
+        <span aria-hidden="true" className="skeleton h-3 min-w-0 flex-1 rounded-pill" />
+        <ChevronDown size={15} aria-hidden="true" className="shrink-0 text-line-strong" />
+        <span className="sr-only">{t.loading}</span>
+      </span>
+    )
   }
 
   if (projects.length === 0) {

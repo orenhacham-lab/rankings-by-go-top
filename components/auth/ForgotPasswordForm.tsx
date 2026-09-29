@@ -45,6 +45,7 @@ export default function ForgotPasswordForm() {
 
   return (
     <AuthShell
+      variant="recover"
       locale={lang}
       logoAlt={ui.logoAlt}
       subtitle={ui.subtitle}

@@ -33,6 +33,7 @@ import { INITIAL_STEPS, knownResearchCode, readResearchStream, researchRun, with
 import { researchScreenCopy } from '@/lib/presignup/copy'
 import type { ReportRequestResponse, ResearchErrorCode, ResearchStepView, ResearchView } from '@/lib/presignup/types'
 import { FreeCheckExperience, FormState } from './FreeCheckExperience'
+import HeroBackdrop from '@/components/public/HeroBackdrop'
 
 type Phase = 'form' | 'progress' | 'summary' | 'fallback'
 
@@ -131,7 +132,9 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
   const domain = site.ok ? site.domain.replace(/^www\./, '') : url.trim()
 
   return (
-    <div dir={dir} className="min-h-[70vh]" data-research-state={phase}>
+    <div dir={dir} className="relative min-h-[70vh]" data-research-state={phase}>
+      {/* The landing hero's backdrop behind every state of the research (w7 P1-9). */}
+      <HeroBackdrop />
       {phase === 'form' && (
         <FormState
           copy={copy}
@@ -145,7 +148,7 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
       )}
       {phase !== 'form' && (
         <FixedDashboardLanguage locale={locale}>
-          <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 md:pt-10">
+          <div className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 md:pt-10">
             {phase === 'progress' && <SeedProgress run={researchRun(steps)} domain={domain} projectId={null} reconnecting={false} />}
             {phase === 'summary' && view && (
               <ResearchSummary
