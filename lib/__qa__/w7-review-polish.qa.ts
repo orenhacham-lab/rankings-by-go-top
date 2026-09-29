@@ -155,13 +155,13 @@ console.log('\nP2-11) Articles list: plural agreement, the connection line in th
   const ArticlesHero: any = require('../../components/content/workspace/ArticlesHero').default
   const h = he.contentHub.articlesHero, e = en.contentHub.articlesHero
   check('A1: one ready article reads "מאמר אחד מוכן"', h.waiting(1, '1').startsWith('מאמר אחד מוכן') && !h.waiting(1, '1').includes('1 מוכנים'))
-  check('A1b: several read in the plural', h.waiting(3, '3') === '3 מאמרים מוכנים ומחכים לפרסום' && e.waiting(1, '1').startsWith('One article') && e.waiting(3, '3').startsWith('3 articles'))
+  check('A1b: several read in the plural', h.waiting(3, '3') === '3 מאמרים מוכנים ומחכים לאישור שלכם' && e.waiting(1, '1').startsWith('One article') && e.waiting(3, '3').startsWith('3 articles'))
   check('A1c: one written article is singular too', h.headlineNone(1, '1') === 'מאמר אחד כתוב, ועוד לא פורסם' && h.headlineNone(4, '4').startsWith('4 מאמרים'))
   const oldWaiting = (ready: string) => `${ready} מוכנים ומחכים לפרסום`
   check('A1-MUT: the old sentence says "1 מוכנים"', oldWaiting('1').startsWith('1 מוכנים'))
   const standing = { total: 3, draft: 0, ready: 1, scheduled: 1, publishing: 0, published: 1, failed: 0, publishedLast30: 1, lastPublishedAt: '2026-09-10T08:00:00Z', weekly: [0, 0, 0, 0, 0, 1, 0, 0] }
   const hero = render('he', createElement(ArticlesHero, { standing, connection: createElement('a', { href: '/settings?projectId=p1#platform' }, 'x') }))
-  check('A2: the hero says "מאמר אחד מוכן ומחכה לפרסום"', text(hero).includes('מאמר אחד מוכן ומחכה לפרסום') && !text(hero).includes('1 מוכנים'))
+  check('A2: the hero says "מאמר אחד מוכן ומחכה לאישור שלכם"', text(hero).includes('מאמר אחד מוכן ומחכה לאישור שלכם') && !text(hero).includes('1 מוכנים'))
   // The render is the hero alone, so the marker being in it at all means inside the hero.
   const inHero = (hh: string) => hh.includes('data-articles-hero=""') && hh.indexOf('data-articles-hero-connection') > hh.indexOf('data-articles-hero=""')
   check('A3: the connection line is drawn inside the hero', inHero(hero))

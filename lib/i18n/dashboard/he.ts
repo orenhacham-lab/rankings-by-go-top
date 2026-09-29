@@ -984,7 +984,7 @@ export const dashboardHe = {
       headline: (published: string, total: string) => `${published} מתוך ${total} המאמרים כבר באוויר`,
       // Singular and plural are separate sentences: "1 מוכנים" reads wrong (review P2-11).
       headlineNone: (n: number, total: string) => (n === 1 ? 'מאמר אחד כתוב, ועוד לא פורסם' : `${total} מאמרים כתובים, ועוד אף אחד מהם לא פורסם`),
-      waiting: (n: number, ready: string) => (n === 1 ? 'מאמר אחד מוכן ומחכה לפרסום' : `${ready} מאמרים מוכנים ומחכים לפרסום`),
+      waiting: (n: number, ready: string) => (n === 1 ? 'מאמר אחד מוכן ומחכה לאישור שלכם' : `${ready} מאמרים מוכנים ומחכים לאישור שלכם`),
       total: 'כל המאמרים',
       totalHint: (drafts: string) => `${drafts} בטיוטה`,
       totalHintNone: 'אין טיוטות פתוחות',
@@ -6060,6 +6060,56 @@ export const dashboardHe = {
       cancel: 'ביטול התזמון',
       cancelled: 'התזמון בוטל.',
       withImage: 'עם תמונה',
+    },
+  },
+  // Nudges for what waits for the owner: the dashboard card, the rail's count pills, the
+  // settings switch and the reminder email (lib/nudges, lib/reminders). Wording: UX decisions, E.
+  waitingCard: {
+    title: 'מחכה לכם',
+    connection: 'החיבור לאתר נותק, ולכן מאמרים ותיקונים לא עולים',
+    connectionAction: 'חיבור מחדש',
+    articles: (n: number) => (n === 1 ? 'מאמר אחד כתוב ומחכה לאישור שלכם' : `${n} מאמרים כתובים ומחכים לאישור שלכם`),
+    articlesAction: 'לאישור המאמרים',
+    topics: (n: number) => `${n} נושאים חדשים מחכים לאישור`,
+    topicsAction: 'לאישור הנושאים',
+    queueDry: (date: string) => `בלי אישור, התור יתרוקן ב-${date}`,
+    fixes: (n: number) => `${n} תיקונים בטוחים מוכנים לאתר`,
+    fixesAction: 'לתיקונים',
+  },
+  railWaiting: {
+    aria: (n: number) => `${n} ממתינים`,
+  },
+  reminders: {
+    settingsTitle: 'תזכורות במייל',
+    settingsDescription: 'כשמאמרים מחכים לאישור שלכם, נשלח תזכורת קצרה: אחרי 48 שעות, אחרי 5 ימים, ואז פעם בשבוע (עד 3 תזכורות לאותם מאמרים). לא יותר ממייל אחד ב-3 ימים, ורק בימים א׳–ה׳ בבוקר.',
+    settingsLabel: 'תזכורות במייל כשמשהו מחכה לכם',
+    on: 'פעיל',
+    off: 'כבוי',
+    saved: 'ההעדפה נשמרה.',
+    failed: 'לא הצלחנו לשמור. נסו שוב.',
+    email: {
+      subject: (n: number, domain: string) => (n === 1 ? `מאמר אחד מחכה לאישור שלכם ב-${domain}` : `${n} מאמרים מחכים לאישור שלכם ב-${domain}`),
+      preheader: 'כמה דקות של קריאה, ולחיצה אחת כדי שיעלו לאתר.',
+      greeting: (name: string | null) => (name ? `שלום ${name},` : 'שלום,'),
+      intro: (n: number, domain: string) => (n === 1
+        ? `כתבנו מאמר חדש לאתר ${domain}, והוא מחכה רק לאישור שלכם:`
+        : `כתבנו ${n} מאמרים חדשים לאתר ${domain}, והם מחכים רק לאישור שלכם:`),
+      more: (k: number) => `(ועוד ${k})`,
+      outro: 'אחרי האישור הם יעלו לאתר בתאריכים שבתוכנית. עד שתאשרו, שום דבר לא מתפרסם.',
+      outroOne: 'אחרי האישור הוא יעלה לאתר בתאריך שבתוכנית. עד שתאשרו, שום דבר לא מתפרסם.',
+      button: 'לאישור המאמרים',
+      help: 'צריכים עזרה? כתבו לנו ב-WhatsApp: 054-9489377',
+      team: 'צוות Go Top',
+      footer: 'קיבלתם את המייל כי יש לכם פרויקט פעיל ב-Rankings by Go Top. לא רוצים תזכורות כאלה?',
+      unsubscribe: 'הסרה בלחיצה אחת, בלי להתחבר',
+      company: 'Go Top · oren@gotop.co.il',
+    },
+    unsubscribePage: {
+      title: 'הוסרתם מהתזכורות',
+      body: 'לא נשלח לכם עוד תזכורות במייל על מאמרים שמחכים לאישור. אפשר להחזיר אותן בכל רגע בהגדרות הפרויקט.',
+      invalidTitle: 'הקישור לא תקין',
+      invalidBody: 'הקישור לא תקין או שפג תוקפו. אפשר לכבות את התזכורות בהגדרות הפרויקט.',
+      back: 'לאתר',
     },
   },
 } as const

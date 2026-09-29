@@ -11,6 +11,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { ARTICLES_WAITING_STATUS } from '@/lib/nudges/rows'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -57,7 +59,10 @@ export default function ArticlesScreen() {
   const cf = t.confirms
   const confirmPublish = (body: string) => confirm({ title: cf.publishTitle, body, confirmLabel: cf.publishAction })
 
-  const [statusFilter, setStatusFilter] = useState('')
+  // A nudge ("articles waiting for your OK") opens this screen already filtered on them; only
+  // that one fixed value is read from the address, anything else is the unfiltered list.
+  const urlParams = useSearchParams()
+  const [statusFilter, setStatusFilter] = useState(() => (urlParams?.get('status') === ARTICLES_WAITING_STATUS ? ARTICLES_WAITING_STATUS : ''))
   const [search, setSearch] = useState('')
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show the first ARTICLES_PAGE rows by default
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)

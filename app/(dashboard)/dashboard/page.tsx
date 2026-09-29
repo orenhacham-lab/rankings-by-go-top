@@ -56,6 +56,9 @@ import { useDashboardOverview, useSeedState } from '@/components/dashboard/useDa
 import Shortcuts, { contentEnabled } from '@/components/dashboard/Shortcuts'
 import HeroCard, { type HeroNews, type NextStep } from '@/components/dashboard/HeroCard'
 import DashboardSetup from '@/components/dashboard/DashboardSetup'
+import WaitingCard from '@/components/dashboard/WaitingCard'
+import { useWaiting } from '@/components/nudges/useWaiting'
+import { waitingRows } from '@/lib/nudges/rows'
 import HoldingBack from '@/components/dashboard/HoldingBack'
 import RecentActivity, { type ActivityModel } from '@/components/dashboard/RecentActivity'
 import RankDistribution from '@/components/dashboard/RankDistribution'
@@ -178,6 +181,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
   const [allCards, setAllCards] = useState(false)
   // Read alongside the keywords but never part of them: each is its own widgets' state.
   const { overview, reload } = useDashboardOverview(project.id)
+  const { waiting, safeFixes } = useWaiting(project.id)
   // The mapping (lib/project-mapping/state.ts): the banner above the opening card, and
   // the areas only it can fill. When a mapping this screen started ends, the scan and
   // the dashboard's own route are read again and the areas fill in.
@@ -358,6 +362,9 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
             seedPhase={seed.kind === 'run' ? seed.phase : null}
             next={next}
           />
+
+          {/* What only the owner can move; nothing at all when nothing waits. */}
+          <WaitingCard t={dict.waitingCard} rows={waitingRows(project.id, waiting, safeFixes)} language={language} />
 
           {/* One equal column per tile from sm up; the clicks tile renders only once it
               has a figure, and the row closes up. On a phone, two per row. */}
