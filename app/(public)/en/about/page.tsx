@@ -7,8 +7,8 @@ export default function EnglishAboutPage() {
 
 const COPY: AboutCopy = {
   breadcrumb: { label: 'About', href: '/en/about' },
-  title: 'About',
-  accent: 'Rankings by Go Top',
+  title: '11 years of experience, in one SEO tool.',
+  accent: 'An automated SEO platform that works for you.',
   subtitle: 'One platform that writes and publishes articles on your site, tracks where you rank in Google and Google Maps, and checks whether AI engines recommend you. Built by Go Top, a digital agency with more than 11 years of experience in SEO and paid advertising.',
   who: {
     title: 'Who is behind the platform',
@@ -18,40 +18,28 @@ const COPY: AboutCopy = {
     ],
   },
   stat: { value: '11+', label: 'years of experience', sub: 'in SEO and digital marketing' },
-  why: {
-    title: 'Why we built the platform',
+  gaps: {
+    title: 'What was missing, and what we built instead',
     body: 'We wanted a business to be able to do everything it takes to get found, in one place, without having to learn SEO.',
-    items: [
+    missingLabel: 'What was missing',
+    builtLabel: 'What we built',
+    rows: [
       {
-        title: 'Manual rank tracking takes too much time',
-        description:
-          'Repeated keyword checks, multiple result screens, and manual calculations that weigh down the daily routine.',
+        pain: { title: 'Manual rank tracking takes too much time', description: 'Repeated keyword checks, multiple result screens, and manual calculations that weigh down the daily routine.' },
+        answer: { title: 'Rankings in Google and Google Maps', description: 'Tracking for every phrase in regular search and in Maps, by area and device, with a history of every change.' },
       },
       {
-        title: 'Data scattered across tools',
-        description:
-          'Rankings in Google, Maps, AI engines and other sources, without one clear picture.',
+        pain: { title: 'Data scattered across tools', description: 'Rankings in Google, Maps, AI engines and other sources, without one clear picture.' },
+        answer: { title: 'Everything in one place', description: 'Keyword research, rankings, AI visibility and your articles are connected to each other, not spread across four separate tools.' },
       },
       {
-        title: 'AI engines became part of search',
-        description:
-          'More customers ask ChatGPT, Gemini and Perplexity. You need to know whether your business is in the answer.',
+        pain: { title: 'AI engines became part of search', description: 'More customers ask ChatGPT, Gemini and Perplexity. You need to know whether your business is in the answer.' },
+        answer: { title: 'AI visibility tracking', description: 'See whether your business is mentioned, cited or recommended in answers from ChatGPT, Gemini, Perplexity and other AI engines.' },
       },
       {
-        title: 'Content that stalls on the way',
-        description:
-          'Knowing what to write about is half the job. It also has to be written, put on the site, and measured.',
+        pain: { title: 'Content that stalls on the way', description: 'Knowing what to write about is half the job. It also has to be written, put on the site, and measured.' },
+        answer: { title: 'Articles written and published', description: 'Complete articles on topics you approve, with images, a Q&A section and internal links, published to WordPress or Shopify.' },
       },
-    ],
-  },
-  solves: {
-    title: 'What Rankings by Go Top solves',
-    body: 'The platform does the work and shows the result: it writes and publishes content, and measures your rankings in Google, Maps and AI engines. Everything is connected, not spread across four separate tools.',
-    items: [
-      { title: 'Articles written and published', description: 'Complete articles on topics you approve, with images, a Q&A section and internal links, published to WordPress or Shopify.' },
-      { title: 'Rankings in Google and Google Maps', description: 'Tracking for every phrase in regular search and in Maps, by area and device, with a history of every change.' },
-      { title: 'AI visibility tracking', description: 'See whether your business is mentioned, cited or recommended in answers from ChatGPT, Gemini, Perplexity and other AI engines.' },
-      { title: 'Keyword research', description: 'Ideas, search volumes and competition from Google Ads, added straight to tracking or turned into AI questions.' },
     ],
   },
   approach: {
@@ -101,7 +89,7 @@ const COPY: AboutCopy = {
   cta: {
     title: 'Want to see what we could do with your site?',
     body: FEATURE_COMMON.en.closeBody,
-    contact: 'Questions? Email us:',
+    contact: 'Questions? Talk to us:',
     updated: 'This page was last updated in September 2026',
   },
 }

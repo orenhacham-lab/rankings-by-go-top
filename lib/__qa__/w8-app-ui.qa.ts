@@ -193,13 +193,13 @@ console.log('\nC) "צרו קשר" in the top bar')
   check('C1: between the switcher and the Guide, for customers only', mounted(layout))
   check('C1-MUT: shown to admins too is caught', !mounted(layout.replace('{!isAdmin && <ContactMenu />}', '<ContactMenu />')))
   const menu = strip(read('components/guide/ContactMenu.tsx'))
-  const oneSource = (s: string) => /from '@\/components\/public\/contact'/.test(s) && /href: PHONE_TEL/.test(s) && /href: CONTACT_MAILTO/.test(s) && /whatsappUrl\(t\.whatsappMessage\(domain\)\)/.test(s)
+  const oneSource = (s: string) => /from '@\/components\/public\/contact'/.test(s) && /href: PHONE_TEL/.test(s) && /href: EMAIL_HREF/.test(s) && /whatsappHelpUrl\(t\.whatsappMessage\(domain\)\)/.test(s)
     && !/972\d{6,}|0549489377|054-9489377|oren@gotop/.test(s)
   check('C2: WhatsApp, phone and email from the one contact source (no number typed here)', oneSource(menu))
   check('C2-MUT: a hard-coded number is caught', !oneSource(menu.replace('href: PHONE_TEL', "href: 'tel:+972549489377'")))
   const contact = require('../../components/public/contact')
-  check('C2: the constants are the existing number and address', contact.PHONE_TEL === 'tel:+972549489377' && contact.CONTACT_MAILTO === 'mailto:oren@gotop.co.il'
-    && contact.whatsappUrl('היי') === `https://wa.me/972549489377?text=${encodeURIComponent('היי')}`)
+  check('C2: the constants are the existing number and address', contact.PHONE_TEL === 'tel:+972549489377' && contact.EMAIL_HREF === 'mailto:oren@gotop.co.il'
+    && contact.whatsappHelpUrl('היי') === `https://wa.me/972549489377?text=${encodeURIComponent('היי')}`)
   const ContactMenu: any = require('../../components/guide/ContactMenu').default
   const pill = render('he', createElement(ContactMenu))
   check('C3: a labelled pill that opens a menu; icon-only below sm (390)', /aria-haspopup="menu"/.test(pill) && /aria-label="צרו קשר"/.test(pill) && /<span class="hidden sm:inline">צרו קשר<\/span>/.test(pill) && /<svg/.test(pill))

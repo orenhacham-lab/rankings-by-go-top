@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { cn } from '@/lib/utils'
-import { WHATSAPP_HELP_URL } from './contact'
+import { whatsappHelpUrl } from './contact'
 
 /**
  * Floating WhatsApp button — public site only, from `md` up.
@@ -22,7 +22,7 @@ export function WhatsAppFloat({ hidden = false }: { hidden?: boolean } = {}) {
   if (hidden) return null
   return (
     <a
-      href={WHATSAPP_HELP_URL}
+      href={whatsappHelpUrl(t.whatsappMessage)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t.whatsappAria}

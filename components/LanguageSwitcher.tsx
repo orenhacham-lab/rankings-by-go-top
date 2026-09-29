@@ -19,7 +19,8 @@ function getCounterpartPath(pathname: string, currentLocale: Locale): string {
   return `/en${pathname.startsWith('/') ? pathname : `/${pathname}`}`
 }
 
-export function LanguageSwitcher({ locale, className }: { locale: Locale; className?: string }) {
+/** `inverse`: white ink, for the nav while it sits over a navy hero. */
+export function LanguageSwitcher({ locale, className, inverse = false }: { locale: Locale; className?: string; inverse?: boolean }) {
   const pathname = usePathname() ?? '/'
   const dict = getPublicDictionary(locale)
   const counterpartHref = getCounterpartPath(pathname, locale)
@@ -31,14 +32,16 @@ export function LanguageSwitcher({ locale, className }: { locale: Locale; classN
       hrefLang={otherLocale}
       lang={otherLocale}
       className={cn(
-        'inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-copy font-medium text-body',
-        'transition-[background-color,color] duration-150 ease-snappy hover:bg-sunk hover:text-ink',
-        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+        'inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-copy font-medium',
+        'transition-[background-color,color] duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4',
+        inverse
+          ? 'text-contrast-ink/85 hover:bg-white/10 hover:text-contrast-ink focus-visible:ring-white/40'
+          : 'text-body hover:bg-sunk hover:text-ink focus-visible:ring-action/20',
         className,
       )}
       aria-label={dict.languageSwitcher.aria}
     >
-      <Languages className="size-4 text-muted" aria-hidden="true" />
+      <Languages className={cn('size-4', inverse ? 'text-contrast-ink/70' : 'text-muted')} aria-hidden="true" />
       {dict.languageSwitcher[otherLocale]}
     </Link>
   )

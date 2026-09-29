@@ -26,6 +26,8 @@ export const landingHe: LandingCopy = {
     signup: `פתחו ${TRIAL_DAYS} ימי ניסיון בחינם`,
     dashboard: 'לדאשבורד שלי',
     trust: ['בלי כרטיס אשראי', 'ביטול בכל רגע', 'עובד עם WordPress ו-Shopify', 'תמיכה אישית בעברית'],
+    climbChip: 'מקום 3 בגוגל',
+    published: 'מאמר פורסם באתר',
   },
   demo: {
     label: 'הדגמה חיה של המערכת',
@@ -254,7 +256,7 @@ export const landingHe: LandingCopy = {
     ],
   },
   check: {
-    eyebrow: 'בדיקה חינמית',
+    eyebrow: 'בדיקת אתר חינמית',
     title: 'עוד לא בטוחים? תנו לנו להראות לכם מה אנחנו רואים',
     body: 'הבדיקה קוראת את האתר שלכם באמת, ומחזירה תוך פחות מדקה תמצית מחקר ראשונה:',
     items: [

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import type { Locale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
+import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
+import { whatsappHelpUrl } from '@/components/public/contact'
 
 /**
  * The public footer: the navy band (bg-contrast), the same navy as the app's
@@ -98,6 +100,20 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
           <div>
             <h4 className={headingClass}>{dict.footer.contact}</h4>
             <ul className="space-y-2.5">
+              {/* WhatsApp first (wave 8, UX decision C) */}
+              <li>
+                <a
+                  href={whatsappHelpUrl(dict.contact.whatsappMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={dict.contact.whatsappAria}
+                  className={`${linkClass} inline-flex items-center gap-2`}
+                  data-footer-whatsapp
+                >
+                  <WhatsAppGlyph size={16} className="shrink-0" />
+                  {dict.contact.whatsappLabel}
+                </a>
+              </li>
               <li>
                 <a href="mailto:oren@gotop.co.il" dir="ltr" className={linkClass}>
                   oren@gotop.co.il
@@ -113,10 +129,17 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
         </div>
 
         {/* Bottom */}
-        <div className="mt-12 border-t border-white/10 pt-6">
+        <div className="mt-12 flex flex-col items-center gap-2 border-t border-white/10 pt-6 sm:flex-row sm:justify-between">
           <p className="text-center text-caption text-contrast-ink/60">
             {dict.footer.copyright}
           </p>
+          <a
+            href="https://gotop.co.il"
+            className="rounded-control text-caption font-semibold text-contrast-ink/80 underline decoration-white/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:text-contrast-ink hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
+            data-footer-credit
+          >
+            {dict.footer.credit}
+          </a>
         </div>
       </div>
     </footer>

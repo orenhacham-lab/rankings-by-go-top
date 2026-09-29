@@ -16,8 +16,14 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { Locale } from '@/lib/i18n/locales'
+import { cn } from '@/lib/utils'
 
-export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
+/**
+ * `inverse` is the home hero's navy variant (wave 8): a white 56px field and
+ * the action button on a frosted plate, start-aligned under the headline.
+ */
+export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Locale; tone?: 'default' | 'inverse' }) {
+  const inverse = tone === 'inverse'
   const copy = freeCheckCopy(locale)
   const router = useRouter()
   const [url, setUrl] = useState('')
@@ -25,7 +31,7 @@ export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
 
   return (
     <form
-      className="mx-auto w-full max-w-xl"
+      className={cn('w-full max-w-xl', !inverse && 'mx-auto')}
       onSubmit={(e) => {
         e.preventDefault()
         const candidate = url.trim()
@@ -35,7 +41,12 @@ export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
       <label htmlFor="hero-free-check-url" className="sr-only">
         {copy.form.label}
       </label>
-      <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-2 shadow-card sm:flex-row">
+      <div
+        className={cn(
+          'flex flex-col gap-2 rounded-card p-2 sm:flex-row',
+          inverse ? 'bg-white/10 ring-1 ring-white/20 backdrop-blur-sm' : 'border border-line bg-surface shadow-card',
+        )}
+      >
         <div className="min-w-0 flex-1">
           <Input
             id="hero-free-check-url"
@@ -46,15 +57,20 @@ export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder={copy.form.placeholder}
-            className="h-11 border-transparent bg-sunk/60 text-start shadow-none hover:border-line focus:bg-surface"
+            className={cn(
+              'text-start',
+              inverse
+                ? 'h-14 border-transparent bg-surface text-lead focus:ring-white/40'
+                : 'h-11 border-transparent bg-sunk/60 shadow-none hover:border-line focus:bg-surface',
+            )}
           />
         </div>
-        <Button type="submit" size="lg" className="shrink-0">
+        <Button type="submit" size="lg" className={cn('shrink-0', inverse && 'h-14 px-6 focus-visible:ring-white/50')}>
           {copy.form.submit}
           <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </Button>
       </div>
-      <p className="mt-2.5 text-center text-caption text-muted">{copy.page.badge}</p>
+      <p className={cn('mt-2.5 text-caption', inverse ? 'text-start text-contrast-ink/75' : 'text-center text-muted')}>{copy.page.badge}</p>
     </form>
   )
 }

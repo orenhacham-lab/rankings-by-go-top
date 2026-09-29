@@ -5,7 +5,7 @@ import { Phone } from 'lucide-react'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { buttonClasses } from './marketing'
-import { WHATSAPP_HELP_URL, PHONE_TEL } from './contact'
+import { whatsappHelpUrl, PHONE_TEL } from './contact'
 
 /**
  * Sticky bottom contact bar — public site only, mobile.
@@ -33,7 +33,7 @@ export function MobileContactBar() {
     >
       <div className="flex w-full items-stretch gap-2 ps-[4.25rem] pe-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
         <a
-          href={WHATSAPP_HELP_URL}
+          href={whatsappHelpUrl(t.whatsappMessage)}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={t.whatsappAria}

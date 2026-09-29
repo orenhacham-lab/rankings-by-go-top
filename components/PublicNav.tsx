@@ -12,14 +12,20 @@ import { buttonClasses } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { authHref } from '@/lib/i18n/auth-href'
+import { ContactMenu, ContactRows } from '@/components/public/ContactMenu'
 
 /**
  * The public site's top bar, in the app's own vocabulary: the Go Top mark and
  * the "Rankings by Go Top" lockup from the rail, copy-sized links, one primary
  * button. Transparent over the hero's paper, a hairline and a blur once the page
  * scrolls. The features menu opens on hover AND on keyboard focus.
+ *
+ * `tone="inverse"` (wave 8, UX decision D) is for a page whose hero is navy
+ * (home, About): transparent with white ink over the hero, and the usual canvas
+ * with a blur once the page has scrolled 80px. The last text item, "צרו קשר",
+ * opens the contact menu (UX decision C).
  */
-export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
+export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale; tone?: 'default' | 'inverse' } = {}) {
   const pathname = usePathname() ?? '/'
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -33,12 +39,15 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
   const signupHref = authHref('signup', locale)
   const loginHref = authHref('login', locale)
 
+  const scrollThreshold = tone === 'inverse' ? 80 : 8
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    const onScroll = () => setScrolled(window.scrollY > scrollThreshold)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [scrollThreshold])
+  // White ink while the bar is still over a navy hero.
+  const onDark = tone === 'inverse' && !scrolled && !mobileOpen
 
   useEffect(() => {
     const supabase = createClient()
@@ -109,8 +118,10 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
   const linkClass = (active: boolean) =>
     cn(
       'inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-copy font-medium transition-[background-color,color] duration-150 ease-snappy',
-      'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
-      active ? 'bg-sunk text-ink' : 'text-body hover:bg-sunk hover:text-ink',
+      'focus-visible:outline-none focus-visible:ring-4',
+      onDark
+        ? cn('focus-visible:ring-white/40', active ? 'bg-white/15 text-contrast-ink' : 'text-contrast-ink/85 hover:bg-white/10 hover:text-contrast-ink')
+        : cn('focus-visible:ring-action/20', active ? 'bg-sunk text-ink' : 'text-body hover:bg-sunk hover:text-ink'),
     )
 
   return (
@@ -120,7 +131,8 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
         scrolled || mobileOpen ? 'border-line bg-canvas/90 backdrop-blur-md' : 'border-transparent bg-transparent',
       )}
     >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      {/* max-w-7xl: seven links, the language switch and two buttons need the room from xl */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
           {/* The lockup, as on the rail */}
           <Link
@@ -130,13 +142,13 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
           >
             <GoTopMark size={32} className="shrink-0" />
             <span className="flex flex-col" dir="ltr">
-              <span className="text-section font-semibold leading-5 text-ink">Rankings</span>
-              <span className="text-overline font-semibold text-action">by Go Top</span>
+              <span className={cn('text-section font-semibold leading-5', onDark ? 'text-contrast-ink' : 'text-ink')}>Rankings</span>
+              <span className={cn('text-overline font-semibold', onDark ? 'text-rail-tagline' : 'text-action')}>by Go Top</span>
             </span>
           </Link>
 
           {/* Desktop Menu */}
-          <nav className="hidden items-center gap-1 lg:flex" aria-label={dict.nav.primaryAria}>
+          <nav className="hidden items-center gap-0.5 whitespace-nowrap xl:flex" aria-label={dict.nav.primaryAria}>
             <Link key={homeLink.href} href={homeLink.href} className={linkClass(isActive(homeLink.href))}>
               {homeLink.label}
             </Link>
@@ -171,11 +183,12 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
                 {link.label}
               </Link>
             ))}
+            <ContactMenu locale={locale} linkClassName={linkClass(false)} />
           </nav>
 
           {/* CTA Buttons + Language Switcher */}
-          <div className="hidden items-center gap-1 lg:flex">
-            <LanguageSwitcher locale={locale} />
+          <div className="hidden items-center gap-1 lg:ms-auto lg:flex xl:ms-0">
+            <LanguageSwitcher locale={locale} inverse={onDark} />
             {!authChecked ? (
               <div className="h-10 w-40" />
             ) : isAuthed ? (
@@ -184,7 +197,7 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
               </Link>
             ) : (
               <>
-                <Link href={loginHref} className={buttonClasses('ghost', 'md')}>
+                <Link href={loginHref} className={buttonClasses(onDark ? 'ghost-inverse' : 'ghost', 'md')}>
                   {dict.nav.login}
                 </Link>
                 <Link href={signupHref} className={buttonClasses('primary', 'md', 'ms-1')}>
@@ -198,7 +211,10 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
           <button
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="flex size-10 items-center justify-center rounded-control text-ink transition-[background-color] duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 lg:hidden"
+            className={cn(
+              'flex size-10 items-center justify-center rounded-control transition-[background-color] duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 xl:hidden',
+              onDark ? 'text-contrast-ink hover:bg-white/10 focus-visible:ring-white/40' : 'text-ink hover:bg-sunk focus-visible:ring-action/20',
+            )}
             aria-label={mobileOpen ? dict.nav.closeMenu : dict.nav.menu}
             aria-expanded={mobileOpen}
           >
@@ -209,7 +225,7 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="max-h-[calc(100dvh-4rem)] animate-pop-in overflow-y-auto border-t border-line bg-surface shadow-pop lg:hidden">
+        <div className="max-h-[calc(100dvh-4rem)] animate-pop-in overflow-y-auto border-t border-line bg-surface shadow-pop xl:hidden">
           <div className="px-4 py-4 sm:px-6">
             <nav className="flex flex-col gap-0.5" aria-label={dict.nav.primaryAria}>
               <Link
@@ -261,6 +277,11 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
                 </Link>
               ))}
             </nav>
+            {/* Contact: the same three rows as the desktop menu */}
+            <div className="mt-3 border-t border-line pt-3" data-mobile-contact>
+              <p className="px-3 pb-1 text-caption font-semibold text-muted">{dict.nav.contact}</p>
+              <ContactRows locale={locale} onPick={() => setMobileOpen(false)} />
+            </div>
             <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
               <LanguageSwitcher locale={locale} className="self-start" />
               {isAuthed ? (

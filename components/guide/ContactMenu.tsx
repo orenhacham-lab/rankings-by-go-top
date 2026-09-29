@@ -15,7 +15,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Mail, Phone } from 'lucide-react'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
-import { CONTACT_EMAIL, CONTACT_MAILTO, PHONE_DISPLAY, PHONE_TEL, whatsappUrl } from '@/components/public/contact'
+import { EMAIL, EMAIL_HREF, PHONE_DISPLAY, PHONE_TEL, whatsappHelpUrl } from '@/components/public/contact'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -64,9 +64,9 @@ export default function ContactMenu() {
 
   const ITEM = 'group flex w-full items-center gap-3 rounded-control px-3 py-2.5 text-start text-copy text-body transition-colors duration-150 hover:bg-sunk hover:text-ink focus-visible:bg-sunk focus-visible:text-ink focus-visible:outline-none'
   const rows = [
-    { key: 'whatsapp', href: whatsappUrl(t.whatsappMessage(domain)), label: t.whatsapp, icon: <WhatsAppGlyph size={16} className="shrink-0 text-muted transition-colors duration-150 group-hover:text-whatsapp group-focus-visible:text-whatsapp" />, external: true },
+    { key: 'whatsapp', href: whatsappHelpUrl(t.whatsappMessage(domain)), label: t.whatsapp, icon: <WhatsAppGlyph size={16} className="shrink-0 text-muted transition-colors duration-150 group-hover:text-whatsapp group-focus-visible:text-whatsapp" />, external: true },
     { key: 'phone', href: PHONE_TEL, label: t.phone(PHONE_DISPLAY), icon: <Phone size={16} className="shrink-0 text-muted" aria-hidden="true" />, external: false },
-    { key: 'email', href: CONTACT_MAILTO, label: t.email(CONTACT_EMAIL), icon: <Mail size={16} className="shrink-0 text-muted" aria-hidden="true" />, external: false },
+    { key: 'email', href: EMAIL_HREF, label: t.email(EMAIL), icon: <Mail size={16} className="shrink-0 text-muted" aria-hidden="true" />, external: false },
   ]
 
   return (
