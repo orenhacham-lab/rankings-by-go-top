@@ -1,12 +1,13 @@
 <?php
 /**
  * Plugin Name: GO TOP SEO Bridge
- * Description: Lets the GO TOP app apply SEO fixes you approve, one at a time: SEO title and meta
- *              description, canonical, focus keyphrase, image alt text, an FAQ block at the end of a
- *              page, JSON-LD schema, a broken link fix and an internal link. Every change keeps the
- *              previous value and can be undone. It never deletes content, never touches prices,
- *              products, the theme, plugins, settings or users, and never publishes or unpublishes.
- * Version:     2.0.0
+ * Description: Lets the GO TOP app apply SEO fixes you approve: SEO title and meta description,
+ *              canonical, focus keyphrase, image alt text, an FAQ block at the end of a page, JSON-LD
+ *              schema, a broken link fix, an internal link, an extra main heading turned into a
+ *              subheading, and an llms.txt for AI assistants. Every change keeps the previous value
+ *              and can be undone. It never deletes content, never touches prices, products, the
+ *              theme, plugins, settings or users, and never publishes or unpublishes.
+ * Version:     2.1.0
  * Requires at least: 5.6
  * Requires PHP: 7.0
  * License:     GPL-2.0-or-later
@@ -25,18 +26,21 @@
  *     POST /wp-json/gotop/v1/fix         |  SHA-256, with the per-site secret. Constant-time
  *     POST /wp-json/gotop/v1/undo       /   compare; +-5 minutes; a nonce is accepted once.
  *   No route is open: each has a permission_callback that fails closed.
- *   /fix accepts ONLY the nine fix types in gotop_seo_bridge_fix_types(), re-validates every value
- *   here, and stores the previous value before it writes.
+ *   /fix accepts ONLY the eleven fix types in gotop_seo_bridge_fix_types() (2.1.0 added h1_demote
+ *   and llms_txt), re-validates every value here, and stores the previous value before it writes.
+ *   Public (no route, no write): GET /llms.txt answers the approved llms.txt text when the site has
+ *   no llms.txt file of its own (includes/llms.php).
  */
 
 if (!defined('ABSPATH')) { exit; }
 
-define('GOTOP_SEO_BRIDGE_VERSION', '2.0.0');
+define('GOTOP_SEO_BRIDGE_VERSION', '2.1.0');
 define('GOTOP_SEO_BRIDGE_DIR', __DIR__);
 
 require_once GOTOP_SEO_BRIDGE_DIR . '/includes/auth.php';
 require_once GOTOP_SEO_BRIDGE_DIR . '/includes/content.php';
 require_once GOTOP_SEO_BRIDGE_DIR . '/includes/fixes.php';
+require_once GOTOP_SEO_BRIDGE_DIR . '/includes/llms.php';
 require_once GOTOP_SEO_BRIDGE_DIR . '/includes/output.php';
 require_once GOTOP_SEO_BRIDGE_DIR . '/includes/admin.php';
 
@@ -199,7 +203,8 @@ function gotop_seo_bridge_status_for($code) {
     $map = array(
         'not_allowed' => 400, 'value_invalid' => 400, 'invalid_request' => 400, 'off_site' => 400,
         'not_in_wordpress' => 404, 'nothing_to_undo' => 404,
-        'changed_since_preview' => 409, 'no_safe_place' => 422, 'nothing_to_change' => 422, 'write_failed' => 500,
+        'changed_since_preview' => 409, 'file_exists' => 409, 'no_safe_place' => 422, 'nothing_to_change' => 422,
+        'builder_page' => 422, 'write_failed' => 500,
     );
     return isset($map[$code]) ? $map[$code] : 400;
 }
@@ -214,4 +219,6 @@ register_uninstall_hook(__FILE__, 'gotop_seo_bridge_uninstall');
 function gotop_seo_bridge_uninstall() {
     delete_option('gotop_seo_bridge_key');
     delete_option('gotop_seo_bridge_log');
+    delete_option('gotop_seo_bridge_llms');
+    delete_option('gotop_seo_bridge_llms_jobs');
 }

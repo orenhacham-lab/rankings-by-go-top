@@ -11,10 +11,14 @@
  *   {"post": 11}                       -> the post's content and meta
  *   {"option": "gotop_seo_bridge_key"} -> an option's value
  *   {"head": 11, "seo": "none"}         -> what wp_head / the title filter print for post 11
+ *   {"setpost": 41, "content": "...", "url": "https://...", "meta": {...}} -> put a post in place (2.1.0 tests)
+ *   {"llms": "/llms.txt", "method": "GET"} -> what a public request for that path answers (null: WordPress carries on)
  * It prints one JSON array: the result of every step.
+ *
+ * GOTOP_HARNESS_ROOT (environment) sets the site's root folder (ABSPATH), where a real llms.txt may sit.
  */
 
-define('ABSPATH', __DIR__ . '/');
+define('ABSPATH', getenv('GOTOP_HARNESS_ROOT') ? rtrim(getenv('GOTOP_HARNESS_ROOT'), '/') . '/' : __DIR__ . '/');
 
 // ── State ───────────────────────────────────────────────────────────────────
 $GLOBALS['__options'] = array('show_on_front' => 'posts', 'page_on_front' => 0);
@@ -155,6 +159,15 @@ foreach ($calls as $step) {
         $head = ob_get_clean();
         $out[] = array('head' => $head, 'title' => gotop_seo_bridge_document_title('Theme title'));
         $GLOBALS['__queried'] = 0;
+    } elseif (isset($step['setpost'])) {
+        $id = (int) $step['setpost'];
+        $GLOBALS['__posts'][$id] = (object) array('ID' => $id, 'post_type' => 'page', 'post_status' => 'publish',
+            'post_title' => isset($step['title']) ? $step['title'] : 'Page ' . $id, 'post_content' => (string) $step['content']);
+        if (isset($step['url'])) { $GLOBALS['__urls'][$step['url']] = $id; }
+        if (isset($step['meta']) && is_array($step['meta'])) { foreach ($step['meta'] as $k => $v) { $GLOBALS['__meta'][$id][$k] = $v; } }
+        $out[] = array('value' => $id);
+    } elseif (isset($step['llms'])) {
+        $out[] = array('value' => gotop_seo_bridge_llms_response(isset($step['method']) ? $step['method'] : 'GET', $step['llms']));
     } elseif (isset($step['define'])) {
         if (!defined($step['define'])) { define($step['define'], '1.0'); }
         $out[] = array('defined' => $step['define']);

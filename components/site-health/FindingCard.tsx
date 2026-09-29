@@ -18,6 +18,7 @@ import type { FixRowState } from '@/lib/site-fix/job-match'
 import { fixKey } from './useSiteHealthScan'
 
 type Copy = DashboardDictionary['siteHealth']
+export type FixMode = 'fix' | 'install' | 'update' | 'copy' | null
 
 const SEVERITY_BADGE: Record<Severity, 'danger' | 'warning' | 'info'> = { urgent: 'danger', important: 'warning', minor: 'info' }
 /** Pages shown before "and N more". */
@@ -76,8 +77,11 @@ export default function FindingCard({
   platform: SitePlatform
   fixed: ReadonlySet<string>
   onFix: (finding: Finding, page: FindingPage) => void
-  /** With the fix queue live: whether this page can be fixed now, needs the plugin first, or neither. */
-  fixModeFor?: ((finding: Finding, page: FindingPage) => 'fix' | 'install' | null) | null
+  /**
+   * With the fix queue live: whether this page can be fixed now, needs the plugin first, needs a newer
+   * plugin (`update`), gets a text to copy and place by hand (`copy`, llms.txt), or none of these.
+   */
+  fixModeFor?: ((finding: Finding, page: FindingPage) => FixMode) | null
   /** With the fix queue live: whether an approved fix already covers this page (the server's queue decides). */
   jobStateFor?: ((finding: Finding, page: FindingPage) => FixRowState) | null
   onInstall?: () => void
@@ -123,7 +127,7 @@ export default function FindingCard({
               const measure = measureOf(copy, finding, page)
               const mode = fixModeFor ? fixModeFor(finding, page) : page.fixable ? 'fix' : null
               return (
-                <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : queued ? 'queued' : mode === 'fix' ? 'fixable' : mode === 'install' ? 'install' : 'guide'}>
+                <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : queued ? 'queued' : mode === 'fix' ? 'fixable' : mode === 'install' ? 'install' : mode === 'update' ? 'update' : mode === 'copy' ? 'copy' : 'guide'}>
                   <div className="min-w-0">
                     {/* The address reads left to right, while the row keeps the page's own alignment. */}
                     <p className="truncate text-copy font-medium text-ink" title={page.url}>
@@ -144,9 +148,17 @@ export default function FindingCard({
                       <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.fixType && fixModeFor ? finding.fixType : finding.field ?? ''}>
                         {copy.fixForMe}
                       </Button>
+                    ) : mode === 'copy' ? (
+                      <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.createTextAria(pageLabel(copy, page))} data-copy-button={finding.fixType ?? ''}>
+                        {copy.createText}
+                      </Button>
                     ) : mode === 'install' && onInstall ? (
                       <Button variant="ghost" size="sm" onClick={onInstall} data-install-button={finding.fixType ?? ''}>
                         {copy.autofix.connection.install}
+                      </Button>
+                    ) : mode === 'update' && onInstall ? (
+                      <Button variant="ghost" size="sm" onClick={onInstall} data-update-button={finding.fixType ?? ''}>
+                        {copy.autofix.connection.update.action}
                       </Button>
                     ) : page.adminUrl ? (
                       <a

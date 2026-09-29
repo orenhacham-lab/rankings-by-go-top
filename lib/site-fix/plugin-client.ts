@@ -29,6 +29,9 @@ const PLUGIN_CODES: Record<string, FixErrorCode> = {
   nothing_to_undo: 'nothing_to_undo',
   invalid_request: 'invalid_request',
   write_failed: 'write_not_confirmed',
+  // 2.1.0
+  builder_page: 'h1_not_safe',
+  file_exists: 'llms_exists',
 }
 
 export async function callPlugin<T>(
@@ -66,6 +69,10 @@ export type PluginItem = {
   content_sha: string
   seo_plugin: 'yoast' | 'rankmath' | 'none'
   seo: { title: string; description: string; canonical: string; focus: string; schema: string }
+  /** 2.1.0: the words of each <h1> of the post's own content, in order (null: markup not simple). Absent on 2.0.0. */
+  h1?: string[] | null
+  /** 2.1.0: a page builder renders this page. */
+  builder?: boolean
 }
 
 export type PluginFixAnswer = {

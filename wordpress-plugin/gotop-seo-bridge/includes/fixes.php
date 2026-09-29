@@ -1,6 +1,6 @@
 <?php
 /**
- * The nine fixes, and nothing else.
+ * The eleven fixes, and nothing else (nine since 2.0.0; h1_demote and llms_txt since 2.1.0).
  *
  * gotop_seo_bridge_fix_types() is the closed list. A request for any other type is refused
  * before anything is read. Each value is re-validated here (the app validated it too, but this
@@ -25,6 +25,8 @@ function gotop_seo_bridge_fix_types() {
         'schema_jsonld',
         'broken_link',
         'internal_link',
+        'h1_demote',
+        'llms_txt',
     );
 }
 
@@ -119,7 +121,7 @@ function gotop_seo_bridge_validate_fix($type, $value) {
         'seo_title' => array('value'), 'meta_description' => array('value'), 'canonical' => array('value'),
         'focus_keyphrase' => array('value'), 'image_alt' => array('images'), 'faq_block' => array('items', 'heading'),
         'schema_jsonld' => array('schema'), 'broken_link' => array('href', 'replacement'),
-        'internal_link' => array('target', 'anchor'),
+        'internal_link' => array('target', 'anchor'), 'h1_demote' => array('headings'), 'llms_txt' => array('text'),
     );
     foreach (array_keys($value) as $k) {
         if (!in_array($k, $allowed_keys[$type], true)) { return 'not_allowed'; }
@@ -193,6 +195,25 @@ function gotop_seo_bridge_validate_fix($type, $value) {
             $anchor = gotop_seo_bridge_text_ok(isset($value['anchor']) ? $value['anchor'] : null, 2, 80);
             if ($anchor === null) { return 'value_invalid'; }
             return array('type' => $type, 'value' => array('target' => $target, 'anchor' => $anchor));
+        case 'h1_demote':
+            // Which main headings of the post's own content become subheadings: by their place among
+            // the content's <h1> tags AND their exact words (a page changed since is refused).
+            $headings = isset($value['headings']) ? $value['headings'] : null;
+            if (!is_array($headings) || count($headings) < 1 || count($headings) > 10) { return 'value_invalid'; }
+            $out = array();
+            $seen = array();
+            foreach ($headings as $h) {
+                if (!is_array($h) || array_diff(array_keys($h), array('n', 'text'))) { return 'not_allowed'; }
+                if (!isset($h['n']) || !is_int($h['n']) || $h['n'] < 0 || $h['n'] > 49 || isset($seen[$h['n']])) { return 'value_invalid'; }
+                $text = gotop_seo_bridge_text_ok(isset($h['text']) ? $h['text'] : null, 1, 300);
+                if ($text === null) { return 'value_invalid'; }
+                $seen[$h['n']] = true;
+                $out[] = array('n' => $h['n'], 'text' => $text);
+            }
+            return array('type' => $type, 'value' => $out);
+        case 'llms_txt':
+            $text = gotop_seo_bridge_llms_text_ok(isset($value['text']) ? $value['text'] : null);
+            return $text === null ? 'value_invalid' : array('type' => $type, 'value' => $text);
     }
     return 'not_allowed';
 }
@@ -220,6 +241,14 @@ function gotop_seo_bridge_describe_post($post) {
         return $key ? (string) get_post_meta($post->ID, $key, true) : '';
     };
     $schema = (string) get_post_meta($post->ID, '_gotop_schema_jsonld', true);
+    // 2.1.0: the content's own main headings (their words, in order; null when the markup is not
+    // simple) and whether a page builder renders this page, for the app's H1 preview.
+    $h1 = gotop_seo_bridge_h1_list($post->post_content);
+    $h1_words = null;
+    if ($h1 !== null) {
+        $h1_words = array();
+        foreach ($h1 as $el) { $h1_words[] = gotop_seo_bridge_words($el['inner']); }
+    }
     return array(
         'post_id'     => (int) $post->ID,
         'post_type'   => $post->post_type,
@@ -235,6 +264,8 @@ function gotop_seo_bridge_describe_post($post) {
             'focus'       => $read('focus_keyphrase'),
             'schema'      => $schema,
         ),
+        'h1'          => $h1_words,
+        'builder'     => gotop_seo_bridge_builder_page($post->ID, $post->post_content),
     );
 }
 
@@ -295,6 +326,8 @@ function gotop_seo_bridge_apply_fix($body) {
     $type = isset($body['type']) ? $body['type'] : '';
     $fix = gotop_seo_bridge_validate_fix($type, isset($body['value']) ? $body['value'] : null);
     if (is_string($fix)) { return array('ok' => false, 'code' => $fix); }
+    // llms.txt belongs to the site, not to a post: its own store, backup and undo (includes/llms.php).
+    if ($type === 'llms_txt') { return gotop_seo_bridge_llms_apply($job_id, isset($body['url']) ? $body['url'] : '', $fix['value'], isset($body['expected']) && is_string($body['expected']) ? $body['expected'] : null); }
     $post = gotop_seo_bridge_resolve_post(isset($body['url']) ? $body['url'] : '');
     if (is_string($post)) { return array('ok' => false, 'code' => $post); }
     $expected = isset($body['expected']) && is_string($body['expected']) ? $body['expected'] : null;
@@ -350,6 +383,14 @@ function gotop_seo_bridge_apply_fix($body) {
             $next = gotop_seo_bridge_add_internal_link($content, $fix['value']['target'], $fix['value']['anchor']);
             if ($next === null) { return array('ok' => false, 'code' => 'no_safe_place'); }
             break;
+        case 'h1_demote':
+            // Only a post's own content, never a page-builder page (the builder renders from its own
+            // data, so a change here would not show, or would be overwritten on the next save).
+            if (gotop_seo_bridge_builder_page($post->ID, $content)) { return array('ok' => false, 'code' => 'builder_page'); }
+            $demoted = gotop_seo_bridge_demote_h1s($content, $fix['value']);
+            if (empty($demoted['ok'])) { return array('ok' => false, 'code' => $demoted['code']); }
+            $next = $demoted['content'];
+            break;
         default:
             return array('ok' => false, 'code' => 'not_allowed');
     }
@@ -373,6 +414,7 @@ function gotop_seo_bridge_apply_fix($body) {
 function gotop_seo_bridge_undo_fix($body) {
     $job_id = isset($body['job_id']) ? $body['job_id'] : null;
     if (!gotop_seo_bridge_valid_job($job_id)) { return array('ok' => false, 'code' => 'invalid_request'); }
+    if (gotop_seo_bridge_llms_backup($job_id) !== null) { return gotop_seo_bridge_llms_undo($job_id); }
     $post = gotop_seo_bridge_resolve_post(isset($body['url']) ? $body['url'] : '');
     if (is_string($post)) { return array('ok' => false, 'code' => $post); }
     $backup = gotop_seo_bridge_read_backup($post->ID, $job_id);

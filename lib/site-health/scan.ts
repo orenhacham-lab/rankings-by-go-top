@@ -231,6 +231,18 @@ export async function scanSite(
         if (outOfTime()) { site.sitemapFound = null; break }
       }
     }
+    // 5. llms.txt (a map of the site for AI assistants): a real file answers 200 with text, not the
+    // site's HTML page. Robots rules are asked like for any other address.
+    const llms = new URL('/llms.txt', homePage.url)
+    if (!outOfTime() && allow(llms)) {
+      const p = pinned(allow)
+      const got = await deps.fetchText(llms, { fetchImpl: p.fetchImpl }).catch(() => null)
+      p.done()
+      if (got && got.ok) {
+        const text = got.text.trim()
+        site.llmsFound = got.status === 200 && text.length > 0 && !/^<(?:!doctype|html|head|body)\b/i.test(text)
+      } else site.llmsFound = null
+    } else site.llmsFound = null
     onProgress({ stage: 'site', done: 1, total: 1 })
     return { ok: true, site, pages, planned: total }
   } finally {

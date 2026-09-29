@@ -16,7 +16,8 @@ type Admin = ReturnType<typeof createAdminClient>
 export interface Scope { projectId: string; userId: string }
 
 export class FixStoreError extends Error {
-  constructor() { super('site_fix_store_failed'); this.name = 'FixStoreError' }
+  /** `check`: the database refused the row by a CHECK (a fix type the applied migration does not list yet). */
+  constructor(readonly kind: 'failed' | 'check' = 'failed') { super('site_fix_store_failed'); this.name = 'FixStoreError' }
 }
 
 export function isMissingTable(error: { code?: string; message?: string } | null | undefined): boolean {
@@ -109,8 +110,21 @@ export async function insertJob(admin: Admin, scope: Scope, job: {
     status: 'pending', undo: job.undo, approved_by: job.approvedBy, approved_at: now, approved_ip: job.approvedIp,
     created_at: now, updated_at: now,
   }).select(JOB_COLUMNS).single()
+  if (error && (error as { code?: string }).code === '23514') throw new FixStoreError('check')
   if (error || !data) throw new FixStoreError()
   return data as FixJobRow
+}
+
+/** The jobs approved since `sinceIso`, newest first (a page's recent fixes; a batch's jobs). */
+export async function listJobsSince(admin: Admin, scope: Scope, sinceIso: string, limit = 500): Promise<FixJobRow[]> {
+  const { data, error } = await admin.from('site_fix_jobs').select(JOB_COLUMNS)
+    .eq('project_id', scope.projectId).eq('user_id', scope.userId).gte('approved_at', sinceIso)
+    .order('approved_at', { ascending: false }).limit(limit)
+  if (error) {
+    if (isMissingTable(error)) return []
+    throw new FixStoreError()
+  }
+  return (data ?? []) as FixJobRow[]
 }
 
 export async function updateJob(admin: Admin, scope: Scope, id: string, patch: {

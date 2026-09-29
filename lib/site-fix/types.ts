@@ -5,10 +5,11 @@
  *
  * THE WHITELIST. `FIX_TYPES` is the complete list of what may ever be written
  * to a merchant's site. The database CHECK (supabase/migrations/
- * 20260928000300_site_fix_queue.sql), the WordPress plugin's own list
- * (wordpress-plugin/gotop-seo-bridge, gotop_seo_bridge_fix_types()) and
- * `validateFix` (./whitelist.ts) hold the same nine names; a QA guard fails when
- * they drift apart. Nothing here deletes content, touches prices or products,
+ * 20260928000300_site_fix_queue.sql, widened by 20260929100000_site_fix_h1_llms.sql),
+ * the WordPress plugin's own list (wordpress-plugin/gotop-seo-bridge,
+ * gotop_seo_bridge_fix_types()) and `validateFix` (./whitelist.ts) hold the same
+ * eleven names; a QA guard fails when they drift apart. `h1_demote` and `llms_txt`
+ * arrived with plugin 2.1.0: a site on 2.0.0 is never sent them (PLUGIN_MIN_VERSION). Nothing here deletes content, touches prices or products,
  * the theme, plugins, settings or users, or publishes/unpublishes a page.
  */
 
@@ -22,13 +23,59 @@ export const FIX_TYPES = [
   'schema_jsonld',
   'broken_link',
   'internal_link',
+  'h1_demote',
+  'llms_txt',
 ] as const
 export type FixType = (typeof FIX_TYPES)[number]
 
 /** Written into the page's own content (undo refuses when the page changed since). */
-export const BODY_FIX_TYPES: readonly FixType[] = ['image_alt', 'faq_block', 'broken_link', 'internal_link']
+export const BODY_FIX_TYPES: readonly FixType[] = ['image_alt', 'faq_block', 'broken_link', 'internal_link', 'h1_demote']
 /** Stored beside the content (SEO plugin fields or the plugin's own meta). */
 export const META_FIX_TYPES: readonly FixType[] = ['seo_title', 'meta_description', 'canonical', 'focus_keyphrase', 'schema_jsonld']
+/** Belongs to the site, not to one page (the plugin's own option, answered at /llms.txt). */
+export const SITE_FIX_TYPES: readonly FixType[] = ['llms_txt']
+
+/** The latest plugin this app ships (wordpress-plugin/gotop-seo-bridge; a guard pins it to the PHP). */
+export const PLUGIN_LATEST_VERSION = '2.1.0'
+/**
+ * The first plugin version that knows a fix type. Anything not listed exists since 2.0.0. An older
+ * plugin is never sent a type it does not know: the screen offers "update the plugin" instead.
+ */
+export const PLUGIN_MIN_VERSION: Partial<Record<FixType, string>> = { h1_demote: '2.1.0', llms_txt: '2.1.0' }
+/** Types only the plugin can write (no application-password or webhook path). */
+export const PLUGIN_ONLY_TYPES: readonly FixType[] = ['h1_demote', 'llms_txt']
+
+/**
+ * "Apply all safe fixes" (one confirmation, plugin sites only; UX decision F) takes ONLY these
+ * types, and only with a suggestion that passed its check (./bulk.ts). Why each is safe:
+ *   seo_title, meta_description   stored in the SEO plugin's field (or the plugin's own), the text
+ *                                 visitors read is untouched, the value is checked (length, never the
+ *                                 current one), the previous value is kept, undoable.
+ *   image_alt                     only images in the content that have NO alt get one; nothing a
+ *                                 visitor sees changes; undoable.
+ * Left out on purpose, each needs the merchant's eyes, one by one: canonical (a wrong one can drop a
+ * page from Google), schema_jsonld (structured data is a statement about the business), broken_link
+ * (chooses where a link goes or removes it), internal_link (picks words to link), faq_block (adds
+ * visible text), h1_demote (changes how headings look), llms_txt (a site-wide file to read first),
+ * focus_keyphrase (a choice of strategy).
+ */
+export const BULK_SAFE_TYPES: readonly FixType[] = ['seo_title', 'meta_description', 'image_alt']
+
+/** a.b.c ≥ min.b.c (missing parts are 0; an unknown version is the oldest with signed routes, 2.0.0). */
+export function versionAtLeast(version: string | null | undefined, min: string): boolean {
+  const parse = (v: string) => v.split('.').map((x) => Number.parseInt(x, 10) || 0)
+  const a = parse(version && /^[0-9]{1,3}(\.[0-9]{1,3}){0,3}$/.test(version) ? version : '2.0.0')
+  const b = parse(min)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0)
+    if (d !== 0) return d > 0
+  }
+  return true
+}
+
+/** The installed plugin can write this type. */
+export const pluginSupports = (version: string | null | undefined, type: FixType) =>
+  versionAtLeast(version, PLUGIN_MIN_VERSION[type] ?? '2.0.0')
 
 /** ממתין · הוחל · נכשל · בוטל · נשלח · לעדכון ידני · הוחזר */
 export const JOB_STATUSES = ['pending', 'applied', 'failed', 'cancelled', 'sent', 'manual', 'reverted'] as const
@@ -43,6 +90,7 @@ export const AUDIT_ACTIONS = [
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
 export type FaqItem = { q: string; a: string }
+export type H1Ref = { n: number; text: string }
 export type AltItem = { src: string; alt: string }
 
 /** The approved new value(s), per type. This is exactly what the approval sentence describes. */
@@ -58,6 +106,10 @@ export type FixPayload =
   | { type: 'broken_link'; href: string; replacement: string | null }
   /** `target` is the page that gets the link; `anchor` is words already in the written page. */
   | { type: 'internal_link'; target: string; anchor: string }
+  /** The content's own <h1> elements (their place among the content's h1s, and their words) that become <h2>. */
+  | { type: 'h1_demote'; headings: H1Ref[] }
+  /** The whole llms.txt text (Markdown, plain text). */
+  | { type: 'llms_txt'; text: string }
 
 export type FixErrorCode =
   | 'unauthorized'
@@ -87,6 +139,18 @@ export type FixErrorCode =
   | 'write_not_confirmed'
   | 'webhook_failed'
   | 'store_failed'
+  /** The installed plugin is older than the fix needs (2.1.0): update it. */
+  | 'needs_update'
+  /** No suggestion passed its check (length, not the current value, the keyword): nothing automatic is offered. */
+  | 'no_valid_suggestion'
+  /** The page has too little text of its own to write questions and answers from. */
+  | 'thin_content'
+  /** The extra main heading is in the theme, a page builder or somewhere we cannot prove is safe. */
+  | 'h1_not_safe'
+  /** The site already has an llms.txt file: it is never overwritten. */
+  | 'llms_exists'
+  /** "Apply all" was asked for a type or a value that is not in the safe list. */
+  | 'not_bulk_safe'
 
 /** One row of `site_fix_jobs`, as the server reads it. */
 export interface FixJobRow {
@@ -136,6 +200,8 @@ export interface FixJobView {
   canUndo: boolean
   canCancel: boolean
   canRetry: boolean
+  /** The "apply all safe fixes" batch this job was approved in, if any (the queue groups by it). */
+  batchId?: string | null
 }
 
 /** The plugin's pairing as the screen sees it. */
@@ -155,8 +221,13 @@ export interface FixCapabilities {
   available: boolean
   /** Shopify: nothing is written; findings keep their instructions. */
   readOnly: boolean
-  /** The channel an approval of each type would take right now. */
-  channelFor: Partial<Record<FixType, FixChannel | 'needs_plugin'>>
+  /**
+   * The channel an approval of each type would take right now. `needs_update`: the plugin is
+   * connected but older than the type needs (PLUGIN_MIN_VERSION).
+   */
+  channelFor: Partial<Record<FixType, FixChannel | 'needs_plugin' | 'needs_update'>>
+  /** The plugin this app ships; the screen offers the update when the site's is older. */
+  pluginLatest?: string
   plugin: PluginState
   /** The site is connected by application password (WordPress REST). */
   appPassword: boolean

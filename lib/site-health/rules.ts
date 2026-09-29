@@ -59,6 +59,7 @@ export const SEVERITY: Record<FindingKind, Severity> = {
   canonical_missing: 'minor',
   schema_missing: 'minor',
   faq_missing: 'minor',
+  llms_missing: 'minor',
 }
 
 /** The one-click field a finding is fixed with, where one exists at all. */
@@ -96,6 +97,7 @@ export const GUIDE: Record<FindingKind, GuideTopic> = {
   canonical_missing: 'canonical',
   schema_missing: 'schema',
   faq_missing: 'faq',
+  llms_missing: 'llms',
 }
 
 /**
@@ -116,6 +118,9 @@ export const FIX_TYPE: Partial<Record<FindingKind, FixType>> = {
   canonical_missing: 'canonical',
   schema_missing: 'schema_jsonld',
   faq_missing: 'faq_block',
+  // Plugin 2.1.0: only where provably safe (lib/site-fix/h1.ts), and llms.txt for the whole site.
+  h1_multiple: 'h1_demote',
+  llms_missing: 'llms_txt',
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = { urgent: 0, important: 1, minor: 2 }
@@ -188,6 +193,7 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
   if (site.robots.blocksAll) add('robots_blocks_all', home, null, null)
   else if (site.robots.blocksAi) add('robots_blocks_ai', home, site.robots.blockedBots.slice(0, 4).join(', ') || null, null)
   if (site.sitemapFound === false) add('sitemap_missing', home, null, null)
+  if (site.homeReachable && site.llmsFound === false) add('llms_missing', home, null, null)
 
   const read = pages.filter((p) => p.ok)
   const titles = new Map<string, PageFacts[]>()
@@ -288,6 +294,135 @@ function withoutSuffix(title: string): string {
   return title
 }
 
+
+// ── Suggestions that may be offered (wave 8) ────────────────────────────────
+//
+// A suggestion is offered only when it passes its check: never the current value (compared
+// trimmed and case-folded), a too-short or missing title 50–60 characters with the page's main
+// keyword, any other title 30–60, a description 120–140. lib/site-fix/suggest.ts adds the model
+// when none of the page's-own-words candidates passes; nothing that fails is ever offered.
+
+const normText = (s: string | null | undefined) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
+const hasMarkupText = (s: string) => /[<>]/.test(s)
+/** Compared the way a merchant reads them: trimmed, whitespace collapsed, case folded. */
+export const sameText = (a: string | null | undefined, b: string | null | undefined) => normText(a).toLocaleLowerCase() === normText(b).toLocaleLowerCase()
+export type TitleKind = 'title_missing' | 'title_short' | 'title_long' | 'title_duplicate'
+/** A too-short or missing title aims here; Google shows about 60 characters. */
+export const TITLE_GOAL = { min: 50, max: 60 } as const
+/** Any suggested title stays within this. */
+export const TITLE_RANGE = { min: 30, max: 60 } as const
+
+export function titleRangeFor(kind: string): { min: number; max: number } {
+  return kind === 'title_short' || kind === 'title_missing' ? TITLE_GOAL : TITLE_RANGE
+}
+
+export interface TitleInput {
+  kind: string
+  current: string | null
+  h1: string | null
+  siteName: string | null
+  /** The page's main keyword: the SEO plugin's focus keyphrase, else the page's main heading. */
+  keyword: string | null
+  path: string
+  /** A few hundred characters of the page's own text, for the model. */
+  text?: string
+}
+
+/** Why a title would not be offered, or null when it may be. */
+export function titleProblem(candidate: string, input: Pick<TitleInput, 'kind' | 'current' | 'keyword'>): string | null {
+  const v = normText(candidate)
+  if (!v) return 'empty'
+  if (hasMarkupText(v)) return 'markup'
+  if (sameText(v, input.current)) return 'same_as_current'
+  const r = titleRangeFor(input.kind)
+  if (v.length < r.min || v.length > r.max) return 'length'
+  if ((input.kind === 'title_short' || input.kind === 'title_missing') && normText(input.current).length >= v.length) return 'not_longer'
+  const k = normText(input.keyword)
+  if ((input.kind === 'title_short' || input.kind === 'title_missing') && k && !v.toLocaleLowerCase().includes(k.toLocaleLowerCase())) return 'no_keyword'
+  if (/[\s|–—:,-]$/.test(v)) return 'dangling'
+  return null
+}
+
+const containsText = (a: string, b: string) => !!b && a.toLocaleLowerCase().includes(b.toLocaleLowerCase())
+
+/** Deterministic candidates from the page's own words, most natural first. */
+export function titleCandidates(input: TitleInput): string[] {
+  const current = normText(input.current)
+  const h1 = normText(input.h1)
+  const site = normText(input.siteName)
+  const k = normText(input.keyword)
+  const out: string[] = []
+  const push = (s: string | null) => { const v = normText(s); if (v && !out.some((x) => sameText(x, v))) out.push(v) }
+  const fit = (base: string, tail: string, max: number) => {
+    const b = normText(base)
+    if (!b) return null
+    if (b.length + tail.length <= max) return `${b}${tail}`
+    const cut = cutAtWord(b, max - tail.length)
+    return cut.length >= 15 ? `${cut}${tail}` : null
+  }
+  if (input.kind === 'title_long') {
+    const head = withoutSuffix(current)
+    // A whole clause first ("About the studio – the full story of…"), then a cut at a word.
+    push(cutAtClause(head, TITLE_RANGE.max, TITLE_RANGE.min))
+    push(cutAtWord(head, TITLE_RANGE.max))
+    push(cutAtWord(current, TITLE_RANGE.max))
+    return out
+  }
+  const bases: string[] = []
+  const addBase = (b: string | null) => { const v = normText(b); if (v && !bases.some((x) => sameText(x, v))) bases.push(v) }
+  const coreCur = withoutSuffix(current)
+  if (coreCur && h1 && !containsText(coreCur, h1) && !containsText(h1, coreCur)) addBase(`${h1} – ${coreCur}`)
+  if (k && h1 && !containsText(h1, k)) addBase(`${k} – ${h1}`)
+  if (k && coreCur && !containsText(coreCur, k)) addBase(`${k} – ${coreCur}`)
+  addBase(h1)
+  addBase(coreCur)
+  if (k) addBase(k)
+  const r = titleRangeFor(input.kind)
+  for (const b of bases) {
+    const tails = site && !containsText(b, site) ? [` | ${site}`, ''] : ['']
+    for (const tail of tails) push(fit(b, tail, r.max))
+  }
+  if (input.kind === 'title_duplicate') {
+    const words = input.path.split('/').filter(Boolean).pop() ?? ''
+    let w = words
+    try { w = decodeURIComponent(words) } catch { /* keep */ }
+    w = w.replace(/[-_]+/g, ' ').trim()
+    if (w) push(fit(`${coreCur} – ${w}`, '', TITLE_RANGE.max))
+  }
+  return out
+}
+
+/** What a suggested description aims for (the owner's rule): 120–140 characters. */
+export const DESCRIPTION_GOAL = { min: 120, max: 140 } as const
+
+export function descriptionProblem(candidate: string, current: string | null): string | null {
+  const v = normText(candidate)
+  if (!v) return 'empty'
+  if (hasMarkupText(v)) return 'markup'
+  if (sameText(v, current)) return 'same_as_current'
+  if (v.length < DESCRIPTION_GOAL.min || v.length > DESCRIPTION_GOAL.max) return 'length'
+  return null
+}
+
+/** Whole sentences of the page that land in 120–140 characters, or null. */
+export function descriptionFromSentences(pageText: string, avoid: string | null = null): string | null {
+  const text = normText(pageText)
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []
+  // Any run of consecutive sentences, from the page's opening first.
+  for (let start = 0; start < Math.min(sentences.length, 12); start++) {
+    let out = ''
+    for (let i = start; i < sentences.length; i++) {
+      const next = normText(`${out} ${sentences[i]}`)
+      if (next.length > DESCRIPTION_GOAL.max) break
+      out = next
+      // Never the page's current description: the next run of sentences is tried instead.
+      if (out.length >= DESCRIPTION_GOAL.min) { if (!sameText(out, avoid)) return out; break }
+    }
+  }
+  return null
+}
+
+
 export interface TitleContext {
   kind: FindingKind
   current: string | null
@@ -296,34 +431,18 @@ export interface TitleContext {
   path: string
 }
 
-function humanizePath(path: string): string {
-  const last = path.split('/').filter(Boolean).pop() ?? ''
-  let s = last
-  try { s = decodeURIComponent(last) } catch { /* keep */ }
-  return s.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
+/**
+ * The first title from the page's own words that passes titleProblem (never the current title; a
+ * short or missing one 50–60 characters with the page's main heading as its keyword; any other
+ * 30–60). An empty string when none passes: no automatic title is offered, the merchant writes it.
+ */
 export function suggestTitle(ctx: TitleContext): string {
-  const current = norm(ctx.current)
-  const h1 = norm(ctx.h1)
-  const site = norm(ctx.siteName)
-  if (!current) return cutAtWord(h1 || site, TITLE_TARGET)
-  if (ctx.kind === 'title_long' || current.length > TITLE_MAX) {
-    const head = withoutSuffix(current)
-    return cutAtClause(head, TITLE_TARGET, TITLE_MIN) ?? cutAtWord(head, TITLE_TARGET)
-  }
-  if (ctx.kind === 'title_short' || current.length < TITLE_MIN) {
-    const extra = h1 && h1.toLowerCase() !== current.toLowerCase() && !current.toLowerCase().includes(h1.toLowerCase()) ? h1 : site
-    if (extra && !current.toLowerCase().includes(extra.toLowerCase())) {
-      const joined = `${current} | ${extra}`
-      if (joined.length <= TITLE_TARGET) return joined
-    }
-    return current
-  }
-  // Duplicate: the page's own main heading tells it apart; otherwise its address does.
-  if (h1 && h1.toLowerCase() !== current.toLowerCase()) return cutAtWord(h1, TITLE_TARGET)
-  const words = humanizePath(ctx.path)
-  return words ? cutAtWord(`${withoutSuffix(current)} – ${words}`, TITLE_TARGET) : current
+  const input: TitleInput = { kind: ctx.kind, current: ctx.current, h1: ctx.h1, siteName: ctx.siteName, keyword: ctx.h1, path: ctx.path }
+  for (const c of titleCandidates(input)) if (!titleProblem(c, input)) return c
+  // The heading may be too long to fit whole: the keyword rule then asks only for the title's own words.
+  const loose = { ...input, keyword: null }
+  for (const c of titleCandidates(loose)) if (!titleProblem(c, loose)) return c
+  return ''
 }
 
 /** Visible text of an HTML fragment: tags, scripts and entities out, whitespace collapsed. */
@@ -342,24 +461,17 @@ export function textOf(html: string): string {
 }
 
 /**
- * A description from the page's own opening words: whole sentences while they fit
- * DESCRIPTION_TARGET, else whole words. Null when the page has too little text to
- * say anything honest; the merchant then writes it in the preview.
+ * A description of 120–140 characters from the page's own words: whole sentences when a run of
+ * them lands there, else the page's words cut at a word, else the current description shortened.
+ * Never the current description. Null when nothing passes: the merchant then writes it.
  */
 export function suggestDescription(current: string | null, pageText: string): string | null {
-  const cur = norm(current)
-  if (cur.length > DESCRIPTION_MAX) return cutAtWord(cur, DESCRIPTION_TARGET)
-  const text = norm(pageText)
-  if (text.length < DESCRIPTION_MIN) return cur.length >= DESCRIPTION_MIN ? cur : null
-  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text]
-  let out = ''
-  for (const s of sentences) {
-    const next = norm(`${out} ${s}`)
-    if (next.length > DESCRIPTION_TARGET) break
-    out = next
-  }
-  if (out.length < DESCRIPTION_MIN) out = cutAtWord(text, DESCRIPTION_TARGET)
-  return out.length >= DESCRIPTION_MIN ? out : null
+  const fromPage = descriptionFromSentences(pageText)
+  if (fromPage && !descriptionProblem(fromPage, current)) return fromPage
+  const cut = cutAtWord(norm(pageText), DESCRIPTION_GOAL.max)
+  if (!descriptionProblem(cut, current)) return cut
+  const own = cutAtWord(norm(current), DESCRIPTION_GOAL.max)
+  return !descriptionProblem(own, current) ? own : null
 }
 
 /** A file name that says nothing: a camera's counter, a hash, a date, a number. */

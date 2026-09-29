@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -22,6 +22,10 @@ export interface ConfirmOptions {
   cancelLabel?: string
   /** danger for deletes and other destructive acts; default otherwise. */
   tone?: 'danger' | 'default'
+  /** Optional content under the body, such as the list of every change a confirmation covers. */
+  details?: ReactNode
+  /** The dialog's width; small unless a list needs room. */
+  size?: 'sm' | 'md' | 'lg'
 }
 
 export function useConfirm() {
@@ -44,8 +48,9 @@ export function useConfirm() {
   }, [])
 
   const dialog = (
-    <Modal open={options !== null} onClose={() => settle(false)} title={options?.title ?? ''} size="sm">
+    <Modal open={options !== null} onClose={() => settle(false)} title={options?.title ?? ''} size={options?.size ?? 'sm'}>
       {options?.body && <p className="whitespace-pre-line text-copy text-body">{options.body}</p>}
+      {options?.details && <div className="mt-4">{options.details}</div>}
       <div className="mt-6 flex flex-wrap justify-end gap-2">
         <Button variant="ghost" onClick={() => settle(false)}>
           {options?.cancelLabel ?? dict.common.cancel}

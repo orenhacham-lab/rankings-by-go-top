@@ -1,4 +1,4 @@
-# GO TOP SEO Bridge 2.0 (companion WordPress plugin)
+# GO TOP SEO Bridge 2.1 (companion WordPress plugin)
 
 Two jobs, both authenticated, both narrow:
 
@@ -13,8 +13,8 @@ Two jobs, both authenticated, both narrow:
 | Route | Auth | What it does |
 |---|---|---|
 | `POST /pair` | signed-in administrator (`manage_options`, via application password) | stores the site key from a pairing code |
-| `POST /status` | signed (HMAC) | version, SEO plugin, the nine fix types |
-| `POST /inspect` | signed | one post/page: content hash, SEO fields |
+| `POST /status` | signed (HMAC) | version, SEO plugin, the fix types (nine in 2.0.0, eleven since 2.1.0) |
+| `POST /inspect` | signed | one post/page: content hash, SEO fields (2.1.0: the content's own H1 words, page-builder flag) |
 | `POST /search` | signed | up to 5 posts/pages containing a phrase (internal-link fix) |
 | `POST /fix` | signed | applies one approved fix |
 | `POST /undo` | signed | restores the value stored before that fix |

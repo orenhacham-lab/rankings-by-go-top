@@ -30,6 +30,8 @@ export type FindingKind =
   | 'canonical_missing'
   | 'schema_missing'
   | 'faq_missing'
+  /** The site answers no /llms.txt (a map of the site for AI assistants). */
+  | 'llms_missing'
 
 /** What the platform is, as far as we know it; decides the step-by-step card. */
 export type SitePlatform = 'wordpress' | 'shopify' | 'wix' | 'other'
@@ -42,7 +44,7 @@ export type FixField = 'title' | 'description' | 'alt' | 'link'
 /** The topic of a step-by-step card; the card itself is `guides[topic][platform]`. */
 export type GuideTopic =
   | 'title' | 'description' | 'alt' | 'h1' | 'noindex' | 'robots' | 'robots_ai'
-  | 'broken' | 'sitemap' | 'orphan' | 'viewport' | 'unreachable' | 'canonical' | 'schema' | 'faq'
+  | 'broken' | 'sitemap' | 'orphan' | 'viewport' | 'unreachable' | 'canonical' | 'schema' | 'faq' | 'llms'
 
 /** One page as the scan read it. */
 export interface PageFacts {
@@ -80,6 +82,8 @@ export interface SiteFacts {
   brokenLinks: { url: string; from: string }[]
   /** Pages no other page links to (WordPress index only; the crawl is too small to tell). */
   orphanPages: { url: string; title: string; keyword: string }[]
+  /** The site answers /llms.txt. null = not checked (robots.txt forbade it, or time ran out); absent in older reports. */
+  llmsFound?: boolean | null
 }
 
 export interface FindingPage {

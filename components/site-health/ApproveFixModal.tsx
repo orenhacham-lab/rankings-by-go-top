@@ -9,9 +9,16 @@
  * before anything leaves (lib/site-fix/api.ts). After the write it shows the
  * job's outcome — applied, sent (webhook), marked for manual update (plugin not
  * connected) or failed — with undo where the channel supports it.
+ *
+ * FAQ: the questions and answers come prefilled from the page's own text, in its language (every
+ * answer grounded in the page, lib/site-fix/suggest.ts), all editable; a page with too little text
+ * says so and the form stays empty. One main heading (plugin 2.1.0): the preview names the heading
+ * that stays and the ones that become H2; when the plugin cannot prove it safe the card says why and
+ * shows the instructions. llms.txt: the text is built from the site's pages and editable; with the
+ * plugin it is served by WordPress, otherwise it is a text to copy with the steps to place it.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CircleCheck, Clock, Info, Plus, Send, ShieldCheck, Trash2, TriangleAlert, Undo2 } from 'lucide-react'
+import { Check, CircleCheck, Clock, Copy as CopyIcon, Info, Plus, Send, ShieldCheck, Trash2, TriangleAlert, Undo2 } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -25,7 +32,7 @@ import type { useToasts } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Finding, FindingPage, SitePlatform } from '@/lib/site-health/types'
-import type { FaqItem, FixChannel, FixErrorCode, FixJobView, FixType } from '@/lib/site-fix/types'
+import type { FaqItem, FixChannel, FixErrorCode, FixJobView, FixType, H1Ref } from '@/lib/site-fix/types'
 import { GuideSteps } from './FindingCard'
 import { LengthMeter, SearchResultMock, Thumb } from './FixPreviewModal'
 import { postFix } from './useSiteFixes'
@@ -39,16 +46,20 @@ type Preview =
   | { type: 'focus_keyphrase' | 'canonical'; before: string; after: string; expected: string | null; via: Via }
   | { type: 'schema_jsonld'; before: string[]; schema: Record<string, unknown>; expected: string | null; via: Via }
   | { type: 'image_alt'; images: { src: string; after: string }[]; expected: string | null; via: Via }
-  | { type: 'faq_block'; items: FaqItem[]; expected: string | null; via: Via }
+  | { type: 'faq_block'; items: FaqItem[]; heading?: string; notice?: 'thin_content' | 'no_valid_suggestion' | null; expected: string | null; via: Via }
+  | { type: 'h1_demote'; headings: H1Ref[]; keep: string; keepFrom: 'theme' | 'content'; expected: string | null; via: Via }
+  | { type: 'llms_txt'; text: string; pages: number; fileUrl: string; copyOnly: boolean; expected: string | null; via: Via }
   | { type: 'broken_link'; pageUrl: string; href: string; words: string[]; expected: string | null; via: Via }
   | { type: 'internal_link'; pageUrl: string; sourceTitle: string; target: string; anchor: string; sentence: string; expected: string | null; via: Via }
 
 type Phase =
   | { kind: 'loading' }
-  | { kind: 'error'; code: FixErrorCode }
+  | { kind: 'error'; code: FixErrorCode; reason?: H1Reason }
   | { kind: 'ready'; preview: Preview; channel: FixChannel }
   | { kind: 'done'; job: FixJobView }
 
+type H1Reason = keyof Copy['autofix']['approve']['h1Reasons']
+const H1_REASONS: readonly string[] = ['builder', 'markup', 'theme', 'unproven']
 const FAQ_MAX = 8
 const pathLabel = (url: string) => { try { const p = decodeURI(new URL(url).pathname); return p.replace(/\/+$/, '') || '/' } catch { return url } }
 const squash = (s: string) => s.replace(/\s+/g, ' ').trim()
@@ -68,7 +79,7 @@ function ValueBox({ children, ltr }: { children: React.ReactNode; ltr?: boolean 
 }
 
 export default function ApproveFixModal({
-  projectId, finding, page, type, platform, copy, toasts, onClose, onJob, onFixed, onInstall, onFocusNext,
+  projectId, finding, page, type, platform, copy, toasts, onClose, onJob, onFixed, onInstall, onFocusNext, updateAvailable,
 }: {
   projectId: string
   finding: Finding
@@ -83,6 +94,8 @@ export default function ApproveFixModal({
   onInstall: () => void
   /** Offered after a title is applied through the plugin: set the page's focus keyphrase too. */
   onFocusNext?: (() => void) | null
+  /** The connected plugin is older than the latest version (the new fix types need the update). */
+  updateAvailable?: boolean
 }) {
   const a = copy.autofix
   const t = a.approve
@@ -97,6 +110,7 @@ export default function ApproveFixModal({
   const [undoError, setUndoError] = useState<FixErrorCode | null>(null)
   /** A value the whitelist refused: the form stays as typed, with the reason above the button. */
   const [formError, setFormError] = useState<FixErrorCode | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -106,11 +120,20 @@ export default function ApproveFixModal({
       ...(type === 'internal_link' && page.value ? { keyword: page.value } : {}),
     }).then((r) => {
       if (cancelled) return
-      if (!r.ok) { setPhase({ kind: 'error', code: r.code }); return }
+      if (!r.ok) {
+        const reason = (r as { reason?: unknown }).reason
+        setPhase({ kind: 'error', code: r.code, ...(typeof reason === 'string' && H1_REASONS.includes(reason) ? { reason: reason as H1Reason } : {}) })
+        return
+      }
       const { channel, ...rest } = r as unknown as Preview & { channel: FixChannel; ok: true }
       const preview = rest as unknown as Preview
       if (preview.type === 'seo_title' || preview.type === 'meta_description' || preview.type === 'canonical' || preview.type === 'focus_keyphrase') setValue(preview.after)
       if (preview.type === 'image_alt') setAlts(preview.images)
+      if (preview.type === 'faq_block') {
+        if (preview.heading) setFaqHeading(preview.heading)
+        if (preview.items.length) setFaq(preview.items.map((x) => ({ q: x.q, a: x.a })))
+      }
+      if (preview.type === 'llms_txt') setValue(preview.text)
       setPhase({ kind: 'ready', preview, channel })
     })
     return () => { cancelled = true }
@@ -138,8 +161,12 @@ export default function ApproveFixModal({
         return brokenMode === 'unlink' ? { type: p.type, href: p.href, replacement: null } : trimmed ? { type: p.type, href: p.href, replacement: trimmed } : null
       case 'internal_link':
         return { type: p.type, target: p.target, anchor: p.anchor }
+      case 'h1_demote':
+        return { type: p.type, headings: p.headings }
+      case 'llms_txt':
+        return p.copyOnly || !value.trim() ? null : { type: p.type, text: value }
     }
-  }, [phase, trimmed, alts, faqFilled, faqHeading, brokenMode])
+  }, [phase, trimmed, value, alts, faqFilled, faqHeading, brokenMode])
 
   const approve = useCallback(async () => {
     if (phase.kind !== 'ready' || busy || !fix) return
@@ -214,6 +241,12 @@ export default function ApproveFixModal({
       case 'internal_link':
         what = <>{t.what.internal_link}<ValueBox>{p.anchor}</ValueBox></>
         break
+      case 'h1_demote':
+        what = t.what.h1_demote(p.headings.length)
+        break
+      case 'llms_txt':
+        what = <>{t.what.llms_txt}<ValueBox ltr>{p.fileUrl}</ValueBox></>
+        break
     }
     return (
       <div className="rounded-inset border border-action/25 bg-action-soft/30 p-4" data-approve-sentence={phase.channel}>
@@ -233,7 +266,12 @@ export default function ApproveFixModal({
     )
   })()
 
-  const viaNote = phase.kind === 'ready' ? (
+  const copyOnly = phase.kind === 'ready' && phase.preview.type === 'llms_txt' && phase.preview.copyOnly
+  const copyText = useCallback(async () => {
+    try { await navigator.clipboard.writeText(value); setCopied(true) } catch { setCopied(false) }
+  }, [value])
+
+  const viaNote = phase.kind === 'ready' && !copyOnly ? (
     <p className="flex gap-2 rounded-inset bg-info-soft px-4 py-3 text-copy text-ink">
       <Info size={16} strokeWidth={2} aria-hidden="true" className="mt-1 shrink-0 text-info" />
       {t.via[phase.preview.via]}
@@ -312,7 +350,16 @@ export default function ApproveFixModal({
       case 'faq_block':
         return (
           <div className="space-y-4">
-            <p className="text-caption text-muted">{t.labels.faqHint}</p>
+            {p.notice ? (
+              <Notice tone="warn">{p.notice === 'thin_content' ? t.labels.faqThin : t.labels.faqNoSuggestion}</Notice>
+            ) : p.items.length ? (
+              <p className="flex gap-2 text-caption text-muted" data-faq-generated={p.items.length}>
+                <Info size={14} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-info" />
+                {t.labels.faqGenerated}
+              </p>
+            ) : (
+              <p className="text-caption text-muted">{t.labels.faqHint}</p>
+            )}
             <Input id="approve-faq-heading" label={t.labels.faqHeading} value={faqHeading} onChange={(e) => setFaqHeading(e.target.value)} />
             <ol className="space-y-3" role="list">
               {faq.map((item, i) => (
@@ -377,6 +424,49 @@ export default function ApproveFixModal({
             )}
           </div>
         )
+      case 'h1_demote':
+        return (
+          <div className="space-y-3" data-h1-plan={p.keepFrom}>
+            <ul className="divide-y divide-line overflow-hidden rounded-inset border border-line" role="list">
+              <li className="flex flex-col gap-1.5 bg-ok-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="min-w-0 text-copy font-medium text-ink" dir="auto"><span className="me-2 font-mono text-caption text-muted" dir="ltr">H1</span>{p.keep}</p>
+                <Badge variant="success">{t.labels.h1Keep} · {p.keepFrom === 'theme' ? t.labels.h1Theme : t.labels.h1Content}</Badge>
+              </li>
+              {p.headings.map((h) => (
+                <li key={h.n} className="flex flex-col gap-1.5 p-4 sm:flex-row sm:items-center sm:justify-between" data-h1-demote={h.n}>
+                  <p className="min-w-0 text-copy text-body" dir="auto"><span className="me-2 font-mono text-caption text-muted" dir="ltr">H1 → H2</span>{h.text}</p>
+                  <Badge variant="info">{t.labels.h1Demote}</Badge>
+                </li>
+              ))}
+            </ul>
+            <p className="text-caption text-muted">{t.labels.h1Note}</p>
+          </div>
+        )
+      case 'llms_txt':
+        return (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="approve-llms" className="text-caption font-semibold text-ink">{t.labels.llmsText}</label>
+              <span className="text-caption text-muted">{t.labels.llmsPages(p.pages)}</span>
+            </div>
+            <Textarea id="approve-llms" rows={14} value={value} onChange={(e) => { setValue(e.target.value); setCopied(false) }} dir="auto" className="font-mono text-caption" data-llms-text="" />
+            <p className="text-caption text-muted">{t.labels.llmsHint}</p>
+            <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-caption">
+              <span className="font-semibold text-ink">{t.labels.llmsAddress}:</span>
+              <span className="min-w-0 break-all text-body" dir="ltr">{p.fileUrl}</span>
+            </p>
+            {p.copyOnly && (
+              <div className="space-y-3" data-llms-copy="">
+                <GuideSteps steps={t.labels.llmsCopySteps} title={t.labels.llmsCopyTitle} />
+                {updateAvailable ? (
+                  <p className="text-caption text-muted">{t.labels.llmsUpdate}</p>
+                ) : platform === 'wordpress' ? (
+                  <p className="text-caption text-muted">{t.labels.llmsCopyWp}</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )
       case 'internal_link': {
         const i = p.sentence.toLowerCase().indexOf(p.anchor.toLowerCase())
         return (
@@ -430,6 +520,22 @@ export default function ApproveFixModal({
   })() : null
 
   const footer = (() => {
+    if (phase.kind === 'ready' && copyOnly) {
+      return (
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={onClose}>{t.close}</Button>
+          {platform === 'wordpress' && (
+            <Button variant="secondary" onClick={() => { onClose(); onInstall() }} data-install-from-fix="">
+              {updateAvailable ? a.connection.update.action : a.connection.install}
+            </Button>
+          )}
+          <Button onClick={copyText} disabled={!value.trim()} aria-live="polite" data-llms-copy-button="">
+            {copied ? <Check size={16} strokeWidth={2.4} aria-hidden="true" /> : <CopyIcon size={16} strokeWidth={2} aria-hidden="true" />}
+            {copied ? t.labels.llmsCopied : t.labels.llmsCopy}
+          </Button>
+        </div>
+      )
+    }
     if (phase.kind === 'ready') {
       return (
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -463,6 +569,9 @@ export default function ApproveFixModal({
         {phase.kind === 'error' && phase.code === 'needs_plugin' && (
           <Button onClick={() => { onClose(); onInstall() }} data-install-from-fix="">{a.connection.install}</Button>
         )}
+        {phase.kind === 'error' && phase.code === 'needs_update' && (
+          <Button onClick={() => { onClose(); onInstall() }} data-update-from-fix="">{a.connection.update.action}</Button>
+        )}
       </div>
     )
   })()
@@ -490,7 +599,7 @@ export default function ApproveFixModal({
 
         {phase.kind === 'error' && (
           <div className="space-y-4">
-            <Notice tone={phase.code === 'nothing_to_fix' ? 'ok' : 'warn'}>{a.errors[phase.code]}</Notice>
+            <Notice tone={phase.code === 'nothing_to_fix' ? 'ok' : 'warn'}>{phase.code === 'h1_not_safe' && phase.reason ? t.h1Reasons[phase.reason] : a.errors[phase.code]}</Notice>
             <GuideSteps steps={copy.guides[finding.guide][platform]} title={copy.stepsTitle} />
           </div>
         )}
@@ -499,7 +608,7 @@ export default function ApproveFixModal({
           <>
             {editor}
             {viaNote}
-            {sentence}
+            {!copyOnly && sentence}
             {formError && <Notice tone="warn">{a.errors[formError]}</Notice>}
           </>
         )}

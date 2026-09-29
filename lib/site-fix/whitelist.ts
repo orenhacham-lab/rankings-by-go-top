@@ -25,6 +25,10 @@ export const LIMITS = {
   url: 2048,
   schemaChars: 16000,
   schemaDepth: 8,
+  h1Headings: { min: 1, max: 10 },
+  h1Text: { min: 1, max: 300 },
+  llms: { min: 20, max: 20000 },
+  llmsLine: 2000,
 } as const
 
 /** The schema.org types the fix writes. No Product (prices and products are never touched), no Offer, no Review. */
@@ -70,6 +74,31 @@ const KEYS: Record<FixType, readonly string[]> = {
   schema_jsonld: ['schema'],
   broken_link: ['href', 'replacement'],
   internal_link: ['target', 'anchor'],
+  h1_demote: ['headings'],
+  llms_txt: ['text'],
+}
+
+/**
+ * An llms.txt the plugin will answer: Markdown as plain text, starting with "# ", no "<" anywhere,
+ * ">" only as a quote mark at the start of a line, no control characters but line breaks and tabs.
+ * Returns the normalised text (\n line ends, trailing spaces off, one final newline) or null.
+ * Mirrors gotop_seo_bridge_llms_text_ok (includes/llms.php).
+ */
+export function llmsTextOk(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const t = raw.replace(/\r\n?/g, '\n')
+  if (/[\u0000-\u0008\u000b-\u001f\u007f]/.test(t) || t.includes('<')) return null
+  const lines: string[] = []
+  for (const l of t.split('\n')) {
+    const line = l.replace(/[ \t\n\r\0\x0B]+$/, '')
+    if (line.replace(/^(?:>[ \t]?)+/, '').includes('>')) return null
+    if (new TextEncoder().encode(line).length > LIMITS.llmsLine) return null
+    lines.push(line)
+  }
+  const out = `${lines.join('\n').replace(/^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, '')}\n`
+  const len = [...out].length
+  if (len < LIMITS.llms.min || len > LIMITS.llms.max || !out.startsWith('# ')) return null
+  return out
 }
 
 function schemaNodeOk(node: unknown, depth: number, budget: { n: number }): boolean {
@@ -189,6 +218,28 @@ export function validateFix(input: unknown, page: unknown, siteKeys: ReadonlySet
       const anchor = plain(raw)
       return within(anchor, LIMITS.anchor) ? { ok: true, payload: { type, target, anchor } } : bad('value_invalid')
     }
+    case 'h1_demote': {
+      if (!Array.isArray(b.headings) || b.headings.length < LIMITS.h1Headings.min || b.headings.length > LIMITS.h1Headings.max) return bad('value_invalid')
+      const headings: { n: number; text: string }[] = []
+      const seen = new Set<number>()
+      for (const h of b.headings as unknown[]) {
+        const x = (h ?? {}) as Record<string, unknown>
+        if (typeof h !== 'object' || h === null || Array.isArray(h)) return bad('value_invalid')
+        if (Object.keys(x).some((k) => k !== 'n' && k !== 'text')) return bad('not_allowed')
+        if (typeof x.n !== 'number' || !Number.isInteger(x.n) || x.n < 0 || x.n > 49 || seen.has(x.n)) return bad('value_invalid')
+        const rawText = typeof x.text === 'string' ? x.text : ''
+        if (hasMarkup(rawText)) return bad('value_invalid')
+        const text = plain(rawText)
+        if (!within(text, LIMITS.h1Text)) return bad('value_invalid')
+        seen.add(x.n)
+        headings.push({ n: x.n, text })
+      }
+      return { ok: true, payload: { type, headings } }
+    }
+    case 'llms_txt': {
+      const text = llmsTextOk(b.text)
+      return text ? { ok: true, payload: { type, text } } : bad('value_invalid')
+    }
   }
 }
 
@@ -212,6 +263,10 @@ export function summaryOf(p: FixPayload): string {
       return p.replacement ?? ''
     case 'internal_link':
       return p.anchor
+    case 'h1_demote':
+      return p.headings.map((h) => h.text).join(' · ').slice(0, 4000)
+    case 'llms_txt':
+      return p.text.slice(0, 4000)
   }
 }
 

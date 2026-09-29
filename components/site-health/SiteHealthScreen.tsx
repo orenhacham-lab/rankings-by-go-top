@@ -22,15 +22,16 @@ import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Finding, FindingPage } from '@/lib/site-health/types'
 import type { Project } from '@/lib/supabase/types'
 import ScoreCard from './ScoreCard'
-import FindingCard from './FindingCard'
+import FindingCard, { type FixMode } from './FindingCard'
 import FixPreviewModal from './FixPreviewModal'
 import ApproveFixModal from './ApproveFixModal'
-import AutoFixStrip from './AutoFixStrip'
+import AutoFixStrip, { pluginUpdateFor, stripView } from './AutoFixStrip'
 import FixQueue from './FixQueue'
 import PluginInstallModal from './PluginInstallModal'
 import { fixKey, useSiteHealthScan, type ScanProgress } from './useSiteHealthScan'
 import { useSiteFixes } from './useSiteFixes'
-import type { FixType } from '@/lib/site-fix/types'
+import { useSafeFixes } from './useSafeFixes'
+import { BULK_SAFE_TYPES, type FixType } from '@/lib/site-fix/types'
 import { rowStateFrom, rowTarget, type FixRowState } from '@/lib/site-fix/job-match'
 import { FIX_TYPE } from '@/lib/site-health/rules'
 
@@ -151,12 +152,18 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     return rowStateFrom(fixes.jobs, rowTarget(finding.fixType, page))
   }, [queueLive, fixes.jobs])
 
-  const fixModeFor = useCallback((finding: Finding, page: FindingPage): 'fix' | 'install' | null => {
+  const fixModeFor = useCallback((finding: Finding, page: FindingPage): FixMode => {
     if (!queueLive || !caps || !finding.fixType) return null
     const channel = caps.channelFor[finding.fixType]
+    // llms.txt: the plugin (2.1.0) serves it; every other site gets the same text to copy and place.
+    if (finding.fixType === 'llms_txt') return channel === 'plugin' ? 'fix' : 'copy'
     if (!channel) return null
     if (finding.fixType === 'broken_link' && !page.from) return null
     if (channel === 'needs_plugin') return 'install'
+    // A type newer than the installed plugin: offer the update, never send it to the old plugin.
+    if (channel === 'needs_update') return 'update'
+    // An extra main heading is changed only where the plugin proves it safe; otherwise instructions.
+    if (finding.fixType === 'h1_demote' && channel !== 'plugin') return null
     if (finding.fixType === 'internal_link' && (channel === 'webhook' || channel === 'manual')) return null
     return 'fix'
   }, [queueLive, caps])
@@ -183,6 +190,17 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   // person, or an "already approved" answer) shows on its row at once.
   const reloadFixes = fixes.reload
   const closeFix = useCallback(() => { setTarget(null); if (queueLive) void reloadFixes() }, [setTarget, queueLive, reloadFixes])
+
+  // "Fix {n} safe items for me": the plugin connected and writing all three safe types now.
+  const safeEnabled = queueLive && !!caps && stripView(caps) === 'connected' && BULK_SAFE_TYPES.every((t) => caps.channelFor[t] === 'plugin')
+  const safeFixable = useCallback((f: Finding, p: FindingPage) => fixModeFor(f, p) === 'fix' && !jobStateFor(f, p), [fixModeFor, jobStateFor])
+  const safe = useSafeFixes({
+    projectId: project.id, enabled: safeEnabled, findings, jobs: fixes.jobs, fixable: safeFixable,
+    copy: copy.autofix, toasts, onJob: fixes.upsertJob, onFinished: reloadFixes,
+  })
+  const openQueue = useCallback(() => {
+    document.getElementById('fixes')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  }, [])
 
   const rescan = (
     <Button variant="secondary" onClick={() => void scan()} loading={scanning} disabled={scanning} data-scan-again="">
@@ -247,6 +265,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
             onInstall={openInstall}
             onChanged={fixes.reload}
             lastSeen={when}
+            safe={safeEnabled ? { count: safe.count, phase: safe.phase, start: () => void safe.start(), onRecheck: () => void scan(), onOpenQueue: openQueue } : null}
           />
         )}
 
@@ -312,6 +331,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
           onJob={fixes.upsertJob}
           onFixed={(on) => { if (target.type !== 'focus_keyphrase') markFixed(fixKey(target.finding.id, target.page.url), on) }}
           onInstall={openInstall}
+          updateAvailable={!!caps && pluginUpdateFor(caps) !== null}
           onFocusNext={caps?.channelFor.focus_keyphrase === 'plugin' && target.type === 'seo_title'
             ? () => setTarget({ ...target, type: 'focus_keyphrase' })
             : null}
@@ -341,6 +361,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
           onChanged={fixes.reload}
         />
       )}
+      {safe.dialog}
       <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={dir} />
     </div>
   )

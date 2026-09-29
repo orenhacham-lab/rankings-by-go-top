@@ -93,7 +93,7 @@ function main() {
 
   console.log('\nA) authentication')
   const src = readFileSync(join(PLUGIN, 'gotop-seo-bridge.php'), 'utf8')
-  check('the plugin version is 2.0.0 (header and constant)', /Version:\s+2\.0\.0/.test(src) && /GOTOP_SEO_BRIDGE_VERSION', '2\.0\.0'/.test(src))
+  check('the plugin version is 2.1.0 (header and constant)', /Version:\s+2\.1\.0/.test(src) && /GOTOP_SEO_BRIDGE_VERSION', '2\.1\.0'/.test(src))
   const allPhp = phpFiles.map((f) => readFileSync(f, 'utf8')).join('\n')
   check('no route is open (__return_true never used as a permission_callback)', !/permission_callback'\s*=>\s*'__return_true'/.test(allPhp))
   check('the signature compare is constant time (hash_equals)', /hash_equals\(\$expected, \$sig\)/.test(allPhp))
@@ -132,7 +132,7 @@ function main() {
   check('a malformed pairing code is refused', r[0].status === 400 && r[0].body?.code === 'invalid_code')
   check('an administrator pairs with the code the app issued', r[1].status === 200 && r[1].body?.key_id === key.keyId, JSON.stringify(r[1]))
   const fixTypes = (r[2].body?.fix_types ?? []) as string[]
-  check('a signed status call answers with the version', r[2].status === 200 && r[2].body?.version === '2.0.0', JSON.stringify(r[2]))
+  check('a signed status call answers with the version', r[2].status === 200 && r[2].body?.version === '2.1.0', JSON.stringify(r[2]))
   check('the plugin whitelist is exactly the app whitelist (no drift)', JSON.stringify(fixTypes) === JSON.stringify([...FIX_TYPES]), fixTypes.join(','))
   check('an unsigned /fix is refused', r[3].status === 401 && r[3].body?.code === 'gotop_bad_headers', JSON.stringify(r[3]))
   check('a request signed with another secret is refused', r[4].body?.code === 'gotop_bad_signature', JSON.stringify(r[4]))
