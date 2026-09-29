@@ -5280,6 +5280,9 @@ export const dashboardEn = {
       showing: (shown: string, total: string) => `Showing ${shown} of ${total}`,
       showAll: 'All suggestions in the table',
       none: 'No keyword has low or medium competition and at least 30 searches a month right now.',
+      rankedBySite: 'The keywords closest to your site\'s content come first.',
+      lessRelated: (n: string) => `Less related to your site (${n})`,
+      lessRelatedHint: 'Keywords that name none of the subjects your site writes about. Nothing was removed: they are here if you still want to track them.',
     },
     chips: {
       label: 'Filter the results',

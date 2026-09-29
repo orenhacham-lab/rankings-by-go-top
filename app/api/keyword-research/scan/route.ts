@@ -11,6 +11,7 @@
  */
 import { buildSiteVocabulary } from '@/lib/content/recommendations/engine'
 import { handleScanResearchGet } from '@/lib/keyword-research/scan-route'
+import { readSiteTitles } from '@/lib/keyword-research/site-relevance'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -26,5 +27,6 @@ export async function GET(request: Request) {
     },
     admin: () => createAdminClient(),
     vocabulary: (admin, projectId, extras, userId) => buildSiteVocabulary(admin, projectId, extras, userId),
+    siteTitles: (db, scope) => readSiteTitles(db, scope),
   })
 }

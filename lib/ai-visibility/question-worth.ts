@@ -24,6 +24,11 @@
  * after the owner adds it, and one below the threshold is not offered at all.
  */
 import { categoryOfferings, type BusinessCategory, type PromptIntent } from './prompt-templates'
+import { entityOf, pageFor, sameStem, siteWords, topicMatch, type SiteTopics } from './site-topics'
+
+/** A text's words that are the site's own (not its broad subject, not the field's everyday words). */
+const siteOwnStems = (text: string, topics: SiteTopics) =>
+  siteWords(text).map(([s]) => s).filter((s) => !topics.core.some((c) => sameStem(c, s)) && !topics.generic.some((g) => sameStem(g, s)))
 
 export const WORTH_THRESHOLD = 55
 
@@ -42,12 +47,20 @@ export type WorthContext = {
   pages?: readonly WorthPage[]
   /** Topics already planned (their text). */
   plannedTopics?: readonly string[]
+  /**
+   * What the site's own pages are about (site-topics.ts), when it has enough
+   * titled pages. With it, a question is judged by the site's content: see
+   * SITE CONTENT below. Without it, the rules above apply unchanged.
+   */
+  siteTopics?: SiteTopics | null
 }
 
 export type WorthRelevance =
   | { kind: 'brand' }
   | { kind: 'keyword'; term: string }
   | { kind: 'business'; term: string }
+  /** No page answers it yet, but the site covers this subject: a complementary article. */
+  | { kind: 'gap'; term: string }
 export type WorthValue = 'buy' | 'choose' | 'compare' | 'learn' | 'brand'
 export type WorthWin = 'page' | 'planned' | 'tracked' | 'new'
 
@@ -59,7 +72,20 @@ export type QuestionWorth = {
   why: { relevance: WorthRelevance; value: WorthValue; win: WorthWin }
   /** A page on the site that already answers the question: improve it rather than write a new one. */
   answeringPage: WorthPage | null
+  /**
+   * With the site's content known: 'brand' names the business, 'page' is answered
+   * by one of its pages, 'gap' is about something the site covers with no page
+   * answering it yet, 'niche' names only the site's broad subject (any business
+   * in the niche could get it). Null without the site's content.
+   */
+  specificity: WorthSpecificity | null
 }
+
+export type WorthSpecificity = 'brand' | 'page' | 'gap' | 'niche'
+/** Site-specific first: the order rankByWorth lists them in. */
+export const SPECIFICITY_ORDER: Record<WorthSpecificity, number> = { brand: 0, page: 0, gap: 1, niche: 2 }
+/** A question any business in the niche could get loses this much, so most fall below the threshold. */
+export const NICHE_PENALTY = 20
 
 const STOP = new Set([
   // Hebrew question and filler words
@@ -164,8 +190,74 @@ export function scoreQuestion(prompt: string, intent: PromptIntent | string, ctx
   else if (kwHit) { winnability = 14; win = 'tracked' }
   if (namesBusiness && answeringPage) win = 'page'
 
+  if (ctx.siteTopics) return bySiteContent(prompt, ctx.siteTopics, ctx.keywords, { namesBusiness, relevance, relevanceWhy, value, valueKind, kwHitCount, planned, label: ctx.identityLabel ?? '' })
+
   const score = relevance === 0 ? 0 : relevance + value + winnability
-  return { score, relevance, value, winnability, why: { relevance: relevanceWhy, value: valueKind, win }, answeringPage }
+  return { score, relevance, value, winnability, why: { relevance: relevanceWhy, value: valueKind, win }, answeringPage, specificity: null }
+}
+
+/**
+ * SITE CONTENT (w8-relevance). With the site's pages known, a question is worth
+ * the business's time when it is tied to that content:
+ *   page    one of its pages is about the question's subject (site-topics.ts
+ *           pageFor): "improve that page". Winnability 20.
+ *   gap     it names something the site covers ("כרטיס", "אונסן") with no page
+ *           answering it: "write a complementary article". Winnability 14.
+ *   niche   it names only the site's broad subject ("ביפן"): any business in the
+ *           niche could get it. Winnability 8 and NICHE_PENALTY off the score.
+ *   none    neither the subject nor anything the site covers ("איזה אתר מומלץ
+ *           לתכנון טיול לחו״ל?"): not shown (score 0).
+ * A question naming the business stays as before. Relevance keeps its rules and,
+ * for a page or gap question the category words missed ("מה כדאי לעשות בטוקיו?"),
+ * starts at 30: the site's own content is the business's word.
+ */
+function bySiteContent(
+  prompt: string,
+  topics: SiteTopics,
+  keywords: readonly string[],
+  base: { namesBusiness: boolean; relevance: number; relevanceWhy: WorthRelevance; value: number; valueKind: WorthValue; kwHitCount: number; planned: boolean; label: string },
+): QuestionWorth {
+  const { namesBusiness, value, valueKind, kwHitCount } = base
+  let { relevance, relevanceWhy } = base
+  // The reason names a tracked keyword only when the question has all of the keyword's own words
+  // ("טוקיו"), never only the broad subject every keyword repeats ("יפן").
+  const own = siteOwnStems(prompt, topics)
+  const kwHit = keywords.find((k) => {
+    const words = siteOwnStems(k, topics)
+    return words.length > 0 && words.every((s) => own.some((o) => sameStem(o, s)))
+  }) ?? null
+  if (relevanceWhy.kind === 'keyword') relevanceWhy = kwHit ? { kind: 'keyword', term: kwHit } : { kind: 'business', term: base.label }
+  const match = topicMatch(prompt, topics)
+  const page = match.tier === 'none' || match.tier === 'generic' ? null : pageFor(prompt, topics)
+  const entity = entityOf(prompt, topics)
+  let specificity: WorthSpecificity | null
+  let winnability: number
+  let win: WorthWin
+  if (namesBusiness) {
+    specificity = 'brand'; winnability = 20; win = page ? 'page' : 'tracked'
+  } else if (page) {
+    specificity = 'page'; winnability = 20; win = 'page'
+  } else if (entity) {
+    specificity = 'gap'; winnability = base.planned ? 16 : 14; win = base.planned ? 'planned' : 'new'
+    relevanceWhy = { kind: 'gap', term: entity }
+  } else if (match.tier === 'core') {
+    specificity = 'niche'; winnability = base.planned ? 16 : 8; win = base.planned ? 'planned' : 'new'
+  } else {
+    specificity = null; winnability = 0; win = 'new'
+  }
+  if (!namesBusiness && relevance === 0 && (specificity === 'page' || specificity === 'gap')) {
+    relevance = Math.min(50, 30 + 6 * kwHitCount)
+    if (relevanceWhy.kind === 'business') relevanceWhy = kwHit ? { kind: 'keyword', term: kwHit } : { kind: 'business', term: base.label }
+  }
+  const answeringPage = page ? { title: page.title, url: page.url } : null
+  let score = relevance === 0 || specificity === null ? 0 : relevance + value + winnability
+  if (specificity === 'niche') score = Math.max(0, score - NICHE_PENALTY)
+  return {
+    score, relevance, value, winnability,
+    why: { relevance: relevanceWhy, value: valueKind, win },
+    answeringPage,
+    specificity,
+  }
 }
 
 /**
@@ -178,8 +270,10 @@ export function rankByWorth<T extends { prompt: string; intent: PromptIntent | s
   ctx: WorthContext,
   threshold: number = WORTH_THRESHOLD,
 ): Array<T & { worth: QuestionWorth }> {
+  const rank = (w: QuestionWorth) => (w.specificity ? SPECIFICITY_ORDER[w.specificity] : 0)
   return list
     .map((s) => ({ ...s, worth: scoreQuestion(s.prompt, s.intent, ctx) }))
     .filter((s) => s.worth.score >= threshold)
-    .sort((a, b) => b.worth.score - a.worth.score)
+    // With the site's content known, site-specific questions come first (page and brand, then gaps, then the niche's).
+    .sort((a, b) => rank(a.worth) - rank(b.worth) || b.worth.score - a.worth.score)
 }

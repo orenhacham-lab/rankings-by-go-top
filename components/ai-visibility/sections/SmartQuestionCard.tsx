@@ -30,7 +30,9 @@ export function worthReason(worth: QuestionWorth, t: T): string {
     ? t('worth_rel_brand')
     : r.kind === 'keyword'
       ? t('worth_rel_keyword').replace('{term}', r.term)
-      : t('worth_rel_business')
+      : r.kind === 'gap'
+        ? t('worth_rel_gap').replace('{term}', r.term)
+        : t('worth_rel_business')
   const second = t(`worth_value_${worth.why.value}` as I18nKey)
   return `${first} · ${second}`
 }

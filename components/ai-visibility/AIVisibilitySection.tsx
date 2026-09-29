@@ -38,6 +38,7 @@ import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
 import { resolveBusinessIdentity, type ScanBusiness } from '@/lib/ai-visibility/business-identity'
 import { rankByWorth, type WorthContext, type WorthPage } from '@/lib/ai-visibility/question-worth'
+import { buildSiteTopics, siteTitleQuestions } from '@/lib/ai-visibility/site-topics'
 import { questionArticleStatus, topicBriefForQuestion, normalizeQuestion, type ContextTopic } from '@/lib/ai-visibility/question-article'
 import { strategyHref, STRATEGY_ANCHORS } from '@/lib/content/strategy/view'
 import CompetitorsPanel from './CompetitorsPanel'
@@ -198,9 +199,13 @@ export default function AIVisibilitySection({
   // ranking can run again when the site's pages and topics arrive.
   const worthRef = useRef<WorthContext | null>(null)
   const rawSuggestionsRef = useRef<PromptSuggestion[] | null>(null)
+  // The questions the site's own page titles ask (site-topics.ts): added to every list, once.
+  const siteQuestionsRef = useRef<PromptSuggestion[]>([])
   const commitSuggestedQuestions = useCallback((list: PromptSuggestion[]) => {
     rawSuggestionsRef.current = list
-    const onTopic = dropOffTopicSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current)
+    const listed = new Set(list.map((s) => normalizeQuestion(s.prompt)))
+    const withSite = [...list, ...siteQuestionsRef.current.filter((s) => !listed.has(normalizeQuestion(s.prompt)))]
+    const onTopic = dropOffTopicSuggestions(withSite.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current)
     setSuggestedQuestions(worthRef.current ? rankByWorth(onTopic, worthRef.current) : onTopic)
   }, [])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
@@ -279,6 +284,18 @@ export default function AIVisibilitySection({
     }
   }, [projectId])
   useEffect(() => { void loadQuestionContext() }, [loadQuestionContext])
+  // SITE CONTENT (w8-relevance): what the site's own pages are about. With it, the
+  // questions are judged by the site's content (a page that answers, a subject the
+  // site covers, or only the broad niche), and the site's own title questions join
+  // the list. Too few titled pages: null, and the rules stay as they were.
+  const siteTopics = useMemo(() => buildSiteTopics({
+    pages: questionContext?.pages ?? [],
+    niche: identity.label,
+    businessName: projectBrandName,
+    domain: projectDomain,
+    category: identity.category,
+    terms: projectKeywords ?? [],
+  }), [questionContext, identity.label, identity.category, projectBrandName, projectDomain, projectKeywords])
   const worthContext = useMemo<WorthContext>(() => ({
     businessName: projectBrandName,
     identityLabel: identity.label,
@@ -287,7 +304,16 @@ export default function AIVisibilitySection({
     scanTerms: scanBusiness?.terms ?? [],
     pages: questionContext?.pages ?? [],
     plannedTopics: (questionContext?.topics ?? []).map((t) => t.topic),
-  }), [projectBrandName, identity.label, identity.category, projectKeywords, scanBusiness, questionContext])
+    siteTopics,
+  }), [projectBrandName, identity.label, identity.category, projectKeywords, scanBusiness, questionContext, siteTopics])
+  siteQuestionsRef.current = useMemo(() => (siteTopics ? siteTitleQuestions(questionContext?.pages ?? []) : []).map((prompt, i): PromptSuggestion => {
+    const meta = deriveSuggestionMeta(/(כמה עול|מחיר|price|cost)/i.test(prompt) ? 'commercial' : /(לבחור|מומלץ|כדאי|best|choose)/i.test(prompt) ? 'recommendation' : 'informational')
+    return {
+      id: `site-${i}`, prompt, intent: meta.intent, intentLabel: meta.intent, category: identity.category,
+      language: projectLanguage ?? 'he', qualityScore: meta.qualityScore, confidenceTier: meta.confidenceTier,
+      reason: '', chips: [], valueReason: '',
+    }
+  }), [siteTopics, questionContext, identity.category, projectLanguage])
   worthRef.current = identityReady ? worthContext : null
   useEffect(() => {
     if (identityReady && rawSuggestionsRef.current) commitSuggestedQuestions(rawSuggestionsRef.current)

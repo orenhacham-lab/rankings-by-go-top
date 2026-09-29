@@ -27,6 +27,7 @@
  *
  * Pure: no React, no I/O.
  */
+import { readSiteTopics } from '@/lib/ai-visibility/site-topics'
 import type { ScanResearch, TrackedKeyword } from './scan-research'
 
 export type SeedRunStatus = 'running' | 'done' | 'partial' | 'failed'
@@ -118,6 +119,7 @@ export function readResearchAnswer(httpStatus: number, body: unknown): ResearchA
   if (httpStatus !== 200 || !body || typeof body !== 'object') return { kind: 'error' }
   const b = body as Partial<ScanResearch> & { ok?: unknown }
   if (b.ok !== true || !Array.isArray(b.keywords) || !Array.isArray(b.tracked)) return { kind: 'error' }
+  const siteTopics = readSiteTopics(b.siteTopics)
   return {
     kind: 'ok',
     research: {
@@ -127,6 +129,8 @@ export function readResearchAnswer(httpStatus: number, body: unknown): ResearchA
       truncated: b.truncated === true,
       tracked: b.tracked,
       sources: readSources(b.sources),
+      // Only a well-formed profile is kept: a malformed one means every keyword counts as related.
+      ...(siteTopics ? { siteTopics } : {}),
     },
   }
 }

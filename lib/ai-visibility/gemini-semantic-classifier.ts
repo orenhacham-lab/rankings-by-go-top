@@ -438,6 +438,50 @@ export interface FallbackQuestionResponse {
  * Generate fallback questions based on project profile (not keyword-specific)
  * Used by enrichment layer when generating diverse suggestions
  */
+/** The site's own content, for grounding the suggested questions (w8-relevance). */
+export type SiteContentForPrompt = {
+  /** Page titles, the site's own words for what it covers. */
+  pages: readonly string[]
+  /** The scan's niche ("מדריך טיולים ליפן לישראלים"). */
+  niche?: string | null
+  /** Where the business works, when it says. */
+  location?: string | null
+}
+
+/** At most this many page titles go into the prompt. */
+export const MAX_PROMPT_PAGES = 40
+
+/**
+ * The prompt block that ties every question to the site's own content: its page
+ * titles, niche and location. Questions come mainly from what a page answers,
+ * the rest are complementary questions on the same subjects; generic questions
+ * any business in the niche could get are ruled out. Empty without pages.
+ */
+export function siteContentPromptBlock(language: 'he' | 'en', site: SiteContentForPrompt | null): string {
+  const pages = (site?.pages ?? []).map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, MAX_PROMPT_PAGES)
+  if (pages.length === 0) return ''
+  const list = pages.map((t, i) => `${i + 1}. ${t}`).join('\n')
+  const niche = site?.niche?.trim()
+  const location = site?.location?.trim()
+  return language === 'he'
+    ? `
+התוכן שהאתר באמת מכסה (כותרות העמודים שלו):
+${list}
+${niche ? `התחום לפי סריקת האתר: ${niche}\n` : ''}${location ? `מיקום: ${location}\n` : ''}
+חשוב מאוד: כל שאלה חייבת לציין בשמו נושא מסוים מהרשימה (עיר, יעד, מוצר, שירות או נושא שמופיע בכותרות).
+לפחות 70% מהשאלות צריכות להיות כאלה שעמוד מהרשימה עונה עליהן. השאר: שאלות משלימות על אותם נושאים, שעדיין אין להן עמוד.
+אסור לכתוב שאלות כלליות שמתאימות לכל עסק בתחום.
+`
+    : `
+What the site actually covers (its page titles):
+${list}
+${niche ? `Niche from the site scan: ${niche}\n` : ''}${location ? `Location: ${location}\n` : ''}
+VERY IMPORTANT: every question must name a specific subject from this list (a city, destination, product, service or topic in the titles).
+At least 70% of the questions must be ones a page on this list answers. The rest: complementary questions on the same subjects that no page answers yet.
+Do NOT write generic questions that any business in this field could get.
+`
+}
+
 export async function generateProjectEnrichmentQuestions(
   projectName: string,
   domain: string,
@@ -446,6 +490,7 @@ export async function generateProjectEnrichmentQuestions(
   allowedLocations?: string[],
   businessScope?: { allowedTopics: string[]; excludedTerms: string[]; businessCategory: string | null },
   candidateCount: number = 5, // How many candidate questions to generate (scales based on need)
+  siteContent: SiteContentForPrompt | null = null, // The site's own pages (w8-relevance); null keeps the prompt as it was
 ): Promise<FallbackQuestionResponse[]> {
   const client = getGeminiClient()
   if (!client) {
@@ -492,7 +537,7 @@ ${countryDisplay ? `מדינה: ${countryDisplay}` : ''}
 אם אתה זקוק לאזכור מדינה, השתמש בשם הטבעי של המדינה.
 
 ${scopeConstraint}
-
+${siteContentPromptBlock('he', siteContent)}
 חשוב: אל תנסח כל שאלה עם "כיצד ניתן", "מהן האפשרויות", "איפה ניתן למצוא".
 הנסח טבעי בעברית: "איזה", "כמה", "איפה אפשר", "מה חשוב", "למי כדאי".
 
@@ -522,7 +567,7 @@ IMPORTANT: Never use ISO country codes (IL, US, GB, etc.) in questions.
 If you need to mention a country, use its full natural name.
 
 ${scopeConstraint}
-
+${siteContentPromptBlock('en', siteContent)}
 IMPORTANT: Avoid "How can one", "What are the options", "Where can one find".
 Use natural English: "What is", "How much", "Which", "Is there a", "Should I".
 
@@ -613,6 +658,7 @@ Return ONLY JSON (no other text):
       allowedLocations: allowedLocations && allowedLocations.length > 0 ? allowedLocations : '(none)',
       allowedTopics: businessScope?.allowedTopics.length ? businessScope.allowedTopics : '(none)',
       excludedTerms: businessScope?.excludedTerms.length ? businessScope.excludedTerms : '(none)',
+      sitePages: siteContent?.pages.length ?? 0,
     })
 
     const genAI = client
