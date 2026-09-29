@@ -14,7 +14,9 @@ import type { Locale } from '@/lib/i18n/locales'
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ['display', 'title', 'metric', 'section', 'lead', 'copy', 'caption', 'overline'],
+      text: ['display', 'title', 'metric', 'section', 'lead', 'copy', 'caption', 'overline',
+        // the public site's marketing steps (wave 8)
+        'hero', 'hero-page', 'h2-mkt', 'lead-mkt', 'numeral', 'eyebrow'],
       radius: ['card', 'inset', 'control', 'pill'],
       shadow: ['card', 'control', 'pop', 'lift', 'glow', 'edge-ltr', 'edge-rtl'],
     },

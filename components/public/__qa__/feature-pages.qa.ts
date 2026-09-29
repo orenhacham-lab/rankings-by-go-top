@@ -119,7 +119,8 @@ function main() {
   }
   check('E1: the About hero and close lead with the free check, then the trial', aboutOk(about))
   check('MUTATION CONTROL: an About close that leads with the trial is caught',
-    !aboutOk(about.replace(/(<CtaBand[\s\S]*?)<ButtonLink href=\{c\.check\.href\}([\s\S]*?)<ButtonLink href=\{c\.trial\.href\}/, '$1<ButtonLink href={c.trial.href}$2<ButtonLink href={c.check.href}')))
+    // (wave 8: the close is a full-bleed navy band, data-final-cta, no longer the CtaBand card)
+    !aboutOk(about.replace(/(data-final-cta[\s\S]*?)<ButtonLink href=\{c\.check\.href\}([\s\S]*?)<ButtonLink href=\{c\.trial\.href\}/, '$1<ButtonLink href={c.trial.href}$2<ButtonLink href={c.check.href}')))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

@@ -29,8 +29,14 @@ import { ArrowRight, Check, ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export const CONTAINER = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8'
+/** The navy heroes' wider frame (home, About), matched by the nav over them. */
+export const CONTAINER_WIDE = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'inverse'
+/**
+ * `inverse` is an outline on navy; `ghost-inverse` a bare link-button on navy;
+ * `light` the white-filled button with action text, for the cobalt band.
+ */
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'inverse' | 'ghost-inverse' | 'light'
 type ButtonSize = 'md' | 'lg'
 
 export function buttonClasses(variant: ButtonVariant = 'primary', size: ButtonSize = 'md', className?: string): string {
@@ -43,6 +49,10 @@ export function buttonClasses(variant: ButtonVariant = 'primary', size: ButtonSi
     variant === 'secondary' && 'border border-line bg-surface text-ink shadow-control hover:border-line-strong hover:bg-sunk/60',
     variant === 'ghost' && 'text-body hover:bg-sunk hover:text-ink',
     variant === 'inverse' && 'border border-white/20 text-contrast-ink hover:bg-white/10',
+    variant === 'ghost-inverse' && 'text-contrast-ink hover:bg-white/10',
+    variant === 'light' && 'bg-surface text-action shadow-[0_1px_2px_rgb(10_27_61/0.25)] hover:bg-action-soft',
+    // On navy or cobalt the action halo disappears: a light ring instead.
+    (variant === 'inverse' || variant === 'ghost-inverse' || variant === 'light') && 'focus-visible:ring-white/50',
     className,
   )
 }
@@ -94,11 +104,16 @@ export function NumberSquircle({ n }: { n: number | string }) {
   )
 }
 
-/** The small pill above a hero title. Never a second title. */
-export function Eyebrow({ children, icon: Icon }: { children: React.ReactNode; icon?: LucideIcon }) {
+/** The small pill above a hero title. Never a second title. `inverse` sits on navy. */
+export function Eyebrow({ children, icon: Icon, inverse = false }: { children: React.ReactNode; icon?: LucideIcon; inverse?: boolean }) {
   return (
-    <span className="inline-flex h-7 items-center gap-2 rounded-pill border border-line bg-surface px-3 text-caption font-semibold text-body shadow-control">
-      {Icon ? <Icon className="size-3.5 text-action" aria-hidden="true" /> : <span className="size-1.5 rounded-pill bg-action" aria-hidden="true" />}
+    <span
+      className={cn(
+        'inline-flex h-7 items-center gap-2 rounded-pill border px-3 text-caption font-semibold',
+        inverse ? 'border-white/15 bg-white/10 text-contrast-ink backdrop-blur-sm' : 'border-line bg-surface text-body shadow-control',
+      )}
+    >
+      {Icon ? <Icon className={cn('size-3.5', inverse ? 'text-rail-tagline' : 'text-action')} aria-hidden="true" /> : <span className={cn('size-1.5 rounded-pill', inverse ? 'bg-rail-tagline' : 'bg-action')} aria-hidden="true" />}
       {children}
     </span>
   )
@@ -168,7 +183,7 @@ export function Section({
 }
 
 export function SectionIntro({
-  eyebrow, title, description, align = 'center', inverse = false, as: As = 'h2', className,
+  eyebrow, title, description, align = 'center', inverse = false, as: As = 'h2', className, size = 'default',
 }: {
   eyebrow?: string
   title: React.ReactNode
@@ -177,16 +192,20 @@ export function SectionIntro({
   inverse?: boolean
   as?: 'h1' | 'h2'
   className?: string
+  /** `mkt`: the marketing scale of the home and About pages (h2-mkt, lead-mkt). */
+  size?: 'default' | 'mkt'
 }) {
   const center = align === 'center'
+  const mkt = size === 'mkt'
   return (
-    <div className={cn('mb-10 sm:mb-12', center ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl', className)}>
+    <div className={cn(mkt ? 'mb-12 sm:mb-14' : 'mb-10 sm:mb-12', center ? (mkt ? 'mx-auto max-w-3xl text-center' : 'mx-auto max-w-2xl text-center') : (mkt ? 'max-w-3xl' : 'max-w-2xl'), className)}>
       {eyebrow && (
-        <p className={cn('mb-3 text-overline font-semibold uppercase tracking-wide', inverse ? 'text-rail-tagline' : 'text-action')}>{eyebrow}</p>
+        // Hebrew is never uppercased and never tracked wider (UX decision D).
+        <p className={cn('mb-3 font-semibold ltr:uppercase ltr:tracking-wide', mkt ? 'text-eyebrow' : 'text-overline', inverse ? 'text-rail-tagline' : 'text-action')}>{eyebrow}</p>
       )}
-      <As className={cn('text-title font-bold tracking-tight text-balance', inverse ? 'text-contrast-ink' : 'text-ink')}>{title}</As>
+      <As className={cn(mkt ? 'text-h2-mkt' : 'text-title font-bold tracking-tight', 'text-balance', inverse ? 'text-contrast-ink' : 'text-ink')}>{title}</As>
       {description && (
-        <p className={cn('mt-3 text-section font-normal text-pretty', inverse ? 'text-contrast-ink/75' : 'text-body')}>{description}</p>
+        <p className={cn('mt-4 font-normal text-pretty', mkt ? 'text-lead-mkt mx-auto max-w-[58ch]' : 'text-section', mkt && !center && 'mx-0', inverse ? 'text-contrast-ink/80' : 'text-body')}>{description}</p>
       )}
     </div>
   )

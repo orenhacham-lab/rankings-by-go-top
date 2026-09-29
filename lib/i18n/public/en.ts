@@ -6,8 +6,9 @@ export const en = {
     pricing: 'Pricing',
     features: 'Features',
     articles: 'Articles',
-    freeCheck: 'Free check',
+    freeCheck: 'Free site check',
     about: 'About',
+    contact: 'Contact',
     login: 'Sign in',
     startFree: 'Start free',
     toDashboard: 'Dashboard',
@@ -57,6 +58,8 @@ export const en = {
     contact: 'Contact',
     copyright: '© 2026 Rankings by Go Top. All rights reserved.',
     agencyAria: 'Go Top - digital marketing agency',
+    // The credit to the agency site (the owner, wave 8): a plain followed link.
+    credit: 'By GO TOP',
   },
   about: {
     breadcrumb: 'About',
@@ -160,6 +163,12 @@ export const en = {
     whatsapp: 'WhatsApp',
     callAria: 'Call us',
     call: 'Call',
+    // The contact menu (nav, mobile menu, footer, About close); wave 8, UX decision C.
+    whatsappLabel: 'WhatsApp',
+    whatsappMessage: 'Hi, I need help',
+    phoneLabel: 'Call',
+    emailLabel: 'Email',
+    emailAria: 'Email us',
   },
   a11y: {
     open: 'Open accessibility menu',

@@ -4,8 +4,9 @@ export const he = {
     pricing: 'מחירים',
     features: 'יכולות המערכת',
     articles: 'מאמרים',
-    freeCheck: 'בדיקה חינמית',
+    freeCheck: 'בדיקת אתר חינמית',
     about: 'אודות',
+    contact: 'צרו קשר',
     login: 'התחברות',
     startFree: 'התחל חינם',
     toDashboard: 'לדאשבורד',
@@ -55,6 +56,8 @@ export const he = {
     contact: 'יצירת קשר',
     copyright: '© 2026 Rankings by Go Top. כל הזכויות שמורות.',
     agencyAria: 'Go Top: סוכנות לשיווק דיגיטלי',
+    // The credit to the agency site (the owner, wave 8): a plain followed link.
+    credit: 'מבית GO TOP',
   },
   about: {
     breadcrumb: 'אודות',
@@ -158,6 +161,12 @@ export const he = {
     whatsapp: 'וואטסאפ',
     callAria: 'התקשרו אלינו',
     call: 'התקשרו',
+    // The contact menu (nav, mobile menu, footer, About close); wave 8, UX decision C.
+    whatsappLabel: 'WhatsApp',
+    whatsappMessage: 'היי, אני צריך עזרה',
+    phoneLabel: 'טלפון',
+    emailLabel: 'מייל',
+    emailAria: 'כתבו לנו במייל',
   },
   a11y: {
     open: 'פתיחת תפריט נגישות',

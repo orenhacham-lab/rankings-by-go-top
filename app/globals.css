@@ -189,6 +189,36 @@
   --text-overline: 0.6875rem;
   --text-overline--line-height: 1rem;
 
+  /* Marketing-only steps (the public site; the app keeps the scale above).
+     Fluid between a 390px phone and a 1440px desktop, so ONE utility carries
+     both sizes the design specifies (wave 8, UX decision D):
+       hero      40/46 → 76/84, weight 800   the home hero's headline
+       hero-page 34/40 → 56/64               the About hero's headline
+       h2-mkt    28/36 → 44/52, weight 700   a marketing section title
+       lead-mkt  17/27 → 21/32               a marketing subtitle
+       numeral   44 → 56                     a step's big numeral
+       eyebrow   13, semibold                the line above a marketing title
+     Hebrew is never tracked wider than 0; the negative tracking only tightens. */
+  --text-hero: clamp(2.5rem, 1.6643rem + 3.4286vw, 4.75rem);
+  --text-hero--line-height: 1.1;
+  --text-hero--font-weight: 800;
+  --text-hero--letter-spacing: -0.01em;
+  --text-hero-page: clamp(2.125rem, 1.6143rem + 2.0952vw, 3.5rem);
+  --text-hero-page--line-height: 1.15;
+  --text-hero-page--font-weight: 800;
+  --text-hero-page--letter-spacing: -0.01em;
+  --text-h2-mkt: clamp(1.75rem, 1.3786rem + 1.5238vw, 2.75rem);
+  --text-h2-mkt--line-height: 1.2;
+  --text-h2-mkt--font-weight: 700;
+  --text-lead-mkt: clamp(1.0625rem, 0.9696rem + 0.381vw, 1.3125rem);
+  --text-lead-mkt--line-height: 1.55;
+  --text-numeral: clamp(2.75rem, 2.4714rem + 1.1429vw, 3.5rem);
+  --text-numeral--line-height: 1;
+  --text-numeral--font-weight: 800;
+  --text-eyebrow: 0.8125rem;
+  --text-eyebrow--line-height: 1.25rem;
+  --text-eyebrow--font-weight: 600;
+
   /* Motion — alive, and out of the way: an ease that arrives quickly and settles.
      The budget (UX review decision 4, widened in wave 7 at the owner's request:
      "where is the animation?" — the first pass was too quiet to be noticed):

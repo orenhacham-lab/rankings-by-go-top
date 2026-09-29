@@ -26,6 +26,8 @@ export const landingEn: LandingCopy = {
     signup: `Start a free ${TRIAL_DAYS}-day trial`,
     dashboard: 'Go to my dashboard',
     trust: ['No credit card', 'Cancel anytime', 'Publishes to WordPress and Shopify', 'Support from real people'],
+    climbChip: '#3 on Google',
+    published: 'Article published on your site',
   },
   demo: {
     label: 'A live demo of the platform',
@@ -254,7 +256,7 @@ export const landingEn: LandingCopy = {
     ],
   },
   check: {
-    eyebrow: 'Free check',
+    eyebrow: 'Free site check',
     title: 'Not sure yet? Let us show you what we see',
     body: 'The check actually reads your site and returns a first research summary in under a minute:',
     items: [

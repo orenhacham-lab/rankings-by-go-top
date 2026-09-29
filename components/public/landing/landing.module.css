@@ -182,3 +182,91 @@
     transform: translate3d(-40px, 30px, 0);
   }
 }
+
+/* ── Wave 8 (UX decision D): the dark hero, the cobalt band and the one
+      signature element, "the rank climb". ── */
+
+/* The navy hero: the app's HeroPanel glow (action in the end corner, brand
+   low in the start corner) on the contrast navy. */
+.heroDark {
+  background-color: var(--color-contrast);
+  background-image:
+    radial-gradient(46rem 30rem at 88% 4%, color-mix(in srgb, var(--color-action) 46%, transparent), transparent 70%),
+    radial-gradient(34rem 24rem at 4% 100%, color-mix(in srgb, var(--color-brand) 22%, transparent), transparent 70%);
+}
+:global([dir='rtl']) .heroDark {
+  background-image:
+    radial-gradient(46rem 30rem at 12% 4%, color-mix(in srgb, var(--color-action) 46%, transparent), transparent 70%),
+    radial-gradient(34rem 24rem at 96% 100%, color-mix(in srgb, var(--color-brand) 22%, transparent), transparent 70%);
+}
+/* A fine light grid on navy, fading out downwards. */
+.darkGrid {
+  background-image:
+    linear-gradient(to right, rgb(245 246 248 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(245 246 248 / 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, #000 10%, transparent 90%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent 90%);
+}
+/* The hairline of light along the top edge of a navy band. */
+.topLight {
+  background: linear-gradient(90deg, transparent, rgb(245 246 248 / 0.28), transparent);
+}
+
+/* The cobalt band (#0070d6: white on it is 4.9:1). Its blooms only DARKEN the
+   blue (navy tints), so white text keeps at least that contrast everywhere. */
+.bandBrand {
+  background-color: var(--color-action);
+  background-image:
+    radial-gradient(44rem 26rem at 100% 0%, rgb(10 27 61 / 0.16), transparent 70%),
+    radial-gradient(34rem 22rem at 0% 100%, rgb(10 27 61 / 0.24), transparent 70%);
+}
+
+/* The rank climb: a stepped polyline, horizontal steps only, drawn ONCE with
+   stroke-dasharray over pathLength="1" (so the stroke scales with its box: a
+   non-scaling stroke would measure the dash in screen pixels and cut the line
+   short). At rest it is whole; the draw is a no-preference enhancement, so
+   reduced motion sees it complete and still. */
+.climbPath {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .climbDraw {
+    animation: climb-draw 2200ms var(--ease-snappy) 250ms both;
+  }
+  .climbPop {
+    animation: climb-pop 420ms var(--ease-snappy) 2300ms both;
+  }
+  /* In the flow the line waits for the section, then draws as it scrolls in. */
+  [data-flow='wait'] .climbFlow {
+    stroke-dashoffset: 1;
+  }
+  [data-flow='in'] .climbFlow {
+    transition: stroke-dashoffset 1800ms var(--ease-snappy) 150ms;
+  }
+  [data-flow='wait'] .climbDot {
+    opacity: 0;
+  }
+  [data-flow='in'] .climbDot {
+    transition: opacity 300ms var(--ease-snappy) var(--node-delay, 0ms);
+  }
+}
+@keyframes climb-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes climb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

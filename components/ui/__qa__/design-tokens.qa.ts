@@ -123,7 +123,8 @@ async function main() {
       ...taught(src, 'shadow').filter((n) => !new RegExp(`--shadow-${n}:`).test(theme)).map((n) => `shadow-${n}`),
     ]
     check('B4: every name cn() is taught is a real @theme token', taught(utils, 'text').length >= 5 && missing(utils, css).length === 0, missing(utils, css).join(', '))
-    check('MUT: teaching cn() a name @theme does not define fails it', missing(utils.replace("'display'", "'hero'"), css).length > 0)
+    // (wave 8: 'hero' became a real marketing step, so the made-up name is now 'jumbo')
+    check('MUT: teaching cn() a name @theme does not define fails it', missing(utils.replace("'display'", "'jumbo'"), css).length > 0)
   }
 
   console.log('\nC) the shell mirrors (logical sides only)')

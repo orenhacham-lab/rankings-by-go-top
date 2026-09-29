@@ -24,8 +24,10 @@ import { Footer } from '@/components/Footer'
 import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
 import type { Locale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
-import { ButtonLink, CONTAINER, CtaBand, Eyebrow, FaqList, IconSquircle, Section, SectionIntro } from './marketing'
+import { ButtonLink, CONTAINER, CONTAINER_WIDE, Eyebrow, FaqList, IconSquircle, Section, SectionIntro } from './marketing'
 import { HeroDemo, type HeroDemoCopy } from './landing/HeroDemo'
+import { HeroSignals } from './landing/HeroSignals'
+import { CtaClimb, FlowClimb, HeroClimb } from './landing/RankClimb'
 import { Counter, Flow, Rise } from './landing/motion'
 import {
   AiVisual, CheckPreview, ContentVisual, RankVisual, ReportsVisual,
@@ -47,6 +49,10 @@ export type LandingCopy = {
     signup: string
     dashboard: string
     trust: string[]
+    /** The chip at the end of the rank climb, e.g. "#3 on Google". */
+    climbChip: string
+    /** The signal stack's third card: an article went live on the site. */
+    published: string
   }
   demo: HeroDemoCopy
   /** The strip under the hero: where we check and where we publish. */
@@ -106,56 +112,60 @@ export function LandingPage({
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <PublicNav locale={locale} />
+      <PublicNav locale={locale} tone="inverse" />
 
       <main className="flex-1">
-        {/* Hero Section: the promise, the free check, and the live demo */}
-        <section className="relative overflow-hidden bg-canvas">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <div className={cn(styles.heroGrid, 'absolute inset-x-0 top-0 h-[760px]')} />
-            <div className={styles.glowA} />
-            <div className={styles.glowB} />
-          </div>
-          <div className={cn(CONTAINER, 'relative pt-24 pb-14 sm:pt-32 sm:pb-20')}>
-            <div className="mx-auto max-w-4xl text-center">
-              <div className="mb-5"><Eyebrow icon={Sparkles}>{copy.hero.eyebrow}</Eyebrow></div>
-              <h1 className="text-title font-bold tracking-tight text-ink text-balance sm:text-display">
-                {copy.hero.title}
-                <span className="block text-action">{copy.hero.accent}</span>
-              </h1>
-              <p className="mx-auto mt-5 max-w-2xl text-section font-normal text-body text-pretty">{copy.hero.subtitle}</p>
-            </div>
+        {/* Hero (navy): the promise and the free check at the start, the signal stack at the end, the rank climb behind */}
+        <section className={cn(styles.heroDark, 'relative isolate overflow-hidden text-contrast-ink')} data-hero-tone="dark">
+          <div aria-hidden="true" className={cn(styles.darkGrid, 'pointer-events-none absolute inset-0')} />
+          <HeroClimb chip={copy.hero.climbChip} />
+          <div className={cn(CONTAINER_WIDE, 'relative pt-28 pb-24 sm:pt-32 sm:pb-32 lg:pt-36 lg:pb-[13rem]')}>
+            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
+              <div className="lg:col-span-7">
+                <div className="mb-6"><Eyebrow icon={Sparkles} inverse>{copy.hero.eyebrow}</Eyebrow></div>
+                <h1 className="text-hero text-contrast-ink">
+                  {copy.hero.title}
+                  <span className="block text-rail-tagline">{copy.hero.accent}</span>
+                </h1>
+                <p className="mt-6 max-w-[58ch] text-lead-mkt text-contrast-ink/80 text-pretty">{copy.hero.subtitle}</p>
 
-            {/* Free site check: the hero's primary action, one field, no signup. */}
-            <div className="mt-8 sm:mt-10">
-              <FreeCheckHeroForm locale={locale} />
-            </div>
+                {/* Free site check: the hero's primary action, one field, no signup. */}
+                <div className="mt-9">
+                  <FreeCheckHeroForm locale={locale} tone="inverse" />
+                </div>
 
-            <div className="mt-5 flex flex-col items-center justify-center gap-x-3 gap-y-2 sm:flex-row">
-              <span className="text-copy text-muted">{copy.hero.or}</span>
-              <ButtonLink href={startHref} variant="secondary" arrow>
-                {signedIn ? copy.hero.dashboard : copy.hero.signup}
-              </ButtonLink>
-            </div>
+                <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2">
+                  <span className="text-copy text-contrast-ink/75">{copy.hero.or}</span>
+                  <ButtonLink href={startHref} variant="ghost-inverse" arrow className="-ms-2 underline decoration-white/30 underline-offset-4 hover:decoration-white/80">
+                    {signedIn ? copy.hero.dashboard : copy.hero.signup}
+                  </ButtonLink>
+                </div>
 
-            <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-copy text-body">
-              {copy.hero.trust.map((line) => (
-                <li key={line} className="flex items-center gap-1.5">
-                  <Check className="size-4 text-action" aria-hidden="true" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-
-            <div className="mx-auto mt-12 max-w-5xl lg:mt-14">
-              <HeroDemo copy={copy.demo} rtl={rtl} />
+                <ul className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-copy text-contrast-ink/85">
+                  {copy.hero.trust.map((line) => (
+                    <li key={line} className="flex items-center gap-1.5">
+                      <Check className="size-4 text-rail-tagline" aria-hidden="true" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="hidden lg:col-span-5 lg:block">
+                <HeroSignals demo={copy.demo} published={copy.hero.published} />
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Where we check and where we publish */}
-        <div className="border-y border-line bg-surface">
-          <div className={cn(CONTAINER, 'flex flex-col items-center gap-3 py-6 lg:flex-row lg:justify-center lg:gap-6')}>
+        {/* The live demo overlaps the hero, over the works-with strip (surface) */}
+        <div className="relative border-b border-line bg-surface">
+          <div className={cn(CONTAINER, 'relative z-10 -mt-12 lg:-mt-[7.5rem]')}>
+            <div className="mx-auto max-w-5xl">
+              <HeroDemo copy={copy.demo} rtl={rtl} />
+            </div>
+          </div>
+          {/* Where we check and where we publish */}
+          <div className={cn(CONTAINER, 'flex flex-col items-center gap-3 py-8 lg:flex-row lg:justify-center lg:gap-6')}>
             <span className="shrink-0 text-caption font-semibold text-muted">{copy.worksWith.label}</span>
             <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               {copy.worksWith.names.map((name) => (
@@ -167,7 +177,7 @@ export function LandingPage({
 
         {/* Outcomes: what the customer gets, as a bento with the figures */}
         <Section>
-          <SectionIntro eyebrow={copy.outcomes.eyebrow} title={copy.outcomes.title} description={copy.outcomes.body} />
+          <SectionIntro size="mkt" eyebrow={copy.outcomes.eyebrow} title={copy.outcomes.title} description={copy.outcomes.body} />
           <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-5" data-outcomes-grid>
             {copy.outcomes.items.map((item, i) => (
               <Rise key={item.title} delay={i * 80} className={i === 0 ? 'h-full lg:col-span-3' : 'h-full lg:col-span-2'}>
@@ -190,13 +200,13 @@ export function LandingPage({
           </div>
         </Section>
 
-        {/* Why now: search moved into AI answers */}
-        <section className={cn(styles.bandBloom, 'bg-contrast py-16 text-contrast-ink sm:py-20 lg:py-24')}>
+        {/* Why now: search moved into AI answers (navy) */}
+        <section className={cn(styles.bandBloom, 'bg-contrast py-16 text-contrast-ink sm:py-20 lg:py-28')}>
           <div className={cn(CONTAINER, 'grid grid-cols-1 items-center gap-10 lg:grid-cols-5 lg:gap-12')}>
             <Rise className="lg:col-span-2">
-              <p className="mb-3 text-overline font-semibold uppercase tracking-wide text-rail-tagline">{copy.shift.eyebrow}</p>
-              <h2 className="text-title font-bold tracking-tight text-balance text-contrast-ink">{copy.shift.title}</h2>
-              <p className="mt-4 text-section font-normal text-pretty text-contrast-ink/75">{copy.shift.body}</p>
+              <p className="mb-3 text-eyebrow text-rail-tagline ltr:uppercase ltr:tracking-wide">{copy.shift.eyebrow}</p>
+              <h2 className="text-h2-mkt text-balance text-contrast-ink">{copy.shift.title}</h2>
+              <p className="mt-4 text-lead-mkt font-normal text-pretty text-contrast-ink/80">{copy.shift.body}</p>
             </Rise>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-3">
               <Rise className="h-full">
@@ -204,8 +214,8 @@ export function LandingPage({
                   <h3 className="mb-4 text-section font-semibold text-contrast-ink/80">{copy.shift.withoutTitle}</h3>
                   <ul className="space-y-3">
                     {copy.shift.without.map((line) => (
-                      <li key={line} className="flex items-start gap-2.5 text-copy text-contrast-ink/70">
-                        <X className="mt-1 size-4 shrink-0 text-contrast-ink/45" aria-hidden="true" />
+                      <li key={line} className="flex items-start gap-2.5 text-copy text-contrast-ink/75">
+                        <X className="mt-1 size-4 shrink-0 text-contrast-ink/50" aria-hidden="true" />
                         <span>{line}</span>
                       </li>
                     ))}
@@ -231,127 +241,120 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* How it works: a flowing line through four steps */}
+        {/* How it works: the rank climb is the connector through four steps */}
         <Section id="how-it-works" className="scroll-mt-16 lg:scroll-mt-[4.5rem]">
-          <SectionIntro eyebrow={copy.flow.eyebrow} title={copy.flow.title} description={copy.flow.body} />
+          <SectionIntro size="mkt" eyebrow={copy.flow.eyebrow} title={copy.flow.title} description={copy.flow.body} />
           <Flow rtl={rtl} className="relative">
-            {/* The line: across the nodes from lg, down the start edge below it */}
-            <div aria-hidden="true" className="absolute inset-x-[12.5%] top-6 hidden h-0.5 rounded-pill bg-line lg:block">
-              <div className={cn(styles.flowFill, 'h-full rounded-pill bg-action')} />
-            </div>
-            <div aria-hidden="true" className="absolute bottom-6 start-6 top-6 w-0.5 rounded-pill bg-line lg:hidden">
-              <div className={cn(styles.flowFillV, 'h-full w-full rounded-pill bg-action')} />
-            </div>
-            <ol className="relative grid grid-cols-1 gap-8 lg:grid-cols-4 lg:gap-6">
+            <FlowClimb chip={copy.hero.climbChip} />
+            <ol className="relative grid grid-cols-1 gap-10 sm:grid-cols-2 lg:mt-6 lg:grid-cols-4 lg:gap-8" data-flow-steps>
               {copy.flow.steps.map((step, i) => (
-                <li key={step.title} className="flex gap-4 lg:flex-col lg:items-center lg:text-center">
-                  <span
-                    className={cn(styles.flowNode, 'relative flex size-12 shrink-0 items-center justify-center rounded-pill bg-action text-section font-bold tabular-nums text-action-ink shadow-[0_0_0_6px_var(--color-canvas)]')}
-                    style={{ '--node-delay': `${250 + i * 400}ms` } as React.CSSProperties}
-                    aria-hidden="true"
-                  >
-                    {i + 1}
+                <li key={step.title} className="flex gap-5 lg:flex-col lg:gap-3 lg:text-center">
+                  <span className="w-16 shrink-0 text-numeral tabular-nums text-action lg:w-auto" aria-hidden="true">
+                    {String(i + 1).padStart(2, '0')}
                   </span>
-                  <div className="min-w-0 pt-1 lg:pt-0">
+                  <div className="min-w-0 lg:flex lg:flex-col lg:items-center">
                     <span className="inline-flex h-6 items-center rounded-pill bg-action-soft px-2.5 text-caption font-semibold text-action">{step.tag}</span>
-                    <h3 className="mt-2 text-section font-semibold text-ink">{step.title}</h3>
-                    <p className="mt-1.5 text-copy text-body lg:mx-auto lg:max-w-60">{step.desc}</p>
+                    <h3 className="mt-2.5 text-section font-bold text-ink">{step.title}</h3>
+                    <p className="mt-1.5 text-copy text-body lg:max-w-60">{step.desc}</p>
                   </div>
                 </li>
               ))}
             </ol>
           </Flow>
-          <div className="mt-12 flex justify-center">
+          <div className="mt-14 flex justify-center">
             <ButtonLink href={checkHref} size="lg" arrow className={styles.cta}>{copy.flow.cta}</ButtonLink>
           </div>
         </Section>
 
-        {/* What is inside: four rows, text and picture alternating */}
-        <Section tone="surface">
-          <SectionIntro eyebrow={f.eyebrow} title={f.title} description={f.body} />
-          <div className="space-y-16 sm:space-y-20 lg:space-y-24">
-            {featureRows.map(({ row, visual }, i) => (
-              <div key={row.title} className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
-                <Rise className={cn(i % 2 === 1 && 'lg:order-2')}>
-                  <div className="flex items-center gap-3">
-                    <IconSquircle icon={FEATURE_ICONS[i] ?? Sparkles} />
-                    <span className="text-overline font-semibold uppercase tracking-wide text-action">{row.overline}</span>
-                  </div>
-                  <h3 className="mt-4 text-title font-bold tracking-tight text-ink text-balance">{row.title}</h3>
-                  <p className="mt-3 max-w-prose text-section font-normal text-body text-pretty">{row.body}</p>
-                  <ul className="mt-5 space-y-2.5">
-                    {row.points.map((p) => (
-                      <li key={p} className="flex items-start gap-2.5 text-copy text-body">
-                        <Check className="mt-1 size-4 shrink-0 text-action" aria-hidden="true" />
-                        <span>{p}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-6">
-                    <ButtonLink href={`${prefix}${row.href}`} variant="ghost" arrow className="-ms-4">{f.more}</ButtonLink>
-                  </div>
-                </Rise>
-                <Rise delay={120} className={cn(i % 2 === 1 && 'lg:order-1')}>{visual}</Rise>
-              </div>
-            ))}
-          </div>
-          <p className="mt-12 text-center text-caption text-muted">{f.note}</p>
-        </Section>
-
-        {/* Who it is for */}
-        <Section>
-          <SectionIntro eyebrow={copy.audience.eyebrow} title={copy.audience.title} description={copy.audience.body} />
-          <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3">
-            {copy.audience.items.map((item, i) => (
-              <Rise key={item.title} delay={i * 80} className="h-full">
-                <div className="flex h-full flex-col gap-3 rounded-card border border-line bg-surface p-5 shadow-card transition-[border-color] duration-150 ease-snappy hover:border-line-strong sm:p-6">
-                  <IconSquircle icon={AUDIENCE_ICONS[i] ?? Users} />
-                  <h3 className="text-section font-semibold text-ink">{item.title}</h3>
-                  <p className="flex-1 text-copy text-body">{item.desc}</p>
-                  <p className="flex items-start gap-2 border-t border-line pt-3 text-copy font-semibold text-ink">
-                    <TrendingUp className="mt-1 size-4 shrink-0 text-action" aria-hidden="true" />
-                    {item.gain}
-                  </p>
+        {/* What is inside (navy): four rows, text and picture alternating */}
+        <section className="relative isolate overflow-hidden bg-contrast py-16 text-contrast-ink sm:py-20 lg:py-28" data-features-tone="dark">
+          <div aria-hidden="true" className={cn(styles.darkGrid, 'pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px]')} />
+          <div aria-hidden="true" className={cn(styles.topLight, 'pointer-events-none absolute inset-x-8 top-0 h-px')} />
+          <div className={CONTAINER}>
+            <SectionIntro size="mkt" inverse eyebrow={f.eyebrow} title={f.title} description={f.body} />
+            <div className="space-y-16 sm:space-y-20 lg:space-y-28">
+              {featureRows.map(({ row, visual }, i) => (
+                <div key={row.title} className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
+                  <Rise className={cn(i % 2 === 1 && 'lg:order-2')}>
+                    <div className="flex items-center gap-3">
+                      <IconSquircle icon={FEATURE_ICONS[i] ?? Sparkles} className="bg-white/10 text-rail-tagline" />
+                      <span className="text-eyebrow text-rail-tagline ltr:uppercase ltr:tracking-wide">{row.overline}</span>
+                    </div>
+                    <h3 className="mt-4 text-h2-mkt text-balance text-contrast-ink">{row.title}</h3>
+                    <p className="mt-4 max-w-prose text-section font-normal text-contrast-ink/80 text-pretty">{row.body}</p>
+                    <ul className="mt-5 space-y-2.5">
+                      {row.points.map((p) => (
+                        <li key={p} className="flex items-start gap-2.5 text-copy text-contrast-ink/75">
+                          <Check className="mt-1 size-4 shrink-0 text-rail-tagline" aria-hidden="true" />
+                          <span>{p}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-6">
+                      <ButtonLink href={`${prefix}${row.href}`} variant="ghost-inverse" arrow className="-ms-4">{f.more}</ButtonLink>
+                    </div>
+                  </Rise>
+                  <Rise delay={120} className={cn(i % 2 === 1 && 'lg:order-1')}>{visual}</Rise>
                 </div>
+              ))}
+            </div>
+            <p className="mt-14 text-center text-caption text-contrast-ink/65">{f.note}</p>
+          </div>
+        </section>
+
+        {/* Who it is for: one row of three columns, hairlines between, no boxes */}
+        <Section tone="surface">
+          <SectionIntro size="mkt" eyebrow={copy.audience.eyebrow} title={copy.audience.title} description={copy.audience.body} />
+          <div className="grid grid-cols-1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0" data-audience-row>
+            {copy.audience.items.map((item, i) => (
+              <Rise key={item.title} delay={i * 80} className="flex h-full flex-col gap-3 py-8 first:pt-0 last:pb-0 md:px-8 md:py-2 md:first:ps-0 md:last:pe-0">
+                <IconSquircle icon={AUDIENCE_ICONS[i] ?? Users} />
+                <h3 className="text-title font-bold tracking-tight text-ink">{item.title}</h3>
+                <p className="flex-1 text-section font-normal text-body text-pretty">{item.desc}</p>
+                <p className="flex items-start gap-2 pt-2 text-section font-semibold text-action">
+                  <TrendingUp className="mt-1 size-4 shrink-0" aria-hidden="true" />
+                  {item.gain}
+                </p>
               </Rise>
             ))}
           </div>
         </Section>
 
-        {/* What the free check shows, before anyone signs up */}
-        <Section tone="surface">
-          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-14">
+        {/* What the free check shows, before anyone signs up (the cobalt band) */}
+        <section className={cn(styles.bandBrand, 'relative overflow-hidden py-16 text-action-ink sm:py-20 lg:py-28')} data-check-tone="brand">
+          <div className={cn(CONTAINER, 'grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16')}>
             <Rise>
-              <p className="mb-3 text-overline font-semibold uppercase tracking-wide text-action">{copy.check.eyebrow}</p>
-              <h2 className="text-title font-bold tracking-tight text-ink text-balance">{copy.check.title}</h2>
-              <p className="mt-3 text-section font-normal text-body text-pretty">{copy.check.body}</p>
-              <ul className="mt-5 space-y-2.5">
+              <p className="mb-3 text-eyebrow text-action-ink ltr:uppercase ltr:tracking-wide">{copy.check.eyebrow}</p>
+              <h2 className="text-h2-mkt text-balance text-action-ink">{copy.check.title}</h2>
+              <p className="mt-4 text-lead-mkt font-normal text-action-ink text-pretty">{copy.check.body}</p>
+              <ul className="mt-6 space-y-3">
                 {copy.check.items.map((line) => (
-                  <li key={line} className="flex items-start gap-2.5 text-copy text-body">
-                    <Check className="mt-1 size-4 shrink-0 text-action" aria-hidden="true" />
+                  <li key={line} className="flex items-start gap-2.5 text-section font-normal text-action-ink">
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-pill bg-surface text-action" aria-hidden="true">
+                      <Check className="size-3" strokeWidth={3} />
+                    </span>
                     <span>{line}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-7 flex flex-col items-start gap-2">
-                <ButtonLink href={checkHref} size="lg" arrow className={styles.cta}>{copy.check.cta}</ButtonLink>
-                <span className="text-caption text-muted">{copy.check.note}</span>
+              <div className="mt-8 flex flex-col items-start gap-2.5">
+                <ButtonLink href={checkHref} variant="light" size="lg" arrow className={cn(styles.cta, 'h-12 px-7')}>{copy.check.cta}</ButtonLink>
+                <span className="text-caption text-action-ink">{copy.check.note}</span>
               </div>
             </Rise>
             <Rise delay={120}>
-              <div className="relative mx-3 sm:mx-5">
-                <div aria-hidden="true" className={cn(styles.stage, 'absolute -inset-3 rounded-card sm:-inset-5')} />
-                <div className="relative"><CheckPreview copy={copy.check.preview} /></div>
+              <div className="relative mx-auto max-w-md rotate-1 lg:max-w-none">
+                <div className="shadow-pop"><CheckPreview copy={copy.check.preview} /></div>
               </div>
             </Rise>
           </div>
-        </Section>
+        </section>
 
         {/* Objections, answered */}
         <Section>
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-5 lg:gap-14">
             <div className="lg:col-span-2">
-              <SectionIntro eyebrow={copy.faq.eyebrow} title={copy.faq.title} description={copy.faq.body} align="start" className="mb-0 sm:mb-0 lg:sticky lg:top-28" />
+              <SectionIntro size="mkt" eyebrow={copy.faq.eyebrow} title={copy.faq.title} description={copy.faq.body} align="start" className="mb-0 sm:mb-0 lg:sticky lg:top-28" />
             </div>
             <div className="lg:col-span-3">
               <FaqList items={copy.faq.items} />
@@ -359,24 +362,24 @@ export function LandingPage({
           </div>
         </Section>
 
-        {/* The close */}
-        <Section className="pt-0 sm:pt-0 lg:pt-0">
-          <CtaBand
-            title={copy.cta.title}
-            body={copy.cta.body}
-            footnote={
-              <>
-                {copy.cta.pricing}{' '}
-                <a href={pricingHref} className="font-semibold text-contrast-ink underline decoration-white/30 underline-offset-4 hover:decoration-white/80">
-                  {copy.cta.pricingLink}
-                </a>
-              </>
-            }
-          >
-            <ButtonLink href={checkHref} size="lg" arrow className={styles.cta}>{copy.cta.check}</ButtonLink>
-            <ButtonLink href={startHref} variant="inverse" size="lg">{signedIn ? copy.cta.dashboard : copy.cta.signup}</ButtonLink>
-          </CtaBand>
-        </Section>
+        {/* The close (navy, full bleed), running into the navy footer */}
+        <section className={cn(styles.bandBloom, 'relative isolate overflow-hidden border-b border-contrast-ink/10 bg-contrast py-20 text-center text-contrast-ink sm:py-24 lg:py-32')} data-final-cta>
+          <CtaClimb />
+          <div className={cn(CONTAINER, 'relative')}>
+            <h2 className="mx-auto max-w-3xl text-h2-mkt text-balance text-contrast-ink">{copy.cta.title}</h2>
+            <p className="mx-auto mt-4 max-w-[58ch] text-lead-mkt font-normal text-contrast-ink/80 text-pretty">{copy.cta.body}</p>
+            <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+              <ButtonLink href={checkHref} size="lg" arrow className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}>{copy.cta.check}</ButtonLink>
+              <ButtonLink href={startHref} variant="inverse" size="lg" className="h-12 px-7">{signedIn ? copy.cta.dashboard : copy.cta.signup}</ButtonLink>
+            </div>
+            <p className="mx-auto mt-10 max-w-xl text-copy text-contrast-ink/75">
+              {copy.cta.pricing}{' '}
+              <a href={pricingHref} className="rounded-control font-semibold text-contrast-ink underline decoration-white/30 underline-offset-4 hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40">
+                {copy.cta.pricingLink}
+              </a>
+            </p>
+          </div>
+        </section>
       </main>
 
       <Footer locale={locale} />
