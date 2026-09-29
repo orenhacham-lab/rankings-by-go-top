@@ -181,6 +181,23 @@ export type NextArticle = {
   alternatives: number
 }
 
+/**
+ * The ideas column holds three kinds of card: the ideas the plan stored ('plan': what the dashboard's
+ * "N topics waiting for approval" counts), suggestions from the keywords the site already ranks for
+ * ('ranking'), and, until the plan is ready, topics from the scan ('scan'). When more than one kind is
+ * there the column names each group with its own count, so the dashboard's number is visible on the board.
+ */
+export type IdeaGroupKind = 'plan' | 'ranking' | 'scan'
+export const IDEA_GROUP_ORDER: readonly IdeaGroupKind[] = ['plan', 'ranking', 'scan']
+export function ideaGroupOf(card: Pick<StrategyCard, 'origin'>): IdeaGroupKind {
+  return card.origin === 'ranking' ? 'ranking' : card.origin === 'scan' ? 'scan' : 'plan'
+}
+export function ideaGroupCounts(cards: readonly Pick<StrategyCard, 'origin'>[]): Record<IdeaGroupKind, number> {
+  const counts: Record<IdeaGroupKind, number> = { plan: 0, ranking: 0, scan: 0 }
+  for (const c of cards) counts[ideaGroupOf(c)]++
+  return counts
+}
+
 export type StrategyBoard = {
   cards: StrategyCard[]
   next: NextArticle | null

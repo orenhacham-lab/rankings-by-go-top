@@ -12,8 +12,8 @@ import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { strategyHref } from '@/lib/content/strategy/view'
 import { FIX_TYPE } from '@/lib/site-health/rules'
 import type { FindingKind } from '@/lib/site-health/types'
-import { bulkCandidates } from '@/lib/site-fix/bulk'
-import type { FixType } from '@/lib/site-fix/types'
+import { bulkCandidates, rowOpenForBulk, safeFixesEnabled } from '@/lib/site-fix/bulk'
+import type { FixCapabilities, FixJobView, FixType } from '@/lib/site-fix/types'
 import { LOW_QUEUE, type WaitingAnswer } from './waiting'
 
 export const MAX_WAITING_ROWS = 3
@@ -37,9 +37,10 @@ export function waitingArticlesHref(): string {
 }
 export const FIXES_HREF = '/site-health#fixes'
 
+/** `null` (the fix queue could not be read) counts as nothing: the row and the badge stay hidden, never a guess. */
 const pos = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0)
 
-export function waitingRows(projectId: string, w: WaitingAnswer | null, safeFixes: number): WaitingRow[] {
+export function waitingRows(projectId: string, w: WaitingAnswer | null, safeFixes: number | null): WaitingRow[] {
   if (!w) return []
   const rows: WaitingRow[] = []
   if (w.connectionDown) {
@@ -58,7 +59,7 @@ export function waitingRows(projectId: string, w: WaitingAnswer | null, safeFixe
 export interface RailCounts { articles: number; strategy: number; siteHealth: number }
 
 /** The count pills: hidden at 0. The health entry counts the fixes, or 1 while the connection is down. */
-export function railCounts(w: WaitingAnswer | null, safeFixes: number): RailCounts {
+export function railCounts(w: WaitingAnswer | null, safeFixes: number | null): RailCounts {
   if (!w) return { articles: 0, strategy: 0, siteHealth: 0 }
   const fixes = w.pluginConnected ? pos(safeFixes) : 0
   return {
@@ -71,42 +72,49 @@ export function railCounts(w: WaitingAnswer | null, safeFixes: number): RailCoun
 /** A pill never shows more than 99. */
 export const pillText = (n: number): string => (n > 99 ? '99+' : String(n))
 
-// ── Safe fixes, from the last site scan kept in this browser ───────────────────
+// ── Safe fixes: the last scan kept in this browser + the fix queue ─────────────
 
 interface CachedScan {
   v?: number
-  report?: { findings?: Array<{ id?: unknown; fixType?: unknown; pages?: Array<{ url?: unknown; kind?: unknown; fixable?: unknown }> }> }
-  fixed?: unknown
+  report?: { findings?: Array<{ id?: unknown; fixType?: unknown; pages?: Array<{ url?: unknown; kind?: unknown }> }> }
 }
 
+/** What GET /api/site-health/fixes answers (the same read the health screen makes). */
+export interface FixesRead { capabilities: FixCapabilities; jobs: FixJobView[] }
+
 /**
- * How many safe fixes the last scan found, by the SAME rule as the site-health screen's
- * "Fix {n} safe items for me" button: lib/site-fix/bulk.ts `bulkCandidates` (Google title,
- * Google description and image alt text only; never the home page; at most 25 pages).
+ * How many safe fixes are ready, by the SAME rule as the site-health screen's "Fix {n} safe items for
+ * me" button, and from the same two sources it uses: the last scan kept in this browser and the fix
+ * queue (GET /api/site-health/fixes).
  *
- * AN ESTIMATE, AND THE COPY SAYS SO ("up to"). The scan report lives only in this browser (nothing
- * is stored on the server), and the screen's button also leaves out pages the fix queue already
- * holds and checks the plugin's channel per type; neither is read here. So this is the button's
- * count before the queue is taken into account: the same or higher, never lower.
+ *   - the button exists only when `safeFixesEnabled(capabilities)` (lib/site-fix/bulk.ts), else 0;
+ *   - the rows are `bulkCandidates` (Google title, Google description and image alt text only; never the
+ *     home page; at most 25 pages) minus every place the queue already holds or fixed in the last 30 days
+ *     (`rowOpenForBulk` + `pageBusy`), so after a batch is applied the count is 0 and the nudge and the
+ *     badge go away at once.
+ *
+ * NEVER A GUESS: `null` when the queue could not be read (no answer, a failed read, or a scan we cannot
+ * parse); the caller then shows neither the row nor the badge. 0 when there is no scan or nothing to fix.
  */
-export function safeFixCountFromScan(raw: string | null): number {
+export function safeFixCountFromScan(raw: string | null, fixes: FixesRead | null, now: number = Date.now()): number | null {
+  if (!fixes || !fixes.capabilities || !Array.isArray(fixes.jobs)) return null
+  if (!safeFixesEnabled(fixes.capabilities)) return 0
   if (!raw) return 0
   let parsed: CachedScan
   try { parsed = JSON.parse(raw) as CachedScan } catch { return 0 }
   if (!parsed || parsed.v !== 1 || !parsed.report || !Array.isArray(parsed.report.findings)) return 0
-  const fixed = new Set(Array.isArray(parsed.fixed) ? parsed.fixed.filter((v): v is string => typeof v === 'string') : [])
-  const findings: { id: string; fixType: FixType | null; pages: { url: string; kind: string; fixable: boolean }[] }[] = []
+  const findings: { id: string; fixType: FixType | null; pages: { url: string; kind: string }[] }[] = []
   for (const f of parsed.report.findings) {
     if (typeof f.id !== 'string' || !Array.isArray(f.pages)) continue
     // A report kept from before the fix queue has no fix type: take it from the scan's own rules, as the screen does.
     const fixType = typeof f.fixType === 'string' ? f.fixType as FixType : FIX_TYPE[f.id as FindingKind] ?? null
-    const pages = f.pages.flatMap((p) => typeof p.url === 'string' ? [{ url: p.url, kind: typeof p.kind === 'string' ? p.kind : '', fixable: p.fixable === true }] : [])
+    const pages = f.pages.flatMap((p) => typeof p.url === 'string' ? [{ url: p.url, kind: typeof p.kind === 'string' ? p.kind : '' }] : [])
     findings.push({ id: f.id, fixType, pages })
   }
-  const byKey = new Map(findings.flatMap((f) => f.pages.map((p) => [`${f.id}|${p.url}`, p.fixable] as const)))
+  const typeOf = new Map(findings.map((f) => [f.id, f.fixType] as const))
   return bulkCandidates(findings, {
-    fixable: (id, url) => byKey.get(`${id}|${url}`) === true && !fixed.has(`${id}|${url}`),
-    jobs: [],
-    now: Date.now(),
+    fixable: (id, url) => { const t = typeOf.get(id); return !!t && rowOpenForBulk(fixes.jobs, t, url) },
+    jobs: fixes.jobs,
+    now,
   }).length
 }

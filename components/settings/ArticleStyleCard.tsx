@@ -115,8 +115,8 @@ export default function ArticleStyleCard({
   const { draft, setDraft } = style
   // The call to action: the saved one, or (never saved) a suggestion from the business details, off.
   const suggestion = useMemo(
-    () => suggestArticleCta({ business: subject?.business, niche: subject?.niche, domain: view.domain }, a.cta.suggestion),
-    [subject?.business, subject?.niche, view.domain, a.cta.suggestion],
+    () => suggestArticleCta({ business: subject?.business, niche: subject?.niche, domain: view.domain, contactUrl: view.contactUrl }, a.cta.suggestion),
+    [subject?.business, subject?.niche, view.domain, view.contactUrl, a.cta.suggestion],
   )
   const ctaBase = view.ctaSaved ? view.cta : suggestion
   const ctaDraft = useDraft<ArticleCta>(ctaBase, sameArticleCta)
@@ -410,7 +410,8 @@ export default function ArticleStyleCard({
                 <Megaphone aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
                 <div>
                   <h3 id={`${ids}-cta`} className="text-copy font-semibold text-ink">{a.cta.label}</h3>
-                  <p className="mt-0.5 text-caption text-muted">{a.cta.hint}</p>
+                  {/* "Off until you turn it on" only while it is off: once on, the sentence would contradict the switch. */}
+                  <p className="mt-0.5 text-caption text-muted">{cta.enabled ? a.cta.hint : `${a.cta.hint} ${a.cta.hintOff}`}</p>
                 </div>
               </div>
               {ctaLocked && !locked && <Notice tone="info">{a.cta.readOnly}</Notice>}

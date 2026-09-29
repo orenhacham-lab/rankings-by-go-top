@@ -47,7 +47,7 @@ export function HeroStat({ label, value, hint, icon, className }: {
         <span className="truncate">{label}</span>
       </p>
       <p className="mt-2 text-metric font-bold tracking-tight tabular-nums">{value}</p>
-      {hint && <p className="mt-1 truncate text-caption text-contrast-ink/65">{hint}</p>}
+      {hint && <p className="mt-1 text-pretty text-caption text-contrast-ink/65">{hint}</p>}
     </div>
   )
 }

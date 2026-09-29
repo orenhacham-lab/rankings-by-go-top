@@ -14,8 +14,8 @@
  * A batch can be undone as a whole for 14 days (each fix keeps its own undo as well).
  */
 import { sameText } from '@/lib/site-health/rules'
-import { urlKey } from './job-match'
-import { BULK_SAFE_TYPES, type FixJobView, type FixPayload, type FixType } from './types'
+import { rowStateFrom, rowTarget, urlKey } from './job-match'
+import { BULK_SAFE_TYPES, type FixCapabilities, type FixJobView, type FixPayload, type FixType } from './types'
 
 export const BULK_TITLE = { min: 30, max: 60 } as const
 export const BULK_DESCRIPTION = { min: 120, max: 155 } as const
@@ -55,6 +55,25 @@ export function pageBusy(jobs: readonly Pick<FixJobView, 'pageUrl' | 'status' | 
     if (j.status === 'applied' || j.status === 'sent') return Date.parse(j.appliedAt ?? j.approvedAt) >= since
     return false
   })
+}
+
+/**
+ * "Fix {n} safe items for me" exists only when the queue is live for the project and the plugin is
+ * connected and writes all three safe types now. The health screen and the dashboard nudge / sidebar
+ * badge ask this ONE question, so they can never disagree about whether the count applies.
+ */
+export function safeFixesEnabled(caps: Pick<FixCapabilities, 'available' | 'readOnly' | 'plugin' | 'channelFor'> | null | undefined): boolean {
+  return !!caps && caps.available && !caps.readOnly && caps.plugin.state === 'connected'
+    && BULK_SAFE_TYPES.every((t) => caps.channelFor[t] === 'plugin')
+}
+
+/**
+ * Whether one finding row can go into a batch as far as the fix queue is concerned: the newest job for
+ * that place is not applied, sent, pending or waiting for a manual update. Also ONE rule for the health
+ * screen (its `jobStateFor`) and the nudge.
+ */
+export function rowOpenForBulk(jobs: Parameters<typeof rowStateFrom>[0], type: FixType, url: string): boolean {
+  return rowStateFrom(jobs, rowTarget(type, { url })) === null
 }
 
 export interface BulkRow { type: FixType; kind: string; url: string }

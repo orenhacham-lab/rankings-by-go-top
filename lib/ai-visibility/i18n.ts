@@ -175,15 +175,15 @@ const STRINGS = {
   // engine. One button checks a question on the three main engines; single
   // engines (all six) sit in the question's ⋯ menu.
   run_a_check_hint: {
-    he: 'כל שאלה נבדקת ב-ChatGPT, ב-Gemini וב-Google AI בלחיצה אחת. מנוע בודד, כולל שאר המנועים, נמצא בתפריט ⋯ של השאלה. כל בדיקה נספרת במכסה.',
-    en: 'Each question is checked on ChatGPT, Gemini and Google AI in one click. A single engine, including the others, is in the ⋯ menu of the question. Each check counts toward your allowance.',
+    he: 'כל שאלה נבדקת ב-ChatGPT, ב-Gemini וב-Google AI בלחיצה אחת. בדיקה במנוע אחד, או במנועים נוספים (Perplexity, Copilot, Grok), נמצאת בתפריט ⋯ של השאלה. כל מנוע הוא בדיקה אחת מהמכסה.',
+    en: 'Each question is checked on ChatGPT, Gemini and Google AI in one click. A check on a single engine, or on more engines (Perplexity, Copilot, Grok), is in the ⋯ menu of the question. Each engine is one check from your allowance.',
   },
   check_question_all: { he: 'בדיקה עכשיו ({n} בדיקות)', en: 'Check now ({n} checks)' },
   recheck_question_all: { he: 'בדיקה חוזרת ({n} בדיקות)', en: 'Recheck ({n} checks)' },
   recheck_not_enough: { he: 'אין מספיק בדיקות החודש', en: 'Not enough checks left this month' },
   recheck_running: { he: 'בודקים… {done}/{n}', en: 'Checking… {done}/{n}' },
   recheck_partial_failed: { he: 'חלק מהבדיקות לא הושלמו. אפשר לנסות שוב בעוד רגע.', en: 'Some of the checks did not finish. You can try again in a moment.' },
-  check_on_engine_menu: { he: 'בדיקה ב-{engine}', en: 'Check on {engine}' },
+  check_on_engine_menu: { he: 'בדיקה ב-{engine} (בדיקה אחת)', en: 'Check on {engine} (1 check)' },
   engine_status_label: { he: '{engine}: {status}', en: '{engine}: {status}' },
   run_tag_automatic: { he: 'אוטומטית', en: 'Automatic' },
   run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
@@ -270,6 +270,7 @@ const STRINGS = {
   mentions_by_engine: { he: 'אזכורים לפי מנוע AI', en: 'Mentions by AI Engine' },
   total_mentions: { he: 'סה״כ אזכורים', en: 'Total mentions' },
   visibility_percent: { he: 'אחוז נראות', en: 'Visibility' },
+  out_of_one_result: { he: 'מתוך תשובה אחת', en: 'out of 1 answer' },
   out_of_results: { he: 'מתוך {count} תשובות', en: 'out of {count} answers' },
 
   // Delete AI question
@@ -385,6 +386,7 @@ const STRINGS = {
   worth_value_learn: { he: 'שאלת מידע ש-AI עונה עליה עם מקורות', en: 'An information question AI answers with sources' },
   worth_value_brand: { he: 'כך לקוחות בודקים אתכם לפני שהם פונים', en: 'How customers check you before they get in touch' },
   // A suggested question → an article that answers it (question-article.ts).
+  qa_track_brand: { he: 'הוסיפו לשאלות AI', en: 'Add to AI questions' },
   qa_write_article: { he: 'כתוב מאמר שיענה על השאלה', en: 'Write an article that answers it' },
   qa_write_failed: { he: 'לא הצלחנו ליצור את הנושא. נסו שוב.', en: 'We could not create the topic. Try again.' },
   qa_page_answers: { he: 'עונה עליה באתר: {title}', en: 'Answered on your site: {title}' },

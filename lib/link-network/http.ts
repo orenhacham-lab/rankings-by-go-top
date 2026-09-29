@@ -29,7 +29,7 @@ import { bareDomain } from '@/lib/site-links/classify'
 import { safeExternalUrl } from '@/lib/site-links/model'
 import { linkContext, linkPresent, removeLink, type LinkRel } from './anchor'
 import { LINK_NETWORK_CONSENT_VERSION } from './consent'
-import { LINK_NETWORK_RULES, receivedCapFor, siteQualifies } from './rules'
+import { LINK_NETWORK_RULES, readinessGap, receivedCapFor, siteQualifies, type ReadinessGap } from './rules'
 import { loadSites, networkRows, NetworkUnavailable, readLinkRel, rows, type MemberRow, type NetworkDb, type PlacementRow } from './store'
 import { linkCount } from './counting'
 
@@ -87,6 +87,8 @@ export type NetworkAnswer =
       consentVersion: string
       membership: { active: boolean; since: string | null; leftAt: string | null }
       readiness: Readiness
+      /** With readiness 'thin_or_new': what is still missing (lib/link-network/rules.ts readinessGap); null when it cannot be told. */
+      gap?: ReadinessGap | null
       caps: { receivedThisMonth: number; receivedCap: number; givenThisMonth: number; givenCap: number; perArticle: number }
       totals: { received: number; given: number }
       received: ReceivedItem[]
@@ -230,6 +232,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
       consentVersion: LINK_NETWORK_CONSENT_VERSION,
       membership: { active: !!member?.active, since: member?.active ? member.consented_at : null, leftAt: member?.left_at ?? null },
       readiness: readinessReason === 'domain_unverified' ? 'domain_unverified' : readinessReason ? 'thin_or_new' : me.site.category ? 'ready' : 'category_unknown',
+      gap: readinessReason === 'thin_or_new' ? readinessGap({ ...me.site, active: true }, now) : null,
       caps: {
         receivedThisMonth: receivedRows.filter((p) => p.status === 'placed' && monthOf(p.placed_at) === month).length,
         receivedCap: receivedCapFor({ memberSince: member?.active ? member.consented_at : null }, now),

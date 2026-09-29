@@ -78,6 +78,14 @@ function ValueBox({ children, ltr }: { children: React.ReactNode; ltr?: boolean 
   )
 }
 
+/**
+ * The llms.txt box is a technical Markdown file: left to right, left aligned, long addresses wrapped
+ * instead of cut. INLINE on purpose: globals.css sets `textarea { direction: rtl; text-align: right }`
+ * unlayered, which beats both the `dir` attribute and every Tailwind utility, and scrambled the Hebrew
+ * lines ("(https://…).[איתור נזילות] -").
+ */
+const LLMS_TEXT_STYLE = { direction: 'ltr', textAlign: 'left', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } as const
+
 export default function ApproveFixModal({
   projectId, finding, page, type, platform, copy, toasts, onClose, onJob, onFixed, onInstall, onFocusNext, updateAvailable,
 }: {
@@ -450,7 +458,7 @@ export default function ApproveFixModal({
               <label htmlFor="approve-llms" className="text-caption font-semibold text-ink">{t.labels.llmsText}</label>
               <span className="text-caption text-muted">{t.labels.llmsPages(p.pages)}</span>
             </div>
-            <Textarea id="approve-llms" rows={14} value={value} onChange={(e) => { setValue(e.target.value); setCopied(false) }} dir="ltr" wrap="off" className="whitespace-pre text-left font-mono text-caption" data-llms-text="" />
+            <Textarea id="approve-llms" rows={14} value={value} onChange={(e) => { setValue(e.target.value); setCopied(false) }} dir="ltr" style={LLMS_TEXT_STYLE} className="font-mono text-caption" data-llms-text="" />
             <p className="text-caption text-muted">{t.labels.llmsHint}</p>
             <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-caption">
               <span className="font-semibold text-ink">{t.labels.llmsAddress}:</span>

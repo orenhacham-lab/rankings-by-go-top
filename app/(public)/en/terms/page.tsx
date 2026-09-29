@@ -355,7 +355,7 @@ export default function EnglishTermsPage() {
         <p className="mt-3">
           In addition to checks you start yourself, the Service runs an automatic monthly check for the
           project. The automatic check counts toward your plan&rsquo;s existing allowance of checks per billing
-          period and does not add to it, and you can turn it off at any time in the project settings.
+          period and does not add to it, and you can turn it off at any time on the &ldquo;AI Visibility&rdquo; screen, in the &ldquo;Automatic monthly check&rdquo; card.
         </p>
       </section>
 

@@ -220,7 +220,7 @@ export function OverviewOpeningCard({
             </div>
           )}
 
-          {state === 'ready' && data && <NextStep c={c} data={data} onRunMore={onChooseQuestions} allowanceOut={allowanceOut} />}
+          {state === 'ready' && data && <NextStep c={c} data={data} onRunMore={onChooseQuestions} allowanceOut={allowanceOut} nextAutoDate={monthlyNextDate(monthly) ? formatWhen(monthlyNextDate(monthly), language, true) : null} />}
 
           {/* The next step depends on whether the project tracks questions, which the
               tool reports once its list loaded: until then the step's shape, not the
@@ -332,11 +332,12 @@ export function nextStepKind(data: Pick<AiOverview, 'enginesChecked' | 'mentions
   return 'keep_going'
 }
 
-function NextStep({ c, data, onRunMore, allowanceOut }: { c: Copy; data: AiOverview; onRunMore: () => void; allowanceOut: boolean }) {
+/** `nextAutoDate`: when the next automatic check runs, or null when there is none (it is off, or no question is tracked). */
+function NextStep({ c, data, onRunMore, allowanceOut, nextAutoDate = null }: { c: Copy; data: AiOverview; onRunMore: () => void; allowanceOut: boolean; nextAutoDate?: string | null }) {
   const kind = nextStepKind(data)
   const text = kind === 'partial'
     ? c.nextStepPartial(mainEnginesChecked(data.enginesChecked), MONTHLY_CORE_ENGINES.length)
-    : kind === 'no_mentions' ? c.nextStepNoMentions : c.nextStepKeepGoing
+    : kind === 'no_mentions' ? c.nextStepNoMentions : nextAutoDate ? c.nextStepKeepGoingAuto(nextAutoDate) : c.nextStepKeepGoing
   return (
     <div data-ai-next-step={kind} className="mt-5 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
       <p className="text-caption font-semibold text-contrast-ink/80">{c.nextStepLabel}</p>
@@ -505,6 +506,12 @@ function Figure({ label, help, value, note }: { label: string; help: string; val
   )
 }
 
+/** "−5 נק׳" / "+3 pts": the signed number as an isolated LTR run, the unit after it in the page's own direction. */
+export function ChangePoints({ text }: { text: string }) {
+  const [num, ...unit] = text.split(' ')
+  return <span className="whitespace-nowrap tabular-nums" data-ai-change-points=""><bdi dir="ltr">{num}</bdi>{unit.length > 0 ? ` ${unit.join(' ')}` : ''}</span>
+}
+
 function ChangeFigure({ c, data, language }: { c: Copy; data: AiOverview | null; language: Locale }) {
   const change = data?.change ?? null
   const dir = !change ? null : change.points > 0 ? 'up' : change.points < 0 ? 'down' : 'flat'
@@ -523,7 +530,8 @@ function ChangeFigure({ c, data, language }: { c: Copy; data: AiOverview | null;
               }`}
             >
               <Icon size={16} strokeWidth={2.5} aria-hidden="true" className="shrink-0 rtl:-scale-x-100" />
-              <span dir="ltr" className="whitespace-nowrap tabular-nums">{c.changePoints(change.points)}</span>
+              {/* The number is its own left-to-right run, so the sign stays before the digits in Hebrew ("−5", not "5−"). */}
+              <ChangePoints text={c.changePoints(change.points)} />
               <span className="sr-only">{dir === 'up' ? c.changeUp : c.changeDown}</span>
             </span>
             <span className="mt-1 block truncate text-caption text-contrast-ink/60">

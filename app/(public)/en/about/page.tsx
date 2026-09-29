@@ -7,8 +7,8 @@ export default function EnglishAboutPage() {
 
 const COPY: AboutCopy = {
   breadcrumb: { label: 'About', href: '/en/about' },
-  title: '11 years of experience, in one SEO tool.',
-  accent: 'An automated SEO platform that works for you.',
+  title: '11 years of SEO,',
+  accent: 'in one platform that works for you.',
   subtitle: 'One platform that writes and publishes articles on your site, tracks where you rank in Google and Google Maps, and checks whether AI engines recommend you. Built by Go Top, a digital agency with more than 11 years of experience in SEO and paid advertising.',
   who: {
     title: 'Who is behind the platform',

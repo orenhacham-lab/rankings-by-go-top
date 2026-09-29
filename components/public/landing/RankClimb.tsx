@@ -76,16 +76,17 @@ const FLOW_RANKS = [18, 12, 7, 3]
 const FLOW_LEVELS = [0.84, 0.6, 0.36, 0.12]
 const FLOW_PATH = `M125 ${FLOW_LEVELS[0] * 120} H250 V${FLOW_LEVELS[1] * 120} H500 V${FLOW_LEVELS[2] * 120} H750 V${FLOW_LEVELS[3] * 120} H875`
 
-export function FlowClimb({ chip }: { chip: string }) {
+/** `inverse`: drawn on a dark band (the home page's steps): a light dashed line, light numbers, a glass chip. */
+export function FlowClimb({ chip, inverse = false }: { chip: string; inverse?: boolean }) {
   return (
     <div aria-hidden="true" className="pointer-events-none relative hidden h-32 lg:block" data-rank-climb="flow">
       <svg viewBox="0 0 1000 120" preserveAspectRatio="none" className="absolute inset-0 size-full rtl:-scale-x-100">
-        <path d={FLOW_PATH} fill="none" stroke="var(--color-line-strong)" strokeWidth={2} strokeDasharray="4 6" vectorEffect="non-scaling-stroke" />
+        <path d={FLOW_PATH} fill="none" stroke={inverse ? 'rgb(255 255 255 / 0.28)' : 'var(--color-line-strong)'} strokeWidth={2} strokeDasharray="4 6" vectorEffect="non-scaling-stroke" />
         <path
           d={FLOW_PATH}
           pathLength={1}
           fill="none"
-          stroke="var(--color-action)"
+          stroke={inverse ? 'var(--color-rail-tagline)' : 'var(--color-action)'}
           strokeWidth={3}
           strokeLinejoin="round"
           className={cn(styles.climbPath, styles.climbFlow)}
@@ -97,20 +98,20 @@ export function FlowClimb({ chip }: { chip: string }) {
           className={cn(styles.climbDot, 'absolute flex -translate-y-1/2 items-center gap-1.5 ltr:-translate-x-1/2 rtl:translate-x-1/2')}
           style={{ insetInlineStart: `${12.5 + i * 25}%`, top: `${FLOW_LEVELS[i] * 100}%`, '--node-delay': `${300 + i * 420}ms` } as React.CSSProperties}
         >
-          <span className="size-3 rounded-pill bg-action shadow-[0_0_0_5px_var(--color-canvas)]" />
+          <span className={cn('size-3 rounded-pill', inverse ? 'bg-rail-tagline shadow-[0_0_0_5px_var(--color-contrast-deep)]' : 'bg-action shadow-[0_0_0_5px_var(--color-canvas)]')} />
         </span>
       ))}
       {FLOW_RANKS.slice(0, 3).map((rank, i) => (
         <span
           key={`n${rank}`}
-          className={cn(styles.climbDot, 'absolute translate-y-2 text-caption font-semibold tabular-nums text-muted ltr:-translate-x-1/2 rtl:translate-x-1/2')}
+          className={cn(styles.climbDot, 'absolute translate-y-2 text-caption font-semibold tabular-nums ltr:-translate-x-1/2 rtl:translate-x-1/2', inverse ? 'text-contrast-ink/65' : 'text-muted')}
           style={{ insetInlineStart: `${12.5 + i * 25}%`, top: `${FLOW_LEVELS[i] * 100}%`, '--node-delay': `${300 + i * 420}ms` } as React.CSSProperties}
         >
           {rank}
         </span>
       ))}
       <span
-        className={cn(styles.climbDot, 'absolute inline-flex -translate-y-[calc(100%+12px)] items-center gap-1.5 whitespace-nowrap rounded-pill bg-contrast px-3 py-1 text-caption font-semibold text-contrast-ink shadow-card ltr:-translate-x-1/2 rtl:translate-x-1/2')}
+        className={cn(styles.climbDot, 'absolute inline-flex -translate-y-[calc(100%+12px)] items-center gap-1.5 whitespace-nowrap rounded-pill px-3 py-1 text-caption font-semibold text-contrast-ink ltr:-translate-x-1/2 rtl:translate-x-1/2', inverse ? 'bg-white/10 ring-1 ring-white/20' : 'bg-contrast shadow-card')}
         style={{ insetInlineStart: '87.5%', top: `${FLOW_LEVELS[3] * 100}%`, '--node-delay': '1700ms' } as React.CSSProperties}
       >
         <span className="size-1.5 rounded-pill bg-ok" />

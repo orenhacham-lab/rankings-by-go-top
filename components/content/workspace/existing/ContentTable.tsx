@@ -21,7 +21,8 @@ import { EMPTY_DATE } from '@/lib/format/date'
 import { strategyHref, STRATEGY_ANCHORS } from '@/lib/content/strategy/view'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { ExistingContentItem, ExistingContentTab } from '@/lib/content/existing-content/model'
-import { displayPath, fill, KIND_TONE } from './format'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { displayPath, fill, KIND_TONE, rowTitle } from './format'
 
 type Copy = ReturnType<typeof getDashboardDictionary>['existingContent']
 
@@ -44,6 +45,7 @@ export default function ContentTable({
   busy: boolean
   panelId: string
 }) {
+  const { language } = useDashboardLanguage()
   const showType = tab === 'all'
   const colCount = 3 + (showType ? 1 : 0) + (showUpdated ? 1 : 0) + (gscOk ? 4 : 0)
   return (
@@ -67,14 +69,17 @@ export default function ContentTable({
           {items.length === 0 ? (
             <EmptyRow colSpan={colCount} message={emptyMessage} />
           ) : items.map((it) => {
-            const title = it.isHome ? x.homePage : it.title
+            const named = rowTitle(it, x.homePage, language === 'he')
+            const title = named.text
             const planned = it.supportTopicPlanned || plannedNow.has(it.key)
             const commerce = it.group === 'commerce'
             const m = it.metrics
             return (
               <TableRow key={it.key}>
                 <Td stack="title" className="max-w-56 sm:max-w-72">
-                  <p className="truncate font-medium text-ink" title={title}>{title}</p>
+                  {named.isPath
+                    ? <p dir="ltr" className="truncate text-start font-medium text-ink" title={title}>{title}</p>
+                    : <p className="truncate font-medium text-ink" title={title}>{title}</p>}
                   <a
                     href={it.url}
                     target="_blank"

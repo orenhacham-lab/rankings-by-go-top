@@ -8,7 +8,7 @@
  *   1. WhatsApp, with a message that names the site on screen;
  *   2. the phone, as tel:;
  *   3. the email, as mailto:;
- * and when we answer. The number and the address are the ones every other contact
+ * No opening hours are shown (the owner has not confirmed any). The number and the address are the ones every other contact
  * entry uses (components/public/contact.ts). Admins do not see it (the layout
  * mounts it for customers only, as the rail's support row).
  */
@@ -120,8 +120,6 @@ export default function ContactMenu() {
               {r.external && <span className="sr-only">{t.opensNewTab}</span>}
             </a>
           ))}
-          <div role="separator" className="mx-2 my-1 h-px bg-line" />
-          <p className="px-3 pb-2 pt-1 text-caption text-muted" data-contact-hours="">{t.hours}</p>
         </div>
       )}
     </div>

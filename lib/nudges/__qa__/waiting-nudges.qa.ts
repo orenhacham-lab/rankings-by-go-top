@@ -7,9 +7,10 @@
  *   B) the card's rows: fixed priority, at most three, hidden at 0, one internal link each,
  *      "the queue runs dry" only with fewer than 2 approved topics and a known date
  *   C) the rail's pills: the same numbers, hidden at 0, 99+
- *   D) safe fixes: counted from the last scan kept in the browser with the health screen's own
- *      rule (lib/site-fix/bulk.ts bulkCandidates): only the safe kinds, never the home page or a
- *      fixed page, at most 25; the copy says "up to" (the fix queue is not read here)
+ *   D) safe fixes: counted from the last scan kept in the browser AND the fix queue with the health
+ *      screen's own rule (lib/site-fix/bulk.ts bulkCandidates): only the safe kinds, never the home
+ *      page or a page the queue holds, at most 25; a queue that cannot be read is null (no guess);
+ *      the copy is the exact count (see also lib/__qa__/w8-final-fixes.qa.ts)
  *   E) the words: exact Hebrew and English copy from the UX decisions (E)
  *   F) the screens: the card sits under the hero and renders nothing when empty; the rail draws
  *      a labelled pill only above 0; the articles screen opens filtered only on "ready";
@@ -26,7 +27,7 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { dashboardHe } from '@/lib/i18n/dashboard/he'
 import { dashboardEn } from '@/lib/i18n/dashboard/en'
 import { handleWaitingGet, type WaitingAnswer, type WaitingDeps } from '../waiting'
-import { pillText, railCounts, safeFixCountFromScan, waitingRows } from '../rows'
+import { pillText, railCounts, safeFixCountFromScan as countFromScan, waitingRows, type FixesRead } from '../rows'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 
 let pass = 0
@@ -209,49 +210,62 @@ async function main() {
     check('C-MUT: counting fixes without the plugin fails C3', mut)
   }
 
-  // ── D) safe fixes from the kept scan ──────────────────────────────────────
-  console.log('\nD) Safe fixes from the last scan')
+  // ── D) safe fixes from the kept scan and the fix queue ────────────────────
+  console.log('\nD) Safe fixes from the last scan and the fix queue')
   {
+    const caps = (over: Record<string, unknown> = {}) => ({
+      available: true, readOnly: false, plugin: { state: 'connected', version: '2.1.0' },
+      channelFor: { seo_title: 'plugin', meta_description: 'plugin', image_alt: 'plugin' }, appPassword: false, webhook: false, wordpress: true, ...over,
+    }) as unknown as FixesRead['capabilities']
+    const fixesRead = (jobs: unknown[] = [], over: Record<string, unknown> = {}): FixesRead => ({ capabilities: caps(over), jobs: jobs as FixesRead['jobs'] })
+    const safeFixCountFromScan = (raw: string | null, fixes: FixesRead | null = fixesRead()) => countFromScan(raw, fixes)
     const page = (url: string, over: Record<string, unknown> = {}) => ({ url, kind: 'page', fixable: true, ...over })
     const scan = (findings: unknown[], fixed: string[] = []) => JSON.stringify({ v: 1, report: { findings }, fixed })
     const one = scan([
-      { id: 'title_long', pages: [page('https://s.co/a'), page('https://s.co/', { kind: 'home' }), page('https://s.co/c', { fixable: false })] },
+      { id: 'title_long', pages: [page('https://s.co/a'), page('https://s.co/', { kind: 'home' }), page('https://s.co/c')] },
       { id: 'description_missing', pages: [page('https://s.co/a'), page('https://s.co/b')] },
       { id: 'images_alt', pages: [page('https://s.co/b')] },
       { id: 'canonical_missing', pages: [page('https://s.co/a'), page('https://s.co/b')] },
       { id: 'h1_multiple', pages: [page('https://s.co/a')] },
       { id: 'broken_links', pages: [page('https://s.co/a')] },
-    ], ['description_missing|https://s.co/b'])
-    check('D1: title, description and image-alt pages only; not home, not unfixable, not fixed, not canonical / h1 / links', safeFixCountFromScan(one) === 3, safeFixCountFromScan(one))
-    check('D2: no scan, junk or another version: 0', safeFixCountFromScan(null) === 0 && safeFixCountFromScan('{') === 0 && safeFixCountFromScan(JSON.stringify({ v: 2, report: { findings: [] } })) === 0)
+    ])
+    check('D1: title, description and image-alt rows only; not home, not canonical / h1 / links', safeFixCountFromScan(one) === 5, safeFixCountFromScan(one))
+    check('D2: no scan or junk: 0; a queue that could not be read: null (never a guess)', safeFixCountFromScan(null) === 0 && safeFixCountFromScan('{') === 0 && safeFixCountFromScan(JSON.stringify({ v: 2, report: { findings: [] } })) === 0 && safeFixCountFromScan(one, null) === null && safeFixCountFromScan(null, null) === null)
     const many = scan([{ id: 'title_long', pages: Array.from({ length: 40 }, (_, i) => page(`https://s.co/p${i}`)) }])
     check('D3: a batch never exceeds 25 pages', safeFixCountFromScan(many) === 25)
-    const mut = await withMutant<{ safeFixCountFromScan: typeof safeFixCountFromScan }, boolean>('lib/nudges/rows.ts', [["fixable: (id, url) => byKey.get(`${id}|${url}`) === true && !fixed.has(`${id}|${url}`),", 'fixable: () => true,']], (m) => m.safeFixCountFromScan(one) !== 3)
-    check('D-MUT: counting unfixable or already-fixed pages fails D1', mut)
+    check('D3b: without the plugin (or a live queue, or on Shopify) there is no button, so the count is 0', safeFixCountFromScan(one, fixesRead([], { plugin: { state: 'none' } })) === 0 && safeFixCountFromScan(one, fixesRead([], { available: false })) === 0 && safeFixCountFromScan(one, fixesRead([], { readOnly: true })) === 0 && safeFixCountFromScan(one, fixesRead([], { channelFor: { seo_title: 'plugin', meta_description: 'plugin' } })) === 0)
+    const job = (type: string, pageUrl: string, status: string, over: Record<string, unknown> = {}) => ({ id: `${type}|${pageUrl}`, type, pageUrl, subject: null, status, appliedAt: new Date().toISOString(), approvedAt: new Date().toISOString(), batchId: 'b1', ...over })
+    check('D3c: a page the queue holds (applied, sent, pending, manual) drops out of the count, all its rows (the button\'s pageBusy rule)', safeFixCountFromScan(one, fixesRead([job('seo_title', 'https://s.co/a', 'applied')])) === 3 && safeFixCountFromScan(one, fixesRead([job('meta_description', 'https://s.co/b', 'pending')])) === 3)
+    const allJobs = [job('seo_title', 'https://s.co/a', 'applied'), job('seo_title', 'https://s.co/c', 'applied'), job('meta_description', 'https://s.co/a', 'applied'), job('meta_description', 'https://s.co/b', 'applied'), job('image_alt', 'https://s.co/b', 'applied')]
+    check('D3d: after the whole batch is applied the count is 0 (the row and the badge disappear)', safeFixCountFromScan(one, fixesRead(allJobs)) === 0 && waitingRows(P, { ...base, pluginConnected: true }, safeFixCountFromScan(one, fixesRead(allJobs))).length === 0 && railCounts({ ...base, pluginConnected: true }, safeFixCountFromScan(one, fixesRead(allJobs))).siteHealth === 0)
+    check('D3e: a null count (queue unreadable) shows neither the row nor the badge', waitingRows(P, { ...base, pluginConnected: true }, null).length === 0 && railCounts({ ...base, pluginConnected: true }, null).siteHealth === 0)
+    check('D3f: a failed or cancelled job offers the fix again (it counts)', safeFixCountFromScan(one, fixesRead([job('seo_title', 'https://s.co/a', 'failed')])) === 5)
+    const mut = await withMutant<{ safeFixCountFromScan: typeof countFromScan }, boolean>('lib/nudges/rows.ts', [["fixable: (id, url) => { const t = typeOf.get(id); return !!t && rowOpenForBulk(fixes.jobs, t, url) },\n    jobs: fixes.jobs,", 'fixable: () => true,\n    jobs: [],']], (m) => m.safeFixCountFromScan(one, fixesRead(allJobs)) !== 0)
+    check('D-MUT: ignoring the fix queue (the old estimate) keeps counting finished work: D3d fails', mut)
     // One rule with the site-health screen's "Fix {n} safe items" button (w8 merge): the count IS
     // bulkCandidates over the kept report, never a second list of safe kinds.
     const rowsSrc = strip(code('lib/nudges/rows.ts'))
-    const oneRule = (src: string) => /import \{ bulkCandidates \} from '@\/lib\/site-fix\/bulk'/.test(src) && /return bulkCandidates\(findings, \{/.test(src) && !/SAFE_FINDINGS|'title_long'|'images_alt'/.test(src)
+    const oneRule = (src: string) => /import \{ bulkCandidates, rowOpenForBulk, safeFixesEnabled \} from '@\/lib\/site-fix\/bulk'/.test(src) && /return bulkCandidates\(findings, \{/.test(src) && !/SAFE_FINDINGS|'title_long'|'images_alt'/.test(src)
     check('D4: the nudge counts with lib/site-fix/bulk.ts bulkCandidates (the button\'s own rule), no list of its own', oneRule(rowsSrc))
     check('D4-MUT: a separate list of safe kinds is caught', !oneRule(rowsSrc.replace('return bulkCandidates(findings, {', "const SAFE_FINDINGS = new Set(['title_long'])\n  return bulkCandidates(findings, {")))
     const { bulkCandidates } = await import('@/lib/site-fix/bulk')
     const { FIX_TYPE } = await import('@/lib/site-health/rules')
-    const parsed = JSON.parse(one) as { report: { findings: { id: string; pages: { url: string; kind: string; fixable: boolean }[] }[] }; fixed: string[] }
+    const parsed = JSON.parse(one) as { report: { findings: { id: string; pages: { url: string; kind: string; fixable: boolean }[] }[] } }
     const direct = bulkCandidates(parsed.report.findings.map((f) => ({ ...f, fixType: FIX_TYPE[f.id as keyof typeof FIX_TYPE] ?? null })), {
-      fixable: (id, url) => !!parsed.report.findings.find((f) => f.id === id)?.pages.find((p) => p.url === url)?.fixable && !parsed.fixed.includes(`${id}|${url}`), jobs: [], now: Date.now(),
+      fixable: () => true, jobs: [], now: Date.now(),
     }).length
-    check('D5: same report, no queue: the nudge count equals the button\'s bulkCandidates count', direct === safeFixCountFromScan(one) && direct === 3, { direct, nudge: safeFixCountFromScan(one) })
+    check('D5: same report, no queue: the nudge count equals the button\'s bulkCandidates count', direct === safeFixCountFromScan(one) && direct === 5, { direct, nudge: safeFixCountFromScan(one) })
   }
 
   // ── E) the words ──────────────────────────────────────────────────────────
   console.log('\nE) The copy (UX decisions, E)')
   {
     const h = dashboardHe.waitingCard, e = dashboardEn.waitingCard
-    check('E1: Hebrew card title and rows', h.title === 'מחכה לכם' && h.connection === 'החיבור לאתר נותק, ולכן מאמרים ותיקונים לא עולים' && h.connectionAction === 'חיבור מחדש' && h.articles(1) === 'מאמר אחד כתוב ומחכה לאישור שלכם' && h.articles(4) === '4 מאמרים כתובים ומחכים לאישור שלכם' && h.articlesAction === 'לאישור המאמרים' && h.topics(3) === '3 נושאים חדשים מחכים לאישור' && h.topicsAction === 'לאישור הנושאים' && h.queueDry('05.10.2026') === 'בלי אישור, התור יתרוקן ב-05.10.2026' && h.fixes(6) === 'עד 6 תיקונים בטוחים מוכנים לאתר' && h.fixes(1) === 'ייתכן שתיקון בטוח אחד מוכן לאתר' && h.fixesAction === 'לתיקונים')
-    check('E2: English card title and rows', e.title === 'Waiting for you' && e.connection === "The site connection dropped, so articles and fixes can't go live" && e.connectionAction === 'Reconnect' && e.articles(1) === '1 article is written and waiting for your OK' && e.articles(4) === '4 articles are written and waiting for your OK' && e.articlesAction === 'Review articles' && e.topics(3) === '3 new topics await approval' && e.topicsAction === 'Review topics' && e.queueDry('Oct 5, 2026') === 'Without approval the queue runs dry on Oct 5, 2026' && e.fixes(6) === 'Up to 6 safe fixes are ready for your site' && e.fixes(1) === 'A safe fix may be ready for your site' && e.fixesAction === 'See fixes')
+    check('E1: Hebrew card title and rows', h.title === 'מחכה לכם' && h.connection === 'החיבור לאתר נותק, ולכן מאמרים ותיקונים לא עולים' && h.connectionAction === 'חיבור מחדש' && h.articles(1) === 'מאמר אחד כתוב ומחכה לאישור שלכם' && h.articles(4) === '4 מאמרים כתובים ומחכים לאישור שלכם' && h.articlesAction === 'לאישור המאמרים' && h.topics(3) === '3 נושאים חדשים מחכים לאישור' && h.topicsAction === 'לאישור הנושאים' && h.queueDry('05.10.2026') === 'בלי אישור, התור יתרוקן ב-05.10.2026' && h.fixes(6) === '6 תיקונים בטוחים מוכנים לאתר' && h.fixes(1) === 'תיקון בטוח אחד מוכן לאתר' && h.fixesAction === 'לתיקונים')
+    check('E2: English card title and rows', e.title === 'Waiting for you' && e.connection === "The site connection dropped, so articles and fixes can't go live" && e.connectionAction === 'Reconnect' && e.articles(1) === '1 article is written and waiting for your OK' && e.articles(4) === '4 articles are written and waiting for your OK' && e.articlesAction === 'Review articles' && e.topics(3) === '3 new topics await approval' && e.topicsAction === 'Review topics' && e.queueDry('Oct 5, 2026') === 'Without approval the queue runs dry on Oct 5, 2026' && e.fixes(6) === '6 safe fixes are ready for your site' && e.fixes(1) === 'One safe fix is ready for your site' && e.fixesAction === 'See fixes')
     check('E3: the rail’s aria-label', dashboardHe.railWaiting.aria(3) === '3 ממתינים' && dashboardEn.railWaiting.aria(3) === '3 waiting')
     const hs = dashboardHe.reminders, es = dashboardEn.reminders
-    check('E4: the settings switch label', hs.settingsLabel === 'תזכורות במייל כשמשהו מחכה לכם' && es.settingsLabel === 'Email me when something is waiting for me')
+    check('E4: the settings switch label', hs.settingsLabel === 'תזכורת במייל כשמאמרים מחכים לאישור' && es.settingsLabel === 'Email me when articles are waiting for approval')
     check('E5: the articles hero says "for your OK"', dashboardHe.contentHub.articlesHero.waiting(2, '2') === '2 מאמרים מוכנים ומחכים לאישור שלכם' && dashboardEn.contentHub.articlesHero.waiting(2, '2') === '2 articles ready and waiting for your OK')
     const emailKeys = Object.keys(hs.email).sort().join()
     check('E6: both languages have the same email keys', emailKeys === Object.keys(es.email).sort().join() && Object.keys(hs.unsubscribePage).sort().join() === Object.keys(es.unsubscribePage).sort().join())

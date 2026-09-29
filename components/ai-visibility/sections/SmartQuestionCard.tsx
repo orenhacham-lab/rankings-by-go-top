@@ -73,6 +73,8 @@ export function SmartQuestionCard({
   const page = question.worth?.answeringPage ?? null
   const status = article?.status ?? 'none'
   const StatusIcon = status !== 'none' ? STATUS_ICON[status] : null
+  // A question about the business itself: tracked, never turned into an article (unless one already exists).
+  const brandQuestion = question.worth?.why.value === 'brand' && !StatusIcon
 
   return (
     <div className="flex flex-col gap-3 rounded-inset border border-line bg-surface p-4 transition-colors duration-150 ease-snappy hover:border-line-strong" data-question-card="">
@@ -100,7 +102,7 @@ export function SmartQuestionCard({
         )}
       </div>
 
-      {article && (
+      {article && !(brandQuestion && isAlreadyTracked) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3" data-question-article={status}>
           {StatusIcon ? (
             <>
@@ -115,6 +117,13 @@ export function SmartQuestionCard({
                 {article.articleHref ? t('qa_open_article') : t('qa_open_topic')}
               </Link>
             </>
+          ) : brandQuestion ? (
+            // A question about the business itself ("reviews of X"): what AI says about it is tracked; an article about
+            // your own reviews is not an action.
+            <Button size="sm" variant="secondary" onClick={onAdd} data-question-track-brand="">
+              <Plus aria-hidden="true" className="size-4" />
+              {t('qa_track_brand')}
+            </Button>
           ) : page ? (
             <>
               <span className="min-w-0 flex-1 basis-40 truncate text-caption text-body" title={page.title}>

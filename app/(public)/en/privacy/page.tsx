@@ -265,7 +265,7 @@ export default function EnglishPrivacyPage() {
           location and tracked keywords to AI assistants (ChatGPT, Perplexity, Gemini, Microsoft Copilot, Grok and
           Google AI Mode) and returns their answers to us. It does not receive data from your Google account. In addition to checks you start
           yourself, an automatic monthly check runs for the project; it counts toward your plan&rsquo;s allowance of checks
-          and can be turned off in the project settings.</li>
+          and can be turned off on the &ldquo;AI Visibility&rdquo; screen, in the &ldquo;Automatic monthly check&rdquo; card.</li>
         </ul>
       </section>
 

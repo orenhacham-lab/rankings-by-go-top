@@ -490,7 +490,7 @@ async function main() {
     const I = require('../i18n.ts')
     const he = I.createI18n('he'), en = I.createI18n('en')
     check('G10: the recheck and menu words exist in both languages', he('recheck_question_all') === 'בדיקה חוזרת ({n} בדיקות)' && en('recheck_question_all') === 'Recheck ({n} checks)'
-      && he('recheck_not_enough') === 'אין מספיק בדיקות החודש' && he('check_on_engine_menu') === 'בדיקה ב-{engine}' && !!en('check_on_engine_menu'))
+      && he('recheck_not_enough') === 'אין מספיק בדיקות החודש' && he('check_on_engine_menu') === 'בדיקה ב-{engine} (בדיקה אחת)' && !!en('check_on_engine_menu'))
     const sec = code('components/ai-visibility/AIVisibilitySection.tsx')
     const noChooser = (s2: string) => !/onClick=\{\(\) => !scanning && scanEngine\(p\.id, engine\)\}/.test(s2) && /data-chip-outcome=/.test(s2) && /<span\s+role="img"\s+title=\{statusLabel\}/.test(s2)
     check('G11: the engine chooser is off the main surface: the chips are status, not buttons', noChooser(sec))

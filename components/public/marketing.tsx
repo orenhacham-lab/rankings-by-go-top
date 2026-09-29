@@ -158,22 +158,28 @@ export function PageHero({
 }
 
 export function Section({
-  children, tone = 'canvas', id, className, narrow = false,
+  children, tone = 'canvas', id, className, narrow = false, ...rest
 }: {
   children: React.ReactNode
-  tone?: 'canvas' | 'surface' | 'contrast'
+  tone?: 'canvas' | 'surface' | 'contrast' | 'deep'
   id?: string
   className?: string
   narrow?: boolean
+  'data-steps-tone'?: string
+  'data-audience-tone'?: string
+  'data-faq-tone'?: string
 }) {
   return (
     <section
       id={id}
+      {...rest}
       className={cn(
         'py-16 sm:py-20 lg:py-24',
         tone === 'canvas' && 'bg-canvas',
         tone === 'surface' && 'border-y border-line bg-surface',
         tone === 'contrast' && 'bg-contrast text-contrast-ink',
+        // The deeper navy: beside a navy band, so two dark bands never touch in the same tone.
+        tone === 'deep' && 'bg-contrast-deep text-contrast-ink',
         className,
       )}
     >
@@ -298,19 +304,19 @@ export function CtaBand({
   )
 }
 
-export function FaqList({ items }: { items: { q: string; a: React.ReactNode }[] }) {
+export function FaqList({ items, inverse = false }: { items: { q: string; a: React.ReactNode }[]; inverse?: boolean }) {
   return (
     <div className="space-y-3">
       {items.map((faq) => (
         <details
           key={faq.q}
-          className="group rounded-card border border-line bg-surface shadow-card transition-[border-color] duration-150 ease-snappy hover:border-line-strong"
+          className={cn('group rounded-card border transition-[border-color] duration-150 ease-snappy', inverse ? 'border-white/10 bg-white/[0.05] hover:border-white/25' : 'border-line bg-surface shadow-card hover:border-line-strong')}
         >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-card px-5 py-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:px-6 [&::-webkit-details-marker]:hidden">
-            <h3 className="text-section font-semibold text-ink">{faq.q}</h3>
-            <ChevronDown className="size-4 shrink-0 text-muted transition-transform duration-150 ease-snappy group-open:rotate-180" aria-hidden="true" />
+          <summary className={cn('flex cursor-pointer list-none items-center justify-between gap-4 rounded-card px-5 py-4 focus-visible:outline-none focus-visible:ring-4 sm:px-6 [&::-webkit-details-marker]:hidden', inverse ? 'focus-visible:ring-white/40' : 'focus-visible:ring-action/20')}>
+            <h3 className={cn('text-section font-semibold', inverse ? 'text-contrast-ink' : 'text-ink')}>{faq.q}</h3>
+            <ChevronDown className={cn('size-4 shrink-0 transition-transform duration-150 ease-snappy group-open:rotate-180', inverse ? 'text-contrast-ink/70' : 'text-muted')} aria-hidden="true" />
           </summary>
-          <div className="px-5 pb-5 text-copy text-body sm:px-6">{faq.a}</div>
+          <div className={cn('px-5 pb-5 text-copy sm:px-6', inverse ? 'text-contrast-ink/80' : 'text-body')}>{faq.a}</div>
         </details>
       ))}
     </div>

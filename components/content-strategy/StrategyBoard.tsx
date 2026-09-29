@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import Segmented from '@/components/ui/Segmented'
 import {
-  ALL_MONTHS, STRATEGY_COLUMNS, cardsInMonth, monthChips, sameTopicKey, unscheduledCount,
+  ALL_MONTHS, IDEA_GROUP_ORDER, STRATEGY_COLUMNS, cardsInMonth, ideaGroupCounts, ideaGroupOf, monthChips, sameTopicKey, unscheduledCount,
   type StrategyCard, type StrategyColumn,
 } from '@/lib/content/strategy/board'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
@@ -145,11 +145,19 @@ function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: Strategy
   return <div data-strategy-card={card.key} className={cn(frame, approvedNow && 'border-ok/40')}>{body}</div>
 }
 
-function Column({ column, cards, lang, dict, note, act, insights }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; note?: string | null; act: BoardIdeaActions | null; insights?: ReadonlyMap<string, TopicInsight> | null }) {
+function Column({ column, cards: raw, lang, dict, note, act, insights }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; note?: string | null; act: BoardIdeaActions | null; insights?: ReadonlyMap<string, TopicInsight> | null }) {
   const s = dict.contentStrategy
   const [open, setOpen] = useState(false)
+  // Ideas: our own first, then the suggestions from the rankings, then the scan's (stable within a group).
+  const cards = column === 'ideas' ? [...raw].sort((a, b) => IDEA_GROUP_ORDER.indexOf(ideaGroupOf(a)) - IDEA_GROUP_ORDER.indexOf(ideaGroupOf(b))) : raw
   const shown = open ? cards : cards.slice(0, COLUMN_PREVIEW)
   const hidden = cards.length - shown.length
+  // The ideas column names each kind of card with its own count when there is more than one (the
+  // dashboard's "N topics waiting" is the first group's number).
+  const totals = column === 'ideas' ? ideaGroupCounts(cards) : null
+  const groups = totals && IDEA_GROUP_ORDER.filter((k) => totals[k] > 0).length > 1
+    ? IDEA_GROUP_ORDER.map((kind) => ({ kind, total: totals[kind], cards: shown.filter((c) => ideaGroupOf(c) === kind) })).filter((g) => g.cards.length > 0)
+    : null
   return (
     <section aria-labelledby={`strategy-col-${column}`} data-strategy-column={column} className="flex min-w-0 flex-col rounded-card border border-line bg-sunk/60 p-3">
       <header className="mb-3 flex items-center justify-between gap-2 px-1">
@@ -168,10 +176,25 @@ function Column({ column, cards, lang, dict, note, act, insights }: { column: St
       {cards.length === 0 ? (
         <p className="rounded-control border border-dashed border-line-strong/70 px-3 py-4 text-caption text-muted">{s.columnEmpty[column]}</p>
       ) : (
-        <ul className="space-y-2">
-          {/* Swap brings the next pending idea in, so it is offered while the column holds more than it shows. */}
-          {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} /></li>)}
-        </ul>
+        groups ? (
+          <div className="space-y-4">
+            {groups.map((g) => (
+              <div key={g.kind} data-idea-group={g.kind}>
+                <p className="mb-2 px-1 text-caption font-semibold text-body">
+                  {s.ideaGroups[g.kind]} <span className="tabular-nums text-muted">({g.total})</span>
+                </p>
+                <ul className="space-y-2">
+                  {g.cards.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} /></li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {/* Swap brings the next pending idea in, so it is offered while the column holds more than it shows. */}
+            {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} /></li>)}
+          </ul>
+        )
       )}
       {(hidden > 0 || open) && cards.length > COLUMN_PREVIEW && (
         <button

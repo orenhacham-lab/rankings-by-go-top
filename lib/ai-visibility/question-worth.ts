@@ -137,6 +137,17 @@ const VALUE: Record<PromptIntent, { points: number; kind: WorthValue }> = {
 }
 const BUY_CUES = /(כמה עול|מחיר|להזמין|לקנות|לרכוש|הזמנת|how much|price|cost|book|buy)/i
 const CHOOSE_CUES = /(מומלץ|מומלצ|הכי טוב|איזה .* כדאי|best|recommend)/i
+/**
+ * "They ask for a recommendation, and AI answers with names of businesses" is true only when the question
+ * asks for a business or a provider: a request word (who, which, best, recommended) together with a word for
+ * one (company, agency, plumber, hotel, site...). "How far ahead should I book a holiday" is recommended
+ * advice, not a request for names: it is an information question.
+ */
+const ASKS_FOR_NAMES = /(^|[\s,(])(מי|איזה|איזו|אילו|הכי טוב|הכי טובה|הכי טובים|מומלץ|מומלצת|מומלצים|מומלצות|ממליצים|best|recommended?|who|which|top)(?=[\s,?.!)]|$)/i
+const PROVIDER_WORDS = /(חברה|חברת|חברות|עסק|עסקים|ספק|ספקים|סוכנות|סוכנויות|סוכן|סוכנים|משרד|משרדי|אינסטלטור|חשמלאי|טכנאי|קבלן|מוסך|מסעדה|מסעדות|מלון|מלונות|קליניקה|מרפאה|עורך דין|עורכי דין|רופא|רופאים|מטפל|מטפלת|יועץ|יועצת|מומחה|מומחים|חנות|חנויות|אתר|אתרים|שירות|מדריך|מדריכים|company|companies|provider|providers|agency|agencies|agent|service|store|shop|firm|contractor|plumber|electrician|lawyer|doctor|clinic|restaurant|hotel|dealer|guide|guides)/i
+export function asksForNames(prompt: string): boolean {
+  return ASKS_FOR_NAMES.test(prompt) && PROVIDER_WORDS.test(prompt)
+}
 
 export function scoreQuestion(prompt: string, intent: PromptIntent | string, ctx: WorthContext): QuestionWorth {
   const q = stems(prompt)
@@ -171,6 +182,8 @@ export function scoreQuestion(prompt: string, intent: PromptIntent | string, ctx
   let valueKind = v.kind
   if (valueKind === 'learn' && BUY_CUES.test(prompt)) { value = 24; valueKind = 'buy' }
   else if (valueKind === 'learn' && CHOOSE_CUES.test(prompt)) { value = 22; valueKind = 'choose' }
+  // The reason "AI answers with names of businesses" only for a question that asks for names (the points stay).
+  if (valueKind === 'choose' && intent !== 'local' && !asksForNames(prompt)) valueKind = 'learn'
 
   // The page whose title shares the most words with the question (two, or all of a short question).
   let answeringPage: WorthPage | null = null

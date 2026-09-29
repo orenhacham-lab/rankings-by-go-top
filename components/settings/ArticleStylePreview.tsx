@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { ImageOff } from 'lucide-react'
 import type { ArticleCta } from '@/lib/content/article-style/cta'
 import { designForSite } from '@/lib/content/article-style/render'
@@ -113,6 +113,25 @@ export default function ArticleStylePreview({
     return out
   }, [html, shown])
 
+  // Turning the call to action on brings its box into view: it sits below the preview's fold, and a switch that
+  // seems to change nothing reads as broken. Only the preview's own scroll region moves (never the page), and
+  // not at all when the owner prefers reduced motion (an instant jump then).
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const hadCta = useRef(!!cta)
+  useEffect(() => {
+    const has = !!cta
+    if (has && !hadCta.current) {
+      const region = scrollRef.current
+      const box = region?.querySelector<HTMLElement>('[data-as="pcta"]')
+      if (region && box) {
+        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        const top = box.getBoundingClientRect().top - region.getBoundingClientRect().top + region.scrollTop - 16
+        region.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' })
+      }
+    }
+    hadCta.current = has
+  }, [cta])
+
   const heroSquare = style.heroRatio === '1:1'
   const art = (label: string, square: boolean, className?: string) => (
     <figure className={cn('m-0', className)} aria-label={label}>
@@ -134,6 +153,7 @@ export default function ArticleStylePreview({
       </div>
       {/* A scrolling region with no link inside (the sample has none since wave 8) must take keyboard focus itself (axe scrollable-region-focusable). */}
       <div
+        ref={scrollRef}
         dir={locale === 'he' ? 'rtl' : 'ltr'}
         role="region"
         aria-label={t.preview.caption}

@@ -42,6 +42,9 @@ async function postJson(url: string, body: unknown): Promise<boolean> {
   }
 }
 
+/** The network's size is shown to a visitor only from this many sites: "2 sites" works against the offer. */
+export const NETWORK_SIZE_SHOWN_FROM = 10
+
 /** The five states of the hero (UX A2 a-e); f (no network here) is SiteLinksView's OutreachHero. */
 export type NetworkState = 'on' | 'not_placing' | 'off' | 'cannot_join' | 'left'
 
@@ -123,7 +126,16 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
     : state === 'not_placing' ? copy.readiness[data.readiness as Exclude<AvailableNetwork['readiness'], 'ready'>]
     : state === 'cannot_join' ? h.body.cannotJoin
     : state === 'left' ? h.body.left(formatDay(data.membership.leftAt, language))
-    : h.body.off(count(data.memberCount))
+    : h.body.off(data.memberCount >= NETWORK_SIZE_SHOWN_FROM ? count(data.memberCount) : null)
+
+  // "Still missing: 2 more published articles, a finished scan, 5 more days": only what the server could tell.
+  const g = copy.gap
+  const gapParts = data.gap ? [
+    data.gap.articles ? g.articles(data.gap.articles) : null,
+    data.gap.scan ? g.scan : null,
+    data.gap.days ? g.days(data.gap.days) : null,
+  ].filter((x): x is string => !!x) : []
+  const gapLine = state === 'not_placing' && data.readiness === 'thin_or_new' && gapParts.length > 0 ? `${g.label} ${gapParts.join(', ')}` : null
 
   // The one step that moves the state on, when there is one.
   const action = state === 'off' || state === 'left'
@@ -163,6 +175,7 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
               </div>
               <h2 id="link-network-title" className="mt-5 max-w-[32ch] text-title font-bold tracking-tight text-balance">{title}</h2>
               <p className="mt-3 max-w-prose text-copy text-contrast-ink/80 text-pretty">{body}</p>
+              {gapLine && <p className="mt-2 max-w-prose text-copy font-medium text-contrast-ink text-pretty" data-link-network="gap">{gapLine}</p>}
               {action && <div className="mt-5 flex flex-wrap gap-3">{action}</div>}
             </div>
 

@@ -8,9 +8,9 @@
  *      footer's contact column starts with WhatsApp, the About close offers the
  *      three as buttons, the floating WhatsApp button and the phone bar stay,
  *      and the English site's WhatsApp message is English;
- *   C) rhythm: the home bands run D S C D C D S B C D (D navy, S surface,
- *      C canvas, B cobalt) so from the four-step flow down no two neighbours
- *      share a tone, and About runs D S D C B D; the heroes are navy with the
+ *   C) rhythm: the home bands run D S C D E D E B E D (D navy, E deeper navy, S surface,
+ *      C canvas, B cobalt) so from the four-step flow down nothing is light and no two
+ *      neighbours share a tone, and About runs D S D C B D; the heroes are navy with the
  *      nav in its inverse tone over them;
  *   D) type: the marketing steps are fluid and land on the sizes the design
  *      gives (hero 40 → 76, About hero 34 → 56, section 28 → 44, lead 17 → 21,
@@ -74,6 +74,8 @@ function mainBands(html: string): string[] {
   return out
 }
 function tone(cls: string): string {
+  // E: the deeper navy (bg-contrast-deep), so two dark bands never touch in the same tone.
+  if (/\bbg-contrast-deep\b/.test(cls)) return 'E'
   if (/\bheroDark\b|\bbg-contrast\b/.test(cls)) return 'D'
   if (/\bbandBrand\b/.test(cls)) return 'B'
   if (/\bbg-surface\b/.test(cls)) return 'S'
@@ -172,12 +174,12 @@ async function main() {
     about[l] = renderToStaticMarkup(createElement((l === 'he' ? heAbout : enAbout).default as never) as never)
   }
   {
-    const HOME = 'D S C D C D S B C D'
+    const HOME = 'D S C D E D E B E D'
     const ABOUT = 'D S D C B D'
     check(`C1: the home bands are ${HOME} in both languages`, tones(home.he) === HOME && tones(home.en) === HOME, `${tones(home.he)} / ${tones(home.en)}`)
     const fromFlow = (t: string) => t.split(' ').slice(4)
     const noTwins = (t: string[]) => t.every((x, i) => i === 0 || x !== t[i - 1])
-    check('C2: from the four-step flow down no two neighbouring bands share a tone (L D L B L D)', noTwins(fromFlow(tones(home.he))) && fromFlow(tones(home.he)).join(' ') === 'C D S B C D')
+    check('C2: from the four-step flow down NOTHING is light (owner) and no two neighbouring bands share a tone (E D E B E D)', noTwins(fromFlow(tones(home.he))) && fromFlow(tones(home.he)).join(' ') === 'E D E B E D' && !/[CS]/.test(fromFlow(tones(home.he)).join('')) && fromFlow(tones(home.en)).join(' ') === 'E D E B E D')
     check(`C3: About is ${ABOUT} (no longer a light hero and four light card grids)`, tones(about.he) === ABOUT && tones(about.en) === ABOUT, `${tones(about.he)} / ${tones(about.en)}`)
     check('MUTATION CONTROL: the old all-light flow-to-FAQ run is caught',
       tones(home.he.replace(/class="relative isolate overflow-hidden bg-contrast py-16/, 'class="relative isolate overflow-hidden bg-surface py-16')) !== HOME)
@@ -190,12 +192,12 @@ async function main() {
     const heroOk = (html: string) => /<h1 class="text-hero text-contrast-ink">/.test(html) && html.indexOf('data-hero-signals') > html.indexOf('<h1')
     check('C6: the home hero: the text-hero headline in light ink, the signal stack at its end', heroOk(home.he) && heroOk(home.en))
     // Software terms, not agency service phrasing (the owner, 2026-09-29: the SaaS site must not compete with gotop.co.il).
-    check('C7: the About hero: text-hero-page, a software headline ("כלי SEO", "מערכת קידום אוטומטית")', /<h1 class="text-hero-page text-balance text-contrast-ink">11 שנות ניסיון, בכלי SEO אחד\.<span class="block text-rail-tagline">מערכת קידום אוטומטית שעובדת בשבילכם\.<\/span>/.test(about.he)
-      && about.en.includes('11 years of experience, in one SEO tool.<span class="block text-rail-tagline">An automated SEO platform that works for you.</span>'))
+    check('C7: the About hero: text-hero-page, the agreed software headline ("11 שנה של קידום אתרים, במערכת אחת שעובדת בשבילכם.")', /<h1 class="text-hero-page text-balance text-contrast-ink">11 שנה של קידום אתרים,<span class="block text-rail-tagline">במערכת אחת שעובדת בשבילכם\.<\/span>/.test(about.he)
+      && about.en.includes('11 years of SEO,<span class="block text-rail-tagline">in one platform that works for you.</span>'))
     const AGENCY = /חברת קידום|שירותי קידום|SEO agency|SEO services/i
     const h1s = (html: string) => (/<h1[\s\S]*?<\/h1>/.exec(html)?.[0] ?? '')
     check('C7b: no hero headline on home or About uses agency service phrasing', [home.he, home.en, about.he, about.en].every((h) => !AGENCY.test(h1s(h))))
-    check('MUTATION CONTROL: a "חברת קידום אתרים" headline is caught', AGENCY.test(h1s(about.he.replace('בכלי SEO אחד', 'חברת קידום אתרים'))))
+    check('MUTATION CONTROL: a "חברת קידום אתרים" headline is caught', AGENCY.test(h1s(about.he.replace('11 שנה של קידום אתרים,', 'חברת קידום אתרים,'))))
     const aboutContact = (html: string) => (html.slice(html.indexOf('data-about-contact')).match(/data-contact-channel="(whatsapp|phone|email)"/g) ?? []).length === 3
     check('C8: the About close offers WhatsApp, call and email as three buttons', aboutContact(about.he) && aboutContact(about.en))
     const hebrewIn = (html: string) => (html.replace(/text=[^"&]*/g, '').replace(/<a [^>]*hrefLang="he"[^>]*>[\s\S]*?<\/a>/gi, '').match(/[^<>]*[\u0590-\u05FF][^<>]*/g) ?? [])

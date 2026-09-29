@@ -242,20 +242,20 @@ export function LandingPage({
         </section>
 
         {/* How it works: the rank climb is the connector through four steps */}
-        <Section id="how-it-works" className="scroll-mt-16 lg:scroll-mt-[4.5rem]">
-          <SectionIntro size="mkt" eyebrow={copy.flow.eyebrow} title={copy.flow.title} description={copy.flow.body} />
+        <Section tone="deep" id="how-it-works" className="scroll-mt-16 lg:scroll-mt-[4.5rem]" data-steps-tone="dark">
+          <SectionIntro size="mkt" inverse eyebrow={copy.flow.eyebrow} title={copy.flow.title} description={copy.flow.body} />
           <Flow rtl={rtl} className="relative">
-            <FlowClimb chip={copy.hero.climbChip} />
+            <FlowClimb chip={copy.hero.climbChip} inverse />
             <ol className="relative grid grid-cols-1 gap-10 sm:grid-cols-2 lg:mt-6 lg:grid-cols-4 lg:gap-8" data-flow-steps>
               {copy.flow.steps.map((step, i) => (
                 <li key={step.title} className="flex gap-5 lg:flex-col lg:gap-3 lg:text-center">
-                  <span className="w-16 shrink-0 text-numeral tabular-nums text-action lg:w-auto" aria-hidden="true">
+                  <span className="w-16 shrink-0 text-numeral tabular-nums text-rail-tagline lg:w-auto" aria-hidden="true">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <div className="min-w-0 lg:flex lg:flex-col lg:items-center">
-                    <span className="inline-flex h-6 items-center rounded-pill bg-action-soft px-2.5 text-caption font-semibold text-action">{step.tag}</span>
-                    <h3 className="mt-2.5 text-section font-bold text-ink">{step.title}</h3>
-                    <p className="mt-1.5 text-copy text-body lg:max-w-60">{step.desc}</p>
+                    <span className="inline-flex h-6 items-center rounded-pill bg-white/10 px-2.5 text-caption font-semibold text-rail-tagline ring-1 ring-white/10">{step.tag}</span>
+                    <h3 className="mt-2.5 text-section font-bold text-contrast-ink">{step.title}</h3>
+                    <p className="mt-1.5 text-copy text-contrast-ink/75 lg:max-w-60">{step.desc}</p>
                   </div>
                 </li>
               ))}
@@ -303,15 +303,15 @@ export function LandingPage({
         </section>
 
         {/* Who it is for: one row of three columns, hairlines between, no boxes */}
-        <Section tone="surface">
-          <SectionIntro size="mkt" eyebrow={copy.audience.eyebrow} title={copy.audience.title} description={copy.audience.body} />
-          <div className="grid grid-cols-1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0" data-audience-row>
+        <Section tone="deep" className="border-y border-white/10" data-audience-tone="dark">
+          <SectionIntro size="mkt" inverse eyebrow={copy.audience.eyebrow} title={copy.audience.title} description={copy.audience.body} />
+          <div className="grid grid-cols-1 divide-y divide-white/10 md:grid-cols-3 md:divide-x md:divide-y-0" data-audience-row>
             {copy.audience.items.map((item, i) => (
               <Rise key={item.title} delay={i * 80} className="flex h-full flex-col gap-3 py-8 first:pt-0 last:pb-0 md:px-8 md:py-2 md:first:ps-0 md:last:pe-0">
-                <IconSquircle icon={AUDIENCE_ICONS[i] ?? Users} />
-                <h3 className="text-title font-bold tracking-tight text-ink">{item.title}</h3>
-                <p className="flex-1 text-section font-normal text-body text-pretty">{item.desc}</p>
-                <p className="flex items-start gap-2 pt-2 text-section font-semibold text-action">
+                <IconSquircle icon={AUDIENCE_ICONS[i] ?? Users} className="bg-white/10 text-rail-tagline" />
+                <h3 className="text-title font-bold tracking-tight text-contrast-ink">{item.title}</h3>
+                <p className="flex-1 text-section font-normal text-contrast-ink/80 text-pretty">{item.desc}</p>
+                <p className="flex items-start gap-2 pt-2 text-section font-semibold text-rail-tagline">
                   <TrendingUp className="mt-1 size-4 shrink-0" aria-hidden="true" />
                   {item.gain}
                 </p>
@@ -351,13 +351,13 @@ export function LandingPage({
         </section>
 
         {/* Objections, answered */}
-        <Section>
+        <Section tone="deep" data-faq-tone="dark">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-5 lg:gap-14">
             <div className="lg:col-span-2">
-              <SectionIntro size="mkt" eyebrow={copy.faq.eyebrow} title={copy.faq.title} description={copy.faq.body} align="start" className="mb-0 sm:mb-0 lg:sticky lg:top-28" />
+              <SectionIntro size="mkt" inverse eyebrow={copy.faq.eyebrow} title={copy.faq.title} description={copy.faq.body} align="start" className="mb-0 sm:mb-0 lg:sticky lg:top-28" />
             </div>
             <div className="lg:col-span-3">
-              <FaqList items={copy.faq.items} />
+              <FaqList items={copy.faq.items} inverse />
             </div>
           </div>
         </Section>

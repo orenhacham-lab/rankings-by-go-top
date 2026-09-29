@@ -603,13 +603,13 @@ async function main() {
     check('MUTATION CONTROL: a safe button shown without a connected plugin is caught by U8', mStrip.found && shown.includes('data-safe-fixes="3"'))
 
     // U9: llms.txt is one file for the whole site. Its approval never says "this page only" nor how a
-    // page's SEO field is saved, and its text shows as the file reads (left to right, lines unwrapped).
+    // page's SEO field is saved, and its text shows as the file reads (left to right, lines wrapped, direction set inline: see w8-final-fixes.qa.ts).
     const code = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1').replace(/\{\s*\}/g, '')
     const llmsOk = (t: string) => {
       const c = code(t)
       return /const lead = p\.type === 'llms_txt' \? t\.labels\.llmsLead : t\.lead\[phase\.channel\]/.test(c)
         && /const viaNote = phase\.kind === 'ready' && phase\.preview\.type !== 'llms_txt'/.test(c)
-        && /data-llms-text[^>]*/.test(c) && /dir="ltr" wrap="off"[^>]*data-llms-text/.test(c)
+        && /data-llms-text[^>]*/.test(c) && /dir="ltr" style=\{LLMS_TEXT_STYLE\}[^>]*data-llms-text/.test(c)
         && /type !== 'llms_txt' && <div/.test(c)
     }
     const modal = read('components/site-health/ApproveFixModal.tsx')

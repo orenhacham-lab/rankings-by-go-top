@@ -21,7 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sampleSiteColors, type SampledColor } from './colors'
 import { cleanProfiles, detectProfilesFromHtml, parseProfilesInput, type OfficialProfiles, type ProfileNetwork } from './profiles'
 import { ARTICLE_CTA_COLUMN, ARTICLE_STYLE_COLUMNS, ARTICLE_STYLE_TABLE, isMissingRelation, readProjectArticleCta } from './store'
-import { DEFAULT_ARTICLE_CTA, parseArticleCtaInput, toCtaRow, type ArticleCta, type CtaField } from './cta'
+import { DEFAULT_ARTICLE_CTA, findContactUrl, parseArticleCtaInput, toCtaRow, type ArticleCta, type CtaField } from './cta'
 import {
   DEFAULT_ARTICLE_STYLE,
   parseArticleStyleInput,
@@ -57,6 +57,8 @@ export type ArticleStyleView = {
   ctaSaved: boolean
   /** False while its column does not exist yet (the migration is not applied): the section is read-only. */
   ctaEditable: boolean
+  /** The site's contact page when the full-site mapping found one: the suggested button goes there. */
+  contactUrl?: string | null
 }
 
 export type ArticleStyleErrorCode = 'unauthorized' | 'not_found' | 'invalid_request' | 'unavailable' | 'save_failed'
@@ -109,7 +111,7 @@ async function readView(deps: ArticleStyleDeps, o: Extract<Owner, { ok: true }>)
     .eq('user_id', o.userId)
     .maybeSingle()
   const platform = await platformOf(deps, o.projectId)
-  const off = { cta: { ...DEFAULT_ARTICLE_CTA }, ctaSaved: false, ctaEditable: false }
+  const off = { cta: { ...DEFAULT_ARTICLE_CTA }, ctaSaved: false, ctaEditable: false, contactUrl: null }
   if (error) {
     if (!isMissingRelation(error)) return { ok: false, code: 'unavailable' }
     return { ok: true, data: { style: { ...DEFAULT_ARTICLE_STYLE, brandColors: [] }, editable: false, saved: false, platform, domain: o.domain, profiles: {}, ...off } }
@@ -121,9 +123,26 @@ async function readView(deps: ArticleStyleDeps, o: Extract<Owner, { ok: true }>)
   const cta = ctaRead
     ? { cta: ctaRead.cta, ctaSaved: ctaRead.state === 'saved', ctaEditable: ctaRead.state === 'saved' || ctaRead.state === 'default' }
     : { cta: { ...DEFAULT_ARTICLE_CTA }, ctaSaved: false, ctaEditable: await ctaColumnExists(o) }
+  const contactUrl = cta.ctaSaved ? null : await readContactUrl(o)
   return {
     ok: true,
-    data: { style: toArticleStyle(saved ? row : null), editable: true, saved, platform, domain: o.domain, profiles: cleanProfiles(saved ? row?.official_profiles : null), ...cta },
+    data: { style: toArticleStyle(saved ? row : null), editable: true, saved, platform, domain: o.domain, profiles: cleanProfiles(saved ? row?.official_profiles : null), ...cta, contactUrl },
+  }
+}
+
+/**
+ * The contact page among the pages the full-site mapping found (site_page_map, read with the owner's own
+ * RLS client and named by project AND owner). Only needed for the suggestion, so only read before the
+ * owner saved a call to action. Any failure, or a table that does not exist yet, is "not known".
+ */
+async function readContactUrl(o: Extract<Owner, { ok: true }>): Promise<string | null> {
+  try {
+    const { data, error } = await o.db.from('site_page_map').select('entries').eq('project_id', o.projectId).eq('user_id', o.userId).maybeSingle()
+    if (error || !data) return null
+    const entries = (data as { entries?: unknown }).entries
+    return findContactUrl(Array.isArray(entries) ? entries as { u?: unknown }[] : null, o.domain)
+  } catch {
+    return null
   }
 }
 

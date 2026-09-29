@@ -34,6 +34,12 @@ export default function EnglishAccessibilityPage() {
           Our platform is built in alignment with the Web Content Accessibility Guidelines (WCAG) 2.1 at Level AA. We
           use semantic HTML, appropriate ARIA labels, and focus on sufficient color contrast.
         </p>
+        <p className="mt-3">
+          In Israel, web services are subject to the Israeli Standard SI 5568, which is based on WCAG 2.0 at Level AA,
+          under the Equal Rights for Persons with Disabilities (Service Accessibility Adjustments) Regulations, 2013.
+          We work to bring the site and the platform in line with this standard at Level AA; the WCAG 2.1 Level AA
+          guidelines we apply also include the WCAG 2.0 requirements.
+        </p>
       </section>
 
       <section>
@@ -41,7 +47,7 @@ export default function EnglishAccessibilityPage() {
         <ul>
           <li>Full screen reader support</li>
           <li>Keyboard-only navigation</li>
-          <li>Descriptive labels for form fields</li>
+          <li>Clear labels for every form field</li>
           <li>Level AA color contrast for text and interface components, in the platform&rsquo;s new design</li>
           <li>Large text sizes and adequate time for orientation</li>
           <li>Clear focus indication for keyboard navigation, and an accessibility menu on the site for adjusting text size, contrast and more</li>
@@ -65,7 +71,7 @@ export default function EnglishAccessibilityPage() {
 
       <section>
         <h2>Reporting Accessibility Issues</h2>
-        <p>If you experience an accessibility issue, please contact our support team:</p>
+        <p>If you experience an accessibility issue, please contact our support team, who also act as the service&rsquo;s accessibility coordinator:</p>
         <p className="mt-2">
           <strong>Email:</strong>{' '}
           <a href="mailto:oren@gotop.co.il">
@@ -80,6 +86,14 @@ export default function EnglishAccessibilityPage() {
         </p>
         <p className="mt-2">
           We aim to respond within 48 hours and work to resolve the issue.
+        </p>
+      </section>
+
+      <section>
+        <h2>Parts That Are Not Yet Fully Accessible</h2>
+        <p>
+          Some parts, mainly third-party content and files uploaded to us, may not yet be fully accessible. If you
+          come across one, write to us and we will deal with it.
         </p>
       </section>
 

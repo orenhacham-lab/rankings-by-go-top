@@ -25,13 +25,14 @@ import ScoreCard from './ScoreCard'
 import FindingCard, { type FixMode } from './FindingCard'
 import FixPreviewModal from './FixPreviewModal'
 import ApproveFixModal from './ApproveFixModal'
-import AutoFixStrip, { pluginUpdateFor, stripView } from './AutoFixStrip'
+import AutoFixStrip, { pluginUpdateFor } from './AutoFixStrip'
 import FixQueue from './FixQueue'
 import PluginInstallModal from './PluginInstallModal'
 import { fixKey, useSiteHealthScan, type ScanProgress } from './useSiteHealthScan'
 import { useSiteFixes } from './useSiteFixes'
 import { useSafeFixes } from './useSafeFixes'
-import { BULK_SAFE_TYPES, type FixType } from '@/lib/site-fix/types'
+import { safeFixesEnabled } from '@/lib/site-fix/bulk'
+import type { FixType } from '@/lib/site-fix/types'
 import { rowStateFrom, rowTarget, type FixRowState } from '@/lib/site-fix/job-match'
 import { FIX_TYPE } from '@/lib/site-health/rules'
 
@@ -192,7 +193,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   const closeFix = useCallback(() => { setTarget(null); if (queueLive) void reloadFixes() }, [setTarget, queueLive, reloadFixes])
 
   // "Fix {n} safe items for me": the plugin connected and writing all three safe types now.
-  const safeEnabled = queueLive && !!caps && stripView(caps) === 'connected' && BULK_SAFE_TYPES.every((t) => caps.channelFor[t] === 'plugin')
+  const safeEnabled = queueLive && safeFixesEnabled(caps)
   const safeFixable = useCallback((f: Finding, p: FindingPage) => fixModeFor(f, p) === 'fix' && !jobStateFor(f, p), [fixModeFor, jobStateFor])
   const safe = useSafeFixes({
     projectId: project.id, enabled: safeEnabled, findings, jobs: fixes.jobs, fixable: safeFixable,

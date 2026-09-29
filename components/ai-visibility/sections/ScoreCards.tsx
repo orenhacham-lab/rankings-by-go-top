@@ -6,6 +6,9 @@ import Badge from '@/components/ui/Badge'
 import StatTile from '@/components/ui/StatTile'
 import type { EngineMetrics, GlobalMetrics, T } from './types'
 
+/** "out of N answers"; one answer reads "out of 1 answer", never "1 out of 1 answers". */
+export const outOf = (t: T, n: number): string => (n === 1 ? t('out_of_one_result') : t('out_of_results').replace('{count}', String(n)))
+
 /** The bare tool's own score card (a caller without the page's overview). */
 export function AIVisibilityScoreCard({
   score,
@@ -53,7 +56,7 @@ export function OverviewSummaryStrip({
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
-      <StatTile label={t('total_mentions')} value={metrics.totalMentions} source={t('out_of_results').replace('{count}', String(totalResults))} />
+      <StatTile label={t('total_mentions')} value={metrics.totalMentions} source={outOf(t, totalResults)} />
       <StatTile label={t('engine_coverage')} value={`${metrics.enginesWithMentions}/${metrics.enginesCovered}`} source={t('ai_engines')} />
       <StatTile label={t('target_cited')} value={metrics.totalCitations} source={t('citations')} />
     </div>
@@ -89,7 +92,7 @@ export function EngineMentionCards({ metrics, t }: { metrics: Map<string, Engine
                 <>
                   <p className="mt-3 text-metric font-bold tabular-nums text-ink">{em.mentions}</p>
                   <p className="mt-0.5 text-caption text-muted">
-                    {t('out_of_results').replace('{count}', String(em.scans))} · <span className="tabular-nums">{em.rate}%</span>
+                    {outOf(t, em.scans)} · <span className="tabular-nums">{em.rate}%</span>
                   </p>
                 </>
               ) : (

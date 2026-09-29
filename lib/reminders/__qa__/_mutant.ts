@@ -19,7 +19,7 @@ export async function withMutant<T, R>(rel: string, edits: Array<[string | RegEx
     if (next === src) throw new Error(`mutation did not apply: ${String(needle)}`)
     src = next
   }
-  const to = from.replace(/\.ts$/, `.mut${++counter}.ts`)
+  const to = from.replace(/\.(tsx?)$/, `.mut${++counter}.$1`)
   writeFileSync(to, src)
   try {
     return await run((await import(to)) as T)

@@ -76,7 +76,6 @@ export const dashboardEn = {
     whatsappMessage: (domain: string) => (domain ? `Hi, I need help with ${domain}` : 'Hi, I need help'),
     phone: (number: string) => `Call ${number}`,
     email: (address: string) => `Email ${address}`,
-    hours: 'We answer Sun-Thu, 9:00-18:00',
     opensNewTab: '(opens in a new tab)',
   },
   guide: {
@@ -416,9 +415,10 @@ export const dashboardEn = {
       },
       cta: {
         label: 'Call to action at the end of the article',
-        hint: 'A box with a heading, a short line and a button to a page you choose, before the FAQ. Off until you turn it on.',
+        hint: 'A box with a heading, a short line and a button to a page you choose, before the FAQ.',
+        hintOff: 'Off until you turn it on.',
         toggle: 'Show a call to action in articles',
-        toggleHint: 'It appears in every article shown or published from now on, on WordPress and on a connected site.',
+        toggleHint: 'It appears in every article shown or published from now on, on a WordPress site and on a site that receives our articles automatically.',
         heading: 'Heading',
         text: 'Short line (optional)',
         buttonLabel: 'Button text',
@@ -2194,6 +2194,8 @@ export const dashboardEn = {
     monthsLabel: 'Filter by month',
     allMonths: 'All',
     columns: { ideas: 'Ideas', planned: 'Planned', written: 'Written', published: 'Published' },
+    // The ideas column, when it holds more than one kind of card (its own count each).
+    ideaGroups: { plan: 'Ideas we prepared', ranking: 'Suggestions from your rankings', scan: 'From the scan' },
     columnEmpty: {
       ideas: 'Ideas from the scan and your content plan appear here.',
       planned: 'An approved topic waits here until it is written.',
@@ -2261,7 +2263,7 @@ export const dashboardEn = {
       addKeyword: 'Add a keyword',
       keywordLabel: 'Keyword for a new topic',
       keywordPlaceholder: 'For example: running shoes for women',
-      keywordHint: 'It is added to your approved topics. If you already have a topic or site content on it, no duplicate is made.',
+      keywordHint: 'It is added to your approved topics. If your site already has a page on it, we will suggest improving that page instead of writing a new one.',
       keywordSubmit: 'Add to the plan',
       keywordCancel: 'Cancel',
       keywordAdded: 'Keyword added to your approved topics.',
@@ -2969,8 +2971,8 @@ export const dashboardEn = {
       error: 'We could not load the links between your pages.',
     },
     policy: {
-      title: 'A link you earned is worth more',
-      body: 'Don\'t pay for links and don\'t agree to link swaps. Google treats that as a \'link scheme\' and can demote the site. A link from a directory, article or association that chose you is the safest and strongest.',
+      title: 'When you reach out to sites yourself',
+      body: 'Don\'t pay for links and don\'t agree to "a link for a link". Google treats that as a \'link scheme\' and can demote the site. A link from a directory, article or association that chose you is the safest and strongest. There are no swaps in our link network: whoever gets a link from you never links back.',
       link: 'Google’s spam policies',
     },
     // The link network, lib/link-network. Opt-in, both ways.
@@ -2987,16 +2989,16 @@ export const dashboardEn = {
       },
       hero: {
         overline: 'Link network',
-        badge: { on: 'On', notPlacing: 'On, not placing yet', off: 'Off', notAvailable: 'Not available yet' },
+        badge: { on: 'On', notPlacing: 'On, placements paused', off: 'Off', notAvailable: 'Not available yet' },
         title: {
           on: 'The link network is on for your site',
-          notPlacing: 'Your site is in the network but not placing links yet',
+          notPlacing: 'Your site is in the network, but no new links are being placed right now',
           off: 'The link network is off for this site',
-          cannotJoin: 'To join, first prove the site is yours',
+          cannotJoin: 'To join, first confirm the site is yours',
         },
         body: {
           on: 'Complementary businesses in the network can link to you from their articles, and you to them. Never both ways, never a competitor.',
-          off: (members: string) => `Turn it on and complementary businesses (never competitors) link to you from real articles, while you link to others. ${members} sites have joined.`,
+          off: (members: string | null) => `Turn it on and complementary businesses (never competitors) link to you from real articles, while you link to others. ${members ? `${members} sites have joined.` : 'The network is being built.'}`,
           cannotJoin: 'Connect it through WordPress (or the Go Top plugin) or Search Console, then turn the network on.',
           left: (date: string) => `You left on ${date}. Links already published stay in the log.`,
         },
@@ -3058,9 +3060,16 @@ export const dashboardEn = {
         error: 'We could not take you out of the network. Try again in a moment.',
       },
       readiness: {
-        thin_or_new: 'Your site is in the network but does not take part in placements yet: it needs at least three published articles or ten scanned pages, one finished scan, and two weeks in the app.',
+        thin_or_new: 'For us to place new links it needs: at least three published articles or ten scanned pages, one finished scan, and two weeks in the app.',
         category_unknown: 'Your site is in the network, but we do not know its business field yet, so we will not place links from it or to it. You can add the field in the project settings.',
         domain_unverified: 'Your site is in the network but does not take part in placements: its connection (WordPress or Search Console) is missing, so we cannot confirm the site is yours. Connect it again to take part.',
+      },
+      // What is still missing, when the reason can be told (readinessGap): one line under the readiness text.
+      gap: {
+        label: 'Still missing:',
+        articles: (n: number) => (n === 1 ? 'one more published article' : `${n} more published articles`),
+        scan: 'a finished scan',
+        days: (n: number) => (n === 1 ? 'one more day in the app' : `${n} more days in the app`),
       },
       caps: (received: number, cap: number) => `This month you received ${received} of ${cap} possible links. The allowance rises gradually in your first months in the network.`,
       log: {
@@ -4032,7 +4041,7 @@ export const dashboardEn = {
     mentionsHelp: 'Answers where the engine named your business or your site',
     citationsLabel: 'Citations',
     citationsHelp: 'Answers that linked to your site as a source, so a customer can reach you in one click',
-    ofAnswers: (answers: number) => `of ${answers} answers`,
+    ofAnswers: (answers: number) => (answers === 1 ? 'of 1 answer' : `of ${answers} answers`),
     changeLabel: 'Change since the previous check',
     changePoints: (points: number) => `${points > 0 ? '+' : points < 0 ? '−' : ''}${Math.abs(points)} pts`,
     changeUp: 'Up',
@@ -4053,6 +4062,8 @@ export const dashboardEn = {
     nextStepPartial: (checked: number, total: number) => `This is a partial picture: ${checked === 1 ? 'one engine' : `${checked} engines`} of the ${total} main ones checked. A recheck of a question checks all of them in one click.`,
     nextStepNoMentions: 'No engine has mentioned you yet in the answers checked. What helps: an article on your site that answers the question exactly, so the engines have something to cite.',
     nextStepKeepGoing: 'Check again from time to time: AI engines update, and the score moves with them.',
+    // With the automatic monthly check on: it does the periodic checking, a manual check is an extra.
+    nextStepKeepGoingAuto: (date: string) => `The next automatic check is on ${date}. You can also check again before then, from your allowance.`,
     runMoreChecks: 'Run more checks',
     upgradeForChecks: 'Upgrade your plan',
     checksUsedUp: 'You have used all the AI checks your plan includes. Upgrade to keep checking.',
@@ -4612,7 +4623,7 @@ export const dashboardEn = {
           canonicalHint: 'Usually the page\'s own address, without parameters. Only an address on your site.',
           focus: 'Focus keyphrase',
           focusHint: 'The words people type into Google to find this page, usually 2 to 4 words.',
-          faqHeading: 'Block heading',
+          faqHeading: 'Heading above the questions',
           faqHeadingDefault: 'Frequently asked questions',
           faqHint: 'Write questions customers really ask, with short, clear answers. We never make answers up for you.',
           question: (n: number) => `Question ${n}`,
@@ -6048,8 +6059,8 @@ export const dashboardEn = {
     topics: (n: number) => (n === 1 ? '1 new topic awaits approval' : `${n} new topics await approval`),
     topicsAction: 'Review topics',
     queueDry: (date: string) => `Without approval the queue runs dry on ${date}`,
-    // An estimate from the scan kept in this browser (lib/nudges/rows.ts): "up to", never a promise.
-    fixes: (n: number) => (n === 1 ? 'A safe fix may be ready for your site' : `Up to ${n} safe fixes are ready for your site`),
+    // The exact count of the health screen's button (lib/nudges/rows.ts): the scan kept in this browser + the fix queue.
+    fixes: (n: number) => (n === 1 ? 'One safe fix is ready for your site' : `${n} safe fixes are ready for your site`),
     fixesAction: 'See fixes',
   },
   railWaiting: {
@@ -6058,7 +6069,7 @@ export const dashboardEn = {
   reminders: {
     settingsTitle: 'Email reminders',
     settingsDescription: "When articles are waiting for your OK we send a short reminder: after 48 hours, after 5 days, then weekly (up to 3 reminders for the same articles). Never more than one email in 3 days, and only Sunday to Thursday mornings.",
-    settingsLabel: 'Email me when something is waiting for me',
+    settingsLabel: 'Email me when articles are waiting for approval',
     on: 'On',
     off: 'Off',
     saved: 'Preference saved.',

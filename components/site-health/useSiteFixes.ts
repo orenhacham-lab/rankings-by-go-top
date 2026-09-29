@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FixCapabilities, FixErrorCode, FixJobView } from '@/lib/site-fix/types'
+import { announceWaitingChanged } from '@/lib/nudges/events'
 
 export type FixAnswer<T> = ({ ok: true } & T) | { ok: false; code: FixErrorCode }
 
@@ -48,7 +49,9 @@ export function useSiteFixes(projectId: string) {
     setJobs(got.jobs)
   }, [])
 
-  const reload = useCallback(async () => { apply(await fetchFixes(projectId)) }, [projectId, apply])
+  // After every re-read of the queue (a fix or a batch applied, undone, cancelled) the dashboard card and
+  // the sidebar badge read their own count again, so they never keep counting work that is done.
+  const reload = useCallback(async () => { apply(await fetchFixes(projectId)); announceWaitingChanged() }, [projectId, apply])
 
   useEffect(() => {
     alive.current = true

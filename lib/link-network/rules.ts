@@ -166,6 +166,27 @@ export function siteQualifies(site: NetworkSite, now: Date): Exclusion | null {
   return null
 }
 
+/**
+ * What a site that qualifies for nothing yet ('thin_or_new') is still missing, as numbers the
+ * screen can say in words: published articles (to the bar of three; the ten-scanned-pages
+ * alternative is not counted), a finished scan, and days in the app. Null when the reason
+ * cannot be told (no domain on record): the screen keeps its general line then.
+ */
+export interface ReadinessGap { articles: number | null; scan: boolean; days: number | null }
+export function readinessGap(site: NetworkSite, now: Date): ReadinessGap | null {
+  const created = new Date(site.createdAt).getTime()
+  const ageMs = Number.isFinite(created) ? now.getTime() - created : Number.NaN
+  const daysLeft = Number.isFinite(ageMs) && ageMs < LINK_NETWORK_RULES.minProjectAgeDays * DAY
+    ? Math.max(1, Math.ceil((LINK_NETWORK_RULES.minProjectAgeDays * DAY - ageMs) / DAY)) : null
+  const thin = site.publishedArticles < LINK_NETWORK_RULES.minPublishedArticles && site.indexedPages < LINK_NETWORK_RULES.minIndexedPages
+  const gap: ReadinessGap = {
+    articles: thin ? LINK_NETWORK_RULES.minPublishedArticles - Math.max(0, site.publishedArticles) : null,
+    scan: !site.scanned,
+    days: daysLeft,
+  }
+  return gap.articles === null && !gap.scan && gap.days === null ? null : gap
+}
+
 const normalizeCategory = (s: string) =>
   s.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
 

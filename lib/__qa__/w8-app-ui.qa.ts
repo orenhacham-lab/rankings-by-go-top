@@ -78,7 +78,7 @@ console.log('\nA) Links tab: the network\'s state first, in words')
 
   const np = draw({ ...on, readiness: 'category_unknown' })
   check('A2b on, not placing: its own badge and headline, the readiness sentence, and the settings step',
-    stateOf(np) === 'not_placing' && text(np).includes('פעיל, עוד לא משבץ') && text(np).includes('האתר ברשת, אבל עוד לא מקבל ולא נותן קישורים')
+    stateOf(np) === 'not_placing' && text(np).includes('פעיל, שיבוצים מושהים') && text(np).includes('האתר ברשת, אבל כרגע לא משובצים בו קישורים חדשים')
     && text(np).includes(h.readiness.category_unknown) && /href="\/settings\?projectId=[^"]*#business"/.test(np) && text(np).includes('להשלמת תחום העסק'))
 
   const off = draw(base), offText = text(off)
@@ -90,7 +90,7 @@ console.log('\nA) Links tab: the network\'s state first, in words')
 
   const cannot = draw({ ...base, readiness: 'domain_unverified' }), cannotText = text(cannot)
   check('A2d cannot join: "לא זמין עדיין", the proof headline, the switch disabled, "חיבור האתר" to the connection settings',
-    stateOf(cannot) === 'cannot_join' && cannotText.includes('לא זמין עדיין') && cannotText.includes('כדי להצטרף לרשת, צריך להוכיח שהאתר שלכם')
+    stateOf(cannot) === 'cannot_join' && cannotText.includes('לא זמין עדיין') && cannotText.includes('כדי להצטרף לרשת, צריך לאשר שהאתר שייך לכם')
     && /role="switch"[^>]*disabled=""/.test(cannot) && /href="\/settings\?projectId=[^"]*#platform"/.test(cannot) && !/data-link-network-turn-on/.test(cannot))
   const left = draw({ ...base, membership: { active: false, since: null, leftAt: '2026-09-01T00:00:00Z' } })
   check('A2e left: the off headline, "יצאתם מהרשת ב-…", and the turn-on button', stateOf(left) === 'left' && text(left).includes('רשת הקישורים כבויה לאתר הזה') && text(left).includes('יצאתם מהרשת ב-') && /data-link-network-turn-on/.test(left))
@@ -131,7 +131,7 @@ console.log('\nA) Links tab: the network\'s state first, in words')
   check('A4-MUT: no progress line is caught', !meter(view.replace('{items.length > 0 && <OutreachMeter ', '{false && <Nothing ')))
 
   // A5, A6: copy that does not contradict the network.
-  check('A5: the policy note, both languages', he.siteLinks.policy.body.startsWith('אל תשלמו על קישור ואל תסכימו להחלפת קישורים.') && en.siteLinks.policy.body.startsWith('Don\'t pay for links and don\'t agree to link swaps.'))
+  check('A5: the policy note, both languages', he.siteLinks.policy.body.startsWith('אל תשלמו על קישור ואל תסכימו ל"קישור תמורת קישור".') && en.siteLinks.policy.body.startsWith('Don\'t pay for links and don\'t agree to "a link for a link".'))
   check('A6: the page subtitle names the network, both languages', he.siteLinks.subtitle.includes('רשת הקישורים של Go Top') && en.siteLinks.subtitle.includes('the Go Top link network'))
 
   // A1: how it works folds away for a member; the tabs are gone.
@@ -204,12 +204,12 @@ console.log('\nC) "צרו קשר" in the top bar')
   const pill = render('he', createElement(ContactMenu))
   check('C3: a labelled pill that opens a menu; icon-only below sm (390)', /aria-haspopup="menu"/.test(pill) && /aria-label="צרו קשר"/.test(pill) && /<span class="hidden sm:inline">צרו קשר<\/span>/.test(pill) && /<svg/.test(pill))
   check('C3-MUT: a label that always shows (no room at 390) is caught', !/<span class="hidden sm:inline">/.test(pill.replace('hidden sm:inline', 'inline')))
-  const menuOk = (s: string) => /role="menu"/.test(s) && /<a\s+key=\{r\.key\}\s+role="menuitem"/.test(s) && /rows\.map/.test(s) && /\{t\.hours\}/.test(s)
-  check('C4: one menu of rows (WhatsApp, phone, email) and the hours under them', menuOk(menu) && /key: 'whatsapp'[\s\S]*key: 'phone'[\s\S]*key: 'email'/.test(menu))
-  check('C4-MUT: the hours dropped are caught', !menuOk(menu.replace('{t.hours}', '')))
+  const menuOk = (s: string) => /role="menu"/.test(s) && /<a\s+key=\{r\.key\}\s+role="menuitem"/.test(s) && /rows\.map/.test(s) && !/\{t\.hours\}|data-contact-hours/.test(s)
+  check('C4: one menu of rows (WhatsApp, phone, email) and no hours line (the owner shows none for now)', menuOk(menu) && /key: 'whatsapp'[\s\S]*key: 'phone'[\s\S]*key: 'email'/.test(menu))
+  check('C4-MUT: an hours line put back is caught', !menuOk(menu.replace('</div>\n      )}', '<p>{t.hours}</p></div>\n      )}')))
   check('C5 copy: both languages, the site named in the WhatsApp message', he.contact.label === 'צרו קשר' && en.contact.label === 'Contact us'
     && he.contact.whatsappMessage('plumber-tlv.co.il') === 'היי, אני צריך עזרה עם plumber-tlv.co.il' && en.contact.whatsappMessage('a.co.il') === 'Hi, I need help with a.co.il'
-    && he.contact.phone('054-9489377') === 'טלפון 054-9489377' && en.contact.email('oren@gotop.co.il') === 'Email oren@gotop.co.il' && he.contact.hours === "עונים בימים א'-ה', 9:00-18:00")
+    && he.contact.phone('054-9489377') === 'טלפון 054-9489377' && en.contact.email('oren@gotop.co.il') === 'Email oren@gotop.co.il' && !('hours' in he.contact) && !('hours' in en.contact))
   check('C5: the rail\'s WhatsApp row is kept', /data-support="whatsapp"/.test(read('components/layout/Sidebar.tsx')))
 }
 

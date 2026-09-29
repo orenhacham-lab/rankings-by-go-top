@@ -151,7 +151,7 @@ export type CtaSuggestionCopy = { heading: string; headingGeneric: string; text:
  * owner edits it; it stays off until they switch it on.
  */
 export function suggestArticleCta(
-  subject: { business?: string | null; niche?: string | null; domain?: string | null },
+  subject: { business?: string | null; niche?: string | null; domain?: string | null; contactUrl?: string | null },
   copy: CtaSuggestionCopy,
 ): ArticleCta {
   const business = cleanCtaText(subject.business ?? '', 40)
@@ -163,6 +163,31 @@ export function suggestArticleCta(
     heading: cleanCtaText(put(niche ? copy.heading : copy.headingGeneric), CTA_LIMITS.heading),
     text: cleanCtaText(put(business ? copy.text : copy.textGeneric), CTA_LIMITS.text),
     buttonLabel: cleanCtaText(copy.buttonLabel, CTA_LIMITS.buttonLabel),
-    buttonUrl: (domain && normalizeCtaUrl(`https://${domain}/`)) || '',
+    // The contact page when the site map shows one (a button to "contact us" should go there), else the home page.
+    buttonUrl: (subject.contactUrl && normalizeCtaUrl(subject.contactUrl)) || (domain && normalizeCtaUrl(`https://${domain}/`)) || '',
   }
+}
+
+const CONTACT_PATH = /(^|\/)(contact|contact-us|contactus|contact_us|צור-קשר|צרו-קשר|צור_קשר|צרו_קשר|צור קשר|צרו קשר)(\/|$)/i
+
+/**
+ * The site's contact page, from the page addresses the full-site mapping found: a page whose path is
+ * "contact" or "contact us" (or its Hebrew form), the shortest path first. Null when none is known. Pure.
+ */
+export function findContactUrl(entries: readonly { u?: unknown }[] | null | undefined, domain?: string | null): string | null {
+  const host = String(domain ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '')
+  let best: string | null = null
+  for (const e of entries ?? []) {
+    if (!e || typeof e.u !== 'string') continue
+    let url: URL
+    try { url = new URL(e.u) } catch { continue }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
+    // Only a page of this project's own site.
+    if (host && url.hostname.toLowerCase().replace(/^www\./, '') !== host) continue
+    let path: string
+    try { path = decodeURIComponent(url.pathname) } catch { path = url.pathname }
+    if (!CONTACT_PATH.test(path)) continue
+    if (best === null || path.length < new URL(best).pathname.length) best = `${url.origin}${url.pathname}`
+  }
+  return best
 }

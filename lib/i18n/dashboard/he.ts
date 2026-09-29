@@ -74,7 +74,6 @@ export const dashboardHe = {
     whatsappMessage: (domain: string) => (domain ? `היי, אני צריך עזרה עם ${domain}` : 'היי, אני צריך עזרה'),
     phone: (number: string) => `טלפון ${number}`,
     email: (address: string) => `מייל ${address}`,
-    hours: "עונים בימים א'-ה', 9:00-18:00",
     opensNewTab: '(נפתח בחלון חדש)',
   },
   guide: {
@@ -414,9 +413,10 @@ export const dashboardHe = {
       },
       cta: {
         label: 'קריאה לפעולה בסוף המאמר',
-        hint: 'תיבה עם כותרת, משפט קצר וכפתור לעמוד שתבחרו, לפני השאלות הנפוצות. כבויה עד שתפעילו אותה.',
+        hint: 'תיבה עם כותרת, משפט קצר וכפתור לעמוד שתבחרו, לפני השאלות הנפוצות.',
+        hintOff: 'כבויה עד שתפעילו אותה.',
         toggle: 'להציג קריאה לפעולה במאמרים',
-        toggleHint: 'תופיע בכל מאמר שיוצג או יפורסם מעכשיו, בוורדפרס ובאתר שמחובר אלינו.',
+        toggleHint: 'תופיע בכל מאמר שיוצג או יפורסם מעכשיו, באתר WordPress ובאתר שמקבל מאיתנו מאמרים אוטומטית.',
         heading: 'כותרת',
         text: 'משפט קצר (לא חובה)',
         buttonLabel: 'טקסט הכפתור',
@@ -2199,6 +2199,8 @@ export const dashboardHe = {
     monthsLabel: 'סינון לפי חודש',
     allMonths: 'הכל',
     columns: { ideas: 'רעיונות', planned: 'מתוכנן', written: 'נכתב', published: 'פורסם' },
+    // The ideas column, when it holds more than one kind of card (its own count each).
+    ideaGroups: { plan: 'רעיונות שהכנו', ranking: 'הצעות מהדירוגים', scan: 'מהסריקה' },
     columnEmpty: {
       ideas: 'רעיונות מהסריקה ומתוכנית התוכן יופיעו כאן.',
       planned: 'נושא שאושר מחכה כאן עד שייכתב.',
@@ -2266,7 +2268,7 @@ export const dashboardHe = {
       addKeyword: 'הוסף מילת מפתח',
       keywordLabel: 'מילת מפתח לנושא חדש',
       keywordPlaceholder: 'לדוגמה: נעלי ריצה לנשים',
-      keywordHint: 'הביטוי יתווסף לנושאים המאושרים. אם כבר יש עליו נושא או תוכן באתר, לא ניצור כפילות.',
+      keywordHint: 'הביטוי יתווסף לנושאים המאושרים. אם כבר יש עליו עמוד באתר, נציע לשפר אותו במקום לכתוב חדש.',
       keywordSubmit: 'הוסף לתוכנית',
       keywordCancel: 'ביטול',
       keywordAdded: 'הביטוי נוסף לנושאים המאושרים.',
@@ -2976,8 +2978,8 @@ export const dashboardHe = {
       error: 'לא הצלחנו לטעון את הקישורים בין העמודים.',
     },
     policy: {
-      title: 'קישור שהרווחתם שווה יותר',
-      body: 'אל תשלמו על קישור ואל תסכימו להחלפת קישורים. גוגל מתייחס לזה כ\'תוכנית קישורים\', ואתר שנתפס בזה יורד בדירוג. קישור מאינדקס, מכתבה או מאיגוד שבחרו בכם הוא הבטוח והחזק ביותר.',
+      title: 'כשאתם פונים לאתרים בעצמכם',
+      body: 'אל תשלמו על קישור ואל תסכימו ל"קישור תמורת קישור". גוגל מתייחס לזה כ\'תוכנית קישורים\', ואתר שנתפס בזה יורד בדירוג. קישור מאינדקס, מכתבה או מאיגוד שבחרו בכם הוא הבטוח והחזק ביותר. ברשת הקישורים שלנו אין החלפות: מי שמקבל מכם קישור לעולם לא מקשר בחזרה.',
       link: 'מדיניות הספאם של גוגל',
     },
     // The link network ("רשת הקישורים"), lib/link-network. Opt-in, both ways.
@@ -2994,16 +2996,17 @@ export const dashboardHe = {
       },
       hero: {
         overline: 'רשת הקישורים',
-        badge: { on: 'פעיל', notPlacing: 'פעיל, עוד לא משבץ', off: 'כבוי', notAvailable: 'לא זמין עדיין' },
+        badge: { on: 'פעיל', notPlacing: 'פעיל, שיבוצים מושהים', off: 'כבוי', notAvailable: 'לא זמין עדיין' },
         title: {
           on: 'רשת הקישורים פעילה לאתר שלכם',
-          notPlacing: 'האתר ברשת, אבל עוד לא מקבל ולא נותן קישורים',
+          notPlacing: 'האתר ברשת, אבל כרגע לא משובצים בו קישורים חדשים',
           off: 'רשת הקישורים כבויה לאתר הזה',
-          cannotJoin: 'כדי להצטרף לרשת, צריך להוכיח שהאתר שלכם',
+          cannotJoin: 'כדי להצטרף לרשת, צריך לאשר שהאתר שייך לכם',
         },
         body: {
           on: 'עסקים משלימים ברשת יכולים לקשר אליכם מתוך המאמרים שלהם, ואתם אליהם. אף פעם לא הדדי, אף פעם לא מתחרה.',
-          off: (members: string) => `כשתפעילו, עסקים משלימים (לא מתחרים) יקשרו אליכם מתוך מאמרים אמיתיים, ואתם תקשרו לעסקים אחרים. ${members} אתרים כבר ברשת.`,
+          // `members` is null while the network is small (under NETWORK_SIZE_SHOWN_FROM): a tiny number works against the offer.
+          off: (members: string | null) => `כשתפעילו, עסקים משלימים (לא מתחרים) יקשרו אליכם מתוך מאמרים אמיתיים, ואתם תקשרו לעסקים אחרים. ${members ? `${members} אתרים כבר ברשת.` : 'הרשת בהקמה.'}`,
           cannotJoin: 'מחברים את האתר ב-WordPress (או בתוסף של Go Top) או ב-Search Console, ומיד אפשר להפעיל.',
           left: (date: string) => `יצאתם מהרשת ב-${date}. קישורים שכבר פורסמו נשארים ביומן.`,
         },
@@ -3065,9 +3068,16 @@ export const dashboardHe = {
         error: 'לא הצלחנו לצאת מהרשת. נסו שוב בעוד רגע.',
       },
       readiness: {
-        thin_or_new: 'האתר ברשת, אבל עוד לא משתתף בשיבוצים: צריך לפחות שלושה מאמרים שפורסמו או עשרה עמודים שנסרקו, סריקה אחת שהסתיימה, ושבועיים באפליקציה.',
+        thin_or_new: 'כדי שנשבץ קישורים חדשים צריך: לפחות שלושה מאמרים שפורסמו או עשרה עמודים שנסרקו, סריקה אחת שהסתיימה, ושבועיים באפליקציה.',
         category_unknown: 'האתר ברשת, אבל עוד לא ידוע לנו תחום העסק, ולכן לא נשבץ קישורים ממנו או אליו. אפשר להשלים את התחום בהגדרות הפרויקט.',
         domain_unverified: 'האתר ברשת, אבל לא משתתף בשיבוצים: החיבור של האתר (WordPress או Search Console) חסר, ולכן אין לנו אישור שהאתר שלכם. חברו אותו שוב כדי להשתתף.',
+      },
+      // What is still missing, when the reason can be told (readinessGap): one line under the readiness text.
+      gap: {
+        label: 'חסר כרגע:',
+        articles: (n: number) => (n === 1 ? 'עוד מאמר אחד שפורסם' : `עוד ${n} מאמרים שפורסמו`),
+        scan: 'סריקה שהסתיימה',
+        days: (n: number) => (n === 1 ? 'עוד יום אחד באפליקציה' : `עוד ${n} ימים באפליקציה`),
       },
       caps: (received: number, cap: number) => `החודש קיבלתם ${received} מתוך ${cap} קישורים אפשריים. המכסה עולה בהדרגה בחודשים הראשונים ברשת.`,
       log: {
@@ -4050,7 +4060,7 @@ export const dashboardHe = {
     mentionsHelp: 'תשובות שבהן המנוע הזכיר את העסק או את האתר בשם',
     citationsLabel: 'ציטוטים',
     citationsHelp: 'תשובות שבהן המנוע הביא קישור לאתר שלכם כמקור, כך שלקוח יכול להגיע אליכם בלחיצה',
-    ofAnswers: (answers: number) => `מתוך ${answers} תשובות`,
+    ofAnswers: (answers: number) => (answers === 1 ? 'מתוך תשובה אחת' : `מתוך ${answers} תשובות`),
     changeLabel: 'שינוי מהבדיקה הקודמת',
     changePoints: (points: number) => `${points > 0 ? '+' : points < 0 ? '−' : ''}${Math.abs(points)} נק׳`,
     changeUp: 'עלייה',
@@ -4071,6 +4081,8 @@ export const dashboardHe = {
     nextStepPartial: (checked: number, total: number) => `זו תמונה חלקית: ${checked === 1 ? 'נבדק מנוע אחד' : `נבדקו ${checked} מנועים`} מתוך ${total} המרכזיים. בדיקה חוזרת של שאלה בודקת את כולם בלחיצה אחת.`,
     nextStepNoMentions: 'עוד אף מנוע לא הזכיר אתכם בתשובות שנבדקו. מה עוזר: מאמר באתר שעונה בדיוק על השאלה, כדי שלמנועים יהיה מה לצטט.',
     nextStepKeepGoing: 'בדקו שוב מדי פעם: מנועי AI מתעדכנים, והציון משתנה איתם.',
+    // With the automatic monthly check on: it does the periodic checking, a manual check is an extra.
+    nextStepKeepGoingAuto: (date: string) => `הבדיקה האוטומטית הבאה ב-${date}. אפשר לבדוק שוב גם לפני כן, מתוך המכסה.`,
     runMoreChecks: 'להרצת בדיקות נוספות',
     upgradeForChecks: 'לשדרוג החבילה',
     checksUsedUp: 'השתמשתם בכל בדיקות ה-AI שכלולות בחבילה. כדי להמשיך לבדוק צריך לשדרג.',
@@ -4634,7 +4646,7 @@ export const dashboardHe = {
           canonicalHint: 'בדרך כלל הכתובת של העמוד עצמו, בלי פרמטרים. רק כתובת באתר שלכם.',
           focus: 'ביטוי המפתח',
           focusHint: 'המילים שאנשים מקלידים בגוגל כדי למצוא את העמוד הזה, בדרך כלל 2 עד 4 מילים.',
-          faqHeading: 'כותרת הבלוק',
+          faqHeading: 'הכותרת מעל השאלות',
           faqHeadingDefault: 'שאלות נפוצות',
           faqHint: 'כתבו שאלות שלקוחות באמת שואלים, ותשובות קצרות וברורות. אנחנו לא ממציאים תשובות בשבילכם.',
           question: (n: number) => `שאלה ${n}`,
@@ -6073,8 +6085,8 @@ export const dashboardHe = {
     topics: (n: number) => `${n} נושאים חדשים מחכים לאישור`,
     topicsAction: 'לאישור הנושאים',
     queueDry: (date: string) => `בלי אישור, התור יתרוקן ב-${date}`,
-    // An estimate from the scan kept in this browser (lib/nudges/rows.ts): "up to", never a promise.
-    fixes: (n: number) => (n === 1 ? 'ייתכן שתיקון בטוח אחד מוכן לאתר' : `עד ${n} תיקונים בטוחים מוכנים לאתר`),
+    // The exact count of the health screen's button (lib/nudges/rows.ts): the scan kept in this browser + the fix queue.
+    fixes: (n: number) => (n === 1 ? 'תיקון בטוח אחד מוכן לאתר' : `${n} תיקונים בטוחים מוכנים לאתר`),
     fixesAction: 'לתיקונים',
   },
   railWaiting: {
@@ -6083,7 +6095,7 @@ export const dashboardHe = {
   reminders: {
     settingsTitle: 'תזכורות במייל',
     settingsDescription: 'כשמאמרים מחכים לאישור שלכם, נשלח תזכורת קצרה: אחרי 48 שעות, אחרי 5 ימים, ואז פעם בשבוע (עד 3 תזכורות לאותם מאמרים). לא יותר ממייל אחד ב-3 ימים, ורק בימים א׳–ה׳ בבוקר.',
-    settingsLabel: 'תזכורות במייל כשמשהו מחכה לכם',
+    settingsLabel: 'תזכורת במייל כשמאמרים מחכים לאישור',
     on: 'פעיל',
     off: 'כבוי',
     saved: 'ההעדפה נשמרה.',

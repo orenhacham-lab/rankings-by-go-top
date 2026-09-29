@@ -109,6 +109,8 @@
      Its own token, because it must stay dark in dark mode instead of inverting. */
   --color-contrast: #0a1b3d;
   --color-contrast-ink: #f5f6f8;
+  /* A deeper navy beside --color-contrast: two dark bands of the public pages never touch in the same tone. */
+  --color-contrast-deep: #06122b;
   /* The same dark strip when time is short (the trial bar's last three days). */
   --color-contrast-urgent: #7a2e0e;
 
@@ -559,6 +561,7 @@
 
   --color-contrast: #0f2247;
   --color-contrast-ink: #f5f6f8;
+  --color-contrast-deep: #0a1834;
   --color-contrast-urgent: #7a2e0e;
 
   --color-skeleton: #1b1f28;
