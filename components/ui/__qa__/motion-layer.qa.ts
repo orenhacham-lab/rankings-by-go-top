@@ -8,7 +8,9 @@
  *  M1) AnimatedNumber keeps the real, formatted value in the page from the first
  *      render (server and client): the count is drawn OVER it, so a screen reader,
  *      a copy or a print never reads a partial figure;
- *  M2) the count reaches its value: the effect that starts the count is not the
+ *  M2) the count is seen and reaches its value: it starts once the block around it
+ *      has finished entering (capped; a count that ran while its card was fading in
+ *      looked like no count at all), the effect that starts the count is not the
  *      effect that runs its frames (merged, the phase change cancelled the frame
  *      loop and the hero stuck at "0.0", "3.3"), the first frame is clamped at 0
  *      (a frame stamped a hair before the start drew "-0.6"), and it ends on the
@@ -22,7 +24,10 @@
  *      languages: time is never mirrored and position 1 is at the top (sparklines,
  *      the history chart; the search-volume trend runs the same way);
  *  M6) the keywords hero's figures come from the rows the table shows: tracked,
- *      checked, per-page buckets, the average of the positions found, what moved.
+ *      checked, per-page buckets, the average of the positions found, what moved;
+ *  M8) the articles hero: the overview's counts, the publishing pace by week and
+ *      the last 30 days from the rows; a zero status figure is left out (§7); each
+ *      row's picture is decorative and falls back to a tile when it fails to load.
  *
  * Source guards strip comments first. Every guard has a mutation control.
  *
@@ -37,6 +42,8 @@ import { positionBucket } from '../PositionChip'
 import Sparkline from '../Sparkline'
 import { keywordStanding } from '../../keywords/KeywordsHero'
 import type { ScanResult, TrackingTarget } from '../../../lib/supabase/types'
+import { articleStanding, PACE_WEEKS } from '../../content/workspace/articles-standing'
+import type { ArticleRow, Counts } from '../../content/workspace/types'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -72,17 +79,24 @@ console.log('\nM2) the count reaches its value')
       if (!/Math\.max\(0, \(now - start\) \/ duration\)/.test(l.body)) out.push('the first frame is not clamped at 0')
       if (!/setFrame\(null\)/.test(l.body) || !/setPhase\('done'\)/.test(l.body)) out.push('the count does not end on the value')
     }
-    if (!all.some((e) => /if \(phase === 'wait' && seen\) setPhase\('run'\)/.test(e.body) && !/requestAnimationFrame/.test(e.body))) out.push('nothing starts the count when seen')
+    if (!all.some((e) => /if \(phase !== 'wait' \|\| !seen\) return/.test(e.body) && /settled\(el\.current, ENTRANCE_WAIT_MS\)\.then\(start\)/.test(e.body) && /setPhase\('run'\)/.test(e.body) && !/requestAnimationFrame/.test(e.body))) out.push('nothing starts the count when seen and settled')
     if (!/if \(reduced \|\| target === 0\) \{ setPhase\('done'\); return \}/.test(src)) out.push('reduced motion still counts')
     return out
   }
   check('M2: the count is started by its own effect, clamped at 0, and ends on the value; reduced motion never counts', reaches(body).length === 0, reaches(body).join(', '))
   const merged = body
-    .replace("    if (phase === 'wait' && seen) setPhase('run')\n", '')
+    .replace("    void settled(el.current, ENTRANCE_WAIT_MS).then(start)\n", '')
     .replace("    if (phase !== 'run') return\n", "    if (phase === 'wait' && seen) setPhase('run')\n    if (phase !== 'run') return\n")
   check('MUT: the start merged back into the frame loop (the frozen "0.0") fails M2', reaches(merged).length > 0)
   check('MUT: an unclamped first frame (the "-0.6") fails M2', reaches(body.replace('Math.max(0, (now - start) / duration)', '(now - start) / duration')).length > 0)
   check('MUT: counting under reduced motion fails M2', reaches(body.replace('if (reduced || target === 0)', 'if (target === 0)')).length > 0)
+  check('MUT: a count that starts while its card is still fading in fails M2', reaches(body.replace('void settled(el.current, ENTRANCE_WAIT_MS).then(start)', 'start()')).length > 0)
+  // The wait itself: only finite entrances around the figure, capped, never a loop.
+  const settle = motion.slice(motion.indexOf('function settled('), motion.indexOf('export function useFirstEntrance'))
+  const waits = (src: string) => /target\.contains\(node\)/.test(src) && /a\.playState === 'running' && timing\?\.iterations !== Infinity/.test(src) && /new Promise<void>\(\(resolve\) => setTimeout\(resolve, cap\)\)/.test(src)
+  check('M2b: the count waits only for the finite entrances around it, and never longer than the cap', waits(settle))
+  check('MUT: waiting on the hero\'s endless glow too fails M2b', !waits(settle.replace(" && timing?.iterations !== Infinity", '')))
+  check('MUT: an uncapped wait fails M2b', !waits(settle.replace('new Promise<void>((resolve) => setTimeout(resolve, cap)),', '')))
 }
 
 console.log('\nM3) a table\'s rows enter once')
@@ -191,6 +205,37 @@ console.log('\nM6) the keywords hero counts what the table shows')
   const counted = (code: string) => /if \(r\.found && typeof r\.position === 'number' && r\.position > 0\) \{ sum \+= r\.position; found\+\+ \}/.test(code)
   check('M6c: only the positions found are averaged (a "not found" never counts as a position)', counted(src))
   check('MUT: averaging every checked keyword fails M6c', !counted(src.replace("if (r.found && typeof r.position === 'number' && r.position > 0) { sum += r.position; found++ }", "if (typeof r.position === 'number') { sum += r.position; found++ }")))
+}
+
+console.log('\nM8) the articles hero and rows')
+{
+  const DAY = 24 * 60 * 60 * 1000
+  const now = Date.parse('2026-09-29T12:00:00Z')
+  const row = (id: string, publishedDaysAgo: number | null) => ({ id, published_at: publishedDaysAgo === null ? null : new Date(now - publishedDaysAgo * DAY).toISOString() }) as unknown as ArticleRow
+  const counts: Counts = { total: 6, draft: 1, ready: 1, scheduled: 0, publishing: 0, published: 4, failed: 0 }
+  const rows = [row('a', 1), row('b', 3), row('c', 20), row('d', 50), row('e', null), row('f', -2)]
+  const s = articleStanding(counts, rows, now)
+  const expectWeekly = new Array(PACE_WEEKS).fill(0); expectWeekly[PACE_WEEKS - 1] = 2; expectWeekly[PACE_WEEKS - 3] = 1; expectWeekly[PACE_WEEKS - 8] = 1
+  const ok = (x: typeof s) => x.total === 6 && x.published === 4 && x.publishedLast30 === 3
+    && x.lastPublishedAt === new Date(now - DAY).toISOString() && JSON.stringify(x.weekly) === JSON.stringify(expectWeekly)
+  check('M8: 4 live (1, 3, 20, 50 days ago): 3 in 30 days, last one a day ago, weeks oldest first; a future date and a draft count nowhere', ok(s), JSON.stringify(s))
+  check('MUT: a pace newest-first fails M8', !ok({ ...s, weekly: [...s.weekly].reverse() }))
+  check('M8b: nothing published: no last date and a flat pace', (() => { const n = articleStanding({ ...counts, published: 0 }, [row('x', null)], now); return n.lastPublishedAt === null && n.weekly.every((w) => w === 0) })())
+
+  const hero = strip(read('components/content/workspace/ArticlesHero.tsx'))
+  const zeroless = (code: string) => /\]\.filter\(\(f\) => f\.key === 'total' \|\| f\.value > 0\)/.test(code) && /\.slice\(0, 4\)/.test(code)
+  check('M8c: the hero shows the total always and a status figure only when it counts something, four at most (§7)', zeroless(hero))
+  check('MUT: a hero that shows every status, zeros too, fails M8c', !zeroless(hero.replace(".filter((f) => f.key === 'total' || f.value > 0)", '')))
+
+  const screen = strip(read('components/content/workspace/ArticlesScreen.tsx'))
+  const thumb = (code: string) => /<img src=\{src\} alt="" [^>]*onError=\{\(\) => setFailed\(true\)\}/.test(code)
+    && /if \(!src \|\| failed\)/.test(code) && /data-article-thumb="image" className=/.test(code) && /<span aria-hidden="true" data-article-thumb="image"/.test(code)
+  check('M8d: a row\'s picture is decorative (alt="", aria-hidden) and a broken one falls back to the document tile', thumb(screen))
+  check('MUT: a picture with no fallback fails M8d', !thumb(screen.replace(' onError={() => setFailed(true)}', '')))
+  const hero1 = (code: string) => /<TableBody enter=\{rowsEnter\}>/.test(code) && /const rowsEnter = useFirstEntrance\(filteredArticles\.length > 0\)/.test(code)
+    && /className="bar-rise sticky/.test(code) && !/<StatTile\b/.test(code)
+  check('M8e: the rows enter once, the bulk bar rises (no-preference only, D3), and the stat tiles gave way to the hero', hero1(screen))
+  check('MUT: rows that enter on every render fail M8e', !hero1(screen.replace('<TableBody enter={rowsEnter}>', '<TableBody enter>')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

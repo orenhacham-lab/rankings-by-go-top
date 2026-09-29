@@ -9,7 +9,7 @@
  * their own screens now, so this file is about articles and nothing else.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
@@ -21,13 +21,12 @@ import SiteHubCard from '@/components/content/site-platforms/SiteHubCard'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { cn, formatDate } from '@/lib/utils'
-import StatTile from '@/components/ui/StatTile'
 import SectionHeading from '@/components/ui/SectionHeading'
 import EmptyState from '@/components/ui/EmptyState'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Checkbox from '@/components/ui/Checkbox'
-import { CheckCircle2, ChevronDown, ExternalLink, FileText, Loader2, Pencil, Plus, Search, Send, ShieldCheck, Trash2, Upload, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ExternalLink, FileText, Lightbulb, Loader2, Pencil, Plus, Search, Send, ShieldCheck, Trash2, Upload, X } from 'lucide-react'
 import { resolvePublishCta } from '@/lib/content/publish-cta'
 import { CitedBadge } from '@/components/content/ArticleAiVisibilityCard'
 import RowMenu from '@/components/ui/RowMenu'
@@ -35,18 +34,12 @@ import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT, STATUS_TONE, type ArticleRow } from './types'
+import ArticlesHero from './ArticlesHero'
+import { articleStanding } from './articles-standing'
+import { useFirstEntrance } from '@/components/ui/motion'
 
 /** Rows shown before "show more" (design contract §7). */
 const ARTICLES_PAGE = 25
-/** Literal column classes for the stat row, so Tailwind sees every one of them. */
-const STAT_COLS: Record<number, string> = {
-  1: 'sm:grid-cols-2 lg:grid-cols-4',
-  2: 'sm:grid-cols-2 lg:grid-cols-4',
-  3: 'sm:grid-cols-3',
-  4: 'sm:grid-cols-4',
-  5: 'sm:grid-cols-3 lg:grid-cols-5',
-  6: 'sm:grid-cols-3 lg:grid-cols-6',
-}
 
 export default function ArticlesScreen() {
   const {
@@ -388,19 +381,16 @@ export default function ArticlesScreen() {
   const wpState = (a: ArticleRow): 'published' | 'exported' | 'none' =>
     a.wp_post_id && a.status === 'published' ? 'published' : a.wp_post_id ? 'exported' : 'none'
 
-  // Design contract §7: a tile that says "0" says nothing. The total always
-  // shows (once there is anything at all); the per-status tiles only when they
-  // count something; and with no articles the empty state below speaks instead.
-  const statCards = counts && counts.total > 0
-    ? [
-        { key: 'total', label: t.stats.total, value: counts.total },
-        { key: 'draft', label: t.stats.draft, value: counts.draft },
-        { key: 'ready', label: t.stats.ready, value: counts.ready },
-        { key: 'scheduled', label: t.stats.scheduled, value: counts.scheduled },
-        { key: 'published', label: t.stats.published, value: counts.published },
-        { key: 'failed', label: t.stats.failed, value: counts.failed },
-      ].filter((c) => c.key === 'total' || c.value > 0)
-    : []
+  // Where the articles stand, for the hero (the overview's counts plus the pace read
+  // from the rows). With no articles the empty state below speaks instead; the hero
+  // keeps design contract §7: a figure that says "0" says nothing.
+  const standing = useMemo(
+    () => (counts && counts.total > 0 ? articleStanding(counts, data?.articles ?? []) : null),
+    [counts, data?.articles],
+  )
+  // The rows rise in once, when the first articles arrive; a filter, "show more" or a
+  // reload after a publish shows them at once.
+  const rowsEnter = useFirstEntrance(filteredArticles.length > 0)
   const shownArticles = articlesExpanded ? filteredArticles : filteredArticles.slice(0, ARTICLES_PAGE)
   const selectedCount = selectedArticles.size
   const someArticlesSelected = selectedCount > 0 && !allArticlesSelected
@@ -433,25 +423,30 @@ export default function ArticlesScreen() {
         </div>
       )}
 
-      {/* Stats: the same tile as every other screen, entering as a list. */}
-      {statCards.length > 0 && (
-        <div className={cn('list-enter mb-8 grid grid-cols-2 gap-4 sm:gap-5', STAT_COLS[statCards.length] ?? 'sm:grid-cols-3 lg:grid-cols-6')}>
-          {statCards.map((s) => (
-            <StatTile key={s.key} label={s.label} value={s.value} />
-          ))}
-        </div>
-      )}
+      {/* Where the articles stand: the headline, the figures, the spread and the pace. */}
+      {standing && (data?.articles?.length ?? 0) > 0 && <ArticlesHero standing={standing} />}
 
       {/* ── Section 1: generated articles, with the screen's primary action ── */}
       <SectionHeading
         title={t.articlesHeading}
         description={t.articlesSubtitle}
-        action={<Button onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>}
+        // With no articles the empty state's own button is the one primary on the screen.
+        action={(data?.articles?.length ?? 0) > 0 ? <Button onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button> : undefined}
       />
 
       {(data?.articles?.length ?? 0) === 0 ? (
         <Card padding={false} className="mb-6">
-          <EmptyState icon={<FileText />} title={t.articlesEmptyTitle} action={<Button variant="secondary" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>} />
+          <EmptyState
+            icon={<FileText />}
+            title={t.articlesEmptyTitle}
+            body={t.articlesEmptyBody}
+            action={<Button size="lg" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>}
+            secondary={(
+              <Link href="/content/strategy" className="inline-flex items-center gap-1.5 font-medium text-action hover:underline">
+                <Lightbulb aria-hidden="true" className="size-4" />{t.articlesEmptyIdeas}
+              </Link>
+            )}
+          />
         </Card>
       ) : (
       <>
@@ -465,7 +460,7 @@ export default function ArticlesScreen() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label={t.filters.search}
-            className="h-10 ps-9"
+            className="h-10 rounded-pill ps-9 shadow-control"
           />
         </div>
         <Select
@@ -484,8 +479,12 @@ export default function ArticlesScreen() {
           batch runs: sticky, dark, three actions at most. Select-all lives in
           the table head. */}
       {(selectedCount > 0 || articleBatchRunning) && (
-        <div data-bulk-bar="" role="region" aria-label={t.batch.selected.replace('{n}', String(selectedCount))} className="sticky top-16 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-inset bg-contrast px-4 py-2.5 text-contrast-ink shadow-pop motion-safe:animate-pop-in">
-          <span className="me-2 text-copy font-semibold tabular-nums">{t.batch.selected.replace('{n}', String(selectedCount))}</span>
+        <div data-bulk-bar="" role="region" aria-label={t.batch.selected.replace('{n}', String(selectedCount))} className="bar-rise sticky top-16 z-20 mb-3 flex flex-wrap items-center gap-2 overflow-hidden rounded-card bg-contrast bg-[linear-gradient(100deg,var(--color-contrast),color-mix(in_srgb,var(--color-contrast)_82%,var(--color-action)))] px-3 py-2.5 text-contrast-ink shadow-pop ring-1 ring-contrast-ink/10 sm:px-4">
+          {/* The count, as a lit pill: what the three actions will act on. */}
+          <span className="me-2 inline-flex items-center gap-2 text-copy font-semibold tabular-nums">
+            <span aria-hidden="true" className="grid h-7 min-w-7 place-items-center rounded-pill bg-rail-focus px-2 text-caption font-bold text-contrast">{selectedCount}</span>
+            {t.batch.selected.replace('{n}', String(selectedCount))}
+          </span>
           <Button size="sm" variant="ghost" className="text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedCount === 0 || selectedCount > BATCH_LIMIT}>
             {!(articleBatchRunning && articleBatchMode === 'publish') && <Upload aria-hidden="true" className="size-4" />}
             {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedCount))}
@@ -539,7 +538,7 @@ export default function ArticlesScreen() {
               <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
-          <TableBody>
+          <TableBody enter={rowsEnter}>
             {filteredArticles.length === 0 ? (
               <EmptyRow colSpan={9} message={t.table.emptyTitle} />
             ) : (
@@ -558,11 +557,16 @@ export default function ArticlesScreen() {
                     )}
                   </Td>
                   <Td className="min-w-[9rem] sm:min-w-[12rem]">
-                    <Link href={`/content/articles/${a.id}`} className="font-medium text-ink hover:text-action hover:underline">{a.title}</Link>
-                    <div className="mt-1 sm:hidden"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></div>
-                    {a.status === 'published' && cited[a.id]?.length ? (
-                      <div className="mt-1"><CitedBadge t={t.editor.aiVisibility} engines={cited[a.id]} /></div>
-                    ) : null}
+                    <div className="flex items-center gap-3">
+                      <ArticleThumb src={a.featured_image_url} />
+                      <div className="min-w-0">
+                        <Link href={`/content/articles/${a.id}`} className="font-semibold text-ink hover:text-action hover:underline">{a.title}</Link>
+                        <div className="mt-1 sm:hidden"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></div>
+                        {a.status === 'published' && cited[a.id]?.length ? (
+                          <div className="mt-1"><CitedBadge t={t.editor.aiVisibility} engines={cited[a.id]} /></div>
+                        ) : null}
+                      </div>
+                    </div>
                   </Td>
                   <Td className="hidden sm:table-cell"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
                   <Td className="hidden md:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.created_at, language)}</span></Td>
@@ -717,6 +721,31 @@ export default function ArticlesScreen() {
       />
       {confirmDialog}
     </>
+  )
+}
+
+/**
+ * The article's picture beside its title: its featured image, small, or a quiet
+ * document tile when it has none (or the image does not load). Decorative: the
+ * title next to it says what the row is. Hidden on a phone, where the row is
+ * checkbox, title and actions.
+ */
+function ArticleThumb({ src }: { src: string | null }) {
+  const [failed, setFailed] = useState(false)
+  const box = 'relative hidden size-10 shrink-0 overflow-hidden rounded-inset ring-1 ring-inset ring-line sm:grid'
+  if (!src || failed) {
+    return (
+      <span aria-hidden="true" data-article-thumb="none" className={cn(box, 'place-items-center bg-action-soft text-action [&_svg]:size-4')}>
+        <FileText />
+      </span>
+    )
+  }
+  return (
+    <span aria-hidden="true" data-article-thumb="image" className={cn(box, 'bg-sunk')}>
+      {/* A plain <img>: the picture is on the merchant's own storage or site, not ours to optimise. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="size-full object-cover" />
+    </span>
   )
 }
 

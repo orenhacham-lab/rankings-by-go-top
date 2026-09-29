@@ -112,7 +112,9 @@ export function AnimatedNumber({ value, format, duration = 900, className }: {
   className?: string
 }) {
   const reduced = useReducedMotion()
-  const [ref, seen] = useInView<HTMLSpanElement>({ threshold: 0.3, rootMargin: '0px' })
+  const [inViewRef, seen] = useInView<HTMLSpanElement>({ threshold: 0.3, rootMargin: '0px' })
+  const el = useRef<HTMLSpanElement | null>(null)
+  const ref = useCallback((node: HTMLSpanElement | null) => { el.current = node; inViewRef(node) }, [inViewRef])
   // null: show the value itself. A number: the frame being drawn.
   const [frame, setFrame] = useState<number | null>(null)
   const [phase, setPhase] = useState<'idle' | 'wait' | 'run' | 'done'>('idle')
@@ -126,10 +128,16 @@ export function AnimatedNumber({ value, format, duration = 900, className }: {
     setFrame(0)
   }, [phase, reduced, target])
 
-  // Seen: start counting. (A separate effect from the frames below, so that changing
-  // the phase does not cancel the frame loop it starts.)
+  // Seen: start counting, once the block it sits in has finished entering (a figure
+  // that counted while its card was still fading in would be seen already done). A
+  // separate effect from the frames below, so that changing the phase does not cancel
+  // the frame loop it starts.
   useEffect(() => {
-    if (phase === 'wait' && seen) setPhase('run')
+    if (phase !== 'wait' || !seen) return
+    let live = true
+    const start = () => { if (live) setPhase('run') }
+    void settled(el.current, ENTRANCE_WAIT_MS).then(start)
+    return () => { live = false }
   }, [phase, seen])
 
   useEffect(() => {
@@ -166,6 +174,29 @@ export function AnimatedNumber({ value, format, duration = 900, className }: {
 }
 
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/** The longest a count waits for its block's entrance (page-in, stagger-in, fade-in). */
+const ENTRANCE_WAIT_MS = 900
+
+/**
+ * Resolves when the CSS entrances running on `node` or any block around it have
+ * finished (or after `cap` ms, whichever is first; at once when there are none or
+ * the browser cannot say). Looping animations (a hero's drifting glow) are ignored.
+ */
+function settled(node: Element | null, cap: number): Promise<void> {
+  if (!node || typeof document === 'undefined' || typeof document.getAnimations !== 'function') return Promise.resolve()
+  const entering = document.getAnimations().filter((a) => {
+    const target = (a.effect as KeyframeEffect | null)?.target
+    if (!target || !(target instanceof Element) || !target.contains(node)) return false
+    const timing = a.effect?.getComputedTiming()
+    return a.playState === 'running' && timing?.iterations !== Infinity
+  })
+  if (entering.length === 0) return Promise.resolve()
+  return Promise.race([
+    Promise.all(entering.map((a) => a.finished.catch(() => undefined))).then(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, cap)),
+  ])
+}
 
 /**
  * True for the first render(s) after `ready` first turns true, then false for good

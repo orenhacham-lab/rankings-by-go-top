@@ -183,7 +183,7 @@ async function main() {
       const outside = flat.replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n\}/g, '')
       const names = ['page-in', 'tab-in', 'count-up 600ms', 'count-up-hold', 'ring-draw 700ms', 'drawer-in-ltr 240ms', 'scrim-in 200ms', 'shimmer 1.2s',
         // The wave 7 motion layer.
-        'rise-in', 'row-in', 'fade-in', 'fade-out', 'grow-x', 'draw-line', 'dialog-spring', 'backdrop-in', 'glow-drift', 'float-y', 'dot-ping']
+        'rise-in', 'row-in', 'fade-in', 'fade-out', 'grow-x', 'draw-line', 'dialog-spring', 'backdrop-in', 'glow-drift', 'float-y', 'dot-ping', 'bar-rise']
       return names.filter((n) => !blocks.includes(`animation: ${n}`) || new RegExp(`animation:\\s*${n.replace('.', '\\.')}`).test(outside))
     }
     check('D3: the tab, count-up, ring, drawer, scrim, shimmer and wave 7 motion-layer animations are no-preference only', gated(css).length === 0, gated(css).join(', '))

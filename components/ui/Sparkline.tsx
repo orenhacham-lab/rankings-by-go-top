@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
  * Given fewer than two values there is no line to draw and it renders nothing.
  */
 export default function Sparkline({
-  values, invert = false, width = 88, height = 28, label, className,
+  values, invert = false, width = 88, height = 28, label, className, tone = 'default',
 }: {
   values: readonly (number | null | undefined)[]
   invert?: boolean
@@ -26,8 +26,12 @@ export default function Sparkline({
   /** What the line shows, for a screen reader ("position over the last 4 checks"). */
   label: string
   className?: string
+  /** `contrast` is for a navy panel (a hero): the line takes the light blue. */
+  tone?: 'default' | 'contrast'
 }) {
   const id = useId().replace(/:/g, '')
+  const ink = tone === 'contrast' ? 'var(--color-rail-focus)' : 'var(--color-action)'
+  const ground = tone === 'contrast' ? 'var(--color-contrast)' : 'var(--color-surface)'
   const pts = values
     .map((v, i) => ({ v, i }))
     .filter((p): p is { v: number; i: number } => typeof p.v === 'number' && Number.isFinite(p.v))
@@ -59,14 +63,14 @@ export default function Sparkline({
     >
       <defs>
         <linearGradient id={`spark-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-action)" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="var(--color-action)" stopOpacity="0" />
+          <stop offset="0%" stopColor={ink} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={ink} stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#spark-${id})`} className="fade-in" />
-      <path d={line} fill="none" stroke="var(--color-action)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" pathLength={1} className="draw-line" />
-      <circle cx={x(last.i)} cy={y(last.v)} r="5" fill="var(--color-action)" opacity="0.16" />
-      <circle cx={x(last.i)} cy={y(last.v)} r="2.5" fill="var(--color-action)" stroke="var(--color-surface)" strokeWidth="1" />
+      <path d={line} fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" pathLength={1} className="draw-line" />
+      <circle cx={x(last.i)} cy={y(last.v)} r="5" fill={ink} opacity="0.16" />
+      <circle cx={x(last.i)} cy={y(last.v)} r="2.5" fill={ink} stroke={ground} strokeWidth="1" />
     </svg>
   )
 }
