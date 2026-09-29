@@ -10,7 +10,9 @@
  *   C) the template captions every product picture as an illustration, renders
  *      nothing waiting to be revealed (Rise starts 'static'), and uses the
  *      shared hero and CTA sweep;
- *   D) no page promises results or invents proof.
+ *   D) no page promises results or invents proof;
+ *   E) the About page follows suit: the free check first in its hero and its
+ *      close, from the same shared calls to action.
  * Each group ends with a MUTATION CONTROL.
  *
  * Run: npx tsx components/public/__qa__/feature-pages.qa.ts
@@ -106,6 +108,18 @@ function main() {
   const badD = PAGES.filter((p) => !honest(read(p.rel))).map((p) => p.rel)
   check('D1: no page promises a ranking or claims customers it cannot show', badD.length === 0, badD.join(', '))
   check('MUTATION CONTROL: a "guaranteed first page" line is caught', !honest(aiEn.replace("title: 'Find out what ChatGPT says about your field',", "title: 'Guaranteed first page in 30 days',")))
+
+  console.log('\nE) the About page: the free check first, too')
+  const about = read('components/public/AboutPage.tsx')
+  const aboutOk = (src: string) => {
+    const s = strip(src)
+    const pairs = [...s.matchAll(/<ButtonLink href=\{c\.(check|trial)\.href\}/g)].map((m) => m[1])
+    return /const c = FEATURE_COMMON\[locale\]/.test(s) && pairs.join(',') === 'check,trial,check,trial'
+      && !/<PageHero|components\/ui\/motion|signupHref/.test(s)
+  }
+  check('E1: the About hero and close lead with the free check, then the trial', aboutOk(about))
+  check('MUTATION CONTROL: an About close that leads with the trial is caught',
+    !aboutOk(about.replace(/(<CtaBand[\s\S]*?)<ButtonLink href=\{c\.check\.href\}([\s\S]*?)<ButtonLink href=\{c\.trial\.href\}/, '$1<ButtonLink href={c.trial.href}$2<ButtonLink href={c.check.href}')))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
