@@ -5,7 +5,12 @@
  * of, and what Google says about it, in one card.
  *
  *   start   the total, a composition bar of the four kinds, and one legend cell
- *           per kind with its TRUE count (a cell is a button: it opens that tab);
+ *           per kind the site HAS, with its true count (a cell is a button: it opens
+ *           that tab). A figure that says 0 says nothing (design contract §7, as in
+ *           the articles hero): a service business saw "מוצרים 0" and "קטגוריות 0".
+ *           The total always shows; one kind alone draws no cell (it would only
+ *           repeat the total), and the grid has as many columns as cells, so no
+ *           cell is left alone in a row and no grid cell stays empty;
  *           under them, where the list comes from and when it was updated.
  *   end     what Search Console says about the whole list (pages with clicks,
  *           seen without clicks, with a clear opportunity, competing), or one
@@ -26,6 +31,20 @@ import type { ExistingContentPayload, ExistingContentTab } from '@/lib/content/e
 import { fill, joinList, KIND_TONE } from './format'
 
 type Copy = ReturnType<typeof getDashboardDictionary>['existingContent']
+
+/**
+ * The kind cells worth drawing: every kind the site has, and the one on screen (a
+ * link can open a kind with none). One kind alone repeats the total: no cells.
+ */
+export function summaryKinds(counts: Record<SiteKind, number>, tab: ExistingContentTab): SiteKind[] {
+  const kinds = SITE_KINDS.filter((k) => counts[k] > 0 || k === tab)
+  return kinds.length > 1 ? kinds : []
+}
+
+/** As many columns as cells (four go 2 by 2 on a phone), so no row is left with a gap. */
+export function summaryGridClass(n: number): string {
+  return n === 4 ? 'grid-cols-2 sm:grid-cols-4' : n === 3 ? 'grid-cols-3' : 'grid-cols-2'
+}
 
 export default function SiteSummary({
   x, data, tab, onTab, onRisk, risk, num, day, refresh,
@@ -48,6 +67,7 @@ export default function SiteSummary({
     .map((s) => x.sourceNames[s])
   const updated = day(data.indexedAt)
   const gscOk = data.gsc.state === 'ok'
+  const kinds = summaryKinds(data.counts, tab)
 
   return (
     <Card className="overflow-hidden" padding={false}>
@@ -79,8 +99,9 @@ export default function SiteSummary({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            {SITE_KINDS.map((k: SiteKind) => {
+          {kinds.length > 0 && (
+          <div data-kind-cells={kinds.length} className={cn('grid gap-2.5', summaryGridClass(kinds.length))}>
+            {kinds.map((k: SiteKind) => {
               const on = tab === k
               return (
                 <button
@@ -104,6 +125,7 @@ export default function SiteSummary({
               )
             })}
           </div>
+          )}
 
           {(sourceParts.length > 0 || updated) && (
             <p className="text-caption text-muted">

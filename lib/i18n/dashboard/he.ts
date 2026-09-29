@@ -909,8 +909,9 @@ export const dashboardHe = {
       lastPublished: (date: string) => `פורסם לאחרונה ${date}`,
       neverPublished: 'עוד לא פורסם מאמר',
       headline: (published: string, total: string) => `${published} מתוך ${total} המאמרים כבר באוויר`,
-      headlineNone: (total: string) => `${total} מאמרים כתובים, ועוד אף אחד מהם לא פורסם`,
-      waiting: (ready: string) => `${ready} מוכנים ומחכים לפרסום`,
+      // Singular and plural are separate sentences: "1 מוכנים" reads wrong (review P2-11).
+      headlineNone: (n: number, total: string) => (n === 1 ? 'מאמר אחד כתוב, ועוד לא פורסם' : `${total} מאמרים כתובים, ועוד אף אחד מהם לא פורסם`),
+      waiting: (n: number, ready: string) => (n === 1 ? 'מאמר אחד מוכן ומחכה לפרסום' : `${ready} מאמרים מוכנים ומחכים לפרסום`),
       total: 'כל המאמרים',
       totalHint: (drafts: string) => `${drafts} בטיוטה`,
       totalHintNone: 'אין טיוטות פתוחות',
@@ -2233,7 +2234,22 @@ export const dashboardHe = {
       stepNow: 'עכשיו',
     },
     board: {
-      unscheduled: (n: string) => `${n} נושאים עוד בלי תאריך פרסום, ולכן הם מוצגים בכל חודש.`,
+      // The totals in words under the month chips (review P2-12): a bare "10" on a month
+      // next to "11" on "all" read as ten topics in that month.
+      summaryAll: (n: { total: number; dated: number; undated: number }, f: (x: number) => string) => {
+        const head = n.total === 1 ? 'נושא אחד בתוכנית' : `${f(n.total)} נושאים בתוכנית`
+        const parts = [
+          n.dated > 0 ? (n.dated === 1 ? 'אחד מתוכנן לחודש מסוים' : `${f(n.dated)} מתוכננים לחודש מסוים`) : '',
+          n.undated > 0 ? (n.undated === 1 ? 'אחד עוד בלי תאריך פרסום' : `${f(n.undated)} עוד בלי תאריך פרסום`) : '',
+        ].filter(Boolean)
+        return parts.length ? `${head}: ${parts.join(', ')}.` : `${head}.`
+      },
+      summaryMonth: (n: { shown: number; inMonth: number; undated: number }, month: string, f: (x: number) => string) => {
+        const head = n.shown === 1 ? `נושא אחד מוצג ב${month}` : `${f(n.shown)} נושאים מוצגים ב${month}`
+        const planned = n.inMonth === 1 ? `אחד מתוכנן ל${month}` : `${f(n.inMonth)} מתוכננים ל${month}`
+        const rest = n.undated === 0 ? '' : n.undated === 1 ? ' ואחד עוד בלי תאריך, ולכן מוצג בכל חודש' : ` ו-${f(n.undated)} עוד בלי תאריך, ולכן מוצגים בכל חודש`
+        return `${head}: ${planned}${rest}.`
+      },
       shown: (shown: string, total: string) => `מוצגים ${shown} מתוך ${total}`,
     },
     list: {
@@ -3856,6 +3872,8 @@ export const dashboardHe = {
     nextStepNoMentions: 'עוד אף מנוע לא הזכיר אתכם בתשובות שנבדקו. מה עוזר: מאמר באתר שעונה בדיוק על השאלה, כדי שלמנועים יהיה מה לצטט.',
     nextStepKeepGoing: 'בדקו שוב מדי פעם: מנועי AI מתעדכנים, והציון משתנה איתם.',
     runMoreChecks: 'להרצת בדיקות נוספות',
+    upgradeForChecks: 'לשדרוג החבילה',
+    checksUsedUp: 'השתמשתם בכל בדיקות ה-AI שכלולות בחבילה. כדי להמשיך לבדוק צריך לשדרג.',
     emptyBodyQuestions: (count: number) => `הסריקה הכינה ${count} שאלות שלקוחות שואלים. בחרו שאלה ומנוע, והבדיקה הראשונה תתחיל.`,
     emptyBodyPending: 'הסריקה מכינה עכשיו שאלות שלקוחות שואלים. הן יופיעו בכלי שלמטה בעוד כמה דקות.',
     chooseQuestions: 'לבחירת שאלות',
@@ -5176,6 +5194,8 @@ export const dashboardHe = {
       about: 'כאן יופיעו הביטויים שבמעקב שגוגל כבר מציג עליהם את האתר, עם הקליקים והחשיפות שלהם, כדי לדעת מה כבר עובד.',
       legend: (n: string) => `${n} מהביטויים שבמעקב קיבלו קליקים או חשיפות מגוגל ב-28 הימים האחרונים.`,
       noneYet: 'ב-28 הימים האחרונים גוגל לא דיווח על קליקים או חשיפות לביטויים שבמעקב.',
+      noneInSearch: 'לביטויים בחיפוש הזה אין עדיין נתונים מגוגל.',
+      legendSearch: (n: string) => `${n} מהביטויים בחיפוש הזה כבר קיבלו קליקים או חשיפות מגוגל ב-28 הימים האחרונים.`,
       loading: 'טוען נתונים מ-Search Console',
     },
     table: {
@@ -5223,12 +5243,16 @@ export const dashboardHe = {
       /** A competitor seen on Google in the scan's checks, but tied to no keyword of the research list. */
       noOverlapSeen: 'הופיע בחיפושים שבדקנו, אבל אף ביטוי ברשימת המחקר עוד לא משויך אליו.',
       summary: (n: string, searches: string) => `${n} מתחרים · ${searches} חיפושים בחודש על ביטויים שרק הם תופסים`,
+      cardsTitle: 'מי מתחרה על הביטויים שלכם',
+      comparedOnly: (y: string) => `לא מופיע ברשימת המחקר, אבל הושווה אליכם על ${y} ביטויים במעקב.`,
     },
     audiences: {
       title: 'מי מחפש אתכם',
       subtitle: 'הקהלים שהסריקה זיהתה באתר, והביטויים שמדברים בשפה של כל אחד מהם.',
       matched: (n: string, searches: string) => `${n} ביטויים · ${searches} חיפושים בחודש`,
       none: 'עוד אין ביטוי שמזכיר את הקהל הזה במפורש.',
+      missingSome: (names: string) => `עוד אין ביטוי במחקר שמזכיר במפורש את: ${names}.`,
+      missingAll: (names: string) => `עוד אין ביטוי במחקר שמזכיר במפורש אחד מהקהלים שלכם (${names}). ביטויים שמזכירים קהל מסוים יופיעו כאן.`,
       how: 'ביטוי משויך לקהל כשהוא מזכיר מילה שמייחדת את הקהל הזה בלבד.',
       empty: 'עוד אין קהלים לפרויקט. אפשר להוסיף אותם בהגדרות הפרויקט.',
       edit: 'עריכת הקהלים',
@@ -5607,6 +5631,8 @@ export const dashboardHe = {
       saving: 'שומרים…',
     },
     composer: {
+      lockedConnect: 'כדי לכתוב פוסט, חברו קודם את פרופיל העסק בגוגל (שלב 1).',
+      lockedLocation: 'כדי לכתוב פוסט, בחרו קודם באיזה עסק לפרסם (שלב 2).',
       overline: 'שלב 3',
       title: 'פוסט חדש',
       sourceLabel: 'על מה הפוסט?',

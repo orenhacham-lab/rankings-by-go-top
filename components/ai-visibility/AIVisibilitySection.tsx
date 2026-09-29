@@ -99,6 +99,7 @@ export default function AIVisibilitySection({
   openQueriesWhenEmpty = false,
   suggestionsRefreshKey = 0,
   requestedTab,
+  onAllowanceOut,
 }: {
   projectId: string
   projectCountry: string | null
@@ -129,6 +130,8 @@ export default function AIVisibilitySection({
   suggestionsRefreshKey?: number
   /** Switch to a tab; `seq` makes the same tab requestable twice. */
   requestedTab?: { tab: TabType; seq: number }
+  /** Whether the allowance is read and nothing is left: the page's hero then offers the billing page, not more checks. */
+  onAllowanceOut?: (out: boolean) => void
 }) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
@@ -235,6 +238,10 @@ export default function AIVisibilitySection({
     }
   }, [])
   useEffect(() => { void loadAllowance() }, [loadAllowance])
+  const onAllowanceOutRef = useRef(onAllowanceOut)
+  onAllowanceOutRef.current = onAllowanceOut
+  const allowanceOut = allowance != null && allowance.state === 'known' && allowance.remaining === 0
+  useEffect(() => { onAllowanceOutRef.current?.(allowanceOut) }, [allowanceOut])
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
   // What the site scan says the business is, read with the saved profile.

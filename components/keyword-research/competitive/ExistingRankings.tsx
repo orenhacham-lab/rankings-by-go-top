@@ -29,7 +29,7 @@ import SourceTag from './SourceTag'
 
 export const RANKINGS_SHOWN = 25
 
-export default function ExistingRankings({ model, gsc, gscRun, projectId, onTrack, tracking, justTracked }: {
+export default function ExistingRankings({ model, gsc, gscRun, projectId, onTrack, tracking, justTracked, heading = true }: {
   model: CompetitiveModel
   gsc: RankingsSource
   gscRun: { startDate: string | null; endDate: string | null } | null
@@ -39,6 +39,8 @@ export default function ExistingRankings({ model, gsc, gscRun, projectId, onTrac
   tracking: ReadonlySet<string>
   /** Keys added in this visit (their exact position comes with the next check). */
   justTracked: ReadonlySet<string>
+  /** False inside a Fold, whose button already is the title. */
+  heading?: boolean
 }) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language).researchCompetitive
@@ -73,8 +75,8 @@ export default function ExistingRankings({ model, gsc, gscRun, projectId, onTrac
     <div data-competitive-rankings="" className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <h3 className="text-section font-semibold text-ink">{t.title}</h3>
-          <p className="mt-0.5 max-w-prose text-copy text-muted text-pretty">{t.subtitle}</p>
+          {heading && <h3 className="text-section font-semibold text-ink">{t.title}</h3>}
+          <p className={heading ? 'mt-0.5 max-w-prose text-copy text-muted text-pretty' : 'max-w-prose text-copy text-muted text-pretty'}>{t.subtitle}</p>
         </div>
         {gscReady && from && to && <p className="shrink-0 text-caption text-muted">{t.gscRange(from, to)}</p>}
       </div>

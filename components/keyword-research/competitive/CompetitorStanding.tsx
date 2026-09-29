@@ -13,9 +13,9 @@
  * is missing (the suggested competitors of the scan, or managing them); it never
  * shows a 0% bar that only means "not compared".
  */
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, CircleSlash, Info, Plus, TriangleAlert } from 'lucide-react'
+import { CheckCircle2, ChevronDown, CircleSlash, Info, Plus, TriangleAlert } from 'lucide-react'
 import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -133,6 +133,10 @@ function Battles({ model }: { model: CompetitiveModel }) {
   const t = dict.battles
   const n = (v: number) => formatCount(v, language)
   const [all, setAll] = useState(false)
+  // The per-keyword table opens on demand: the tiles and each competitor's record
+  // above it already say who is ahead, and the table is the longest part on a phone.
+  const [tableOpen, setTableOpen] = useState(false)
+  const tableId = useId()
   const rows: Battle[] = all ? model.battles : model.battles.slice(0, BATTLES_SHOWN)
   const date = formatResearchDate(model.share?.checkedAt ?? null, language) ?? ''
   const source = dict.source.scan(date)
@@ -160,6 +164,22 @@ function Battles({ model }: { model: CompetitiveModel }) {
           ))}
         </ul>
       )}
+      {model.battles.length > 0 && (
+        <button
+          type="button"
+          data-battles-toggle=""
+          aria-expanded={tableOpen}
+          aria-controls={tableId}
+          onClick={() => setTableOpen((v) => !v)}
+          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+        >
+          {tableOpen ? t.hideTable : t.showTable(n(model.battles.length))}
+          <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform duration-200 ease-snappy motion-reduce:transition-none', tableOpen && 'rotate-180')} />
+        </button>
+      )}
+      <div id={tableId} hidden={!tableOpen} className="space-y-4 motion-safe:animate-pop-in">
+      {tableOpen && (
+      <>
       <Table stackBelowSm>
         <TableHead>
           <tr>
@@ -200,6 +220,9 @@ function Battles({ model }: { model: CompetitiveModel }) {
           </Button>
         </div>
       )}
+      </>
+      )}
+      </div>
     </div>
   )
 }
@@ -210,7 +233,7 @@ function SuggestedCompetitors({ suggested, onAdd, adding }: { suggested: string[
   const t = getDashboardDictionary(language).researchCompetitive.competitors
   if (suggested.length === 0) return null
   return (
-    <div data-competitive-suggested="" className="mx-auto mt-2 w-full max-w-md text-start">
+    <div data-competitive-suggested="" className="mt-4 w-full max-w-md text-start">
       <p className="mb-2 text-overline font-semibold text-muted">{t.suggestedTitle}</p>
       <ul className="divide-y divide-line rounded-inset border border-line bg-surface">
         {suggested.map((d) => (
@@ -244,15 +267,17 @@ export default function CompetitorStanding({ model, domain, siteIcon, manageHref
   const hasTracked = model.rankingCounts.tracked > 0
 
   if (model.competitorsState === 'none') {
+    // One line and the one step that is missing, not a full empty card: a project
+    // without competitors should not scroll past a large empty state (review P1-2).
     return (
       <div data-competitive-state="no-competitors">
-        <EmptyState
-          icon={<CompetitorIcon />}
-          title={t.noneTitle}
-          body={t.noneBody}
-          action={suggested.length === 0 && manageHref ? <Link href={manageHref} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>{t.manage}</Link> : undefined}
-          className="py-8"
-        />
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-copy text-body">
+          <CompetitorIcon size={16} aria-hidden="true" className="shrink-0 text-muted" />
+          <span className="min-w-0 flex-1 text-pretty">{t.noneLine}</span>
+          {suggested.length === 0 && manageHref && (
+            <Link href={manageHref} data-competitive-manage="" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>{t.choose}</Link>
+          )}
+        </p>
         <SuggestedCompetitors suggested={suggested} onAdd={onAddCompetitor} adding={addingCompetitor} />
       </div>
     )

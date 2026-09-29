@@ -14,7 +14,8 @@
  * figures count up the first time they are on screen and the bar grows; with
  * reduced motion they are simply there.
  */
-import { AlertTriangle, CalendarClock, CheckCircle2, FileText, Globe } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { AlertTriangle, CalendarClock, CheckCircle2, FileText, Globe, PlugZap } from 'lucide-react'
 import HeroPanel, { HeroBadge, HeroStat } from '@/components/ui/HeroPanel'
 import DistributionBar, { type DistributionPart } from '@/components/ui/DistributionBar'
 import Sparkline from '@/components/ui/Sparkline'
@@ -25,7 +26,12 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { PACE_WEEKS, type ArticleStanding } from './articles-standing'
 
-export default function ArticlesHero({ standing }: { standing: ArticleStanding }) {
+export default function ArticlesHero({ standing, connection }: {
+  standing: ArticleStanding
+  /** Where the publishing connection is managed: a quiet footer line of the hero,
+   *  not a line floating above it (review P2-11). */
+  connection?: ReactNode
+}) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const h = dict.contentHub.articlesHero
@@ -33,7 +39,7 @@ export default function ArticlesHero({ standing }: { standing: ArticleStanding }
   const count = (n: number) => formatCount(n, language)
   const s = standing
 
-  const headline = s.published > 0 ? h.headline(count(s.published), count(s.total)) : h.headlineNone(count(s.total))
+  const headline = s.published > 0 ? h.headline(count(s.published), count(s.total)) : h.headlineNone(s.total, count(s.total))
   const paceTotal = s.weekly.reduce((a, b) => a + b, 0)
 
   // The total always; every status figure only when it counts something (§7).
@@ -63,7 +69,7 @@ export default function ArticlesHero({ standing }: { standing: ArticleStanding }
           <HeroBadge tone={s.lastPublishedAt ? 'ok' : 'muted'}>
             {s.lastPublishedAt ? h.lastPublished(formatDate(s.lastPublishedAt, language)) : h.neverPublished}
           </HeroBadge>
-          {s.ready > 0 && <span className="text-caption text-contrast-ink/75">{h.waiting(count(s.ready))}</span>}
+          {s.ready > 0 && <span className="text-caption text-contrast-ink/75">{h.waiting(s.ready, count(s.ready))}</span>}
         </div>
 
         <h2 className="mt-5 max-w-3xl text-title font-bold tracking-tight text-balance tabular-nums">{headline}</h2>
@@ -90,6 +96,12 @@ export default function ArticlesHero({ standing }: { standing: ArticleStanding }
           )}
         </div>
       </div>
+      {connection && (
+        <div data-articles-hero-connection="" className="flex items-start gap-2.5 border-t border-contrast-ink/10 px-5 py-3.5 text-caption text-contrast-ink/70 sm:px-8">
+          <PlugZap aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-contrast-ink/50" />
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">{connection}</div>
+        </div>
+      )}
     </HeroPanel>
   )
 }

@@ -12,7 +12,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { ConnectCard, LocationCard } from './ConnectCards'
 import PostComposer from './PostComposer'
 import PostsList from './PostsList'
-import type { GbpStatus } from './types'
+import type { GbpReadyStatus, GbpStatus } from './types'
 
 /** The result the OAuth callback appends (?gbp=…) → our sentence. Fixed set; anything else is "failed". */
 /** The screen's state from the server, or null when it could not be read. */
@@ -28,12 +28,22 @@ function callbackNotice(t: ReturnType<typeof getDashboardDictionary>['mapsPosts'
   return { tone: 'bad', text: t.callback.failed }
 }
 
+/** The status as the screen shows it: a grant step 2 found gone reads as "reconnect" in every step. */
+export function withAuthLost(status: GbpReadyStatus, authLost: boolean): GbpReadyStatus {
+  if (!authLost || status.connection?.status !== 'connected') return status
+  return { ...status, connection: { ...status.connection, status: 'reauth_required' } }
+}
+
 function Screen({ projectId }: { projectId: string }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).mapsPosts
   const [status, setStatus] = useState<GbpStatus | null>(null)
   const [failed, setFailed] = useState(false)
   const [flash, setFlash] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
+  // Step 2 learned that Google no longer honours the grant (the server marks the
+  // connection too). Until the status read says so, step 1 already shows "reconnect":
+  // the screen never says "connected" and "permission expired" at once (review P2-7).
+  const [authLost, setAuthLost] = useState(false)
 
   const apply = useCallback((body: GbpStatus | null) => {
     if (!body) { setFailed(true); return }
@@ -50,6 +60,7 @@ function Screen({ projectId }: { projectId: string }) {
   }, [t])
 
   const load = useCallback(() => fetchGbpStatus(projectId).then(apply), [projectId, apply])
+  const onAuthLost = useCallback(() => { setAuthLost(true); void load() }, [load])
 
   useEffect(() => {
     let live = true
@@ -63,15 +74,16 @@ function Screen({ projectId }: { projectId: string }) {
   if (!status) return <ScreenSkeleton label={t.loading} />
   if (status.state === 'shopify') return <EmptyState icon={<Store className="size-5" />} title={t.shopifyTitle} body={t.shopifyBody} />
   if (status.state === 'unavailable') return <EmptyState icon={<MapPinOff className="size-5" />} title={t.unavailableTitle} body={t.unavailableBody} />
+  const shown = withAuthLost(status, authLost)
 
   return (
     <div className="space-y-8">
       {flash && <Notice tone={flash.tone} onDismiss={() => setFlash(null)}>{flash.text}</Notice>}
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-        <ConnectCard projectId={projectId} status={status} onChanged={load} />
-        <LocationCard projectId={projectId} status={status} onChanged={load} />
+        <ConnectCard projectId={projectId} status={shown} onChanged={() => { setAuthLost(false); void load() }} />
+        <LocationCard projectId={projectId} status={shown} onChanged={load} onAuthLost={onAuthLost} />
       </div>
-      <PostComposer key={status.location?.locationName ?? 'none'} projectId={projectId} status={status} onPosted={load} />
+      <PostComposer key={shown.location?.locationName ?? 'none'} projectId={projectId} status={shown} onPosted={load} />
       <PostsList projectId={projectId} posts={status.posts} onChanged={load} />
     </div>
   )

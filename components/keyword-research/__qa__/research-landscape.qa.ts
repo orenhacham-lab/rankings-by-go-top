@@ -118,8 +118,13 @@ console.log('\nP) the real page')
   check('P1: every row of the table can be tracked in one click, or says it already is', rows > 1 && track + trackedPills === rows - 1 && trackedPills === 1, show({ rows, track, trackedPills }))
   check('P2: the site\'s icon (its initial until the icon loads) and domain under the title, with the niche',
     /data-research-site=""/.test(html) && /runshop\.co\.il/.test(html.slice(html.indexOf('data-research-site'), html.indexOf('data-research-site') + 1500)))
-  check('P3: the sections nav and both new sections are on the page',
-    /id="research-rivals"/.test(html) && /id="research-audiences"/.test(html) && /id="research-overview"/.test(html) && /id="research-wins"/.test(html) && /href="#research-rivals"|data-section-nav/.test(html))
+  // Wave-7 review P1-3: the competitor cards are the first part of the ONE competitor
+  // section, so the nav links that section (not a second "rivals" one).
+  const compAt = html.indexOf('id="research-competitive"')
+  check('P3: the sections nav and both new sections are on the page (the cards inside the one competitor section)',
+    /id="research-rivals"/.test(html) && /id="research-audiences"/.test(html) && /id="research-overview"/.test(html) && /id="research-wins"/.test(html)
+    && /href="#research-competitive"/.test(html) && !/href="#research-rivals"/.test(html)
+    && compAt >= 0 && html.indexOf('id="research-rivals"') > compAt && html.indexOf('id="research-rivals"') < html.indexOf('id="research-audiences"'))
   check('P4: the competitor card links out safely (no referrer, no follow, a new tab)', /href="https:\/\/rival\.co\.il\/?"[^>]*rel="noopener noreferrer nofollow"|rel="noopener noreferrer nofollow"[^>]*href="https:\/\/rival\.co\.il/.test(html))
   const legacy = HARNESS.renderPage('he', { scan: { view: { kind: 'none' }, reloadTracked() {}, retry() {} }, state: HARNESS.LEGACY_SCENARIOS[Object.keys(HARNESS.LEGACY_SCENARIOS).find((k) => /result/i.test(k)) ?? Object.keys(HARNESS.LEGACY_SCENARIOS)[0]] })
   check('P5: without a scan (the legacy screen) none of it: no track buttons, no site line, no sections', !/data-row-track|data-research-site|research-rivals/.test(legacy))

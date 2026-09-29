@@ -43,7 +43,7 @@ import RowMenu from '@/components/ui/RowMenu'
 import Badge from '@/components/ui/Badge'
 import EmptyState from '@/components/ui/EmptyState'
 import { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
-import ResearchLandscape, { LANDSCAPE_IDS } from '@/components/keyword-research/ResearchLandscape'
+import { LANDSCAPE_IDS, ResearchAudiences, ResearchRivals } from '@/components/keyword-research/ResearchLandscape'
 import SectionNav from '@/components/keyword-research/SectionNav'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import { useFirstEntrance } from '@/components/ui/motion'
@@ -927,7 +927,7 @@ export default function KeywordResearchPage() {
   const gscState = gscSource ? gscKeywords.data.state : 'disabled'
   const googleChip = gscState === 'disabled' ? 'hidden' : gscState === 'loading' ? 'loading' : 'counted'
   const gscNotice = gscSource ? (
-    <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} retry={gscKeywords.retry} />
+    <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} scope={model.mode === 'manual' ? 'search' : 'tracked'} retry={gscKeywords.retry} />
   ) : null
 
   // The research's own site, named with its icon under the title, once the scan's research is on screen.
@@ -942,6 +942,24 @@ export default function KeywordResearchPage() {
   ) : undefined
   const header = <Header title={t.title} subtitle={t.subtitle}>{siteChip}</Header>
   const landscapeOn = scanMode && model.mode === 'scan' && scanOn?.kind === 'seeded' && !!activeProjectId
+  // THE ONE COMPETITOR SECTION, for every project. It used to mount only with the
+  // scan's research on screen: a project made by hand never saw it, and a seeded one
+  // lost it on its first manual search (review P1-2). Its reads (the tracked
+  // competitors, their rank rows, Search Console) do not depend on the research on
+  // screen, so it is always there. With the scan's research it opens with the scan's
+  // competitor cards and sits beside the rest of the scan's story; otherwise it
+  // follows the results, so a search's table stays right under its form.
+  const competitorSection = activeProjectId ? (
+    <CompetitiveResearch
+      projectId={activeProjectId}
+      siteIcon={seedLandscape.siteIcon}
+      suggested={seedLandscape.competitors.filter((c) => c.validated).map((c) => c.domain)}
+      onTracked={scan.reloadTracked}
+      rivals={landscapeOn && scanOn?.kind === 'seeded'
+        ? <ResearchRivals projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} domain={ownDomain} />
+        : undefined}
+    />
+  ) : null
 
   // Nothing is known yet about which screen this is: its skeleton, not today's form.
   if (firstAnswerPending) {
@@ -985,9 +1003,8 @@ export default function KeywordResearchPage() {
           sections={[
             { id: 'research-overview', label: ti.nav.overview },
             { id: 'research-wins', label: ti.nav.wins },
-            { id: LANDSCAPE_IDS.rivals, label: ti.nav.rivals },
-            { id: LANDSCAPE_IDS.audiences, label: ti.nav.audiences },
             { id: COMPETITIVE_ID, label: dict.researchCompetitive.nav },
+            { id: LANDSCAPE_IDS.audiences, label: ti.nav.audiences },
             { id: 'research-table', label: ti.nav.keywords },
           ]}
         />
@@ -1139,18 +1156,11 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
-      {/* Who the site competes with, and who searches for it (only with the scan's research on screen),
-          then where it stands against them. One slot, so the screen without a scan keeps its exact markup. */}
+      {/* With the scan's research on screen: who the site competes with (one section),
+          then who searches for it. */}
+      {landscapeOn && competitorSection}
       {landscapeOn && scanOn?.kind === 'seeded' && activeProjectId && (
-        <>
-          <ResearchLandscape projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} domain={ownDomain} />
-          <CompetitiveResearch
-            projectId={activeProjectId}
-            siteIcon={seedLandscape.siteIcon}
-            suggested={seedLandscape.competitors.filter((c) => c.validated).map((c) => c.domain)}
-            onTracked={scan.reloadTracked}
-          />
-        </>
+        <ResearchAudiences projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} />
       )}
 
       {/* Search Console's source, where there is no table for it to sit in. */}
@@ -1450,6 +1460,10 @@ export default function KeywordResearchPage() {
       {!scanMode && !loading && results.length === 0 && !error && (
         <EmptyState icon={<Search />} title={t.states.empty} />
       )}
+
+      {/* Every other screen (no scan, the empty start, a manual search): the same
+          competitor section, after the results. */}
+      {!landscapeOn && competitorSection && <div data-competitive-after="" className="mt-6">{competitorSection}</div>}
 
       {/* Internal/dev-only raw Search Console opportunity browser (Stage E2A/E2B) —
           behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. It is a diagnostic, never the

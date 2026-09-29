@@ -397,6 +397,26 @@ export default function ArticlesScreen() {
   const someArticlesSelected = selectedCount > 0 && !allArticlesSelected
 
 
+  // With WordPress connected the destination card is only this one line (the card renders
+  // its children), and above the hero it floated on its own (review P2-11). When the hero
+  // is on screen the line is the hero's footer instead; everything else is unchanged.
+  const heroShown = !!standing && (data?.articles?.length ?? 0) > 0
+  const connectionInHero = heroShown && data?.platform?.platform === 'wordpress'
+  // One line, drawn in two places: on the page (dark text) or in the hero (light text).
+  const connectionLine = (onHero: boolean) => (
+    <>
+      <span className={onHero ? undefined : 'text-copy text-body'}>{t.manageConnection}</span>
+      <Link
+        href={platformSetupHref(projectId)}
+        className={onHero
+          ? 'whitespace-nowrap rounded-control font-semibold text-contrast-ink underline decoration-contrast-ink/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:decoration-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-contrast-ink/25'
+          : 'text-copy font-medium text-action hover:underline'}
+      >
+        {t.manageConnectionCta}
+      </Link>
+    </>
+  )
+
   return (
     <>
       {/* Phase 4F.1 — the platform-aware destination card. A Shopify project
@@ -411,23 +431,18 @@ export default function ArticlesScreen() {
           and two cards asking one question is the clutter this split removes. */}
       {/* Only once this project's overview says which platform: until then the
           platform is not known, and a guess drew the wrong card for a second. */}
-      {data && activePlatform !== 'none' && (
+      {data && activePlatform !== 'none' && (connectionInHero ? null :
         <div className="mb-4">
           {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-copy text-body">{t.manageConnection}</span>
-              <Link href={platformSetupHref(projectId)} className="text-copy font-medium text-action hover:underline">
-                {t.manageConnectionCta}
-              </Link>
-            </div>
+            <div className="flex flex-wrap items-center gap-3">{connectionLine(false)}</div>
           </ContentHubPlatformCard>
           )}
         </div>
       )}
 
       {/* Where the articles stand: the headline, the figures, the spread and the pace. */}
-      {standing && (data?.articles?.length ?? 0) > 0 && <ArticlesHero standing={standing} />}
+      {heroShown && standing && <ArticlesHero standing={standing} connection={connectionInHero ? connectionLine(true) : undefined} />}
 
       {/* ── Section 1: generated articles, with the screen's primary action ── */}
       <SectionHeading
@@ -661,11 +676,11 @@ export default function ArticlesScreen() {
                           <ShieldCheck aria-hidden="true" className="size-4" /> {t.editor.topBar.grantScope}
                         </a>
                       ) : canPublish ? (
-                        <Button size="sm" variant="ghost" className="text-action hover:bg-action-soft hover:text-action" onClick={() => exportRow(a, 'publish')} loading={busyHere && rowBusy?.action === 'publish'} disabled={rowLocked}>
+                        <Button size="sm" variant="ghost" className="whitespace-nowrap text-action hover:bg-action-soft hover:text-action" onClick={() => exportRow(a, 'publish')} loading={busyHere && rowBusy?.action === 'publish'} disabled={rowLocked}>
                           {busyHere && rowBusy?.action === 'publish' ? t.rowWp.publishing : publishLabel}
                         </Button>
                       ) : canMarkReady ? (
-                        <Button size="sm" variant="ghost" className="text-action hover:bg-action-soft hover:text-action" onClick={() => markReadyRow(a)} loading={busyHere && rowBusy?.action === 'ready'} disabled={rowLocked}>
+                        <Button size="sm" variant="ghost" className="whitespace-nowrap text-action hover:bg-action-soft hover:text-action" onClick={() => markReadyRow(a)} loading={busyHere && rowBusy?.action === 'ready'} disabled={rowLocked}>
                           {t.rowWp.markReady}
                         </Button>
                       ) : null

@@ -14,9 +14,10 @@
  * 'error' when they could not be read; each row keeps its height in every state.
  */
 import { useState } from 'react'
+import NextLink from 'next/link'
 import { ArrowDownRight, ArrowUpRight, CheckCircle2, CircleDashed, Info, Loader2, Quote, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import Button from '@/components/ui/Button'
+import Button, { buttonClasses } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -135,6 +136,7 @@ export function OverviewOpeningCard({
   questionsPending,
   questionsSuggested,
   questionsCount = null,
+  allowanceOut = false,
   onChooseQuestions,
 }: {
   overview: OverviewData
@@ -142,6 +144,13 @@ export function OverviewOpeningCard({
   questionsSuggested: number | null
   /** Questions the project tracks (the tool's own list); null until it has loaded. */
   questionsCount?: number | null
+  /**
+   * The AI-check allowance is read and nothing is left (see the allowance route,
+   * which reports the same rule the dispatcher enforces). A "run more checks"
+   * step would then lead to engine buttons that can only refuse, so the step
+   * becomes the way to more checks: the billing page. It only opens that page.
+   */
+  allowanceOut?: boolean
   onChooseQuestions: () => void
 }) {
   const { c, language } = useCopy()
@@ -185,7 +194,7 @@ export function OverviewOpeningCard({
             </div>
           )}
 
-          {state === 'ready' && data && <NextStep c={c} data={data} onRunMore={onChooseQuestions} />}
+          {state === 'ready' && data && <NextStep c={c} data={data} onRunMore={onChooseQuestions} allowanceOut={allowanceOut} />}
 
           {/* The next step depends on whether the project tracks questions, which the
               tool reports once its list loaded: until then the step's shape, not the
@@ -206,9 +215,15 @@ export function OverviewOpeningCard({
                   ? c.emptyBodyHasQuestions(questionsCount)
                   : questionsPending ? c.emptyBodyPending : questionsSuggested ? c.emptyBodyQuestions(questionsSuggested) : c.emptyBody}
               </p>
-              <Button size="md" className="mt-4" onClick={onChooseQuestions} data-ai-choose-questions="">
-                {questionsCount ? c.runFirstCheck : c.chooseQuestions}
-              </Button>
+              {allowanceOut && questionsCount ? (
+                <NextLink href="/billing" data-ai-upgrade-cta="" className={buttonClasses({ size: 'md', className: 'mt-4' })}>
+                  {c.upgradeForChecks}
+                </NextLink>
+              ) : (
+                <Button size="md" className="mt-4" onClick={onChooseQuestions} data-ai-choose-questions="">
+                  {questionsCount ? c.runFirstCheck : c.chooseQuestions}
+                </Button>
+              )}
             </div>
           )}
 
@@ -286,7 +301,7 @@ export function nextStepKind(data: Pick<AiOverview, 'enginesChecked' | 'mentions
   return 'keep_going'
 }
 
-function NextStep({ c, data, onRunMore }: { c: Copy; data: AiOverview; onRunMore: () => void }) {
+function NextStep({ c, data, onRunMore, allowanceOut }: { c: Copy; data: AiOverview; onRunMore: () => void; allowanceOut: boolean }) {
   const kind = nextStepKind(data)
   const text = kind === 'partial'
     ? c.nextStepPartial(data.enginesChecked.length, OVERVIEW_ENGINES.length)
@@ -295,9 +310,16 @@ function NextStep({ c, data, onRunMore }: { c: Copy; data: AiOverview; onRunMore
     <div data-ai-next-step={kind} className="mt-5 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
       <p className="text-caption font-semibold text-contrast-ink/80">{c.nextStepLabel}</p>
       <p className="mt-0.5 text-copy text-contrast-ink/80">{text}</p>
-      {kind === 'partial' && (
-        <Button size="sm" variant="secondary" className="mt-3" onClick={onRunMore}>{c.runMoreChecks}</Button>
-      )}
+      {kind === 'partial' && (allowanceOut ? (
+        <>
+          <p className="mt-2 text-caption text-contrast-ink/70" data-ai-allowance-used-up="">{c.checksUsedUp}</p>
+          <NextLink href="/billing" data-ai-upgrade-cta="" className={buttonClasses({ size: 'sm', variant: 'secondary', className: 'mt-3' })}>
+            {c.upgradeForChecks}
+          </NextLink>
+        </>
+      ) : (
+        <Button size="sm" variant="secondary" className="mt-3" onClick={onRunMore} data-ai-run-more="">{c.runMoreChecks}</Button>
+      ))}
     </div>
   )
 }
