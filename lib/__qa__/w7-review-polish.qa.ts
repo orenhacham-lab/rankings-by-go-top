@@ -8,6 +8,9 @@
  *   P2-9  Existing content on a phone: a kind with nothing in it is not a tab ("מוצרים 0"
  *         for a service business); "all" and the tab on screen stay; the tab row
  *         scrolls with room at both ends, so "הכל" is never clipped.
+ *   P2-9b Existing content summary: a kind the site has none of draws no tile
+ *         ("מוצרים 0", "קטגוריות 0"); the total always shows; one kind alone draws
+ *         none (it repeats the total); the grid has as many columns as tiles.
  *   P2-11 Articles list: "פרסם באתר" never wraps; one ready article reads "מאמר אחד
  *         מוכן" (not "1 מוכנים"); the connection line is the hero's footer instead
  *         of a line floating above it.
@@ -102,6 +105,48 @@ console.log('\nP2-9) Existing content: no empty kind tabs, a tab row that scroll
   const scroller = (h: string) => /data-kind-tabs-scroll=""[^>]*class="[^"]*overflow-x-auto[^"]*px-4[^"]*\[scroll-padding-inline:1rem\]/.test(h)
   check('K3: the row scrolls inside itself with room at both ends (the first tab is never clipped)', scroller(html))
   check('K3-MUT: the old tight row (-mx-1 px-1, no scroll padding) fails K3', !scroller(html.replace('px-4 [scroll-padding-inline:1rem]', 'px-1')))
+}
+
+// ── P2-9b ───────────────────────────────────────────────────────────────────
+console.log('\nP2-9b) Existing content summary: no 0 tiles, no lonely tile, no empty grid cell')
+{
+  const SiteSummary: any = require('../../components/content/workspace/existing/SiteSummary').default
+  const { summaryKinds, summaryGridClass } = require('../../components/content/workspace/existing/SiteSummary')
+  const payload = (counts: Record<string, number>) => ({
+    counts: { all: Object.values(counts).reduce((a, b) => a + b, 0), ...counts },
+    map: { capped: false, state: 'done', phase: null, found: 0, docsRead: 0, docsSeen: 0 },
+    sources: { map: 14, shopify: 0, wordpress: 0, crawl: 0, gsc: 0 }, indexedAt: '2026-09-27T08:00:00Z',
+    gsc: { state: 'none' }, insights: { withClicks: 0, seenNoClicks: 0, actionable: 0 }, riskCount: 0,
+  })
+  const draw = (counts: Record<string, number>, tab = 'all') => render('he', createElement(SiteSummary, {
+    x: he.existingContent, data: payload(counts), tab, onTab() {}, risk: false, onRisk() {},
+    num: new Intl.NumberFormat('he-IL'), day: () => '27.09.2026', refresh: { show: false, busy: false, onClick() {} },
+  }))
+  const tiles = (h: string) => [...h.matchAll(/data-kind-count="(\w+)"/g)].map((m) => m[1])
+  const service = draw({ product: 0, article: 4, page: 10, category: 0 })
+  check('S1: a service business sees only the kinds it has (no "מוצרים 0", no "קטגוריות 0")', tiles(service).join() === 'article,page', tiles(service).join())
+  check('S1b: the total still shows', /data-existing-total=""[^>]*>14</.test(service))
+  const cells = (h: string) => { const m = h.match(/data-kind-cells="(\d)" class="([^"]*)"/); return m ? { n: Number(m[1]), cls: m[2] } : null }
+  const full = (n: number, cls: string) => {
+    const cols = (bp: string) => Number((cls.match(new RegExp(`(?:^|\\s)${bp}grid-cols-(\\d)`)) ?? [])[1] ?? 0)
+    const base = cols(''), sm = cols('sm:') || base
+    return base > 0 && n % base === 0 && n % sm === 0
+  }
+  const c2 = cells(service)
+  check('S2: the grid has as many columns as tiles (no empty cell, no lonely tile)', !!c2 && full(c2.n, c2.cls), JSON.stringify(c2))
+  check('S2b: …for 2, 3 and 4 tiles alike', [2, 3, 4].every((n) => full(n, summaryGridClass(n))))
+  const three = draw({ product: 0, article: 4, page: 10, category: 2 })
+  check('S2c: three kinds draw three tiles in one row', tiles(three).length === 3 && !!cells(three) && full(3, cells(three)!.cls))
+  const onlyPages = draw({ product: 0, article: 0, page: 9, category: 0 })
+  check('S3: one kind alone draws no tile (it would only repeat the total)', tiles(onlyPages).length === 0 && !onlyPages.includes('data-kind-cells'))
+  check('S3b: an empty site draws no tile and no grid', tiles(draw({ product: 0, article: 0, page: 0, category: 0 })).length === 0)
+  check('S4: the kind on screen keeps its tile even at 0 (a link can open it)', summaryKinds({ product: 0, article: 4, page: 10, category: 0 }, 'product').join() === 'product,article,page')
+  check('S4-MUT: every kind drawn (before the fix) shows the two zero tiles', ['product', 'article', 'page', 'category'].length - tiles(service).length === 2)
+  const src = strip(read('components/content/workspace/existing/SiteSummary.tsx'))
+  const filtered = (s: string) => /\{kinds\.map\(\(k: SiteKind\)/.test(s) && !/\{SITE_KINDS\.map\(\(k: SiteKind\)/.test(s)
+  check('S5: the tiles come from the filtered kinds', filtered(src))
+  check('S5-MUT: tiles from every kind again fail S5', !filtered(src.replace('{kinds.map((k: SiteKind)', '{SITE_KINDS.map((k: SiteKind)')))
+  check('S2-MUT: the old fixed grid (2 / 4 columns) leaves an empty cell with 3 tiles', !full(3, 'grid-cols-2 sm:grid-cols-4'))
 }
 
 // ── P2-11 ───────────────────────────────────────────────────────────────────
