@@ -23,6 +23,7 @@ import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { loadSchemaContext } from '@/lib/content/article-visibility'
+import { composeWebhookBody } from '@/lib/content/article-style/publish'
 import type { PublishItemResult } from '@/lib/content/automation/publish-item'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -94,6 +95,10 @@ export async function publishArticleToSite(
   // come from the project this call already scoped the article to.
   if (platform === 'webhook') {
     try { article.schema_context = await loadSchemaContext(admin, projectId, article.topic_id) } catch { article.schema_context = null }
+    // The body with its inline images and the project's article design
+    // (lib/content/article-style/publish.ts). Wix keeps the plain body: its rich
+    // content has no place for styled boxes.
+    if (article.content_html) article.content_html = await composeWebhookBody(admin, article.id, article.content_html)
   }
 
   const adapter = (deps.adapters ?? SITE_ADAPTERS)[platform]

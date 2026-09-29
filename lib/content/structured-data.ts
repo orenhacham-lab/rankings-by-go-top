@@ -33,8 +33,9 @@ export interface StructuredDataInput {
   url?: string | null
   /** 'he' | 'en' (anything else is passed through when it looks like a BCP 47 tag). */
   language?: string | null
-  /** The business behind the site. Used as publisher and, as an Organization, as author. */
-  publisher?: { name: string | null; url?: string | null } | null
+  /** The business behind the site. Used as publisher and, as an Organization, as author.
+   *  `sameAs`: the business's official profiles (project settings), https only. */
+  publisher?: { name: string | null; url?: string | null; sameAs?: readonly string[] | null } | null
   faq?: StructuredDataFaq[] | null
   type?: 'BlogPosting' | 'Article'
 }
@@ -143,6 +144,8 @@ export function buildArticleJsonLd(input: StructuredDataInput): JsonLd | null {
     const org: JsonLd = { '@type': 'Organization', name: publisherName }
     const site = siteUrlFromDomain(input.publisher?.url)
     if (site) org.url = site
+    const sameAs = [...new Set((input.publisher?.sameAs ?? []).map(httpsUrl).filter((u): u is string => !!u))].slice(0, 12)
+    if (sameAs.length) org.sameAs = sameAs
     out.author = org
     out.publisher = org
   }

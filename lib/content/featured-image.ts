@@ -12,6 +12,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { assertContentGenerationAllowedForProject, gateDenialCode } from '@/lib/content/entitlement-guard'
+import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
 
 export const CONTENT_IMAGE_BUCKET = 'content-article-images'
 
@@ -67,14 +68,21 @@ export async function createFeaturedImageForArticle(
     language,
   })
 
-  const gen = await generateArticleImage({ title: String(a.title || ''), imagePrompt: concept, topic: topicText || null, language })
+  // The project's image style and hero shape (lib/content/article-style). No
+  // setting, or no table yet, is the realistic 16:9 hero this always made.
+  const { style } = await readArticleStyleForArticle(admin, articleId)
+
+  const gen = await generateArticleImage({
+    title: String(a.title || ''), imagePrompt: concept, topic: topicText || null, language,
+    style: style.imageStyle, brandColors: style.brandColors, aspectRatio: style.heroRatio,
+  })
   if ('error' in gen) return { error: gen.error }
 
-  // Normalize to JPEG 1600x900 before storing (falls back to raw on sharp error).
+  // Normalize to JPEG 1600x900 (or 1200x1200 for a square hero) before storing (falls back to raw on sharp error).
   let bytes = gen.data
   let mimeType = gen.mimeType
   try {
-    const norm = await normalizeFeaturedImage(gen.data)
+    const norm = await normalizeFeaturedImage(gen.data, style.heroRatio)
     bytes = norm.data
     mimeType = norm.mimeType
   } catch (e) {
