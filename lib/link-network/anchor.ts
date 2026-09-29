@@ -37,8 +37,11 @@ const decode = (s: string) => s
   .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
 
+const INLINE_TAG = /<\/?(?:a|abbr|b|code|em|i|mark|small|span|strong|sub|sup|u)\b[^>]*>/gi
+
+/** Inline tags vanish without a space, so "word</a>, next" stays "word, next". */
 export function plainText(html: string): string {
-  return decode(html.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim()
+  return decode(html.replace(INLINE_TAG, '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim()
 }
 
 function insideContainer(html: string, at: number): boolean {

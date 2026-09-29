@@ -206,6 +206,11 @@ function partB() {
   check('part of a word is never linked', insertLink('<p>a</p><p>התכנון המוקדם של האירוע הוא חשוב מאוד כדי שהכול יעבור בשלום ובלי הפתעות בכלל ובעיקר ביום עצמו</p><p>z</p>',
     bodyParagraphs('<p>a</p><p>התכנון המוקדם של האירוע הוא חשוב מאוד כדי שהכול יעבור בשלום ובלי הפתעות בכלל ובעיקר ביום עצמו</p><p>z</p>')[0], 'תכנון המוקדם', target, 'follow') === null)
   check('linkPresent / linkContext find the placed link and its sentence', linkPresent(follow, target) && (linkContext(follow, target) ?? '').includes('עיצוב פנים של אוהל האירוע'))
+  const punct = '<p>כשעוברים דירה כדאי <a href="https://c.co.il/x">לבדוק את הצנרת</a>, כי <strong>מים</strong> חמים לא עוזרים.</p>'
+  const punctWant = 'כשעוברים דירה כדאי לבדוק את הצנרת, כי מים חמים לא עוזרים.'
+  check('linkContext keeps punctuation next to the link text (inline tags leave no space)', linkContext(punct, 'https://c.co.il/x') === punctWant)
+  const punctMut = withMutant('lib/link-network/anchor.ts', (s) => s.replace(".replace(INLINE_TAG, '')", ''), (m) => m.linkContext(punct, 'https://c.co.il/x'))
+  check('mutation control: stripping inline tags with a space splits "הצנרת ," (guard fails)', punctMut !== punctWant, String(punctMut))
 
   check('validAnchor: 2-8 words', validAnchor('עיצוב פנים') && !validAnchor('עיצוב') && !validAnchor('אחת שתיים שלוש ארבע חמש שש שבע שמונה תשע'))
   check('validAnchor: never "click here" / "לחצו כאן"', !validAnchor('לחצו כאן') && !validAnchor('click here') && !validAnchor('Read more.'))

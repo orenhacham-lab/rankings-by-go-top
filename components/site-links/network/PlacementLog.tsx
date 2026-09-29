@@ -42,7 +42,7 @@ function Context({ text, anchor }: { text: string; anchor: string }) {
   return (
     <>
       {text.slice(0, at)}
-      <mark className="rounded-sm bg-action-soft px-0.5 font-medium text-ink">{text.slice(at, at + anchor.length)}</mark>
+      <mark className="rounded-sm bg-action-soft font-medium text-ink">{text.slice(at, at + anchor.length)}</mark>
       {text.slice(at + anchor.length)}
     </>
   )

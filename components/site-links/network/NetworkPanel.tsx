@@ -15,7 +15,7 @@
  * no server text is ever shown, only the dictionary's words.
  */
 import { useState } from 'react'
-import { ArrowUpRight, Check, Network, ShieldCheck, Users } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Check, Network, ShieldCheck, Users } from 'lucide-react'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
@@ -72,10 +72,12 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
     onChanged()
   }
 
+  // The switch shows the real membership: it stays off until the consent is
+  // confirmed. Pressing it while off opens (or closes) the consent panel.
   function onSwitch(next: boolean) {
-    if (next) { setConsentOpen(true); return }
+    if (active) { if (!next) void leave(); return }
     if (consentOpen) { setConsentOpen(false); setAgreed(false); return }
-    void leave()
+    setConsentOpen(true)
   }
 
   const switchDescription = active
@@ -100,7 +102,7 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
           </div>
           <div className={cn('rounded-inset border bg-canvas/70 p-5', active ? 'border-action/25' : 'border-line')} data-link-network="switch">
             <Switch
-              checked={active || consentOpen}
+              checked={active}
               onChange={onSwitch}
               disabled={busy}
               label={<span className="font-semibold">{copy.switch.label}</span>}
@@ -150,9 +152,9 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-5" data-link-network="stats">
         <StatTile label={copy.stats.members} value={nf.format(data.memberCount)} source={copy.stats.membersSource} icon={<Users />} />
         <StatTile label={copy.stats.received} value={nf.format(data.totals.received)}
-          empty={active || data.totals.received ? undefined : copy.stats.notJoined} source={copy.stats.sinceJoining} />
+          empty={active || data.totals.received ? undefined : copy.stats.notJoined} source={copy.stats.sinceJoining} icon={<ArrowDownLeft />} />
         <StatTile label={copy.stats.given} value={nf.format(data.totals.given)}
-          empty={active || data.totals.given ? undefined : copy.stats.notJoined} source={copy.stats.sinceJoining} />
+          empty={active || data.totals.given ? undefined : copy.stats.notJoined} source={copy.stats.sinceJoining} icon={<ArrowUpRight />} />
       </div>
 
       {active && data.readiness !== 'ready' && (
