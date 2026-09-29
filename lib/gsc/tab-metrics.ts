@@ -155,3 +155,85 @@ export function performanceDelta(metric: PerformanceMetric, current: number | nu
   const pct = ((current - previous) / previous) * 100
   return { size: Math.abs(pct), direction: pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat', percent: true }
 }
+
+// ── Google's 28-day average per keyword, and the queries not tracked yet ────
+
+export interface QueryPositionRow { query: string; clicks: number; impressions: number; position: number }
+
+/**
+ * Google's own figures for a query over the latest 28-day sync: clicks and
+ * impressions summed over every page, and the average position weighted by
+ * impressions (Search Console reports one average per query+page row; a page
+ * seen 900 times weighs more than one seen twice). One decimal, like Google.
+ * A secondary layer beside our own scan, which stays the position of record.
+ */
+export interface GoogleAverage { clicks: number; impressions: number; position: number | null }
+
+interface QuerySum { raw: Map<string, number>; clicks: number; impressions: number; posSum: number }
+
+/** Every row, grouped by the engine's normalization of its query. */
+function sumByQuery(rows: readonly QueryPositionRow[]): Map<string, QuerySum> {
+  const by = new Map<string, QuerySum>()
+  for (const r of rows) {
+    const key = normalizeQuery(r.query)
+    if (!key) continue
+    const impressions = Math.max(0, Number(r.impressions) || 0)
+    let g = by.get(key)
+    if (!g) { g = { raw: new Map(), clicks: 0, impressions: 0, posSum: 0 }; by.set(key, g) }
+    g.raw.set(r.query, (g.raw.get(r.query) ?? 0) + impressions)
+    g.clicks += Math.max(0, Number(r.clicks) || 0)
+    g.impressions += impressions
+    g.posSum += (Number(r.position) || 0) * impressions
+  }
+  return by
+}
+
+function averageOf(g: QuerySum): GoogleAverage {
+  return {
+    clicks: g.clicks,
+    impressions: g.impressions,
+    position: g.impressions > 0 && g.posSum > 0 ? Math.round((g.posSum / g.impressions) * 10) / 10 : null,
+  }
+}
+
+/**
+ * Each tracked keyword's 28-day Google average, matched exactly like keywordFigures
+ * (the engine's normalization, nothing looser). A keyword Google reports nothing for
+ * is absent, which the screen says in words, never as a 0.
+ */
+export function keywordAverages(targets: KeywordTarget[], rows: readonly QueryPositionRow[]): Record<string, GoogleAverage> {
+  const sums = sumByQuery(rows)
+  const out: Record<string, GoogleAverage> = {}
+  for (const t of targets) {
+    const g = sums.get(normalizeQuery(t.keyword))
+    if (g) out[t.id] = averageOf(g)
+  }
+  return out
+}
+
+export interface UntrackedQuery extends GoogleAverage { query: string }
+
+/** How many untracked queries the Keywords tab is handed (most impressions first). */
+export const UNTRACKED_LIMIT = 25
+
+/**
+ * The queries Google already shows the site for that no tracked keyword matches, most
+ * impressions first (then clicks, then the query). Each is named by its most seen
+ * spelling. `total` counts all of them; `queries` counts every distinct query.
+ */
+export function untrackedQueries(
+  targets: KeywordTarget[],
+  rows: readonly QueryPositionRow[],
+  limit = UNTRACKED_LIMIT,
+): { rows: UntrackedQuery[]; total: number; queries: number } {
+  const tracked = new Set(targets.map((t) => normalizeQuery(t.keyword)).filter(Boolean))
+  const sums = sumByQuery(rows)
+  const all: UntrackedQuery[] = []
+  for (const [key, g] of sums) {
+    if (tracked.has(key) || g.impressions <= 0) continue
+    const query = [...g.raw.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))[0][0].trim()
+    all.push({ query, ...averageOf(g) })
+  }
+  all.sort((a, b) => b.impressions - a.impressions || b.clicks - a.clicks || (a.query < b.query ? -1 : a.query > b.query ? 1 : 0))
+  return { rows: all.slice(0, Math.max(0, limit)), total: all.length, queries: sums.size }
+}

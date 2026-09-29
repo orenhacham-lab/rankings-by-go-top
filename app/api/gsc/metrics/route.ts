@@ -9,7 +9,10 @@
  *                    NOT confirmed cannibalization).
  * And three for the screens Search Console feeds (lib/gsc/tab-metrics.ts):
  *   - pages:    the project's top pages by clicks (dashboard).
- *   - keywords: each tracked keyword's clicks and impressions (keywords table).
+ *   - keywords: each tracked keyword's clicks and impressions (keywords table), and,
+ *               for the Keywords tab, Google's 28-day average per keyword (position,
+ *               clicks, impressions), the queries the site shows for that no tracked
+ *               keyword matches, and when the sync finished.
  *   - trend:    the authoritative totals of every succeeded sync of the window, oldest
  *               first ("my progress"). Needs no latest run, so it is answered first.
  * Every read is filtered by the authenticated project: the admin client bypasses RLS.
@@ -20,7 +23,7 @@ import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { latestSucceededRun, GscServiceError } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
 import { multiPageQueries, type GscMetricRow } from '@/lib/gsc/summary'
-import { keywordFigures, topPagesByClicks, trendPoints, type KeywordTarget, type PageClicksRow, type QueryFiguresRow, type RunSummaryRow } from '@/lib/gsc/tab-metrics'
+import { keywordAverages, keywordFigures, topPagesByClicks, trendPoints, untrackedQueries, type KeywordTarget, type PageClicksRow, type QueryPositionRow, type RunSummaryRow } from '@/lib/gsc/tab-metrics'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -136,21 +139,32 @@ export async function GET(request: Request) {
       .eq('project_id', auth.project.id)
     if (targetsError) return Response.json({ ok: false, error: 'metrics_read_failed' }, { status: 500 })
     const targets = (targetRows ?? []) as KeywordTarget[]
-    const rows: QueryFiguresRow[] = []
-    for (let offset = 0; targets.length > 0 && offset < KEYWORDS_MAX_ROWS; offset += FETCH_CHUNK) {
+    // Read even with no keyword tracked yet: the queries Google already shows the site
+    // for are what an empty Keywords tab offers to track.
+    const rows: QueryPositionRow[] = []
+    for (let offset = 0; offset < KEYWORDS_MAX_ROWS; offset += FETCH_CHUNK) {
       const { data, error } = await auth.admin
         .from('gsc_query_page_metrics')
-        .select('query,clicks,impressions')
+        .select('query,clicks,impressions,position')
         .eq('sync_run_id', run.id)
         .eq('project_id', auth.project.id)
         .order('query', { ascending: true }).order('page', { ascending: true })
         .range(offset, offset + FETCH_CHUNK - 1)
       if (error) return Response.json({ ok: false, error: 'metrics_read_failed' }, { status: 500 })
-      const batch = (data ?? []) as QueryFiguresRow[]
+      const batch = (data ?? []) as QueryPositionRow[]
       rows.push(...batch)
       if (batch.length < FETCH_CHUNK) break
     }
-    return Response.json({ ok: true, run: runMeta, view, keywords: keywordFigures(targets, rows) })
+    const untracked = untrackedQueries(targets, rows)
+    return Response.json({
+      ok: true, run: runMeta, view,
+      keywords: keywordFigures(targets, rows),
+      averages: keywordAverages(targets, rows),
+      untracked: untracked.rows,
+      untrackedTotal: untracked.total,
+      queriesTotal: untracked.queries,
+      syncedAt: run.finished_at ?? null,
+    })
   }
 
   return Response.json({ ok: false, error: 'invalid_view' }, { status: 400 })

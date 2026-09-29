@@ -66,6 +66,13 @@ const KEYWORD_RESEARCH_NOTES: Record<string, string> = {
   en: 'Added from Keyword Research module',
 }
 
+/** The Keywords tab adds a query Google already shows the site for: its note says so.
+ *  Only the note differs; the ownership, quota and duplicate checks are the same. */
+const SEARCH_CONSOLE_NOTES: Record<string, string> = {
+  he: 'נוסף מתוך הביטויים שגוגל מציג בהם את האתר',
+  en: 'Added from the searches Google shows the site for',
+}
+
 interface AddKeywordsResult {
   success: boolean
   added: number
@@ -230,7 +237,8 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Insert new keywords (with metrics from keyword research, when available)
-    const note = KEYWORD_RESEARCH_NOTES[language] || KEYWORD_RESEARCH_NOTES['en']
+    const notes = body.source === 'search_console' ? SEARCH_CONSOLE_NOTES : KEYWORD_RESEARCH_NOTES
+    const note = notes[language] || notes['en']
     const toInsert = newKeywords.map((keyword) => {
       const metrics = metricsByKeyword.get(keyword) ?? EMPTY_METRICS
       return {

@@ -34,7 +34,8 @@ import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import CompetitorSummary from '@/components/competitors/CompetitorSummary'
 import { useCompetitorComparison, type CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import type { OwnCheck } from '@/lib/competitors/comparison'
-import { GscKeywordsNotice, useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
+import { GscKeywordsLegend, GscKeywordsNotice, useGscKeywordInsights } from '@/components/gsc/GscKeywordFigures'
+import type { TrackOutcome } from '@/components/gsc/GscUntrackedQueries'
 
 /** How many of a keyword's checks its row's trend line shows. */
 const TREND_CHECKS = 8
@@ -322,9 +323,41 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     ? { ...comparedView, status: 'error', retry: () => { void loadTargets() } }
     : comparedView
 
-  // Clicks and impressions from Search Console, per keyword: read again when the list changes.
+  // Google's own 28-day average per keyword, and the searches it shows the site for that
+  // are not tracked yet, from Search Console: read again when the list changes.
   const targetsKey = useMemo(() => targets.map((t) => t.id).join(','), [targets])
-  const gscKeywords = useGscKeywordFigures(id, targetsKey)
+  const gscKeywords = useGscKeywordInsights(id, targetsKey)
+
+  /**
+   * "Track it" on a search Google already shows the site for. The EXISTING
+   * add-to-project request (keyword research's): its ownership check, its plan keyword
+   * limit (402) and its duplicate check decide, exactly as for every other add. The new
+   * keyword then gets its search volume like one added by hand.
+   */
+  const trackGscQuery = useCallback(async (query: string): Promise<TrackOutcome> => {
+    const g = dict.gscWidgets.untracked
+    try {
+      const response = await fetch('/api/keyword-research/add-to-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id, engineType: 'google_search', language, source: 'search_console', keywords: [{ keyword: query }] }),
+      })
+      const body = await response.json().catch(() => null) as { success?: boolean; added?: number } | null
+      if (response.ok && body?.success) {
+        const added = (body.added ?? 0) > 0
+        if (added) toasts.success(g.addedToast(query))
+        else toasts.success(g.existsToast(query))
+        void loadTargets().then(() => { if (added) void refreshMissingVolumes() })
+        return added ? 'added' : 'exists'
+      }
+      // Our own words only: the route's message is for the log.
+      toasts.error(response.status === 402 ? g.quota : g.failed)
+      return response.status === 402 ? 'quota' : 'failed'
+    } catch {
+      toasts.error(g.failed)
+      return 'failed'
+    }
+  }, [id, language, dict, toasts, loadTargets, refreshMissingVolumes])
 
   const standing = useMemo(() => keywordStanding(targets, latestResults), [targets, latestResults])
   // A project with no keywords yet (known, not still loading): one invitation, not an empty toolbar and table.
@@ -419,9 +452,8 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         </div>
       )}
 
-      {/* What the line under each search volume is, or, before Search Console is set
-          up, what it will be and the one step that is missing. */}
-      <GscKeywordsNotice projectId={id} view={gscKeywords} className="mb-3" />
+      {/* What the Google line under each keyword is, and when Google's figures were synced. */}
+      {!empty && <GscKeywordsLegend view={gscKeywords} className="mb-3" />}
 
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
         <Card padding={false}><EmptyState compact icon={<SearchX />} title={kp.noMatches} /></Card>
@@ -455,6 +487,11 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           )}
         />
       )}
+
+      {/* Search Console, under the keywords: the searches Google already shows the site
+          for that are not tracked yet, or, before it is set up, what connecting adds and
+          the one step that is missing. */}
+      <GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} className="mt-6" />
 
       <Modal open={showAddTarget} onClose={() => setShowAddTarget(false)} title={k.modals.addKeywordTitle} size="md">
         <TrackingTargetForm
