@@ -1,6 +1,8 @@
 /**
- * Why the app does not trade links between its customers, in two sentences and
- * a link to Google's own policy. Quiet on purpose: a note, not a sermon.
+ * Google's rule on links, for the owner's own outreach: do not pay for a link or
+ * agree to a swap; an earned link is the safest. Worded so it never contradicts the
+ * opt-in link network above it (UX A5). Two sentences and a link to Google's own
+ * policy. Quiet on purpose: a note, not a sermon.
  */
 import { ShieldCheck } from 'lucide-react'
 import ExternalLink from './ExternalLink'

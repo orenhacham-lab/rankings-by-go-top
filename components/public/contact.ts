@@ -13,3 +13,12 @@ export const PHONE_TEL = 'tel:+972549489377'
 export const WHATSAPP_HELP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
   'היי, אני צריך עזרה'
 )}`
+
+/** The support email, for the dashboard's contact menu (and any future entry point). */
+export const CONTACT_EMAIL = 'oren@gotop.co.il'
+export const CONTACT_MAILTO = `mailto:${CONTACT_EMAIL}`
+
+/** wa.me deep link with a given pre-filled message. */
+export function whatsappUrl(message: string): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+}

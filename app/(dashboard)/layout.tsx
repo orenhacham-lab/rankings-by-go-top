@@ -4,6 +4,7 @@ import DocumentTitle from '@/components/layout/DocumentTitle'
 import { MAIN_CONTENT_ID } from '@/components/layout/main-content'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
+import ContactMenu from '@/components/guide/ContactMenu'
 import TrialBar from '@/components/layout/TrialBar'
 import { TRIAL_BAR_HIDE_COOKIE, trialBarDismissed } from '@/lib/billing/trial-bar-dismissal'
 import { loadTrialBar } from '@/lib/billing/trial-bar'
@@ -96,9 +97,12 @@ export default async function DashboardLayout({
                     "which site am I looking at" is a question about the app, not about
                     the screen — it used to be answered by a different widget per page.
                     On a phone it is the only bar: the menu button (the sidebar's) sits
-                    at its start, hence the wider start padding there. */}
+                    at its start, hence the wider start padding there. Beside the switcher,
+                    "Contact us" (WhatsApp, phone, email; customers only, as the rail's
+                    support row), then the Guide. */}
                 <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/85 pe-4 ps-16 backdrop-blur-md backdrop-saturate-150 md:px-8">
                   <WorkspaceSwitcher />
+                  {!isAdmin && <ContactMenu />}
                   <GuideMenu userId={user.id} accountCreatedAt={user.created_at ?? null} />
                 </div>
                 <Suspense fallback={null}>

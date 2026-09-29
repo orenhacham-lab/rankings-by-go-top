@@ -26,6 +26,12 @@ export default function HeroPanel({ children, className, ...data }: {
   )
 }
 
+/**
+ * A secondary action on the context card: light outline and light words on the
+ * navy (the inverse of the secondary button). Pass it to Button / a link as className.
+ */
+export const HERO_INVERSE_BUTTON = 'border border-contrast-ink/25 bg-contrast-ink/10 text-contrast-ink shadow-none hover:border-contrast-ink/40 hover:bg-contrast-ink/15 hover:text-contrast-ink focus-visible:ring-contrast-ink focus-visible:ring-offset-contrast'
+
 /** One key number on the context card: a label, the figure, a line under it. */
 export function HeroStat({ label, value, hint, icon, className }: {
   label: string

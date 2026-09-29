@@ -21,7 +21,7 @@
  * The giver's account and article ids never leave the server.
  *
  * Hidden, not an error: without the network's tables (migration not applied),
- * and for a Shopify project, GET answers { available: false } and the POSTs 409.
+ * and for a Shopify project, GET answers { available: false, reason } and the POSTs 409.
  * Answers carry stable codes only, never database or provider text.
  * Guarded by lib/link-network/__qa__/link-network.qa.ts.
  */
@@ -70,8 +70,15 @@ export interface ReceivedItem {
 /** domain_unverified: the site is not connected (WordPress or Search Console), so the switch cannot be turned on. */
 export type Readiness = 'ready' | 'domain_unverified' | 'thin_or_new' | 'category_unknown'
 
+/**
+ * Why the network is not on the screen: 'shopify' (a Shopify store, where the network
+ * does not exist and the screen says so), 'off' (the tables are missing, or the read
+ * failed; the screen never mentions the network then). Presentation only.
+ */
+export type UnavailableReason = 'shopify' | 'off'
+
 export type NetworkAnswer =
-  | { ok: true; available: false }
+  | { ok: true; available: false; reason: UnavailableReason }
   | {
       ok: true
       available: true
@@ -139,14 +146,14 @@ function stateOf(p: PlacementRow, article: ArticleRow | undefined): PlacementSta
 export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Promise<Response> {
   const g = await gate(projectId, deps)
   if (!g.ok) return g.response
-  if (g.hidden) return Response.json({ ok: true, available: false } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
+  if (g.hidden) return Response.json({ ok: true, available: false, reason: 'off' } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
   const { db, userId, project } = g
   const now = deps.now()
   try {
     const sites = await loadSites(db, [project.id])
     const me = sites.get(project.id)
     // Shopify: the network does not exist for this project. Not shown, not joinable.
-    if (!me || me.site.shopify) return Response.json({ ok: true, available: false } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
+    if (!me || me.site.shopify) return Response.json({ ok: true, available: false, reason: me?.site.shopify ? 'shopify' : 'off' } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
 
     const countQuery = await db.from('link_network_members').select('project_id', { count: 'exact', head: true }).eq('active', true)
     if (countQuery.error) throw countQuery.error
@@ -237,7 +244,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
     }
     return Response.json(answer, { status: 200, headers: NO_STORE })
   } catch (err) {
-    if (err instanceof NetworkUnavailable) return Response.json({ ok: true, available: false } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
+    if (err instanceof NetworkUnavailable) return Response.json({ ok: true, available: false, reason: 'off' } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
     console.error('[link-network] read failed', { projectId: project.id })
     return refuse(500, 'internal')
   }
