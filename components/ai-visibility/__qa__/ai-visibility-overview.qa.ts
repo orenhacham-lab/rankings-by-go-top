@@ -282,8 +282,15 @@ async function main() {
       check(`${locale}: MUT printing the 0-point delta fails that rule`, !flatRule(flat.replace(c.changeFlat, c.changePoints(0))))
       const oneCheck = render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview(M.readRuns([aiRun('only', 3, [res('chatgpt', true)])])), questionsPending: false, questionsSuggested: null, onChooseQuestions: () => {} }))
       check(`${locale}: …and no trend from a single check, only "${c.trendPending(2)}"`, !oneCheck.includes('data-ai-trend=') && oneCheck.includes('data-ai-trend-pending="2"'))
-      const empty = text(render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview([]), questionsPending: false, questionsSuggested: 8, onChooseQuestions: () => {} })))
+      // questionsCount 0: the tool's list loaded and the project tracks no question yet.
+      const empty = text(render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview([]), questionsPending: false, questionsSuggested: 8, questionsCount: 0, onChooseQuestions: () => {} })))
       check(`${locale}: with no check yet it names the scan's 8 questions and offers to choose one`, empty.includes(c.emptyBodyQuestions(8)) && empty.includes(c.chooseQuestions))
+      // Until the tool reported its questions, the next step is not known: its shape, not
+      // "pick a question" shown for a second to a project that tracks eight (w7-flash).
+      const unknownHtml = render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview([]), questionsPending: false, questionsSuggested: 8, questionsCount: null, onChooseQuestions: () => {} }))
+      const waitsForCount = (html: string) => html.includes('data-ai-empty-step="loading"') && !text(html).includes(c.emptyBodyQuestions(8)) && !text(html).includes(c.chooseQuestions) && !html.includes('data-ai-choose-questions')
+      check(`${locale}: …while the question count is unknown, the step's skeleton, never "choose questions"`, waitsForCount(unknownHtml))
+      check(`${locale}: MUT drawing the "choose" step before the count fails that rule`, !waitsForCount(render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview([]), questionsPending: false, questionsSuggested: 8, questionsCount: 0, onChooseQuestions: () => {} }))))
       check(`${locale}: …and says what a check will measure instead of empty figures`,
         empty.includes(c.emptyWhatYouGet) && [c.scoreHelp, c.mentionsHelp, c.citationsHelp].every((h) => empty.includes(h)) && !empty.includes(c.ofAnswers(0)))
       const pendingCard = text(render(locale, createElement(OverviewOpeningCard, { overview: M.buildOverview([]), questionsPending: true, questionsSuggested: null, onChooseQuestions: () => {} })))

@@ -49,6 +49,10 @@ import PlatformIcon from './site-platforms/PlatformIcon'
 import PlatformSwitchModal from './site-platforms/PlatformSwitchModal'
 import SitePlatformPanel from './site-platforms/SitePlatformPanel'
 import type { ChoosablePlatform, SanitizedSiteConnection } from '@/lib/site-platforms/types'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { peekKnownRead, readKnown } from '@/lib/connection-status/useKnownRead'
+import { projectConnectionsFrom, projectConnectionUrls, type ProjectConnections } from '@/lib/connection-status/project-connections'
+import type { Known } from '@/lib/connection-status/known'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -72,44 +76,65 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
     router.push(`/content?projectId=${encodeURIComponent(projectId)}`)
   }, [router, projectId])
 
-  const [loading, setLoading] = useState(true)
-  const [wpConnected, setWpConnected] = useState(false)
-  const [shopifyConnected, setShopifyConnected] = useState(false)
+  // The three connections, known or not (lib/connection-status). When the screen
+  // already read them (the settings screen asks for them the moment it opens), the
+  // first render has the answer and draws the final state: no skeleton, no flash.
+  const urls = useMemo(() => projectConnectionUrls(projectId), [projectId])
+  const [initial] = useState(() => projectConnectionsFrom<unknown, unknown, SanitizedSiteConnection>({
+    wordpress: peekKnownRead(urls.wordpress), shopify: peekKnownRead(urls.shopify), site: peekKnownRead(urls.site),
+  }))
+  const known0 = initial.state === 'ready' ? initial.value : null
+  // 'error': the connections could not be READ. That is not "nothing is connected",
+  // so it never draws the platform choice; it says so, with a retry.
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>(initial.state)
+  const loading = loadState === 'loading'
+  const [wpConnected, setWpConnected] = useState(!!known0?.wordpress)
+  const [shopifyConnected, setShopifyConnected] = useState(!!known0?.shopify)
   // Wix / custom-site connection (sanitized: never a key or secret).
-  const [site, setSite] = useState<SanitizedSiteConnection | null>(null)
+  const [site, setSite] = useState<SanitizedSiteConnection | null>(known0?.site ?? null)
   // A Shopify App Store merchant: no platform switch, the section as it always was.
-  const [switchLocked, setSwitchLocked] = useState(false)
+  const [switchLocked, setSwitchLocked] = useState(known0?.switchLocked ?? false)
   const [switchOpen, setSwitchOpen] = useState(false)
   // When neither platform is connected, which one the user chose to connect.
   const [choice, setChoice] = useState<'wordpress' | 'shopify' | null>(null)
 
-  const refresh = useCallback(async (opts?: { keepChoice?: boolean }) => {
-    try {
-      const [wpRes, shRes, siteRes] = await Promise.all([
-        fetch(`/api/wordpress/connection?projectId=${projectId}`),
-        fetch(`/api/shopify/connection?projectId=${projectId}`),
-        fetch(`/api/site-platforms/connection?projectId=${projectId}`),
-      ])
-      const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
-      const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
-      const st = siteRes.ok ? await siteRes.json().catch(() => ({})) : {}
-      const wpc = !!wp.connection
-      const shc = !!sh.connection
-      setWpConnected(wpc)
-      setShopifyConnected(shc)
-      setSite((st.connection ?? null) as SanitizedSiteConnection | null)
-      setSwitchLocked(st.switchLocked === true)
-      // Returning to the neither-connected state (a disconnect) resets to the
-      // platform choice; a choice the merchant just confirmed is kept.
-      if (!wpc && !shc && !opts?.keepChoice) setChoice(null)
-    } catch {
-      /* leave as-is; panels still render on demand */
-    } finally {
-      setLoading(false)
-    }
-  }, [projectId])
+  const readConnections = useCallback(async (fresh: boolean) => {
+    const [wordpress, shopify, siteRes] = await Promise.all([
+      readKnown(urls.wordpress, { fresh }), readKnown(urls.shopify, { fresh }), readKnown(urls.site, { fresh }),
+    ])
+    return projectConnectionsFrom<unknown, unknown, SanitizedSiteConnection>({ wordpress, shopify, site: siteRes })
+  }, [urls])
 
-  useEffect(() => { void refresh() }, [refresh])
+  const apply = useCallback((known: Known<ProjectConnections<unknown, unknown, SanitizedSiteConnection>>, keepChoice?: boolean) => {
+    if (known.state !== 'ready') {
+      // A re-read that failed keeps what is on screen; a first read that failed says so.
+      setLoadState((prev) => (prev === 'ready' ? 'ready' : 'error'))
+      return
+    }
+    const wpc = !!known.value.wordpress
+    const shc = !!known.value.shopify
+    setWpConnected(wpc)
+    setShopifyConnected(shc)
+    setSite(known.value.site)
+    setSwitchLocked(known.value.switchLocked)
+    // Returning to the neither-connected state (a disconnect) resets to the
+    // platform choice; a choice the merchant just confirmed is kept.
+    if (!wpc && !shc && !keepChoice) setChoice(null)
+    setLoadState('ready')
+  }, [])
+
+  const refresh = useCallback(async (opts?: { keepChoice?: boolean }) => {
+    apply(await readConnections(true), opts?.keepChoice)
+  }, [readConnections, apply])
+
+  const retry = useCallback(() => { setLoadState('loading'); void refresh() }, [refresh])
+  // The first read joins one the screen already started; later reads ask again.
+  useEffect(() => {
+    if (initial.state !== 'loading') return
+    let cancelled = false
+    void readConnections(false).then((known) => { if (!cancelled) apply(known) })
+    return () => { cancelled = true }
+  }, [readConnections, apply, initial.state])
   const onPanelChanged = useCallback(() => { void refresh() }, [refresh])
 
   // Returning from a Shopify OAuth attempt (?shopify=connected|warning|error)
@@ -138,9 +163,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   const legacy = (
     <section>
       {loading ? (
-        <Card className="p-5 sm:p-6">
-          <Skeleton className="h-10 w-2/3" />
-        </Card>
+        <PlatformCardSkeleton />
       ) : both ? (
         // Unexpected dual connection — surface a conflict, delete nothing. Both
         // panels render so the owner can disconnect one to resolve it.
@@ -198,6 +221,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
     </section>
   )
 
+  if (loadState === 'error') return <ConnectionLoadFailed onRetry={retry} />
   if (loading || switchLocked) return legacy
 
   // ── Web projects: the platform card, the switch modal, and the current panel ──
@@ -291,5 +315,30 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
         onSwitched={onSwitched}
       />
     </section>
+  )
+}
+
+/**
+ * The platform card's shape while the connections are read: the icon tile, the
+ * overline, the title, one line and the button, where they will be, so the card
+ * does not jump when the answer arrives. Nothing in it says "connected" or not.
+ */
+function PlatformCardSkeleton() {
+  return (
+    <div aria-busy="true" data-connection-loading="platform">
+    <Card className="p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Skeleton className="size-10 shrink-0 rounded-inset" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-full max-w-sm" />
+          </div>
+        </div>
+        <Skeleton className="h-8 w-32 shrink-0 rounded-control" />
+      </div>
+    </Card>
+    </div>
   )
 }

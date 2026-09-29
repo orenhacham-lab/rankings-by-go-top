@@ -170,13 +170,20 @@ function main() {
     const off = renderToStaticMarkup(createElement(GscFeatureProvider, { enabled: false }, createElement(Probe)))
     check('D3: unknown outside the dashboard, false inside it when the server says off', outside === '<i>null</i>' && off === '<i>false</i>', `${outside} ${off}`)
     // Every other direct caller of the route asks the same switch first.
-    const direct = ['components/content/ContentHubSetup.tsx', 'components/content/GscPanel.tsx']
+    const direct = ['components/content/GscPanel.tsx']
     const guarded = (src: string) => /useGscEnabled\(\)/.test(src) && /if \(gscEnabled === false\)/.test(src)
     for (const f of direct) {
       const src = code(f)
       check(`D4: ${f} skips /api/gsc/status when Search Console is off`, guarded(src))
       check(`MUT: ${f} without the skip fails D4`, !guarded(src.replace(/if \(gscEnabled === false\)[^\n]*/, '')))
     }
+    // w7-flash: the setup row reads the status only through useGscStatus (pinned by D2), so it
+    // skips the route when Search Console is off and never calls it on its own.
+    const viaHook = (src: string) => /import \{ useGscStatus \} from '@\/components\/gsc\/gsc-data'/.test(src)
+      && /useGscStatus\(projectId\)/.test(src) && !/api\/gsc\/status|gscStatusUrl|fetch\(/.test(src)
+    const setupSrc = code('components/content/ContentHubSetup.tsx')
+    check('D4: components/content/ContentHubSetup.tsx skips /api/gsc/status when Search Console is off (reads only through useGscStatus)', viaHook(setupSrc))
+    check('MUT: ContentHubSetup fetching the route itself fails D4', !viaHook(setupSrc + "\nfetch(`/api/gsc/status?projectId=${projectId}`)"))
   }
 
   // ── E) motion ─────────────────────────────────────────────────────────────

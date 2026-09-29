@@ -33,6 +33,17 @@ function request(url: string, fresh: boolean): Promise<GscResponse> {
   return entry.promise
 }
 
+/** The shared read, for code that is not a hook (the settings panel's own refresh).
+ *  `fresh` asks again past the sharing window. */
+export function readGscResponse(url: string, fresh = false): Promise<GscResponse> {
+  return request(url, fresh)
+}
+
+/** The answer already in hand for `url`, if a widget of this screen read it moments ago. */
+export function peekGscResponse(url: string | null): GscResponse | undefined {
+  return peek(url)
+}
+
 function peek(url: string | null): GscResponse | undefined {
   if (!url) return undefined
   const hit = shared.get(url)

@@ -16,7 +16,7 @@
  * what it does is unchanged.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Search as SearchIcon, X } from 'lucide-react'
 import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -28,6 +28,9 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscMetricsTable from '@/components/content/GscMetricsTable'
 import { useGscEnabled } from '@/components/gsc/GscFeature'
+import { gscStatusUrl, peekGscResponse, readGscResponse, type GscResponse } from '@/components/gsc/gsc-data'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { gscStatusView } from '@/lib/gsc/widget-state'
 import { AUTO_SYNC_MIN_INTERVAL_DAYS } from '@/lib/gsc/auto-sync'
 import { formatDateTime } from '@/lib/utils'
 
@@ -42,14 +45,37 @@ interface PropertyView { siteUrl: string; permissionLevel: string; kind: 'domain
 
 type Dict = ReturnType<typeof getDashboardDictionary>['projectDetail']['contentSection']['gsc']
 
+/** The status route's answer, as the panel needs it: the body only when the route
+ *  really answered; switched off and failed reads are their own states. */
+type PanelRead = { kind: 'loading' } | { kind: 'disabled' } | { kind: 'error' } | { kind: 'ready'; status: StatusResponse }
+function panelRead(response: GscResponse | undefined): PanelRead {
+  if (!response) return { kind: 'loading' }
+  const view = gscStatusView(response.status, response.body)
+  if (view.state === 'disabled') return { kind: 'disabled' }
+  if (view.state === 'error') return { kind: 'error' }
+  return { kind: 'ready', status: response.body as StatusResponse }
+}
+
 export default function GscPanel({ projectId, connectOrigin = 'project' }: { projectId: string; connectOrigin?: 'hub' | 'project' }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
   // In-app questions (never window.confirm): both disconnects are destructive, so danger.
   const { confirm, dialog: confirmDialog } = useConfirm()
 
-  const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<StatusResponse | null>(null)
+  // What the status route answered, decided once (lib/gsc/widget-state): the panel
+  // draws "not connected" only from an answer that says so. Read through the same
+  // shared request as every Search Console widget, so when the screen already asked,
+  // the first render has the answer.
+  const gscEnabled = useGscEnabled()
+  const statusUrl = gscStatusUrl(projectId)
+  const [initial] = useState(() => panelRead(peekGscResponse(statusUrl)))
+  const [loading, setLoading] = useState(initial.kind === 'loading')
+  const [status, setStatus] = useState<StatusResponse | null>(initial.kind === 'ready' ? initial.status : null)
+  // 'disabled': Search Console switched off on the server (nothing to offer);
+  // 'error': the status could not be read (never drawn as "not connected").
+  const [unavailable, setUnavailable] = useState<'disabled' | 'error' | null>(
+    initial.kind === 'disabled' || initial.kind === 'error' ? initial.kind : null,
+  )
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   const [connecting, setConnecting] = useState(false)
@@ -69,19 +95,20 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     return (t.errors as Record<string, string>)[code] ?? t.genericError
   }, [t])
 
-  const gscEnabled = useGscEnabled()
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (fresh = true) => {
     // Search Console is off on this server: the route answers 404, so do not ask.
-    if (gscEnabled === false) { setStatus(null); setLoading(false); return }
-    try {
-      const res = await fetch(`/api/gsc/status?projectId=${projectId}`)
-      if (res.status === 404) { setStatus(null); return }
-      const data = (await res.json()) as StatusResponse
-      setStatus(data)
-    } catch { /* leave prior state */ } finally { setLoading(false) }
-  }, [projectId, gscEnabled])
+    if (gscEnabled === false) { setStatus(null); setUnavailable('disabled'); setLoading(false); return }
+    const read = panelRead(await readGscResponse(statusUrl, fresh))
+    if (read.kind === 'ready') { setStatus(read.status); setUnavailable(null) }
+    else if (read.kind === 'disabled') { setStatus(null); setUnavailable('disabled') }
+    // A re-read that failed keeps what is on screen; a first one says it failed.
+    else setUnavailable((was) => (statusRef.current ? was : 'error'))
+    setLoading(false)
+  }, [statusUrl, gscEnabled])
+  const statusRef = useRef(status)
+  statusRef.current = status
 
-  useEffect(() => { loadStatus() }, [loadStatus])
+  useEffect(() => { if (initial.kind === 'loading' || gscEnabled === false) void loadStatus(false) }, [loadStatus, initial.kind, gscEnabled])
 
   // Surface the OAuth callback result (?gsc / ?gsc_error), then strip the params so a
   // refresh doesn't re-show the banner.
@@ -203,9 +230,12 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     return <Badge variant="danger">{t.statusError}</Badge>
   }
 
+  // Switched off on the server: like every Search Console widget, nothing at all.
+  if (unavailable === 'disabled' || gscEnabled === false) return null
+
   return (
     <Card className="p-5 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4" data-gsc-card={connected ? 'connected' : 'none'}>
+      <div className="flex flex-wrap items-center justify-between gap-4" data-gsc-card={loading ? 'loading' : unavailable ? 'error' : connected ? 'connected' : 'none'}>
         <div className="flex min-w-0 items-center gap-3">
           <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
             <SearchIcon className="size-5" />
@@ -218,7 +248,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
             <p className="mt-0.5 text-copy text-muted">{t.subtitle}</p>
           </div>
         </div>
-        {!loading && status?.oauthConfigured !== false && !connected && (
+        {!loading && !unavailable && status?.oauthConfigured !== false && !connected && (
           <Button size="sm" onClick={handleConnect} loading={connecting} disabled={connecting} className="shrink-0" data-gsc-connect>
             {connecting ? t.connecting : t.connect}
           </Button>
@@ -226,7 +256,9 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
       </div>
 
       {loading ? (
-        <Skeleton className="mt-4 h-12 w-full rounded-inset" />
+        <div aria-busy="true" data-connection-loading="gsc"><Skeleton className="mt-4 h-12 w-full rounded-inset" /></div>
+      ) : unavailable === 'error' ? (
+        <ConnectionLoadFailed className="mt-4" onRetry={() => { setLoading(true); void loadStatus() }} />
       ) : status && !status.oauthConfigured ? (
         // A merchant reads that it is unavailable, with nothing to press; only an administrator
         // (the server's opsDetail) also reads the configuration reason.

@@ -118,9 +118,13 @@ function main() {
   {
     const panel = code('components/content/GscPanel.tsx')
     const merchantOnly = (s: string) => /\{t\.unavailable\}/.test(s) && /\{status\.opsDetail && <span[^>]*>\{t\.notConfigured\}<\/span>\}/.test(s)
-      && /\{!loading && status\?\.oauthConfigured !== false && !connected && \(/.test(s)
+      // w7-flash: the connect button also waits for a definite status answer (!unavailable),
+      // so a failed or disabled read never offers "connect".
+      && /\{!loading && !unavailable && status\?\.oauthConfigured !== false && !connected && \(/.test(s)
     check('D1: the card says "unavailable"; the reason renders only with opsDetail; no connect button when unconfigured', merchantOnly(panel))
     check('D2: MUT showing the ops reason to everyone fails D1', !merchantOnly(panel.replace('{status.opsDetail && <span', '{true && <span')))
+    check('D2b: MUT offering connect while the status is unconfigured fails D1', !merchantOnly(panel.replace('status?.oauthConfigured !== false && !connected', '!connected')))
+    check('D2c: MUT offering connect after a failed status read fails D1', !merchantOnly(panel.replace('{!loading && !unavailable && ', '{!loading && ')))
     const route = code('app/api/gsc/status/route.ts')
     const serverDecides = (s: string) => /import \{ isAdminUser \} from '@\/lib\/auth\/admin-role'/.test(s) && /const opsDetail = !oauthConfigured && await isAdminUser\(auth\.admin, auth\.user\.id\)/.test(s) && /\bopsDetail,/.test(s)
     check('D3: the status route decides opsDetail with isAdminUser (profiles.role, service role), never a request field', serverDecides(route) && !/searchParams\.get\('admin'\)|opsDetail = .*searchParams/.test(route))

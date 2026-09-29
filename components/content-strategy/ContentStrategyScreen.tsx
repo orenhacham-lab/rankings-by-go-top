@@ -297,7 +297,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
             <PlanBasis seed={strategy.seed} dict={dict} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {automationEnabled && view === 'board' && !planEmpty && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
+            {automationEnabled && view === 'board' && !!board && !planEmpty && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
             <ViewSwitch view={view} onChange={setView} dict={dict} />
           </div>
         </div>

@@ -2333,6 +2333,12 @@ export const dashboardEn = {
   uiKit: {
     noticeMore: '{n} more',
   },
+  // A connection's status that could not be read (lib/connection-status/known.ts):
+  // never "not connected", which is a different fact.
+  connectionStatus: {
+    loadFailed: 'We could not check this connection just now. It does not mean it was disconnected.',
+    retry: 'Try again',
+  },
   common: {
     close: 'Close',
     menu: 'Menu',

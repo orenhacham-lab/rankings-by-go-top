@@ -46,7 +46,10 @@ function main() {
   // Shared component with the specified projectId API.
   check('GscMetricsTable is a projectId component', /export default function GscMetricsTable\(\{ projectId/.test(table))
   check('it reuses the existing status + metrics endpoints (one data model)',
-    /\/api\/gsc\/status\?projectId=/.test(table) && /\/api\/gsc\/metrics\?projectId=/.test(table))
+    // The status through the shared Search Console read (components/gsc/gsc-data: the same
+    // GET /api/gsc/status the widgets use, one request per screen), the rows directly.
+    /import \{[^}]*\bgscStatusUrl\b[^}]*\} from '@\/components\/gsc\/gsc-data'/.test(table) && /gscStatusUrl\(projectId\)/.test(table)
+    && /\/api\/gsc\/metrics\?projectId=/.test(table))
   check('it is READ-ONLY — no sync/disconnect/connect logic duplicated', !/\/api\/gsc\/sync|\/api\/gsc\/connect|\/api\/gsc\/property/.test(table))
 
   // Every required state is represented.

@@ -77,7 +77,17 @@ function useWorkspaceValue() {
     [t],
   )
 
-  const [data, setData] = useState<Overview | null>(null)
+  const [overviewRead, setData] = useState<Overview | null>(null)
+  // The overview of THIS project, or null while it is on its way. The workspace reads
+  // an overview before the active project is resolved (the project list only) and
+  // keeps the previous project's until the next one answers; drawn as this project's,
+  // either said "no platform connected" and "no articles yet" for a second to a
+  // merchant who has both. Screens show their skeleton while it is null.
+  const data = overviewRead && (!projectId || overviewRead.selected === projectId) ? overviewRead : null
+  // The overview could not be read: the screens stop waiting and draw what they can.
+  const [overviewFailed, setOverviewFailed] = useState(false)
+  /** This project's overview answered, or failed: past this, an empty list is an answer. */
+  const overviewSettled = !!data || overviewFailed
   // The project's ACTIVE publishing platform (resolved server-side by connection validity).
   // Manual publish/draft actions route by this — a Shopify project never calls WordPress.
   const activePlatform: ActivePlatform = data?.platform?.platform ?? 'wordpress'
@@ -193,9 +203,10 @@ function useWorkspaceValue() {
     try {
       const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
       const res = await fetch(`/api/content/overview${qs}`)
-      if (res.ok) setData(await res.json())
+      if (res.ok) { setData(await res.json()); setOverviewFailed(false) } else setOverviewFailed(true)
     } catch {
       // Non-fatal: the page still renders its empty/selector states.
+      setOverviewFailed(true)
     } finally {
       setLoading(false)
     }
@@ -323,7 +334,7 @@ function useWorkspaceValue() {
     projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects,
     language, t, isHebrew, toast,
     // overview
-    data, loading, counts, activePlatform, isShopify, isSite, exportedIdOf, load, patchArticle, shopifyPublishError,
+    data, overviewSettled, loading, counts, activePlatform, isShopify, isSite, exportedIdOf, load, patchArticle, shopifyPublishError,
     // topics
     topics, selectableTopics, articleByTopic, topicsLoading, loadTopics,
     planStatus, setPlanStatus, highlightTopicIds,
