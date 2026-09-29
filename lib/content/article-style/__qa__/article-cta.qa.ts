@@ -121,6 +121,17 @@ async function main() {
   check('MUTATION CONTROL: the old sample (closing on a linked "talk to us") brings the phantom box back (so A2 would fail)',
     /margin:36px 0;padding:22px 24px;background-color:#c60035/.test(oldPreview))
 
+  // w8 merge: with no link left in the sample, the scrolling preview has nothing focusable inside,
+  // so the region itself takes keyboard focus (axe scrollable-region-focusable, journey axe-a11y).
+  const scrollOk = (Preview: typeof ArticleStylePreview) => {
+    const markup = renderToStaticMarkup(createElement(Preview, { style: STYLE, cta: null, platform: 'wordpress', domain: 'japan4u.co.il', t: he, locale: 'he', subject: null }))
+    const region = markup.match(/<div[^>]*data-preview-scroll=""[^>]*>/)?.[0] ?? ''
+    return /class="[^"]*overflow-y-auto/.test(region) && /tabindex="0"/.test(region) && /role="region"/.test(region) && region.includes(`aria-label="${he.preview.caption}"`)
+  }
+  check('A4: the scrolling preview is keyboard-focusable and labelled (no link inside it any more)', scrollOk(ArticleStylePreview))
+  const noFocus = await mutant<typeof import('@/components/settings/ArticleStylePreview')>('components/settings/ArticleStylePreview.tsx', (s) => s.replace('        tabIndex={0}\n', ''))
+  check('MUTATION CONTROL: the region without tabIndex is caught (A4 would fail)', !scrollOk(noFocus.default))
+
   // ── B) preview == publish, per platform ──────────────────────────────────
   console.log('\nB) the preview and the published article come from one function')
   for (const platform of ['wordpress', 'webhook', 'none'] as const) {

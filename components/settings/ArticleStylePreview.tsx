@@ -132,7 +132,15 @@ export default function ArticleStylePreview({
           {domain || t.preview.domain}
         </span>
       </div>
-      <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="max-h-[36rem] overflow-y-auto px-4 py-5 sm:px-5">
+      {/* A scrolling region with no link inside (the sample has none since wave 8) must take keyboard focus itself (axe scrollable-region-focusable). */}
+      <div
+        dir={locale === 'he' ? 'rtl' : 'ltr'}
+        role="region"
+        aria-label={t.preview.caption}
+        tabIndex={0}
+        data-preview-scroll=""
+        className="max-h-[36rem] overflow-y-auto px-4 py-5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:px-5"
+      >
         <h3 className="mb-3 text-section font-bold leading-snug text-ink">{words.title}</h3>
         {style.ownImagesOnly ? (
           <div className="mb-4 flex aspect-video items-center justify-center gap-2 rounded-inset border border-dashed border-line-strong bg-sunk text-caption text-muted">
