@@ -2931,6 +2931,7 @@ export const dashboardEn = {
         received: 'Received',
         given: 'Given',
         fromSite: (domain: string) => `From ${domain}`,
+        fromNetworkSite: 'From a site in the network (its address shows once the article is published)',
         inArticle: (title: string) => `In the article "${title}"`,
         articleGone: 'The article was deleted',
         toPage: 'To the page',

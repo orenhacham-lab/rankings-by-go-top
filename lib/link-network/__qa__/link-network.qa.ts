@@ -16,7 +16,9 @@
  *      database's reciprocal refusal handled.
  *   E  the routes (http.ts): owner filter, consent required, leave, Shopify and
  *      missing tables hidden, reject before publish only and only by the giver,
- *      nothing of another customer's draft reaches the receiving side.
+ *      nothing of another customer's draft reaches the receiving side (not even
+ *      the giving site), rejected links are not listed for it, and the table
+ *      grants it nothing of the giver's ids.
  *   F  the one call site in article generation, which never throws.
  *   G  the screen: hidden → the old view; no confirm()/alert(); no literal text.
  *
@@ -393,8 +395,29 @@ async function partE() {
   check('the link type in force is part of the answer', own.linkRel === 'follow')
 
   const recv = await (await handleNetworkGet(P.OK, routeDeps(U_OK, db))).json() as any
-  check('the receiver sees the link: from which site, on which words, to which page, when', recv.received.length === 1
-    && recv.received[0].sourceDomain === 'site0.co.il' && recv.received[0].anchor === 'עיצוב פנים של אוהל האירוע' && recv.received[0].placedAt === NOW.toISOString())
+  check('the receiver sees the link: on which words, to which page, when', recv.received.length === 1
+    && recv.received[0].anchor === 'עיצוב פנים של אוהל האירוע' && recv.received[0].placedAt === NOW.toISOString())
+  check('…but not which site gives it while the article is a draft (sourceDomain null)', recv.received[0].state === 'waiting' && recv.received[0].sourceDomain === null
+    && !JSON.stringify(recv).includes('site0.co.il'), JSON.stringify(recv.received[0]))
+  const domMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("sourceDomain: state === 'published' ? p.source_domain : null,", 'sourceDomain: p.source_domain,'),
+    async (m) => (await (await m.handleNetworkGet(P.OK, routeDeps(U_OK, db))).json()).received[0].sourceDomain)
+  check('MUTATION CONTROL: the giving site shown for a draft → caught', domMut === 'site0.co.il', String(domMut))
+  check('the giver\'s account id and article id never reach the receiver', !JSON.stringify(recv).includes(U_S) && !JSON.stringify(recv).includes(ART))
+  const livePub = networkDbWithPlacement()
+  const liveArt = livePub.tables.generated_articles.find((a: any) => a.id === ART) as any
+  liveArt.status = 'published'; liveArt.wp_post_url = 'https://site0.co.il/tent/'
+  const U_OK2 = (livePub.tables.projects.find((p: any) => p.id === P.OK) as any).user_id as string
+  const liveRecv = (await (await handleNetworkGet(P.OK, routeDeps(U_OK2, livePub))).json() as any).received[0]
+  check('once the giving article is live: the giving site, the page and the sentence', liveRecv?.state === 'published' && liveRecv.sourceDomain === 'site0.co.il'
+    && liveRecv.liveUrl === 'https://site0.co.il/tent/' && (liveRecv.context ?? '').length > 0, JSON.stringify(liveRecv))
+  const rejDb = networkDbWithPlacement()
+  ;(rejDb.tables.link_network_placements[0] as any).status = 'rejected'
+  ;(rejDb.tables.link_network_placements[0] as any).rejected_at = NOW.toISOString()
+  const rejRecv = (await (await handleNetworkGet(P.OK, routeDeps(U_OK2, rejDb))).json() as any)
+  check('a link the giver rejected is not in the receiver\'s list', rejRecv.received.length === 0 && !JSON.stringify(rejRecv).includes('site0.co.il'), JSON.stringify(rejRecv.received))
+  const rejMutR = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("receivedRows.filter((p) => p.status !== 'rejected').map(", 'receivedRows.map('),
+    async (m) => (await (await m.handleNetworkGet(P.OK, routeDeps(U_OK2, rejDb))).json()).received.length)
+  check('MUTATION CONTROL: rejected rows listed for the receiver → caught', rejMutR === 1, String(rejMutR))
   check('nothing of the giver\'s draft reaches the receiver (no title, no sentence, no address)', recv.received[0].context === null && recv.received[0].liveUrl === null
     && !JSON.stringify(recv).includes('איך מעצבים אוהל לחתונה'))
   const leakMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("context: state === 'published' && a ? linkContext(a.content_html, p.target_url) : null,", 'context: a ? linkContext(a.content_html, p.target_url) : null,'),
@@ -461,6 +484,18 @@ async function partE() {
   const nt = await handleNetworkGet(P.S, routeDeps(U_S, noTables))
   check('without the tables: 200 { available: false } (hidden, not an error)', nt.status === 200 && ((await nt.json()) as any).available === false)
   check('without the tables: joining is 409', (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.S, routeDeps(U_S, noTables))).status === 409)
+  // The table itself: the receiving side cannot read the giver's ids through PostgREST
+  // (executed proof: supabase/migrations/__qa__/link-network.probe.sql).
+  const mig = read('supabase/migrations/20260929010000_link_network.sql').replace(/--.*$/gm, '')
+  const placementsGrantOk = (sql: string) => {
+    const tableWide = /GRANT\s+SELECT\s+ON\s+TABLE\s+public\.link_network_placements\s+TO\s+authenticated/i.test(sql)
+    const cols = /GRANT\s+SELECT\s*\(([^)]*)\)\s*ON\s+TABLE\s+public\.link_network_placements\s+TO\s+authenticated/i.exec(sql)?.[1] ?? ''
+    const policy = /CREATE POLICY link_network_placements_\w+ ON public\.link_network_placements[\s\S]*?;/i.exec(sql)?.[0] ?? ''
+    return !tableWide && !!cols && !/source_user_id|target_user_id|rejected_by/.test(cols) && !/target_project_id/.test(policy)
+  }
+  check('migration: placements are granted to browsers by column, no account ids, and the receiver has no read policy', placementsGrantOk(mig))
+  check('MUTATION CONTROL: the old table-wide grant → caught', !placementsGrantOk(mig.replace(/GRANT SELECT \([^)]*\)\s*ON TABLE public\.link_network_placements TO authenticated/, 'GRANT SELECT ON TABLE public.link_network_placements TO authenticated')))
+  check('MUTATION CONTROL: the target-side read clause back → caught', !placementsGrantOk(mig.replace("USING (source_project_id IN", "USING (target_project_id IN (SELECT 1) OR source_project_id IN")))
   const errText = JSON.stringify(await (await handleNetworkGet(P.S, routeDeps(U_S, networkDb({ hooks: { link_network_placements: { select: () => ({ code: 'XX000', message: 'relation secret exploded' }) } } })))).json())
   check('a database failure answers a code, never the database text', /"code":"internal"/.test(errText) && !/secret|exploded/.test(errText))
 }

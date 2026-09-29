@@ -14,8 +14,10 @@
  * proves ownership itself. OWNER FILTER: every read of this owner's rows is
  * filtered by the verified project AND owner; the only reads beyond this owner
  * are the member count (a number), the network's link type, and, for a link
- * this project RECEIVED, whether the giving article is live (its address and the
- * sentence around the link once it is published; nothing of a draft).
+ * this project RECEIVED, whether the giving article is live (the giving site's
+ * domain, its address and the sentence around the link once it is published;
+ * nothing of a draft, and a link the giver rejected is not listed at all).
+ * The giver's account and article ids never leave the server.
  *
  * Hidden, not an error: without the network's tables (migration not applied),
  * and for a Shopify project, GET answers { available: false } and the POSTs 409.
@@ -53,7 +55,8 @@ export interface GivenItem {
 
 export interface ReceivedItem {
   id: string
-  sourceDomain: string
+  /** The giving site, only once its article is live (null while it is a draft or the link is gone). */
+  sourceDomain: string | null
   targetUrl: string
   anchor: string
   placedAt: string
@@ -189,18 +192,19 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
         canReject: state === 'waiting',
       }
     })
-    const received: ReceivedItem[] = receivedRows.map((p) => {
+    // A link the giver rejected never existed for the receiver: not listed.
+    const received: ReceivedItem[] = receivedRows.filter((p) => p.status !== 'rejected').map((p) => {
       const found = p.source_article_id ? recvById.get(p.source_article_id) : undefined
       const a = found && found.project_id === p.source_project_id ? found : undefined
       const state = stateOf(p, a)
       return {
         id: p.id,
-        sourceDomain: p.source_domain,
+        // Nothing of another customer's draft: who is giving only once it is live.
+        sourceDomain: state === 'published' ? p.source_domain : null,
         targetUrl: safeExternalUrl(p.target_url) ?? '',
         anchor: p.anchor_text,
         placedAt: p.placed_at,
         state,
-        // Nothing of another customer's draft: the address and sentence only once it is live.
         liveUrl: state === 'published' ? safeExternalUrl(a?.wp_post_url) : null,
         context: state === 'published' && a ? linkContext(a.content_html, p.target_url) : null,
       }

@@ -14,8 +14,10 @@
 --                            record) stays.
 --   link_network_placements  the placement log: every link the engine wrote
 --                            (source project + article, target project + url,
---                            anchor, link type, time). Both sides read their own
---                            rows. The giving side can reject a placement
+--                            anchor, link type, time). Only the giving side reads
+--                            its rows directly; the receiving side sees its
+--                            links through the owner route (service role),
+--                            which shows nothing of a draft. The giving side can reject a placement
 --                            before the article is published (status
 --                            'rejected', the link is taken out of the draft).
 --   link_network_settings    ONE row: the network-wide link type, 'follow'
@@ -35,8 +37,12 @@
 --
 -- ACCESS. Rows are written ONLY by service-role server code (the generation step
 -- and the owner routes after they verified the signed-in user owns the project).
--- The owner reads their own membership; a placement is read by the owner of
--- either side; an admin who owns neither side reads nothing; anon nothing.
+-- The owner reads their own membership; a placement is read directly only by
+-- the owner of the GIVING side, and only its non-identifying columns (no account
+-- id of either side). The receiving side never reads the row through PostgREST:
+-- it would learn the giver's account and article ids and which site is linking
+-- to it from a draft that may never be published. An admin who owns neither
+-- side reads nothing; anon nothing.
 -- Grants follow 20260928000000_project_monthly_reports.sql: Supabase's default
 -- table grants are revoked and only what is needed is granted back.
 --
@@ -117,7 +123,7 @@ CREATE TABLE IF NOT EXISTS public.link_network_placements (
 );
 
 COMMENT ON TABLE public.link_network_placements IS
-  'Link network placement log: one row per link the engine wrote into a member article. Never reciprocal (trigger), one per article, never between one owner''s projects. Written only by service-role server code; each side reads its own rows under RLS.';
+  'Link network placement log: one row per link the engine wrote into a member article. Never reciprocal (trigger), one per article, never between one owner''s projects. Written only by service-role server code; the giving side reads its own rows (non-identifying columns) under RLS, the receiving side only through the owner route.';
 
 -- One placed link per source article.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_link_network_placements_article
@@ -167,17 +173,23 @@ CREATE TRIGGER link_network_placements_guard
 
 ALTER TABLE public.link_network_placements ENABLE ROW LEVEL SECURITY;
 
+-- REVOKE ALL also removes any column grant, so a re-run starts clean.
 REVOKE ALL ON TABLE public.link_network_placements FROM PUBLIC, anon, authenticated, service_role;
-GRANT SELECT ON TABLE public.link_network_placements TO authenticated;
+-- Browser roles: the non-identifying columns only. No source_user_id,
+-- target_user_id or rejected_by (account ids) for anyone.
+GRANT SELECT (id, source_project_id, source_article_id, source_domain, target_project_id, target_url,
+              anchor_text, link_rel, anchor_kind, relevance, status, placed_at, rejected_at)
+  ON TABLE public.link_network_placements TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.link_network_placements TO service_role;
 
+-- The giving side only. The receiving side reads its links through
+-- GET /api/projects/[id]/link-network (service role, owner-filtered), which
+-- shows the giving site only once its article is live.
 DROP POLICY IF EXISTS link_network_placements_sides_select ON public.link_network_placements;
-CREATE POLICY link_network_placements_sides_select ON public.link_network_placements
+DROP POLICY IF EXISTS link_network_placements_source_select ON public.link_network_placements;
+CREATE POLICY link_network_placements_source_select ON public.link_network_placements
   FOR SELECT TO authenticated
-  USING (
-    source_project_id IN (SELECT p.id FROM public.projects p WHERE p.user_id = auth.uid())
-    OR target_project_id IN (SELECT p.id FROM public.projects p WHERE p.user_id = auth.uid())
-  );
+  USING (source_project_id IN (SELECT p.id FROM public.projects p WHERE p.user_id = auth.uid()));
 
 -- ── 3. the network-wide link type ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.link_network_settings (

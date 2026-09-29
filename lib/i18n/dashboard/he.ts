@@ -2935,6 +2935,7 @@ export const dashboardHe = {
         received: 'קיבלתם',
         given: 'נתתם',
         fromSite: (domain: string) => `מ-${domain}`,
+        fromNetworkSite: 'מאתר ברשת (הכתובת תופיע כשהמאמר יפורסם)',
         inArticle: (title: string) => `במאמר "${title}"`,
         articleGone: 'המאמר נמחק',
         toPage: 'לעמוד',
