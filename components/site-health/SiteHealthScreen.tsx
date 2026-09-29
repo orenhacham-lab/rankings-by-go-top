@@ -24,7 +24,13 @@ import type { Project } from '@/lib/supabase/types'
 import ScoreCard from './ScoreCard'
 import FindingCard from './FindingCard'
 import FixPreviewModal from './FixPreviewModal'
+import ApproveFixModal from './ApproveFixModal'
+import AutoFixStrip from './AutoFixStrip'
+import FixQueue from './FixQueue'
+import PluginInstallModal from './PluginInstallModal'
 import { fixKey, useSiteHealthScan, type ScanProgress } from './useSiteHealthScan'
+import { useSiteFixes } from './useSiteFixes'
+import type { FixType } from '@/lib/site-fix/types'
 
 type Copy = DashboardDictionary['siteHealth']
 type Filter = 'all' | 'fixable' | 'guide'
@@ -120,21 +126,46 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   const toasts = useToasts()
   const { report, fixed, loaded, progress, error, scan, markFixed } = useSiteHealthScan(project.id)
   const [filter, setFilter] = useState<Filter>('all')
-  const [target, setTarget] = useState<{ finding: Finding; page: FindingPage } | null>(null)
+  const [target, setTarget] = useState<{ finding: Finding; page: FindingPage; type: FixType | null } | null>(null)
+  const [installOpen, setInstallOpen] = useState(false)
+  const fixes = useSiteFixes(project.id)
+  const caps = fixes.capabilities
+  const queueLive = fixes.active && !!caps
   const domain = cleanDomain(project.target_domain)
   const icon = project.site_icon ?? null
   const scanning = progress !== null
 
-  const fixableCount = useMemo(() => report?.findings.filter((f) => f.fixable).length ?? 0, [report])
-  const visible = useMemo(() => {
+  /**
+   * With the fix queue live, what each page offers comes from where an approved fix would go
+   * (lib/site-fix/channel.ts): fix it now, install the plugin first, or instructions only.
+   */
+  const fixModeFor = useCallback((finding: Finding, page: FindingPage): 'fix' | 'install' | null => {
+    if (!queueLive || !caps || !finding.fixType) return null
+    const channel = caps.channelFor[finding.fixType]
+    if (!channel) return null
+    if (finding.fixType === 'broken_link' && !page.from) return null
+    if (channel === 'needs_plugin') return 'install'
+    if (finding.fixType === 'internal_link' && (channel === 'webhook' || channel === 'manual')) return null
+    return 'fix'
+  }, [queueLive, caps])
+  const findings = useMemo(() => {
     const list = report?.findings ?? []
+    if (!queueLive) return list
+    return list.map((f) => ({ ...f, fixable: f.pages.some((p) => fixModeFor(f, p) === 'fix') }))
+  }, [report, queueLive, fixModeFor])
+
+  const fixableCount = useMemo(() => findings.filter((f) => f.fixable).length, [findings])
+  const visible = useMemo(() => {
+    const list = findings
     if (filter === 'fixable') return list.filter((f) => f.fixable)
     if (filter === 'guide') return list.filter((f) => !f.fixable)
     return list
-  }, [report, filter])
+  }, [findings, filter])
 
-  const onFix = useCallback((finding: Finding, page: FindingPage) => setTarget({ finding, page }), [])
-  const closeFix = useCallback(() => setTarget(null), [])
+  const onFix = useCallback((finding: Finding, page: FindingPage) => setTarget({ finding, page, type: finding.fixType ?? null }), [setTarget])
+  const openInstall = useCallback(() => setInstallOpen(true), [setInstallOpen])
+  const when = useCallback((iso: string) => formatDate(language).dateTime(iso), [language])
+  const closeFix = useCallback(() => setTarget(null), [setTarget])
 
   const rescan = (
     <Button variant="secondary" onClick={() => void scan()} loading={scanning} disabled={scanning} data-scan-again="">
@@ -143,7 +174,8 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     </Button>
   )
 
-  const hint = report && !(report.platform === 'wordpress' && report.connections.wordpress)
+  const showStrip = queueLive && !!caps && (caps.wordpress || caps.webhook || caps.plugin.state !== 'none')
+  const hint = report && !showStrip && !(report.platform === 'wordpress' && report.connections.wordpress)
     ? copy.connectHint[report.platform]
     : null
   const canConnect = report && (report.platform === 'wordpress' || report.platform === 'other') && !report.connections.wordpress
@@ -190,6 +222,21 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
           </div>
         )}
 
+        {loaded && showStrip && caps && (
+          <AutoFixStrip
+            projectId={project.id}
+            capabilities={caps}
+            copy={copy.autofix}
+            onInstall={openInstall}
+            onChanged={fixes.reload}
+            lastSeen={when}
+          />
+        )}
+
+        {loaded && queueLive && fixes.jobs.length > 0 && (
+          <FixQueue projectId={project.id} jobs={fixes.jobs} copy={copy.autofix} toasts={toasts} when={when} onJob={(j) => { fixes.upsertJob(j); void fixes.reload() }} />
+        )}
+
         {loaded && report && report.findings.length > 0 && (
           <section aria-label={copy.counts.findings(report.findings.length)} className={cn('space-y-4', scanning && 'pointer-events-none opacity-50')}>
             {/* Below sm the filter takes its own full-width line under the count. */}
@@ -207,7 +254,15 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
             <div className="space-y-4">
               {visible.map((f, i) => (
                 <Reveal key={f.id} index={i}>
-                  <FindingCard finding={f} copy={copy} platform={report.platform} fixed={fixed} onFix={onFix} />
+                  <FindingCard
+                    finding={f}
+                    copy={copy}
+                    platform={report.platform}
+                    fixed={fixed}
+                    onFix={onFix}
+                    fixModeFor={queueLive ? fixModeFor : null}
+                    onInstall={openInstall}
+                  />
                 </Reveal>
               ))}
             </div>
@@ -225,7 +280,26 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
         )}
       </div>
 
-      {target && report && (
+      {target && report && queueLive && target.type && (
+        <ApproveFixModal
+          key={`${target.type}|${fixKey(target.finding.id, target.page.url)}`}
+          projectId={project.id}
+          finding={target.finding}
+          page={target.page}
+          type={target.type}
+          platform={report.platform}
+          copy={copy}
+          toasts={toasts}
+          onClose={closeFix}
+          onJob={fixes.upsertJob}
+          onFixed={(on) => { if (target.type !== 'focus_keyphrase') markFixed(fixKey(target.finding.id, target.page.url), on) }}
+          onInstall={openInstall}
+          onFocusNext={caps?.channelFor.focus_keyphrase === 'plugin' && target.type === 'seo_title'
+            ? () => setTarget({ ...target, type: 'focus_keyphrase' })
+            : null}
+        />
+      )}
+      {target && report && !queueLive && (
         <FixPreviewModal
           key={fixKey(target.finding.id, target.page.url)}
           projectId={project.id}
@@ -236,6 +310,17 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
           toasts={toasts}
           onClose={closeFix}
           onFixed={(on) => markFixed(fixKey(target.finding.id, target.page.url), on)}
+        />
+      )}
+      {installOpen && caps && (
+        <PluginInstallModal
+          projectId={project.id}
+          siteUrl={`https://${domain}`}
+          capabilities={caps}
+          copy={copy.autofix}
+          toasts={toasts}
+          onClose={() => setInstallOpen(false)}
+          onChanged={fixes.reload}
         />
       )}
       <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={dir} />

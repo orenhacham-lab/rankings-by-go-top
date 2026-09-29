@@ -27,6 +27,22 @@ export const EXAMPLE_PAYLOAD = `{
   }
 }`
 
+/** An approved site-health fix (lib/site-fix/webhook-fix.ts buildFixPayload): the QA suite holds the two together. */
+export const EXAMPLE_FIX_PAYLOAD = `{
+  "fix_payload_version": 1,
+  "event": "site_fix.approved",
+  "delivery_id": "fix_8b1e…",
+  "sent_at": "2026-09-28T07:00:00.000Z",
+  "fix": {
+    "id": "…",
+    "type": "meta_description",
+    "page_url": "https://…/about/",
+    "value": { "value": "…" },
+    "previous": "…",
+    "approved_at": "2026-09-28T06:59:58.000Z"
+  }
+}`
+
 export const EXAMPLE_VERIFY = `// Node.js
 const crypto = require('crypto')
 const expected = 'sha256=' + crypto
@@ -58,6 +74,8 @@ export default function WebhookDocs({ t }: { t: DashboardDictionary['sitePlatfor
         </ul>
         <pre dir="ltr" className="overflow-x-auto rounded-control bg-contrast p-3 text-left font-mono text-caption leading-relaxed text-contrast-ink">{EXAMPLE_VERIFY}</pre>
         <p>{t.respond}</p>
+        <p>{t.fixes}</p>
+        <pre dir="ltr" className="overflow-x-auto rounded-control bg-contrast p-3 text-left font-mono text-caption leading-relaxed text-contrast-ink">{EXAMPLE_FIX_PAYLOAD}</pre>
       </div>
     </details>
   )

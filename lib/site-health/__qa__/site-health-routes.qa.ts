@@ -172,9 +172,12 @@ async function main() {
   }
 
   // FIX: the connection must be the owner's, and the project too.
-  const fixRun = async (A: Api, body: Record<string, unknown>, rows = baseRows(), wp = fakeWp(), userId: string | null = U) => {
+  // The fix-queue tables (lib/site-fix) are absent unless `queue` is set: the older path is what these checks cover.
+  const MISSING = { select: () => ({ code: '42P01', message: 'relation does not exist' }) }
+  const fixRun = async (A: Api, body: Record<string, unknown>, rows = baseRows(), wp = fakeWp(), userId: string | null = U, queue = false) => {
     const decrypted: string[] = []
-    const answer = await A.handleFix(body, { userId, admin: new FakeAdmin(rows) as never, decrypt: (s) => { decrypted.push(s); return 'app-pass' }, wp: wp.deps })
+    const hooks: Record<string, typeof MISSING> = queue ? {} : { site_fix_jobs: MISSING, site_fix_audit: MISSING }
+    const answer = await A.handleFix(body, { userId, admin: new FakeAdmin(rows, hooks) as never, decrypt: (s) => { decrypted.push(s); return 'app-pass' }, wp: wp.deps })
     return { answer, decrypted, wp }
   }
   const preview = { projectId: P, action: 'preview', field: 'title', url: `${SITE}/about/`, kind: 'title_long' }
@@ -258,6 +261,19 @@ async function main() {
     check('MUTATION CONTROL: an apply without compare-and-set is caught by P5', caughtCas)
   }
   {
+    // Once the fix queue exists every write goes through it (approved, audited, undoable): this path refuses to write.
+    const queueChecks = async (A: Api) => {
+      const wp = fakeWp()
+      const pv = await fixRun(A, preview, baseRows(), wp, U, true)
+      const ap = await fixRun(A, applyTitle(), baseRows(), wp, U, true)
+      return { Q1: pv.answer.body.ok === true && (ap.answer.body as { code?: string }).code === 'use_fix_queue' && ap.answer.status === 409 && wp.writes.length === 0 }
+    }
+    check('P11: with the fix queue in place, the older apply refuses (use_fix_queue) and writes nothing; its preview still reads', (await queueChecks(API)).Q1)
+    const m = mutant<Api>('lib/site-health/api.ts', "if (await queueAvailable(deps.admin, { projectId, userId: deps.userId })) return refuse('use_fix_queue')", '')
+    const r = m.mod ? await queueChecks(m.mod) : null
+    check('MUTATION CONTROL: an apply that ignores the fix queue is caught by P11', m.found && !!r && !r.Q1)
+  }
+  {
     const senders = (dir: string): string[] => readdirSync(join(ROOT, dir)).flatMap((n) => {
       const rel = `${dir}/${n}`
       if (n === 'node_modules' || n === '__qa__') return []
@@ -265,7 +281,8 @@ async function main() {
       return /\.tsx?$/.test(n) && /approved:\s*true/.test(strip(read(rel))) ? [rel] : []
     })
     const found = [...senders('components'), ...senders('app')]
-    check('P8: only the preview modal (its approve and undo buttons) sends approved: true', found.length === 1 && found[0] === 'components/site-health/FixPreviewModal.tsx', found.join(', '))
+    const SENDERS = ['components/site-health/ApproveFixModal.tsx', 'components/site-health/FixPreviewModal.tsx']
+    check('P8: only the two approval modals (their approve and undo buttons) send approved: true', JSON.stringify([...found].sort()) === JSON.stringify(SENDERS), found.join(', '))
     const modal = strip(read('components/site-health/FixPreviewModal.tsx'))
     const count = (modal.match(/approved:\s*true/g) ?? []).length
     const inApprove = modal.slice(modal.indexOf('const approve = useCallback'), modal.indexOf('const undo = useCallback'))
@@ -273,6 +290,16 @@ async function main() {
     check('P9: …once in approve, once in undo, and nowhere on load', count === 2 && /approved:\s*true/.test(inApprove) && /approved:\s*true/.test(inUndo))
     const autoApply = modal.replace("void post<PreviewBody>({\n      projectId, action: 'preview'", "void post<PreviewBody>({\n      approved: true, projectId, action: 'preview'")
     check('MUTATION CONTROL: a modal that sends approval on load is caught by P9', (autoApply.match(/approved:\s*true/g) ?? []).length !== 2)
+    // The queue's approval modal: approved: true only inside its approve callback (undo, cancel and retry need no approval flag).
+    const queueModal = strip(read('components/site-health/ApproveFixModal.tsx'))
+    const onlyInApprove = (src: string) => {
+      const at = src.indexOf('const approve = useCallback')
+      const end = src.indexOf('const undo = useCallback')
+      return (src.match(/approved:\s*true/g) ?? []).length === 1 && at >= 0 && end > at && /approved:\s*true/.test(src.slice(at, end))
+    }
+    check('P10: the fix-queue modal sends approved: true once, from its "Approve fix" callback only', onlyInApprove(queueModal))
+    const eager = queueModal.replace("projectId, action: 'preview', type,", "projectId, action: 'preview', approved: true, type,")
+    check('MUTATION CONTROL: a queue modal that sends approval with its preview is caught by P10', eager !== queueModal && !onlyInApprove(eager))
   }
 
   console.log('\nR) no raw provider error text')

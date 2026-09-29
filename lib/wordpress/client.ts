@@ -337,7 +337,7 @@ function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; b
  */
 function httpsSend(
   target: URL,
-  authHeader: string,
+  authHeader: string | null,
   body: Buffer,
   extraHeaders: Record<string, string>
 ): Promise<{ status: number; body: string; contentType: string }> {
@@ -350,7 +350,8 @@ function httpsSend(
         path: `${target.pathname}${target.search}`,
         method: 'POST',
         headers: {
-          Authorization: authHeader,
+          // The signed Go Top plugin routes carry their own HMAC headers and no Basic auth.
+          ...(authHeader ? { Authorization: authHeader } : {}),
           Accept: 'application/json',
           'User-Agent': 'RankingsByGoTop-Content/1.0',
           'Content-Length': String(body.length),
@@ -532,6 +533,32 @@ export async function detectSeoCapabilities(creds: WordPressCredentials): Promis
   } catch {
     return { plugin: 'unknown', hasBridge: false }
   }
+}
+
+/**
+ * One POST to a Go Top plugin route (`/wp-json/gotop/v1/<route>`), through the same guards as
+ * every other WordPress call: https only, the site URL checked, the address re-checked at connect
+ * time (no private networks, no DNS rebinding), no redirects, a timeout and a response cap.
+ *
+ *   auth: 'signed'    no Authorization header; `headers` carry the plugin HMAC signature
+ *                     (lib/site-fix/plugin-auth.ts).
+ *   auth: creds       the site's application password (used only to pair the plugin).
+ *
+ * Returns the status and the raw body for the caller to parse. Throws WordPressClientError on a
+ * transport failure (its message is ours, never the site's).
+ */
+export async function postToGoTopPlugin(
+  siteUrl: string,
+  route: string,
+  body: string,
+  opts: { headers?: Record<string, string>; creds?: WordPressCredentials },
+): Promise<{ status: number; body: string }> {
+  if (!/^\/[a-z-]{2,20}$/.test(route)) throw new Error('postToGoTopPlugin: route must be a fixed /gotop/v1 path') // a programming error, never shown
+  const origin = await assertSafeSiteUrl(siteUrl)
+  const target = new URL(`${origin}/wp-json/gotop/v1${route}`)
+  const auth = opts.creds ? buildAuthHeader(opts.creds) : null
+  const res = await httpsSend(target, auth, Buffer.from(body, 'utf8'), { 'Content-Type': 'application/json', ...(opts.headers ?? {}) })
+  return { status: res.status, body: res.body }
 }
 
 /**

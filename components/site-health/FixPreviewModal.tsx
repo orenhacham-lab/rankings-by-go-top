@@ -58,7 +58,7 @@ const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^w
 const pathLabel = (url: string) => { try { const p = decodeURI(new URL(url).pathname); return p.replace(/\/+$/, '') || '/' } catch { return url } }
 
 /** The image as the site serves it; when it will not load here, a quiet placeholder, never the browser's broken glyph. */
-function Thumb({ src }: { src: string }) {
+export function Thumb({ src }: { src: string }) {
   const [failed, setFailed] = useState(false)
   if (failed) {
     return (
@@ -73,7 +73,7 @@ function Thumb({ src }: { src: string }) {
   )
 }
 
-function LengthMeter({ n, limits, copy }: { n: number; limits: Limits; copy: Copy }) {
+export function LengthMeter({ n, limits, copy }: { n: number; limits: Limits; copy: Copy }) {
   const state = n > limits.max ? 'long' : n < limits.min ? 'short' : 'good'
   const pct = Math.min(100, Math.round((n / limits.max) * 100))
   return (
@@ -95,7 +95,7 @@ function LengthMeter({ n, limits, copy }: { n: number; limits: Limits; copy: Cop
 }
 
 /** A search result as Google draws it, from the values the fix would leave on the page. */
-function SearchResultMock({ url, title, description, caption }: { url: string; title: string; description: string; caption: string }) {
+export function SearchResultMock({ url, title, description, caption }: { url: string; title: string; description: string; caption: string }) {
   return (
     <div className="rounded-inset border border-line bg-surface p-4" data-site-health="serp">
       <p className="text-overline font-semibold uppercase tracking-wide text-muted">{caption}</p>

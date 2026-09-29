@@ -271,7 +271,7 @@ async function main() {
   const TOPICS = [...new Set(Object.values(RULES.GUIDE))] as GuideTopic[]
   const PLATFORMS: SitePlatform[] = ['wordpress', 'shopify', 'wix', 'other']
   check('E3: every step-by-step topic has steps for every platform, in both languages', TOPICS.every((t) => PLATFORMS.every((p) => he.guides[t]?.[p]?.length >= 1 && en.guides[t]?.[p]?.length >= 1)))
-  const CODES: SiteHealthErrorCode[] = ['unauthorized', 'not_found', 'invalid_request', 'site_unreachable', 'site_blocked', 'scan_failed', 'no_connection', 'not_in_wordpress', 'needs_seo_plugin', 'needs_bridge', 'nothing_to_fix', 'no_safe_place', 'changed_since_preview', 'approval_required', 'wordpress_permission', 'wordpress_unreachable', 'write_not_confirmed', 'value_invalid', 'off_site']
+  const CODES: SiteHealthErrorCode[] = ['unauthorized', 'not_found', 'invalid_request', 'site_unreachable', 'site_blocked', 'scan_failed', 'no_connection', 'not_in_wordpress', 'needs_seo_plugin', 'needs_bridge', 'nothing_to_fix', 'no_safe_place', 'changed_since_preview', 'approval_required', 'use_fix_queue', 'wordpress_permission', 'wordpress_unreachable', 'write_not_confirmed', 'value_invalid', 'off_site']
   check('E4: every error code has our own sentence in both languages', CODES.every((c) => he.errors[c] && en.errors[c]))
   check('E5: the Hebrew copy is Hebrew (no untranslated English sentence)', Object.values(he.findings).every((f) => /[א-ת]/.test(f.title) && /[א-ת]/.test(f.why)))
   check('E6: the sidebar label exists in both languages', dashboardHe.sidebar.siteHealth === 'בריאות האתר' && dashboardEn.sidebar.siteHealth === 'Site health')

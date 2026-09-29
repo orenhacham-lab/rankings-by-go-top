@@ -26,13 +26,14 @@ import { buildFindings, scoreOf } from './rules'
 import { scanSite, defaultScanDeps, PAGE_MS, type ScanDeps } from './scan'
 import { loadProjectSources, SourcesReadError } from './sources'
 import type { FindingKind, FixField, ScanStreamLine, SiteHealthErrorCode, SiteHealthReport } from './types'
+import { queueAvailable } from '@/lib/site-fix/store'
 import { applyFix, previewFix, type ApplyRequest, type ApplyResult, type Preview, type WpFixDeps } from './wordpress-fix'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 export const HTTP_STATUS: Partial<Record<SiteHealthErrorCode, number>> = {
   unauthorized: 401, not_found: 404, invalid_request: 400, off_site: 400, approval_required: 400, value_invalid: 400,
-  no_connection: 409, changed_since_preview: 409, scan_failed: 500,
+  no_connection: 409, changed_since_preview: 409, use_fix_queue: 409, scan_failed: 500,
 }
 export const statusFor = (code: SiteHealthErrorCode) => HTTP_STATUS[code] ?? 422
 
@@ -180,6 +181,9 @@ export async function handleFix(body: unknown, deps: FixApiDeps): Promise<FixAns
   // the value the preview read.
   if (b.approved !== true) return refuse('approval_required')
   if (typeof b.expected !== 'string') return refuse('approval_required')
+  // Once the fix queue exists, a write only happens through it: recorded (who, when, IP, before
+  // and after) and undoable. This older path stays for previews and for accounts without it.
+  if (await queueAvailable(deps.admin, { projectId, userId: deps.userId })) return refuse('use_fix_queue')
   let req: ApplyRequest
   if (field === 'alt') {
     if (!Array.isArray(b.images)) return refuse('invalid_request')

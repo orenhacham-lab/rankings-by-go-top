@@ -27,6 +27,9 @@ export type FindingKind =
   | 'h1_multiple'
   | 'orphan_page'
   | 'no_viewport'
+  | 'canonical_missing'
+  | 'schema_missing'
+  | 'faq_missing'
 
 /** What the platform is, as far as we know it; decides the step-by-step card. */
 export type SitePlatform = 'wordpress' | 'shopify' | 'wix' | 'other'
@@ -39,7 +42,7 @@ export type FixField = 'title' | 'description' | 'alt' | 'link'
 /** The topic of a step-by-step card; the card itself is `guides[topic][platform]`. */
 export type GuideTopic =
   | 'title' | 'description' | 'alt' | 'h1' | 'noindex' | 'robots' | 'robots_ai'
-  | 'broken' | 'sitemap' | 'orphan' | 'viewport' | 'unreachable'
+  | 'broken' | 'sitemap' | 'orphan' | 'viewport' | 'unreachable' | 'canonical' | 'schema' | 'faq'
 
 /** One page as the scan read it. */
 export interface PageFacts {
@@ -56,6 +59,12 @@ export interface PageFacts {
   viewport: boolean
   /** Same-site links on the page (for the broken-link check). */
   links: string[]
+  /** The page's rel=canonical, when it has one (absent in reports cached before it was read). */
+  canonical?: string | null
+  /** Distinct JSON-LD @type values on the page. */
+  schemaTypes?: string[]
+  /** A visible questions-and-answers block (FAQ schema, or several question headings). */
+  faq?: boolean
   /** A direct link to this item in the store's admin, when we know it (Shopify). */
   adminUrl: string | null
 }
@@ -98,6 +107,8 @@ export interface Finding {
   guide: GuideTopic
   /** At least one page offers "fix it for me". */
   fixable: boolean
+  /** The approved-fix type (lib/site-fix) this finding is fixed with, where one exists. */
+  fixType?: import('@/lib/site-fix/types').FixType | null
 }
 
 export interface ConnectionState {
@@ -139,6 +150,8 @@ export type SiteHealthErrorCode =
   | 'no_safe_place'
   | 'changed_since_preview'
   | 'approval_required'
+  /** The fix queue is live: every write goes through it (approved, audited, undoable). */
+  | 'use_fix_queue'
   | 'wordpress_permission'
   | 'wordpress_unreachable'
   | 'write_not_confirmed'
