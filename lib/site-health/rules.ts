@@ -17,6 +17,7 @@
  * image alt text in the page's own content, and a link to a page nothing links
  * to. Everything else is a step-by-step card, on every platform.
  */
+import type { FixType } from '@/lib/site-fix/types'
 import type {
   ConnectionState, Finding, FindingKind, FindingPage, FixField, GuideTopic, PageFacts, PageKind, Severity, SiteFacts,
   SitePlatform,
@@ -55,6 +56,9 @@ export const SEVERITY: Record<FindingKind, Severity> = {
   h1_multiple: 'minor',
   orphan_page: 'minor',
   no_viewport: 'important',
+  canonical_missing: 'minor',
+  schema_missing: 'minor',
+  faq_missing: 'minor',
 }
 
 /** The one-click field a finding is fixed with, where one exists at all. */
@@ -89,6 +93,29 @@ export const GUIDE: Record<FindingKind, GuideTopic> = {
   sitemap_missing: 'sitemap',
   orphan_page: 'orphan',
   no_viewport: 'viewport',
+  canonical_missing: 'canonical',
+  schema_missing: 'schema',
+  faq_missing: 'faq',
+}
+
+/**
+ * The approved-fix type (lib/site-fix) for each finding that has one. Where the fix goes (the
+ * plugin, the application password, the webhook) is decided per project by lib/site-fix/channel.ts.
+ */
+export const FIX_TYPE: Partial<Record<FindingKind, FixType>> = {
+  title_missing: 'seo_title',
+  title_long: 'seo_title',
+  title_short: 'seo_title',
+  title_duplicate: 'seo_title',
+  description_missing: 'meta_description',
+  description_length: 'meta_description',
+  description_duplicate: 'meta_description',
+  images_alt: 'image_alt',
+  orphan_page: 'internal_link',
+  broken_links: 'broken_link',
+  canonical_missing: 'canonical',
+  schema_missing: 'schema_jsonld',
+  faq_missing: 'faq_block',
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = { urgent: 0, important: 1, minor: 2 }
@@ -180,6 +207,10 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
     else if (p.h1.length > 1) add('h1_multiple', p, null, p.h1.length)
     if (p.images.total > 0 && p.images.missingAlt / p.images.total > ALT_TOLERANCE) add('images_alt', p, null, p.images.missingAlt)
     if (!p.viewport) add('no_viewport', p, null, null)
+    // Read only by scans since these were added (a cached report has no such facts: nothing is claimed).
+    if (p.canonical === null) add('canonical_missing', p, null, null)
+    if (Array.isArray(p.schemaTypes) && p.schemaTypes.length === 0 && (p.kind === 'home' || p.kind === 'article' || p.kind === 'page')) add('schema_missing', p, null, null)
+    if (p.faq === false && (p.kind === 'home' || p.kind === 'article')) add('faq_missing', p, null, null)
   }
   for (const [, group] of titles) if (group.length > 1) for (const p of group) add('title_duplicate', p, norm(p.title), group.length)
   for (const [, group] of descriptions) if (group.length > 1) for (const p of group) add('description_duplicate', p, norm(p.description), group.length)
@@ -195,7 +226,7 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
     const field = FIX_FIELD[id] ?? null
     findings.push({
       id, severity: SEVERITY[id], pages: list.slice(0, MAX_PAGES_SHOWN), total: list.length,
-      field, guide: GUIDE[id], fixable: list.some((p) => p.fixable),
+      field, guide: GUIDE[id], fixable: list.some((p) => p.fixable), fixType: FIX_TYPE[id] ?? null,
     })
   }
   return findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || b.total - a.total || a.id.localeCompare(b.id))

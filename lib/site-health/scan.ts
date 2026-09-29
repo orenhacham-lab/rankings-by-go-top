@@ -148,6 +148,7 @@ export async function scanSite(
         url: c.url, kind: c.kind, ok: true, status: got.status, title: s.title, description: s.metaDescription,
         h1: s.h1, images: s.images, noindex: hasNoindex(got.html), viewport: s.viewportMeta,
         links: s.internalLinkUrls, adminUrl: c.adminUrl,
+        canonical: s.canonical, schemaTypes: s.schemaTypes, faq: s.hasFaqSection,
       }
     }
 

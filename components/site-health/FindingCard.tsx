@@ -68,13 +68,16 @@ export function GuideSteps({ steps, title, id }: { steps: readonly string[]; tit
 }
 
 export default function FindingCard({
-  finding, copy, platform, fixed, onFix,
+  finding, copy, platform, fixed, onFix, fixModeFor, onInstall,
 }: {
   finding: Finding
   copy: Copy
   platform: SitePlatform
   fixed: ReadonlySet<string>
   onFix: (finding: Finding, page: FindingPage) => void
+  /** With the fix queue live: whether this page can be fixed now, needs the plugin first, or neither. */
+  fixModeFor?: ((finding: Finding, page: FindingPage) => 'fix' | 'install' | null) | null
+  onInstall?: () => void
 }) {
   const [stepsOpen, setStepsOpen] = useState(false)
   const [allPages, setAllPages] = useState(false)
@@ -112,8 +115,9 @@ export default function FindingCard({
             {shown.map((page) => {
               const done = fixed.has(fixKey(finding.id, page.url))
               const measure = measureOf(copy, finding, page)
+              const mode = fixModeFor ? fixModeFor(finding, page) : page.fixable ? 'fix' : null
               return (
-                <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : page.fixable ? 'fixable' : 'guide'}>
+                <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : mode === 'fix' ? 'fixable' : mode === 'install' ? 'install' : 'guide'}>
                   <div className="min-w-0">
                     {/* The address reads left to right, while the row keeps the page's own alignment. */}
                     <p className="truncate text-copy font-medium text-ink" title={page.url}>
@@ -128,9 +132,13 @@ export default function FindingCard({
                   <div className="flex shrink-0 items-center gap-2">
                     {done ? (
                       <Badge variant="success"><Check size={14} strokeWidth={2.4} aria-hidden="true" />{copy.fixedBadge}</Badge>
-                    ) : page.fixable ? (
-                      <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.field ?? ''}>
+                    ) : mode === 'fix' ? (
+                      <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.fixType && fixModeFor ? finding.fixType : finding.field ?? ''}>
                         {copy.fixForMe}
+                      </Button>
+                    ) : mode === 'install' && onInstall ? (
+                      <Button variant="ghost" size="sm" onClick={onInstall} data-install-button={finding.fixType ?? ''}>
+                        {copy.autofix.connection.install}
                       </Button>
                     ) : page.adminUrl ? (
                       <a
