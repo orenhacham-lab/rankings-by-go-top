@@ -21,11 +21,11 @@ export const landingEn: LandingCopy = {
     title: 'Your next customers are already searching.',
     accent: 'We make sure they find you.',
     subtitle:
-      'Go Top writes and publishes articles on your site that answer exactly what your customers search for, and tracks where you show up in Google, Google Maps and the answers of ChatGPT and Gemini. No content team, and no guessing what works.',
+      'Go Top writes and publishes articles that answer what your customers are searching for, then shows you where you appear in Google, Google Maps, ChatGPT and Gemini. No content team. No guesswork.',
     or: 'or',
     signup: `Start a free ${TRIAL_DAYS}-day trial`,
     dashboard: 'Go to my dashboard',
-    trust: ['No credit card', 'Cancel anytime', 'Works with WordPress and Shopify', 'Real human support'],
+    trust: ['No credit card', 'Cancel anytime', 'Publishes to WordPress and Shopify', 'Support from real people'],
   },
   demo: {
     label: 'A live demo of the platform',
@@ -71,7 +71,7 @@ export const landingEn: LandingCopy = {
       question: 'Who is a good AC installer in Austin?',
       intro: 'Here are a few companies with strong recommendations in the area:',
       items: [
-        { name: 'Northwind Air', desc: 'Licensed installers, a warranty on the work and same-day replies.', you: true },
+        { name: 'Summit Air', desc: 'Licensed installers, a warranty on the work and same-day replies.', you: true },
         { name: 'CoolPoint HVAC', desc: 'Fair prices for cleaning and maintenance.' },
         { name: 'Bayside Comfort', desc: 'Specialists in ducted systems.' },
       ],
@@ -95,7 +95,7 @@ export const landingEn: LandingCopy = {
   outcomes: {
     eyebrow: 'What you get',
     title: 'What Go Top does for you while you run the business',
-    body: 'Not another tool to learn. A system that does the work, and shows you what came of it.',
+    body: 'Not another tool to learn. A system that does the work, then shows you the results.',
     items: [
       {
         title: 'Content that brings customers, not just traffic',
@@ -115,7 +115,7 @@ export const landingEn: LandingCopy = {
     ],
     stats: [
       { value: 6, label: 'AI engines checked', detail: 'ChatGPT, Gemini, Perplexity, Copilot, Grok and Google AI' },
-      { value: 3, label: 'channels, one report', detail: 'Google, Google Maps and AI answers' },
+      { value: 3, label: 'channels in one report', detail: 'Google, Google Maps and AI answers' },
       { value: 2, label: 'platforms to publish to', detail: 'WordPress and Shopify, no copy and paste' },
       { value: TRIAL_DAYS, label: 'day free trial', detail: 'No credit card' },
     ],
@@ -123,12 +123,12 @@ export const landingEn: LandingCopy = {
   shift: {
     eyebrow: 'Search has changed',
     title: 'Customers no longer just google. They ask AI, and get three recommendations.',
-    body: 'If your site does not answer their questions, in Google or in a ChatGPT answer, the recommendation goes to a competitor. Most businesses have no idea where they stand, because no tool showed them both worlds together.',
+    body: 'If your site doesn\'t answer their questions, in Google or in a ChatGPT answer, that recommendation goes to a competitor. Most businesses have no idea where they stand, because no tool has shown them both at once.',
     withoutTitle: 'Without Go Top',
     without: [
-      'An article every couple of months, when someone finds the time',
-      'No clear idea what to write about or which phrase is worth it',
-      'Positions checked by hand, or not at all',
+      'An article every couple of months, when someone finds time',
+      'No clear idea what to write, or which phrase is worth it',
+      'Rankings checked by hand, or not at all',
       'No idea whether ChatGPT recommends you or a competitor',
     ],
     withTitle: 'With Go Top',
@@ -152,7 +152,7 @@ export const landingEn: LandingCopy = {
     cta: 'Start with a free check',
   },
   features: {
-    eyebrow: 'What is inside',
+    eyebrow: 'What\'s inside',
     title: 'Everything you need to rise, in one place',
     body: 'Four tools that work together, so every article is measured and every measurement becomes the next article.',
     more: 'Learn more',
@@ -227,19 +227,19 @@ export const landingEn: LandingCopy = {
           { label: 'Average position', value: '6.2', up: true },
         ],
         clientsLabel: 'Projects:',
-        clients: ['northwind-air.com', 'studio-dana.com', '+3'],
+        clients: ['summit-air.com', 'studio-dana.com', '+3'],
       },
     },
   },
   audience: {
     eyebrow: 'Who it is for',
     title: 'For anyone who wants their site to bring customers',
-    body: 'You do not need to know SEO. You need to know what you sell.',
+    body: 'You don\'t need to know SEO. You need to know what you sell.',
     items: [
       {
         title: 'Business owners',
-        desc: 'You want more leads from Google without learning SEO or hiring a writer. Approve topics, and the rest happens.',
-        gain: 'A site that works for you while you are busy',
+        desc: 'You want more leads from Google without learning SEO or hiring a writer. Approve the topics, and the rest happens.',
+        gain: 'A site that works while you\'re busy',
       },
       {
         title: 'Freelancers and agencies',
@@ -267,7 +267,7 @@ export const landingEn: LandingCopy = {
     cta: 'Check my site',
     note: 'Free, no signup and no credit card.',
     preview: {
-      domain: 'northwind-air.com',
+      domain: 'summit-air.com',
       heading: 'Your first research summary',
       scoreLabel: 'AI readiness',
       score: '3/4',
@@ -278,14 +278,14 @@ export const landingEn: LandingCopy = {
   faq: {
     eyebrow: 'Questions',
     title: 'What people usually ask before they start',
-    body: 'Did not find your answer? Message us on WhatsApp.',
+    body: 'Didn\'t find your answer? Message us on WhatsApp.',
     items: [
       {
-        q: 'I do not know anything about SEO. Is this for me?',
+        q: 'I don\'t know anything about SEO. Is this for me?',
         a: 'Yes. The platform picks the phrases, suggests topics and writes the articles. What is left for you is deciding what fits the business, and approving it.',
       },
       {
-        q: 'Will anything be published on my site without me seeing it?',
+        q: 'Will anything go live on my site without me seeing it?',
         a: 'Only topics you approved go into writing, and every article passes a quality check before it goes live. You can review and edit any article and choose when it publishes.',
       },
       {
@@ -298,7 +298,7 @@ export const landingEn: LandingCopy = {
       },
       {
         q: `What happens after the ${TRIAL_DAYS}-day trial?`,
-        a: 'Pick a plan and carry on from where you are. Did not pick one? Nothing is charged, because we never asked for a card.',
+        a: 'Pick a plan and carry on right where you left off. Didn\'t pick one? Nothing is charged, because we never asked for a card.',
       },
       {
         q: 'Can I cancel?',

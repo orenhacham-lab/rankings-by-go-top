@@ -117,7 +117,7 @@ export function LandingPage({
             <div className={styles.glowB} />
           </div>
           <div className={cn(CONTAINER, 'relative pt-24 pb-14 sm:pt-32 sm:pb-20')}>
-            <div className="mx-auto max-w-3xl text-center">
+            <div className="mx-auto max-w-4xl text-center">
               <div className="mb-5"><Eyebrow icon={Sparkles}>{copy.hero.eyebrow}</Eyebrow></div>
               <h1 className="text-title font-bold tracking-tight text-ink text-balance sm:text-display">
                 {copy.hero.title}
