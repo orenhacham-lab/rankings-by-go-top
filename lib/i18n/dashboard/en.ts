@@ -68,6 +68,17 @@ export const dashboardEn = {
   // The Guide pill in the top bar (components/guide/GuideMenu.tsx) and the tours
   // it starts (components/onboarding/DashboardOnboardingTour.tsx). Every answer and
   // every step describes something the product does today.
+  // "Contact us" in the top bar (wave 8, UX C): WhatsApp, phone and email, beside the Guide.
+  contact: {
+    label: 'Contact us',
+    menuLabel: 'Contact',
+    whatsapp: 'WhatsApp',
+    whatsappMessage: (domain: string) => (domain ? `Hi, I need help with ${domain}` : 'Hi, I need help'),
+    phone: (number: string) => `Call ${number}`,
+    email: (address: string) => `Email ${address}`,
+    hours: 'We answer Sun-Thu, 9:00-18:00',
+    opensNewTab: '(opens in a new tab)',
+  },
   guide: {
     label: 'Guide',
     menuLabel: 'Guide and help',
@@ -2773,22 +2784,28 @@ export const dashboardEn = {
   // opt-in link network among our customers (lib/link-network).
   siteLinks: {
     title: 'Links',
-    subtitle: 'Who links to you, where else you can earn links, and what is missing between your own pages.',
+    subtitle: 'Links from other sites make yours stronger in Google. Here you see the Go Top link network, sites worth contacting, and the links between your own pages.',
     loading: 'Loading your links…',
     loadError: 'We could not load this. Try again in a moment.',
     retry: 'Try again',
-    progress: {
-      title: 'Your progress',
-      body: 'Every link from a real site that chose you makes your site stronger in Google. Mark each outreach here and watch the list move.',
+    // The hero when the link network is not on this screen (a Shopify store, or no network):
+    // the outreach list's own figures (wave 8, UX A2-f).
+    outreachHero: {
+      title: (t: number) => (t === 0 ? 'Sites worth a link from' : t === 1 ? '1 site worth a link from' : `${t} sites worth a link from`),
+      shopify: 'The customer link network is not available for Shopify stores: there is no safe way for us to add a link inside a store article. Everything else here works.',
       found: 'Sites on the list',
       contacted: 'Contacted',
       received: 'Link received',
-      meter: (done: number, total: number) => `${done} of ${total} in progress`,
-      savedHere: 'Your marks are saved in this browser.',
     },
     opportunities: {
       title: 'Sites worth getting a link from',
-      description: 'Sites that already show up in Google and in AI answers for what your customers search. For each one: why it matters, and how to get a link.',
+      description: 'Directories, articles and associations already showing in Google or AI answers for what your customers search. Each one says how to get a link from it. You contact these yourself; they are not part of the link network.',
+      progress: (contacted: number, total: number, received: number) =>
+        `Contacted ${contacted} of ${total} · ${received === 1 ? '1 link received' : `${received} links received`}`,
+      savedHere: 'Your marks are saved in this browser only.',
+      competitorsHidden: (n: number) => (n === 1
+        ? '1 competitor site showed up in the same searches, so it is left out. Directories and articles that mention your competitors stay, because you want to be there too.'
+        : `${n} competitor sites showed up in the same searches, so they are left out. Directories and articles that mention your competitors stay, because you want to be there too.`),
       filterLabel: 'Filter by type of site',
       filterAll: 'All',
       categories: {
@@ -2797,7 +2814,6 @@ export const dashboardEn = {
         association: 'Industry association',
         media: 'Media',
       },
-      competitor: 'Competitor',
       local: 'Local',
       reasons: {
         known_directory: 'A known business directory or review site',
@@ -2824,7 +2840,6 @@ export const dashboardEn = {
         contacted: 'Contacted',
         got_link: 'Got a link',
       },
-      competitorNote: 'This is a competitor’s site. Competitors rarely link to each other, so reaching out is not worth it. It is worth seeing how they got onto the list, and going to the same places.',
       steps: {
         directory: [
           'Search the site for your business name. If you are listed, check that the details are right and that your website is linked.',
@@ -2897,29 +2912,43 @@ export const dashboardEn = {
     },
     policy: {
       title: 'A link you earned is worth more',
-      body: 'Google treats links built only to influence rankings as a link scheme, and a site caught in one can drop in the rankings. A link from a directory, an article or an association that chose you is the safest and strongest kind, and it lasts.',
+      body: 'Don\'t pay for links and don\'t agree to link swaps. Google treats that as a \'link scheme\' and can demote the site. A link from a directory, article or association that chose you is the safest and strongest.',
       link: 'Google’s spam policies',
     },
     // The link network, lib/link-network. Opt-in, both ways.
+    // The screen opens on its state, in words (wave 8, UX A1-A2).
     network: {
-      tabs: { label: 'Show', network: 'Link network', opportunities: 'Link opportunities' },
       loading: 'Loading the link network…',
       loadError: 'We could not load the link network. Try again in a moment.',
       stats: {
-        members: 'Sites in the network',
-        membersSource: 'Businesses that joined so far',
-        received: 'Links you received',
-        given: 'Links you gave',
+        received: 'Links received',
+        given: 'Links given',
+        waiting: 'Waiting to go live',
         sinceJoining: 'Since you joined',
-        notJoined: 'You have not joined yet',
+        countsStart: 'Counts start when you turn it on',
       },
       hero: {
         overline: 'Link network',
-        title: 'Natural links from sites of complementary businesses',
-        body: 'Businesses that write their content with us link to each other inside their articles, only where the link really helps the reader. No outreach, no swaps, and no competitors.',
+        badge: { on: 'On', notPlacing: 'On, not placing yet', off: 'Off', notAvailable: 'Not available yet' },
+        title: {
+          on: 'The link network is on for your site',
+          notPlacing: 'Your site is in the network but not placing links yet',
+          off: 'The link network is off for this site',
+          cannotJoin: 'To join, first prove the site is yours',
+        },
+        body: {
+          on: 'Complementary businesses in the network can link to you from their articles, and you to them. Never both ways, never a competitor.',
+          off: (members: string) => `Turn it on and complementary businesses (never competitors) link to you from real articles, while you link to others. ${members} sites have joined.`,
+          cannotJoin: 'Connect it through WordPress (or the Go Top plugin) or Search Console, then turn the network on.',
+          left: (date: string) => `You left on ${date}. Links already published stay in the log.`,
+        },
+        turnOn: 'Turn on the link network',
+        connect: 'Connect the site',
+        completeCategory: 'Add your business field',
       },
       how: {
         title: 'How it works',
+        toggle: 'How it works and the rules that protect you',
         steps: [
           'When we write an article for a complementary business in the network, it can include a natural link to a relevant page of yours, inside a sentence that is already there.',
           'When we write an article for you, it can include one link to a page of a complementary business. You see it here before it is published, and you can remove it.',
@@ -2943,10 +2972,11 @@ export const dashboardEn = {
       },
       switch: {
         label: 'Take part in the link network',
-        offDescription: 'Off. It turns on only after you accept the terms.',
-        domainUnverified: 'To join the network, connect your site (WordPress or Search Console) so we know the site is yours.',
+        on: 'On',
+        off: 'Off',
         onDescription: (date: string) => `In the network since ${date}. You can leave at any time.`,
-        leftDescription: (date: string) => `You left the network on ${date}. Links already placed stay in the log.`,
+        offDescription: 'Off. It turns on only after you accept the terms.',
+        cannotJoinDescription: 'You can turn it on once the site is connected.',
       },
       consent: {
         title: 'Before you join',
@@ -3041,6 +3071,17 @@ export const dashboardEn = {
       risk: 'pages competing with each other',
     },
     insightsNoGsc: 'Connect Search Console to see which pages bring traffic and which to strengthen.',
+    // The screen's hero (wave 8, UX A7): the same figures, on the dark context card.
+    hero: {
+      updated: 'Updated {date}',
+      mapping: 'Mapping the site…',
+      headline: '{total} pages on the site',
+      headlineAtLeast: 'At least {total} pages on the site',
+      headlineGsc: '{total} pages on the site, {withClicks} bring clicks from Google',
+      stats: { withClicks: 'Bring clicks', seenNoClicks: 'Seen, no clicks', actionable: 'Clear opportunity', risk: 'Competing with each other' },
+      riskHint: 'Click to filter the list',
+      connectGsc: 'Connect Search Console',
+    },
     map: {
       running: 'Mapping your whole site…',
       runningSitemaps: '{n} addresses found so far · {read} of {seen} page lists read',

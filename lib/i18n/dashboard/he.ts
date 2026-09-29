@@ -66,6 +66,17 @@ export const dashboardHe = {
   // The Guide pill in the top bar (components/guide/GuideMenu.tsx) and the tours
   // it starts (components/onboarding/DashboardOnboardingTour.tsx). Every answer and
   // every step describes something the product does today.
+  // "צרו קשר" in the top bar (wave 8, UX C): WhatsApp, phone and email, beside the Guide.
+  contact: {
+    label: 'צרו קשר',
+    menuLabel: 'יצירת קשר',
+    whatsapp: 'WhatsApp',
+    whatsappMessage: (domain: string) => (domain ? `היי, אני צריך עזרה עם ${domain}` : 'היי, אני צריך עזרה'),
+    phone: (number: string) => `טלפון ${number}`,
+    email: (address: string) => `מייל ${address}`,
+    hours: "עונים בימים א'-ה', 9:00-18:00",
+    opensNewTab: '(נפתח בחלון חדש)',
+  },
   guide: {
     label: 'מדריך',
     menuLabel: 'מדריך ועזרה',
@@ -2780,22 +2791,28 @@ export const dashboardHe = {
   // opt-in link network among our customers (lib/link-network).
   siteLinks: {
     title: 'קישורים לאתר',
-    subtitle: 'מי מקשר אליכם, מאיפה עוד אפשר לקבל קישורים, ומה חסר בקישורים בין העמודים שלכם.',
+    subtitle: 'קישורים מאתרים אחרים מחזקים את האתר בגוגל. כאן רואים את רשת הקישורים של Go Top, אתרים שכדאי לפנות אליהם, והקישורים בין העמודים שלכם.',
     loading: 'טוענים את הקישורים…',
     loadError: 'לא הצלחנו לטעון את הנתונים. נסו שוב בעוד רגע.',
     retry: 'נסו שוב',
-    progress: {
-      title: 'ההתקדמות שלכם',
-      body: 'כל קישור מאתר אמיתי שבחר בכם מחזק את האתר בגוגל. סמנו כאן כל פנייה, ותראו איך הרשימה מתקדמת.',
+    // The hero when the link network is not on this screen (a Shopify store, or no network):
+    // the outreach list's own figures (wave 8, UX A2-f).
+    outreachHero: {
+      title: (t: number) => (t === 0 ? 'אתרים שכדאי שיקשרו אליכם' : t === 1 ? 'אתר אחד שכדאי שיקשר אליכם' : `${t} אתרים שכדאי שיקשרו אליכם`),
+      shopify: 'רשת הקישורים בין לקוחות לא זמינה לחנויות Shopify, כי אין לנו דרך בטוחה להוסיף קישור בתוך מאמר בחנות. כל שאר הכלים כאן עובדים.',
       found: 'אתרים ברשימה',
       contacted: 'פניתם',
       received: 'קיבלתם קישור',
-      meter: (done: number, total: number) => `${done} מתוך ${total} בטיפול`,
-      savedHere: 'הסימונים נשמרים בדפדפן הזה.',
     },
     opportunities: {
       title: 'אתרים שכדאי שיקשרו אליכם',
-      description: 'אתרים שכבר מופיעים בגוגל ובתשובות של AI על מה שהלקוחות שלכם מחפשים. לכל אתר: למה הוא חשוב, ואיך מקבלים ממנו קישור.',
+      description: 'אינדקסים, כתבות ואיגודים שכבר מופיעים בגוגל או בתשובות AI על מה שהלקוחות שלכם מחפשים. לכל אתר כתוב איך מקבלים ממנו קישור. אליהם פונים בעצמכם, הם לא חלק מרשת הקישורים.',
+      progress: (contacted: number, total: number, received: number) =>
+        `פניתם ל-${contacted} מתוך ${total} · ${received === 1 ? 'קיבלתם קישור אחד' : `קיבלתם ${received} קישורים`}`,
+      savedHere: 'הסימונים נשמרים רק בדפדפן הזה.',
+      competitorsHidden: (n: number) => (n === 1
+        ? 'אתר אחד של מתחרה הופיע באותם חיפושים, ולכן הוא לא ברשימה. אינדקסים וכתבות שמזכירים את המתחרים שלכם נשארו, כי שם כדאי להופיע גם לכם.'
+        : `${n} אתרים של מתחרים הופיעו באותם חיפושים, ולכן הם לא ברשימה. אינדקסים וכתבות שמזכירים את המתחרים שלכם נשארו, כי שם כדאי להופיע גם לכם.`),
       filterLabel: 'סינון לפי סוג אתר',
       filterAll: 'הכול',
       categories: {
@@ -2804,7 +2821,6 @@ export const dashboardHe = {
         association: 'איגוד מקצועי',
         media: 'תקשורת',
       },
-      competitor: 'מתחרה',
       local: 'מקומי',
       reasons: {
         known_directory: 'אינדקס עסקים או אתר ביקורות מוכר',
@@ -2831,7 +2847,6 @@ export const dashboardHe = {
         contacted: 'פניתי',
         got_link: 'קיבלתי קישור',
       },
-      competitorNote: 'זה אתר של מתחרה שלכם. מתחרים בדרך כלל לא מקשרים זה לזה, ולכן לא כדאי לפנות אליו. כדאי כן לבדוק איך הוא נכנס לרשימה, ולהגיע לאותם מקומות.',
       steps: {
         directory: [
           'חפשו באתר את שם העסק שלכם. אם אתם כבר שם, בדקו שהפרטים נכונים ושיש קישור לאתר שלכם.',
@@ -2904,29 +2919,43 @@ export const dashboardHe = {
     },
     policy: {
       title: 'קישור שהרווחתם שווה יותר',
-      body: 'גוגל מתייחס לקישורים שנבנו רק כדי להשפיע על הדירוג כאל "תוכנית קישורים" (link scheme), ואתר שנתפס בזה יכול לרדת בדירוג. קישור מאינדקס, מכתבה או מאיגוד שבחרו בכם הוא הקישור הבטוח והחזק ביותר, והוא נשאר.',
+      body: 'אל תשלמו על קישור ואל תסכימו להחלפת קישורים. גוגל מתייחס לזה כ\'תוכנית קישורים\', ואתר שנתפס בזה יורד בדירוג. קישור מאינדקס, מכתבה או מאיגוד שבחרו בכם הוא הבטוח והחזק ביותר.',
       link: 'מדיניות הספאם של גוגל',
     },
     // The link network ("רשת הקישורים"), lib/link-network. Opt-in, both ways.
+    // The screen opens on its state, in words (wave 8, UX A1-A2).
     network: {
-      tabs: { label: 'מה מציגים', network: 'רשת הקישורים', opportunities: 'הזדמנויות קישור' },
       loading: 'טוענים את רשת הקישורים…',
       loadError: 'לא הצלחנו לטעון את רשת הקישורים. נסו שוב בעוד רגע.',
       stats: {
-        members: 'אתרים ברשת',
-        membersSource: 'עסקים שהצטרפו עד היום',
         received: 'קישורים שקיבלתם',
         given: 'קישורים שנתתם',
+        waiting: 'ממתינים לפרסום',
         sinceJoining: 'מאז ההצטרפות',
-        notJoined: 'עוד לא הצטרפתם',
+        countsStart: 'יתחיל להיספר כשתפעילו',
       },
       hero: {
         overline: 'רשת הקישורים',
-        title: 'קישורים טבעיים מאתרים של עסקים משלימים',
-        body: 'עסקים שכותבים איתנו תוכן מקשרים זה לזה בתוך המאמרים, רק כשהקישור באמת עוזר לקורא. בלי פניות, בלי החלפות, ובלי מתחרים.',
+        badge: { on: 'פעיל', notPlacing: 'פעיל, עוד לא משבץ', off: 'כבוי', notAvailable: 'לא זמין עדיין' },
+        title: {
+          on: 'רשת הקישורים פעילה לאתר שלכם',
+          notPlacing: 'האתר ברשת, אבל עוד לא מקבל ולא נותן קישורים',
+          off: 'רשת הקישורים כבויה לאתר הזה',
+          cannotJoin: 'כדי להצטרף לרשת, צריך להוכיח שהאתר שלכם',
+        },
+        body: {
+          on: 'עסקים משלימים ברשת יכולים לקשר אליכם מתוך המאמרים שלהם, ואתם אליהם. אף פעם לא הדדי, אף פעם לא מתחרה.',
+          off: (members: string) => `כשתפעילו, עסקים משלימים (לא מתחרים) יקשרו אליכם מתוך מאמרים אמיתיים, ואתם תקשרו לעסקים אחרים. ${members} אתרים כבר ברשת.`,
+          cannotJoin: 'מחברים את האתר ב-WordPress (או בתוסף של Go Top) או ב-Search Console, ומיד אפשר להפעיל.',
+          left: (date: string) => `יצאתם מהרשת ב-${date}. קישורים שכבר פורסמו נשארים ביומן.`,
+        },
+        turnOn: 'הפעלת רשת הקישורים',
+        connect: 'חיבור האתר',
+        completeCategory: 'להשלמת תחום העסק',
       },
       how: {
         title: 'איך זה עובד',
+        toggle: 'איך זה עובד והכללים ששומרים עליכם',
         steps: [
           'כשאנחנו כותבים מאמר לעסק משלים ברשת, הוא יכול לכלול קישור טבעי לעמוד רלוונטי אצלכם, בתוך משפט שכבר קיים.',
           'כשאנחנו כותבים מאמר בשבילכם, הוא יכול לכלול קישור אחד לעמוד של עסק משלים. תראו אותו כאן לפני הפרסום, ותוכלו להסיר אותו.',
@@ -2950,10 +2979,11 @@ export const dashboardHe = {
       },
       switch: {
         label: 'השתתפות ברשת הקישורים',
-        offDescription: 'כבוי. נדליק רק אחרי שתאשרו את התנאים.',
-        domainUnverified: 'כדי להצטרף לרשת צריך לחבר את האתר (WordPress או Search Console), כדי שנדע שהאתר שלכם.',
+        on: 'פעיל',
+        off: 'כבוי',
         onDescription: (date: string) => `האתר ברשת מאז ${date}. אפשר לצאת בכל רגע.`,
-        leftDescription: (date: string) => `יצאתם מהרשת ב-${date}. קישורים שכבר שובצו נשארים ביומן.`,
+        offDescription: 'כבוי. נדליק רק אחרי שתאשרו את התנאים.',
+        cannotJoinDescription: 'אפשר להפעיל אחרי שהאתר מחובר.',
       },
       consent: {
         title: 'לפני שמצטרפים',
@@ -3048,6 +3078,17 @@ export const dashboardHe = {
       risk: 'עמודים שמתחרים זה בזה',
     },
     insightsNoGsc: 'כשמחברים את Search Console, רואים כאן אילו עמודים מביאים תנועה ואילו כדאי לחזק.',
+    // The screen's hero (wave 8, UX A7): the same figures, on the dark context card.
+    hero: {
+      updated: 'עודכן {date}',
+      mapping: 'ממפים את האתר…',
+      headline: '{total} עמודים באתר',
+      headlineAtLeast: 'לפחות {total} עמודים באתר',
+      headlineGsc: '{total} עמודים באתר, {withClicks} מהם מביאים קליקים מגוגל',
+      stats: { withClicks: 'מביאים קליקים', seenNoClicks: 'מופיעים בלי קליקים', actionable: 'עם הזדמנות ברורה', risk: 'מתחרים זה בזה' },
+      riskHint: 'לחיצה מסננת את הרשימה',
+      connectGsc: 'חיבור Search Console',
+    },
     map: {
       running: 'ממפים את כל האתר…',
       runningSitemaps: 'נמצאו עד עכשיו {n} כתובות · נקראו {read} מתוך {seen} רשימות עמודים',

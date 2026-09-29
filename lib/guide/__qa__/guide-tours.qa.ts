@@ -156,8 +156,9 @@ console.log('\nD) where the bubble goes')
 console.log('\nE) one tour system, mounted once from the pill in the top bar')
 {
   const layout = code('app/(dashboard)/layout.tsx')
-  const mounted = (src: string) => /<WorkspaceSwitcher \/>\s*<GuideMenu userId=\{user\.id\} accountCreatedAt=\{user\.created_at \?\? null\} \/>/.test(src)
-  check('E1: the pill sits right after the switcher in the top bar (left of it in Hebrew)', mounted(layout))
+  // Wave 8 (UX C): the "Contact us" pill sits between the switcher and the Guide pill.
+  const mounted = (src: string) => /<WorkspaceSwitcher \/>\s*\{!isAdmin && <ContactMenu \/>\}\s*<GuideMenu userId=\{user\.id\} accountCreatedAt=\{user\.created_at \?\? null\} \/>/.test(src)
+  check('E1: the pill sits right after the switcher and the contact pill in the top bar (left of them in Hebrew)', mounted(layout))
   check('E1-MUT: a pill mounted elsewhere fails E1', !mounted(layout.replace(/<GuideMenu [^>]*\/>/, '')))
   const dash = code('app/(dashboard)/dashboard/page.tsx')
   check('E2: the dashboard no longer mounts a tour of its own (one runner, from the pill)', !/DashboardOnboardingTour/.test(dash))

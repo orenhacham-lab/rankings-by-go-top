@@ -161,7 +161,8 @@ console.log('\nC. safe external links')
   check('MUTATION CONTROL: without the scheme checks javascript:/ftp: get through → caught', m.badAccepted.length > 0)
 
   const files = ['components/site-links/SiteLinksView.tsx', 'components/site-links/OpportunityList.tsx', 'components/site-links/InternalLinksSection.tsx',
-    'components/site-links/ProgressCard.tsx', 'components/site-links/PolicyNote.tsx', 'components/site-links/LinkButton.tsx', 'app/(dashboard)/site-links/page.tsx']
+    'components/site-links/PolicyNote.tsx', 'components/site-links/LinkButton.tsx', 'app/(dashboard)/site-links/page.tsx']
+  // (ProgressCard.tsx was removed in wave 8: its progress is one line in the list's header, UX A4.)
   const rawAnchors = (src: string) => /<a[\s>]/.test(strip(src))
   const hrefProps = (src: string) => [...strip(src).matchAll(/\bhref=\{([^}]*)\}|\bhref="([^"]*)"/g)].map((x) => (x[1] ?? x[2] ?? '').trim())
   // An href on the tab is ExternalLink's (checked there) or an in-app path starting with "/".

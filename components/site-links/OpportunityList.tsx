@@ -3,16 +3,15 @@
 /**
  * The sites worth getting a link from, one row per site.
  *
- * Each row says what the site is (category, and "competitor" / "local" when
- * they apply), the one strongest reason it is on the list, and where the owner
- * stands with it. Opening a row shows every reason, the rule that classified the
- * site, the pages that showed up, and the plain steps to get a link. Rows of
- * competitors carry the competitor badge and a note instead of outreach steps:
- * a competitor is never presented as a link target.
+ * Each row says what the site is (category, and "local" when it applies), the
+ * one strongest reason it is on the list, and where the owner stands with it.
+ * Opening a row shows every reason, the rule that classified the site, the pages
+ * that showed up, and the plain steps to get a link. Competitors never reach this
+ * list (SiteLinksView leaves them out and says how many, UX A3): a competitor is
+ * never presented as a link target.
  */
 import { useId, useMemo, useState } from 'react'
 import { BookMarked, Check, ChevronDown, Landmark, ListOrdered, MapPin, Newspaper, Search, Sparkles } from 'lucide-react'
-import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
 import { cn } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import SiteAvatar from '@/components/ui/SiteAvatar'
@@ -123,12 +122,6 @@ function OpportunityRow({ copy, item: o, status, onStatus }: {
                 <CategoryIcon size={12} aria-hidden="true" />
                 {copy.categories[o.category]}
               </Badge>
-              {o.isCompetitor && (
-                <Badge variant="warning" className="gap-1">
-                  <CompetitorIcon size={12} aria-hidden="true" />
-                  {copy.competitor}
-                </Badge>
-              )}
               {o.isLocal && (
                 <Badge variant="info" className="gap-1">
                   <MapPin size={12} aria-hidden="true" />
@@ -144,7 +137,7 @@ function OpportunityRow({ copy, item: o, status, onStatus }: {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:shrink-0 lg:flex-nowrap">
-          {!o.isCompetitor && <StatusControl copy={copy} domain={o.domain} value={status} onChange={onStatus} />}
+          <StatusControl copy={copy} domain={o.domain} value={status} onChange={onStatus} />
           <button
             type="button"
             aria-expanded={open}
@@ -211,26 +204,17 @@ function OpportunityRow({ copy, item: o, status, onStatus }: {
             </div>
 
             <div className="min-w-0">
-              {o.isCompetitor ? (
-                <div className="flex gap-3 rounded-inset border border-warn/20 bg-warn-soft p-4 text-copy text-ink">
-                  <CompetitorIcon size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-warn" />
-                  <p className="text-pretty">{copy.competitorNote}</p>
-                </div>
-              ) : (
-                <>
-                  <h3 className="text-overline font-semibold text-muted ltr:uppercase ltr:tracking-wider">{copy.stepsTitle}</h3>
-                  <ol className="mt-3 space-y-3" data-site-links-steps={o.category}>
-                    {copy.steps[o.category].map((step, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-pill bg-action-soft text-caption font-semibold text-action tabular-nums">
-                          {i + 1}
-                        </span>
-                        <span className="min-w-0 pt-0.5 text-copy text-body text-pretty">{step}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </>
-              )}
+              <h3 className="text-overline font-semibold text-muted ltr:uppercase ltr:tracking-wider">{copy.stepsTitle}</h3>
+              <ol className="mt-3 space-y-3" data-site-links-steps={o.category}>
+                {copy.steps[o.category].map((step, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-pill bg-action-soft text-caption font-semibold text-action tabular-nums">
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 pt-0.5 text-copy text-body text-pretty">{step}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
         </div>

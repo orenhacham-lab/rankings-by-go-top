@@ -510,6 +510,12 @@ async function partE() {
   const noTables = networkDb({ hooks: { link_network_settings: { select: () => ({ code: '42P01' }) } } })
   const nt = await handleNetworkGet(P.S, routeDeps(U_S, noTables))
   check('without the tables: 200 { available: false } (hidden, not an error)', nt.status === 200 && ((await nt.json()) as any).available === false)
+  // Wave 8 (UX A1): the screen is told why, to say so for a Shopify store and never mention the network otherwise.
+  check('the hidden answer says why: shopify for a store, off without the tables', shopAns.reason === 'shopify'
+    && ((await (await handleNetworkGet(P.S, routeDeps(U_S, noTables))).json()) as any).reason === 'off', `${shopAns.reason}`)
+  const reasonMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("reason: me?.site.shopify ? 'shopify' : 'off'", "reason: 'off'"),
+    async (m) => ((await (await m.handleNetworkGet(P.SHOP, routeDeps(U_SHOP, networkDb()))).json()) as any).reason)
+  check('MUTATION CONTROL: a Shopify store answered as "off" → caught', reasonMut === 'off', String(reasonMut))
   check('without the tables: joining is 409', (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.S, routeDeps(U_S, noTables))).status === 409)
   // The table itself: the receiving side cannot read the giver's ids through PostgREST
   // (executed proof: supabase/migrations/__qa__/link-network.probe.sql).
@@ -557,9 +563,10 @@ function partF() {
 function partG() {
   console.log('\nG. the screen')
   const screen = strip(read('components/site-links/network/SiteLinksScreen.tsx'))
-  check('hidden network → exactly the earlier view (SiteLinksView), no switch', /kind === 'hidden'\) return <SiteLinksView projectId=\{projectId\} \/>/.test(screen))
+  // Wave 8 (UX A1-A2): with no network, the opportunities view leads with its outreach hero, told why.
+  check('hidden network → the opportunities view (SiteLinksView) with the reason, no switch', /kind === 'hidden'\) return <SiteLinksView projectId=\{projectId\} outreach=\{load\.reason\} \/>/.test(screen))
   check('the page renders the screen', /SiteLinksScreen/.test(read('app/(dashboard)/site-links/page.tsx')))
-  const files = ['components/site-links/network/SiteLinksScreen.tsx', 'components/site-links/network/NetworkPanel.tsx', 'components/site-links/network/PlacementLog.tsx', 'components/site-links/network/shared.ts']
+  const files = ['components/site-links/network/SiteLinksScreen.tsx', 'components/site-links/network/NetworkPanel.tsx', 'components/site-links/network/PlacementLog.tsx', 'components/site-links/network/shared.ts', 'components/site-links/network/NetworkHow.tsx']
   const bad = files.filter((f) => /window\.confirm|\balert\(|confirm\(\s*['"`]/.test(strip(read(f))))
   check('no window.confirm or alert() (useConfirm and toasts)', bad.length === 0, bad.join(', '))
   const literal = files.filter((f) => /[א-ת]/.test(strip(read(f))))
@@ -666,12 +673,14 @@ async function partH() {
 
   // The screen: the switch is disabled with the reason, in both languages.
   const panel = strip(read('components/site-links/network/NetworkPanel.tsx'))
-  const panelOk = (src: string) => /const cannotJoin = !active && data\.readiness === 'domain_unverified'/.test(src) && /disabled=\{busy \|\| cannotJoin\}/.test(src) && /copy\.switch\.domainUnverified/.test(src)
+  // Wave 8: the reason is the hero's body (h.body.cannotJoin) and the switch's line (cannotJoinDescription).
+  const panelOk = (src: string) => /const cannotJoin = !active && data\.readiness === 'domain_unverified'/.test(src) && /disabled=\{busy \|\| cannotJoin\}/.test(src)
+    && /h\.body\.cannotJoin/.test(src) && /copy\.switch\.cannotJoinDescription/.test(src)
   check('the switch is disabled and says why when the site is not connected', panelOk(panel))
   check('MUTATION CONTROL: the switch left enabled → caught', !panelOk(panel.replace('disabled={busy || cannotJoin}', 'disabled={busy}')))
   const he = read('lib/i18n/dashboard/he.ts'), en = read('lib/i18n/dashboard/en.ts')
-  check('the reason is in both dictionaries', /domainUnverified: 'כדי להצטרף לרשת צריך לחבר את האתר \(WordPress או Search Console\), כדי שנדע שהאתר שלכם\.'/.test(he)
-    && /domainUnverified: 'To join the network, connect your site/.test(en) && /domain_unverified: '/.test(he) && /domain_unverified: '/.test(en))
+  check('the reason is in both dictionaries', /cannotJoin: 'מחברים את האתר ב-WordPress \(או בתוסף של Go Top\) או ב-Search Console, ומיד אפשר להפעיל\.'/.test(he)
+    && /cannotJoin: 'Connect it through WordPress \(or the Go Top plugin\) or Search Console, then turn the network on\.'/.test(en) && /domain_unverified: '/.test(he) && /domain_unverified: '/.test(en))
 }
 
 // ── I. the page count reads the full-site mapping (review P1-8) ───────────
@@ -732,11 +741,14 @@ async function partJ() {
   const logOk = (src: string) => /count: linkCount\(data\.received\)/.test(src) && /count: linkCount\(given\)/.test(src) && /const list = all\.filter\(\(i\) => countsAsLink\(i\.state\)\)/.test(src)
   check('the log\'s tab counts and list use the same definition as the KPI', logOk(log))
   check('MUTATION CONTROL: tab count back to every row → caught', !logOk(log.replace('count: linkCount(data.received)', 'count: data.received.length')))
+  // Wave 8 (UX A1): one page, no tabs. The network's state first; the log only for a member;
+  // the free opportunities always on the same page, under it.
   const screen = strip(read('components/site-links/network/SiteLinksScreen.tsx'))
-  const defOk = (src: string) => /const view: View = picked \?\? \(load\.data\.membership\.active \? 'network' : 'opportunities'\)/.test(src)
-    && src.indexOf("value: 'opportunities'") < src.indexOf("value: 'network'")
-  check('the free opportunities tab is first and the default; a member opens on the network', defOk(screen))
-  check('MUTATION CONTROL: the network as everyone\'s default → caught', !defOk(screen.replace("? 'network' : 'opportunities'", "? 'network' : 'network'")))
+  const defOk = (src: string) => !/Segmented/.test(src) && /<NetworkPanel projectId=\{projectId\} data=\{load\.data\} onChanged=\{refresh\} \/>/.test(src)
+    && /\{member && <PlacementLog /.test(src) && src.indexOf('<NetworkPanel') < src.indexOf('<PlacementLog') && /<SiteLinksView\s+projectId=\{projectId\}\s+top=/.test(src)
+  check('one page: the network\'s state first, the log only for a member, the opportunities on the same page', defOk(screen))
+  check('MUTATION CONTROL: a tab switch back → caught', !defOk(screen + '\n<Segmented />'))
+  check('MUTATION CONTROL: the log shown to a site that is not in the network → caught', !defOk(screen.replace('{member && <PlacementLog ', '{<PlacementLog ')))
   check('the history line is in both dictionaries', /history: \(n: number\) =>/.test(read('lib/i18n/dashboard/he.ts')) && /history: \(n: number\) =>/.test(read('lib/i18n/dashboard/en.ts')))
 }
 

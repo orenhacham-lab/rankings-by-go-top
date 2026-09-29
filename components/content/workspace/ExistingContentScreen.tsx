@@ -5,8 +5,8 @@
  *
  * What the merchant learns here, top to bottom:
  *   1. how big the site is and what it is made of: the TRUE total per kind
- *      (products, articles, pages, categories), and what Google says about it
- *      (existing/SiteSummary.tsx);
+ *      (products, articles, pages, categories), and what Google says about it,
+ *      on the hero every tab has (existing/SiteSummary.tsx);
  *   2. one tab per kind with that same total on the tab ("מוצרים 912"), even
  *      when the list shows only its first rows: the list is paged, searched
  *      and sorted on the server (GET /api/content/existing), 50 rows at a time;
@@ -338,6 +338,7 @@ export default function ExistingContentScreen() {
         num={num}
         day={day}
         refresh={{ show: canRefresh, busy: refreshing, onClick: () => void refresh() }}
+        projectId={projectId}
       />
 
       {payload.partial && mapIdle && (
