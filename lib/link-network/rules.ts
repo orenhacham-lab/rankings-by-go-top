@@ -10,10 +10,12 @@
  * The rules, in plain words (the report and the screen say the same):
  *   - only members who joined with explicit consent, both sides;
  *   - only a site whose owner proved control of its domain in the app: a
- *     connected WordPress (application password or the GO TOP plugin) or a
- *     connected Wix / custom-site connection on that exact host, or a verified
- *     Search Console property covering it (provenDomains). Typing a domain into
- *     a project proves nothing, so a stranger's site can never enter the network;
+ *     connected WordPress (application password or the GO TOP plugin) on that
+ *     exact host, or a verified Search Console property covering it
+ *     (provenDomains). Typing a domain into a project proves nothing, and
+ *     neither does a Wix or custom-site (webhook) connection, whose site
+ *     address the owner types in and nothing checks; so a stranger's site can
+ *     never enter the network;
  *   - never Shopify, never a site that is new or thin (too young, never scanned
  *     successfully, or with too little published content);
  *   - never a project to itself, to another project of the same owner or of the
@@ -130,7 +132,8 @@ export function receivedCapFor(target: Pick<NetworkSite, 'memberSince'>, now: Da
  * What the app already knows proves control of a site, read from the project's
  * own connections (never from what the owner typed as the project's domain):
  *   hosts          site URLs of a CONNECTED WordPress (application password or
- *                  the GO TOP plugin link) or Wix / custom-site connection;
+ *                  the GO TOP plugin link). Never a Wix / custom-site address:
+ *                  the owner types it and nothing checks it against the site;
  *   gscProperties  Search Console properties assigned to the project, with the
  *                  permission level Google gave (siteUnverifiedUser proves nothing).
  */

@@ -66,7 +66,7 @@ export interface ReceivedItem {
   context: string | null
 }
 
-/** domain_unverified: the site is not connected (WordPress / Search Console / Wix / custom site), so the switch cannot be turned on. */
+/** domain_unverified: the site is not connected (WordPress or Search Console), so the switch cannot be turned on. */
 export type Readiness = 'ready' | 'domain_unverified' | 'thin_or_new' | 'category_unknown'
 
 export type NetworkAnswer =

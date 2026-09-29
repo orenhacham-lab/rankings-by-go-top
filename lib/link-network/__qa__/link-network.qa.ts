@@ -3,8 +3,9 @@
  * CONTROL: the same check on a deliberately broken copy of the code must fail.
  *
  *   A  matching rules (rules.ts): only a site whose domain the owner proved
- *      (a live WordPress / plugin / Wix / custom-site connection on that exact
- *      host, or a verified Search Console property covering it), never reciprocal, no short loops, never a
+ *      (a live WordPress / GO TOP plugin connection on that exact host, or a
+ *      verified Search Console property covering it; never a Wix / webhook
+ *      address, which the owner types), never reciprocal, no short loops, never a
  *      competitor (either side's list), never the same category, never the same
  *      owner / client / server address, not thin or new, not Shopify, caps per
  *      target (with the ramp for new members) and per source, exact anchors rare.
@@ -604,9 +605,18 @@ async function partH() {
   check('the GO TOP plugin link (connected) proves it', (await verified(plug, P.OK)).join() === 'site1.co.il')
   plug.tables.site_fix_plugin_links[0].status = 'pending'
   check('…a plugin code issued but never answered proves nothing', (await verified(plug, P.OK)).length === 0)
+  // A Wix / custom-site (webhook) address is typed by the owner and never checked: no proof.
   const wix = networkDb({ unconnected: [P.OK] })
-  wix.tables.site_platform_connections = [{ project_id: P.OK, user_id: user(P.OK), site_url: 'https://site1.co.il/', connection_status: 'connected' }]
-  check('a connected Wix / custom-site connection for that host proves it', (await verified(wix, P.OK)).join() === 'site1.co.il')
+  wix.tables.site_platform_connections = [{ project_id: P.OK, user_id: user(P.OK), platform: 'webhook', site_url: 'https://site1.co.il/', endpoint_url: 'https://site1.co.il/hook', connection_status: 'connected' }]
+  check('a webhook / Wix connection alone proves nothing (typed address)', (await verified(wix, P.OK)).length === 0)
+  const U_WIX = user(P.OK)
+  const wixAns = await (await handleNetworkGet(P.OK, routeDeps(U_WIX, wix))).json() as any
+  check('…so a webhook / Wix-only project is domain_unverified and cannot join', wixAns.readiness === 'domain_unverified'
+    && (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.OK, routeDeps(U_WIX, wix))).status === 409, String(wixAns.readiness))
+  const wixMut = await withMutantAsync(STORE, (s) => s.replace('  for (const r of [...wp, ...plugin]) {',
+    "  for (const r of [...wp, ...plugin, ...(await rows<OwnedSiteRow>(db.from('site_platform_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)))]) {"),
+    async (m) => (await m.loadSites(wix, [P.OK])).get(P.OK).site.verifiedDomains.length)
+  check('MUTATION CONTROL: Wix / webhook site_url accepted as proof → caught', wixMut === 1, String(wixMut))
 
   const gsc = networkDb({ unconnected: [P.OK] })
   gsc.tables.project_gsc_properties = [{ project_id: P.OK, connection_id: 'g1', site_url: 'sc-domain:site1.co.il', permission_level: 'siteOwner' }]

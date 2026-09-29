@@ -49,8 +49,8 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
   const [busy, setBusy] = useState(false)
 
   const active = data.membership.active
-  // Only a site whose owner proved it is theirs (a WordPress / Search Console /
-  // Wix / custom-site connection on that domain) can join; the server refuses too.
+  // Only a site whose owner proved it is theirs (a WordPress or Search Console
+  // connection on that domain) can join; the server refuses too.
   const cannotJoin = !active && data.readiness === 'domain_unverified'
   const nf = new Intl.NumberFormat(language === 'he' ? 'he-IL' : 'en-US')
 

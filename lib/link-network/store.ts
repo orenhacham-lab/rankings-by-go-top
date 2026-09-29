@@ -246,9 +246,11 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
  * the project's owner. A connection that is not live proves nothing:
  *   wordpress_connections      connection_status 'connected' (application password tested)
  *   site_fix_plugin_links      status 'connected' (the GO TOP plugin answered a signed call)
- *   site_platform_connections  connection_status 'connected' (Wix pair tested / custom site)
  *   project_gsc_properties     the assigned Search Console property, its Google
  *                              connection still 'connected' and the owner's own.
+ * NOT site_platform_connections: a Wix or custom-site (webhook) site_url is typed
+ * by the owner and never checked against the site (a webhook is 'connected' on
+ * save, untested), so it proves nothing.
  * A missing table (not migrated yet) is no proof from it.
  */
 export async function readDomainProof(db: NetworkDb, projects: { id: string; user_id: string }[]): Promise<Map<string, DomainProof>> {
@@ -256,10 +258,9 @@ export async function readDomainProof(db: NetworkDb, projects: { id: string; use
   if (!projects.length) return out
   const ids = projects.map((p) => p.id)
   const ownerOf = new Map(projects.map((p) => [p.id, p.user_id]))
-  const [wp, plugin, platform, gsc] = await Promise.all([
+  const [wp, plugin, gsc] = await Promise.all([
     rows<OwnedSiteRow>(db.from('wordpress_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)),
     rows<OwnedSiteRow>(db.from('site_fix_plugin_links').select('project_id, user_id, site_url').in('project_id', ids).eq('status', 'connected').limit(ids.length)),
-    rows<OwnedSiteRow>(db.from('site_platform_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)),
     rows<GscPropertyRow>(db.from('project_gsc_properties').select('project_id, connection_id, site_url, permission_level').in('project_id', ids).limit(ids.length)),
   ])
   const connIds = [...new Set(gsc.map((g) => g.connection_id).filter((id): id is string => !!id))]
@@ -272,7 +273,7 @@ export async function readDomainProof(db: NetworkDb, projects: { id: string; use
     if (!e) out.set(projectId, (e = { hosts: [], gscProperties: [] }))
     return e
   }
-  for (const r of [...wp, ...plugin, ...platform]) {
+  for (const r of [...wp, ...plugin]) {
     if (!r.site_url || !ownerOf.has(r.project_id) || r.user_id !== ownerOf.get(r.project_id)) continue
     entry(r.project_id).hosts.push(r.site_url)
   }
