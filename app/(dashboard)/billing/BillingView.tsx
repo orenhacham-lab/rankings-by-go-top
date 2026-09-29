@@ -6,7 +6,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
 import type { BillingMarket } from '@/lib/paypal/checkout-plans'
-import { Check, ShoppingBag, TriangleAlert } from 'lucide-react'
+import { Check, ShoppingBag, Star, TriangleAlert } from 'lucide-react'
+import { PLAN_AUDIENCE_DESCRIPTION, PLAN_AUDIENCE_LABEL } from '@/lib/plans/features'
 import { Card } from '@/components/ui/Card'
 import Button, { buttonClasses } from '@/components/ui/Button'
 import Notice from '@/components/ui/Notice'
@@ -81,6 +82,8 @@ export default function BillingView({
   const shownMarket: BillingMarket = market ?? pickedMarket ?? (language === 'en' ? 'USD' : 'ILS')
   const planPrices = shownMarket === 'USD' ? planPricesUSD : planPricesILS
   const currencySymbol = shownMarket === 'USD' ? '$' : '₪'
+  // DISPLAY ONLY (w7 P2-13): the same grouping the public pricing page shows (₪1,999, not ₪1999).
+  const numberLocale = language === 'en' ? 'en-US' : 'he-IL'
 
   const [cancelling, setCancelling] = useState(false)
   // Shown in the page in our words; the route's own error text never reaches the merchant.
@@ -316,7 +319,7 @@ export default function BillingView({
             currentLabel={t.currentPlan}
           />
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 pt-3 md:grid-cols-2 xl:grid-cols-4">
             <PlanCard
               name={t.planLabels.regular}
               price={planPrices.regular}
@@ -326,6 +329,9 @@ export default function BillingView({
               isPopular={false}
               isCurrent={plan === 'regular' && hasActiveSubscription}
               plan="regular"
+              audience={PLAN_AUDIENCE_LABEL.regular[language]}
+              description={PLAN_AUDIENCE_DESCRIPTION.regular[language]}
+              numberLocale={numberLocale}
               action={planAction('regular')}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
@@ -339,6 +345,9 @@ export default function BillingView({
               isPopular={true}
               isCurrent={plan === 'advanced' && hasActiveSubscription}
               plan="advanced"
+              audience={PLAN_AUDIENCE_LABEL.advanced[language]}
+              description={PLAN_AUDIENCE_DESCRIPTION.advanced[language]}
+              numberLocale={numberLocale}
               action={planAction('advanced', true)}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
@@ -352,6 +361,9 @@ export default function BillingView({
               isPopular={false}
               isCurrent={plan === 'premium' && hasActiveSubscription}
               plan="premium"
+              audience={PLAN_AUDIENCE_LABEL.premium[language]}
+              description={PLAN_AUDIENCE_DESCRIPTION.premium[language]}
+              numberLocale={numberLocale}
               action={planAction('premium')}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
@@ -366,6 +378,9 @@ export default function BillingView({
                 isPopular={false}
                 isCurrent={plan === 'large_agency' && hasActiveSubscription}
                 plan="large_agency"
+                audience={PLAN_AUDIENCE_LABEL.large_agency[language]}
+                description={PLAN_AUDIENCE_DESCRIPTION.large_agency[language]}
+                numberLocale={numberLocale}
                 action={planAction('large_agency')}
                 recommendedLabel={t.recommended}
                 currentLabel={t.currentPlan}
@@ -385,10 +400,10 @@ export default function BillingView({
   )
 }
 
-function Feature({ children }: { children: React.ReactNode }) {
+function Feature({ children, inverse = false }: { children: React.ReactNode; inverse?: boolean }) {
   return (
-    <li className="flex items-start gap-2 text-copy text-body">
-      <Check strokeWidth={2.25} aria-hidden="true" className="mt-1 size-4 shrink-0 text-action" />
+    <li className={cn('flex items-start gap-2 text-copy', inverse ? 'text-contrast-ink/90' : 'text-body')}>
+      <Check strokeWidth={2.5} aria-hidden="true" className={cn('mt-1 size-4 shrink-0', inverse ? 'text-rail-tagline' : 'text-action')} />
       <span className="min-w-0">{children}</span>
     </li>
   )
@@ -433,12 +448,24 @@ interface PlanCardProps {
   isPopular: boolean
   isCurrent: boolean
   plan: string
+  /** Who the plan is for, and the sentence under its name: the public pricing page's own words. */
+  audience: string
+  description: string
+  /** The locale the price is grouped in (he-IL / en-US). */
+  numberLocale: string
   /** Shown in place of the PayPal container when there is no stored billing market. */
   action?: React.ReactNode
   recommendedLabel: string
   currentLabel: string
 }
 
+/**
+ * One plan, drawn like the public pricing page's card (w7 P2-13): the audience
+ * pill, the name and its sentence, the price grouped for the locale, the limits
+ * under a hairline, and the recommended plan as the one navy card with the star
+ * badge on its edge (in the action colour: no amber on this screen). DISPLAY ONLY: the price, the limits and the actions are the
+ * ones this screen was given.
+ */
 function PlanCard({
   name,
   price,
@@ -448,49 +475,62 @@ function PlanCard({
   isPopular,
   isCurrent,
   plan,
+  audience,
+  description,
+  numberLocale,
   action,
   recommendedLabel,
   currentLabel,
 }: PlanCardProps) {
+  const navy = isPopular
   return (
     <div
       data-plan-card={plan}
       className={cn(
-        'flex h-full min-w-0 flex-col rounded-card border bg-surface p-5 shadow-card sm:p-6',
-        isPopular ? 'border-action ring-1 ring-action' : isCurrent ? 'border-line-strong' : 'border-line',
+        'lift relative flex h-full min-w-0 flex-col rounded-card border p-5 shadow-card sm:p-6',
+        navy
+          ? 'border-contrast bg-contrast text-contrast-ink bg-[radial-gradient(60%_80%_at_85%_0%,rgb(0_134_245/0.35),transparent_60%),radial-gradient(50%_70%_at_10%_100%,rgb(127_195_255/0.18),transparent_65%)]'
+          : isCurrent ? 'border-line-strong bg-surface' : 'border-line bg-surface',
       )}
     >
-      {/* One line for the plan's mark. Side by side it is kept even when empty, so the prices of
-          the four cards sit on one line. */}
-      <div className="flex flex-wrap items-center gap-2 empty:hidden md:min-h-6 md:empty:flex">
-        {isPopular && (
-          <span className="inline-flex rounded-pill bg-action px-2.5 py-0.5 text-caption font-semibold text-action-ink">
-            {recommendedLabel}
-          </span>
-        )}
+      {isPopular && (
+        <span className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center gap-1 rounded-pill bg-action px-2.5 py-0.5 text-caption font-semibold text-action-ink shadow-control">
+          <Star className="size-3" fill="currentColor" aria-hidden="true" />
+          {recommendedLabel}
+        </span>
+      )}
+
+      {/* The audience, and the current-plan mark beside it. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn('inline-flex h-6 items-center rounded-pill px-2.5 text-caption font-semibold', navy ? 'bg-contrast-ink/10 text-rail-tagline' : 'bg-action-soft text-action')}>
+          {audience}
+        </span>
         {isCurrent && (
-          <span className="inline-flex items-center gap-1 rounded-pill bg-sunk px-2.5 py-0.5 text-caption font-semibold text-ink">
+          <span className={cn('inline-flex h-6 items-center gap-1 rounded-pill px-2.5 text-caption font-semibold', navy ? 'bg-contrast-ink/10 text-contrast-ink' : 'bg-sunk text-ink')}>
             <Check aria-hidden="true" className="size-3.5" />
             {currentLabel}
           </span>
         )}
       </div>
 
-      <h3 className="mt-3 text-section font-semibold text-ink">{name}</h3>
+      <h3 className={cn('mt-3 text-title font-bold tracking-tight', navy ? 'text-contrast-ink' : 'text-ink')}>{name}</h3>
+      <p className={cn('mt-1 text-copy md:min-h-12', navy ? 'text-contrast-ink/75' : 'text-body')}>{description}</p>
 
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
-        <span className="text-metric font-bold tracking-tight text-ink tabular-nums">{currencySymbol}{price}</span>
-        {period && <span className="text-copy text-muted">{period}</span>}
+      <div className="mt-4 flex flex-wrap items-baseline gap-x-1.5">
+        <span className={cn('text-metric font-bold tracking-tight tabular-nums', navy ? 'text-contrast-ink' : 'text-ink')} data-plan-price>
+          {currencySymbol}{price.toLocaleString(numberLocale)}
+        </span>
+        {period && <span className={cn('text-copy', navy ? 'text-contrast-ink/60' : 'text-muted')}>{period}</span>}
       </div>
 
-      <ul className="mt-5 mb-6 flex-1 space-y-2.5">
-        {features.map((feature, i) => <Feature key={i}>{feature}</Feature>)}
+      <ul className={cn('mt-5 mb-6 flex-1 space-y-2.5 border-t pt-5', navy ? 'border-contrast-ink/10' : 'border-line')}>
+        {features.map((feature, i) => <Feature key={i} inverse={navy}>{feature}</Feature>)}
       </ul>
 
       {isCurrent ? (
         <button
           disabled
-          className="h-10 w-full cursor-not-allowed rounded-control bg-sunk px-4 text-copy font-semibold text-muted"
+          className={cn('h-10 w-full cursor-not-allowed rounded-control px-4 text-copy font-semibold', navy ? 'bg-contrast-ink/10 text-contrast-ink/70' : 'bg-sunk text-muted')}
         >
           {currentLabel}
         </button>

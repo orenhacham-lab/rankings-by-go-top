@@ -119,12 +119,18 @@ async function main() {
   const demo = strip(read('components/public/landing/HeroDemo.tsx'))
   const css = read('components/public/landing/landing.module.css').replace(/\/\*[\s\S]*?\*\//g, '')
   const entranceOk = (src: string) => /useState<Entrance>\('static'\)/.test(src)
-    && /if \(!el \|\| reduced \|\| typeof IntersectionObserver === 'undefined'\) return/.test(src)
+    // Reduced motion (which arrives AFTER the first run, with the server's answer) sends the
+    // block back to its finished state, so a counter parked below the fold never stays at 0 (w7 P0-2).
+    && /if \(reduced\) \{ setState\('static'\); return \}\s*const el = ref\.current\s*if \(!el \|\| typeof IntersectionObserver === 'undefined'\) return/.test(src)
+    && /if \(reduced\) \{ setShown\(value\); return \}/.test(src)
     && /if \(rect\.top < window\.innerHeight \* 0\.92\) return/.test(src)
     && src.indexOf("setState('wait')") > src.indexOf('if (rect.top < window.innerHeight * 0.92) return')
   check('B1: a block starts finished, and is parked only by the client, only below the fold, never with reduced motion', entranceOk(motion))
   check('MUTATION CONTROL: an entrance that starts hidden is caught', !entranceOk(motion.replace("useState<Entrance>('static')", "useState<Entrance>('wait')")))
-  check('MUTATION CONTROL: an entrance that ignores reduced motion is caught', !entranceOk(motion.replace('if (!el || reduced ||', 'if (!el ||')))
+  check('MUTATION CONTROL: an entrance that ignores reduced motion is caught', !entranceOk(motion.replace("if (reduced) { setState('static'); return }", '')))
+  check('MUTATION CONTROL (w7 P0-2): the old early return that left a parked counter at 0 is caught',
+    !entranceOk(motion.replace("if (reduced) { setState('static'); return }\n    const el = ref.current\n    if (!el || typeof", 'const el = ref.current\n    if (!el || reduced || typeof')))
+  check('MUTATION CONTROL (w7 P0-2): a counter that draws 0 under reduced motion is caught', !entranceOk(motion.replace('if (reduced) { setShown(value); return }', '')))
   const demoOk = (src: string) => /useState<\{ scene: number; t: number; held: number \}>\(\{ scene: 0, t: Infinity, held: 0 \}\)/.test(src)
     && /const playing = !reduced && !hovered && visible/.test(src)
     && /setClock\(\{ scene: i, t: reduced \? Infinity : 0, held: 0 \}\)/.test(src)

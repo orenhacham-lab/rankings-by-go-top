@@ -10,18 +10,23 @@ import { buttonClasses } from '@/components/public/marketing'
  * The privacy notice: ONE element, shaped by the width it has.
  *
  * - Below `md` (where the contact bar is): a slim bottom sheet laid exactly over
- *   the contact bar's strip, one short sentence and the accept button, so it
- *   covers nothing the page had not already given to the bar. Like the bar, it
- *   keeps the start slot free for the accessibility button that docks there.
- * - From `md`: a card in the bottom end corner, where the WhatsApp button sits
- *   (that button steps aside while the notice is open, PublicSiteWidgets).
- * - From 1400px: the same card in the top end corner under the navigation, in
- *   the empty margin beside the centred hero, clear of the hero's product frame.
+ *   the contact bar's strip, one short sentence and the accept button. Like the
+ *   bar it keeps the start slot free for the accessibility button that docks
+ *   there, with a wider gap than the bar's, so the button never touches the
+ *   sentence (w7 P2-10).
+ * - From `md`: one slim floating bar centred at the bottom of the window (the
+ *   WhatsApp button steps aside while it is open, PublicSiteWidgets). It used to
+ *   be a card in a top or bottom corner, where it sat on the English hero
+ *   headline and on the free check's first figures (w7 P2-10).
  *
- * While the sheet shows on a phone the page gets bottom padding for whatever
- * the sheet needs beyond the contact bar's strip (the footer already pads for
- * the bar), so nothing ends up under it. `onOpenChange` tells the other widgets.
+ * While it shows, the page gets bottom padding for whatever it covers (on a
+ * phone, only what the sheet needs beyond the contact bar's strip, which the
+ * footer already pads for), so nothing on the page ends up under it for good.
+ * `onOpenChange` tells the other widgets.
  */
+/** From md, the gap kept free under the floating bar (its bottom-5) plus a little air. */
+const DESKTOP_GAP_PX = 32
+
 export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean) => void } = {}) {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(false)
@@ -44,8 +49,9 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
     onOpenChange?.(isClient && isVisible)
   }, [isClient, isVisible, onOpenChange])
 
-  // Bottom padding while the phone sheet shows: only what the sheet needs beyond
-  // the contact bar's strip, which the footer already pads for.
+  // Bottom padding while the notice shows: on a phone only what the sheet needs
+  // beyond the contact bar's strip (the footer already pads for the bar); from md
+  // the floating bar's height and the gap under it.
   const sheetRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const sheet = sheetRef.current
@@ -55,7 +61,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       const bar = document.querySelector<HTMLElement>('[data-mobile-contact-bar]')
       const barH = bar && bar.offsetParent !== null ? bar.offsetHeight : 0
       const phone = window.matchMedia('(max-width: 767px)').matches
-      body.style.paddingBottom = phone ? `${Math.max(0, sheet.offsetHeight - barH)}px` : ''
+      body.style.paddingBottom = phone ? `${Math.max(0, sheet.offsetHeight - barH)}px` : `${sheet.offsetHeight + DESKTOP_GAP_PX}px`
     }
     pad()
     const ro = new ResizeObserver(pad)
@@ -88,12 +94,10 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       data-cookie-consent
       className={[
         'fixed z-[58] animate-pop-in border-line bg-surface text-start shadow-pop',
-        // phone: a slim sheet over the contact bar's strip; the start slot stays free for the accessibility button
-        'inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card border-t ps-[4.25rem] pe-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]',
-        // md+: a card in the bottom end corner, where the WhatsApp button is
-        'md:inset-x-auto md:end-6 md:block md:w-[20rem] md:rounded-card md:border md:p-5 md:max-[1399px]:bottom-6',
-        // 1400px+: the top end corner, beside the centred hero instead of over its product frame
-        'min-[1400px]:bottom-auto min-[1400px]:top-24',
+        // phone: a slim sheet over the contact bar's strip; a wide start slot stays free for the accessibility button
+        'inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card border-t ps-[4.75rem] pe-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]',
+        // md+: one slim bar floating at the bottom centre, clear of every headline and first figure
+        'md:start-[4.75rem] md:end-6 md:bottom-5 md:mx-auto md:max-w-3xl md:gap-5 md:rounded-card md:border md:px-5 md:py-3.5 lg:inset-x-6',
       ].join(' ')}
     >
       <p className="min-w-0 flex-1 text-caption text-body md:hidden">
@@ -102,16 +106,16 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
         {privacy}
         {'.'}
       </p>
-      <div className="hidden md:block">
+      <div className="hidden min-w-0 flex-1 md:block">
         <p className="text-copy font-semibold text-ink">{t.title}</p>
-        <p className="mt-1 text-caption text-body">
+        <p className="mt-0.5 text-caption text-body">
           {t.body}
           {isEnglish ? ' ' : ''}
           {privacy}
           {'.'}
         </p>
       </div>
-      <button type="button" onClick={handleAccept} className={buttonClasses('primary', 'md', 'shrink-0 md:mt-3 md:w-full')}>
+      <button type="button" onClick={handleAccept} className={buttonClasses('primary', 'md', 'shrink-0 md:px-6')}>
         {t.accept}
       </button>
     </div>

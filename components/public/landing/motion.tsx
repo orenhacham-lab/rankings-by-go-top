@@ -30,13 +30,18 @@ function useEntrance<T extends Element>(threshold = 0.2): [React.RefObject<T | n
   const reduced = useReducedMotion()
   const [state, setState] = useState<Entrance>('static')
   useEffect(() => {
+    // Reduced motion asked for: back to the finished state. The hook's first run
+    // happens with the server's answer (motion allowed), so a block below the
+    // fold may already have been parked in 'wait' by the time the real setting
+    // arrives; staying there left every counter reading 0 for good.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (reduced) { setState('static'); return }
     const el = ref.current
-    if (!el || reduced || typeof IntersectionObserver === 'undefined') return
+    if (!el || typeof IntersectionObserver === 'undefined') return
     const rect = el.getBoundingClientRect()
     if (rect.top < window.innerHeight * 0.92) return // visible at load: leave it be
     // Parking it is the one synchronous state change, and it has to happen
     // before the next paint or the block would flash in and out.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState('wait')
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) {
@@ -78,8 +83,11 @@ export function Rise({ children, className, delay = 0, as: As = 'div' }: {
 export function Counter({ value, className }: { value: number; className?: string }) {
   const [ref, state] = useEntrance<HTMLSpanElement>(0.6)
   const [shown, setShown] = useState<number>(value)
+  const reduced = useReducedMotion()
   useEffect(() => {
-    if (state === 'wait') { setShown(0); return } // eslint-disable-line react-hooks/set-state-in-effect
+    // With reduced motion the figure is simply its value, whatever the entrance state says.
+    if (reduced) { setShown(value); return } // eslint-disable-line react-hooks/set-state-in-effect
+    if (state === 'wait') { setShown(0); return }
     if (state !== 'in') { setShown(value); return }
     let raf = 0
     const start = performance.now()
@@ -90,7 +98,7 @@ export function Counter({ value, className }: { value: number; className?: strin
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [state, value])
+  }, [state, value, reduced])
   return (
     <span ref={ref} className={cn('tabular-nums', className)}>
       <span aria-hidden="true">{shown}</span>

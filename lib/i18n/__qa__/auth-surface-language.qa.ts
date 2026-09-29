@@ -165,7 +165,8 @@ async function main() {
     const en = uiStrings('app/(auth)/signup/page.tsx', 'en')
     const he = uiStrings('app/(auth)/signup/page.tsx', 'he')
     const enHtml = firstRender(SIGNUP.default, 'en', '/signup')
-    for (const key of ['heading', 'fullName', 'email', 'companyName', 'phone', 'password', 'confirmPassword', 'termsCheckbox', 'signupBtn', 'trialBadge', 'alreadyHaveAccount', 'signIn']) {
+    // w7 P1-9: sign-up asks for an email and a password only; the terms are a consent line with links.
+    for (const key of ['heading', 'intro', 'email', 'password', 'passwordHint', 'showPassword', 'terms', 'privacyPolicy', 'signupBtn', 'trialBadge', 'alreadyHaveAccount', 'signIn']) {
       check(`C1-${key}: English "${en[key]}" is in the FIRST render`, enHtml.includes(esc(en[key])), en[key])
     }
     check('C2: NOT ONE Hebrew character appears',

@@ -14,29 +14,31 @@ import { CLAIM_START_PATH } from '@/lib/onboarding/claim-start'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell, { AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
 import Badge from '@/components/ui/Badge'
-import Checkbox from '@/components/ui/Checkbox'
 import { NoticeBox } from '@/components/ui/Notice'
+import PasswordField from '@/components/auth/PasswordField'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 
 const SIGNUP_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
     logoAlt: 'הלוגו של Go Top',
-    heading: 'צור חשבון חדש',
-    fullName: 'שם מלא',
-    fullNamePlaceholder: 'ישראל כהן',
+    heading: 'פותחים חשבון בחינם',
+    intro: 'אימייל וסיסמה, וזהו. את פרטי העסק נקרא מהאתר שלכם בצעד הבא.',
     email: 'כתובת אימייל',
     emailPlaceholder: 'you@example.com',
-    companyName: 'שם חברה / עסק',
-    companyNamePlaceholder: 'שם העסק שלך',
-    phone: 'טלפון נייד',
-    phonePlaceholder: '050-1234567',
     password: 'סיסמה',
     passwordPlaceholder: '••••••••',
-    confirmPassword: 'אימות סיסמה',
-    confirmPasswordPlaceholder: '••••••••',
-    termsCheckbox: 'אני מסכים לתנאי השימוש ולמדיניות הפרטיות',
-    signupBtn: 'יצירת חשבון',
+    passwordHint: 'לפחות 8 תווים',
+    showPassword: 'הצגת הסיסמה',
+    hidePassword: 'הסתרת הסיסמה',
+    consentBefore: 'ביצירת החשבון אתם מאשרים את ',
+    terms: 'תנאי השימוש',
+    consentMiddle: ' ואת ',
+    privacyPolicy: 'מדיניות הפרטיות',
+    consentAfter: '.',
+    termsHref: '/terms',
+    privacyPolicyHref: '/privacy',
+    signupBtn: 'יצירת חשבון בחינם',
     trialBadge: '7 ימי ניסיון בחינם',
     alreadyHaveAccount: 'יש לי כבר חשבון',
     signIn: 'כניסה',
@@ -49,10 +51,7 @@ const SIGNUP_UI = {
     err: {
       invalidEmail: 'כתובת אימייל לא תקינה',
       passwordTooShort: 'הסיסמה חייבת להכיל לפחות 8 תווים',
-      passwordMismatch: 'הסיסמאות אינן תואמות',
-      invalidPhone: 'מספר טלפון לא תקין',
       fieldRequired: 'שדה זה הוא חובה',
-      termsRequired: 'עליך להסכים לתנאים ולמדיניות הפרטיות',
       emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר.',
       emailRateLimit: 'נשלחו יותר מדי בקשות הרשמה בזמן קצר. נסו שוב בעוד כמה דקות או השתמשו בכתובת אימייל אחרת.',
       signupFailed: 'אירעה שגיאה ביצירת החשבון. אנא נסו שוב.',
@@ -71,21 +70,23 @@ const SIGNUP_UI = {
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
     logoAlt: 'Go Top logo',
-    heading: 'Create your account',
-    fullName: 'Full name',
-    fullNamePlaceholder: 'John Smith',
+    heading: 'Create your free account',
+    intro: 'Just an email and a password. We read your business details from your site in the next step.',
     email: 'Email address',
     emailPlaceholder: 'you@example.com',
-    companyName: 'Company / Business name',
-    companyNamePlaceholder: 'Your business name',
-    phone: 'Mobile phone',
-    phonePlaceholder: '(555) 123-4567',
     password: 'Password',
     passwordPlaceholder: '••••••••',
-    confirmPassword: 'Confirm password',
-    confirmPasswordPlaceholder: '••••••••',
-    termsCheckbox: 'I agree to the Terms of Service and Privacy Policy',
-    signupBtn: 'Create account',
+    passwordHint: 'At least 8 characters',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    consentBefore: 'By creating an account you agree to the ',
+    terms: 'Terms of Service',
+    consentMiddle: ' and the ',
+    privacyPolicy: 'Privacy Policy',
+    consentAfter: '.',
+    termsHref: '/en/terms',
+    privacyPolicyHref: '/en/privacy',
+    signupBtn: 'Create free account',
     trialBadge: '7-day free trial',
     alreadyHaveAccount: 'Already have an account?',
     signIn: 'Sign in',
@@ -98,10 +99,7 @@ const SIGNUP_UI = {
     err: {
       invalidEmail: 'Invalid email address',
       passwordTooShort: 'Password must be at least 8 characters',
-      passwordMismatch: 'Passwords do not match',
-      invalidPhone: 'Invalid phone number',
       fieldRequired: 'This field is required',
-      termsRequired: 'You must agree to the terms and privacy policy',
       emailExists: 'This email is already registered. Please sign in instead.',
       emailRateLimit: 'Too many signup requests were sent in a short time. Please try again in a few minutes or use a different email address.',
       signupFailed: 'An error occurred while creating your account. Please try again.',
@@ -149,92 +147,35 @@ export function SignupForm() {
       })
   }, [claimParam, pathname, router, searchParams])
 
+  // Only what the account truly needs (w7 P1-9): Supabase signs up with an email
+  // and a password; the default client falls back to the email for its name
+  // (lib/clients/ensure-default-client.ts), the business details come from the
+  // site in onboarding, and agreeing to the terms is the consent line above the
+  // button. Name, company, phone, a second password and a checkbox used to stand
+  // between the visitor and the trial.
   const [formData, setFormData] = useState({
-    fullName: '',
     email: '',
-    companyName: '',
-    phone: '',
     password: '',
-    confirmPassword: '',
-    termsAccepted: false,
   })
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Phone input filter: allow only digits and dash, max 11 chars, max 1 dash
-  function handlePhoneChange(value: string) {
-    // Allow only digits and dash
-    let filtered = value.replace(/[^\d-]/g, '')
-
-    // Limit to 11 chars (054-9489377)
-    filtered = filtered.substring(0, 11)
-
-    // Prevent multiple dashes and ensure dash is only after 3rd digit
-    const dashCount = (filtered.match(/-/g) || []).length
-    if (dashCount > 1) {
-      // Remove all dashes and rebuild
-      const digits = filtered.replace(/-/g, '')
-      if (digits.length > 3) {
-        filtered = digits.substring(0, 3) + '-' + digits.substring(3, 10)
-      } else {
-        filtered = digits
-      }
-    } else if (dashCount === 1) {
-      const dashIndex = filtered.indexOf('-')
-      if (dashIndex !== 3) {
-        // Remove dash and rebuild
-        const digits = filtered.replace(/-/g, '')
-        if (digits.length > 3) {
-          filtered = digits.substring(0, 3) + '-' + digits.substring(3, 10)
-        } else {
-          filtered = digits
-        }
-      }
-    }
-
-    setFormData({ ...formData, phone: filtered })
-  }
-
   // Form validation
   function validateForm(): string[] {
     const errors: string[] = []
 
-    if (!formData.fullName.trim()) {
-      errors.push(t.err.fieldRequired)
-    }
-
     if (!formData.email.trim()) {
       errors.push(t.err.fieldRequired)
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       errors.push(t.err.invalidEmail)
-    }
-
-    if (!formData.companyName.trim()) {
-      errors.push(t.err.fieldRequired)
-    }
-
-    if (!formData.phone.trim()) {
-      errors.push(t.err.fieldRequired)
-    } else if (!/^(?:[0-9]{10}|[0-9]{3}-[0-9]{7})$/.test(formData.phone)) {
-      errors.push(t.err.invalidPhone)
     }
 
     if (!formData.password) {
       errors.push(t.err.fieldRequired)
     } else if (formData.password.length < 8) {
       errors.push(t.err.passwordTooShort)
-    }
-
-    if (!formData.confirmPassword) {
-      errors.push(t.err.fieldRequired)
-    } else if (formData.password !== formData.confirmPassword) {
-      errors.push(t.err.passwordMismatch)
-    }
-
-    if (!formData.termsAccepted) {
-      errors.push(t.err.termsRequired)
     }
 
     return errors
@@ -245,39 +186,25 @@ export function SignupForm() {
     setError('')
     setSuccess('')
 
-    // Debug: Log raw phone input
-    console.log('[signup-phone] raw phone:', JSON.stringify(formData.phone), 'length:', formData.phone.length)
-
     const validationErrors = validateForm()
-
-    // Debug: Log validation result
-    console.log('[signup-phone] validation errors:', validationErrors)
-    console.log('[signup-phone] phone regex test:', /^(?:[0-9]{10}|[0-9]{3}-[0-9]{7})$/.test(formData.phone))
-
     if (validationErrors.length > 0) {
-      console.log('[signup] validation failed, showing error:', validationErrors[0])
       setError(validationErrors[0])
       return
     }
 
     setLoading(true)
-
-    // Debug: Normalization
-    const normalizedPhone = formData.phone.replace(/-/g, '')
-    console.log('[signup-phone] normalized phone:', normalizedPhone, 'length:', normalizedPhone.length)
+    const email = formData.email.trim()
 
     try {
       const supabase = createClient()
 
       // 1. Create Supabase auth user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
+        email,
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName,
-            company_name: formData.companyName,
-            phone: normalizedPhone,
+            // Agreed by creating the account: the consent line sits right above the button.
             terms_accepted: true,
             // Area G — persist the signup-origin language (derived from the route/param,
             // NOT the browser) so a later fresh-device login opens the app in that language.
@@ -372,7 +299,7 @@ export function SignupForm() {
 
       // 3. Sign in the user (should be immediate if session exists)
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email,
         password: formData.password,
       })
 
@@ -400,12 +327,8 @@ export function SignupForm() {
         const emailResponse = await fetch('/api/send-notification-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: formData.fullName,
-            email: formData.email,
-            companyName: formData.companyName,
-            phone: normalizedPhone,
-          }),
+          // The route ignores the body and reads the verified user; nothing to send.
+          body: JSON.stringify({}),
         })
 
         console.log('[signup-email] response status:', emailResponse.status, 'ok:', emailResponse.ok)
@@ -451,6 +374,7 @@ export function SignupForm() {
   return (
     <AuthShell
       locale={lang}
+      variant="signup"
       logoAlt={t.logoAlt}
       subtitle={t.subtitle}
       footer={t}
@@ -464,9 +388,10 @@ export function SignupForm() {
       }
     >
       <div className="space-y-6">
-        <div className="space-y-3">
+        <div className="space-y-2">
           <Badge variant="success">{t.trialBadge}</Badge>
           <h1 className={AUTH_TITLE_CLASSES}>{t.heading}</h1>
+          <p className="text-copy text-body">{t.intro}</p>
         </div>
 
         {error && <NoticeBox tone="bad" language={lang}>{error}</NoticeBox>}
@@ -477,17 +402,7 @@ export function SignupForm() {
             kept (it leaves the address once its cookie is set), so the claim survives the trip to Google. */}
         <GoogleSignInButton lang={lang} nextPath="/dashboard" disabled={searchParams.has('claim')} />
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <Input
-            label={t.fullName}
-            type="text"
-            value={formData.fullName}
-            onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-            placeholder={t.fullNamePlaceholder}
-            required
-            autoComplete="name"
-          />
-
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate data-signup-form>
           <Input
             label={t.email}
             type="email"
@@ -496,55 +411,29 @@ export function SignupForm() {
             placeholder={t.emailPlaceholder}
             required
             autoComplete="email"
+            autoFocus
+            className="h-11"
           />
 
-          <Input
-            label={t.companyName}
-            type="text"
-            value={formData.companyName}
-            onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-            placeholder={t.companyNamePlaceholder}
-            required
-            autoComplete="organization"
-          />
-
-          <Input
-            label={t.phone}
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => handlePhoneChange(e.target.value)}
-            placeholder={t.phonePlaceholder}
-            required
-            autoComplete="tel"
-          />
-
-          <Input
+          <PasswordField
+            id="signup-password"
             label={t.password}
-            type="password"
             value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            onChange={(password) => setFormData({ ...formData, password })}
             placeholder={t.passwordPlaceholder}
-            required
+            hint={t.passwordHint}
+            showLabel={t.showPassword}
+            hideLabel={t.hidePassword}
             autoComplete="new-password"
           />
 
-          <Input
-            label={t.confirmPassword}
-            type="password"
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-            placeholder={t.confirmPasswordPlaceholder}
-            required
-            autoComplete="new-password"
-          />
-
-          <Checkbox
-            id="terms"
-            checked={formData.termsAccepted}
-            onChange={(checked) => setFormData({ ...formData, termsAccepted: checked })}
-            label={t.termsCheckbox}
-            className="pt-1"
-          />
+          <p className="text-caption text-muted" data-signup-consent>
+            {t.consentBefore}
+            <Link href={t.termsHref} className={AUTH_LINK_CLASSES} target="_blank">{t.terms}</Link>
+            {t.consentMiddle}
+            <Link href={t.privacyPolicyHref} className={AUTH_LINK_CLASSES} target="_blank">{t.privacyPolicy}</Link>
+            {t.consentAfter}
+          </p>
 
           <Button
             type="submit"

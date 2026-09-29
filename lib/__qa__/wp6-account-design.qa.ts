@@ -232,9 +232,12 @@ console.log('\nC) screen specifics')
     && (s.match(/planAction\('[a-z_]+', true\)/g) ?? []).length === 1 && /planAction\('advanced', true\)/.test(s)
   check('C4: billing has one primary plan action, on the recommended plan', onePrimary(billing))
   check('MUTATION CONTROL: a second primary plan fails C4', !onePrimary(billing.replace("planAction('premium')", "planAction('premium', true)")))
-  const ringOnlyPopular = (s: string) => (s.match(/ring-1 ring-action/g) ?? []).length === 1 && /isPopular \? 'border-action ring-1 ring-action'/.test(s)
-  check('C5: only the popular plan carries the accent ring (the trial row and current plan do not)', ringOnlyPopular(billing))
-  check('MUTATION CONTROL: the ring back on the current plan fails C5', !ringOnlyPopular(billing.replace("isCurrent ? 'border-line-strong' : 'border-line',", "isCurrent ? 'border-action ring-1 ring-action' : 'border-line',")))
+  // Since w7 P2-13 the popular plan is set apart the pricing page's way, as the one navy card,
+  // instead of by an accent ring; the trial row and the current plan still are not set apart.
+  const ringOnlyPopular = (s: string) => !/ring-1 ring-action/.test(s) && /const navy = isPopular/.test(s)
+    && /navy\s*\?\s*'border-contrast bg-contrast /.test(s) && /isCurrent \? 'border-line-strong bg-surface' : 'border-line bg-surface'/.test(s)
+  check('C5: only the popular plan is set apart (the one navy card); the trial row and current plan are not', ringOnlyPopular(billing))
+  check('MUTATION CONTROL: the ring back on the current plan fails C5', !ringOnlyPopular(billing.replace("isCurrent ? 'border-line-strong bg-surface' : 'border-line bg-surface'", "isCurrent ? 'border-action ring-1 ring-action bg-surface' : 'border-line bg-surface'")))
 
   const clients = stripComments(read('components/clients/ClientsTable.tsx'))
   const rowMenu = (s: string) => /<RowMenu\b/.test(s) && !/<Button\b/.test(s)

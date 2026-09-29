@@ -267,7 +267,9 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
   const startMode = modeKnown && !!rankings && isStartMode({ checked: rankings.checked, articles: articlesTotal, steps })
   useEffect(() => { onStartMode(startMode) }, [startMode, onStartMode])
   // A new project's few cards all show on a phone too; otherwise the rest waits behind "more".
-  const fold = allCards || startMode ? '' : 'max-xl:hidden'
+  // The fold (P1-16, and on every width since w7 P2-14): the first five cards, then
+  // "more" for the rest, so the screen opens on what matters instead of ~14 cards.
+  const fold = allCards || startMode ? '' : 'hidden'
 
   if (status === 'error') {
     return (
@@ -482,10 +484,11 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
           )}
         </div>
 
-        {/* Phone only: the fold after the fifth card (P1-16), and back. Not on a new
-            project, whose few cards all fit. */}
+        {/* The fold after the fifth card (P1-16 on a phone; every width since w7 P2-14),
+            and back. Under both columns on a wide screen. Not on a new project, whose
+            few cards all fit. */}
         {!startMode && (
-          <div className={`${allCards ? 'order-last' : 'order-5'} flex justify-center xl:hidden`}>
+          <div className={`${allCards ? 'order-last' : 'order-5'} flex justify-center xl:order-last xl:col-span-2`}>
             <Button type="button" variant="secondary" aria-expanded={allCards} data-dashboard-fold onClick={() => setAllCards((v) => !v)}>
               {allCards ? t.fewerCards : t.moreCards}
             </Button>

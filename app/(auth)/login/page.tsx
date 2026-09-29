@@ -119,6 +119,7 @@ export function AuthForm() {
 
   return (
     <AuthShell
+      variant="login"
       locale={lang}
       logoAlt={t.logoAlt}
       subtitle={t.subtitle}
