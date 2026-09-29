@@ -2,11 +2,13 @@
 
 /**
  * Row 2 of the content strategy tab: the month board. Four columns (ideas, planned,
- * written, published) under a row of month chips, each with its count; "all" is the
- * default and every other chip is a month the plan schedules something in. A chip's
- * number is exactly the cards it shows: a month shows what the plan puts in it, and
- * everything not scheduled yet (ideas, topics waiting for a slot), which belongs to no
- * month and so is never hidden by one (lib/content/strategy/board.ts monthChips).
+ * written, published) under a row of month chips; "all" is the default and every other
+ * chip is a month the plan schedules something in. A month shows what the plan puts in
+ * it, and everything not scheduled yet (ideas, topics waiting for a slot), which belongs
+ * to no month and so is never hidden by one (lib/content/strategy/board.ts monthChips).
+ * The chips carry no bare number: "September 10" beside "all 11" read as ten topics in
+ * September when one was (review P2-12). One line under them says the totals in words
+ * ("10 topics shown in October: 1 planned for October and 9 with no date yet").
  * A card says which date it carries, and, when the research knows its keyword, why it
  * is worth writing (TopicFacts).
  *
@@ -207,6 +209,7 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
   const active = chips.some((c) => c.key === month) ? month : ALL_MONTHS
   const visible = useMemo(() => cardsInMonth(cards, active), [cards, active])
   const unscheduled = useMemo(() => unscheduledCount(cards), [cards])
+  const fmt = (n: number) => formatCount(n, lang)
   const byColumn = useMemo(() => {
     const m: Record<StrategyColumn, StrategyCard[]> = { ideas: [], planned: [], written: [], published: [] }
     for (const c of visible) m[c.column].push(c)
@@ -220,13 +223,15 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
           ariaLabel={s.monthsLabel}
           value={active}
           onChange={setMonth}
-          options={chips.map((c) => ({ value: c.key, label: c.key === ALL_MONTHS ? s.allMonths : monthLabel(c.key, lang), count: c.count }))}
+          options={chips.map((c) => ({ value: c.key, label: c.key === ALL_MONTHS ? s.allMonths : monthLabel(c.key, lang) }))}
         />
       </div>
 
-      {active !== ALL_MONTHS && unscheduled > 0 && (
-        <p data-unscheduled-note="" className="-mt-2 mb-3 text-caption text-muted">{dict.strategyInsights.board.unscheduled(formatCount(unscheduled, lang))}</p>
-      )}
+      <p data-month-summary={active} aria-live="polite" className="-mt-2 mb-3 text-caption text-muted tabular-nums">
+        {active === ALL_MONTHS
+          ? dict.strategyInsights.board.summaryAll({ total: cards.length, dated: cards.length - unscheduled, undated: unscheduled }, fmt)
+          : dict.strategyInsights.board.summaryMonth({ shown: visible.length, inMonth: visible.length - unscheduled, undated: unscheduled }, monthLabel(active, lang), fmt)}
+      </p>
 
       <div key={active} className="grid motion-safe:animate-pop-in items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {STRATEGY_COLUMNS.map((col) => <Column key={col} column={col} cards={byColumn[col]} lang={lang} dict={dict} note={col === 'ideas' ? ideasNote : null} act={act} insights={insights} />)}

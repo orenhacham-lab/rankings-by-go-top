@@ -178,12 +178,12 @@ const STRINGS = {
   run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
   rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ' },
   engines_show_rest: { he: 'הצגת כל המנועים (עוד {n})', en: 'Show all engines ({n} more)' },
-  ai_allowance: { he: 'בדיקות AI במחזור הנוכחי', en: 'AI checks this billing period' },
+  ai_allowance: { he: 'בדיקות AI שנוצלו', en: 'AI checks used' },
   ai_allowance_unknown: { he: 'לא ניתן לאמת כרגע את המכסה', en: 'The allowance could not be read right now' },
   ai_allowance_unmetered: { he: 'ללא מגבלה', en: 'Unmetered' },
   ai_allowance_exhausted: {
-    he: 'ניצלתם את כל בדיקות ה-AI במחזור החיוב הזה',
-    en: 'You have used every AI check in this billing period',
+    he: 'ניצלתם את כל בדיקות ה-AI שכלולות בחבילה',
+    en: 'You have used every AI check your plan includes',
   },
   ai_allowance_not_included: { he: 'לא כלולות בחבילה', en: 'not included in your plan' },
   ai_allowance_none_body: {

@@ -45,7 +45,6 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
   const t = getDashboardDictionary(language).mapsPosts
   const c = t.composer
   const canPublish = status.connection?.status === 'connected' && !!status.location
-  const blockedReason = status.connection?.status !== 'connected' ? t.errors.not_connected : !status.location ? t.errors.no_location : null
 
   const [source, setSource] = useState<Source>(status.articles.length > 0 ? 'article' : 'topic')
   const [articleId, setArticleId] = useState('')
@@ -186,8 +185,15 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
         </div>
       </div>
 
+      {/* Nothing to write until there is a business to post to: the form is shown (so the
+          merchant sees what is coming) but locked, with the one step that is missing. */}
+      {!canPublish && (
+        <div data-gbp-composer-locked={status.connection?.status !== 'connected' ? 'connect' : 'location'} className="mb-6">
+          <Notice tone="info">{status.connection?.status !== 'connected' ? c.lockedConnect : c.lockedLocation}</Notice>
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-8">
-        <div className="min-w-0 space-y-6">
+        <fieldset disabled={!canPublish} aria-disabled={!canPublish || undefined} className={cn('min-w-0 space-y-6', !canPublish && 'opacity-60')}>
           {/* Source + AI draft */}
           <section className="space-y-3">
             <p className={FIELD_LABEL_CLASSES}>{c.sourceLabel}</p>
@@ -328,9 +334,8 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
               {when === 'later' ? <CalendarClock aria-hidden="true" className="size-4" /> : <Send aria-hidden="true" className="size-4" />}
               {sending ? c.sending : when === 'later' ? c.schedule : c.publish}
             </Button>
-            {!canPublish && blockedReason && <p className="text-caption text-muted">{blockedReason}</p>}
           </div>
-        </div>
+        </fieldset>
 
         <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           <p className="mb-3 text-overline font-semibold uppercase tracking-wide text-muted">{t.preview.title}</p>

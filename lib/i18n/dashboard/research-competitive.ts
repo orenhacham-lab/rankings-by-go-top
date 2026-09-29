@@ -9,9 +9,9 @@
  * (lib/i18n/dashboard/__qa__/own-wording.qa.ts).
  */
 export const researchCompetitiveHe = {
-  nav: 'מול המתחרים',
-  title: 'איפה אתם מול המתחרים',
-  subtitle: 'כמה מהקליקים על הביטויים שלכם מגיעים אליכם ולא למתחרים, איפה אתם מקדימים, ואיזה עמוד באתר עונה על כל ביטוי.',
+  nav: 'מתחרים',
+  title: 'מול מי אתם מתחרים',
+  subtitle: 'מי מתחרה על הביטויים שלכם, כמה מהקליקים מגיעים אליכם ולא אליהם, איפה אתם מקדימים, ואיזה עמוד באתר עונה על כל ביטוי.',
   loading: 'טוענים את ההשוואה למתחרים',
   error: 'לא הצלחנו לטעון את ההשוואה למתחרים.',
   retry: 'נסו שוב',
@@ -66,8 +66,12 @@ export const researchCompetitiveHe = {
       none: 'אף אחד לא בטופ 20',
     },
     volume: (n: string) => `${n} חיפושים בחודש`,
+    showTable: (n: string) => `הצגת ההשוואה לפי ביטוי (${n})`,
+    hideTable: 'הסתרת ההשוואה לפי ביטוי',
   },
   competitors: {
+    noneLine: 'עוד לא בחרתם מתחרים להשוואה. אחרי שתבחרו, בדיקת הדירוג הבאה תראה איפה כל אחד מהם מופיע על הביטויים שלכם.',
+    choose: 'בחירת מתחרים',
     noneTitle: 'עוד לא בחרתם מתחרים להשוואה',
     noneBody: 'בחרו מתחרים, ובבדיקת הדירוג הבאה נרשום איפה כל אחד מהם מופיע על הביטויים שלכם.',
     manage: 'ניהול מתחרים',
@@ -103,6 +107,8 @@ export const researchCompetitiveHe = {
     competingHow: 'עמודים מתחרים: שני עמודים או יותר, שכל אחד מהם מקבל לפחות 15% מהחשיפות על אותו חיפוש.',
     noneFiltered: 'אין ביטויים במצב הזה.',
     empty: 'המיפוי יופיע כשיהיו ביטויים במעקב או נתונים מ-Search Console.',
+    gist: (all: string, noPage: string, competing: string) => `${all} ביטויים · ${noPage} בלי עמוד · ${competing} עם עמודים מתחרים`,
+    gistEmpty: 'עוד אין ביטויים למיפוי',
   },
   rankings: {
     title: 'הדירוגים שכבר יש לכם',
@@ -129,15 +135,19 @@ export const researchCompetitiveHe = {
     noneFiltered: 'אין ביטויים במצב הזה.',
     empty: 'עוד אין דירוגים להציג. הוסיפו ביטויים למעקב או חברו את Search Console.',
     gscRange: (from: string, to: string) => `נתוני Search Console מ-${from} עד ${to}`,
+    gist: (tracked: string, gscOnly: string) => `${tracked} במעקב · ${gscOnly} חיפושים נוספים מ-Search Console`,
+    gistNoGsc: (tracked: string) => `${tracked} במעקב`,
+    gistConnect: (tracked: string) => `${tracked} במעקב · חיבור Search Console יוסיף כל חיפוש שהאתר כבר מופיע עליו`,
+    gistEmpty: 'עוד אין דירוגים להציג',
   },
 }
 
 export type ResearchCompetitiveCopy = typeof researchCompetitiveHe
 
 export const researchCompetitiveEn: ResearchCompetitiveCopy = {
-  nav: 'Vs. competitors',
-  title: 'Where you stand against your competitors',
-  subtitle: 'How much of the clicks on your keywords reach you rather than your competitors, where you are ahead, and which page of your site answers each keyword.',
+  nav: 'Competitors',
+  title: 'Who you are up against',
+  subtitle: 'Who competes for your keywords, how much of the clicks reach you rather than them, where you are ahead, and which page of your site answers each keyword.',
   loading: 'Loading the competitor comparison',
   error: 'We could not load the competitor comparison.',
   retry: 'Try again',
@@ -192,8 +202,12 @@ export const researchCompetitiveEn: ResearchCompetitiveCopy = {
       none: 'Nobody in the top 20',
     },
     volume: (n: string) => `${n} searches a month`,
+    showTable: (n: string) => `Show the keyword-by-keyword comparison (${n})`,
+    hideTable: 'Hide the keyword-by-keyword comparison',
   },
   competitors: {
+    noneLine: 'You have not picked competitors to compare yet. Once you do, the next ranking check shows where each of them appears for your keywords.',
+    choose: 'Pick competitors',
     noneTitle: 'You have not picked competitors to compare yet',
     noneBody: 'Pick your competitors, and the next ranking check records where each of them shows for your keywords.',
     manage: 'Manage competitors',
@@ -229,6 +243,8 @@ export const researchCompetitiveEn: ResearchCompetitiveCopy = {
     competingHow: 'Competing pages: two or more pages, each getting at least 15% of the impressions for the same search.',
     noneFiltered: 'No keywords in this state.',
     empty: 'The map appears once there are tracked keywords or Search Console data.',
+    gist: (all: string, noPage: string, competing: string) => `${all} keywords · ${noPage} without a page · ${competing} with competing pages`,
+    gistEmpty: 'No keywords to map yet',
   },
   rankings: {
     title: 'The rankings you already have',
@@ -255,5 +271,9 @@ export const researchCompetitiveEn: ResearchCompetitiveCopy = {
     noneFiltered: 'No keywords in this state.',
     empty: 'No rankings to show yet. Track keywords or connect Search Console.',
     gscRange: (from: string, to: string) => `Search Console: ${from} to ${to}`,
+    gist: (tracked: string, gscOnly: string) => `${tracked} tracked · ${gscOnly} more searches from Search Console`,
+    gistNoGsc: (tracked: string) => `${tracked} tracked`,
+    gistConnect: (tracked: string) => `${tracked} tracked · connecting Search Console adds every search your site already shows for`,
+    gistEmpty: 'No rankings to show yet',
   },
 }

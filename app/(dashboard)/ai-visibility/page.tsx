@@ -50,6 +50,7 @@ import { useMapping } from '@/components/mapping/useMapping'
 import { createClient } from '@/lib/supabase/client'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import type { Project } from '@/lib/supabase/types'
+import { Reveal } from '@/components/ui/motion'
 
 export default function AIVisibilityPage() {
   const { language } = useDashboardLanguage()
@@ -109,6 +110,8 @@ function ProjectAIVisibility({ project }: { project: Project }) {
   const [questionsCount, setQuestionsCount] = useState<number | null>(null)
   const onRunsLoaded = useCallback((raw: unknown[] | null) => setRuns(raw === null ? 'error' : readRuns(raw)), [])
   const overview = useMemo<OverviewData>(() => (runs === null ? null : runs === 'error' ? 'error' : buildOverview(runs)), [runs])
+  // The hero's next step reads the same allowance the tool shows (reported by the tool).
+  const [allowanceOut, setAllowanceOut] = useState(false)
   const [tabRequest, setTabRequest] = useState<{ tab: AIVisibilityTab; seq: number } | undefined>(undefined)
   const toolRef = useRef<HTMLDivElement>(null)
   const chooseQuestions = useCallback(() => {
@@ -142,6 +145,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     openQueriesWhenEmpty: true,
     suggestionsRefreshKey: questionsArrived,
     requestedTab: tabRequest,
+    onAllowanceOut: setAllowanceOut,
     competitorsSlot: (
       <CompetitorsReadOnly
         projectId={project.id}
@@ -168,23 +172,32 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     </section>
   )
   return (
+    // The rows enter the way every other app screen's do (components/ui/motion:
+    // once, 8px, staggered, nothing at all under reduced motion).
     <div className="space-y-8" data-ai-page={seed.kind}>
-      <OverviewStatusBar overview={overview} questionsPending={questionsPending} />
-      <OverviewOpeningCard
-        overview={overview}
-        questionsPending={questionsPending}
-        questionsSuggested={seed.kind === 'none' ? null : seed.questionsSuggested}
-        questionsCount={questionsCount}
-        onChooseQuestions={chooseQuestions}
-      />
-      <div ref={toolRef} className="scroll-mt-4">
-        {tool}
-      </div>
-      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
+      <Reveal index={0} data-ai-entrance="status">
+        <OverviewStatusBar overview={overview} questionsPending={questionsPending} />
+      </Reveal>
+      <Reveal index={1} data-ai-entrance="opening">
+        <OverviewOpeningCard
+          overview={overview}
+          questionsPending={questionsPending}
+          questionsSuggested={seed.kind === 'none' ? null : seed.questionsSuggested}
+          questionsCount={questionsCount}
+          allowanceOut={allowanceOut}
+          onChooseQuestions={chooseQuestions}
+        />
+      </Reveal>
+      <Reveal index={2} data-ai-entrance="tool">
+        <div ref={toolRef} className="scroll-mt-4">
+          {tool}
+        </div>
+      </Reveal>
+      <Reveal index={3} data-ai-entrance="activity" className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
         <RecentActivity overview={overview} />
         {readiness && seed.kind !== 'none' && <ReadinessCard view={readiness} scannedAt={seed.scannedAt} settingsHref={settingsHref(project.id)} />}
         {mappingCard}
-      </div>
+      </Reveal>
     </div>
   )
 }

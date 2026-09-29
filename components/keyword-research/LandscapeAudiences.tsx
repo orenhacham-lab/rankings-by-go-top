@@ -34,6 +34,17 @@ export const AUDIENCE_ICONS: readonly LucideIcon[] = [UserRound, Users, Home, Br
 /** Keywords shown per audience. */
 export const AUDIENCE_KEYWORDS_SHOWN = 4
 
+/**
+ * The audiences the research speaks to (with their original index, which keeps each
+ * one's icon), and the labels of those it does not name yet.
+ */
+export function splitAudiences(audiences: readonly AudienceKeywords[]): { matched: { a: AudienceKeywords; i: number }[]; missing: string[] } {
+  const matched: { a: AudienceKeywords; i: number }[] = []
+  const missing: string[] = []
+  audiences.forEach((a, i) => { if (a.keywords.length > 0) matched.push({ a, i }); else missing.push(a.label) })
+  return { matched, missing }
+}
+
 export function IntentBar({ mix, label }: { mix: readonly IntentShare[]; label: string }) {
   const total = mix.reduce((s, m) => s + m.searches, 0)
   return (
@@ -58,6 +69,10 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
   // "general information" bar is an empty panel, not data (final review R18).
   const showMix = mix.some((m) => m.intent !== 'info' && m.searches > 0)
   const mixLabel = mix.map((m) => `${t.intents[m.intent]}: ${t.intentLine(n(m.keywords), n(m.searches))}`).join(' · ')
+  // A card per audience the research speaks to. An audience no keyword names yet is
+  // not a card of its own (three empty cards read as "nobody searches for you"): the
+  // ones still missing are named once, in one line under the cards.
+  const { matched, missing } = splitAudiences(audiences)
 
   return (
     <section id={id} data-landscape-audiences="" className="mb-6 scroll-mt-20">
@@ -78,8 +93,10 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
             {audiences.length === 0 ? (
               <p className="text-copy text-muted">{t.empty}</p>
             ) : (
-              <ol className="grid gap-3 md:grid-cols-2">
-                {audiences.map((a, i) => (
+              <>
+              {matched.length > 0 && (
+              <ol className={cn('grid gap-3', matched.length > 1 && 'md:grid-cols-2')}>
+                {matched.map(({ a, i }) => (
                   <li
                     key={a.label}
                     data-audience={i}
@@ -100,21 +117,24 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
                         {a.keywords.length > 0 && <p className="mt-0.5 text-caption text-muted tabular-nums">{t.matched(n(a.keywords.length), n(a.searches))}</p>}
                       </div>
                     </div>
-                    {a.keywords.length === 0 ? (
-                      <p className="mt-3 text-caption text-muted">{t.none}</p>
-                    ) : (
-                      <ul className="mt-3 flex flex-wrap gap-1.5">
-                        {a.keywords.slice(0, AUDIENCE_KEYWORDS_SHOWN).map((k) => (
-                          <li key={k.keyword} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-line bg-sunk px-2 py-0.5 text-caption text-body">
-                            <span className="truncate">{k.keyword}</span>
-                            {k.volume !== null && <span className="shrink-0 font-semibold tabular-nums text-ink">{n(k.volume)}</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <ul className="mt-3 flex flex-wrap gap-1.5">
+                      {a.keywords.slice(0, AUDIENCE_KEYWORDS_SHOWN).map((k) => (
+                        <li key={k.keyword} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-line bg-sunk px-2 py-0.5 text-caption text-body">
+                          <span className="truncate">{k.keyword}</span>
+                          {k.volume !== null && <span className="shrink-0 font-semibold tabular-nums text-ink">{n(k.volume)}</span>}
+                        </li>
+                      ))}
+                    </ul>
                   </li>
                 ))}
               </ol>
+              )}
+              {missing.length > 0 && (
+                <p data-audiences-missing={missing.length} className={cn('text-copy text-body text-pretty', matched.length > 0 && 'mt-3')}>
+                  {matched.length > 0 ? t.missingSome(missing.join(', ')) : t.missingAll(missing.join(', '))}
+                </p>
+              )}
+              </>
             )}
             <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted">
               <span>{t.how}</span>

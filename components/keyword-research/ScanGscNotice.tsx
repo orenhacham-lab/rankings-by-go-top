@@ -23,12 +23,21 @@ import GscSetupPrompt, { GscLoadError } from '@/components/gsc/GscSetupPrompt'
 import { formatCount } from '@/components/gsc/format'
 
 export default function ScanGscNotice({
-  projectId, data, count, retry, className,
+  projectId, data, count, scope = 'tracked', retry, className,
 }: {
   projectId: string | null
   data: GscData<Record<string, KeywordFigures>>
   /** Keywords on screen that Google reports figures for. */
   count: number
+  /**
+   * What `count` counts. 'tracked': the scan's research, which lists every tracked
+   * keyword Google reports for, so a 0 means none of the TRACKED keywords had clicks.
+   * 'search': a search the merchant ran, whose rows are that search's keywords only,
+   * so a 0 says nothing about the tracked ones and must not claim it did (it read
+   * "Google reported nothing for your tracked keywords" while the dashboard showed
+   * clicks for the same site).
+   */
+  scope?: 'tracked' | 'search'
   retry: () => void
   className?: string
 }) {
@@ -51,7 +60,9 @@ export default function ScanGscNotice({
       ) : state === 'error' ? (
         <GscLoadError onRetry={retry} className="min-w-0 flex-1 basis-80" />
       ) : state === 'ready' ? (
-        <p className="min-w-0 flex-1 basis-80 text-copy text-muted">{count > 0 ? t.legend(formatCount(count, language)) : t.noneYet}</p>
+        <p className="min-w-0 flex-1 basis-80 text-copy text-muted">{scope === 'search'
+          ? (count > 0 ? t.legendSearch(formatCount(count, language)) : t.noneInSearch)
+          : (count > 0 ? t.legend(formatCount(count, language)) : t.noneYet)}</p>
       ) : (
         <p className="min-w-0 flex-1 basis-80 text-copy text-muted" aria-busy="true">{t.loading}</p>
       )}

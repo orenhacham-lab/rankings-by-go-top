@@ -126,8 +126,21 @@ function GoogleMark() {
 
 interface LocationOption { accountName: string; locationName: string; title: string; address: string | null }
 
+/**
+ * Codes that mean Google no longer honours the connection. Step 2 learns them first
+ * (listing the businesses needs a live grant); they belong to step 1, so step 2 hands
+ * them up instead of showing its own red error beside step 1's "connected" badge.
+ */
+export const GBP_AUTH_LOST_CODES: ReadonlySet<string> = new Set(['reauth_required', 'not_connected', 'connection_revoked'])
+
 /** Step 2: which of the merchant's businesses this project posts to. */
-export function LocationCard({ projectId, status, onChanged }: { projectId: string; status: GbpReadyStatus; onChanged: () => void }) {
+export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
+  projectId: string
+  status: GbpReadyStatus
+  onChanged: () => void
+  /** The grant turned out to be gone: step 1 says so (one status per step). */
+  onAuthLost?: () => void
+}) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).mapsPosts
   const connected = status.connection?.status === 'connected'
@@ -145,17 +158,19 @@ export function LocationCard({ projectId, status, onChanged }: { projectId: stri
         const body = await res.json().catch(() => ({}))
         if (!alive) return
         if (res.ok && Array.isArray(body.locations)) setOptions(body.locations as LocationOption[])
+        else if (typeof body.error === 'string' && GBP_AUTH_LOST_CODES.has(body.error)) { setOptions(null); onAuthLost?.() }
         else { setOptions([]); setError(gbpErrorText(t, body.error)) }
       })
       .catch(() => { if (alive) { setOptions([]); setError(t.errors.unexpected) } })
     return () => { alive = false }
-  }, [needList, options, projectId, t])
+  }, [needList, options, projectId, t, onAuthLost])
 
   const choose = async (o: LocationOption) => {
     setSaving(o.locationName); setError(null)
     const res = await fetch('/api/gbp/locations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, accountName: o.accountName, locationName: o.locationName }) }).catch(() => null)
     const body = res ? await res.json().catch(() => ({})) : {}
     setSaving(null)
+    if (res && typeof body.error === 'string' && GBP_AUTH_LOST_CODES.has(body.error)) { onAuthLost?.(); return }
     if (!res || !res.ok) { setError(gbpErrorText(t, body.error)); return }
     setPicking(false)
     onChanged()

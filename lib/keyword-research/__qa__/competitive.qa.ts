@@ -301,12 +301,17 @@ async function main() {
       && /from\('gsc_query_page_metrics'\)[\s\S]{0,200}\.eq\('project_id', projectId\)/.test(route)
       && /from\('ai_visibility_competitors'\)[\s\S]{0,200}\.eq\('user_id', userId\)/.test(route))
     const page = src('app/(dashboard)/keyword-research/page.tsx')
-    // Mounted in the landscape's own slot: a new sibling slot would shift React's ids on the
-    // screen without a scan, which legacy-screen.qa.ts holds byte for byte.
+    // Wave-7 review P1-2: ONE element, built for every project with a project (not only
+    // with the scan's research on screen), placed beside the scan's story when that is on
+    // screen and after the results otherwise. (It used to be pinned to the landscape's
+    // slot, which is exactly what hid it from projects without a scan and after a search;
+    // the legacy screen's golden was recaptured for this change.)
     const mountsOnce = (p: string) => (p.match(/<CompetitiveResearch\b/g) ?? []).length === 1
-      && /\{landscapeOn && scanOn\?\.kind === 'seeded' && activeProjectId && \(\s*<>\s*<ResearchLandscape\b[^>]*\/>\s*<CompetitiveResearch\b/.test(p)
-    check('R8: the research page mounts the section once, in the landscape\'s slot, with the scan\'s research on screen', mountsOnce(page))
-    check('R8-MUT: a mount in a slot of its own fails R8', !mountsOnce(page.replace(/<CompetitiveResearch\b/, '</>)}\n      {landscapeOn && (<CompetitiveResearch')))
+      && /const competitorSection = activeProjectId \? \(\s*<CompetitiveResearch\b/.test(p)
+      && /\{landscapeOn && competitorSection\}/.test(p)
+      && /\{!landscapeOn && competitorSection && /.test(p)
+    check('R8: the research page builds the section once, for every project, and shows it with or without the scan\'s research', mountsOnce(page))
+    check('R8-MUT: gating it on the scan\'s research again fails R8', !mountsOnce(page.replace('const competitorSection = activeProjectId ? (', 'const competitorSection = landscapeOn && activeProjectId ? (').replace('{!landscapeOn && competitorSection && ', '{false && ')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

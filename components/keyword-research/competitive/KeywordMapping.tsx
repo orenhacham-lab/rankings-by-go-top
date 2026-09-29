@@ -55,7 +55,11 @@ function PageCell({ row }: { row: MappingRow }) {
   )
 }
 
-export default function KeywordMapping({ model }: { model: CompetitiveModel }) {
+export default function KeywordMapping({ model, heading = true }: {
+  model: CompetitiveModel
+  /** False inside a Fold, whose button already is the title. */
+  heading?: boolean
+}) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language).researchCompetitive
   const t = dict.mapping
@@ -68,8 +72,8 @@ export default function KeywordMapping({ model }: { model: CompetitiveModel }) {
   return (
     <div data-competitive-mapping="" className="space-y-4">
       <div>
-        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
-        <p className="mt-0.5 max-w-prose text-copy text-muted text-pretty">{t.subtitle}</p>
+        {heading && <h3 className="text-section font-semibold text-ink">{t.title}</h3>}
+        <p className={heading ? 'mt-0.5 max-w-prose text-copy text-muted text-pretty' : 'max-w-prose text-copy text-muted text-pretty'}>{t.subtitle}</p>
       </div>
       {model.mapping.length === 0 ? (
         <p className="rounded-inset border border-line bg-sunk px-4 py-3 text-copy text-body">{t.empty}</p>

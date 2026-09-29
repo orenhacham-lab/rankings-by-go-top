@@ -907,8 +907,8 @@ export const dashboardEn = {
       lastPublished: (date: string) => `Last published ${date}`,
       neverPublished: 'Nothing published yet',
       headline: (published: string, total: string) => `${published} of your ${total} articles are live`,
-      headlineNone: (total: string) => `${total} articles written, none of them published yet`,
-      waiting: (ready: string) => `${ready} ready and waiting to be published`,
+      headlineNone: (n: number, total: string) => (n === 1 ? 'One article written, not published yet' : `${total} articles written, none of them published yet`),
+      waiting: (n: number, ready: string) => (n === 1 ? 'One article ready and waiting to be published' : `${ready} articles ready and waiting to be published`),
       total: 'All articles',
       totalHint: (drafts: string) => `${drafts} in draft`,
       totalHintNone: 'No open drafts',
@@ -2229,7 +2229,20 @@ export const dashboardEn = {
       stepNow: 'Now',
     },
     board: {
-      unscheduled: (n: string) => `${n} topics have no publish date yet, so they show under every month.`,
+      summaryAll: (n: { total: number; dated: number; undated: number }, f: (x: number) => string) => {
+        const head = n.total === 1 ? 'One topic in the plan' : `${f(n.total)} topics in the plan`
+        const parts = [
+          n.dated > 0 ? (n.dated === 1 ? 'one planned for a month' : `${f(n.dated)} planned for a month`) : '',
+          n.undated > 0 ? (n.undated === 1 ? 'one with no publish date yet' : `${f(n.undated)} with no publish date yet`) : '',
+        ].filter(Boolean)
+        return parts.length ? `${head}: ${parts.join(', ')}.` : `${head}.`
+      },
+      summaryMonth: (n: { shown: number; inMonth: number; undated: number }, month: string, f: (x: number) => string) => {
+        const head = n.shown === 1 ? `One topic shown in ${month}` : `${f(n.shown)} topics shown in ${month}`
+        const planned = `${n.inMonth === 1 ? 'one' : f(n.inMonth)} planned for ${month}`
+        const rest = n.undated === 0 ? '' : ` and ${n.undated === 1 ? 'one' : f(n.undated)} with no publish date yet, so shown under every month`
+        return `${head}: ${planned}${rest}.`
+      },
       shown: (shown: string, total: string) => `Showing ${shown} of ${total}`,
     },
     list: {
@@ -3842,6 +3855,8 @@ export const dashboardEn = {
     nextStepNoMentions: 'No engine has mentioned you yet in the answers checked. What helps: an article on your site that answers the question exactly, so the engines have something to cite.',
     nextStepKeepGoing: 'Check again from time to time: AI engines update, and the score moves with them.',
     runMoreChecks: 'Run more checks',
+    upgradeForChecks: 'Upgrade your plan',
+    checksUsedUp: 'You have used all the AI checks your plan includes. Upgrade to keep checking.',
     emptyBodyQuestions: (count: number) => `The scan prepared ${count} questions your customers ask. Pick a question and an engine to run the first check.`,
     emptyBodyPending: 'The scan is preparing questions your customers ask. They will appear in the tool below in a few minutes.',
     chooseQuestions: 'Choose questions',
@@ -5157,6 +5172,8 @@ export const dashboardEn = {
       about: 'Your tracked keywords that Google already shows your site for will appear here with their clicks and impressions, so you know what already works.',
       legend: (n: string) => `${n} of your tracked keywords got clicks or impressions from Google in the last 28 days.`,
       noneYet: 'In the last 28 days Google reported no clicks or impressions for your tracked keywords.',
+      noneInSearch: 'Google has no data yet for the keywords in this search.',
+      legendSearch: (n: string) => `${n} of the keywords in this search already got clicks or impressions from Google in the last 28 days.`,
       loading: 'Loading Search Console data',
     },
     table: {
@@ -5204,12 +5221,16 @@ export const dashboardEn = {
       /** A competitor seen on Google in the scan's checks, but tied to no keyword of the research list. */
       noOverlapSeen: 'It showed up in the searches we checked, but no keyword in the research list is tied to it yet.',
       summary: (n: string, searches: string) => `${n} competitors · ${searches} searches a month on keywords only they reach`,
+      cardsTitle: 'Who competes for your keywords',
+      comparedOnly: (y: string) => `Not in the research list, but compared with you on ${y} tracked keywords.`,
     },
     audiences: {
       title: 'Who searches for you',
       subtitle: 'The audiences the scan found on your site, and the keywords that speak each one’s language.',
       matched: (n: string, searches: string) => `${n} keywords · ${searches} searches a month`,
       none: 'No keyword names this audience explicitly yet.',
+      missingSome: (names: string) => `No keyword in the research names these yet: ${names}.`,
+      missingAll: (names: string) => `No keyword in the research names any of your audiences yet (${names}). Keywords that name an audience will show here.`,
       how: 'A keyword belongs to an audience when it uses a word only that audience has.',
       empty: 'This project has no audiences yet. You can add them in the project settings.',
       edit: 'Edit audiences',
@@ -5587,6 +5608,8 @@ export const dashboardEn = {
       saving: 'Saving…',
     },
     composer: {
+      lockedConnect: 'To write a post, first connect your Google business profile (step 1).',
+      lockedLocation: 'To write a post, first choose which business to post to (step 2).',
       overline: 'Step 3',
       title: 'New post',
       sourceLabel: 'What is the post about?',
