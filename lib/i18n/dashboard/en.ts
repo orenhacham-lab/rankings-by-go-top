@@ -4479,6 +4479,7 @@ export const dashboardEn = {
           h1Demote: 'Becomes a subheading (H2)',
           h1Note: 'Only headings inside the page\'s own content change, and only from H1 to H2. The words, the order and the design stay the same.',
           llmsText: 'The llms.txt text',
+          llmsLead: 'When you click "Approve fix", the plugin serves this text at your site\'s llms.txt address:',
           llmsHint: 'Your site\'s name, one line about it, and its main pages with one line each, taken from the pages themselves. You can edit anything.',
           llmsPages: (n: number) => (n === 1 ? 'Built from 1 page of your site' : `Built from ${n} pages of your site`),
           llmsAddress: 'It will be at',

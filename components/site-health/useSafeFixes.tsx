@@ -101,11 +101,13 @@ function BulkChanges({ list, copy }: { list: ReadyFix[]; copy: Copy }) {
                   {r.fix.type === 'image_alt' ? ` (${b.images(r.fix.images.length)})` : ''}
                 </span>
               </p>
-              <p className="mt-1 text-body">
-                <span dir="auto" className={cn(!r.before && 'italic text-muted')}>{r.before || copy.approve.empty}</span>
-                <span aria-hidden="true" className="mx-1.5 inline-block text-muted rtl:-scale-x-100">→</span>
-                <span dir="auto" className="font-medium text-ink">{r.after}</span>
-              </p>
+              {/* Before and after on their own lines: each keeps its own direction, nothing runs together. */}
+              <dl className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+                <dt className="text-muted">{copy.approve.before}</dt>
+                <dd dir="auto" className={cn('min-w-0 text-body', !r.before && 'italic text-muted')}>{r.before || copy.approve.empty}</dd>
+                <dt className="text-muted">{copy.approve.after}</dt>
+                <dd dir="auto" className="min-w-0 font-medium text-ink">{r.after}</dd>
+              </dl>
             </li>
           ))}
         </ul>

@@ -601,6 +601,27 @@ async function main() {
     const real = renderToStaticMarkup(createElement(AutoFixStrip, { projectId: P, capabilities: pending, copy: he.autofix, onInstall: () => {}, onChanged: () => {}, lastSeen: (s: string) => s, safe: { count: 3, phase: { kind: 'idle' }, start: () => {}, onRecheck: () => {}, onOpenQueue: () => {} } }))
     check('U8: the safe button shows only with the plugin connected', !real.includes('data-safe-fixes'))
     check('MUTATION CONTROL: a safe button shown without a connected plugin is caught by U8', mStrip.found && shown.includes('data-safe-fixes="3"'))
+
+    // U9: llms.txt is one file for the whole site. Its approval never says "this page only" nor how a
+    // page's SEO field is saved, and its text shows as the file reads (left to right, lines unwrapped).
+    const code = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1').replace(/\{\s*\}/g, '')
+    const llmsOk = (t: string) => {
+      const c = code(t)
+      return /const lead = p\.type === 'llms_txt' \? t\.labels\.llmsLead : t\.lead\[phase\.channel\]/.test(c)
+        && /const viaNote = phase\.kind === 'ready' && phase\.preview\.type !== 'llms_txt'/.test(c)
+        && /data-llms-text[^>]*/.test(c) && /dir="ltr" wrap="off"[^>]*data-llms-text/.test(c)
+        && /type !== 'llms_txt' && <div/.test(c)
+    }
+    const modal = read('components/site-health/ApproveFixModal.tsx')
+    check('U9: the llms.txt approval speaks of the site file, hides the page line and the SEO-field note, and shows the text left to right', llmsOk(modal))
+    check('MUTATION CONTROL: the "this page only" lead back on llms.txt is caught by U9', !llmsOk(modal.replace("p.type === 'llms_txt' ? t.labels.llmsLead : t.lead[phase.channel]", 't.lead[phase.channel]')))
+    check('MUTATION CONTROL: the SEO-field note back on llms.txt is caught by U9', !llmsOk(modal.replace("phase.preview.type !== 'llms_txt' ? (", '!copyOnly ? (')))
+    check('U9b: the llms lead exists in both dictionaries (Hebrew in Hebrew)', /[֐-׿]/.test(he.autofix.approve.labels.llmsLead) && !!en.autofix.approve.labels.llmsLead && !/[֐-׿]/.test(en.autofix.approve.labels.llmsLead))
+    // U10: the batch confirmation shows each change as "now" and "after the fix" on their own lines.
+    const bulkOk = (t: string) => { const c = code(t); return /<dt[^>]*>\{copy\.approve\.before\}<\/dt>/.test(c) && /<dt[^>]*>\{copy\.approve\.after\}<\/dt>/.test(c) && !/→<\/span>/.test(c) }
+    const safeSrc = read('components/site-health/useSafeFixes.tsx')
+    check('U10: every change in the batch dialog reads as "now" / "after the fix" lines', bulkOk(safeSrc))
+    check('MUTATION CONTROL: an inline "before → after" run is caught by U10', !bulkOk(safeSrc.replace('<dt className="text-muted">{copy.approve.after}</dt>', '<span aria-hidden="true">→</span>')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -217,7 +217,8 @@ export default function ApproveFixModal({
   const sentence = (() => {
     if (phase.kind !== 'ready') return null
     const p = phase.preview
-    const lead = t.lead[phase.channel]
+    // llms.txt is one file for the whole site, not a change to this page.
+    const lead = p.type === 'llms_txt' ? t.labels.llmsLead : t.lead[phase.channel]
     let what: React.ReactNode = null
     switch (p.type) {
       case 'seo_title': case 'meta_description': case 'focus_keyphrase':
@@ -271,7 +272,7 @@ export default function ApproveFixModal({
     try { await navigator.clipboard.writeText(value); setCopied(true) } catch { setCopied(false) }
   }, [value])
 
-  const viaNote = phase.kind === 'ready' && !copyOnly ? (
+  const viaNote = phase.kind === 'ready' && phase.preview.type !== 'llms_txt' ? (
     <p className="flex gap-2 rounded-inset bg-info-soft px-4 py-3 text-copy text-ink">
       <Info size={16} strokeWidth={2} aria-hidden="true" className="mt-1 shrink-0 text-info" />
       {t.via[phase.preview.via]}
@@ -429,13 +430,13 @@ export default function ApproveFixModal({
           <div className="space-y-3" data-h1-plan={p.keepFrom}>
             <ul className="divide-y divide-line overflow-hidden rounded-inset border border-line" role="list">
               <li className="flex flex-col gap-1.5 bg-ok-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="min-w-0 text-copy font-medium text-ink" dir="auto"><span className="me-2 font-mono text-caption text-muted" dir="ltr">H1</span>{p.keep}</p>
-                <Badge variant="success">{t.labels.h1Keep} · {p.keepFrom === 'theme' ? t.labels.h1Theme : t.labels.h1Content}</Badge>
+                <p className="flex min-w-0 items-baseline gap-2 text-copy font-medium text-ink" dir="auto"><span className="shrink-0 font-mono text-caption text-muted" dir="ltr">H1</span>{p.keep}</p>
+                <Badge variant="success" className="self-start sm:self-auto">{t.labels.h1Keep} · {p.keepFrom === 'theme' ? t.labels.h1Theme : t.labels.h1Content}</Badge>
               </li>
               {p.headings.map((h) => (
                 <li key={h.n} className="flex flex-col gap-1.5 p-4 sm:flex-row sm:items-center sm:justify-between" data-h1-demote={h.n}>
-                  <p className="min-w-0 text-copy text-body" dir="auto"><span className="me-2 font-mono text-caption text-muted" dir="ltr">H1 → H2</span>{h.text}</p>
-                  <Badge variant="info">{t.labels.h1Demote}</Badge>
+                  <p className="flex min-w-0 items-baseline gap-2 text-copy text-body" dir="auto"><span className="shrink-0 font-mono text-caption text-muted" dir="ltr">H1 → H2</span>{h.text}</p>
+                  <Badge variant="info" className="self-start sm:self-auto">{t.labels.h1Demote}</Badge>
                 </li>
               ))}
             </ul>
@@ -449,7 +450,7 @@ export default function ApproveFixModal({
               <label htmlFor="approve-llms" className="text-caption font-semibold text-ink">{t.labels.llmsText}</label>
               <span className="text-caption text-muted">{t.labels.llmsPages(p.pages)}</span>
             </div>
-            <Textarea id="approve-llms" rows={14} value={value} onChange={(e) => { setValue(e.target.value); setCopied(false) }} dir="auto" className="font-mono text-caption" data-llms-text="" />
+            <Textarea id="approve-llms" rows={14} value={value} onChange={(e) => { setValue(e.target.value); setCopied(false) }} dir="ltr" wrap="off" className="whitespace-pre text-left font-mono text-caption" data-llms-text="" />
             <p className="text-caption text-muted">{t.labels.llmsHint}</p>
             <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-caption">
               <span className="font-semibold text-ink">{t.labels.llmsAddress}:</span>
@@ -579,12 +580,13 @@ export default function ApproveFixModal({
   return (
     <Modal open onClose={busy ? () => {} : close} title={t.title[type]} size="lg">
       <div className="space-y-5" data-fix-phase={phase.kind} data-fix-type={type}>
-        <div className="flex min-w-0 items-baseline gap-2 text-copy">
+        {/* llms.txt is for the whole site: its own address is shown with the text, not a page. */}
+        {type !== 'llms_txt' && <div className="flex min-w-0 items-baseline gap-2 text-copy">
           <span className="shrink-0 font-semibold text-ink">{t.page}:</span>
           <span className="min-w-0 truncate text-body" dir="ltr" title={page.url}>
             {pathLabel(phase.kind === 'ready' && (phase.preview.type === 'broken_link' || phase.preview.type === 'internal_link') ? phase.preview.pageUrl : page.url)}
           </span>
-        </div>
+        </div>}
 
         {phase.kind === 'loading' && (
           <div role="status" aria-busy="true" className="space-y-3">
