@@ -7,7 +7,7 @@
  * The words come from each page (Hebrew or English); these only lay them out.
  */
 import type { LucideIcon } from 'lucide-react'
-import { ArrowDown, ArrowUp, Check, FileSpreadsheet, FileText, Minus, Star, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, FileSpreadsheet, FileText, Minus, Plus, Search, Star, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IconSquircle, ProductFrame } from './marketing'
 
@@ -192,6 +192,60 @@ export function ReportVisual({
             </li>
           ))}
         </ul>
+      </div>
+    </ProductFrame>
+  )
+}
+
+/** Keyword ideas: a seed, then ideas with volume, competition and an "add" action. */
+export function KeywordIdeasVisual({
+  seed, headers, rows,
+}: {
+  seed: string
+  headers: [string, string, string]
+  rows: { keyword: string; volume: string; competition: string; level: 'low' | 'medium' | 'high'; added?: boolean }[]
+}) {
+  return (
+    <ProductFrame>
+      <div className="mb-4 flex h-11 items-center gap-2 rounded-control border border-line bg-surface px-3 shadow-control">
+        <Search className="size-4 shrink-0 text-muted" aria-hidden="true" />
+        <span className="truncate text-copy text-ink">{seed}</span>
+      </div>
+      <div className="overflow-hidden rounded-inset border border-line">
+        <table className="w-full text-start">
+          <thead className="bg-sunk">
+            <tr className="h-10">
+              {headers.map((h, i) => (
+                <th key={h} className={cn('px-3 text-caption font-semibold text-muted sm:px-4', i === 0 ? 'text-start' : 'text-center', i === 2 && 'hidden sm:table-cell')}>{h}</th>
+              ))}
+              <th className="w-12 px-3" aria-hidden="true" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line bg-surface">
+            {rows.map((row) => (
+              <tr key={row.keyword} className="h-12">
+                <td className="px-3 text-copy font-medium text-ink sm:px-4">{row.keyword}</td>
+                <td className="px-3 text-center text-copy font-semibold tabular-nums text-ink sm:px-4">{row.volume}</td>
+                <td className="hidden px-3 text-center sm:table-cell sm:px-4">
+                  <span className={cn(
+                    'inline-flex h-6 items-center rounded-pill px-2 text-caption font-semibold',
+                    row.level === 'low' && 'bg-ok-soft text-ok',
+                    row.level === 'medium' && 'bg-warn-soft text-warn',
+                    row.level === 'high' && 'bg-bad-soft text-bad',
+                  )}>{row.competition}</span>
+                </td>
+                <td className="px-3 text-end">
+                  <span
+                    className={cn('inline-flex size-7 items-center justify-center rounded-pill', row.added ? 'bg-action text-action-ink' : 'border border-line text-muted')}
+                    aria-hidden="true"
+                  >
+                    {row.added ? <Check className="size-4" strokeWidth={3} aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </ProductFrame>
   )

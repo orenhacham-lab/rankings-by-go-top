@@ -1,8 +1,10 @@
 import { Metadata } from 'next'
-import { Brain, MessageSquare, Zap, TrendingUp, Link2, BarChart3 } from 'lucide-react'
+import { Award, FileSpreadsheet, Lightbulb, LineChart, Link2, MessagesSquare, Sparkles, Target, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
-import { AiAnswersVisual } from '@/components/public/feature-visuals'
+import { AiVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
   title: 'AI Visibility Tracking | Rankings by Go Top',
@@ -20,71 +22,71 @@ export default function AIVisibilityFeaturePage() {
   return <FeaturePage locale="en" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.en
+
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'GEO - Generative Engine Optimization',
-    eyebrowIcon: Brain,
-    title: 'Monitor Your Business in AI Answers',
-    subtitle: "More people use ChatGPT, Gemini, and Perplexity to find information. If you're mentioned there, you'll get discovered. Track your AI visibility now.",
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
-    visual: (
-      <AiAnswersVisual
-        heading={'AI Mentions for: "best home loan options"'}
-        rows={[
-          { engine: 'ChatGPT (OpenAI)', detail: 'Mentioned as trusted lender', ok: true, icon: MessageSquare },
-          { engine: 'Gemini (Google)', detail: 'Direct quote from your website', ok: true, icon: Zap },
-          { engine: 'Perplexity', detail: 'Not mentioned in answer', ok: false, icon: Brain },
-        ]}
-      />
-    ),
+    eyebrow: 'Visibility in AI engines',
+    eyebrowIcon: Sparkles,
+    title: 'When a customer asks ChatGPT,',
+    accent: 'know whether it recommends you',
+    subtitle: 'The platform asks ChatGPT, Gemini, Perplexity, Copilot, Grok and Google AI the questions your customers ask, and shows who appears in the answer: you, or a competitor.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: <AiVisual copy={landingEn.features.ai.visual} />,
   },
   sections: [
     {
       kind: 'cards',
-      title: 'Why AI Visibility Will Matter',
-      intro: 'In a few years, GEO will be as important as SEO. Start measuring it now.',
+      tone: 'contrast',
+      eyebrow: 'Why it matters now',
+      title: 'Some customers don\'t search Google anymore. They ask AI.',
+      intro: 'Whoever appears in the answer gets the recommendation. Whoever doesn\'t isn\'t part of the conversation.',
       items: [
-        { icon: Brain, title: 'New Search Paradigm', body: 'Google is no longer the only search engine. AI tools are becoming the primary research method for many users.' },
-        { icon: Link2, title: 'Mentions = Credibility', body: 'Appearing in AI answers is like getting a recommendation from the AI itself. It builds trust and authority.' },
-        { icon: TrendingUp, title: 'Competitors Are Already There', body: "Your competitors are already appearing in AI answers. Don't get left behind." },
+        { icon: MessagesSquare, title: 'The question moved to chat', body: 'Instead of scanning ten results, people ask one question and get one answer with a few names. One of them should be yours.' },
+        { icon: Award, title: 'A recommendation people trust', body: 'When an AI engine mentions a business, it sounds like a recommendation. A customer who arrives that way arrives ready to act.' },
+        { icon: Target, title: 'Your competitors may already be there', body: 'Without checking, you can\'t know who gets recommended in your field. Tracking shows it by question and by engine.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'How Tracking Works',
+      eyebrow: 'How it works',
+      title: 'Three steps to a clear picture',
       items: [
-        { title: 'Choose Questions', body: 'Select the questions customers might ask AI about your business or industry.' },
-        { title: 'System Queries AI', body: 'We ask ChatGPT, Gemini, Perplexity, and more. Each AI tool is queried separately.' },
-        { title: 'Get Clear Results', body: "See where you're mentioned, how you're cited, and track changes over time." },
+        { title: 'Pick the questions', body: 'The platform suggests questions from your business\'s keywords, and you add or remove. For example: "Who installs AC in Austin?"' },
+        { title: 'Each engine is asked separately', body: 'Every question goes to each of the six engines, and every answer is read and checked.' },
+        { title: 'See who\'s in', body: 'For each question: whether you were mentioned, whether your site was cited as a source, and who was mentioned instead.' },
       ],
     },
     {
       kind: 'cards',
-      title: 'What You Can Track',
+      eyebrow: 'What you get',
+      title: 'Everything you need to get into the answer',
       items: [
-        { icon: Brain, title: 'All Major AI Engines', body: 'ChatGPT, Gemini, Perplexity, Google AI, and more - each tracked separately.' },
-        { icon: MessageSquare, title: 'Citation Tracking', body: 'See exactly how your site is cited in AI answers. Summary? Link? Attribution?' },
-        { icon: Link2, title: 'Source Page Tracking', body: 'See which pages from your website receive AI citations for optimization.' },
-        { icon: Zap, title: 'Trends Over Time', body: 'See how AI mentions change week to week and month to month.' },
-        { icon: BarChart3, title: 'Professional Reports', body: 'PDF and Excel reports showing your AI visibility clearly.' },
-        { icon: TrendingUp, title: 'Competitive Tracking', body: 'Monitor where competitors appear in AI answers. Know your competitive landscape.' },
+        { icon: Sparkles, title: 'Mentions by engine', body: 'In each of the six engines separately, because each one answers differently.' },
+        { icon: Link2, title: 'Cited as a source', body: 'Whether the answer points to your site as a source, not just your name.' },
+        { icon: Users, title: 'Who\'s mentioned instead', body: 'The competitors that show up in answers, and the questions where they take the recommendation.' },
+        { icon: Lightbulb, title: 'What to improve', body: 'Recommendations on what to add or change on your site to improve your odds of being in the answer.' },
+        { icon: LineChart, title: 'Trends over time', body: 'Every check is saved, so you can see whether visibility rises after articles go live.' },
+        { icon: FileSpreadsheet, title: 'PDF and Excel reports', body: 'Mentions and citations by engine, in a report you can send to a client or a manager.' },
       ],
     },
     {
-      kind: 'audiences',
-      title: "Who It's Critical For",
+      kind: 'faq',
+      eyebrow: 'Questions',
+      title: 'What people ask about AI visibility',
       items: [
-        { title: 'Content Creators & Writers', body: 'If you write blogs or content, being cited in AI is now a key metric of success.', bullets: ['Know which articles are cited', 'Optimize for AI mentions', 'Prove content impact'] },
-        { title: 'Digital Agencies & SEO', body: 'Clients will soon ask: "Where are we in AI answers?" Be ready with the answer.', bullets: ['New service to offer clients', 'Forward-thinking positioning', 'Competitive advantage'] },
-        { title: 'Podcasters & Media', body: 'If you create media or podcasts, AI visibility is a new distribution channel.', bullets: ['Track AI mentions', 'Prove audience reach', 'Partnership opportunities'] },
-        { title: 'Marketing & Product Managers', body: 'A new KPI for success. Track visibility as AI transforms how people search.', bullets: ['Modern success metrics', 'Competitive benchmarking', 'Executive reports'] },
+        { q: 'What\'s the difference between SEO and GEO?', a: 'SEO is showing up in Google\'s results. GEO is showing up in AI engines\' answers. The platform measures both, and the articles it writes are built for both: clear structure, Q&A sections and structured data.' },
+        { q: 'Do you guarantee we\'ll appear in answers?', a: 'No. Nobody controls what an AI engine answers. What we do: measure exactly where you stand, show who appears instead of you, and build content that improves your odds.' },
+        { q: 'How is an AI check counted?', a: 'One query in one engine is one check. The same query in all six engines is six checks. Each plan\'s allowance is on the pricing page.' },
       ],
     },
   ],
   cta: {
-    title: 'Stay Ahead with AI Visibility Tracking',
-    body: 'Get ahead of the curve. Start measuring AI visibility today.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
+    title: 'Find out what ChatGPT says about your field',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }

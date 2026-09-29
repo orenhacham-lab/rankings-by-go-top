@@ -1,8 +1,10 @@
 import { Metadata } from 'next'
-import { Search, TrendingUp, Globe, Smartphone, BarChart3, Clock } from 'lucide-react'
+import { FileSpreadsheet, FileText, Globe, History, LineChart, Link2, MapPin, Smartphone, Target, TrendingUp } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
-import { RankTableVisual } from '@/components/public/feature-visuals'
+import { RankVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
   title: 'Google Organic Rank Tracking | Rankings by Go Top',
@@ -20,72 +22,71 @@ export default function GoogleOrganicFeaturePage() {
   return <FeaturePage locale="en" content={CONTENT} />
 }
 
+const C = FEATURE_COMMON.en
+
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Google Rank Tracking',
-    eyebrowIcon: Search,
-    title: 'Monitor Your Google Rankings, Whenever You Need',
-    subtitle: 'Get accurate position data for every keyword. Track trends, analyze competitors, and generate detailed reports that prove ROI.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
-    secondary: { label: 'View Pricing', href: '/en/pricing' },
-    visual: (
-      <RankTableVisual
-        headers={['Keyword', 'Position', 'Change', 'URL']}
-        rows={[
-          { keyword: 'digital marketing agency', pos: 3, move: { dir: 'up', value: '2' }, url: 'example.com' },
-          { keyword: 'SEO services', pos: 8, move: { dir: 'down', value: '1' }, url: 'example.com' },
-          { keyword: 'rank tracking software', pos: 1, move: { dir: 'flat' }, url: 'example.com' },
-          { keyword: 'local SEO tools', pos: 12, move: { dir: 'up', value: '5' }, url: 'example.com' },
-        ]}
-      />
-    ),
+    eyebrow: 'Rankings in Google',
+    eyebrowIcon: TrendingUp,
+    title: 'Know where you rank in Google,',
+    accent: 'and whether the work is paying off',
+    subtitle: 'Track every phrase that matters to you, by country, city, language and device. Scan whenever you like, or automatically once a month, with a history of every change.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: <RankVisual copy={landingEn.features.rank.visual} />,
   },
   sections: [
     {
       kind: 'cards',
-      title: 'Why Rank Tracking Matters',
-      intro: 'High Google rankings drive organic traffic. Track your positions over time to understand what works and optimize your SEO strategy.',
+      tone: 'contrast',
+      eyebrow: 'Why measure',
+      title: 'What isn\'t measured doesn\'t improve',
+      intro: 'Without tracking, there\'s no way to know whether a new article, a site change or an agency\'s work moved anything.',
       items: [
-        { icon: TrendingUp, title: 'Track Trends Over Time', body: 'See how your rankings change from scan to scan. Identify what SEO strategies are working and what needs adjustment.' },
-        { icon: Globe, title: 'Competitive Analysis', body: 'Know exactly where you stand against competitors. Identify gaps and opportunities to outrank them.' },
-        { icon: BarChart3, title: 'Professional Reports', body: 'Generate reports that clearly show clients the value of your SEO work and justify continued investment.' },
+        { icon: LineChart, title: 'See the direction', body: 'Up, down or steady for every phrase, from one scan to the next.' },
+        { icon: FileText, title: 'Tie content to results', body: 'See which pages climb after an article goes live, and what to write about next.' },
+        { icon: Target, title: 'Focus on what\'s close', body: 'Phrases sitting just below page one are usually your nearest opportunity. Tracking shows you which ones they are.' },
       ],
     },
     {
       kind: 'steps',
-      title: 'How It Works',
+      eyebrow: 'How it works',
+      title: 'Set it up once, see every change',
       items: [
-        { title: 'Add Keywords', body: 'Add the keywords you want to track. Bulk import from CSV for quick setup.' },
-        { title: 'Set Preferences', body: 'Choose country, city, language, and device. Get precise data for your target audience.' },
-        { title: 'Get Results', body: 'Run a scan on demand, or turn on automatic monthly scanning to keep your history up to date. View rankings, trends, and insights on a professional dashboard.' },
+        { title: 'Add your phrases', body: 'Type in the phrases that matter to you, or add them from keyword research in one click.' },
+        { title: 'Choose where and on what device', body: 'Country, language, city, desktop or mobile, because results change with each.' },
+        { title: 'Scan and see the trend', body: 'Run a manual scan anytime, or an automatic monthly scan that runs by itself. Every result is saved to your history.' },
       ],
     },
     {
       kind: 'cards',
-      title: 'What You Can Measure',
+      eyebrow: 'What you get',
+      title: 'An accurate picture of where you stand in Google',
       items: [
-        { icon: Smartphone, title: 'Device-Specific Tracking', body: 'Track rankings separately for desktop and mobile. Rankings often vary by device.' },
-        { icon: Globe, title: 'Geographic Tracking', body: 'Track by country, city, and language. Each location can have different results.' },
-        { icon: TrendingUp, title: 'Trend Analysis', body: 'See how rankings change over time with detailed graphs and historical data.' },
-        { icon: BarChart3, title: 'Competitor Tracking', body: 'Monitor competitor rankings. See where they rank and where you can gain ground.' },
-        { icon: Clock, title: 'Automatic Monthly Checks', body: 'The system checks your rankings automatically once a month, and you can also run a manual check any time you need.' },
-        { icon: Search, title: 'Complete Data', body: 'For each keyword, get the ranking URL, meta description, and more details.' },
+        { icon: Smartphone, title: 'Desktop and mobile, separately', body: 'Mobile and desktop results aren\'t always the same. Check each on its own.' },
+        { icon: Globe, title: 'By country, city and language', body: 'See what a customer sees when they search from the place that matters to you.' },
+        { icon: Link2, title: 'Which page ranks', body: 'For every phrase, see which page on your site shows up in the results.' },
+        { icon: History, title: 'Full history', body: 'Every scan is saved, so you see the journey, not just today\'s snapshot.' },
+        { icon: MapPin, title: 'Google Maps too', body: 'Track the same phrases in Maps, by city or area.' },
+        { icon: FileSpreadsheet, title: 'PDF and Excel reports', body: 'Rankings, changes and history in a report you can pass along.' },
       ],
     },
     {
-      kind: 'audiences',
-      title: "Who It's For",
+      kind: 'faq',
+      eyebrow: 'Questions',
+      title: 'What people ask about rank tracking',
       items: [
-        { title: 'Small & Medium Businesses', body: 'If you have a website and want customers to find you through Google, this is essential.', bullets: ['Simple, clear tracking', 'Affordable for small teams', 'Reports to share with clients'] },
-        { title: 'Digital Agencies', body: 'Your clients ask monthly: "How\'s our SEO performing?" Here\'s the answer.', bullets: ['Client presentation reports', 'Track multiple projects simultaneously', 'Proof of service value'] },
-        { title: 'Marketing Managers', body: 'Responsible for website performance? You need accurate rank data and reports.', bullets: ['Detailed performance analytics', 'Problem identification', 'Evidence of marketing impact'] },
-        { title: 'SEO Professionals', body: 'You need reliable ranking data to prove your work is having impact.', bullets: ['Scans on demand, whenever you need them', 'Evidence of SEO effectiveness', 'Clear KPIs and goals'] },
+        { q: 'How often are rankings checked?', a: 'Every time you run a manual scan, and you can also turn on an automatic monthly scan. There\'s no daily or weekly automatic scan at the moment.' },
+        { q: 'Why is what I see in Google different from the platform?', a: 'Google personalizes results by location, device and search history. The platform checks under fixed conditions you set, which makes it a better measure for comparing over time.' },
+        { q: 'How many phrases can I track?', a: 'It depends on your plan. The exact allowances are on the pricing page.' },
       ],
     },
   ],
   cta: {
-    title: 'Start Tracking Your Rankings Today',
-    body: 'Free trial for 7 days, no credit card required. See exactly where your site ranks.',
-    primary: { label: 'Start Free Trial', href: '/en/signup' },
+    title: 'Find out where you stand today',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
   },
 }
