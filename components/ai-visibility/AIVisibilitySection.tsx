@@ -69,6 +69,7 @@ import { AIVisibilitySummarySection } from './sections/InsightsSummary'
 import { GeoOpportunityMappingSection } from './sections/GeoOpportunityMapping'
 import { GeoCompetitorIntelligenceSection } from './sections/GeoCompetitorIntelligence'
 import { NewAIQueryModal } from './sections/NewAIQueryModal'
+import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
 
 const MAX_SUGGESTIONS = 40
 
@@ -325,10 +326,17 @@ export default function AIVisibilitySection({
   )
   const [writingArticleFor, setWritingArticleFor] = useState<string | null>(null)
   const [articleErrorFor, setArticleErrorFor] = useState<string | null>(null)
-  const writeArticleFor = useCallback(async (q: PromptSuggestion) => {
+  // "Write an article" on a subject the site already covers: offer improving it first.
+  const [articleOverlapFor, setArticleOverlapFor] = useState<Record<string, OverlapPayload>>({})
+  const writeArticleFor = useCallback(async (q: PromptSuggestion, anyway = false) => {
     setWritingArticleFor(q.id)
     setArticleErrorFor(null)
     try {
+      if (!anyway) {
+        const found = await fetchOverlap(projectId, q.prompt, q.prompt)
+        if (found) { setArticleOverlapFor((m) => ({ ...m, [q.id]: found })); return }
+      }
+      setArticleOverlapFor((m) => { if (!(q.id in m)) return m; const next = { ...m }; delete next[q.id]; return next })
       const lang = normalizeLanguage(projectLanguage)
       const res = await fetch('/api/content/topics', {
         method: 'POST',
@@ -2443,6 +2451,9 @@ export default function AIVisibilitySection({
                               topicHref: strategyHref('list', STRATEGY_ANCHORS.topics),
                               articleHref: topic?.article ? `/content/articles/${encodeURIComponent(topic.article.id)}` : null,
                               existingHref: '/content/existing',
+                              overlap: articleOverlapFor[q.id]
+                                ? { found: articleOverlapFor[q.id], language: dashboardLanguage, onWriteAnyway: () => { void writeArticleFor(q, true) } }
+                                : null,
                             }
                           })() : null}
                           onAdd={async () => {

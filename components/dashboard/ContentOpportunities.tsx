@@ -10,6 +10,10 @@
  * A topic costs nothing; writing the article is a separate, explicit step on the
  * topics screen, under the article allowance. Without the content module the
  * rows stay, and the button is not offered.
+ *
+ * Before it adds one, the cannibalization check asks whether the site already has a
+ * page on the keyword (lib/content/cannibalization): when it does, the row offers
+ * improving that page first, and "create it anyway" still adds the topic.
  */
 import { useState } from 'react'
 import Link from 'next/link'
@@ -20,6 +24,8 @@ import { strategyHref } from '@/lib/content/strategy/view'
 import { formatCompact } from '@/components/gsc/format'
 import { cn } from '@/lib/utils'
 import { HeaderLink, LinkButton, linkButtonClass, Widget, WidgetEmpty } from './ui'
+import OverlapHint from '@/components/content/OverlapHint'
+import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
 
 type Copy = DashboardDictionary['dashboardHome']
 type CreateState = 'idle' | 'saving' | 'created' | 'failed'
@@ -33,9 +39,19 @@ export default function ContentOpportunities({ t, language, projectId, items, ca
 }) {
   const o = t.opportunities
   const [created, setCreated] = useState<Record<string, CreateState>>({})
+  const [overlapFor, setOverlapFor] = useState<Record<string, OverlapPayload>>({})
 
-  async function createTopic(item: PageTwoKeyword) {
+  async function createTopic(item: PageTwoKeyword, anyway = false) {
     setCreated((s) => ({ ...s, [item.targetId]: 'saving' }))
+    if (!anyway) {
+      const found = await fetchOverlap(projectId, item.keyword, item.keyword)
+      if (found) {
+        setOverlapFor((m) => ({ ...m, [item.targetId]: found }))
+        setCreated((s) => ({ ...s, [item.targetId]: 'idle' }))
+        return
+      }
+    }
+    setOverlapFor((m) => { if (!(item.targetId in m)) return m; const next = { ...m }; delete next[item.targetId]; return next })
     try {
       const res = await fetch('/api/content/topics', {
         method: 'POST',
@@ -75,12 +91,16 @@ export default function ContentOpportunities({ t, language, projectId, items, ca
                   </p>
                   <p className="mt-0.5 text-caption text-muted">{o.why(item.position)}</p>
                   {state === 'failed' && <p role="alert" className="mt-1 text-caption text-bad">{o.failed}</p>}
+                  {canCreateTopics && state !== 'created' && overlapFor[item.targetId] && (
+                    <OverlapHint className="mt-2" overlap={overlapFor[item.targetId]} language={language} busy={state === 'saving'}
+                      onCreateAnyway={() => void createTopic(item, true)} />
+                  )}
                 </div>
                 {canCreateTopics && (
                   state === 'created' ? (
                     <Link href={strategyHref('board')} className="shrink-0 text-caption font-medium text-ok hover:underline">{o.created}</Link>
                   ) : (
-                    <button type="button" disabled={state === 'saving'} onClick={() => void createTopic(item)}
+                    overlapFor[item.targetId] ? null : <button type="button" disabled={state === 'saving'} onClick={() => void createTopic(item)}
                       className={cn(linkButtonClass('secondary', 'sm'), 'shrink-0 disabled:opacity-60')}>
                       {state === 'saving' ? o.creating : o.createTopic}
                     </button>

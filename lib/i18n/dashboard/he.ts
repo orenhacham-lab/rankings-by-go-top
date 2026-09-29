@@ -475,6 +475,18 @@ export const dashboardHe = {
       delete: 'מחיקה לצמיתות',
     },
   },
+  // The cannibalization check's warning on a manual path (components/content/OverlapHint.tsx).
+  topicOverlap: {
+    page: 'כבר יש לכם עמוד על זה: {label}, עדיף לשפר אותו.',
+    article: 'כבר יש לכם מאמר על זה: {label}, עדיף לשפר אותו.',
+    search: 'כבר יש לכם עמוד שמופיע בגוגל על זה: {label}, עדיף לשפר אותו.',
+    planned: 'כבר יש לכם נושא מתוכנן על זה: {label}, עדיף לא לכתוב עליו פעמיים.',
+    why: 'שני עמודים על אותו נושא מתחרים זה בזה בגוגל, וכך שניהם מדורגים נמוך יותר.',
+    improve: 'לשפר את העמוד הקיים',
+    openPlanned: 'לנושא המתוכנן',
+    createAnyway: 'ליצור בכל זאת',
+    addedWithOverlap: 'הנושא נוסף. {message}',
+  },
   contentHub: {
     selectProjectMessage: 'בחרו פרויקט מהבורר שלמעלה כדי לראות ולנהל את התוכן שלו.',
     noProjectsTitle: 'כדי להשתמש בכלי הזה, יש ליצור פרויקט ראשון',
@@ -2182,6 +2194,13 @@ export const dashboardHe = {
       basisAudiences: 'קהלים',
       basisCompetitors: 'מתחרים',
       basisPages: 'עמודים שנקראו',
+    },
+    // The monthly top-up's topics (components/content-strategy/TopUpNotice.tsx).
+    topup: {
+      title: 'נושאים חדשים שהכנו לכם החודש',
+      body: 'הוספנו {count} נושאים לתוכנית, כדי שיהיו לכם נושאים לכל החודש הבא. בחרנו אותם מתוך תוכנית התוכן שלכם, ובדקנו שאין לכם כבר עמוד או מאמר על אותו נושא. הם בעמודה "מתוכנן", ובתצוגת הרשימה אפשר לדחות כל נושא שלא מתאים לכם.',
+      bodyOne: 'הוספנו נושא אחד לתוכנית, כדי שיהיו לכם נושאים לכל החודש הבא. בחרנו אותו מתוך תוכנית התוכן שלכם, ובדקנו שאין לכם כבר עמוד או מאמר על אותו נושא. הוא בעמודה "מתוכנן", ובתצוגת הרשימה אפשר לדחות אותו אם הוא לא מתאים לכם.',
+      origins: { scan: 'מסריקת האתר', research: 'ממחקר מילות מפתח', keywords: 'ממילות המפתח שלכם', plan: 'מתוכנית התוכן' },
     },
     loading: 'טוען את התוכנית…',
     loadError: 'לא הצלחנו לטעון את התוכנית.',

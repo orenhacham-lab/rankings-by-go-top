@@ -477,6 +477,18 @@ export const dashboardEn = {
       delete: 'Delete permanently',
     },
   },
+  // The cannibalization check's warning on a manual path (components/content/OverlapHint.tsx).
+  topicOverlap: {
+    page: 'You already have a page on this: {label}. Improving it is the better move.',
+    article: 'You already have an article on this: {label}. Improving it is the better move.',
+    search: 'You already have a page Google shows for this: {label}. Improving it is the better move.',
+    planned: 'You already have a planned topic on this: {label}. Better not to write about it twice.',
+    why: 'Two pages on the same subject compete with each other in Google, and both rank lower.',
+    improve: 'Improve the existing page',
+    openPlanned: 'Open the planned topic',
+    createAnyway: 'Create it anyway',
+    addedWithOverlap: 'The topic was added. {message}',
+  },
   contentHub: {
     selectProjectMessage: 'Pick a project in the switcher above to view and manage its content.',
     noProjectsTitle: 'Create your first project to use this tool',
@@ -2177,6 +2189,13 @@ export const dashboardEn = {
       basisAudiences: 'Audiences',
       basisCompetitors: 'Competitors',
       basisPages: 'Pages read',
+    },
+    // The monthly top-up's topics (components/content-strategy/TopUpNotice.tsx).
+    topup: {
+      title: 'New topics we prepared for you this month',
+      body: 'We added {count} topics to your plan, so you have topics for all of next month. We picked them from your content plan and checked that you do not already have a page or an article on the same subject. They are in the "Planned" column, and in the list view you can reject any that does not fit.',
+      bodyOne: 'We added one topic to your plan, so you have topics for all of next month. We picked it from your content plan and checked that you do not already have a page or an article on the same subject. It is in the "Planned" column, and in the list view you can reject it if it does not fit.',
+      origins: { scan: 'From your site scan', research: 'From keyword research', keywords: 'From your keywords', plan: 'From your content plan' },
     },
     loading: 'Loading the plan…',
     loadError: 'We could not load the plan.',

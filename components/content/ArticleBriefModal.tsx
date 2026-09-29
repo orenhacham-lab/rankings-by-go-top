@@ -31,6 +31,8 @@ import { encodeBriefNotes, decodeBriefNotes, encodeBriefSections, decodeBriefSec
 import { ARTICLE_DEPTHS, type ArticleDepth } from '@/lib/content/article-depth'
 import type { InternalLinkCandidate } from '@/lib/content/internal-link-candidates'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
+import OverlapHint from '@/components/content/OverlapHint'
+import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
 
 type ProjectOption = { id: string; name: string; language?: string | null; business_name?: string | null }
 
@@ -185,6 +187,12 @@ export default function ArticleBriefModal({
   const [errProject, setErrProject] = useState(false)
   const [errTopic, setErrTopic] = useState(false)
   const [badAnchors, setBadAnchors] = useState<Set<number>>(new Set())
+  // The cannibalization check before a new topic is saved: what it found, for which
+  // inputs, and the inputs the merchant chose to create anyway. A change to the
+  // project, keyword or topics makes the warning stale, and the next save checks again.
+  const [overlaps, setOverlaps] = useState<{ key: string; found: { topic: string; overlap: OverlapPayload }[] } | null>(null)
+  const [overlapAck, setOverlapAck] = useState<string | null>(null)
+  const overlapRef = useRef<HTMLDivElement | null>(null)
   const projectRef = useRef<HTMLSelectElement>(null)
   const topicRef = useRef<HTMLInputElement>(null)
   const anchorsRef = useRef<HTMLDivElement>(null)
@@ -409,7 +417,7 @@ export default function ArticleBriefModal({
     try { const p = new URL(u); return p.protocol !== 'http:' && p.protocol !== 'https:' } catch { return true }
   }
 
-  async function handleSave() {
+  async function handleSave(overlapAcknowledged = false) {
     // Reset validation state.
     setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set())
 
@@ -437,6 +445,24 @@ export default function ArticleBriefModal({
       setBadAnchors(bad); setFormError(t.fixErrors); setAdvancedOpen(true)
       setTimeout(() => anchorsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
       return
+    }
+
+    // A new topic the site already covers: offer improving the existing page first.
+    // Never a block: "create it anyway" saves it, and a failed check is no match.
+    if (!editing) {
+      const key = overlapKey(projectId, topicList)
+      if (!overlapAcknowledged && overlapAck !== key) {
+        setSaving(true)
+        const found = (await Promise.all(topicList.map(async (topic) => ({ topic, overlap: await fetchOverlap(projectId, topic, primaryKeyword.trim() || topic) }))))
+          .filter((r): r is { topic: string; overlap: OverlapPayload } => !!r.overlap)
+        setSaving(false)
+        if (found.length > 0) {
+          setOverlaps({ key, found })
+          setTimeout(() => overlapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+          return
+        }
+      }
+      setOverlapAck(key)
     }
 
     setSaving(true)
@@ -496,6 +522,12 @@ export default function ArticleBriefModal({
   }
 
   const selectedCount = selected.size + (manualTopic.trim() ? 1 : 0)
+
+  function overlapKey(project: string, topicList: string[]): string {
+    return JSON.stringify([project, primaryKeyword.trim(), [...topicList].sort()])
+  }
+  const currentTopics = gscMode ? (manualTopic.trim() ? [manualTopic.trim()] : []) : Array.from(new Set([...Array.from(selected), ...(manualTopic.trim() ? [manualTopic.trim()] : [])]))
+  const overlapShown = !editing && overlaps && overlaps.key === overlapKey(projectId, currentTopics) ? overlaps.found : null
 
   return (
     <Modal open={open} onClose={onClose} title={editing ? t.editTitle : t.newTitle} size="xl">
@@ -836,9 +868,24 @@ export default function ArticleBriefModal({
 
         <div className="pt-2">
           {formError && <Notice tone="bad" className="mb-3">{formError}</Notice>}
+          {overlapShown && (
+            <div ref={overlapRef} className="mb-3 space-y-2" data-brief-overlap>
+              {overlapShown.map(({ topic, overlap }, i) => (
+                <div key={topic} className="space-y-1">
+                  {overlapShown.length > 1 && <p className="text-caption font-semibold text-muted">{topic}</p>}
+                  <OverlapHint
+                    overlap={overlap}
+                    language={language}
+                    busy={saving}
+                    onCreateAnyway={i === overlapShown.length - 1 ? () => { setOverlaps(null); void handleSave(true) } : undefined}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={saving}>{t.cancel}</Button>
-            <Button onClick={handleSave} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+            <Button onClick={() => void handleSave()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
           </div>
         </div>
       </div>

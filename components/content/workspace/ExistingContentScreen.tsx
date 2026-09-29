@@ -70,6 +70,15 @@ const PANEL_ID = 'existing-content-panel'
 interface View { tab: ExistingContentTab; q: string; sort: ExistingContentSort | null; risk: boolean }
 const FIRST_VIEW: View = { tab: 'all', q: '', sort: null, risk: false }
 
+/** The search a link opened the screen with (?q=), trimmed and bounded; '' without one. */
+function initialSearch(): string {
+  try {
+    return (new URLSearchParams(window.location.search).get('q') ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
+  } catch {
+    return ''
+  }
+}
+
 /** The mapping should (re)start by itself: never mapped, or mapped long ago. */
 function mapDue(m: SiteMapStatus, now: number): boolean {
   if (m.state === 'never') return true
@@ -135,13 +144,19 @@ export default function ExistingContentScreen() {
     }
   }, [projectId, toastError])
 
-  // A new project: start over, skeleton first.
+  // A new project: start over, skeleton first. A link may open it already searched
+  // (?q=, the "improve the existing page" of a topic that repeats one): the first
+  // project's view starts with that search; a project switched to later starts clean.
+  const linkedQuery = useRef<string | null>(null)
   useEffect(() => {
     hasPayload.current = false
     autoStarted.current = null
-    viewRef.current = FIRST_VIEW
-    setPayload(null); setRows([]); setLoadFailed(false); setView(FIRST_VIEW); setQueryText(''); setPlannedNow(new Set()); setAutoFailed(false)
-    void fetchList(FIRST_VIEW, 0)
+    if (linkedQuery.current === null) linkedQuery.current = initialSearch()
+    const first: View = linkedQuery.current ? { ...FIRST_VIEW, q: linkedQuery.current } : FIRST_VIEW
+    linkedQuery.current = ''
+    viewRef.current = first
+    setPayload(null); setRows([]); setLoadFailed(false); setView(first); setQueryText(first.q); setPlannedNow(new Set()); setAutoFailed(false)
+    void fetchList(first, 0)
   }, [fetchList])
 
   const changeView = useCallback((patch: Partial<View>) => {

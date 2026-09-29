@@ -58,6 +58,11 @@ export type StrategyTopic = {
   source: string
   reason: string | null
   createdAt: string
+  /**
+   * Set when the monthly top-up prepared it (lib/content/automation/topic-topup.ts):
+   * when, and the source of the plan's idea it came from. Absent otherwise.
+   */
+  autoPrepared?: { at: string; source: string | null }
 }
 
 /** An article (generated_articles), without its body. */

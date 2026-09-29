@@ -31,6 +31,7 @@
  * says each in its own words.
  */
 import { sameTopicKey, type StrategyCard, type StrategyData, type StrategyOrigin } from './board'
+import { readOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
 
 export const IDEA_ENDPOINTS = {
   approve: '/api/content/automation/topics/bulk',
@@ -136,6 +137,18 @@ export function readApproveOutcome(url: string, ok: boolean, body: unknown): Ide
   if (typeof r.topicId === 'string' && r.topicId) return r.source === 'existing' ? 'existing' : 'created'
   if (r.unresolvedReason === 'covered_by_existing_content') return 'covered'
   return 'failed'
+}
+
+/**
+ * What the cannibalization check found for a topic the answer just created: the
+ * topics route's `overlap`, or the bulk route's first resolved topic's. Null otherwise.
+ */
+export function readCreatedOverlap(url: string, body: unknown): OverlapPayload | null {
+  if (!body || typeof body !== 'object') return null
+  if (url === IDEA_ENDPOINTS.topic) return readOverlap((body as { overlap?: unknown }).overlap)
+  const resolved = (body as { resolvedTopics?: unknown }).resolvedTopics
+  const first = Array.isArray(resolved) ? resolved[0] : null
+  return first && typeof first === 'object' ? readOverlap((first as { overlap?: unknown }).overlap) : null
 }
 
 export function readRejectOutcome(ok: boolean, body: unknown): boolean {

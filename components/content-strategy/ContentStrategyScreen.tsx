@@ -6,7 +6,8 @@
  * It merged two screens of the content workspace, "topics" and "automation", into one
  * tab (decision 2 of the per-tab plan), in this order:
  *   row 0  where the plan comes from: the seeding scan's step b4, or, until it is
- *          ready, the topics its stage A found (SeedPlanNotice, and the board's ideas)
+ *          ready, the topics its stage A found (SeedPlanNotice, and the board's ideas);
+ *          and the topics the monthly top-up prepared this month (TopUpNotice)
  *   row 1  the next article, its date, and why it was chosen (NextArticleCard)
  *   row 2  the month board: ideas, planned, written, published (StrategyBoard); its
  *          ideas include the tracked keywords the site already ranks 4 to 20 for
@@ -59,6 +60,7 @@ import NextArticleCard from './NextArticleCard'
 import StrategyBoard, { type BoardIdeaActions } from './StrategyBoard'
 import AddKeywordForm, { AddKeywordButton } from './AddKeywordForm'
 import SeedPlanNotice, { PlanBasis } from './SeedPlanNotice'
+import TopUpNotice from './TopUpNotice'
 import { useStrategyInsights } from './useStrategyInsights'
 import PlanOverview from './PlanOverview'
 import TopicClusters from './TopicClusters'
@@ -259,6 +261,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
   return (
     <div className="space-y-6">
       <SeedPlanNotice seed={strategy.seed} dict={dict} />
+      <TopUpNotice data={strategy.data} projectId={projectId} dict={dict} />
 
       {planEmpty ? null : board ? (
         <NextArticleCard
@@ -302,7 +305,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           </div>
         </div>
 
-        {addOpen && <AddKeywordForm dict={dict} onAdd={actions.addKeyword} onClose={() => setAdding(false)} />}
+        {addOpen && <AddKeywordForm dict={dict} onAdd={actions.addKeyword} onClose={() => setAdding(false)} projectId={projectId} language={language} />}
         {/* What the last action did, for a screen reader (the toast says it on screen). */}
         <p role="status" aria-live="polite" className="sr-only">{actions.announcement}</p>
 
