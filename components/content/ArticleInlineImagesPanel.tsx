@@ -3,7 +3,7 @@
 /**
  * Phase 4D — inline article images editor panel.
  *
- * Manages the article's inline images (max 3) via /api/content/articles/:id/
+ * Manages the article's inline images (max 4) via /api/content/articles/:id/
  * inline-images. Each image is attached to an eligible H2 section and composed
  * into the body at publish/preview time — this panel never edits content_html.
  * Per-image controls: generate/regenerate, edit prompt/alt/caption, move to

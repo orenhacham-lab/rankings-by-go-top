@@ -29,6 +29,9 @@ import GscPanel from '@/components/content/GscPanel'
 import AudienceCard from '@/components/settings/AudienceCard'
 import BusinessCard from '@/components/settings/BusinessCard'
 import CompetitorsCard from '@/components/settings/CompetitorsCard'
+import ArticleStyleCard from '@/components/settings/ArticleStyleCard'
+import OfficialProfilesCard from '@/components/settings/OfficialProfilesCard'
+import { useArticleSettings } from '@/components/settings/useArticleSettings'
 import DangerZone from '@/components/settings/DangerZone'
 import Notice from '@/components/settings/Notice'
 import ProfileCard from '@/components/settings/ProfileCard'
@@ -82,6 +85,8 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   // The profile, the audiences and the scan's state. The screen renders once they
   // answered (or failed), so the cards appear in place instead of one by one.
   const settings = useProjectSettings(project.id)
+  // The article design and the official profiles: one row per project, their own load.
+  const article = useArticleSettings(project.id)
   const data = settings.state.status === 'ready' ? settings.state.data : null
   const settingsReady = settings.state.status !== 'loading'
 
@@ -189,6 +194,9 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   if (visibility.profileCard) index.push({ id: SECTION.profile, label: t.profile.title })
   if (visibility.audienceCard) index.push({ id: SECTION.audience, label: t.audience.title })
   if (competitorsShown) index.push({ id: SECTION.competitors, label: t.competitors.title })
+  if (article.state.status !== 'loading') {
+    index.push({ id: SECTION.articleDesign, label: t.articleStyle.title }, { id: SECTION.officialProfiles, label: t.officialProfiles.navLabel })
+  }
   index.push({ id: SECTION.connections, label: t.connectionsTitle }, { id: SECTION.danger, label: t.danger.title })
 
   return (
@@ -228,6 +236,32 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               onAvailability={setCompetitorsShown}
               t={t}
             />
+
+            {article.state.status === 'ready' ? (
+              <>
+                <ArticleStyleCard
+                  projectId={project.id}
+                  view={article.state.data}
+                  signals={article.signals}
+                  onReadSite={() => void article.readSignals()}
+                  onData={article.setData}
+                  t={t}
+                  locale={language}
+                />
+                <OfficialProfilesCard
+                  projectId={project.id}
+                  view={article.state.data}
+                  signals={article.signals}
+                  onReadSite={() => void article.readSignals()}
+                  onData={article.setData}
+                  t={t}
+                />
+              </>
+            ) : article.state.status === 'failed' ? (
+              <Notice tone="bad" action={{ label: t.articleStyle.retry, onClick: () => void article.reload() }}>
+                {t.articleStyle.loadFailed}
+              </Notice>
+            ) : null}
 
             <section id={SECTION.connections} aria-labelledby={`${SECTION.connections}-title`} className="scroll-mt-20 space-y-4">
               <div className="flex items-start gap-3 pt-2">

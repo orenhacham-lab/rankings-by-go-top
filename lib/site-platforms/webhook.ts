@@ -88,7 +88,7 @@ export function buildArticlePayload(article: SitePublishArticle, event: WebhookE
     datePublished: article.published_at ?? now.toISOString(),
     dateModified: article.updated_at ?? now.toISOString(),
     language: ctx?.language ?? null,
-    publisher: ctx ? { name: ctx.publisherName, url: ctx.publisherUrl } : null,
+    publisher: ctx ? { name: ctx.publisherName, url: ctx.publisherUrl, sameAs: ctx.sameAs ?? [] } : null,
     faq: Array.isArray(article.faq_json) ? article.faq_json : [],
   })
   return {

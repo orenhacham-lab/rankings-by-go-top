@@ -98,7 +98,7 @@ export type SitePublishArticle = {
   published_at?: string | null
   updated_at?: string | null
   /** Publisher facts and language for structured_data; loaded by the orchestrator for a webhook. */
-  schema_context?: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en' } | null
+  schema_context?: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en'; sameAs?: string[] } | null
 }
 
 export const SITE_ARTICLE_SELECT =

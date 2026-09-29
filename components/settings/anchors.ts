@@ -10,6 +10,8 @@ export const SECTION = {
   profile: 'profile',
   audience: 'audiences',
   competitors: 'competitors',
+  articleDesign: 'article-design',
+  officialProfiles: 'official-profiles',
   connections: 'connections',
   googleAds: 'google-ads',
   danger: 'danger',

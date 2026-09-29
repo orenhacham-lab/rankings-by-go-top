@@ -8,7 +8,8 @@
  *
  * The body is the stored content_html, which is sanitized on every write, with
  * the inline-image figures composed into a COPY (the same composition
- * ArticleBodyPreview uses); content_html itself is never changed here.
+ * ArticleBodyPreview uses), shown in the project's article design
+ * (StyledArticleBody); content_html itself is never changed here.
  */
 
 import { useMemo } from 'react'
@@ -16,13 +17,14 @@ import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
+import StyledArticleBody from '@/components/content/article-style/StyledArticleBody'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 
 type ReadDict = DashboardDictionary['contentHub']['editor']['readView']
 
 export default function ArticleReadView({
   t, faqTitle, title, metaTitle, metaDescription, slug, publishedUrl, featuredImageUrl,
-  html, images, faq, dir, onEdit,
+  html, images, faq, dir, onEdit, projectId,
 }: {
   t: ReadDict
   faqTitle: string
@@ -37,6 +39,8 @@ export default function ArticleReadView({
   faq: { question: string; answer: string }[]
   dir: 'rtl' | 'ltr'
   onEdit: () => void
+  /** The article's project, whose article design the body is shown in. */
+  projectId?: string | null
 }) {
   const composed = useMemo(() => injectInlineImages(html || '', images || [], 'preview'), [html, images])
   const answered = faq.filter((f) => f.question.trim())
@@ -72,7 +76,8 @@ export default function ArticleReadView({
       )}
 
       {composed.trim() ? (
-        <div dir={dir} className="article-content max-w-none text-ink" dangerouslySetInnerHTML={{ __html: composed }} />
+        // The project's article design (formatted or minimal), as the site will show it.
+        <StyledArticleBody projectId={projectId} html={composed} dir={dir} />
       ) : (
         <p className="text-copy text-muted">{t.empty}</p>
       )}

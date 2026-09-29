@@ -18,6 +18,7 @@ import { matchArticleCitations, publishedUrlOf, citedArticles, type CitationMatc
 import { suggestAiQuery } from './ai-query-suggestion'
 import { sameQuestion } from '@/lib/ai-visibility/article-question'
 import { siteUrlFromDomain } from './structured-data'
+import { readProjectSameAs } from './article-style/store'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -28,6 +29,8 @@ export interface SchemaContext {
   publisherName: string | null
   publisherUrl: string | null
   language: 'he' | 'en'
+  /** The business's official profiles (project settings), for the publisher's sameAs. */
+  sameAs: string[]
 }
 
 export interface ProjectFacts {
@@ -59,16 +62,16 @@ export async function loadTopicFacts(admin: Admin, topicId: string | null | unde
   }
 }
 
-export function schemaContextFrom(project: ProjectFacts | null, topicLanguage: string | null | undefined): SchemaContext {
+export function schemaContextFrom(project: ProjectFacts | null, topicLanguage: string | null | undefined, sameAs: string[] = []): SchemaContext {
   const lang = String(topicLanguage || project?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
   const name = String(project?.business_name || project?.name || '').trim() || null
-  return { publisherName: name, publisherUrl: siteUrlFromDomain(project?.target_domain), language: lang }
+  return { publisherName: name, publisherUrl: siteUrlFromDomain(project?.target_domain), language: lang, sameAs }
 }
 
 /** The schema context of one article of `projectId` (owner already verified by the caller). */
 export async function loadSchemaContext(admin: Admin, projectId: string, topicId: string | null | undefined): Promise<SchemaContext> {
-  const [project, topic] = await Promise.all([loadProjectFacts(admin, projectId), loadTopicFacts(admin, topicId)])
-  return schemaContextFrom(project, topic?.language)
+  const [project, topic, sameAs] = await Promise.all([loadProjectFacts(admin, projectId), loadTopicFacts(admin, topicId), readProjectSameAs(admin, projectId)])
+  return schemaContextFrom(project, topic?.language, sameAs)
 }
 
 /** Recent stored citations of the project. A missing table or a failed read is "none", never an error text. */
@@ -125,8 +128,8 @@ export interface VisibilityArticle {
 
 export async function loadArticleVisibility(admin: Admin, article: VisibilityArticle, opts: { aiVisibilityEnabled: boolean }): Promise<ArticleVisibility> {
   const projectId = article.project_id
-  const [project, topic] = await Promise.all([loadProjectFacts(admin, projectId), loadTopicFacts(admin, article.topic_id)])
-  const schema = schemaContextFrom(project, topic?.language)
+  const [project, topic, sameAs] = await Promise.all([loadProjectFacts(admin, projectId), loadTopicFacts(admin, article.topic_id), readProjectSameAs(admin, projectId)])
+  const schema = schemaContextFrom(project, topic?.language, sameAs)
   const publishedUrl = publishedUrlOf(article)
 
   let citations: CitationMatch[] = []

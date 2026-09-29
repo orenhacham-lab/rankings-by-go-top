@@ -19,6 +19,7 @@ import { runLinkNetworkStep } from '@/lib/link-network/step'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
+import { runArticleImageStep } from '@/lib/content/article-style/generation'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
@@ -405,17 +406,13 @@ export async function generateArticleForTopic(
   // only for a project that joined. One delimited, best-effort step; never throws.
   await runLinkNetworkStep(admin, { projectId, userId, articleId: inserted.id })
 
-  // Auto-generate a brand-neutral featured image (default ON). Best-effort.
-  let imageGenerated = false
-  if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
-    try {
-      const img = await deps.createFeaturedImage(admin, inserted.id)
-      imageGenerated = !('error' in img)
-      if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
-    } catch (e) {
-      console.warn('[content-article-generation] auto image threw', { message: e instanceof Error ? e.message : String(e) })
-    }
-  }
+  // The article's images, by the project's article-design settings
+  // (lib/content/article-style/generation.ts): the brand-neutral featured image
+  // as before (default ON, best-effort), in the project's image style, plus the
+  // inline images the project asked for. No settings = the featured image only.
+  const { imageGenerated } = await runArticleImageStep(admin, { articleId: inserted.id, projectId, ownerId: userId }, {
+    createFeaturedImage: () => deps.createFeaturedImage(admin, inserted.id),
+  })
 
   return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated, autoInternalLinks }
 }

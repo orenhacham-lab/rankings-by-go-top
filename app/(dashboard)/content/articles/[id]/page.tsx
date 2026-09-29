@@ -127,7 +127,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [copying, setCopying] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [visibility, setVisibility] = useState<(ArticleVisibilityData & {
-    schema: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en' }
+    schema: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en'; sameAs?: string[] }
     dates: { published: string | null; modified: string | null }
   }) | null>(null)
   const detected = usePublishPlatform(projectId, !!projectId)
@@ -473,7 +473,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     dateModified: visibility?.dates.modified ?? null,
     url: publishedUrl,
     language: visibility?.schema.language ?? language,
-    publisher: visibility ? { name: visibility.schema.publisherName, url: visibility.schema.publisherUrl } : null,
+    publisher: visibility ? { name: visibility.schema.publisherName, url: visibility.schema.publisherUrl, sameAs: visibility.schema.sameAs ?? [] } : null,
     faq,
   }
 
@@ -617,6 +617,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           faq={faq}
           dir={isHebrew ? 'rtl' : 'ltr'}
           onEdit={() => setEditing(true)}
+          projectId={projectId}
         />
       ) : (
         <Notice tone="info" className="mb-4" action={{ label: e.readView.done, onClick: () => setEditing(false) }}>
