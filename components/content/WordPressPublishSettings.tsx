@@ -124,6 +124,7 @@ export default function WordPressPublishSettings({
     } catch { notify(t.saveError, false) } finally { setSaving(false) }
   }
 
+  const seoPluginKnown = (p: string) => p === 'yoast' || p === 'rankmath' || p === 'none' || p === 'permission_error'
   function seoPluginLabel(p: string): string {
     if (p === 'yoast') return t.seoYoast
     if (p === 'rankmath') return t.seoRankMath
@@ -148,9 +149,12 @@ export default function WordPressPublishSettings({
     <Card className="p-5 sm:p-6">
       <div className="flex items-center justify-between gap-2 mb-1">
         <h3 className="text-section font-semibold text-ink">{t.title}</h3>
-        <Badge variant={seoPlugin === 'yoast' || seoPlugin === 'rankmath' ? 'success' : 'neutral'}>
-          {t.seoPluginLabel}: {seoPluginLabel(seoPlugin)}
-        </Badge>
+        {/* An unknown value says nothing to the owner: the badge shows only what we actually know. */}
+        {seoPluginKnown(seoPlugin) && (
+          <Badge variant={seoPlugin === 'yoast' || seoPlugin === 'rankmath' ? 'success' : 'neutral'}>
+            {t.seoPluginLabel}: {seoPluginLabel(seoPlugin)}
+          </Badge>
+        )}
       </div>
       <p className="mb-4 max-w-prose text-caption text-muted">{t.hint}</p>
 

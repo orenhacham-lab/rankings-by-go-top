@@ -23,7 +23,7 @@ import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
 import { fill } from '@/lib/project-settings/view'
 import { cn } from '@/lib/utils'
-import ArticleStylePreview from './ArticleStylePreview'
+import ArticleStylePreview, { type PreviewSubject } from './ArticleStylePreview'
 import ImageStyleArt from './ImageStyleArt'
 import SaveBar, { showSaveBar, type SaveState } from './SaveBar'
 import SettingsCard, { fieldClass } from './SettingsCard'
@@ -95,6 +95,7 @@ export default function ArticleStyleCard({
   t,
   locale,
   projectId,
+  subject,
 }: {
   view: ArticleStyleView
   signals: SiteSignals
@@ -103,6 +104,8 @@ export default function ArticleStyleCard({
   t: Copy
   locale: Locale
   projectId: string
+  /** What the preview article is about: the project's line of business and name. */
+  subject?: PreviewSubject | null
 }) {
   const a = t.articleStyle
   const ids = useId()
@@ -377,7 +380,7 @@ export default function ArticleStyleCard({
 
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             <p className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{a.preview.label}</p>
-            <ArticleStylePreview style={draft} platform={view.platform} domain={view.domain} t={a} locale={locale} />
+            <ArticleStylePreview style={draft} platform={view.platform} domain={view.domain} t={a} locale={locale} subject={subject} />
             <p className="mt-2 text-caption text-muted">{a.preview.caption}</p>
           </div>
         </div>

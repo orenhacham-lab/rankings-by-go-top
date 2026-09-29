@@ -313,7 +313,7 @@ export const dashboardEn = {
         addLabel: 'New colour',
         placeholder: '#1f6feb',
         pick: 'Pick a colour',
-        invalid: 'Enter a HEX colour, for example #1f6feb.',
+        invalid: 'Enter a colour code: a # and six letters or digits, for example #1f6feb.',
         full: 'You can keep up to 6 colours.',
         empty: 'No brand colours yet. Without one, articles are styled in a calm blue.',
         fromSite: 'Colours from your site',
@@ -327,7 +327,7 @@ export const dashboardEn = {
       design: {
         label: 'Article layout',
         formatted: { label: 'Designed', hint: 'An "in short" box, key takeaways, framed tables, FAQ cards and a call to action, in your brand colours.' },
-        minimal: { label: 'Minimal', hint: 'Clean HTML that takes on your site\'s own design, as today.' },
+        minimal: { label: 'Minimal', hint: 'Plain text with no design of its own, so your site styles it, as today.' },
       },
       preview: {
         label: 'Preview',
@@ -357,6 +357,28 @@ export const dashboardEn = {
         faqTitle: 'Frequently asked questions',
         faqQ: 'How often should a mattress be replaced?',
         faqA: 'Usually every eight to ten years.',
+        // The same sample, about the project's own line of business ({niche}) and name ({business}).
+        forNiche: {
+          title: 'The complete guide to {niche}',
+          lead: 'The short answer: here is how to get good {niche} service, on time and with no surprises on the bill.',
+          intro: 'Before you book, it helps to know what really affects the result.',
+          h1: 'What to know before you book',
+          p1: 'Experience, a warranty and availability matter more than anything else, so start there. Then compare prices.',
+          h2: 'How to choose a professional',
+          p2: 'Ask for a detailed written quote and about the warranty. A good professional explains exactly what will be done and why.',
+          th1: 'What to check',
+          th2: 'Why it matters',
+          r1a: 'A written warranty',
+          r1b: 'Peace of mind afterwards',
+          r2a: 'A detailed quote',
+          r2b: 'No surprises on the bill',
+          h3: 'What it costs',
+          p3: 'The price depends on the size of the job and the materials. A detailed quote up front saves arguments at the end.',
+          cta: 'Want a quote from {business}?',
+          ctaGeneric: 'Want a quote?',
+          faqQ: 'How long does a {niche} job take?',
+          faqA: 'It depends on the size. Most small jobs are done the same day.',
+        },
       },
       images: {
         label: 'Image style',
@@ -395,7 +417,7 @@ export const dashboardEn = {
     officialProfiles: {
       title: 'Official business profiles',
       navLabel: 'Official profiles',
-      body: 'Links to the business\'s official pages on Google and social networks. Every article carries them in its structured data (Schema).',
+      body: 'Links to the business\'s official pages on Google and social networks. Every article carries them in the markup Google and AI assistants read, so they know it is one business.',
       whyTitle: 'Why does this help?',
       why: 'Google and AI assistants such as ChatGPT and Gemini piece together a picture of a business from many sources. When every article on your site points to the same official pages, it is easier for them to see that the site, the Google profile and the social pages are one business, and to show correct information about you. It does not guarantee a mention in answers, but it removes doubt about who you are.',
       readOnly: 'These fields are not open for editing on your account yet.',
@@ -409,7 +431,7 @@ export const dashboardEn = {
       detectNone: 'We found no profile links on your home page. You can paste them here.',
       detectFailed: 'We could not read your site right now. You can paste the links by hand.',
       invalid: 'This is not a link to a page on {network}. Paste a full https address, for example:',
-      count: '{n} of {max} connected',
+      count: '{n} of {max} filled in',
       networks: {
         google_business: { label: 'Google Business Profile', example: 'https://maps.app.goo.gl/…' },
         facebook: { label: 'Facebook', example: 'https://www.facebook.com/your-business' },
@@ -1681,7 +1703,7 @@ export const dashboardEn = {
         downloadFailed: 'We couldn’t download the image, so we opened it in a new tab.',
         tabsLabel: 'Article sections',
         tabArticle: 'Article',
-        tabSchema: 'Schema',
+        tabSchema: 'Google markup',
         publishPanelHint: 'Choose how to publish here:',
       },
       // C3 — the Schema tab (JSON-LD preview and copy).
@@ -2363,7 +2385,7 @@ export const dashboardEn = {
       failedTitle: 'The scan did not finish',
       failed: 'We could not read the whole site, so there are no findings yet. You can run the scan again from settings.',
       geo: {
-        schema: { title: 'Structured data (Schema)', why: 'Tells Google and AI engines for certain who the business is and what it does.' },
+        schema: { title: 'Markup for Google', why: 'Tells Google and AI engines for certain who the business is and what it does.' },
         faq: { title: 'Questions and answers', why: 'A page with questions and answers gives an AI engine a ready answer to quote.' },
         robots: { title: 'AI bot access', why: 'A bot blocked in robots.txt cannot read the site, so it cannot cite it either.' },
         llms: { title: 'llms.txt file', why: 'Hands AI engines a tidy map of the site. Most of the market has not done it yet.' },
@@ -2616,6 +2638,7 @@ export const dashboardEn = {
       scanFreqManual: 'Manual only',
       scanFreqMonthly: 'Monthly',
       autoScanLabel: 'Enable automatic scans',
+      autoScanOff: 'Automatic scans are off. You can scan manually at any time.',
       submitCreate: 'Create project',
       submitUpdate: 'Save changes',
       cancel: 'Cancel',
@@ -3901,7 +3924,7 @@ export const dashboardEn = {
     rescanLink: 'Rescan in settings',
     checks: {
       schema: {
-        title: 'Structured data about your business (schema)',
+        title: 'Markup about your business',
         why: 'AI engines read JSON-LD markup to learn who you are, what you sell and what you are called. Without it they guess.',
         fix: 'Add Organization or LocalBusiness markup to your home page with your name, logo and links. Most themes and apps add it without code.',
       },
@@ -3911,7 +3934,7 @@ export const dashboardEn = {
         fix: 'Add a FAQ section with 5 to 8 real customer questions to a key page, and mark it up as FAQPage.',
       },
       robots: {
-        title: 'Access for AI crawlers (robots.txt)',
+        title: 'Access for AI crawlers',
         why: 'If robots.txt blocks GPTBot, PerplexityBot or Google-Extended, those engines cannot read your site and will not cite it.',
         fix: 'Remove the Disallow lines for AI crawlers from robots.txt, unless you blocked them on purpose.',
       },
@@ -4109,7 +4132,7 @@ export const dashboardEn = {
       totalKeywords: 'Total keywords',
       found: 'Found',
       notFound: 'Not found',
-      coverage: 'Coverage',
+      coverage: 'Found on Google',
       currentRankings: 'Current rankings',
       keyword: 'Keyword',
       engine: 'Engine',
@@ -4343,7 +4366,7 @@ export const dashboardEn = {
         title: {
           seo_title: 'A new title for Google',
           meta_description: 'A new description for Google',
-          canonical: 'A canonical address for the page',
+          canonical: 'An official address for the page',
           focus_keyphrase: 'A focus keyphrase for the page',
           image_alt: 'Image descriptions',
           faq_block: 'FAQs at the end of the page',
@@ -4365,7 +4388,7 @@ export const dashboardEn = {
         what: {
           seo_title: 'The page\'s SEO title will be:',
           meta_description: 'The description for Google will be:',
-          canonical: 'The page\'s canonical address will be:',
+          canonical: 'The page\'s official address will be:',
           focus_keyphrase: 'The page\'s focus keyphrase in the SEO plugin will be:',
           image_alt: (n: number) => (n === 1
             ? 'One image without a description gets the description you wrote. Images that already have one do not change.'
@@ -4387,7 +4410,7 @@ export const dashboardEn = {
         close: 'Close',
         undo: 'Undo the fix',
         labels: {
-          canonical: 'Canonical address',
+          canonical: 'The page\'s official address',
           canonicalHint: 'Usually the page\'s own address, without parameters. Only an address on your site.',
           focus: 'Focus keyphrase',
           focusHint: 'The words people type into Google to find this page, usually 2 to 4 words.',
@@ -4522,7 +4545,7 @@ export const dashboardEn = {
       sitemap_missing: { title: 'We did not find a sitemap', why: 'A sitemap lists all your pages for Google. Without one, new pages are discovered more slowly.' },
       orphan_page: { title: 'Pages no other page links to', why: 'A page with no links from inside the site is hard for Google to reach and is treated as less important.' },
       no_viewport: { title: 'Pages not set up for phones', why: 'Without a mobile display setting the page looks tiny on a phone, and Google ranks by the mobile version.' },
-      canonical_missing: { title: 'Pages without a canonical address', why: 'A canonical address tells Google which address is the official one for the page. Without it Google may count several versions of the same page as separate pages.' },
+      canonical_missing: { title: 'Pages without an official address', why: 'The page\'s official address (canonical) tells Google which address is the official one for the page. Without it Google may count several versions of the same page as separate pages.' },
       schema_missing: { title: 'Pages without structured data', why: 'Structured data (schema) tells Google and AI assistants what the page is: a business, an article or a service. It helps you show up in rich results and AI answers.' },
       faq_missing: { title: 'Pages without FAQs', why: 'Short questions and answers match exactly what people type, and AI assistants tend to quote them. This is an addition worth considering, not a mistake.' },
     },

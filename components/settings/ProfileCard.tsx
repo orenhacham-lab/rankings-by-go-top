@@ -24,7 +24,7 @@ import SourceChip from './SourceChip'
 import { bidiField } from './copy'
 import { SECTION } from './anchors'
 import { useDraft } from './useDraft'
-import { useRedetect } from './useRedetect'
+import { useChainTurn, useRedetect, type RedetectChain } from './useRedetect'
 
 type Copy = DashboardDictionary['projectSettings']
 type Draft = { description: string; commerce_type: CommerceType | null }
@@ -53,6 +53,7 @@ export default function ProfileCard({
   onData,
   t,
   locale,
+  chain,
 }: {
   projectId: string
   profile: ProfileView | null
@@ -63,6 +64,8 @@ export default function ProfileCard({
   onData: (data: SettingsData) => void
   t: Copy
   locale: Locale
+  /** The group's one "detect again" (./useRedetect.ts): this card takes its turn, without a button of its own. */
+  chain?: RedetectChain
 }) {
   const ids = useId()
   const saved = toDraft(profile)
@@ -110,6 +113,11 @@ export default function ProfileCard({
     if (neverScanned) redetect.preempt({ kind: 'scan_required' })
     else void redetect.run(locale)
   }
+  useChainTurn(chain, async () => {
+    if (neverScanned) { redetect.preempt({ kind: 'scan_required' }); return true }
+    await redetect.run(locale)
+    return false
+  })
 
   const s = redetect.suggestions
   const rows: SuggestionRow[] = s
@@ -153,7 +161,7 @@ export default function ProfileCard({
       icon={FileText}
       title={t.profile.title}
       description={t.profile.body}
-      actions={seedFeatures ? <RedetectButton working={redetect.working} busyScan={scanBusy} onClick={detect} t={t} /> : undefined}
+      actions={seedFeatures && !chain ? <RedetectButton working={redetect.working} busyScan={scanBusy} onClick={detect} t={t} /> : undefined}
       footer={showSaveBar(dirty, state) ? (
         <SaveBar
           dirty={dirty}
@@ -170,6 +178,9 @@ export default function ProfileCard({
       ) : undefined}
     >
       <div className="space-y-5">
+        {seedFeatures && chain && redetect.working && (
+          <p role="status" className="text-caption font-medium text-action" data-redetect-working="">{t.ai.working}</p>
+        )}
         {seedFeatures && redetect.notice && (
           <RedetectNoticeView notice={redetect.notice} t={t} locale={locale} onRescan={onRescan} onDismiss={redetect.clear} />
         )}

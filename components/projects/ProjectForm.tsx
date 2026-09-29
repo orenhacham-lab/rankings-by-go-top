@@ -49,6 +49,11 @@ export default function ProjectForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? false)
+  // Turning automatic scans on starts them monthly; the frequency shows only while they are on.
+  const toggleAutoScan = (on: boolean) => {
+    setAutoScan(on)
+    if (on && scanFreq === 'manual') setScanFreq('monthly')
+  }
   // Phase 3 — weekly and monthly_first_day removed; only manual/monthly remain.
   const [scanFreq, setScanFreq] = useState<'manual' | 'monthly'>(
     project?.scan_frequency || 'manual'
@@ -87,6 +92,8 @@ export default function ProjectForm({
 
     const formData = new FormData(e.currentTarget)
     formData.set('auto_scan_enabled', autoScan ? 'true' : 'false')
+    // The frequency select shows only while automatic scans are on; its value is sent either way.
+    formData.set('scan_frequency', scanFreq)
 
     try {
       let createdId: string | undefined
@@ -237,22 +244,26 @@ export default function ProjectForm({
       <div className="space-y-4 border-t border-line pt-4">
         <h4 className="text-copy font-semibold text-ink">{f.schedulingTitle}</h4>
 
-        <Select
-          label={f.scanFrequencyLabel}
-          name="scan_frequency"
-          value={scanFreq}
-          onChange={(e) => {
-            setScanFreq(e.target.value as 'manual' | 'monthly')
-            if (e.target.value === 'manual') setAutoScan(false)
-          }}
-          options={[
-            { value: 'manual', label: f.scanFreqManual },
-            { value: 'monthly', label: f.scanFreqMonthly },
-          ]}
-        />
+        {/* One decision, one status (review P2-6): the switch leads, and the frequency shows only while
+            automatic scans are on, so "monthly" never sits beside a switch that is off. */}
+        <Switch checked={autoScan} onChange={toggleAutoScan} label={f.autoScanLabel} />
 
-        {scanFreq !== 'manual' && (
-          <Switch checked={autoScan} onChange={setAutoScan} label={f.autoScanLabel} />
+        {autoScan ? (
+          <Select
+            label={f.scanFrequencyLabel}
+            name="scan_frequency"
+            value={scanFreq}
+            onChange={(e) => {
+              setScanFreq(e.target.value as 'manual' | 'monthly')
+              if (e.target.value === 'manual') setAutoScan(false)
+            }}
+            options={[
+              { value: 'manual', label: f.scanFreqManual },
+              { value: 'monthly', label: f.scanFreqMonthly },
+            ]}
+          />
+        ) : (
+          <p className="text-caption text-muted" data-auto-scan-off="">{f.autoScanOff}</p>
         )}
       </div>
 
