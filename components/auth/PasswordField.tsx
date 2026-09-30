@@ -5,9 +5,9 @@ import { Eye, EyeOff } from 'lucide-react'
 import Input, { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 
 /**
- * A password field with a show / hide switch beside its label. It replaces the
- * second "confirm password" field on sign-up (w7 P1-9): the visitor can check
- * what they typed instead of typing it twice. The field itself is ui/Input.
+ * A password field with a show / hide switch beside its label: the visitor can
+ * check what they typed. Sign-up uses two of them, the password and its
+ * confirmation, each with its own inline `error` (w9). The field is ui/Input.
  */
 export default function PasswordField({
   id,
@@ -16,6 +16,7 @@ export default function PasswordField({
   onChange,
   placeholder,
   hint,
+  error,
   showLabel,
   hideLabel,
   autoComplete,
@@ -26,6 +27,7 @@ export default function PasswordField({
   onChange: (value: string) => void
   placeholder?: string
   hint?: string
+  error?: string
   showLabel: string
   hideLabel: string
   autoComplete: 'new-password' | 'current-password'
@@ -55,6 +57,7 @@ export default function PasswordField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         hint={hint}
+        error={error}
         required
         autoComplete={autoComplete}
         className="h-11 text-left"

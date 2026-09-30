@@ -132,7 +132,7 @@ console.log('\nA) Links tab: the network\'s state first, in words')
 
   // A5, A6: copy that does not contradict the network.
   check('A5: the policy note, both languages', he.siteLinks.policy.body.startsWith('אל תשלמו על קישור ואל תסכימו ל"קישור תמורת קישור".') && en.siteLinks.policy.body.startsWith('Don\'t pay for links and don\'t agree to "a link for a link".'))
-  check('A6: the page subtitle names the network, both languages', he.siteLinks.subtitle.includes('רשת הקישורים של Go Top') && en.siteLinks.subtitle.includes('the Go Top link network'))
+  check('A6: the page subtitle names the network, both languages', he.siteLinks.subtitle.includes('רשת הקישורים של Go Top SEO') && en.siteLinks.subtitle.includes('the Go Top SEO link network'))
 
   // A1: how it works folds away for a member; the tabs are gone.
   const NetworkHow: any = require('../../components/site-links/network/NetworkHow').default

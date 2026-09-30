@@ -376,7 +376,7 @@ function generateReportHTML(data: ExportData): string {
         </table>
 
         <div class="footer">
-          Go Top | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
+          Go Top SEO | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
         </div>
       </div>
     </body>
@@ -727,7 +727,7 @@ function generateAIReportHTML(data: AIExportData): string {
         </table>
 
         <div class="footer">
-          Go Top | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
+          Go Top SEO | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
         </div>
       </div>
     </body>

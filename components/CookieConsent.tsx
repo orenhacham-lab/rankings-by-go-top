@@ -1,32 +1,23 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { Cookie } from 'lucide-react'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
-import { buttonClasses } from '@/components/public/marketing'
 
 /**
- * The privacy notice: ONE element, shaped by the width it has.
- *
- * - Below `md` (where the contact bar is): a slim bottom sheet laid exactly over
- *   the contact bar's strip, one short sentence and the accept button. Like the
- *   bar it keeps the start slot free for the accessibility button that docks
- *   there, with a wider gap than the bar's, so the button never touches the
- *   sentence (w7 P2-10).
- * - From `md`: one slim floating bar centred at the bottom of the window (the
- *   WhatsApp button steps aside while it is open, PublicSiteWidgets). It used to
- *   be a card in a top or bottom corner, where it sat on the English hero
- *   headline and on the free check's first figures (w7 P2-10).
- *
- * While it shows, the page gets bottom padding for whatever it covers (on a
- * phone, only what the sheet needs beyond the contact bar's strip, which the
- * footer already pads for), so nothing on the page ends up under it for good.
+ * The privacy notice: the small popup at the left side (w9: back to the original
+ * shape from before the redesign, the owner's ask). One compact card anchored to
+ * the physical left in both languages: from `sm` a 340px card at the bottom-left
+ * corner, on a phone a 240px card lifted above the contact bar. It never spans
+ * the page, so it needs no bottom padding. The WhatsApp button, which also sits
+ * at the bottom-left, steps aside while it is open (PublicSiteWidgets), and
  * `onOpenChange` tells the other widgets.
+ *
+ * Consent logic and storage are untouched: the key `cookie-consent-accepted` in
+ * localStorage, shown again when storage is blocked.
  */
-/** From md, the gap kept free under the floating bar (its bottom-5) plus a little air. */
-const DESKTOP_GAP_PX = 32
-
 export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean) => void } = {}) {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(false)
@@ -49,27 +40,6 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
     onOpenChange?.(isClient && isVisible)
   }, [isClient, isVisible, onOpenChange])
 
-  // Bottom padding while the notice shows: on a phone only what the sheet needs
-  // beyond the contact bar's strip (the footer already pads for the bar); from md
-  // the floating bar's height and the gap under it.
-  const sheetRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const sheet = sheetRef.current
-    if (!isClient || !isVisible || !sheet || typeof ResizeObserver === 'undefined') return
-    const body = document.body
-    const pad = () => {
-      const bar = document.querySelector<HTMLElement>('[data-mobile-contact-bar]')
-      const barH = bar && bar.offsetParent !== null ? bar.offsetHeight : 0
-      const phone = window.matchMedia('(max-width: 767px)').matches
-      body.style.paddingBottom = phone ? `${Math.max(0, sheet.offsetHeight - barH)}px` : `${sheet.offsetHeight + DESKTOP_GAP_PX}px`
-    }
-    pad()
-    const ro = new ResizeObserver(pad)
-    ro.observe(sheet)
-    window.addEventListener('resize', pad)
-    return () => { ro.disconnect(); window.removeEventListener('resize', pad); body.style.paddingBottom = '' }
-  }, [isClient, isVisible])
-
   const handleAccept = () => {
     try { localStorage.setItem('cookie-consent-accepted', 'true') } catch { /* storage blocked */ }
     setIsVisible(false)
@@ -80,44 +50,58 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
   }
 
   const privacy = (
-    <Link href={privacyLink} className="whitespace-nowrap font-semibold text-action underline underline-offset-2 hover:text-action-hover">
+    <Link href={privacyLink} className="font-medium text-rail-tagline underline underline-offset-2 hover:text-contrast-ink">
       {t.privacy}
     </Link>
   )
 
   return (
-    <div
-      ref={sheetRef}
-      dir={isEnglish ? 'ltr' : 'rtl'}
-      role="dialog"
-      aria-label={t.aria}
-      data-cookie-consent
-      className={[
-        'fixed z-[58] animate-pop-in border-line bg-surface text-start shadow-pop',
-        // phone: a slim sheet over the contact bar's strip; a wide start slot stays free for the accessibility button
-        'inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card border-t ps-[4.75rem] pe-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]',
-        // md+: one slim bar floating at the bottom centre, clear of every headline and first figure
-        'md:start-[4.75rem] md:end-6 md:bottom-5 md:mx-auto md:max-w-3xl md:gap-5 md:rounded-card md:border md:px-5 md:py-3.5 lg:inset-x-6',
-      ].join(' ')}
-    >
-      <p className="min-w-0 flex-1 text-caption text-body md:hidden">
-        {t.short}
-        {isEnglish ? ' ' : ''}
-        {privacy}
-        {'.'}
-      </p>
-      <div className="hidden min-w-0 flex-1 md:block">
-        <p className="text-copy font-semibold text-ink">{t.title}</p>
-        <p className="mt-0.5 text-caption text-body">
-          {t.body}
+    <div dir={isEnglish ? 'ltr' : 'rtl'} role="dialog" aria-label={t.aria} data-cookie-consent>
+      {/* Phone: ultra compact, 240px, no title, lifted above the contact bar */}
+      <div
+        data-cookie-compact
+        className="fixed left-3.5 z-[58] flex w-[240px] max-w-[calc(100vw-1.75rem)] flex-col items-stretch rounded-card border border-white/10 bg-contrast px-2.5 pb-2 pt-1.5 shadow-pop animate-pop-in sm:hidden"
+        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <p className="m-0 text-center text-caption leading-tight text-contrast-ink/80">
+          {t.short}
           {isEnglish ? ' ' : ''}
           {privacy}
           {'.'}
         </p>
+        <button
+          type="button"
+          onClick={handleAccept}
+          className="mt-1.5 h-[26px] w-full rounded-control bg-action px-2 text-overline font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
+        >
+          {t.accept}
+        </button>
       </div>
-      <button type="button" onClick={handleAccept} className={buttonClasses('primary', 'md', 'shrink-0 md:px-6')}>
-        {t.accept}
-      </button>
+
+      {/* From sm: compact but readable, 340px, at the bottom-left corner */}
+      <div className="fixed bottom-6 left-6 z-[58] hidden w-[340px] max-w-[340px] rounded-card border border-white/10 bg-contrast px-4 py-3.5 shadow-pop animate-pop-in sm:block">
+        <div className="flex items-start gap-2.5">
+          <div className="flex size-[30px] shrink-0 items-center justify-center rounded-pill bg-white/10 text-contrast-ink" aria-hidden="true">
+            <Cookie className="size-4" />
+          </div>
+          <div className="flex-1">
+            <h2 className="m-0 text-lead font-bold leading-tight text-contrast-ink">{t.title}</h2>
+            <p className="m-0 mt-1 text-caption leading-snug text-contrast-ink/80">
+              {t.body}
+              {isEnglish ? ' ' : ''}
+              {privacy}
+              {'.'}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleAccept}
+          className="mt-2.5 h-9 w-full rounded-control bg-action text-copy font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
+        >
+          {t.accept}
+        </button>
+      </div>
     </div>
   )
 }

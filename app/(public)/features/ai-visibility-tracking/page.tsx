@@ -7,7 +7,7 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingHe } from '@/lib/i18n/public/landing-he'
 
 export const metadata: Metadata = {
-  title: 'מעקב נראות AI | Rankings by Go Top',
+  title: 'מעקב נראות AI | Go Top SEO',
   description: 'גלו האם העסק, האתר או המותג שלכם מופיעים בתשובות של ChatGPT, Gemini, Perplexity, Google AI וכלים נוספים. מעקב GEO - Generative Engine Optimization.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/ai-visibility-tracking',

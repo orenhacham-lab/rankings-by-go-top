@@ -1,12 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'תקנון ותנאי שימוש | GO TOP',
-  description: 'תקנון ותנאי השימוש של GO TOP — התנאים המסדירים את השימוש בשירות.',
+  title: 'תקנון ותנאי שימוש | Go Top SEO',
+  description: 'תקנון ותנאי השימוש של Go Top SEO — התנאים המסדירים את השימוש בשירות.',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'תקנון ותנאי שימוש | GO TOP',
-    description: 'תקנון ותנאי השימוש של GO TOP',
+    title: 'תקנון ותנאי שימוש | Go Top SEO',
+    description: 'תקנון ותנאי השימוש של Go Top SEO',
     url: 'https://www.gotopseo.com/terms',
     locale: 'he_IL',
   },
@@ -18,12 +18,12 @@ export default function HebrewTermsPage() {
       locale="he"
       breadcrumbs={[{ label: 'תקנון ותנאי שימוש', href: '/terms' }]}
       title="תקנון ותנאי שימוש"
-      subtitle="GO TOP"
+      subtitle="Go Top SEO"
     >
       <section>
         <h2>1. מבוא והגדרת השירות</h2>
         <p>
-          GO TOP (להלן: &ldquo;השירות&rdquo; או &ldquo;המערכת&rdquo;) הוא שירות SaaS המופעל על ידי
+          Go Top SEO (להלן: &ldquo;השירות&rdquo; או &ldquo;המערכת&rdquo;) הוא שירות SaaS המופעל על ידי
           Go Top Digital Marketing &amp; Advertising Ltd. (להלן: &ldquo;החברה&rdquo;), המאפשר ללקוחות לעקוב אחר
           מיקומים בתוצאות החיפוש של Google, נראות בתוצאות Google Maps, נראות במנועי AI כגון ChatGPT, Gemini,
           Perplexity ואחרים, לבצע מחקר ביטויים ולהפיק דוחות מקצועיים. השירות כולל גם סריקת אתרים, חיבור

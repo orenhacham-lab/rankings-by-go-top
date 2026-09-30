@@ -73,8 +73,8 @@ export function AboutPage({ locale, copy }: { locale: Locale; copy: AboutCopy })
               <p className="mx-auto mt-6 max-w-[58ch] text-lead-mkt text-contrast-ink/80 text-pretty">{copy.subtitle}</p>
             </div>
             <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-              <ButtonLink href={c.check.href} size="lg" arrow className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}>{c.check.label}</ButtonLink>
-              <ButtonLink href={c.trial.href} variant="inverse" size="lg" className="h-12 px-7">{c.trial.label}</ButtonLink>
+              <ButtonLink href={c.check.href} size="lg" arrow className={cn(styles.cta, 'h-12 px-7')}>{c.check.label}</ButtonLink>
+              <ButtonLink href={c.trial.href} variant="secondary" size="lg" className="h-12 px-7">{c.trial.label}</ButtonLink>
             </div>
           </div>
         </section>
@@ -157,32 +157,33 @@ export function AboutPage({ locale, copy }: { locale: Locale; copy: AboutCopy })
           </ol>
         </Section>
 
-        {/* 5. Why choose us (cobalt) */}
-        <section className={cn(styles.bandBrand, 'py-16 text-action-ink sm:py-20 lg:py-28')} data-about-choose>
+        {/* 5. Why choose us (navy, the ground of "what was missing") */}
+        <section className={cn(styles.bandBloom, 'relative isolate overflow-hidden bg-contrast py-16 text-contrast-ink sm:py-20 lg:py-28')} data-about-choose>
+          <div aria-hidden="true" className={cn(styles.topLight, 'pointer-events-none absolute inset-x-8 top-0 h-px')} />
           <div className={CONTAINER}>
-            <h2 className="max-w-3xl text-h2-mkt text-balance text-action-ink">{copy.choose.title}</h2>
+            <h2 className="max-w-3xl text-h2-mkt text-balance text-contrast-ink">{copy.choose.title}</h2>
             <ul className="mt-10 grid grid-cols-1 gap-x-12 gap-y-8 sm:grid-cols-2 lg:mt-14">
               {copy.choose.items.map((item, i) => (
                 <Rise key={item.title} as="li" delay={i * 80} className="border-t border-white/30 pt-5">
-                  <h3 className="text-title font-bold tracking-tight text-action-ink">{item.title}</h3>
-                  <p className="mt-2 text-section font-normal text-action-ink text-pretty">{item.description}</p>
+                  <h3 className="text-title font-bold tracking-tight text-contrast-ink">{item.title}</h3>
+                  <p className="mt-2 text-section font-normal text-contrast-ink/80 text-pretty">{item.description}</p>
                 </Rise>
               ))}
             </ul>
           </div>
         </section>
 
-        {/* 6. The close (navy, full bleed): the free check, the trial, and the three contact channels */}
-        <section className={cn(styles.bandBloom, 'relative isolate overflow-hidden border-b border-contrast-ink/10 bg-contrast py-20 text-center text-contrast-ink sm:py-24 lg:py-28')} data-final-cta>
+        {/* 6. The close (light, the ground of "our approach"): the free check, the trial, and the three contact channels */}
+        <section className="bg-canvas py-20 text-center sm:py-24 lg:py-28" data-final-cta>
           <div className={cn(CONTAINER, 'relative')}>
-            <h2 className="mx-auto max-w-3xl text-h2-mkt text-balance text-contrast-ink">{copy.cta.title}</h2>
-            <p className="mx-auto mt-4 max-w-[58ch] text-lead-mkt font-normal text-contrast-ink/80 text-pretty">{copy.cta.body}</p>
+            <h2 className="mx-auto max-w-3xl text-h2-mkt text-balance text-ink">{copy.cta.title}</h2>
+            <p className="mx-auto mt-4 max-w-[58ch] text-lead-mkt font-normal text-body text-pretty">{copy.cta.body}</p>
             <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
               <ButtonLink href={c.check.href} size="lg" arrow className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}>{c.check.label}</ButtonLink>
               <ButtonLink href={c.trial.href} variant="inverse" size="lg" className="h-12 px-7">{c.trial.label}</ButtonLink>
             </div>
-            <div className="mx-auto mt-12 max-w-xl border-t border-white/10 pt-8">
-              <p className="text-copy text-contrast-ink/80">{copy.cta.contact}</p>
+            <div className="mx-auto mt-12 max-w-xl border-t border-line pt-8">
+              <p className="text-copy text-body">{copy.cta.contact}</p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3" data-about-contact>
                 {contactButtons.map((b) => (
                   <a
@@ -190,7 +191,7 @@ export function AboutPage({ locale, copy }: { locale: Locale; copy: AboutCopy })
                     href={b.href}
                     {...(b.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     title={b.title}
-                    className={buttonClasses('inverse', 'md')}
+                    className={buttonClasses('secondary', 'md')}
                     data-contact-channel={b.id}
                   >
                     {b.id === 'whatsapp' ? <WhatsAppGlyph size={16} /> : b.id === 'phone' ? <Phone className="size-4" aria-hidden="true" /> : <Mail className="size-4" aria-hidden="true" />}
@@ -198,7 +199,7 @@ export function AboutPage({ locale, copy }: { locale: Locale; copy: AboutCopy })
                   </a>
                 ))}
               </div>
-              <p className="mt-6 text-caption text-contrast-ink/65">{copy.cta.updated}</p>
+              <p className="mt-6 text-caption text-muted">{copy.cta.updated}</p>
             </div>
           </div>
         </section>

@@ -7,14 +7,11 @@
  *   B) every feature page is its metadata plus the one FeaturePage template,
  *      and every legal document uses the one LegalDoc layout;
  *   C) pricing: ONE primary button (the recommended plan), no scaled card;
- *   D) the overlays never sit on the hero: on a phone the cookie notice is a
- *      slim sheet laid exactly over the contact bar's strip (with bottom padding
- *      for anything it needs beyond it), and both keep the start slot free for
- *      the accessibility button, which docks there instead of floating over the
- *      hero's buttons; from md the notice is one slim bar floating at the
- *      bottom centre with the page padded for it (WhatsApp steps aside). The
- *      earlier corner card sat on the English hero headline and on the free
- *      check's first figures (w7 P2-10; final review R27 before it).
+ *   D) the overlays: the cookie notice is the ORIGINAL small popup at the left
+ *      side again (w9, the owner's ask): 340px at the bottom-left corner from
+ *      sm, 240px above the contact bar on a phone, never a page-wide bar; the
+ *      accessibility button docks in the contact bar's strip and WhatsApp steps
+ *      aside while the notice shows.
  *   E) the landing's feature rows alternate text and picture (wave 7; the old
  *      five-reason grid's rule moved to landing-page.qa.ts, group C).
  * Each group ends with a MUTATION CONTROL: the same check run on a deliberately
@@ -142,21 +139,19 @@ function main() {
 
   console.log('\nD) the overlays never sit on the hero')
   const SLOT = 'ps-[4.25rem]'
-  const SHEET_SLOT = 'ps-[4.75rem]'
   const DOCKED = "'bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-24'"
   const overlaysOk = (widgets: string, cookie: string, a11y: string, whatsapp: string, bar: string) => {
     const w = strip(widgets), c = strip(cookie), a = strip(a11y), wa = strip(whatsapp), b = strip(bar)
     return /<WhatsAppFloat hidden=\{cookieOpen\} \/>/.test(w)
       && /<AccessibilityWidget \/>/.test(w)
       && /<CookieConsent onOpenChange=\{setCookieOpen\} \/>/.test(w)
-      // phone: a slim sheet over the contact bar's strip, the start slot left for the accessibility button
-      // (w7 P2-10) a wider start slot in the sheet than in the bar, so the docked button never touches the sentence
-      && /inset-x-0 bottom-0 flex items-center gap-3 rounded-t-card/.test(c) && c.includes(SHEET_SLOT) && /z-\[58\]/.test(c)
-      // md+ (w7 P2-10): one slim bar at the bottom centre, never a corner card over the hero headline or the first figures
-      && /md:start-\[4\.75rem\] md:end-6 md:bottom-5 md:mx-auto md:max-w-3xl/.test(c) && /lg:inset-x-6/.test(c)
-      && !/top-24|md:w-\[20rem\]|min-\[1400px\]/.test(c)
-      // bottom padding while it shows: on a phone what the sheet needs beyond the bar, from md the bar and its gap
-      && /body\.style\.paddingBottom = phone \? `\$\{Math\.max\(0, sheet\.offsetHeight - barH\)\}px` : `\$\{sheet\.offsetHeight \+ DESKTOP_GAP_PX\}px`/.test(c)
+      // w9 (the owner): the ORIGINAL small popup at the left side, back from the full-width sheet/bar.
+      // From sm a 340px card at the bottom-left corner; on a phone a 240px card above the contact bar.
+      && /fixed bottom-6 left-6 z-\[58\] hidden w-\[340px\] max-w-\[340px\]/.test(c) && /sm:block/.test(c)
+      && /fixed left-3\.5 z-\[58\] flex w-\[240px\] max-w-\[calc\(100vw-1\.75rem\)\]/.test(c) && /sm:hidden/.test(c)
+      && c.includes("bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))'")
+      // never a page-wide bar or sheet again, and no bottom padding on the page
+      && !/inset-x-0|md:mx-auto|md:max-w-3xl|paddingBottom/.test(c)
       && /onOpenChange\?\.\(/.test(c)
       // the accessibility button: 40px, start corner, docked in the strip below md, floating from md
       && /fixed start-4 z-\[60\] flex size-10/.test(a) && a.includes(DOCKED) && !/\braised\b/.test(a)
@@ -170,7 +165,7 @@ function main() {
     const a11y = read('components/public/AccessibilityWidget.tsx')
     const whatsapp = read('components/public/WhatsAppFloat.tsx')
     const bar = read('components/public/MobileContactBar.tsx')
-    check('D1: sheet, contact bar and accessibility button share one bottom strip; from md one slim bottom bar clears the hero', overlaysOk(widgets, cookie, a11y, whatsapp, bar))
+    check('D1: the cookie notice is the small left popup (w9); the accessibility button and contact bar keep their strip', overlaysOk(widgets, cookie, a11y, whatsapp, bar))
     check('D2: the contact bar stays under the cookie sheet (z-55 < z-58)', /z-\[55\]/.test(strip(bar)))
     check('MUTATION CONTROL: WhatsApp no longer stepping aside is caught',
       !overlaysOk(widgets.replace('<WhatsAppFloat hidden={cookieOpen} />', '<WhatsAppFloat />'), cookie, a11y, whatsapp, bar))
@@ -178,18 +173,12 @@ function main() {
       !overlaysOk(widgets, cookie, a11y.replace(DOCKED, "raised ? 'bottom-48 sm:bottom-24' : 'bottom-24'"), whatsapp, bar))
     check('MUTATION CONTROL: a contact bar that no longer keeps the slot free is caught',
       !overlaysOk(widgets, cookie, a11y, whatsapp, bar.replace(SLOT, 'px-4')))
-    check('MUTATION CONTROL (w7 P2-10): the old top-corner card over the English hero headline is caught',
-      !overlaysOk(widgets, cookie.replace('lg:inset-x-6', 'min-[1400px]:bottom-auto min-[1400px]:top-24'), a11y, whatsapp, bar))
-    check('MUTATION CONTROL (w7 P2-10): the old corner card is caught',
-      !overlaysOk(widgets, cookie.replace('md:start-[4.75rem] md:end-6 md:bottom-5 md:mx-auto md:max-w-3xl', 'md:inset-x-auto md:end-6 md:w-[20rem] md:max-[1399px]:bottom-6'), a11y, whatsapp, bar))
-    check('MUTATION CONTROL: no bottom padding while the sheet shows is caught',
-      !overlaysOk(widgets, cookie.replace("body.style.paddingBottom = phone ?", 'void (phone ?'), a11y, whatsapp, bar))
-    check('MUTATION CONTROL (w7 P2-10): no bottom padding from md is caught',
-      !overlaysOk(widgets, cookie.replace('`${sheet.offsetHeight + DESKTOP_GAP_PX}px`', "''"), a11y, whatsapp, bar))
-    check('MUTATION CONTROL (w7 P2-10): the old narrow sheet slot the button sat against is caught',
-      !overlaysOk(widgets, cookie.replace(SHEET_SLOT, SLOT), a11y, whatsapp, bar))
-    check('MUTATION CONTROL: a full-width phone banner without the sheet shape is caught',
-      !overlaysOk(widgets, cookie.replace('rounded-t-card', 'rounded-none'), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w9): the full-width phone sheet back is caught',
+      !overlaysOk(widgets, cookie.replace('fixed left-3.5 z-[58] flex w-[240px]', 'fixed inset-x-0 bottom-0 z-[58] flex w-[240px]'), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w9): the centred desktop bar back is caught',
+      !overlaysOk(widgets, cookie.replace('fixed bottom-6 left-6 z-[58] hidden w-[340px] max-w-[340px]', 'fixed bottom-5 z-[58] hidden md:mx-auto md:max-w-3xl'), a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w9): the phone card no longer lifted above the contact bar is caught',
+      !overlaysOk(widgets, cookie.replace('calc(76px + env(safe-area-inset-bottom, 0px))', '0px'), a11y, whatsapp, bar))
     const short = (l: 'he' | 'en') => (l === 'he' ? publicHe : publicEn).cookie.short
     const shortOk = (h: string, e: string) => [h, e].every((x) => x.length > 0 && x.length <= 60)
     check('D3: the phone sheet has its own short sentence (two lines beside the button), in both languages', shortOk(short('he'), short('en')), `${short('he').length}/${short('en').length}`)

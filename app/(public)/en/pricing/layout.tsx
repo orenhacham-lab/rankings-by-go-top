@@ -1,10 +1,10 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'Pricing - Rankings by Go Top',
+  title: 'Pricing - Go Top SEO',
   description: 'Flexible pricing plans for Google rank tracking and AI visibility. Free 7-day trial, no commitment. Plans starting from $79/month.',
   openGraph: {
-    title: 'Pricing - Rankings by Go Top',
+    title: 'Pricing - Go Top SEO',
     description: 'Flexible pricing plans for Google rank tracking and AI visibility monitoring',
     url: 'https://www.gotopseo.com/en/pricing',
     type: 'website',

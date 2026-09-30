@@ -2,11 +2,11 @@ import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Sitemap | Rankings by Go Top',
-  description: 'Complete sitemap for Rankings by Go Top — find all our pages in one place.',
+  title: 'Sitemap | Go Top SEO',
+  description: 'Complete sitemap for Go Top SEO — find all our pages in one place.',
   openGraph: {
-    title: 'Sitemap | Rankings by Go Top',
-    description: 'Complete sitemap for Rankings by Go Top',
+    title: 'Sitemap | Go Top SEO',
+    description: 'Complete sitemap for Go Top SEO',
     url: 'https://www.gotopseo.com/en/sitemap',
     locale: 'en_US',
   },
@@ -54,7 +54,7 @@ export default function EnglishSitemapPage() {
 
   return (
     <LegalFrame locale="en" breadcrumbs={[{ label: 'Sitemap', href: '/en/sitemap' }]}>
-      <LegalHeader title="Sitemap" subtitle="Find all pages and sections of Rankings by Go Top here" />
+      <LegalHeader title="Sitemap" subtitle="Find all pages and sections of Go Top SEO here" />
 
       <SitemapGroups groups={sections} />
 

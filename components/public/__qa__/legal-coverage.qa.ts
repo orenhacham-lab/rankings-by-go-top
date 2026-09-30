@@ -12,7 +12,7 @@
  * content; emails (reminder with one-click unsubscribe, monthly report); the
  * sub-processors; the accessibility measures of the new design.
  *
- * Also: the product name is "GO TOP" (never the old name) in the six pages'
+ * Also: the product name is "Go Top SEO" (never the old name) in the six pages'
  * text and metadata, source comments stripped; the last-updated line is
  * 29 September 2026; Hebrew and English carry the same number of sections.
  *
@@ -121,7 +121,7 @@ for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy'
   const hit = dated.exec(p.body)
   const body = hit ? p.body.slice(0, hit.index + hit[0].length) : p.body
   check(`${lang} ${doc}: the old product name is gone from the text, metadata and code`, !OLD_NAME.test(body) && !OLD_NAME.test(p.meta) && !OLD_NAME.test(p.src))
-  check(`${lang} ${doc}: the page names GO TOP`, /GO TOP/.test(p.text) && /GO TOP/.test(p.meta))
+  check(`${lang} ${doc}: the page names GO TOP`, /Go Top SEO/.test(p.text) && /Go Top SEO/.test(p.meta))
   check(`${lang} ${doc}: last updated 29 September 2026`, dated.test(p.text))
 }
 check('MUTATION — the old name put back into a page is caught', OLD_NAME.test(pages.en.terms.src + ' Rankings by Go Top') && !OLD_NAME.test(pages.en.terms.src))

@@ -7,7 +7,7 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
-  title: 'SEO/GEO Reports | Rankings by Go Top',
+  title: 'SEO/GEO Reports | Go Top SEO',
   description: 'Professional PDF and Excel reports with rankings, trends, and competitive analysis. Client-ready reports in seconds.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/seo-geo-reports',

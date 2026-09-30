@@ -7,7 +7,7 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
       <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-4 sm:px-6">
         <Image
           src="/gotop-primary.png"
-          alt="Go Top logo"
+          alt="Go Top SEO logo"
           width={120}
           height={120}
           className="h-auto w-24"

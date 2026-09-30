@@ -9,7 +9,7 @@ import type { Locale } from './locales'
 
 export const ERROR_PAGES_UI = {
   he: {
-    logoAlt: 'הלוגו של Go Top',
+    logoAlt: 'הלוגו של Go Top SEO',
     notFound: {
       code: '404',
       title: 'לא מצאנו את העמוד הזה',
@@ -34,7 +34,7 @@ export const ERROR_PAGES_UI = {
     },
   },
   en: {
-    logoAlt: 'Go Top logo',
+    logoAlt: 'Go Top SEO logo',
     notFound: {
       code: '404',
       title: "We couldn't find this page",

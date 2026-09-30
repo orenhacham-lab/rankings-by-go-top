@@ -7,7 +7,7 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingHe } from '@/lib/i18n/public/landing-he'
 
 export const metadata: Metadata = {
-  title: 'מעקב דירוג בגוגל חיפוש | Rankings by Go Top',
+  title: 'מעקב דירוג בגוגל חיפוש | Go Top SEO',
   description: 'עקבו אחרי דירוגים אורגניים בגוגל לפי ביטוי חיפוש, מדינה, שפה ומכשיר. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ומעקב מתחרים.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/google-organic-rank-tracking',

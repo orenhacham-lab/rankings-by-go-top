@@ -1,10 +1,10 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'עמוד אודות - Rankings by Go Top',
-  description: 'גלו הכל על Rankings by Go Top - מערכת מעקב מיקומים בגוגל ונראות ב-AI המהפכנית. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI כמו ChatGPT ו-Gemini.',
+  title: 'עמוד אודות - Go Top SEO',
+  description: 'גלו הכל על Go Top SEO - מערכת מעקב מיקומים בגוגל ונראות ב-AI המהפכנית. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI כמו ChatGPT ו-Gemini.',
   openGraph: {
-    title: 'עמוד אודות - Rankings by Go Top',
+    title: 'עמוד אודות - Go Top SEO',
     description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
     url: 'https://www.gotopseo.com/about',
     type: 'website',

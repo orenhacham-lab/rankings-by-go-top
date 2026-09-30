@@ -7,7 +7,7 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
-  title: 'AI Visibility Tracking | Rankings by Go Top',
+  title: 'AI Visibility Tracking | Go Top SEO',
   description: 'Track your business mentions in ChatGPT, Gemini, Perplexity, and Google AI. Monitor GEO - Generative Engine Optimization.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/ai-visibility-tracking',

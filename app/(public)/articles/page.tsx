@@ -55,7 +55,7 @@ export default function ArticlesPage() {
         <PageHero
           compact
           before={<Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }]} />}
-          eyebrow="בלוג Rankings by Go Top"
+          eyebrow="בלוג Go Top SEO"
           title="מאמרים, מדריכים"
           accent="ותובנות"
           subtitle="תכנים מקצועיים בנושאי קידום אתרים, נראות ב-AI, שיווק דיגיטלי וטכנולוגיה — מהצוות של Go Top."
@@ -153,7 +153,7 @@ export default function ArticlesPage() {
 }
 
 const PROMO: ArticlesPromoCopy = {
-  badge: 'Rankings by Go Top',
+  badge: 'Go Top SEO',
   title: ['עקבו אחר הדירוגים שלכם', 'בגוגל, מתי שתרצו'],
   body: 'מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.',
   signup: { label: 'התחילו ניסיון חינם', href: authHref('signup', 'he') },

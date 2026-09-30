@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 const LOGIN_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
-    logoAlt: 'הלוגו של Go Top',
+    logoAlt: 'הלוגו של Go Top SEO',
     heading: 'כניסה',
     emailLabel: 'כתובת אימייל',
     emailPlaceholder: 'you@example.com',
@@ -44,7 +44,7 @@ const LOGIN_UI = {
   },
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
-    logoAlt: 'Go Top logo',
+    logoAlt: 'Go Top SEO logo',
     heading: 'Sign in',
     emailLabel: 'Email address',
     emailPlaceholder: 'you@example.com',

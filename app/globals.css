@@ -194,14 +194,14 @@
   /* Marketing-only steps (the public site; the app keeps the scale above).
      Fluid between a 390px phone and a 1440px desktop, so ONE utility carries
      both sizes the design specifies (wave 8, UX decision D):
-       hero      40/46 → 76/84, weight 800   the home hero's headline
+       hero      32/35 → 54/59, weight 800   the home hero's headline (w9: large, not dominant)
        hero-page 34/40 → 56/64               the About hero's headline
        h2-mkt    28/36 → 44/52, weight 700   a marketing section title
        lead-mkt  17/27 → 21/32               a marketing subtitle
        numeral   44 → 56                     a step's big numeral
        eyebrow   13, semibold                the line above a marketing title
      Hebrew is never tracked wider than 0; the negative tracking only tightens. */
-  --text-hero: clamp(2.5rem, 1.6643rem + 3.4286vw, 4.75rem);
+  --text-hero: clamp(2rem, 1.4893rem + 2.0952vw, 3.5rem);
   --text-hero--line-height: 1.1;
   --text-hero--font-weight: 800;
   --text-hero--letter-spacing: -0.01em;

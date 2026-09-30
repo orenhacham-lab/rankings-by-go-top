@@ -6,7 +6,7 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
-  title: 'Keyword Research | Rankings by Go Top',
+  title: 'Keyword Research | Go Top SEO',
   description: 'Discover keyword ideas with Google Ads data. Check search volume, competition, and CPC estimates. Add keywords directly to rank tracking and AI questions.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/keyword-research',

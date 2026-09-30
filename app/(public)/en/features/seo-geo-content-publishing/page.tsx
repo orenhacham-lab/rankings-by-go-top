@@ -8,7 +8,7 @@ import { TRIAL_CATALOG } from '@/lib/plans/catalog'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
-  title: 'SEO/GEO Content Creation, Scheduling & Publishing | Rankings by Go Top',
+  title: 'SEO/GEO Content Creation, Scheduling & Publishing | Go Top SEO',
   description:
     'Plan topics, get a complete AI-generated article draft, edit it, schedule it, and publish straight to WordPress or Shopify — all from one place.',
   alternates: {

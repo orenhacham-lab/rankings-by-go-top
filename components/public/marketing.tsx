@@ -105,15 +105,19 @@ export function NumberSquircle({ n }: { n: number | string }) {
 }
 
 /** The small pill above a hero title. Never a second title. `inverse` sits on navy. */
-export function Eyebrow({ children, icon: Icon, inverse = false }: { children: React.ReactNode; icon?: LucideIcon; inverse?: boolean }) {
+export function Eyebrow({ children, icon: Icon, inverse = false, prominent = false }: { children: React.ReactNode; icon?: LucideIcon; inverse?: boolean; prominent?: boolean }) {
   return (
     <span
       className={cn(
-        'inline-flex h-7 items-center gap-2 rounded-pill border px-3 text-caption font-semibold',
-        inverse ? 'border-white/15 bg-white/10 text-contrast-ink backdrop-blur-sm' : 'border-line bg-surface text-body shadow-control',
+        'inline-flex items-center rounded-pill border font-semibold',
+        // The home hero's tag (w9): the first thing the eye lands on. A solid light pill with navy text, larger than a caption.
+        prominent ? 'min-h-10 gap-2.5 px-4 py-1.5 text-copy font-bold sm:h-11 sm:px-5 sm:text-lead' : 'h-7 gap-2 px-3 text-caption',
+        prominent
+          ? 'border-contrast-ink bg-contrast-ink text-contrast shadow-[0_0_0_4px_rgb(255_255_255/0.14),0_8px_24px_rgb(0_0_0/0.25)]'
+          : inverse ? 'border-white/15 bg-white/10 text-contrast-ink backdrop-blur-sm' : 'border-line bg-surface text-body shadow-control',
       )}
     >
-      {Icon ? <Icon className={cn('size-3.5', inverse ? 'text-rail-tagline' : 'text-action')} aria-hidden="true" /> : <span className={cn('size-1.5 rounded-pill', inverse ? 'bg-rail-tagline' : 'bg-action')} aria-hidden="true" />}
+      {Icon ? <Icon className={cn(prominent ? 'size-4 sm:size-[18px] text-action' : cn('size-3.5', inverse ? 'text-rail-tagline' : 'text-action'))} aria-hidden="true" /> : <span className={cn('size-1.5 rounded-pill', inverse ? 'bg-rail-tagline' : 'bg-action')} aria-hidden="true" />}
       {children}
     </span>
   )

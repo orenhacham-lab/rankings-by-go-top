@@ -38,7 +38,7 @@ export default async function ShopifyLinkPage() {
       <Shell>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Connect {pending.shop_domain}</h1>
         <p style={{ color: '#616161', marginBottom: 20 }}>
-          Log in or create a Rankings by Go Top account to finish connecting this store. You&apos;ll come right back here afterward.
+          Log in or create a Go Top SEO account to finish connecting this store. You&apos;ll come right back here afterward.
         </p>
         <div style={{ display: 'flex', gap: 12 }}>
           {/* The surface's language travels with the handoff — the same rule

@@ -25,18 +25,18 @@ export interface SiteMetadataStrings {
 
 const SITE_METADATA: Record<Locale, SiteMetadataStrings> = {
   he: {
-    title: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top',
-    description: 'Rankings by Go Top - יצירה, תזמון ופרסום תוכן SEO ו-GEO ממקום אחד, לצד מעקב מיקומים בגוגל ונראות ב-AI (ChatGPT, Gemini, Perplexity). להרשמה בחינם כנסו עכשיו',
+    title: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top SEO',
+    description: 'Go Top SEO - יצירה, תזמון ופרסום תוכן SEO ו-GEO ממקום אחד, לצד מעקב מיקומים בגוגל ונראות ב-AI (ChatGPT, Gemini, Perplexity). להרשמה בחינם כנסו עכשיו',
     keywords: 'יצירת תוכן SEO, תזמון תוכן, פרסום תוכן, GEO, מעקב מיקומים, קידום אתרים, SEO, גוגל, דירוג, מפות גוגל, AI visibility, ChatGPT, Gemini',
-    ogTitle: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO - Rankings by Go Top',
+    ogTitle: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO - Go Top SEO',
     ogDescription: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO ממקום אחד, לצד מעקב מיקומים בגוגל ונראות ב-AI (ChatGPT, Gemini, Perplexity)',
     ogLocale: 'he_IL',
   },
   en: {
-    title: 'Create, schedule and publish SEO & GEO content | Go Top',
-    description: 'Rankings by Go Top — create, schedule and publish SEO and GEO content from one place, alongside Google rank tracking and visibility in AI answers (ChatGPT, Gemini, Perplexity). Start free.',
+    title: 'Create, schedule and publish SEO & GEO content | Go Top SEO',
+    description: 'Go Top SEO — create, schedule and publish SEO and GEO content from one place, alongside Google rank tracking and visibility in AI answers (ChatGPT, Gemini, Perplexity). Start free.',
     keywords: 'SEO content creation, content scheduling, content publishing, GEO, rank tracking, SEO, Google, rankings, Google Maps, AI visibility, ChatGPT, Gemini',
-    ogTitle: 'Create, schedule and publish SEO & GEO content — Rankings by Go Top',
+    ogTitle: 'Create, schedule and publish SEO & GEO content — Go Top SEO',
     ogDescription: 'Create, schedule and publish SEO and GEO content from one place, alongside Google rank tracking and visibility in AI answers (ChatGPT, Gemini, Perplexity)',
     ogLocale: 'en_US',
   },

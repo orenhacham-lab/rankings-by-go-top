@@ -7,10 +7,10 @@ import { ArticlesPromo, type ArticlesPromoCopy } from '@/components/public/Artic
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'SEO, Rank Tracking and AI Visibility Articles | Rankings by Go Top',
+  title: 'SEO, Rank Tracking and AI Visibility Articles | Go Top SEO',
   description: 'Articles, guides and tips on Google rank tracking, SEO, and AI visibility monitoring across ChatGPT, Gemini, Perplexity and more.',
   openGraph: {
-    title: 'SEO, Rank Tracking and AI Visibility Articles | Rankings by Go Top',
+    title: 'SEO, Rank Tracking and AI Visibility Articles | Go Top SEO',
     description: 'Articles and guides on rank tracking, SEO and AI visibility',
     url: 'https://www.gotopseo.com/en/articles',
     type: 'website',
@@ -64,7 +64,7 @@ export default function EnglishArticlesPage() {
 }
 
 const PROMO: ArticlesPromoCopy = {
-  badge: 'Rankings by Go Top',
+  badge: 'Go Top SEO',
   title: ['Track Your Rankings', 'in Google, Whenever You Need'],
   body: 'Professional platform for tracking your Google organic and Google Maps rankings. Scan on demand whenever you need, or automatically once a month. Detailed reports, trend tracking and personal support.',
   signup: { label: 'Start Free Trial', href: '/en/signup' },

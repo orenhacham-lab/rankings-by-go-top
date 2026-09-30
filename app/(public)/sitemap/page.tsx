@@ -73,7 +73,7 @@ export default function SitemapPage() {
 
   return (
     <LegalFrame locale="he" breadcrumbs={[{ label: 'מפת אתר', href: '/sitemap' }]}>
-      <LegalHeader title="מפת אתר" subtitle="כאן תמצאו את כל העמודים והקטגוריות ב-Rankings by Go Top" />
+      <LegalHeader title="מפת אתר" subtitle="כאן תמצאו את כל העמודים והקטגוריות ב-Go Top SEO" />
 
       <SitemapGroups groups={[...sections, ...articleSection]} />
 
