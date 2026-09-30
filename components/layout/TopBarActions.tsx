@@ -49,21 +49,26 @@ export default function TopBarActions() {
   const rows = activeProjectId ? allWaitingRows(activeProjectId, waiting, safeFixes) : []
   const count = bellCount(rows)
 
-  const [open, setOpen] = useState(false)
+  // Open on the screen it was opened on: a change of screen closes it (no effect needed).
+  const [openOn, setOpenOn] = useState<string | null>(null)
+  const open = openOn === pathname
+  const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(open) : next
+    setOpenOn(value ? pathname : null)
+  }
   const boxRef = useRef<HTMLDivElement>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
   const titleId = useId()
 
-  // Close on an outside click, and when the screen changes.
+  // Close on an outside click.
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false) }
+    const onDown = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpenOn(null) }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
-  useEffect(() => { setOpen(false) }, [pathname])
 
   // Opening moves focus to the first row (or the panel itself when nothing waits).
   useEffect(() => {
@@ -115,7 +120,7 @@ export default function TopBarActions() {
             <span
               aria-hidden="true"
               data-top-bar-badge=""
-              className="absolute -top-0.5 -end-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-pill bg-bad px-1 text-[11px] font-bold leading-none text-bad-ink tabular-nums ring-2 ring-canvas"
+              className="absolute -top-1 -end-1 grid h-5 min-w-5 place-items-center rounded-pill bg-bad px-1 text-overline font-semibold leading-none text-bad-ink tabular-nums ring-2 ring-canvas"
             >
               {pillText(count)}
             </span>
