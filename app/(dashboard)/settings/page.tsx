@@ -42,6 +42,7 @@ import ReminderEmailsCard from '@/components/reminders/ReminderEmailsCard'
 import ScanBand from '@/components/settings/ScanBand'
 import SettingsIndex from '@/components/settings/SettingsIndex'
 import SettingsSkeleton from '@/components/settings/SettingsSkeleton'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { LINKED_SECTIONS, SECTION, scrollToSection } from '@/components/settings/anchors'
 import { useClock } from '@/components/settings/useDraft'
 import { useProjectSettings } from '@/components/settings/useProjectSettings'
@@ -286,8 +287,11 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               </Notice>
             ) : (
               // Still on its way (it may wait behind the page's other reads): its place, not a blank.
-              <div aria-busy="true" data-article-style="loading" className="h-40 animate-pulse rounded-card border border-line bg-sunk/60 motion-reduce:animate-none">
+              <div aria-busy="true" data-article-style="loading" className="rounded-card border border-line bg-surface p-5">
                 <span className="sr-only">{dict.common.loading}</span>
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="mt-3 h-4 w-full max-w-lg" />
+                <Skeleton className="mt-5 h-24 w-full" />
               </div>
             )}
 

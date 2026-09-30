@@ -80,7 +80,7 @@ async function main() {
     check('A5: the hook reads through readArticleSettings, with no 8 s clock of its own', /readArticleSettings\(\(\) => loadArticleStyleAction\(projectId\)/.test(hook) && !/loadArticleStyleAction\(projectId\), 8_000/.test(hook))
     check('A5-MUT: the old call is caught', /loadArticleStyleAction\(projectId\), 8_000/.test('withDeadline(loadArticleStyleAction(projectId), 8_000)'))
     const page = strip(read('app/(dashboard)/settings/page.tsx'))
-    check('A6: while it loads the card keeps its place (no blank, no failure)', /data-article-style="loading"/.test(page) && /motion-reduce:animate-none/.test(page))
+    check('A6: while it loads the card keeps its place (no blank, no failure)', /data-article-style="loading"[^>]*>[\s\S]{0,200}<Skeleton/.test(page))
   }
 
   // ── B) inline images on the owner's real article ─────────────────────────
