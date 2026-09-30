@@ -7,7 +7,7 @@
  * of" article, association and news site that showed up in the project's
  * searches, with steps for asking each one for a link. "Nobody gives you a link
  * just like that": that list is gone. What stays is this short, curated list,
- * each entry checked by hand against the site's own terms:
+ * each entry one we are sure meets these terms:
  *
  *   - the basic listing is free (a paid upgrade may exist; it is never needed);
  *   - the business opens it itself, on the site's own page (no editor to write
@@ -22,11 +22,14 @@
  * `url` is the site's own "add your business" page, or its home page when the
  * sign-up page moves often. Every address is https on the site's own domain.
  *
- * Pure: no React, no I/O. Guarded by lib/site-links/__qa__/free-listings.qa.ts.
+ * Only entries we are sure offer a free self-listing stay: Houzz and G2 were
+ * dropped (wave 9 follow-up) because that could not be confirmed.
+ *
+ * Pure: no React, no I/O. Guarded by lib/__qa__/w9-links.qa.ts.
  */
 
 /** Who the site is for. The screen says it in words (dictionary: siteLinks.listings.fit). */
-export type ListingFit = 'any' | 'local' | 'hospitality' | 'home' | 'b2b' | 'software'
+export type ListingFit = 'any' | 'local' | 'hospitality' | 'b2b' | 'software'
 /** Where the site works: everywhere, only in Israel, or everywhere but Israel. */
 export type ListingRegion = 'all' | 'il' | 'not_il'
 
@@ -55,11 +58,9 @@ export const FREE_LISTINGS: readonly FreeListing[] = [
   { id: 'trustpilot', name: 'Trustpilot', domain: 'trustpilot.com', url: 'https://business.trustpilot.com/', fit: 'any', region: 'all' },
   // By field.
   { id: 'tripadvisor', name: 'Tripadvisor', domain: 'tripadvisor.com', url: 'https://www.tripadvisor.com/Owners', fit: 'hospitality', region: 'all' },
-  { id: 'houzz', name: 'Houzz', domain: 'houzz.com', url: 'https://www.houzz.com/', fit: 'home', region: 'all' },
   { id: 'clutch', name: 'Clutch', domain: 'clutch.co', url: 'https://clutch.co/get-listed', fit: 'b2b', region: 'all' },
   { id: 'goodfirms', name: 'GoodFirms', domain: 'goodfirms.co', url: 'https://www.goodfirms.co/', fit: 'b2b', region: 'all' },
   { id: 'capterra', name: 'Capterra', domain: 'capterra.com', url: 'https://www.capterra.com/vendors/', fit: 'software', region: 'all' },
-  { id: 'g2', name: 'G2', domain: 'g2.com', url: 'https://sell.g2.com/', fit: 'software', region: 'all' },
 ]
 
 /** Israel when the project says so (country), or, with no country, a Hebrew project. */

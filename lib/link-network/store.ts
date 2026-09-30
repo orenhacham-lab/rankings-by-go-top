@@ -10,6 +10,7 @@
  * "unavailable": the screen hides the network and the generation step does
  * nothing. Never an error.
  */
+import { isAdminUser } from '@/lib/auth/admin-role'
 import { bareDomain } from '@/lib/site-links/classify'
 import { safeExternalUrl } from '@/lib/site-links/model'
 import { provenDomains, type AnchorKind, type DomainProof, type Edge, type NetworkSite } from './rules'
@@ -199,7 +200,12 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
   const memberOf = new Map(members.map((m) => [m.project_id, m]))
   const profileOf = new Map(profiles.map((p) => [p.project_id, p]))
   const shopifyIds = new Set(shopify.map((s) => s.project_id))
-  const shopifyBilled = new Set(governance.filter((g) => g.billing_authority === 'shopify').map((g) => g.user_id))
+  const billedByShopify = [...new Set(governance.filter((g) => g.billing_authority === 'shopify').map((g) => g.user_id))]
+  // An administrator is not a Shopify account because of how he is billed: each of his projects is
+  // judged by its own platform (a Shopify connection or a detected Shopify store stays Shopify).
+  // isAdminUser reads profiles.role with the service role and fails closed (unreadable = not admin).
+  const billedAdmins = await Promise.all(billedByShopify.map((uid) => isAdminUser(db, uid)))
+  const shopifyBilled = new Set(billedByShopify.filter((_, i) => !billedAdmins[i]))
   const compOf = by(competitors), runsOf = by(seedRuns), crawlOf = by(crawl), wpOf = by(wpIndex), pubOf = by(published)
   const ownerOfProject = new Map(projects.map((p) => [p.id, p.user_id]))
   // The service role bypasses RLS: a mapping counts only when it belongs to the project's own owner.

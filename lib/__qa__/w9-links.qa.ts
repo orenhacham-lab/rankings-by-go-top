@@ -83,7 +83,7 @@ async function main() {
     check('A7-MUT: the promises removed from the hero → caught', !mutP)
     // The network's server side is not part of this change.
     const store = read('lib/link-network/store.ts')
-    check('A8: the network rules are unchanged: a Shopify-billed account is still outside the network', /shopifyBilled\.has\(p\.user_id\)/.test(store) && /billing_authority === 'shopify'/.test(store))
+    check('A8: a Shopify-billed account is still outside the network (admins are judged per project, guarded in link-network.qa)', /shopifyBilled\.has\(p\.user_id\)/.test(store) && /billing_authority === 'shopify'/.test(store))
   }
 
   // ── B. free listings ──────────────────────────────────────────────────────
