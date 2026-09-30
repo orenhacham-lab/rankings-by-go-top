@@ -24,7 +24,7 @@ import type { Generate } from './suggest'
 export const siteFixGenerate: Generate = async (prompt) => {
   const client = getRecoGenAiClient()
   if (!client) throw new Error('suggest_unavailable')
-  const mc = resolveModelConfig(RECOMMENDATION_MODEL_PRIMARY, 1200)
+  const mc = resolveModelConfig(RECOMMENDATION_MODEL_PRIMARY, 2048)
   const resp = await client.models.generateContent({
     model: RECOMMENDATION_MODEL_PRIMARY,
     contents: prompt,

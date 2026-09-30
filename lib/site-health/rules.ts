@@ -131,6 +131,34 @@ export function scoreOf(findings: readonly Pick<Finding, 'severity'>[]): number 
   return Math.max(0, Math.min(100, 100 - lost))
 }
 
+/**
+ * The score with the fixes already applied (wave 9: "after fixing I don't see the score rise").
+ * scoreOf counts each KIND of problem once, so fixing 3 of a kind's 12 pages changed nothing
+ * until every page was fixed and the site checked again. Here each kind loses its points in
+ * proportion to the pages still open: with nothing fixed it is exactly scoreOf; every applied
+ * fix raises it at once, with no new scan and no call to anyone. A page counts as fixed only
+ * when `isFixed` says so (the fix queue's applied or sent job for that page, or the owner's own
+ * "I fixed it"); pages beyond the ones listed are never assumed fixed.
+ */
+export function scoreWithFixes<F extends Pick<Finding, 'severity' | 'total' | 'pages'>>(
+  findings: readonly F[],
+  isFixed: (finding: F, page: FindingPage) => boolean,
+): { score: number; fixedPages: number; base: number } {
+  let lost = 0
+  let fixedPages = 0
+  let all = 0
+  for (const f of findings) {
+    const total = Math.max(f.total || 0, f.pages.length, 1)
+    const fixed = Math.min(total, f.pages.filter((p) => isFixed(f, p)).length)
+    fixedPages += fixed
+    lost += SEVERITY_POINTS[f.severity] * ((total - fixed) / total)
+    all += SEVERITY_POINTS[f.severity]
+  }
+  const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
+  // `base` is the same findings with nothing fixed: what the gain is measured from.
+  return { score: clamp(100 - lost), fixedPages, base: clamp(100 - all) }
+}
+
 export type ScoreBand = 'excellent' | 'good' | 'fair' | 'poor'
 export function scoreBand(score: number): ScoreBand {
   if (score >= 90) return 'excellent'
@@ -326,6 +354,8 @@ export interface TitleInput {
   path: string
   /** A few hundred characters of the page's own text, for the model. */
   text?: string
+  /** The page's meta description, when it has one (a too-short title's last resort, lib/site-fix/suggest.ts). */
+  description?: string | null
 }
 
 /** Why a title would not be offered, or null when it may be. */

@@ -41,6 +41,12 @@ export const MONTHLY_AI_CHECK = {
   inactiveAfterDays: 30,
 } as const
 
+/** The fewest and the most questions a plan checks automatically (the AI tab's administrator view names the range). */
+export function monthlyQuestionRange(): { min: number; max: number } {
+  const counts = Object.values(MONTHLY_AI_CHECK.questionsPerPlan).filter((n) => n > 0)
+  return counts.length ? { min: Math.min(...counts), max: Math.max(...counts) } : { min: 0, max: 0 }
+}
+
 /** The engines of the monthly check, in the order they are run. */
 export const MONTHLY_CORE_ENGINES = ['chatgpt', 'gemini', 'google_ai_mode'] as const
 /** Takes the place of a core engine the project's country does not support (JP, TW). */

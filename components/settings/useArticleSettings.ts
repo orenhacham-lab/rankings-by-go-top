@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadArticleStyleAction, readSiteSignalsAction } from '@/app/(dashboard)/settings/article-style-actions'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import type { ArticleStyleView } from '@/lib/content/article-style/data'
+import { readArticleSettings } from './article-settings-load'
 import type { SampledColor } from '@/lib/content/article-style/colors'
 import type { OfficialProfiles } from '@/lib/content/article-style/profiles'
 
@@ -26,9 +27,10 @@ export function useArticleSettings(projectId: string) {
   const latest = useRef(0)
   const autoRead = useRef(false)
 
+  // Queued behind the page's other server actions is not failed (./article-settings-load.ts).
   const load = useCallback((): Promise<void> => {
     const mine = ++latest.current
-    return withDeadline(loadArticleStyleAction(projectId), 8_000).then((res) => {
+    return readArticleSettings(() => loadArticleStyleAction(projectId), { stale: () => mine !== latest.current }).then((res) => {
       if (mine !== latest.current) return
       setState((prev) => (res?.ok ? { status: 'ready', data: res.data } : prev.status === 'ready' ? prev : { status: 'failed' }))
     })

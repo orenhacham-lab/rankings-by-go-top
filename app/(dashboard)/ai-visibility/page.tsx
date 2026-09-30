@@ -193,6 +193,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     requestedTab: tabRequest,
     onAllowanceOut: setAllowanceOut,
     onChecksRan: loadMonthly,
+    autoQuestionIds: monthly && 'questions' in monthly ? (monthly.questions ?? []).map((q) => q.id) : undefined,
     resultsRefreshKey,
     competitorsSlot: (
       <CompetitorsReadOnly

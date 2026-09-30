@@ -15,7 +15,7 @@
  */
 import { useState } from 'react'
 import NextLink from 'next/link'
-import { ArrowDownRight, ArrowUpRight, CheckCircle2, CircleDashed, Info, Loader2, Quote, XCircle } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, CalendarClock, Check, CheckCircle2, CircleDashed, Info, Loader2, Quote, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button, { buttonClasses } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -30,8 +30,10 @@ import type { MonthlyStatus } from '@/lib/ai-visibility/monthly-check/runner'
 
 /** What GET /api/ai-visibility/monthly answered; null while it loads or when it could not be read. */
 export type MonthlyView = MonthlyStatus | null
-type MonthlyShown = Extract<MonthlyStatus, { engines: string[] }>
-const shownMonthly = (m: MonthlyView): MonthlyShown | null => (m && 'engines' in m ? m : null)
+type MonthlyShown = Extract<MonthlyStatus, { limit: number }>
+type MonthlyAdmin = Extract<MonthlyStatus, { state: 'admin' }>
+const shownMonthly = (m: MonthlyView): MonthlyShown | null => (m && 'limit' in m ? m : null)
+const adminMonthly = (m: MonthlyView): MonthlyAdmin | null => (m && m.state === 'admin' ? m : null)
 
 /** The date of the next automatic check, when there is one to name. */
 export function monthlyNextDate(m: MonthlyView): string | null {
@@ -126,7 +128,7 @@ export function OverviewStatusBar({ overview, questionsPending, monthly = null }
           {/* The hint rides on `title` and the screen-reader text: a positioned
               tooltip this close to the edge would widen the page on a phone. */}
           <dd className="mt-1 flex items-center gap-1.5 text-copy font-medium text-ink" title={c.nextCheckManualHint} data-ai-next-check={monthlyNextDate(monthly) ? 'auto' : 'manual'}>
-            {monthlyNextDate(monthly) ? formatWhen(monthlyNextDate(monthly), language, true) : c.nextCheckManual}
+            {monthlyNextDate(monthly) ? formatWhen(monthlyNextDate(monthly), language, true) : adminMonthly(monthly) ? c.autoAdminNext : c.nextCheckManual}
             <Info size={14} className="shrink-0 text-muted" aria-hidden="true" />
             <span className="sr-only">{c.nextCheckManualHint}</span>
           </dd>
@@ -374,6 +376,8 @@ function AutoCheckPanel({ c, language, monthly, running, error, onRunNow, onTogg
   c: Copy; language: Locale; monthly: MonthlyView; running: boolean; error: string | null
   onRunNow?: () => void; onToggle?: (next: boolean) => void
 }) {
+  const adminView = adminMonthly(monthly)
+  if (adminView) return <AdminAutoPanel c={c} view={adminView} />
   const m = shownMonthly(monthly)
   if (!m) return null
   const names = m.engines.map((e) => c.autoEngineNames[e] ?? e).join(', ')
@@ -382,6 +386,12 @@ function AutoCheckPanel({ c, language, monthly, running, error, onRunNow, onTogg
   const labelId = 'ai-auto-check-label'
   return (
     <div data-ai-auto-check={m.state} className="mt-6 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
+      {m.state !== 'off' && (m.questions ?? []).length > 0 && (
+        <div className="mb-3 border-b border-contrast-ink/10 pb-3">
+          <p className="flex items-center gap-1.5 text-copy font-semibold text-contrast-ink"><CalendarClock aria-hidden size={15} />{c.autoTitle}</p>
+          <AutoQuestions c={c} questions={m.questions ?? []} engines={names} />
+        </div>
+      )}
       <p className="text-caption font-semibold text-contrast-ink/80">{c.autoMeterLabel}</p>
       <p className="mt-0.5 text-copy tabular-nums text-contrast-ink" data-ai-auto-meter="">{c.autoMeter(m.used, m.limit, m.autoUsed, m.left)}</p>
       {/* Used by the automatic check, then by manual checks, of X. */}
@@ -418,6 +428,38 @@ function AutoCheckPanel({ c, language, monthly, running, error, onRunNow, onTogg
           <Switch checked={m.state !== 'off'} onChange={onToggle} aria-labelledby={labelId} disabled={running} data-ai-auto-toggle="" className="mt-0.5" />
         </div>
       )}
+    </div>
+  )
+}
+
+/** Which questions the automatic check takes, on which engines; manual checks are the extra. */
+function AutoQuestions({ c, questions, engines }: { c: Copy; questions: ReadonlyArray<{ id: string; prompt: string }>; engines: string }) {
+  return (
+    <>
+      <p className="mt-2 text-caption text-contrast-ink/75">{c.autoQuestionsLabel(questions.length)}</p>
+      <ul className="mt-1.5 space-y-1" data-ai-auto-questions={questions.length}>
+        {questions.map((q) => (
+          <li key={q.id} className="flex items-start gap-2 text-copy text-contrast-ink">
+            <Check aria-hidden size={14} strokeWidth={2.5} className="mt-1 shrink-0 text-contrast-ink/70" />
+            <span className="min-w-0 line-clamp-2">{q.prompt}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-caption text-contrast-ink/65" dir="auto">{engines}</p>
+      <p className="mt-2 text-caption text-contrast-ink/65">{c.autoManualExtra}</p>
+    </>
+  )
+}
+
+/** An administrator's account: what a customer's automatic check covers here (it does not run in this account). */
+function AdminAutoPanel({ c, view }: { c: Copy; view: MonthlyAdmin }) {
+  const names = view.engines.map((e) => c.autoEngineNames[e] ?? e).join(', ')
+  return (
+    <div data-ai-auto-check="admin" className="mt-6 max-w-[56ch] rounded-control border border-contrast-ink/10 bg-contrast-ink/[0.05] px-3.5 py-3">
+      <p className="flex items-center gap-1.5 text-copy font-semibold text-contrast-ink"><CalendarClock aria-hidden size={15} />{c.autoTitle}</p>
+      <p className="mt-1 text-caption text-contrast-ink/80">{c.autoAdminBody(names, view.startAfterDays)}</p>
+      {view.questions.length > 0 ? <AutoQuestions c={c} questions={view.questions} engines={names} /> : <p className="mt-2 text-caption text-contrast-ink/75">{c.autoNoQuestions}</p>}
+      {view.range.max > 0 && <p className="mt-2 text-caption text-contrast-ink/65">{c.autoAdminPlans(view.range.min, view.range.max)}</p>}
     </div>
   )
 }

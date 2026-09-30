@@ -284,7 +284,12 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               <Notice tone="bad" action={{ label: t.articleStyle.retry, onClick: () => void article.reload() }}>
                 {t.articleStyle.loadFailed}
               </Notice>
-            ) : null}
+            ) : (
+              // Still on its way (it may wait behind the page's other reads): its place, not a blank.
+              <div aria-busy="true" data-article-style="loading" className="h-40 animate-pulse rounded-card border border-line bg-sunk/60 motion-reduce:animate-none">
+                <span className="sr-only">{dict.common.loading}</span>
+              </div>
+            )}
 
             <section id={SECTION.connections} aria-labelledby={`${SECTION.connections}-title`} className="scroll-mt-20 space-y-4">
               <div className="flex items-start gap-3 pt-2">

@@ -49,7 +49,7 @@ import { resolveBusinessIdentity, type ScanBusiness } from '@/lib/ai-visibility/
 import { scoreQuestion, type WorthContext } from '@/lib/ai-visibility/question-worth'
 import type { ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import {
-  MONTHLY_AI_CHECK, MONTHLY_DAY_MS, SCHEDULED_KEY_PREFIX, cronTickAtOrAfter, monthlyDueAt, monthlyEngines,
+  MONTHLY_AI_CHECK, MONTHLY_DAY_MS, SCHEDULED_KEY_PREFIX, cronTickAtOrAfter, monthlyDueAt, monthlyEngines, monthlyQuestionRange,
   monthlyQuestionCount, parseScheduledKey, scheduledKey,
 } from './config'
 
@@ -119,6 +119,8 @@ export type MonthlyPlan =
       /** Due checks before the budget cut; `pairs` is what fits. */
       pairsDue: number
       pairs: MonthlyPair[]
+      /** The questions the automatic check covers this period (what the AI tab lists). */
+      questions: Array<{ id: string; prompt: string }>
     }
 
 const ms = (v: string | null | undefined) => { const n = Date.parse(v ?? ''); return Number.isFinite(n) ? n : NaN }
@@ -337,6 +339,7 @@ export async function planMonthlyCheck(admin: Admin, project: ProjectRow, opts: 
   return {
     ok: true, entitlement, period, dueAt, windowEndAt, nextPeriodDueAt, engines, questionCount,
     limit, used, remaining, budget, autoUsed, lastAutoAt, pairsDue: due.length, pairs: due.slice(0, budget),
+    questions: selected.map((q) => ({ id: q.id, prompt: q.prompt })),
   }
 }
 
@@ -575,9 +578,17 @@ export async function runMonthlyCheckNow(
 export type MonthlyStatus =
   | { state: 'not_included' }
   | { state: 'unavailable' }
+  /**
+   * An administrator's account has no plan, so the check never runs in it (it would spend on
+   * every project). The AI tab still shows exactly what a customer's check covers, on these
+   * engines and these questions, so the change can be seen (wave 9).
+   */
+  | { state: 'admin'; engines: string[]; questions: Array<{ id: string; prompt: string }>; range: { min: number; max: number }; startAfterDays: number }
   | {
       state: 'off' | 'no_questions' | 'scheduled' | 'done' | 'skipped' | 'allowance_low'
       engines: string[]
+      /** The questions checked automatically (empty when off or none are tracked). */
+      questions: Array<{ id: string; prompt: string }>
       /** Checks the next (or this, when skipped) automatic run would take. */
       checks: number
       nextAt: string | null
@@ -594,14 +605,15 @@ export async function readMonthlyCheckStatus(admin: Admin, project: ProjectRow, 
   const at = (deps?.now ?? (() => new Date()))()
   const plan = await planMonthlyCheck(admin, project, { now: at })
   if (!plan.ok) {
-    if (plan.reason === 'admin' || plan.reason === 'no_active_subscription') return { state: 'not_included' }
+    if (plan.reason === 'admin') return readAdminView(admin, project)
+    if (plan.reason === 'no_active_subscription') return { state: 'not_included' }
     if (plan.reason === 'entitlement_unavailable' || plan.reason === 'no_period' || plan.reason === 'error') return { state: 'unavailable' }
     // 'setting_off' and 'no_questions' still show the meter: read it without the plan's early exit.
     const base = await readMeterOnly(admin, project, at)
     if (!base) return { state: 'unavailable' }
-    return { state: plan.reason === 'setting_off' ? 'off' : 'no_questions', ...base, checks: 0, lastAt: null, skippedBecause: null }
+    return { state: plan.reason === 'setting_off' ? 'off' : 'no_questions', ...base, questions: [], checks: 0, lastAt: null, skippedBecause: null }
   }
-  const meter = { engines: plan.engines, limit: plan.limit, used: plan.used, autoUsed: plan.autoUsed, left: plan.remaining }
+  const meter = { engines: plan.engines, questions: plan.questions, limit: plan.limit, used: plan.used, autoUsed: plan.autoUsed, left: plan.remaining }
   const tickAfter = (d: Date) => cronTickAtOrAfter(d).toISOString()
   const ranThisPeriod = plan.lastAutoAt !== null
   const checks = plan.pairs.length
@@ -617,6 +629,25 @@ export async function readMonthlyCheckStatus(admin: Admin, project: ProjectRow, 
   return {
     state: 'skipped', ...meter, checks, nextAt: tickAfter(plan.nextPeriodDueAt), lastAt: plan.lastAutoAt,
     skippedBecause: !active && !ranThisPeriod ? 'inactive' : 'missed',
+  }
+}
+
+/** The administrator's view: the engines and the questions a customer's check would take (the largest plan's count). Reads only. */
+async function readAdminView(admin: Admin, project: ProjectRow): Promise<MonthlyStatus> {
+  try {
+    const { data, error } = await admin.from('ai_prompts')
+      .select('id, prompt, created_at').eq('project_id', project.id).eq('is_active', true)
+      .order('created_at', { ascending: true }).limit(500)
+    if (error) return { state: 'unavailable' }
+    const prompts = ((data ?? []) as Array<{ id: string; prompt: string | null; created_at?: string | null }>)
+      .filter((p) => typeof p.prompt === 'string' && p.prompt.trim())
+      .map((p) => ({ id: p.id, prompt: p.prompt as string, created_at: p.created_at ?? null }))
+    const range = monthlyQuestionRange()
+    const ctx = prompts.length ? await readWorthContext(admin, project) : null
+    const questions = selectMonthlyQuestions(prompts, [], range.max, (text) => (ctx ? scoreQuestion(text, 'informational', ctx).score : 0))
+    return { state: 'admin', engines: monthlyEngines(project.country), questions, range, startAfterDays: MONTHLY_AI_CHECK.startAfterDays }
+  } catch {
+    return { state: 'unavailable' }
   }
 }
 

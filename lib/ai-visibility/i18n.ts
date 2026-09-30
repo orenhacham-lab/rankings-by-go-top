@@ -850,6 +850,7 @@ const STRINGS = {
   something_went_wrong: { he: 'משהו השתבש. נסו שוב בעוד רגע.', en: 'Something went wrong. Please try again in a moment.' },
   result_more_actions: { he: 'פעולות נוספות לתוצאה', en: 'More actions for this result' },
   question_more_actions: { he: 'פעולות נוספות לשאלה', en: 'More actions for this question' },
+  question_auto_monthly: { he: 'נבדקת אוטומטית כל חודש', en: 'Checked automatically every month' },
   archive_result: { he: 'העברה לארכיון', en: 'Archive' },
   restore_result: { he: 'החזרה לחישוב הציון', en: 'Restore to the score' },
   not_in_score: { he: 'לא נכלל בציון', en: 'Not in score' },

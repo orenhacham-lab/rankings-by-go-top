@@ -19,7 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, Check, ChevronDown, Info, Loader2, MessageSquareText, Minus, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
+import { Archive, CalendarClock, Check, ChevronDown, Info, Loader2, MessageSquareText, Minus, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
 import NextLink from 'next/link'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
@@ -105,6 +105,7 @@ export default function AIVisibilitySection({
   requestedTab,
   onAllowanceOut,
   onChecksRan,
+  autoQuestionIds,
   resultsRefreshKey = 0,
 }: {
   projectId: string
@@ -140,6 +141,8 @@ export default function AIVisibilitySection({
   onAllowanceOut?: (out: boolean) => void
   /** A check finished (or failed): the page re-reads what it shows about the allowance. */
   onChecksRan?: () => void
+  /** The questions the automatic monthly check covers: each gets a badge in the list (wave 9). */
+  autoQuestionIds?: readonly string[]
   /** Bumped when checks ran outside the tool (the monthly check's "run now"): reload results and the allowance. */
   resultsRefreshKey?: number
 }) {
@@ -2219,7 +2222,15 @@ export default function AIVisibilitySection({
                     className="space-y-3 rounded-inset border border-line bg-surface p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="line-clamp-2 flex-1 text-copy font-medium text-ink">{p.prompt}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-copy font-medium text-ink">{p.prompt}</p>
+                        {autoQuestionIds?.includes(p.id) && (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-action-soft px-2 py-0.5 text-caption font-semibold text-action" data-ai-auto-question={p.id}>
+                            <CalendarClock aria-hidden size={13} />
+                            {t('question_auto_monthly')}
+                          </span>
+                        )}
+                      </div>
                       {/* Single engines, all six the plan promises, one check each: the
                           main surface no longer asks the customer to pick an engine. */}
                       <RowMenu

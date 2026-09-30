@@ -66,7 +66,7 @@ function ScoreRing({ score, band, label, outOf }: { score: number; band: ScoreBa
 }
 
 export default function ScoreCard({
-  report, copy, domain, siteIcon, checkedAt, fixableCount, action,
+  report, copy, domain, siteIcon, checkedAt, fixableCount, live, action,
 }: {
   report: SiteHealthReport
   copy: Copy
@@ -74,11 +74,15 @@ export default function ScoreCard({
   siteIcon?: string | null
   checkedAt: string
   fixableCount: number
+  /** The score with the applied fixes counted (scoreWithFixes); absent = the scan's own score. */
+  live?: { score: number; fixedPages: number; base: number }
   /** "Check again", at the card's top end. */
   action?: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
-  const band = scoreBand(report.score)
+  const score = live ? live.score : report.score
+  const gained = live ? live.score - live.base : 0
+  const band = scoreBand(score)
   const tally: Record<Severity, number> = { urgent: 0, important: 0, minor: 0 }
   for (const f of report.findings) tally[f.severity]++
 
@@ -90,7 +94,7 @@ export default function ScoreCard({
     >
       <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:gap-8 lg:p-8">
         <div className="self-center sm:self-auto">
-          <ScoreRing score={report.score} band={band} label={copy.score.label} outOf={copy.score.outOf} />
+          <ScoreRing score={score} band={band} label={copy.score.label} outOf={copy.score.outOf} />
         </div>
         <div className="min-w-0 flex-1 text-center sm:text-start">
           <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-between">
@@ -107,6 +111,11 @@ export default function ScoreCard({
             {copy.counts.findings(report.findings.length)}
             {fixableCount > 0 && <> · <span className="font-medium text-action">{copy.counts.fixable(fixableCount)}</span></>}
           </p>
+          {live && live.fixedPages > 0 && (
+            <p className="mt-2 inline-flex flex-wrap items-center justify-center gap-x-1.5 rounded-control bg-ok-soft px-2.5 py-1 text-caption font-medium text-ink" data-site-health-gain={gained}>
+              {copy.score.afterFixes(gained, live.fixedPages)}
+            </p>
+          )}
           <ul className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 sm:justify-start" aria-label={copy.score.label}>
             {(['urgent', 'important', 'minor'] as const).map((s) => (
               <li key={s} className="flex items-center gap-2 text-copy text-body">

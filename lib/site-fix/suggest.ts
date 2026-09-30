@@ -68,25 +68,69 @@ export type { TitleInput }
 function titlePrompt(input: TitleInput, lang: 'he' | 'en'): string {
   const r = titleRangeFor(input.kind)
   return [
-    `Write 3 different SEO titles (the <title> Google shows) in ${langName(lang)} for one page of ${input.siteName ? `the website "${input.siteName}"` : 'a website'}.`,
+    `Write 5 different SEO titles (the <title> Google shows) in ${langName(lang)} for one page of ${input.siteName ? `the website "${input.siteName}"` : 'a website'}.`,
     `Current title: ${norm(input.current) || '(none)'}`,
     `Main heading: ${norm(input.h1) || '(none)'}`,
     input.keyword ? `Each title MUST contain this exact keyword: ${norm(input.keyword)}` : '',
     input.text ? `Page text (the only source of facts): ${norm(input.text).slice(0, 1200)}` : '',
-    `Rules: each title between ${r.min} and ${r.max} characters, counting spaces. Different from the current title. Describe what the page offers; you may end with " | ${norm(input.siteName) || 'brand'}" when it fits.`,
+    `Rules: each title between ${r.min} and ${r.max} characters (aim for ${Math.round((r.min + r.max) / 2)}), counting spaces. Different from the current title. Describe what the page offers; you may end with " | ${norm(input.siteName) || 'brand'}" when it fits.`,
     'No quotes, no emoji, no ALL CAPS, no invented claims, prices or dates.',
-    'Return JSON: {"titles": ["…", "…", "…"]}',
+    'Return JSON: {"titles": ["…", "…", "…", "…", "…"]}',
   ].filter(Boolean).join('\n')
 }
 
-/** The first title that passes titleProblem, trying the page's own words first, then the model. */
+const SUFFIX_SEPARATORS = [' | ', ' - ', ' – ', ' — ', ' · ']
+const trimDangling = (s: string) => norm(s).replace(/[\s|–—:,;·-]+$/u, '')
+
+/**
+ * A model title a few characters off the window, brought into it WITHOUT new words (wave 9: a
+ * "title too short" page was never fixed because the model rarely lands exactly on 50–60
+ * characters in Hebrew, and every near miss was thrown away). Too long: its " | brand" tail
+ * dropped, else cut at a word. Too short: the site's name added as a tail. Each result is
+ * checked again by titleProblem, so nothing outside the rules is ever offered.
+ */
+export function titleFits(candidate: string, input: Pick<TitleInput, 'kind' | 'siteName'>): string[] {
+  const r = titleRangeFor(input.kind)
+  const v = norm(candidate)
+  const out = [v]
+  const site = norm(input.siteName)
+  if (v.length > r.max) {
+    for (const sep of SUFFIX_SEPARATORS) {
+      const i = v.lastIndexOf(sep)
+      if (i >= r.min) out.push(v.slice(0, i).trim())
+    }
+    out.push(trimDangling(cutAtWord(v, r.max)))
+  } else if (v.length < r.min && site && !v.toLocaleLowerCase().includes(site.toLocaleLowerCase())) {
+    out.push(`${v} | ${site}`)
+  }
+  return out
+}
+
+/**
+ * The last resort for a too-short or missing title, from the page's own words only: its main
+ * keyword (or heading) with the first sentence of its description or of its text, cut at a word.
+ */
+export function titlesFromPage(input: TitleInput): string[] {
+  if (input.kind !== 'title_short' && input.kind !== 'title_missing') return []
+  const lead = norm(input.keyword) || norm(input.h1)
+  const source = norm(input.description) || norm(input.text)
+  if (!lead || !source) return []
+  const first = (source.split(/(?<=[.!?])\s/u)[0] ?? '').replace(/[.!?]+$/u, '').trim()
+  if (!first) return []
+  const r = titleRangeFor(input.kind)
+  const body = first.toLocaleLowerCase().includes(lead.toLocaleLowerCase()) ? first : `${lead} – ${first}`
+  return [trimDangling(cutAtWord(body, r.max)), ...titleFits(trimDangling(cutAtWord(body, r.max - 12)), input)]
+}
+
+/** The first title that passes titleProblem: the page's own words, then the model (near misses fitted), then the page's text. */
 export async function suggestSeoTitle(input: TitleInput, generate?: Generate): Promise<string | null> {
   for (const c of titleCandidates(input)) if (!titleProblem(c, input)) return c
   const lang = pageLanguage(`${norm(input.h1)} ${norm(input.current)} ${norm(input.text)}`)
   for (let attempt = 0; attempt < 2; attempt++) {
     const answer = await ask(generate, titlePrompt(input, lang))
-    for (const c of strings(answer, 'titles')) if (!titleProblem(c, input)) return c
+    for (const raw of strings(answer, 'titles')) for (const c of titleFits(raw, input)) if (!titleProblem(c, input)) return c
   }
+  for (const c of titlesFromPage(input)) if (!titleProblem(c, input)) return c
   return null
 }
 
@@ -128,16 +172,22 @@ export const FAQ_ITEMS = { min: 2, max: 5 } as const
 export const FAQ_GROUNDING = 0.75
 
 const HEBREW_PREFIX = /^[והבלמשכ]{1,2}(?=\p{Script=Hebrew}{3,})/u
+/** Hebrew plural and feminine endings (טיסות/טיסה, מסלולים/מסלול), so a sentence that says the page's words in another form still counts as the page's. */
+const HEBREW_SUFFIX = /(?:ים|ות|ה|ת)$/u
 function variants(token: string): string[] {
   const t = token.toLocaleLowerCase()
   const out = [t]
   const bare = t.replace(HEBREW_PREFIX, '')
   if (bare !== t) out.push(bare)
+  for (const w of [t, bare]) {
+    if (/\p{Script=Hebrew}{4,}$/u.test(w) && HEBREW_SUFFIX.test(w)) out.push(w.replace(HEBREW_SUFFIX, ''))
+  }
   if (t.length > 4 && /s$/.test(t)) out.push(t.slice(0, -1))
   return out
 }
 const wordsOf = (s: string) => (s.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).filter((w) => w.length >= 3 || /\d/.test(w))
-const numbersOf = (s: string) => s.match(/\d+(?:[.,]\d+)*/g) ?? []
+/** Numbers as written, thousands separators dropped (1,500 and 1500 are the same number). */
+const numbersOf = (s: string) => (s.match(/\d+(?:[.,]\d+)*/g) ?? []).map((n) => n.replace(/,(?=\d{3}\b)/g, ''))
 
 /** Whether an answer says only what the page says: its words are the page's, and every number is. */
 export function grounded(answer: string, pageText: string, share = FAQ_GROUNDING): boolean {
@@ -181,7 +231,17 @@ export async function suggestFaq(input: { text: string; title: string }, generat
   const language = pageLanguage(`${input.title} ${text}`)
   const heading = FAQ_HEADING[language]
   if (thinContent(text)) return { ok: false, code: 'thin_content', heading, language }
-  const answer = await ask(generate, faqPrompt(text, input.title, language))
+  // Asked twice at most, like titles: one answer whose pairs fail the page check is not the last word.
+  let items: FaqItem[] = []
+  for (let attempt = 0; attempt < 2 && items.length < FAQ_ITEMS.min; attempt++) {
+    items = checkedFaq(await ask(generate, faqPrompt(text, input.title, language)), text)
+  }
+  if (items.length < FAQ_ITEMS.min) return { ok: false, code: 'no_valid_suggestion', heading, language }
+  return { ok: true, heading, items, language }
+}
+
+/** The pairs of one model answer that pass every check against the page. */
+function checkedFaq(answer: unknown, text: string): FaqItem[] {
   const raw = answer && typeof answer === 'object' ? (answer as { items?: unknown }).items : null
   const items: FaqItem[] = []
   for (const x of Array.isArray(raw) ? raw : []) {
@@ -195,8 +255,7 @@ export async function suggestFaq(input: { text: string; title: string }, generat
     items.push({ q, a })
     if (items.length >= FAQ_ITEMS.max) break
   }
-  if (items.length < FAQ_ITEMS.min) return { ok: false, code: 'no_valid_suggestion', heading, language }
-  return { ok: true, heading, items, language }
+  return items
 }
 
 // ── llms.txt ────────────────────────────────────────────────────────────────

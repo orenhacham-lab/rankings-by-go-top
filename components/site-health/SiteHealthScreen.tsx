@@ -34,7 +34,7 @@ import { useSafeFixes } from './useSafeFixes'
 import { safeFixesEnabled } from '@/lib/site-fix/bulk'
 import type { FixType } from '@/lib/site-fix/types'
 import { rowStateFrom, rowTarget, type FixRowState } from '@/lib/site-fix/job-match'
-import { FIX_TYPE } from '@/lib/site-health/rules'
+import { FIX_TYPE, scoreWithFixes } from '@/lib/site-health/rules'
 
 type Copy = DashboardDictionary['siteHealth']
 type Filter = 'all' | 'fixable' | 'guide'
@@ -177,6 +177,12 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   }, [report, queueLive, fixModeFor, jobStateFor])
 
   const fixableCount = useMemo(() => findings.filter((f) => f.fixable).length, [findings])
+  // The score counts what is already fixed (an applied or sent job, or the owner's own "I fixed it"),
+  // at once: each fixed page takes its share of its problem's points off (lib/site-health/rules.ts).
+  const live = useMemo(
+    () => scoreWithFixes(findings, (f, p) => jobStateFor(f, p) === 'applied' || fixed.has(fixKey(f.id, p.url))),
+    [findings, jobStateFor, fixed],
+  )
   const visible = useMemo(() => {
     const list = findings
     if (filter === 'fixable') return list.filter((f) => f.fixable)
@@ -240,6 +246,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
             siteIcon={icon}
             checkedAt={copy.checkedAt(formatDate(language).dateTime(report.scannedAt))}
             fixableCount={fixableCount}
+            live={live}
             action={rescan}
           />
         )}

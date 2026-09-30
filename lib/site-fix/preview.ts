@@ -33,7 +33,7 @@ import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { brokenLinkWords } from './content'
 import { planH1Demotion } from './h1'
 import { pluginInspect, pluginSearch, type PluginItem, type PluginLink, type PluginPost } from './plugin-client'
-import { buildLlmsTxt, pageLanguage, suggestFaq, suggestMetaDescription, suggestSeoTitle, type Generate, type LlmsPage } from './suggest'
+import { buildLlmsTxt, pageLanguage, suggestFaq, suggestMetaDescription, suggestSeoTitle, thinContent, type Generate, type LlmsPage } from './suggest'
 import type { FaqItem, FixChannel, FixErrorCode, FixType, H1Ref } from './types'
 
 export interface LivePage {
@@ -278,7 +278,7 @@ async function previewViaPlugin(req: PreviewRequest, ctx: PreviewContext, link: 
       return { ok: true, type: 'broken_link', pageUrl, href: req.url, words, expected: it.content_sha, via: 'content' }
     }
     case 'faq_block':
-      return await previewFaq(textOf(it.content), it.title, it.content_sha, 'content', deps)
+      return await previewFaq(await faqSourceText(textOf(it.content), req.url, deps), it.title, it.content_sha, 'content', deps)
     case 'h1_demote': {
       if (!Object.prototype.hasOwnProperty.call(it, 'h1')) return fail('needs_update')
       const live = await deps.readLive(req.url)
@@ -340,7 +340,7 @@ async function previewViaRest(req: PreviewRequest, ctx: PreviewContext, creds: W
       const item = await deps.wp.findItemByUrl(creds, pageUrl)
       if (!item) return fail('not_in_wordpress')
       const full = await deps.wp.getItemForEdit(creds, item.endpoint, item.id)
-      if (req.type === 'faq_block') return await previewFaq(textOf(full.content), full.title, sha(full.content), 'content', deps)
+      if (req.type === 'faq_block') return await previewFaq(await faqSourceText(textOf(full.content), pageUrl, deps), full.title, sha(full.content), 'content', deps)
       const words = brokenLinkWords(full.content, req.url, new URL(creds.siteUrl).hostname)
       if (words.length === 0) return fail('nothing_to_fix')
       return { ok: true, type: 'broken_link', pageUrl, href: req.url, words, expected: sha(full.content), via: 'content' }
@@ -452,9 +452,22 @@ async function checkedSuggestion(
     const keyword = plainTitle(page.focus) || (h1 && h1.length <= 40 ? h1 : null)
     return suggestSeoTitle({
       kind: req.kind, current: page.currentTitle, h1, siteName: ctx.siteName, keyword, path: pathOf(req.url), text: page.text.slice(0, 1500),
+      description: page.currentDescription || null,
     }, deps.generate)
   }
   return suggestMetaDescription({ current: page.currentDescription, text: page.text, title: page.title }, deps.generate)
+}
+
+/**
+ * The text an FAQ is written from. A page built with a page builder keeps little or none of its
+ * words in the post content, so the content alone read "too little text" on a full page (wave 9).
+ * Then the page as visitors read it (its main part) is used instead, when it says more.
+ */
+export async function faqSourceText(contentText: string, url: string, deps: Pick<PreviewDeps, 'readLive'>): Promise<string> {
+  if (!thinContent(contentText)) return contentText
+  const live = await deps.readLive(url).catch(() => null)
+  const shown = live ? mainTextOf(live.html) : ''
+  return shown.length > contentText.length ? shown : contentText
 }
 
 async function previewFaq(text: string, title: string, expected: string | null, via: Via, deps: PreviewDeps): Promise<FixPreview> {
