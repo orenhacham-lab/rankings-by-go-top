@@ -160,13 +160,13 @@ console.log('\nC. safe external links')
     .replace("if (u.protocol !== 'http:' && u.protocol !== 'https:') return null", ''), (mod) => accepts(mod.safeExternalUrl))
   check('MUTATION CONTROL: without the scheme checks javascript:/ftp: get through → caught', m.badAccepted.length > 0)
 
-  const files = ['components/site-links/SiteLinksView.tsx', 'components/site-links/OpportunityList.tsx', 'components/site-links/InternalLinksSection.tsx',
+  const files = ['components/site-links/SiteLinksView.tsx', 'components/site-links/FreeListings.tsx', 'components/site-links/SearchConsoleLinks.tsx', 'components/site-links/InternalLinksSection.tsx',
     'components/site-links/PolicyNote.tsx', 'components/site-links/LinkButton.tsx', 'app/(dashboard)/site-links/page.tsx']
-  // (ProgressCard.tsx was removed in wave 8: its progress is one line in the list's header, UX A4.)
+  // (ProgressCard.tsx was removed in wave 8; OpportunityList.tsx in wave 9, replaced by FreeListings.tsx.)
   const rawAnchors = (src: string) => /<a[\s>]/.test(strip(src))
   const hrefProps = (src: string) => [...strip(src).matchAll(/\bhref=\{([^}]*)\}|\bhref="([^"]*)"/g)].map((x) => (x[1] ?? x[2] ?? '').trim())
   // An href on the tab is ExternalLink's (checked there) or an in-app path starting with "/".
-  const unsafeHref = (src: string) => hrefProps(src).filter((h) => !(/^\//.test(h) || /^`\//.test(h) || h === 'href' || /^GOOGLE_LINK_SPAM_POLICY$/.test(h) || /^p\.url$/.test(h)))
+  const unsafeHref = (src: string) => hrefProps(src).filter((h) => !(/^\//.test(h) || /^`\//.test(h) || h === 'href' || /^GOOGLE_LINK_SPAM_POLICY$/.test(h) || /^p\.url$/.test(h) || /^listing\.url$/.test(h) || /^reportUrl$/.test(h)))
   const guard = (srcs: Record<string, string>) => {
     const problems: string[] = []
     for (const [f, src] of Object.entries(srcs)) {
@@ -182,8 +182,8 @@ console.log('\nC. safe external links')
   const ext = strip(read('components/site-links/ExternalLink.tsx'))
   check('ExternalLink re-checks the address and opens with noopener noreferrer',
     /const safe = safeExternalUrl\(href\)/.test(ext) && /href=\{safe\}/.test(ext) && /rel="noopener noreferrer"/.test(ext) && /if \(!safe\) return <span/.test(ext))
-  const broken = { ...srcs, 'components/site-links/OpportunityList.tsx': srcs['components/site-links/OpportunityList.tsx'].replace('<ExternalLink href={p.url}', '<a href={p.url} target="_blank"') }
-  check('MUTATION CONTROL: a raw <a href={p.url}> in the list → caught', guard(broken).length > 0)
+  const broken = { ...srcs, 'components/site-links/FreeListings.tsx': srcs['components/site-links/FreeListings.tsx'].replace('<ExternalLink href={listing.url}', '<a href={listing.url} target="_blank"') }
+  check('MUTATION CONTROL: a raw <a href={listing.url}> in the list → caught', guard(broken).length > 0)
   check('the policy link is Google\'s own spam policy page', /GOOGLE_LINK_SPAM_POLICY = 'https:\/\/developers\.google\.com\/search\/docs\/essentials\/spam-policies#link-spam'/.test(read('components/site-links/PolicyNote.tsx')))
 }
 
@@ -339,18 +339,17 @@ function partF() {
   const he = (dashboardHe as any).siteLinks, en = (dashboardEn as any).siteLinks
   const p = i18nProblems(he, en)
   check('he and en siteLinks have the same keys, arrays and functions; he is Hebrew, en has none', p.length === 0, p.slice(0, 5).join('; '))
-  check('every category and reason the rules can produce has a label in both languages',
-    ['directory', 'listicle', 'association', 'media'].every((c) => he.opportunities.categories[c] && en.opportunities.categories[c] && he.opportunities.steps[c]?.length >= 3)
-    && ['known_directory', 'directory_pattern', 'best_of_title', 'best_of_address', 'top_n_title', 'association_pattern', 'known_media', 'media_pattern'].every((r) => he.opportunities.reasons[r] && en.opportunities.reasons[r]))
-  const reasonsInCode = [...read('lib/site-links/classify.ts').matchAll(/reason: '([a-z_]+)'/g)].map((m) => m[1])
-  check('the rules produce no reason without a label', reasonsInCode.every((r) => he.opportunities.reasons[r]))
+  // Wave 9: the screen no longer shows the classified outreach list (its categories, reasons and
+  // steps to ask for a link are gone from the dictionaries); what it shows is the free listings.
+  const listingIds = [...read('lib/site-links/free-listings.ts').matchAll(/\{ id: '([a-z_0-9]+)'/g)].map((m) => m[1])
+  check('every free listing has its words in both languages', listingIds.length >= 10 && listingIds.every((id) => he.listings.items[id] && en.listings.items[id]))
   check('the sidebar label exists in both languages', typeof (dashboardHe as any).sidebar.siteLinks === 'string' && typeof (dashboardEn as any).sidebar.siteLinks === 'string')
   const noKey = JSON.parse(JSON.stringify(en)); delete noKey.policy.link
   check('MUTATION CONTROL: a key missing in en → caught', i18nProblems(he, noKey).length > 0)
   const hebInEn = { ...en, retry: 'נסו שוב' }
   check('MUTATION CONTROL: Hebrew in the English dictionary → caught', i18nProblems(he, hebInEn).length > 0)
-  const shortSteps = { ...en, opportunities: { ...en.opportunities, steps: { ...en.opportunities.steps, media: en.opportunities.steps.media.slice(1) } } }
-  check('MUTATION CONTROL: a missing step in en → caught', i18nProblems(he, shortSteps).length > 0)
+  const shortPromises = { ...en, network: { ...en.network, hero: { ...en.network.hero, promises: en.network.hero.promises.slice(1) } } }
+  check('MUTATION CONTROL: a missing promise in en → caught', i18nProblems(he, shortPromises).length > 0)
 }
 
 // ── G. shell ────────────────────────────────────────────────────────────────
@@ -375,7 +374,7 @@ function partG() {
 function partH() {
   console.log('\nH. the opportunities view only reads')
   const files = ['lib/site-links/http.ts', 'lib/site-links/model.ts', 'lib/site-links/classify.ts',
-    'components/site-links/SiteLinksView.tsx', 'components/site-links/OpportunityList.tsx', 'components/site-links/InternalLinksSection.tsx']
+    'components/site-links/SiteLinksView.tsx', 'components/site-links/FreeListings.tsx', 'components/site-links/SearchConsoleLinks.tsx', 'components/site-links/InternalLinksSection.tsx']
   const writes = (src: string) => /method:\s*'(POST|PUT|PATCH|DELETE)'|\.(insert|update|upsert|delete)\(|\/api\/(?!projects\/\$\{)/.test(strip(src))
   const offenders = files.filter((f) => writes(read(f)))
   check('the tab only reads: no write call and no other API than its own GET', offenders.length === 0, offenders.join(', '))

@@ -100,39 +100,24 @@ console.log('\nA) Links tab: the network\'s state first, in words')
   check('A2f: a hidden answer is read with its reason (shopify says so, anything else is "off")',
     (readNetwork({ ok: true, available: false, reason: 'shopify' }) as any).reason === 'shopify' && (readNetwork({ ok: true, available: false }) as any).reason === 'off'
     && (readNetwork(null) as any).reason === 'off' && (readNetwork({ ...on }) as any).data?.available === true)
+  // A2f, A3, A4 (wave 8: the outreach hero, the competitor caption, the outreach progress line) are
+  // SUPERSEDED in wave 9 by the owner: the outreach list ("sites worth a link from", contacted / link
+  // received) is gone, the network always leads with its reason (Shopify included), and the free
+  // listings replace the list. Their successors, with mutation controls: lib/__qa__/w9-links.qa.ts
+  // A1-A4 (the reason, never vanishing) and B6-B7 (no outreach list, marks or words). What stays
+  // true from them is checked here.
   const view = strip(read('components/site-links/SiteLinksView.tsx'))
-  const outreachOk = (s: string) => /reason === 'shopify' && <p[^>]*data-site-links="shopify-note">\{h\.shopify\}<\/p>/.test(s) && /h\.title\(total\)/.test(s)
-  check('A2f: the outreach hero says why only for Shopify', outreachOk(view))
-  check('A2f-MUT: the Shopify note shown for every hidden network is caught', !outreachOk(view.replace("reason === 'shopify' && <p", 'true && <p')))
-  check('A2f copy: both languages', he.siteLinks.outreachHero.shopify.startsWith('רשת הקישורים בין לקוחות לא זמינה לחנויות Shopify')
-    && en.siteLinks.outreachHero.shopify.startsWith('The customer link network is not available for Shopify stores') && he.siteLinks.outreachHero.title(11) === '11 אתרים שכדאי שיקשרו אליכם')
-
-  // A3: competitors out of the list, one caption.
-  const filtered = (s: string) => /const items = useMemo\(\(\) => all\.filter\(\(o\) => !o\.isCompetitor\), \[all\]\)/.test(s) && /const competitorsLeftOut = all\.length - items\.length/.test(s)
-    && /o\.competitorsHidden\(competitorsLeftOut\)/.test(s)
-  check('A3: competitors are filtered out of the list and counted for one caption', filtered(view))
-  check('A3-MUT: the list with competitors again is caught', !filtered(view.replace('all.filter((o) => !o.isCompetitor)', 'all')))
-  const list = strip(read('components/site-links/OpportunityList.tsx'))
-  check('A3: no competitor badge or note left in the row', !/isCompetitor|competitorNote|CompetitorIcon/.test(list) && !('competitorNote' in he.siteLinks.opportunities) && !('competitor' in he.siteLinks.opportunities))
-  check('A3 copy: the caption in both languages', he.siteLinks.opportunities.competitorsHidden(3).startsWith('3 אתרים של מתחרים הופיעו באותם חיפושים, ולכן הם לא ברשימה.')
-    && en.siteLinks.opportunities.competitorsHidden(3).startsWith('3 competitor sites showed up in the same searches, so they are left out.'))
-
-  // A4: the header replaces the progress card; the old sentence is gone everywhere.
+  const noOutreach = (s: string) => !/OutreachHero|OutreachMeter|competitorsHidden|isCompetitor/.test(s)
+  check('A2f/A3/A4 (w9): no outreach hero, progress line or competitor list on the screen', noOutreach(view) && !('outreachHero' in he.siteLinks) && !('opportunities' in en.siteLinks))
+  check('A2f/A3/A4-MUT: the outreach hero back is caught', !noOutreach(view + '<OutreachHero />'))
   check('A4: ProgressCard is gone and nothing imports it', !existsSync(join(ROOT, 'components/site-links/ProgressCard.tsx')) && !/ProgressCard/.test(view))
   const oldSentence = /כל קישור מאתר אמיתי שבחר בכם/
   check('A4: "כל קישור מאתר אמיתי…" is nowhere in the dictionaries', !oldSentence.test(read('lib/i18n/dashboard/he.ts')) && !/Every link from a real site that chose you/.test(read('lib/i18n/dashboard/en.ts')))
   check('A4-MUT: the sentence back in he is caught', oldSentence.test(read('lib/i18n/dashboard/he.ts') + "'כל קישור מאתר אמיתי שבחר בכם'"))
-  check('A4 copy: the outreach is manual, not the network (both languages)', he.siteLinks.opportunities.description.endsWith('אליהם פונים בעצמכם, הם לא חלק מרשת הקישורים.')
-    && en.siteLinks.opportunities.description.endsWith('You contact these yourself; they are not part of the link network.'))
-  check('A4 copy: the progress line and the browser-only caption', he.siteLinks.opportunities.progress(3, 11, 2) === 'פניתם ל-3 מתוך 11 · קיבלתם 2 קישורים'
-    && en.siteLinks.opportunities.progress(3, 11, 2) === 'Contacted 3 of 11 · 2 links received' && he.siteLinks.opportunities.savedHere === 'הסימונים נשמרים רק בדפדפן הזה.')
-  const meter = (s: string) => /\{items\.length > 0 && <OutreachMeter /.test(s) && s.indexOf('<SectionHeading title={o.title}') < s.indexOf('<OutreachMeter')
-  check('A4: the progress line sits in the list\'s header, right under its description', meter(view))
-  check('A4-MUT: no progress line is caught', !meter(view.replace('{items.length > 0 && <OutreachMeter ', '{false && <Nothing ')))
 
   // A5, A6: copy that does not contradict the network.
   check('A5: the policy note, both languages', he.siteLinks.policy.body.startsWith('אל תשלמו על קישור ואל תסכימו ל"קישור תמורת קישור".') && en.siteLinks.policy.body.startsWith('Don\'t pay for links and don\'t agree to "a link for a link".'))
-  check('A6: the page subtitle names the network, both languages', he.siteLinks.subtitle.includes('רשת הקישורים של Go Top') && en.siteLinks.subtitle.includes('the Go Top link network'))
+  check('A6: the page subtitle names the network among Go Top SEO customers, both languages', he.siteLinks.subtitle.includes('רשת הקישורים בין לקוחות Go Top SEO') && en.siteLinks.subtitle.includes('the link network among Go Top SEO customers'))
 
   // A1: how it works folds away for a member; the tabs are gone.
   const NetworkHow: any = require('../../components/site-links/network/NetworkHow').default

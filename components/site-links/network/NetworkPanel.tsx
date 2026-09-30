@@ -33,6 +33,24 @@ import { SECTION } from '@/components/settings/anchors'
 import LinkButton from '../LinkButton'
 import { formatDay, networkUrl, type AvailableNetwork } from './shared'
 
+/**
+ * The network's three promises, in every state of the hero (wave 9): no reciprocal
+ * links, anchors taken from the article's own content, never a competitor. What the
+ * rules in lib/link-network/rules.ts and anchor.ts already enforce, said in words.
+ */
+export function NetworkPromises({ label, items }: { label: string; items: readonly string[] }) {
+  return (
+    <ul aria-label={label} data-link-network="promises" className="mt-4 grid max-w-prose gap-1.5">
+      {items.map((p) => (
+        <li key={p} className="flex items-start gap-2 text-caption text-contrast-ink/80">
+          <Check size={14} strokeWidth={2.4} aria-hidden="true" className="mt-0.5 shrink-0 text-contrast-ink" />
+          <span className="text-pretty">{p}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 async function postJson(url: string, body: unknown): Promise<boolean> {
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -176,6 +194,7 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
               <h2 id="link-network-title" className="mt-5 max-w-[32ch] text-title font-bold tracking-tight text-balance">{title}</h2>
               <p className="mt-3 max-w-prose text-copy text-contrast-ink/80 text-pretty">{body}</p>
               {gapLine && <p className="mt-2 max-w-prose text-copy font-medium text-contrast-ink text-pretty" data-link-network="gap">{gapLine}</p>}
+              <NetworkPromises label={h.promisesLabel} items={h.promises} />
               {action && <div className="mt-5 flex flex-wrap gap-3">{action}</div>}
             </div>
 

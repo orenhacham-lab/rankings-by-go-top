@@ -13,6 +13,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Project, Client } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import Link from 'next/link'
+import { isSingleClientAccount } from '@/lib/clients/single-client'
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams()
@@ -104,7 +106,18 @@ export default function ProjectsPage() {
       {loading ? (
         <TableSkeleton label={dict.common.loading} rows={4} />
       ) : (
-        <ProjectsTable projects={projects} clients={clients} onProjectsChange={loadData} />
+        <>
+          {/* One business, one client: no client column; the way to add clients stays, quietly. */}
+          <ProjectsTable projects={projects} clients={clients} showClient={!isSingleClientAccount(clients)} onProjectsChange={loadData} />
+          {isSingleClientAccount(clients) && (
+            <p className="mt-4 text-caption text-muted" data-projects="agency-hint">
+              {dict.projects.agencyHint}{' '}
+              <Link href="/clients" className="font-medium text-action underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+                {dict.projects.agencyLink}
+              </Link>
+            </p>
+          )}
+        </>
       )}
 
       <Modal

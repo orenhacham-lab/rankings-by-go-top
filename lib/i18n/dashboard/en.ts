@@ -2650,6 +2650,9 @@ export const dashboardEn = {
   projects: {
     title: 'Projects',
     countSuffix: 'projects',
+    // One business, one client (lib/clients/single-client.ts): the quiet way to add clients.
+    agencyHint: 'Managing sites for several businesses?',
+    agencyLink: 'Manage clients',
     countPrefix: 'Total:',
     newProject: 'New project',
     newProjectTitle: 'New Project',
@@ -2844,100 +2847,54 @@ export const dashboardEn = {
   // opt-in link network among our customers (lib/link-network).
   siteLinks: {
     title: 'Links',
-    subtitle: 'Links from other sites make yours stronger in Google. Here you see the Go Top link network, sites worth contacting, and the links between your own pages.',
+    subtitle: 'Links from other sites make yours stronger in Google. Here you see the link network among Go Top SEO customers, directories you can join for free, and the links between your own pages.',
     loading: 'Loading your links…',
     loadError: 'We could not load this. Try again in a moment.',
     retry: 'Try again',
-    // The hero when the link network is not on this screen (a Shopify store, or no network):
-    // the outreach list's own figures (wave 8, UX A2-f).
-    outreachHero: {
-      title: (t: number) => (t === 0 ? 'Sites worth a link from' : t === 1 ? '1 site worth a link from' : `${t} sites worth a link from`),
-      shopify: 'The customer link network is not available for Shopify stores: there is no safe way for us to add a link inside a store article. Everything else here works.',
-      found: 'Sites on the list',
-      contacted: 'Contacted',
-      received: 'Link received',
+    opensNewTab: 'Opens in a new tab',
+    // Free listings (lib/site-links/free-listings.ts), wave 9: sites where the business adds
+    // itself, for free. Nobody is asked for a link and nothing is paid for.
+    listings: {
+      title: 'Free directories and business profiles',
+      description: 'Sites where you add your business yourself, without asking anyone and without paying: a business profile, a directory card or a review page. Each one gives your site a link from a place Google already knows.',
+      open: 'Open a free listing',
+      seen: 'Shows up in your searches',
+      seenHint: 'This site comes up in Google or in AI answers for what your customers search, so a listing on it is worth more.',
+      groups: { any: 'For every business', field: 'By field' },
+      fit: {
+        any: 'Any business',
+        local: 'Local business',
+        hospitality: 'Restaurants, stays and attractions',
+        home: 'Home, renovation and design',
+        b2b: 'Services for businesses',
+        software: 'Software and apps',
+      },
+      names: { dapei_zahav: 'Dapei Zahav' },
+      items: {
+        google: 'Your business profile on Google: it shows in Search and Maps, with your site, opening hours and reviews.',
+        bing: 'The same profile on Microsoft\'s search engine, which Copilot and other AI assistants answer from. You can import your details from Google.',
+        apple: 'Your business card in Apple Maps and Siri, for people searching on an iPhone.',
+        dapei_zahav: 'A free basic card in Israel\'s oldest business directory. Look for "add a business" on the site.',
+        b144: 'A free basic listing in Bezeq\'s business directory. Look for "add a business" on the site.',
+        easy: 'A free business page in the local recommendations app, with reviews and a link to your site.',
+        yelp: 'A free business page with reviews, in the US and other countries.',
+        trustpilot: 'A free review page. Once it is open, ask happy customers to leave a review.',
+        tripadvisor: 'A free listing for restaurants, places to stay and attractions.',
+        houzz: 'A free professional profile for home and renovation pros, with photos of your work.',
+        clutch: 'A free company profile for firms that serve businesses: marketing, development, design.',
+        goodfirms: 'A free company profile for service and technology firms.',
+        capterra: 'A free basic listing for business software and apps.',
+        g2: 'A free product profile for software, with user reviews.',
+      },
+      tip: 'On every site, use exactly the same name, address and phone as on your site and your Google profile. If a paid upgrade is offered, you do not need it for the link.',
     },
-    opportunities: {
-      title: 'Sites worth getting a link from',
-      description: 'Directories, articles and associations already showing in Google or AI answers for what your customers search. Each one says how to get a link from it. You contact these yourself; they are not part of the link network.',
-      progress: (contacted: number, total: number, received: number) =>
-        `Contacted ${contacted} of ${total} · ${received === 1 ? '1 link received' : `${received} links received`}`,
-      savedHere: 'Your marks are saved in this browser only.',
-      competitorsHidden: (n: number) => (n === 1
-        ? '1 competitor site showed up in the same searches, so it is left out. Directories and articles that mention your competitors stay, because you want to be there too.'
-        : `${n} competitor sites showed up in the same searches, so they are left out. Directories and articles that mention your competitors stay, because you want to be there too.`),
-      filterLabel: 'Filter by type of site',
-      filterAll: 'All',
-      categories: {
-        directory: 'Business directory',
-        listicle: '"Best of" list',
-        association: 'Industry association',
-        media: 'Media',
-      },
-      local: 'Local',
-      reasons: {
-        known_directory: 'A known business directory or review site',
-        directory_pattern: 'The site name looks like a directory',
-        best_of_title: 'The page title says "best" or "recommended"',
-        best_of_address: 'The page address says "best" or "recommended"',
-        top_n_title: 'The title is a numbered list of businesses',
-        association_pattern: 'The name of an association, chamber or union',
-        known_media: 'A known news or magazine site',
-        media_pattern: 'The site name looks like a news site',
-      },
-      whyTitle: 'Why this site',
-      classifiedAs: 'How we recognised it:',
-      googleFor: (query: string, rank: number) => `Ranks #${rank} on Google for "${query}"`,
-      aiFor: (question: string) => `Cited in an AI answer to "${question}"`,
-      pagesTitle: 'Pages that showed up',
-      stepsTitle: 'How to get a link',
-      showSteps: 'How to get a link',
-      hideSteps: 'Close',
-      opensNewTab: 'opens in a new tab',
-      statusLabel: 'Where it stands',
-      status: {
-        not_started: 'Not started',
-        contacted: 'Contacted',
-        got_link: 'Got a link',
-      },
-      steps: {
-        directory: [
-          'Search the site for your business name. If you are listed, check that the details are right and that your website is linked.',
-          'If you are not listed, look for "add your business" and create a listing. Most directories offer a free basic listing.',
-          'Use exactly the same name, address and phone as on your website and your Google business profile, and add your website address.',
-          'Ask a few happy customers to leave a review. Listings with reviews show up higher.',
-        ],
-        listicle: [
-          'Open the article and see who is on the list and why. That tells you what the writer cares about.',
-          'Find the writer or editor and how to reach them: at the end of the article or on the contact page.',
-          'Send a short, personal note: what makes you different, one fact that shows it, and a link to the right page on your site.',
-          'No reply? Follow up once, politely, a week later. If they ask for payment to be listed, that is a paid link, and Google expects it to be marked as sponsored.',
-        ],
-        association: [
-          'Check what it takes to join and what members get. Many associations give each member a page with a link to their site.',
-          'If you are already a member, ask them to add your website to your page.',
-          'Offer something useful: a professional tip for their newsletter, a short talk, or a guide for members. That kind of content gets linked naturally.',
-        ],
-        media: [
-          'Find the reporter who covers your field, from their earlier articles on the site.',
-          'Do not ask for a link. Offer a story: an interesting figure from your business, a seasonal tip, or an expert comment on a current topic.',
-          'Keep a short page on your site with facts, photos and contact details, so it is easy to write about you.',
-          'Quoted without a link? You can politely ask them to add one.',
-        ],
-      },
-      sources: (searches: number, citations: number) => `From ${searches} Google searches and ${citations} sources cited in AI answers`,
-      emptyNoKeywords: {
-        title: 'Start with what your customers search for',
-        body: 'To find sites worth being linked from, we need to know which searches you want to show up for. Choose your keywords, and the sites that already rank for them will appear here.',
-        cta: 'Go to keyword research',
-      },
-      emptyNothingFound: {
-        title: 'The list fills in after the next check',
-        body: 'We build it from the Google results and AI answers already saved for this project, and none of them is a directory, a list, an association or a news site yet. An AI visibility check adds more sources.',
-        cta: 'Go to AI visibility',
-        ctaResearch: 'Go to keyword research',
-      },
-      error: 'We could not load the list of sites. Try again in a moment.',
+    // "Links Google already found": the Search Console API has no links report, so the
+    // screen says so and opens the report in Search Console (lib/site-links/search-console-links.ts).
+    gscLinks: {
+      title: 'Links Google already found',
+      body: 'Search Console has a report of which sites link to you and to which pages. Google does not let anyone read that report outside Search Console, so we will not show a number we do not have. The button opens the report directly, for the site you connected.',
+      open: 'Open the Links report in Search Console',
+      propertyLabel: 'Search Console property:',
     },
     internal: {
       title: 'Links between your pages',
@@ -2971,7 +2928,7 @@ export const dashboardEn = {
       error: 'We could not load the links between your pages.',
     },
     policy: {
-      title: 'When you reach out to sites yourself',
+      title: 'Paid links and swaps',
       body: 'Don\'t pay for links and don\'t agree to "a link for a link". Google treats that as a \'link scheme\' and can demote the site. A link from a directory, article or association that chose you is the safest and strongest. There are no swaps in our link network: whoever gets a link from you never links back.',
       link: 'Google’s spam policies',
     },
@@ -2981,8 +2938,8 @@ export const dashboardEn = {
       loading: 'Loading the link network…',
       loadError: 'We could not load the link network. Try again in a moment.',
       stats: {
-        received: 'Links received',
-        given: 'Links given',
+        received: 'Links received from Go Top SEO customers',
+        given: 'Links given to Go Top SEO customers',
         waiting: 'Waiting to go live',
         sinceJoining: 'Since you joined',
         countsStart: 'Counts start when you turn it on',
@@ -2998,11 +2955,21 @@ export const dashboardEn = {
         },
         body: {
           on: 'Complementary businesses in the network can link to you from their articles, and you to them. Never both ways, never a competitor.',
-          off: (members: string | null) => `Turn it on and complementary businesses (never competitors) link to you from real articles, while you link to others. ${members ? `${members} sites have joined.` : 'The network is being built.'}`,
+          off: (members: string | null) => `Turn it on and other Go Top SEO customers in complementary fields (never competitors) link to you from real articles, while you link to others in the network. ${members ? `${members} sites have joined.` : 'The network is being built.'}`,
           cannotJoin: 'Connect it through WordPress (or the Go Top plugin) or Search Console, then turn the network on.',
           left: (date: string) => `You left on ${date}. Links already published stay in the log.`,
         },
         turnOn: 'Turn on the link network',
+        // What the network promises, as three short lines under the headline (wave 9).
+        promisesLabel: 'The network\'s rules',
+        promises: ['No reciprocal links: a site that gets a link from you never links back', 'The anchor words come from the article and fit its content', 'Never a competitor, never a business in your own field'],
+        // The network cannot run for this site (lib/link-network/http.ts answers available: false).
+        unavailable: {
+          badge: 'Not available',
+          title: 'The link network is not available for this site',
+          shopify: 'The network does not run on sites connected through Shopify: a Shopify store, or an account whose subscription is billed through Shopify. There is no safe way for us to add a link inside an article there. Everything else on this page works.',
+          off: 'We could not load the link network right now. Try again in a moment.',
+        },
         connect: 'Connect the site',
         completeCategory: 'Add your business field',
       },
@@ -6062,6 +6029,15 @@ export const dashboardEn = {
     // The exact count of the health screen's button (lib/nudges/rows.ts): the scan kept in this browser + the fix queue.
     fixes: (n: number) => (n === 1 ? 'One safe fix is ready for your site' : `${n} safe fixes are ready for your site`),
     fixesAction: 'See fixes',
+  },
+  // The top bar's settings icon and notifications bell (wave 9). The bell's rows reuse waitingCard.
+  topBarActions: {
+    settings: 'Project settings',
+    notifications: 'Notifications',
+    notificationsCount: (n: number) => (n === 0 ? 'Notifications: nothing is waiting for you' : n === 1 ? 'Notifications: 1 thing is waiting for you' : `Notifications: ${n} things are waiting for you`),
+    title: 'Waiting for you',
+    empty: 'Nothing is waiting for you right now',
+    emptyBody: 'When articles or topics wait for your OK, when safe fixes are ready or when the site connection drops, it shows up here.',
   },
   railWaiting: {
     aria: (n: number) => `${n} waiting`,

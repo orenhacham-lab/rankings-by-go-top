@@ -41,6 +41,15 @@ export const FIXES_HREF = '/site-health#fixes'
 const pos = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0)
 
 export function waitingRows(projectId: string, w: WaitingAnswer | null, safeFixes: number | null): WaitingRow[] {
+  const rows = allWaitingRows(projectId, w, safeFixes)
+  return rows.slice(0, MAX_WAITING_ROWS)
+}
+
+/**
+ * Every row, in the same order and by the same rule, without the card's cap: the top
+ * bar's notifications list (components/layout/NotificationsBell.tsx) shows them all.
+ */
+export function allWaitingRows(projectId: string, w: WaitingAnswer | null, safeFixes: number | null): WaitingRow[] {
   if (!w) return []
   const rows: WaitingRow[] = []
   if (w.connectionDown) {
@@ -53,7 +62,12 @@ export function waitingRows(projectId: string, w: WaitingAnswer | null, safeFixe
   }
   // Safe fixes are written through the plugin only: without it there is nothing to "see".
   if (w.pluginConnected && pos(safeFixes) > 0) rows.push({ kind: 'fixes', n: pos(safeFixes), href: FIXES_HREF, dryOn: null })
-  return rows.slice(0, MAX_WAITING_ROWS)
+  return rows
+}
+
+/** The bell's badge: one per thing to do (a lost connection is one, however many articles wait behind it). */
+export function bellCount(rows: readonly WaitingRow[]): number {
+  return rows.reduce((sum, r) => sum + (r.kind === 'connection' ? 1 : Math.max(0, r.n)), 0)
 }
 
 export interface RailCounts { articles: number; strategy: number; siteHealth: number }

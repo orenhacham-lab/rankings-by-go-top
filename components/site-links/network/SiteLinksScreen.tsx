@@ -1,23 +1,22 @@
 'use client'
 
 /**
- * The Links screen for one project, as one page (wave 8, UX A1), in this order:
+ * The Links screen for one project, as one page, in this order (wave 9, owner's ask):
  *
- *   1. the link network's state, always first: a hero that says in words whether
- *      the network is on for this site, with the switch and its state word
- *      (NetworkPanel), and the consent panel right under it when it is opened;
+ *   1. the link network among Go Top SEO customers, ALWAYS first: a hero that says in
+ *      words whether it is on for this site, with the switch, what the site gave and
+ *      received, what waits, and the network's promises (NetworkPanel); the consent
+ *      panel right under it when it is opened. When the network cannot run here (a
+ *      Shopify store or a Shopify-billed account, or the read failed) the same place
+ *      says so and why (NetworkUnavailable): it never disappears;
  *   2. only while the site is in the network: the placement log (PlacementLog),
  *      where a link given can be taken out before it is published;
- *   3. the sites worth a link from (the owner's own outreach, not the network),
- *      with its progress in the header, and the links between the site's pages
- *      (SiteLinksView);
- *   4. how the network works and its rules (NetworkHow): open while the site is
- *      out, folded into one line once it is in;
+ *   3. free directories and business profiles the owner opens himself, the links
+ *      between the site's pages, and the links Google already found (SiteLinksView);
+ *   4. how the network works and its rules (NetworkHow);
  *   5. Google's rule on paid links (PolicyNote).
  *
- * Where the network does not exist (a Shopify store, the tables missing, or the
- * read failed) there is no switch: SiteLinksView leads with the outreach hero,
- * which says why for a Shopify store and never mentions the network otherwise.
+ * The network's rules and routes are unchanged (lib/link-network).
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -28,6 +27,7 @@ import type { UnavailableReason } from '@/lib/link-network/http'
 import SiteLinksView from '../SiteLinksView'
 import NetworkHow from './NetworkHow'
 import NetworkPanel from './NetworkPanel'
+import NetworkUnavailable from './NetworkUnavailable'
 import PlacementLog from './PlacementLog'
 import { networkUrl, type AvailableNetwork } from './shared'
 
@@ -42,7 +42,12 @@ export function readNetwork(body: unknown): { data: AvailableNetwork } | { reaso
   return { data: b as AvailableNetwork }
 }
 
-export default function SiteLinksScreen({ projectId }: { projectId: string }) {
+export default function SiteLinksScreen({ projectId, projectCountry = null, projectLanguage = null }: {
+  projectId: string
+  /** Which free listings work where the business is (lib/site-links/free-listings.ts). */
+  projectCountry?: string | null
+  projectLanguage?: string | null
+}) {
   const { language } = useDashboardLanguage()
   const copy = getDashboardDictionary(language).siteLinks
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
@@ -76,7 +81,19 @@ export default function SiteLinksScreen({ projectId }: { projectId: string }) {
       </div>
     )
   }
-  if (load.kind === 'hidden') return <SiteLinksView projectId={projectId} outreach={load.reason} />
+  const where = { projectCountry, projectLanguage }
+  if (load.kind === 'hidden') {
+    return (
+      <div data-link-network="screen" data-member="no">
+        <SiteLinksView
+          projectId={projectId}
+          {...where}
+          top={<NetworkUnavailable reason={load.reason} onRetry={() => { setLoad({ kind: 'loading' }); refresh() }} />}
+          beforePolicy={load.reason === 'off' ? <NetworkHow member={false} /> : undefined}
+        />
+      </div>
+    )
+  }
 
   const member = load.data.membership.active
   return (
@@ -90,6 +107,7 @@ export default function SiteLinksScreen({ projectId }: { projectId: string }) {
           </div>
         )}
         beforePolicy={<NetworkHow member={member} />}
+        {...where}
       />
     </div>
   )

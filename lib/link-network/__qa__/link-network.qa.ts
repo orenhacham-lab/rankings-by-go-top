@@ -563,10 +563,11 @@ function partF() {
 function partG() {
   console.log('\nG. the screen')
   const screen = strip(read('components/site-links/network/SiteLinksScreen.tsx'))
-  // Wave 8 (UX A1-A2): with no network, the opportunities view leads with its outreach hero, told why.
-  check('hidden network → the opportunities view (SiteLinksView) with the reason, no switch', /kind === 'hidden'\) return <SiteLinksView projectId=\{projectId\} outreach=\{load\.reason\} \/>/.test(screen))
+  // Wave 9 (owner): the network never vanishes. With no network here, its place at the top says why
+  // (NetworkUnavailable, no switch); the outreach hero that used to lead is gone (lib/__qa__/w9-links.qa.ts A1).
+  check('hidden network → its place at the top says why (NetworkUnavailable), no switch', /top=\{<NetworkUnavailable reason=\{load\.reason\}/.test(screen) && !/Switch/.test(strip(read('components/site-links/network/NetworkUnavailable.tsx'))))
   check('the page renders the screen', /SiteLinksScreen/.test(read('app/(dashboard)/site-links/page.tsx')))
-  const files = ['components/site-links/network/SiteLinksScreen.tsx', 'components/site-links/network/NetworkPanel.tsx', 'components/site-links/network/PlacementLog.tsx', 'components/site-links/network/shared.ts', 'components/site-links/network/NetworkHow.tsx']
+  const files = ['components/site-links/network/SiteLinksScreen.tsx', 'components/site-links/network/NetworkPanel.tsx', 'components/site-links/network/PlacementLog.tsx', 'components/site-links/network/shared.ts', 'components/site-links/network/NetworkHow.tsx', 'components/site-links/network/NetworkUnavailable.tsx']
   const bad = files.filter((f) => /window\.confirm|\balert\(|confirm\(\s*['"`]/.test(strip(read(f))))
   check('no window.confirm or alert() (useConfirm and toasts)', bad.length === 0, bad.join(', '))
   const literal = files.filter((f) => /[א-ת]/.test(strip(read(f))))

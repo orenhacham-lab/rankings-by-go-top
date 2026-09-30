@@ -179,7 +179,7 @@ export default function WorkspaceSwitcher() {
   const focusable = Math.min(focusIndex, Math.max(0, filtered.length - 1))
 
   return (
-    <div className="relative" ref={boxRef} data-onboarding="workspace">
+    <div className="relative min-w-0 shrink" ref={boxRef} data-onboarding="workspace">
       <button
         ref={triggerRef}
         type="button"
@@ -188,7 +188,7 @@ export default function WorkspaceSwitcher() {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        className="group inline-flex h-9 max-w-[min(70vw,22rem)] items-center gap-2.5 rounded-control border border-line bg-surface ps-1.5 pe-2.5 text-copy shadow-control transition-[border-color,background-color] duration-150 hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+        className="group inline-flex h-9 max-w-full sm:max-w-[min(70vw,22rem)] items-center gap-2.5 rounded-control border border-line bg-surface ps-1.5 pe-2.5 text-copy shadow-control transition-[border-color,background-color] duration-150 hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
       >
         {/* The site's own icon, or the project's initial on a small accent tile: the
             one thing on the bar that says "this site", readable before the name is. */}

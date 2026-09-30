@@ -2,9 +2,9 @@
 
 /**
  * Links ("קישורים לאתר"): the opt-in link network among our customers' sites
- * (lib/link-network; hidden for Shopify projects and while its tables do not
- * exist), and, as the second view, links the owner can earn from the open web
- * and the links between the site's own pages (lib/site-links). Opening the tab
+ * first (lib/link-network; for a Shopify project it says why it cannot run), then
+ * free directories the owner adds the business to, the links between the site's
+ * own pages (lib/site-links), and Search Console's Links report. Opening the tab
  * reads stored data only: it calls no provider and spends nothing.
  */
 import Header from '@/components/layout/Header'
@@ -20,7 +20,7 @@ export default function SiteLinksPage() {
     <div>
       <Header title={copy.title} subtitle={copy.subtitle} />
       <WorkspaceGate>
-        {(project) => <SiteLinksScreen key={project.id} projectId={project.id} />}
+        {(project) => <SiteLinksScreen key={project.id} projectId={project.id} projectCountry={project.country ?? null} projectLanguage={project.language ?? null} />}
       </WorkspaceGate>
     </div>
   )

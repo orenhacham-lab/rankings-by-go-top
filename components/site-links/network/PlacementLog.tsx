@@ -54,7 +54,7 @@ export default function PlacementLog({ projectId, data, onChanged }: { projectId
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language).siteLinks
   const copy = dict.network.log
-  const newTab = dict.opportunities.opensNewTab
+  const newTab = dict.opensNewTab
   const { confirm, dialog } = useConfirm()
   const { toasts, dismiss, success, error } = useToasts()
   const [side, setSide] = useState<Side>(data.received.length === 0 && data.given.length > 0 ? 'given' : 'received')

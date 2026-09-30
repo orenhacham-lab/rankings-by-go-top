@@ -90,7 +90,8 @@ async function main() {
 
     // P1-3 policy.
     const pol = he.siteLinks.policy
-    check('A3 policy: outreach only, and the network has no swaps (both languages)', pol.title === 'כשאתם פונים לאתרים בעצמכם' && pol.body.includes('"קישור תמורת קישור"') && pol.body.endsWith('ברשת הקישורים שלנו אין החלפות: מי שמקבל מכם קישור לעולם לא מקבל חזרה.'.replace('לא מקבל חזרה', 'לא מקשר בחזרה')) && en.siteLinks.policy.title === 'When you reach out to sites yourself' && en.siteLinks.policy.body.endsWith('whoever gets a link from you never links back.'))
+    // Wave 9: the outreach list is gone, so the title names the rule itself (lib/__qa__/w9-links.qa.ts B10).
+    check('A3 policy: paid links and swaps, and the network has no swaps (both languages)', pol.title === 'קישורים בתשלום והחלפות' && pol.body.includes('"קישור תמורת קישור"') && pol.body.endsWith('ברשת הקישורים שלנו אין החלפות: מי שמקבל מכם קישור לעולם לא מקבל חזרה.'.replace('לא מקבל חזרה', 'לא מקשר בחזרה')) && en.siteLinks.policy.title === 'Paid links and swaps' && en.siteLinks.policy.body.endsWith('whoever gets a link from you never links back.'))
     check('A3-MUT: the old "swaps of links" wording is not the text', !he.siteLinks.policy.body.includes('להחלפת קישורים'))
 
     // P2-9 the network's size.
