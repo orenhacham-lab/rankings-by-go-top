@@ -31,7 +31,7 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
-const { readFileSync } = require('fs') as typeof import('fs')
+const { readFileSync, existsSync } = require('fs') as typeof import('fs')
 const { join } = require('path') as typeof import('path')
 const { createElement } = require('react') as typeof import('react')
 const { renderToStaticMarkup } = require('react-dom/server') as typeof import('react-dom/server')
@@ -139,10 +139,12 @@ function main() {
 
   console.log('\nE) the smaller review rows')
   {
-    const opp = code('components/site-links/OpportunityList.tsx')
-    const chip = (s: string) => !/bg-ink\b|border-ink\b/.test(s) && /on \? 'border-action\/30 bg-action-soft text-action'/.test(s)
-    check('E1 (R8): the chosen category chip is action-soft, never black', chip(opp))
-    check('E2: MUT the black chip back fails E1', !chip(opp.replace("on ? 'border-action/30 bg-action-soft text-action'", "on ? 'border-ink bg-ink text-surface'")))
+    // Wave 9: the outreach list and its category chips are gone (OpportunityList.tsx removed; the free
+    // listings have no chips). What R8 protected, no black selection on the Links tab, still holds.
+    const links = code('components/site-links/FreeListings.tsx') + code('components/site-links/SiteLinksView.tsx')
+    const chip = (s: string) => !/bg-ink\b|border-ink\b/.test(s) && !existsSync(join(ROOT, 'components/site-links/OpportunityList.tsx'))
+    check('E1 (R8): no black chip or selection on the Links tab', chip(links))
+    check('E2: MUT a black chip fails E1', !chip(links + "className='border-ink bg-ink text-surface'"))
     const screen = code('components/site-health/SiteHealthScreen.tsx')
     const seg = (s: string) => /<Segmented\s+ariaLabel=\{copy\.filters\.label\}[\s\S]{0,160}\bfill\b/.test(s) && !/rounded-\[0\.5rem\]/.test(s) && !/aria-pressed=\{filter === f\}/.test(s)
     check('E3 (R9): the findings filter is ui/Segmented, full width below sm', seg(screen) && /className="sm:inline-flex sm:w-auto"/.test(screen))

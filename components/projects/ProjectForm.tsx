@@ -12,6 +12,7 @@ import { apiErrorText } from '@/lib/i18n/user-facing-error'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { languageName, regionName, withCurrentOption } from '@/lib/project-settings/view'
+import { implicitClientId } from '@/lib/clients/single-client'
 
 /** The business fields the settings screen follows: where each came from, and what was saved. */
 type BusinessNoteField = 'business_name' | 'country' | 'language' | 'city'
@@ -46,6 +47,7 @@ export default function ProjectForm({
   const dict = getDashboardDictionary(language)
   const f = dict.projects.form
 
+  const onlyClient = implicitClientId(clients)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? false)
@@ -145,7 +147,9 @@ export default function ProjectForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <Notice tone="bad">{error}</Notice>}
 
-      {!project && (
+      {/* One business, one client (lib/clients/single-client.ts): the project goes to it, no picker. */}
+      {!project && onlyClient && <input type="hidden" name="client_id" value={onlyClient} />}
+      {!project && !onlyClient && (
         <Select
           label={f.clientLabel}
           name="client_id"

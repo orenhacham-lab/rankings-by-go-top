@@ -507,6 +507,28 @@ async function partE() {
   const billed = networkDb()
   billed.tables.billing_governance.push({ user_id: U_S, billing_authority: 'shopify' })
   check('an account billed by Shopify is Shopify too', ((await (await handleNetworkGet(P.S, routeDeps(U_S, billed))).json()) as any).available === false)
+  // Wave 9: an administrator billed through Shopify is judged per project, by the project's own platform.
+  const avail = async (db: any) => ((await (await handleNetworkGet(P.S, routeDeps(U_S, db))).json()) as any).available
+  const billedAs = (role: string | null, shopConnected = false) => {
+    const db = networkDb()
+    db.tables.billing_governance.push({ user_id: U_S, billing_authority: 'shopify' })
+    if (role) db.tables.profiles = [{ id: U_S, role }]
+    if (shopConnected) db.tables.shopify_connections.push({ project_id: P.S, archived_at: null })
+    return db
+  }
+  check('an admin billed by Shopify, on a WordPress project: the network is available', (await avail(billedAs('admin'))) === true)
+  check('the same admin, on a Shopify-connected project: still unavailable', (await avail(billedAs('admin', true))) === false)
+  check('a non-admin billed by Shopify: still unavailable (a plain user row and no row alike)',
+    (await avail(billedAs('user'))) === false && (await avail(billedAs(null))) === false)
+  const adminMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('.filter((_, i) => !billedAdmins[i])', ''),
+    async (m) => (await m.loadSites(billedAs('admin'), [P.S])).get(P.S).site.shopify)
+  check('MUTATION CONTROL: admin exemption removed → the admin\'s WordPress project is Shopify again → caught', adminMut === true, String(adminMut))
+  const everyoneMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('!billedAdmins[i]', 'false'),
+    async (m) => (await m.loadSites(billedAs('user'), [P.S])).get(P.S).site.shopify)
+  check('MUTATION CONTROL: exemption given to every account → a non-admin billed by Shopify gets in → caught', everyoneMut === false, String(everyoneMut))
+  const connMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('shopify: shopifyIds.has(p.id) || ', 'shopify: '),
+    async (m) => (await m.loadSites(billedAs('admin', true), [P.S])).get(P.S).site.shopify)
+  check('MUTATION CONTROL: the Shopify connection ignored → the admin\'s connected store gets in → caught', connMut === false, String(connMut))
   const noTables = networkDb({ hooks: { link_network_settings: { select: () => ({ code: '42P01' }) } } })
   const nt = await handleNetworkGet(P.S, routeDeps(U_S, noTables))
   check('without the tables: 200 { available: false } (hidden, not an error)', nt.status === 200 && ((await nt.json()) as any).available === false)
@@ -563,10 +585,11 @@ function partF() {
 function partG() {
   console.log('\nG. the screen')
   const screen = strip(read('components/site-links/network/SiteLinksScreen.tsx'))
-  // Wave 8 (UX A1-A2): with no network, the opportunities view leads with its outreach hero, told why.
-  check('hidden network → the opportunities view (SiteLinksView) with the reason, no switch', /kind === 'hidden'\) return <SiteLinksView projectId=\{projectId\} outreach=\{load\.reason\} \/>/.test(screen))
+  // Wave 9 (owner): the network never vanishes. With no network here, its place at the top says why
+  // (NetworkUnavailable, no switch); the outreach hero that used to lead is gone (lib/__qa__/w9-links.qa.ts A1).
+  check('hidden network → its place at the top says why (NetworkUnavailable), no switch', /top=\{<NetworkUnavailable reason=\{load\.reason\}/.test(screen) && !/Switch/.test(strip(read('components/site-links/network/NetworkUnavailable.tsx'))))
   check('the page renders the screen', /SiteLinksScreen/.test(read('app/(dashboard)/site-links/page.tsx')))
-  const files = ['components/site-links/network/SiteLinksScreen.tsx', 'components/site-links/network/NetworkPanel.tsx', 'components/site-links/network/PlacementLog.tsx', 'components/site-links/network/shared.ts', 'components/site-links/network/NetworkHow.tsx']
+  const files = ['components/site-links/network/SiteLinksScreen.tsx', 'components/site-links/network/NetworkPanel.tsx', 'components/site-links/network/PlacementLog.tsx', 'components/site-links/network/shared.ts', 'components/site-links/network/NetworkHow.tsx', 'components/site-links/network/NetworkUnavailable.tsx']
   const bad = files.filter((f) => /window\.confirm|\balert\(|confirm\(\s*['"`]/.test(strip(read(f))))
   check('no window.confirm or alert() (useConfirm and toasts)', bad.length === 0, bad.join(', '))
   const literal = files.filter((f) => /[א-ת]/.test(strip(read(f))))
