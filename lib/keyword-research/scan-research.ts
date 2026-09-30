@@ -78,6 +78,12 @@ export interface ScanResearch {
    * pages say too little: every keyword then counts as related.
    */
   siteTopics?: SiteTopics
+  /**
+   * Wave 9: the research keywords the site already covers (a page, one of our
+   * articles, or a query it ranks for with a page), by keywordKey, from the shared
+   * cannibalization check (lib/keyword-research/covered.ts). Absent: none known.
+   */
+  covered?: import('./covered').CoveredMap
 }
 
 export const SCAN_RESEARCH_ERROR_CODES = ['unauthorized', 'not_found', 'invalid_request', 'internal', 'unavailable'] as const

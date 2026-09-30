@@ -21,7 +21,7 @@ import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { UntrackedQuery } from '@/lib/gsc/tab-metrics'
-import { formatCompact, formatCount, formatPosition } from './format'
+import { formatCompact, formatCount, formatWholePosition } from './format'
 
 /** How the add ended: added, already tracked, the plan's limit, or a failure. */
 export type TrackOutcome = 'added' | 'exists' | 'quota' | 'failed'
@@ -53,10 +53,21 @@ interface Insights {
   queriesTotal: number
 }
 
-export default function GscUntrackedQueries({ loading, insights, onTrack }: {
+/** A row of the list: a search Google reports, and whether it is one of the tracked keywords. */
+type Row = UntrackedQuery & { tracked: boolean }
+
+/**
+ * Wave 9: the Keywords tab lists here, at its top, EVERY search Google reports for the
+ * site: the tracked keywords Google shows it for too (`tracked`, marked "tracked", with
+ * no add), merged with the untracked ones, most seen first. A tracked keyword's Google
+ * figure lives only here now; its live-tracking row shows our live check alone.
+ */
+export default function GscUntrackedQueries({ loading, insights, onTrack, tracked = [] }: {
   loading: boolean
   insights: Insights | null
   onTrack?: TrackQuery
+  /** Tracked keywords with Google's own figures for them (impressions above 0). */
+  tracked?: UntrackedQuery[]
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets.untracked
@@ -82,7 +93,11 @@ export default function GscUntrackedQueries({ loading, insights, onTrack }: {
     )
   }
 
-  const rows = insights.untracked
+  const rows: Row[] = [
+    ...tracked.filter((q) => q.impressions > 0).map((q) => ({ ...q, tracked: true })),
+    ...insights.untracked.map((q) => ({ ...q, tracked: false })),
+  ].sort((a, b) => b.impressions - a.impressions || b.clicks - a.clicks)
+  const trackedCount = rows.length - insights.untracked.length
   if (rows.length === 0) {
     return (
       <p className="px-4 py-6 text-copy text-muted sm:px-6" data-gsc-untracked={insights.queriesTotal > 0 ? 'all-tracked' : 'none'}>
@@ -119,7 +134,7 @@ export default function GscUntrackedQueries({ loading, insights, onTrack }: {
       </div>
       <ul>
         {shown.map((q) => {
-          const isAdded = added.has(q.query)
+          const isAdded = q.tracked || added.has(q.query)
           const isAdding = adding === q.query
           const share = Math.max(4, Math.round((q.impressions / top) * 100))
           return (
@@ -132,7 +147,7 @@ export default function GscUntrackedQueries({ loading, insights, onTrack }: {
               <span className="col-start-1 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted md:hidden">
                 <span className="tabular-nums">{t.impressions} {formatCompact(q.impressions, language)}</span>
                 <span className="tabular-nums">{t.clicks} {formatCompact(q.clicks, language)}</span>
-                {q.position != null && <span className="tabular-nums">{t.position} {formatPosition(q.position, language)}</span>}
+                {q.position != null && <span className="tabular-nums">{t.position} {formatWholePosition(q.position, language)}</span>}
               </span>
               <span className="hidden flex-col gap-1 md:flex">
                 <span className="text-copy tabular-nums text-body">{formatCount(q.impressions, language)}</span>
@@ -141,10 +156,10 @@ export default function GscUntrackedQueries({ loading, insights, onTrack }: {
                 </span>
               </span>
               <span className="hidden text-copy tabular-nums text-body md:block">{formatCount(q.clicks, language)}</span>
-              <span className="hidden text-copy tabular-nums text-body md:block">{q.position == null ? '—' : formatPosition(q.position, language)}</span>
+              <span className="hidden text-copy tabular-nums text-body md:block">{q.position == null ? '—' : formatWholePosition(q.position, language)}</span>
               <span className="col-start-2 row-span-2 row-start-1 justify-self-end md:col-start-auto md:row-span-1 md:row-start-auto">
                 {isAdded ? (
-                  <span className="inline-flex h-8 items-center gap-1.5 px-2 text-caption font-semibold text-ok" data-gsc-tracked="">
+                  <span className="inline-flex h-8 items-center gap-1.5 px-2 text-caption font-semibold text-ok" data-gsc-tracked={q.tracked ? 'tracked' : ''}>
                     <Check size={15} strokeWidth={2.25} aria-hidden="true" />
                     {t.added}
                   </span>
@@ -167,10 +182,12 @@ export default function GscUntrackedQueries({ loading, insights, onTrack }: {
           )
         })}
       </ul>
-      {(rows.length > UNTRACKED_VISIBLE || insights.untrackedTotal > rows.length) && (
+      {(rows.length > UNTRACKED_VISIBLE || insights.untrackedTotal + trackedCount > rows.length) && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line px-4 py-3 sm:px-6">
           <p className="text-caption text-muted">
-            {t.shownOf(formatCount(shown.length, language), formatCount(insights.untrackedTotal, language))}
+            {trackedCount > 0
+              ? t.shownOfAll(formatCount(shown.length, language), formatCount(insights.untrackedTotal + trackedCount, language))
+              : t.shownOf(formatCount(shown.length, language), formatCount(insights.untrackedTotal, language))}
           </p>
           {rows.length > UNTRACKED_VISIBLE && (
             <button

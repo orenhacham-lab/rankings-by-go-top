@@ -29,6 +29,15 @@ export function formatPosition(n: number, language: string): string {
   return new Intl.NumberFormat(locale(language), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n)
 }
 
+/**
+ * A Search Console average position as a whole number (the Keywords tab, wave 9: the
+ * owner asked for no "11.2"). Standard rounding, half up: 11.2 → 11, 11.5 → 12. The
+ * screen says, once and in small print, that these are rounded averages.
+ */
+export function formatWholePosition(n: number, language: string): string {
+  return formatCount(Math.round(n), language)
+}
+
 /** A calendar date as Search Console reports it (YYYY-MM-DD, no time zone). */
 export function formatDay(isoDate: string, language: string): string {
   const [y, m, d] = isoDate.split('-').map(Number)

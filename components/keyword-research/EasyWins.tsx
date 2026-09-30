@@ -11,7 +11,9 @@
  * wins related to the site, most related first, and the unrelated ones wait in a
  * collapsed "פחות קשורים לאתר שלכם" group under it: listed, never deleted.
  */
-import { Check, ChevronDown, Coins, Plus, Sprout } from 'lucide-react'
+import Link from 'next/link'
+import { Check, ChevronDown, Coins, FileCheck2, Plus, Sprout } from 'lucide-react'
+import type { OverlapPayload } from '@/lib/content/cannibalization/client'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -29,7 +31,7 @@ const GRID = '@3xl:grid-cols-[minmax(0,1fr)_7.5rem_6rem_8.5rem_6.5rem]'
 type Win = { row: ResearchRow; win: EasyWin }
 
 export default function EasyWins({
-  wins, total, adding, onTrack, onShowAll, lessRelated,
+  wins, total, adding, onTrack, onShowAll, lessRelated, covered,
 }: {
   /** The best ones, best first (at most EASY_WINS_SHOWN). */
   wins: Win[]
@@ -41,6 +43,11 @@ export default function EasyWins({
   onShowAll?: () => void
   /** The wins unrelated to the site's content; undefined when the site's content is not known (no group, no line). */
   lessRelated?: Win[]
+  /**
+   * Wave 9: keywords the site already covers with a page, an article or a query it
+   * ranks for (never in `wins`): a collapsed group with "improve the page", not deleted.
+   */
+  covered?: { row: ResearchRow; covered: OverlapPayload }[]
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).keywordResearchScan.easyWins
@@ -66,6 +73,35 @@ export default function EasyWins({
       <ol className="divide-y divide-line">{lessRelated.map(apart)}</ol>
     </details>
   ) : null
+  const coveredGroup = covered && covered.length > 0 ? (
+    <details data-covered-group="" className="group/covered border-t border-line">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-copy font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:px-6 [&::-webkit-details-marker]:hidden">
+        <ChevronDown size={16} strokeWidth={2.5} aria-hidden="true" className="shrink-0 text-muted transition-transform duration-150 motion-reduce:transition-none group-open/covered:rotate-180" />
+        <FileCheck2 size={16} strokeWidth={2} aria-hidden="true" className="shrink-0 text-ok" />
+        {t.covered(formatCount(covered.length, language))}
+      </summary>
+      <p className="px-4 pb-3 text-caption text-muted text-pretty sm:px-6">{t.coveredHint}</p>
+      <ul className="divide-y divide-line border-t border-line">
+        {covered.map(({ row: r, covered: c }) => (
+          <li key={keywordKey(r.keyword)} data-covered={r.keyword} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 sm:px-6">
+            <div className="min-w-0 flex-1 basis-60">
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-copy font-semibold text-ink">
+                <span className="min-w-0 break-words">{r.keyword}</span>
+                <span className="inline-flex items-center rounded-pill bg-ok-soft px-2 py-0.5 text-caption font-semibold text-ok">{t.coveredMark}</span>
+              </p>
+              <p className="mt-0.5 truncate text-caption text-muted" dir="auto" title={c.label}>{t.coveredPage(c.label)}</p>
+            </div>
+            {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined && (
+              <span className="text-caption tabular-nums text-muted">{formatCount(r.avgMonthlySearches, language)} {t.searches}</span>
+            )}
+            <Link href={c.improveHref} aria-label={t.improveAria(r.keyword)} className="inline-flex h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-caption font-semibold text-action shadow-control transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+              {t.improve}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </details>
+  ) : null
   return (
     <section data-easy-wins="" className="@container mb-6">
       <Card padding={false}>
@@ -83,12 +119,14 @@ export default function EasyWins({
           <>
             <p className="px-4 py-6 text-copy text-muted sm:px-6">{t.none}</p>
             {group}
+            {coveredGroup}
           </>
         ) : (
           <>
             {header}
             <ol className="stagger-in divide-y divide-line">{wins.map(row)}</ol>
             {group}
+            {coveredGroup}
             <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-sunk/40 px-4 py-3 text-copy sm:px-6">
               <span className="text-muted tabular-nums">{t.showing(formatCount(wins.length, language), formatCount(total, language))}</span>
               {onShowAll && (

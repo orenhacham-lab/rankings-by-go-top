@@ -12,6 +12,7 @@
 import { buildSiteVocabulary } from '@/lib/content/recommendations/engine'
 import { handleScanResearchGet } from '@/lib/keyword-research/scan-route'
 import { readSiteTitles } from '@/lib/keyword-research/site-relevance'
+import { loadOverlapIndex } from '@/lib/content/cannibalization/load'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -28,5 +29,7 @@ export async function GET(request: Request) {
     admin: () => createAdminClient(),
     vocabulary: (admin, projectId, extras, userId) => buildSiteVocabulary(admin, projectId, extras, userId),
     siteTitles: (db, scope) => readSiteTitles(db, scope),
+    // The owner is proven by then (the route's step 2); the loader names project AND owner.
+    overlap: (admin, scope) => loadOverlapIndex(admin, scope, { gsc: true }),
   })
 }

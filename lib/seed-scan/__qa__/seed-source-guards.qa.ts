@@ -700,7 +700,7 @@ function main() {
   const routeCap = capOf(read('app/api/projects/[id]/ai-visibility/competitors/route.ts'))
   const ourCap = capOf(read('lib/seed-scan/settings.ts'))
   check(`MAX_ACTIVE_COMPETITORS matches (${ourCap} = ${routeCap})`, Number.isFinite(routeCap) && ourCap === routeCap)
-  check('MUTATION CONTROL: a drifted cap is caught', capOf(read('lib/seed-scan/settings.ts').replace('MAX_ACTIVE_COMPETITORS = 3', 'MAX_ACTIVE_COMPETITORS = 5')) !== routeCap)
+  check('MUTATION CONTROL: a drifted cap is caught', capOf(read('lib/seed-scan/settings.ts').replace('MAX_ACTIVE_COMPETITORS = 5', 'MAX_ACTIVE_COMPETITORS = 6')) !== routeCap)
 
   console.log('\nG8) the cron resumes stalled runs behind its auth, after the runner, isolated, never as the merchant')
   const cronOffenders = (cronSrc: string, resumeSrc: string): string[] => {

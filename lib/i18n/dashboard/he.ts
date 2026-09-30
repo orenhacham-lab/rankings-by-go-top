@@ -287,13 +287,13 @@ export const dashboardHe = {
     },
     competitors: {
       title: 'מתחרים',
-      body: 'האתרים שמולם נמדדים הדירוגים והנראות ב-AI. עד 3 פעילים בכל פעם.',
+      body: 'האתרים שמולם נמדדים הדירוגים והנראות ב-AI. עד 5 פעילים בכל פעם.',
       addLabel: 'הוספת מתחרה',
       addPlaceholder: 'example.com',
       add: 'הוספה',
       remove: 'הסרה',
       empty: 'עוד אין מתחרים. הוסיפו אתר אחד לפחות כדי להשוות אליו.',
-      max: 'אפשר עד 3 מתחרים פעילים. הסירו אחד כדי להוסיף אחר.',
+      max: 'אפשר עד 5 מתחרים פעילים. הסירו אחד כדי להוסיף אחר.',
       invalid: 'זו לא כתובת אתר תקינה. כתבו דומיין, למשל example.com.',
       duplicate: 'המתחרה הזה כבר ברשימה.',
       self: 'זה האתר שלכם.',
@@ -302,6 +302,9 @@ export const dashboardHe = {
       signedOut: 'נותקתם מהחשבון. רעננו את העמוד והתחברו שוב.',
       scanNote: 'מתחרים חדשים נמצאים ומאומתים בחיפוש אמיתי בכל סריקה של האתר.',
       scanLink: 'לסריקת האתר',
+      // Wave 9: no competitors yet (most projects created before the scan existed never ran it).
+      emptyScan: 'עוד לא מיפינו מתחרים לפרויקט הזה. סריקת האתר מוצאת אותם בחיפושים אמיתיים בגוגל ומוסיפה עד 5.',
+      mapNow: 'מפו מתחרים עכשיו',
     },
     articleStyle: {
       title: 'עיצוב המאמרים',
@@ -2746,6 +2749,12 @@ export const dashboardHe = {
     engineGoogleSearch: 'גוגל חיפוש',
     engineGoogleMaps: 'גוגל מפות',
     noMatches: 'אין מילות מפתח שמתאימות לחיפוש הזה.',
+    // Wave 9: the heading of our live rank tracking, under the Search Console positions.
+    live: {
+      title: 'מעקב מיקומים בלייב',
+      body: 'הבדיקה החיה שלנו בגוגל, לא מ-Search Console: איפה האתר מופיע עכשיו לכל מילה במעקב.',
+      badge: 'לייב',
+    },
     // The context card at the top of the tab (wave 7): where the keywords stand.
     hero: {
       lastCheck: (date: string) => `בדיקה אחרונה ${date}`,
@@ -3278,8 +3287,10 @@ export const dashboardHe = {
     // The Search Console section of the Keywords tab (wave 8), under the keywords table:
     // the searches Google already shows the site for that are not tracked yet.
     keywords: {
-      title: 'ביטויים שגוגל כבר מציג אתכם בהם',
-      about: 'חיפושים שהאתר כבר הופיע בהם בגוגל ב-28 הימים האחרונים ועוד לא נמצאים במעקב, מהנצפה ביותר, כדי שתוכלו להוסיף בלחיצה את מה שחשוב לכם.',
+      title: 'המיקומים שלכם בגוגל לפי Search Console',
+      about: 'החיפושים שבהם גוגל הציג את האתר, מהנצפה ביותר, עם המיקום הממוצע, הקליקים והחשיפות כפי שגוגל מדווח, והוספה למעקב בלחיצה.',
+      range: (from: string, to: string) => `ממוצע של 28 ימים, ${from} עד ${to}`,
+      rounded: 'המיקומים הם הממוצע של גוגל, מעוגל למספר שלם.',
     },
     // The Keywords tab (wave 8): Google's own 28-day average beside our scan, never
     // a second position column. Our live check stays the position of record.
@@ -3313,6 +3324,7 @@ export const dashboardHe = {
       more: (n: string) => `הציגו עוד ${n}`,
       less: 'הציגו פחות',
       shownOf: (shown: string, total: string) => `${shown} המובילים מתוך ${total} ביטויים שעוד לא במעקב`,
+      shownOfAll: (shown: string, total: string) => `${shown} המובילים מתוך ${total} ביטויים מ-Search Console`,
       emptyAllTracked: 'כל הביטויים שגוגל מציג בהם את האתר כבר במעקב.',
       emptyNone: 'ב-28 הימים האחרונים גוגל עוד לא הציג את האתר בחיפושים. כשזה יקרה, הביטויים יופיעו כאן.',
       loading: 'טוען את הביטויים מגוגל',
@@ -3326,9 +3338,9 @@ export const dashboardHe = {
       },
       body: 'Search Console מוסיף לטאב הזה נתונים שגוגל כבר אוסף על האתר, בלי סריקה ובלי עלות:',
       points: [
-        'מיקום ממוצע, קליקים וחשיפות ל-28 ימים ליד כל מילה, גם לפני הבדיקה הראשונה',
+        'מיקום ממוצע, קליקים וחשיפות ל-28 ימים לכל ביטוי, בראש הטאב, גם לפני הבדיקה הראשונה',
         'ביטויים שגוגל כבר מציג אתכם בהם ועוד לא במעקב, עם הוספה בלחיצה',
-        'המיקום שלנו נשאר מהבדיקה החיה; הנתונים של גוגל מוצגים לידו, בנפרד',
+        'מעקב המיקומים בלייב נשאר מהבדיקה החיה שלנו; הנתונים של גוגל מוצגים בנפרד, מעליו',
       ],
       note: 'הרשאת קריאה בלבד: אנחנו לא משנים דבר בחשבון ה-Search Console שלכם.',
     },
@@ -5486,6 +5498,13 @@ export const dashboardHe = {
       rankedBySite: 'הביטויים הקשורים ביותר לתוכן האתר שלכם מופיעים ראשונים.',
       lessRelated: (n: string) => `פחות קשורים לאתר שלכם (${n})`,
       lessRelatedHint: 'ביטויים שלא מזכירים אף נושא שהאתר שלכם כותב עליו. לא מחקנו אותם: הם כאן אם תרצו בכל זאת לעקוב אחריהם.',
+      // Wave 9: research keywords the site already covers (the shared cannibalization check).
+      covered: (n: string) => `כבר יש לכם עמוד על זה (${n})`,
+      coveredHint: 'ביטויים שהאתר כבר מכסה בעמוד קיים. כדי לא ליצור תוכן כפול, עדיף לשפר את העמוד הקיים במקום לכתוב עמוד חדש.',
+      coveredMark: 'כבר יש לכם עמוד על זה',
+      coveredPage: (label: string) => `העמוד: ${label}`,
+      improve: 'לשפר את העמוד',
+      improveAria: (keyword: string) => `לשפר את העמוד על "${keyword}"`,
     },
     chips: {
       label: 'סינון התוצאות',

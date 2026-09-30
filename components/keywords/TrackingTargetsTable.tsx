@@ -25,7 +25,6 @@ import EmptyState from '@/components/ui/EmptyState'
 import { Card } from '@/components/ui/Card'
 import TopCompetitorLine from '@/components/competitors/TopCompetitorLine'
 import type { CompetitorView } from '@/components/competitors/useCompetitorComparison'
-import { GscGoogleAverage, googleLineShown, type GscKeywordsView } from '@/components/gsc/GscKeywordFigures'
 
 /** The table's columns: keyword, type, volume, position, change, last check, actions. */
 const COLUMNS = 7
@@ -66,11 +65,6 @@ interface TrackingTargetsTableProps {
   /** You vs. competitors: when given, a line under each position shows the
    *  best-placed competitor of the same check. */
   competitorView?: CompetitorView
-  /** Search Console: when given, a line under each keyword's name shows Google's own
-   *  28-day average for it (position, clicks, impressions), labelled as Google's,
-   *  beside, never instead of, our checked position. Before Search Console is set up,
-   *  and while it is switched off on the server, there is no line. */
-  gscKeywords?: GscKeywordsView
   /** The empty project's one action (the page's add-keyword button); row actions stay in the row menu. */
   emptyAction?: ReactNode
 }
@@ -95,7 +89,6 @@ export default function TrackingTargetsTable({
   projectDevice,
   onActionComplete,
   competitorView,
-  gscKeywords,
   emptyAction,
 }: TrackingTargetsTableProps) {
   const { language } = useDashboardLanguage()
@@ -282,7 +275,6 @@ export default function TrackingTargetsTable({
                     <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
                   )}
                   {/* Search Console is Google's web search: a Maps keyword has no such average. */}
-                  {gscKeywords && target.engine_type === 'google_search' && googleLineShown(gscKeywords) && <GscGoogleAverage view={gscKeywords} targetId={target.id} />}
                 </Td>
                 <Td className="hidden whitespace-nowrap md:table-cell">
                   <EngineLabel engine={target.engine_type} device={projectDevice} />

@@ -27,7 +27,7 @@
  * then replaces it like any field of its own.
  *   ai_visibility_competitors
  *                     validated competitors are ADDED, as the competitors route
- *                     adds them, within its three-active cap. Existing rows —
+ *                     adds them, within its five-active cap. Existing rows —
  *                     active or removed by the owner — are never modified,
  *                     re-added or deleted.
  *
@@ -65,7 +65,7 @@ type ProjectField = (typeof PROJECT_FIELDS)[number]
 export type SeedProjectField = ProjectField
 
 /** Mirrors MAX_ACTIVE_COMPETITORS in app/api/projects/[id]/ai-visibility/competitors/route.ts. */
-export const MAX_ACTIVE_COMPETITORS = 3
+export const MAX_ACTIVE_COMPETITORS = 5
 export const MAX_AUDIENCES = 5
 
 type ProfileRow = {
@@ -398,7 +398,7 @@ export type CompetitorInsertReport = { inserted: string[]; alreadyListed: string
 
 /**
  * Add validated competitors the project does not list yet, within the
- * three-active cap. A domain already present — including one the owner removed
+ * five-active cap. A domain already present — including one the owner removed
  * (is_active = false) — is never added again.
  */
 export async function addValidatedCompetitors(

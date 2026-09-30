@@ -6,11 +6,13 @@
  * Pure: no React, no I/O. The page calls it once per render (memoised).
  */
 import type { KeywordFigures } from '@/lib/gsc/tab-metrics'
-import { chipCounts, rowsForChip, type ResearchChip } from './chips'
+import { chipCounts, chipMatches, rowsForChip, type ResearchChip } from './chips'
 import { compareWins, easyWin, rankEasyWins, type EasyWin } from './easy-wins'
 import { researchRows, type ResearchRow } from './rows'
 import { keywordKey, researchTotals, type KeywordIdea, type ResearchTotals, type ScanKeyword, type TrackedKeyword } from './scan-research'
 import { siteRelevance, type SiteRelevance, type SiteTopics } from './site-relevance'
+import type { OverlapPayload } from '@/lib/content/cannibalization/client'
+import type { CoveredMap } from './covered'
 
 export interface ResearchModel {
   /** Whose research the rows are; null when there is none to show. */
@@ -32,6 +34,12 @@ export interface ResearchModel {
   relevance: Map<string, SiteRelevance>
   /** A row by its keyword key, for the table's per-row line. */
   byKey: Map<string, ResearchRow>
+  /**
+   * Wave 9: the research's keywords the site ALREADY covers with a page, an article or
+   * a query it ranks for (not tracked), most searched first. They are out of the easy
+   * wins and the "suggested" chip, listed apart ("כבר יש לכם עמוד על זה"), never removed.
+   */
+  covered: { row: ResearchRow; covered: OverlapPayload }[]
 }
 
 export function researchModel(args: {
@@ -43,7 +51,30 @@ export function researchModel(args: {
   chip: ResearchChip
   /** What the site's pages are about (the research route's answer); null or absent: every keyword counts as related. */
   siteTopics?: SiteTopics | null
+  /** The keywords the site already covers, by keywordKey (the research route's answer). */
+  covered?: Readonly<CoveredMap> | null
 }): ResearchModel {
+  const base = modelOf(args)
+  const map = args.covered
+  if (!map || base.mode === null) return { ...base, covered: [] }
+  const coveredOf = (r: KeywordIdea) => map[keywordKey(r.keyword)] ?? null
+  const open = (r: ResearchRow) => r.tracked || !coveredOf(r)
+  const own = base.mode === 'scan' ? base.rows.filter((r) => r.origins.length > 0) : base.rows
+  const covered = own.filter((r) => !r.tracked && coveredOf(r))
+    .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
+    .map((row) => ({ row, covered: coveredOf(row) as OverlapPayload }))
+  const counts = { ...base.counts, suggested: base.counts.suggested - base.rows.filter((r) => chipMatches('suggested', r) && !open(r)).length }
+  return {
+    ...base,
+    chipRows: args.chip === 'suggested' ? base.chipRows.filter(open) : base.chipRows,
+    counts,
+    wins: base.wins.filter((w) => open(w.row)),
+    lessRelatedWins: base.lessRelatedWins.filter((w) => open(w.row)),
+    covered,
+  }
+}
+
+function modelOf(args: Parameters<typeof researchModel>[0]): Omit<ResearchModel, 'covered'> {
   const mode = args.manual && args.manual.length > 0 ? 'manual' : args.scanKeywords.length > 0 ? 'scan' : null
   const rows = mode === null
     ? []

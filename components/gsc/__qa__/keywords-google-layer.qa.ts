@@ -291,16 +291,22 @@ async function main() {
     check('E1-MUT: a position chip fed by Google\'s average fails E1',
       !oursOnly(table.replace('<PositionChip position={result.position}', '<PositionChip position={gscKeywords?.data.state === \'ready\' ? gscKeywords.data.data.averages[target.id]?.position ?? result.position : result.position}')))
     const panel = code('components/keywords/ProjectKeywordsPanel.tsx')
+    // Wave 9 (the owner's layout): Search Console's positions FIRST, then our live rank
+    // tracking under its own "live" heading; before setup, the connect card under it.
     const placed = (src: string) => {
-      const legend = src.indexOf('<GscKeywordsLegend view={gscKeywords}')
+      const top = src.indexOf('<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top"')
+      const live = src.indexOf('<LiveTrackingHeading title={kp.live.title}')
+      const hero = src.indexOf('<KeywordsHero')
       const tbl = src.indexOf('<TrackingTargetsTable')
-      const notice = src.indexOf('<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery}')
-      return legend > 0 && tbl > legend && notice > tbl && src.indexOf('useGscKeywordInsights(id, targetsKey)') > 0
+      const bottom = src.indexOf('<GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom"')
+      return top > 0 && live > top && hero > live && tbl > hero && bottom > tbl
+        && !src.includes('<GscKeywordsLegend') && src.indexOf('useGscKeywordInsights(id, targetsKey)') > 0
     }
-    check('E2: the legend (label and sync date) over the table, the searches section under it, both from one read', placed(panel))
-    check('E2-MUT: the section moved above the table fails E2',
-      !placed(panel.replace('<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} className="mt-6" />', '')
-        .replace('<GscKeywordsLegend view={gscKeywords}', '<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} /><GscKeywordsLegend view={gscKeywords}')))
+    check('E2: Search Console\'s positions on top, then the "live rank tracking" heading, the live table, and the setup card under it, all from one read', placed(panel))
+    check('E2-MUT: the Search Console section moved under the live table fails E2',
+      !placed(panel.replace('<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top" className="mb-8" />', '')
+        .replace('<GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom"', '<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top" /><GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom"')))
+    check('E2-MUT2: the live heading dropped fails E2', !placed(panel.replace('<LiveTrackingHeading title={kp.live.title}', '<div')))
     // Measured at 390px: a line that cannot wrap widened the keyword column from 120 to
     // 238px and pushed the table 118px past the phone's edge. Every part wraps on its own
     // on a phone; the groups hold together only from `sm` up.

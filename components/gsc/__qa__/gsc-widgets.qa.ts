@@ -511,7 +511,8 @@ async function main() {
     check('D9-MUT: a line without its "Google average, 28 days" label (a second position column) fails D9',
       !d9(kw.split(esc(en.googleAverage.label)).join('')))
     const d9b = (html: string) => html.includes('data-gsc-state="ready"') && html.includes(esc(en.keywords.title))
-      && html.includes('trail sandals') && html.includes('2,400') && html.includes('14.2')
+      // Wave 9: Google's average position is a whole number on this tab (14.2 → 14).
+      && html.includes('trail sandals') && html.includes('2,400') && />14</.test(html) && !html.includes('14.2')
       && html.includes(esc(en.untracked.addAria('trail sandals'))) && html.includes(esc(en.googleAverage.synced('Sep 27')))
       && !html.includes('/settings')
     check('D9b: ready, the section lists the searches Google shows the site for that are not tracked, with "Track it" and the sync date, no settings link', d9b(kw))
@@ -527,7 +528,8 @@ async function main() {
     const SCREENS: [string, string[]][] = [
       ['app/(dashboard)/dashboard/page.tsx', ['<GscClicksTile projectId={project.id} onlyWithData />', '<GscTopPages projectId={project.id} onlyWithData />']],
       ['app/(dashboard)/reports/page.tsx', ['<GscPerformance projectId={activeProjectId}']],
-      ['components/keywords/ProjectKeywordsPanel.tsx', ['<GscKeywordsNotice projectId={id} view={gscKeywords}', 'gscKeywords={gscKeywords}']],
+      // Wave 9: mounted twice, unconditionally: the positions on top, the setup card under the live tracking.
+      ['components/keywords/ProjectKeywordsPanel.tsx', ['<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top"', '<GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom"']],
       ['components/content/workspace/TopicsScreen.tsx', ['<GscRecommendations']],
     ]
     /** The element is there, nothing between it and the previous tag decides whether it
@@ -570,30 +572,26 @@ async function main() {
     check('E4-MUT3: a second, ungated mount of the browser fails E4',
       !behindRawFlag(`${research}\nconst extra = <GscOpportunities projectId={selectedProject} />`))
 
-    // Wave 8: Google's line sits under the keyword's NAME (a phone shows that column; it
-    // hides the volume), drawn only when googleLineShown says there is something to draw.
-    // The volume cell is the volume alone again, as it was before Search Console.
+    // Wave 9 (the owner: the Google chip on a live-tracked row is unclear): the live
+    // tracking table shows our live check only. Google's figure for a tracked keyword
+    // lives in the Search Console section at the top of the tab. The volume cell is the
+    // volume alone, as before.
     const table = code('components/keywords/TrackingTargetsTable.tsx')
-    const lineUnderName = (src: string) => {
-      const nameCell = /<Td className="min-w-\[7rem\] sm:whitespace-nowrap">([\s\S]*?)<\/Td>/.exec(src)?.[1] ?? ''
+    const liveOnly = (src: string) => {
       const volumeCell = /<Td className="hidden sm:table-cell">\s*\{target\.avg_monthly_searches !== null[\s\S]*?<\/Td>/.exec(src)?.[0] ?? ''
-      return /\{gscKeywords && target\.engine_type === 'google_search' && googleLineShown\(gscKeywords\) && <GscGoogleAverage view=\{gscKeywords\} targetId=\{target\.id\} \/>\}/.test(nameCell)
-        && volumeCell !== '' && !/Gsc|gsc/.test(volumeCell)
-        && (src.match(/<GscGoogleAverage\b/g) ?? []).length === 1 && !/GscVolumeCell|GscKeywordLine/.test(src)
+      return volumeCell !== '' && !/Gsc[A-Z]|gscKeywords|data-gsc-/.test(src) && !/GscVolumeCell|GscKeywordLine|googleLineShown/.test(src)
     }
-    check('E2: the keywords table draws Google\'s line under each web-search keyword\'s name, gated by googleLineShown, and leaves the volume cell alone', lineUnderName(table))
-    check('E2-MUT: the line drawn without its gate (a dash on every row before setup) fails E2',
-      !lineUnderName(table.replace('{gscKeywords && target.engine_type === \'google_search\' && googleLineShown(gscKeywords) && <GscGoogleAverage', '{gscKeywords && target.engine_type === \'google_search\' && <GscGoogleAverage')))
-    check('E2-MUT3: the line on a Google Maps keyword too (Search Console has no Maps average) fails E2',
-      !lineUnderName(table.replace("target.engine_type === 'google_search' && googleLineShown", 'googleLineShown')))
-    check('E2-MUT2: the line back in the volume cell fails E2',
-      !lineUnderName(table.replace('{target.avg_monthly_searches !== null', '{gscKeywords && <GscGoogleAverage view={gscKeywords} targetId={target.id} />}{target.avg_monthly_searches !== null')))
+    check('E2: the live tracking table carries no Search Console line or chip on any row, and leaves the volume cell alone', liveOnly(table))
+    check('E2-MUT: the Google line back under a keyword\'s name fails E2',
+      !liveOnly(table.replace('{target.avg_monthly_searches !== null', '{gscKeywords && <GscGoogleAverage view={gscKeywords} targetId={target.id} />}{target.avg_monthly_searches !== null')))
 
     // The widgets never remove themselves, except when Search Console is switched off on
     // the server; none reads a Search Console flag to decide.
     const widgetFiles = ['components/gsc/GscClicksTile.tsx', 'components/gsc/GscTopPages.tsx', 'components/gsc/GscPerformance.tsx', 'components/gsc/GscKeywordFigures.tsx', 'components/gsc/GscUntrackedQueries.tsx', 'components/gsc/GscSetupPrompt.tsx', 'components/content/GscOpportunities.tsx', 'components/content/GscRecommendations.tsx']
     // Also allowed: the dashboard's `onlyWithData` return, which never hides a failed read.
-    const allowedNull = /if \((?:[\w.]+\.)?state === 'disabled'\) return null\b|if \(onlyWithData && [^\n]*?\.state !== 'error'\) return null\b/g
+    // And wave 9's two mounts of the Keywords tab's block: each slot leaves to the other
+    // the states it does not draw (the block itself is always mounted, twice).
+    const allowedNull = /if \((?:[\w.]+\.)?state === 'disabled'\) return null\b|if \(onlyWithData && [^\n]*?\.state !== 'error'\) return null\b|if \(slot === '(?:top|bottom)'\) return null\b/g
     const hidesOnlyWhenOff = (src: string) => (src.match(/return null\b/g) ?? []).length === (src.match(allowedNull) ?? []).length
       && !/NEXT_PUBLIC_GSC_(READ_ONLY|RAW_BROWSER)/.test(src)
     const selfHiding = (files: [string, string][]) => files.filter(([, src]) => !hidesOnlyWhenOff(src)).map(([p]) => p)
@@ -715,9 +713,11 @@ async function main() {
       check(`H1 (${locale}) switched off, the keywords table is the table without Search Console: each volume cell is the volume alone`,
         looksAsBefore(off, without), volumeCells(off).map((c) => c.slice(0, 80)).join(' | '))
       const on = table(locale, view({ state: 'ready', data: insights }))
-      check(`H1b (${locale}) switched on, each keyword's name carries Google's line, and the volume cells stay the volume alone`,
+      // Wave 9: switched on, the rows are still our live check alone (Google's figures sit
+      // in the section at the top of the tab).
+      check(`H1b (${locale}) switched on, no keyword row carries a Google line, and the volume cells stay the volume alone`,
         nameCells(on).length === TARGETS.length
-        && nameCells(on).every((c) => /data-gsc-keyword="(figures|none)"/.test(c))
+        && nameCells(on).every((c) => !/data-gsc-keyword/.test(c))
         && volumeCells(on).every(bareVolume))
       const setup = table(locale, view({ state: 'not_connected' }))
       check(`H1c (${locale}) before Search Console is set up, no row carries a Google line (the card under the table says it once)`,
