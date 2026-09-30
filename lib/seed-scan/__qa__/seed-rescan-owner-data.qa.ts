@@ -111,7 +111,7 @@ function ownerViolations(before: Tables, after: Tables, spec: { projectKeys: str
   }
   const added = competitorsOf(after).filter((c) => !competitorsOf(before).some((b) => b.id === c.id))
   if (added.some((c) => c.is_active !== true)) out.push('an added competitor is not a plain active addition')
-  if (added.length > 0 && competitorsOf(after).filter((c) => c.is_active).length > MAX_ACTIVE_COMPETITORS) out.push('the three-active cap was exceeded')
+  if (added.length > 0 && competitorsOf(after).filter((c) => c.is_active).length > MAX_ACTIVE_COMPETITORS) out.push('the five-active cap was exceeded')
   if (!same(before.tracking_targets, after.tracking_targets)) out.push('tracked keywords changed')
   const others = (t: Tables) => Object.fromEntries(Object.entries(t).map(([n, rows]) => [n, rows.filter((r) => r.user_id === OTHER_USER)]))
   if (!same(others(before), others(after))) out.push("another user's rows changed")
@@ -197,8 +197,9 @@ async function main() {
   const project = s1.tables.projects.find((p) => p.id === PROJECT) as Row
   check("…and the project's own name, country, language and city are the owner's", project.business_name === 'העסק של הבעלים' && project.country === 'US' && project.language === 'en' && project.city === 'חיפה')
   const active = competitorsOf(s1.tables).filter((c) => c.is_active).map((c) => c.domain).sort().join(',')
-  check('competitors: only added, up to three active; the one the owner removed stays removed, once',
-    active === 'easy.co.il,owner-rival.co.il,pipes-pro.co.il' && domainCount(s1.tables, 'rival-plumber.co.il') === 1
+  // Wave 9: the cap is five active (was three), so the scan's fourth rival is added too.
+  check('competitors: only added, up to five active; the one the owner removed stays removed, once',
+    active === 'easy.co.il,owner-rival.co.il,pipes-pro.co.il,zap.co.il' && domainCount(s1.tables, 'rival-plumber.co.il') === 1
     && competitorsOf(s1.tables).find((c) => c.id === 'c-2')?.is_active === false, active)
   check('the rescan adds nothing more once the cap is reached', competitorsOf(s1.afterFirst).length === competitorsOf(s1.tables).length)
 

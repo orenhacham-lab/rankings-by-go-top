@@ -61,6 +61,8 @@ export default function CompetitorsCard({
   scanCompetitors,
   seedFeatures,
   onScanLink,
+  onScan,
+  scanBusy = false,
   onAvailability,
   t,
 }: {
@@ -71,6 +73,13 @@ export default function CompetitorsCard({
   seedFeatures: boolean
   /** Take the owner to the site scan. */
   onScanLink: () => void
+  /**
+   * Wave 9: start the site scan from the empty state. Competitors come only from the
+   * scan's real searches (a4), and most projects created before the scan existed never
+   * ran it, so they have none at all. The scan route keeps its own caps and checks.
+   */
+  onScan?: () => void
+  scanBusy?: boolean
   /** Whether the card is shown at all (its routes may be off), for the screen's index. */
   onAvailability?: (shown: boolean) => void
   t: Copy
@@ -200,7 +209,17 @@ export default function CompetitorsCard({
         {load.status === 'ready' && (
           <>
             {active.length === 0 ? (
-              <p className="rounded-inset bg-sunk px-4 py-6 text-center text-copy text-muted">{c.empty}</p>
+              seedFeatures && onScan ? (
+                <div data-competitors-empty="scan" className="flex flex-col items-center gap-3 rounded-inset bg-sunk px-4 py-6 text-center">
+                  <p className="max-w-prose text-copy text-muted text-pretty">{c.emptyScan}</p>
+                  <Button size="sm" onClick={onScan} loading={scanBusy} disabled={scanBusy}>
+                    {!scanBusy && <ScanSearch aria-hidden className="size-4" />}
+                    {c.mapNow}
+                  </Button>
+                </div>
+              ) : (
+                <p className="rounded-inset bg-sunk px-4 py-6 text-center text-copy text-muted">{c.empty}</p>
+              )
             ) : (
               <ul className="list-enter divide-y divide-line overflow-hidden rounded-inset border border-line">
                 {active.map((item) => {

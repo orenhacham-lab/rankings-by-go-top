@@ -38,6 +38,8 @@ import { readSummary } from '@/lib/seed-scan/summary'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { mergeSeedResearch, readIdea, type ScanKeyword, type ScanResearchErrorCode, type ScanResearchResponse, type TrackedKeyword } from './scan-research'
 import { researchSiteTopics, type SiteTopics } from './site-relevance'
+import type { OverlapIndex } from '@/lib/content/cannibalization/check'
+import { coveredKeywords, type CoveredMap } from './covered'
 
 export type ScanRouteDeps = {
   session: () => Promise<{ userId: string | null; db: SupabaseClient }>
@@ -50,6 +52,13 @@ export type ScanRouteDeps = {
    * and the answer is exactly what it was.
    */
   siteTitles?: (db: SupabaseClient, scope: Scope) => Promise<string[]>
+  /**
+   * Wave 9: the shared cannibalization index of the project (lib/content/cannibalization/
+   * load.ts: the site's pages, our articles, the Search Console queries it ranks for),
+   * read with the service role and filtered by the project AND its owner. Absent or
+   * failing: no keyword is marked covered, and the answer is exactly what it was.
+   */
+  overlap?: (admin: ServiceRoleClient, scope: Scope) => Promise<OverlapIndex>
 }
 
 /** Tracked keywords read per project: well above any plan's keyword quota. */
@@ -140,6 +149,7 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
     const merged = mergeSeedResearch(rows)
     let keywords: ScanKeyword[] = []
     let siteTopics: SiteTopics | null = null
+    let covered: CoveredMap = {}
     if (merged.keywords.length > 0) {
       const run = await getLatestSeedRun(session.db, scope)
       const summary = run && run !== 'error' ? readSummary(run.summary) : null
@@ -169,6 +179,14 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
           siteTopics = null
         }
       }
+      // ALREADY ON THE SITE (wave 9): marked, never removed; the screen sets them apart.
+      if (deps.overlap) {
+        try {
+          covered = coveredKeywords(await deps.overlap(adminClient(), scope), keywords)
+        } catch {
+          covered = {}
+        }
+      }
     }
 
     const body: ScanResearchResponse = {
@@ -180,6 +198,7 @@ export async function handleScanResearchGet(request: Request, deps: ScanRouteDep
       tracked,
       sources: researchSources(rows, merged.market),
       ...(siteTopics ? { siteTopics } : {}),
+      ...(Object.keys(covered).length > 0 ? { covered } : {}),
     }
     return Response.json(body, { status: 200, headers: NO_STORE })
   } catch (err) {

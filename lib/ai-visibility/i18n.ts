@@ -474,8 +474,8 @@ const STRINGS = {
   // Competitors panel (Phase 1)
   competitors_title: { he: 'מתחרים למעקב', en: 'Tracked competitors' },
   competitors_subtitle: {
-    he: 'הגדירו עד 3 מתחרים שאתם רוצים לעקוב אחריהם בתשובות AI.',
-    en: 'Define up to 3 competitors you want to track in AI answers.',
+    he: 'הגדירו עד 5 מתחרים שאתם רוצים לעקוב אחריהם בתשובות AI.',
+    en: 'Define up to 5 competitors you want to track in AI answers.',
   },
   competitor_name: { he: 'שם המתחרה', en: 'Competitor name' },
   competitor_name_placeholder: { he: 'לדוגמה: Adidas', en: 'e.g. Adidas' },
@@ -493,8 +493,8 @@ const STRINGS = {
   competitor_edit: { he: 'עריכה', en: 'Edit' },
   competitor_delete: { he: 'מחיקה', en: 'Delete' },
   competitor_max_reached: {
-    he: 'הגעת למקסימום של 3 מתחרים פעילים. השבת אחד כדי להוסיף חדש.',
-    en: 'You\'ve reached the limit of 3 active competitors. Deactivate one to add another.',
+    he: 'הגעת למקסימום של 5 מתחרים פעילים. השבת אחד כדי להוסיף חדש.',
+    en: 'You\'ve reached the limit of 5 active competitors. Deactivate one to add another.',
   },
   competitor_empty: {
     he: 'עדיין לא הוגדרו מתחרים. הוסיפו מתחרה ראשון כדי להתחיל.',

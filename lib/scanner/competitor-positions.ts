@@ -22,7 +22,7 @@ import type { CompetitorPosition } from './types'
 /** Positions are recorded inside this window only. */
 export const COMPETITOR_TOP_N = 20
 
-/** More than the product lets a project configure (3), so a real list is never cut. */
+/** More than the product lets a project configure (5), so a real list is never cut. */
 export const MAX_COMPETITOR_DOMAINS = 10
 
 /**

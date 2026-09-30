@@ -256,6 +256,8 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               scanCompetitors={data?.scanCompetitors ?? []}
               seedFeatures={visibility.seedFeatures}
               onScanLink={() => scrollToSection(SECTION.scan)}
+              onScan={rescan ? scanFromCard : undefined}
+              scanBusy={scan.busy}
               onAvailability={setCompetitorsShown}
               t={t}
             />

@@ -289,13 +289,13 @@ export const dashboardEn = {
     },
     competitors: {
       title: 'Competitors',
-      body: 'The sites your rankings and AI visibility are measured against. Up to 3 active at a time.',
+      body: 'The sites your rankings and AI visibility are measured against. Up to 5 active at a time.',
       addLabel: 'Add a competitor',
       addPlaceholder: 'example.com',
       add: 'Add',
       remove: 'Remove',
       empty: 'No competitors yet. Add at least one site to compare against.',
-      max: 'You can have up to 3 active competitors. Remove one to add another.',
+      max: 'You can have up to 5 active competitors. Remove one to add another.',
       invalid: 'That is not a valid site address. Type a domain, for example example.com.',
       duplicate: 'This competitor is already on the list.',
       self: 'That is your own site.',
@@ -304,6 +304,9 @@ export const dashboardEn = {
       signedOut: 'You were signed out. Refresh the page and sign in again.',
       scanNote: 'New competitors are found and verified against real search results every time the site is scanned.',
       scanLink: 'Go to the site scan',
+      // Wave 9: no competitors yet (most projects created before the scan existed never ran it).
+      emptyScan: 'No competitors are mapped for this project yet. The site scan finds them in real Google searches and adds up to 5.',
+      mapNow: 'Map competitors now',
     },
     articleStyle: {
       title: 'Article design',
@@ -2742,6 +2745,12 @@ export const dashboardEn = {
     engineGoogleSearch: 'Google search',
     engineGoogleMaps: 'Google Maps',
     noMatches: 'No keywords match this search.',
+    // Wave 9: the heading of our live rank tracking, under the Search Console positions.
+    live: {
+      title: 'Live rank tracking',
+      body: 'Our live check on Google, not Search Console: where the site shows up right now for each tracked keyword.',
+      badge: 'Live',
+    },
     // The context card at the top of the tab (wave 7): where the keywords stand.
     hero: {
       lastCheck: (date: string) => `Last check ${date}`,
@@ -3232,8 +3241,10 @@ export const dashboardEn = {
     // The Search Console section of the Keywords tab (wave 8), under the keywords table:
     // the searches Google already shows the site for that are not tracked yet.
     keywords: {
-      title: 'Searches Google already shows you for',
-      about: 'Searches your site already appeared in on Google in the last 28 days that you don’t track yet, most seen first, so you can track the ones that matter in one click.',
+      title: 'Your Google positions from Search Console',
+      about: 'The searches Google showed your site for, most seen first, with the average position, clicks and impressions Google reports, and one click to track any of them.',
+      range: (from: string, to: string) => `28-day average, ${from} to ${to}`,
+      rounded: 'Positions are Google’s averages, rounded to a whole number.',
     },
     // The Keywords tab (wave 8): Google's own 28-day average beside our scan, never
     // a second position column. Our live check stays the position of record.
@@ -3267,6 +3278,7 @@ export const dashboardEn = {
       more: (n: string) => `Show ${n} more`,
       less: 'Show less',
       shownOf: (shown: string, total: string) => `Top ${shown} of ${total} searches you don’t track yet`,
+      shownOfAll: (shown: string, total: string) => `Top ${shown} of ${total} searches from Search Console`,
       emptyAllTracked: 'Every search Google shows the site for is already tracked.',
       emptyNone: 'Google has not shown the site in any search in the last 28 days. When it does, the searches appear here.',
       loading: 'Loading the searches from Google',
@@ -3280,9 +3292,9 @@ export const dashboardEn = {
       },
       body: 'Search Console adds figures Google already collects about your site to this tab, with no scan and no cost:',
       points: [
-        'Average position, clicks and impressions over 28 days beside each keyword, even before the first check',
+        'Average position, clicks and impressions over 28 days for each search, at the top of the tab, even before the first check',
         'Searches Google already shows you for that you don’t track yet, added in one click',
-        'Our position stays the one from the live check; Google’s figures sit beside it, separately',
+        'Live rank tracking stays our own live check; Google’s figures sit separately, above it',
       ],
       note: 'Read-only access: we change nothing in your Search Console account.',
     },
@@ -5433,6 +5445,13 @@ export const dashboardEn = {
       rankedBySite: 'The keywords closest to your site\'s content come first.',
       lessRelated: (n: string) => `Less related to your site (${n})`,
       lessRelatedHint: 'Keywords that name none of the subjects your site writes about. Nothing was removed: they are here if you still want to track them.',
+      // Wave 9: research keywords the site already covers (the shared cannibalization check).
+      covered: (n: string) => `You already have a page on this (${n})`,
+      coveredHint: 'Keywords your site already covers with an existing page. To avoid duplicate content, improve that page rather than writing a new one.',
+      coveredMark: 'You already have a page on this',
+      coveredPage: (label: string) => `Page: ${label}`,
+      improve: 'Improve the page',
+      improveAria: (keyword: string) => `Improve the page on "${keyword}"`,
     },
     chips: {
       label: 'Filter the results',

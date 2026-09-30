@@ -27,6 +27,7 @@
  *
  * Pure: no React, no I/O.
  */
+import { readCovered } from './covered'
 import { readSiteTopics } from '@/lib/ai-visibility/site-topics'
 import type { ScanResearch, TrackedKeyword } from './scan-research'
 
@@ -120,6 +121,7 @@ export function readResearchAnswer(httpStatus: number, body: unknown): ResearchA
   const b = body as Partial<ScanResearch> & { ok?: unknown }
   if (b.ok !== true || !Array.isArray(b.keywords) || !Array.isArray(b.tracked)) return { kind: 'error' }
   const siteTopics = readSiteTopics(b.siteTopics)
+  const covered = readCovered((b as { covered?: unknown }).covered)
   return {
     kind: 'ok',
     research: {
@@ -131,6 +133,7 @@ export function readResearchAnswer(httpStatus: number, body: unknown): ResearchA
       sources: readSources(b.sources),
       // Only a well-formed profile is kept: a malformed one means every keyword counts as related.
       ...(siteTopics ? { siteTopics } : {}),
+      ...(covered ? { covered } : {}),
     },
   }
 }

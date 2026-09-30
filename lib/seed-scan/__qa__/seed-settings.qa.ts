@@ -254,11 +254,12 @@ async function main() {
     ]
     const snapshot = JSON.stringify(existing)
     const { tables, admin } = world(projectRow(), { ai_visibility_competitors: existing.map((r) => ({ ...r })) })
-    const report = await addValidatedCompetitors(admin, SCOPE, ['https://www.Removed.com/about', 'new-one.com', 'x.com', 'third.com', 'fourth.com'], NOW)
+    const report = await addValidatedCompetitors(admin, SCOPE, ['https://www.Removed.com/about', 'new-one.com', 'x.com', 'third.com', 'fourth.com', 'fifth.com'], NOW)
     const mine = tables.ai_visibility_competitors.filter((r) => r.project_id === PROJECT)
     check('a competitor the owner removed is never added back', report !== 'error' && report.alreadyListed.includes('removed.com'))
     check("another project's competitor does not count as listed here", report !== 'error' && report.inserted.includes('x.com'))
-    check('only up to three active per project (1 existing + 2 new)', report !== 'error' && report.inserted.join(',') === 'new-one.com,x.com' && report.overCap.join(',') === 'third.com,fourth.com',
+    // Wave 9: five active per project (was three).
+    check('only up to five active per project (1 existing + 4 new)', report !== 'error' && report.inserted.join(',') === 'new-one.com,x.com,third.com,fourth.com' && report.overCap.join(',') === 'fifth.com',
       report === 'error' ? 'error' : JSON.stringify(report))
     check('the existing rows are unchanged, and none deleted', JSON.stringify(tables.ai_visibility_competitors.slice(0, 3)) === snapshot)
     check('new rows are owned by this user and project, active', mine.filter((r) => !['c1', 'c2'].includes(r.id as string)).every((r) => r.user_id === USER && r.is_active === true && r.domain === r.name))

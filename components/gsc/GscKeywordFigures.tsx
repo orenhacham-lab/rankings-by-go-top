@@ -79,6 +79,9 @@ export interface KeywordInsights {
   queriesTotal: number
   /** When the sync finished (ISO), for "updated …". */
   syncedAt: string | null
+  /** The sync's real window (YYYY-MM-DD, inclusive): 28 days up to the last day Google had. */
+  windowStart?: string | null
+  windowEnd?: string | null
 }
 
 export interface GscKeywordsView {
@@ -110,7 +113,16 @@ export function pickInsights(body: Record<string, unknown>): KeywordInsights {
     untrackedTotal: Math.max(untracked.length, num(body.untrackedTotal)),
     queriesTotal: num(body.queriesTotal),
     syncedAt: typeof body.syncedAt === 'string' ? body.syncedAt : null,
+    ...windowOf(body.run),
   }
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+/** The run's window, as the metrics route reports it (`run.startDate`, `run.endDate`). */
+function windowOf(run: unknown): { windowStart: string | null; windowEnd: string | null } {
+  const r = run && typeof run === 'object' ? (run as Record<string, unknown>) : {}
+  const day = (v: unknown) => (typeof v === 'string' && DAY.test(v) ? v : null)
+  return { windowStart: day(r.startDate), windowEnd: day(r.endDate) }
 }
 
 /**
@@ -221,12 +233,24 @@ export function GscKeywordsLegend({ view, className }: { view: GscKeywordsView; 
   ) : null
 }
 
-/** The block under the keywords table. */
-export function GscKeywordsNotice({ projectId, view, onTrack, className }: {
+/**
+ * The Search Console block of the Keywords tab.
+ *
+ * Wave 9 (the owner's layout): connected, it is the TOP of the tab, Google's positions
+ * for the site's searches (tracked ones included), above our live rank tracking;
+ * before setup it is the quiet connect card UNDER the live tracking, as before. The
+ * panel mounts it twice, unconditionally: `slot="top"` draws only the connected states
+ * (loading, ready, error), `slot="bottom"` only the setup card. Without a slot it draws
+ * whatever the state is (one block, as other screens and the guards compose it).
+ */
+export function GscKeywordsNotice({ projectId, view, onTrack, targets, slot, className }: {
   projectId: string | null | undefined
   view: GscKeywordsView
   /** Adds a query to the tracked keywords (the panel's add-to-project request). */
   onTrack?: TrackQuery
+  /** The tracked keywords, so the ones Google reports appear in the list as "tracked". */
+  targets?: readonly { id: string; keyword: string }[]
+  slot?: 'top' | 'bottom'
   className?: string
 }) {
   const { language } = useDashboardLanguage()
@@ -234,9 +258,20 @@ export function GscKeywordsNotice({ projectId, view, onTrack, className }: {
   const data = view.data
   if (data.state === 'disabled') return null
   if (isGscSetupState(data.state)) {
+    if (slot === 'top') return null
     return <GscConnectCard state={data.state} projectId={projectId} className={className} />
   }
+  if (slot === 'bottom') return null
   const synced = data.state === 'ready' ? syncedDay(data.data.syncedAt, language) : null
+  const range = data.state === 'ready' && data.data.windowStart && data.data.windowEnd
+    ? t.keywords.range(formatDay(data.data.windowStart, language), formatDay(data.data.windowEnd, language))
+    : null
+  const tracked = data.state === 'ready' && targets
+    ? targets.flatMap((target) => {
+      const a = data.data.averages[target.id]
+      return a && a.impressions > 0 ? [{ query: target.keyword, ...a }] : []
+    })
+    : []
   return (
     <section
       data-gsc-widget="keywords"
@@ -251,6 +286,7 @@ export function GscKeywordsNotice({ projectId, view, onTrack, className }: {
             {t.keywords.title}
           </h2>
           <p className="mt-1 max-w-prose text-copy text-muted">{t.keywords.about}</p>
+          {range && <p className="mt-1 text-caption text-muted" data-gsc-window="">{range}</p>}
         </div>
         <p className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-sunk px-2.5 py-1 text-caption text-muted">
           <span className="font-medium text-body">{t.googleAverage.label}</span>
@@ -264,7 +300,12 @@ export function GscKeywordsNotice({ projectId, view, onTrack, className }: {
           loading={data.state === 'loading'}
           insights={data.state === 'ready' ? data.data : null}
           onTrack={onTrack}
+          tracked={tracked}
         />
+      )}
+      {/* One small note, so no one reads a rounded average as a wrong figure. */}
+      {data.state === 'ready' && (
+        <p data-gsc-rounding="" className="border-t border-line px-4 py-2.5 text-caption text-muted sm:px-6">{t.keywords.rounded}</p>
       )}
     </section>
   )

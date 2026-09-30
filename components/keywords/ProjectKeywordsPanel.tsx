@@ -34,7 +34,7 @@ import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import CompetitorSummary from '@/components/competitors/CompetitorSummary'
 import { useCompetitorComparison, type CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import type { OwnCheck } from '@/lib/competitors/comparison'
-import { GscKeywordsLegend, GscKeywordsNotice, useGscKeywordInsights } from '@/components/gsc/GscKeywordFigures'
+import { GscKeywordsNotice, useGscKeywordInsights } from '@/components/gsc/GscKeywordFigures'
 import type { TrackOutcome } from '@/components/gsc/GscUntrackedQueries'
 
 /** How many of a keyword's checks its row's trend line shows. */
@@ -327,6 +327,8 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   // are not tracked yet, from Search Console: read again when the list changes.
   const targetsKey = useMemo(() => targets.map((t) => t.id).join(','), [targets])
   const gscKeywords = useGscKeywordInsights(id, targetsKey)
+  // Google reports searches, not engines: only the Google-search keywords are matched.
+  const gscTargets = useMemo(() => targets.filter((t) => t.engine_type === 'google_search').map((t) => ({ id: t.id, keyword: t.keyword })), [targets])
 
   /**
    * "Track it" on a search Google already shows the site for. The EXISTING
@@ -365,6 +367,14 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
 
   return (
     <div className="stagger-in">
+      {/* Wave 9 (the owner's layout): Search Console first, Google's own positions for the
+          site's searches (a 28-day average, rounded, labelled so), then our live rank
+          tracking under its own heading. Before Search Console is set up, the top slot is
+          empty and the connect card waits under the live tracking. */}
+      <GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top" className="mb-8" />
+
+      <LiveTrackingHeading title={kp.live.title} body={kp.live.body} badge={kp.live.badge} />
+
       {/* Where the keywords stand: the tab's context card, from the rows below. Its
           skeleton crossfades into it when the list arrives. */}
       {!empty && !(targetsError && targets.length === 0) && (
@@ -452,9 +462,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         </div>
       )}
 
-      {/* What the Google line under each keyword is, and when Google's figures were synced. */}
-      {!empty && <GscKeywordsLegend view={gscKeywords} className="mb-3" />}
-
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
         <Card padding={false}><EmptyState compact icon={<SearchX />} title={kp.noMatches} /></Card>
       ) : empty ? null : (
@@ -478,7 +485,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           projectDevice={project.device_type}
           onActionComplete={loadTargets}
           competitorView={competitorView}
-          gscKeywords={gscKeywords}
           emptyAction={(
             <Button onClick={() => setShowAddTarget(true)}>
               <Plus aria-hidden="true" className="size-4" />
@@ -488,10 +494,9 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         />
       )}
 
-      {/* Search Console, under the keywords: the searches Google already shows the site
-          for that are not tracked yet, or, before it is set up, what connecting adds and
-          the one step that is missing. */}
-      <GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} className="mt-6" />
+      {/* Before Search Console is set up: what connecting adds and the one step that is
+          missing, under the live tracking (connected, the block is the tab's top). */}
+      <GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom" className="mt-6" />
 
       <Modal open={showAddTarget} onClose={() => setShowAddTarget(false)} title={k.modals.addKeywordTitle} size="md">
         <TrackingTargetForm
@@ -511,6 +516,23 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         />
       </Modal>
       <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
+    </div>
+  )
+}
+
+/** The heading of our own live rank tracking: it is a live check, not Search Console. */
+function LiveTrackingHeading({ title, body, badge }: { title: string; body: string; badge: string }) {
+  return (
+    <div className="mb-4 flex flex-wrap items-start gap-x-3 gap-y-1" data-live-tracking="">
+      <h2 className="flex items-center gap-2 text-section font-semibold text-ink">
+        <span className="relative flex size-2.5" aria-hidden="true">
+          <span className="absolute inline-flex size-full rounded-full bg-ok opacity-60 motion-safe:animate-ping" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-ok" />
+        </span>
+        {title}
+        <span className="rounded-pill bg-ok-soft px-2 py-0.5 text-overline font-semibold uppercase tracking-wide text-ok">{badge}</span>
+      </h2>
+      <p className="basis-full text-copy text-muted">{body}</p>
     </div>
   )
 }

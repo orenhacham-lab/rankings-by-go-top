@@ -3,7 +3,7 @@
 /**
  * CompetitorsPanel — Phase 1 of AI Visibility competitor tracking.
  *
- * Lets the user define up to 3 active competitors per project (name, optional
+ * Lets the user define up to 5 active competitors per project (name, optional
  * domain, optional alternative names). Competitors are stored in
  * ai_visibility_competitors via /api/projects/[id]/ai-visibility/competitors.
  *
@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
-const MAX_ACTIVE = 3
+const MAX_ACTIVE = 5
 
 type Competitor = {
   id: string

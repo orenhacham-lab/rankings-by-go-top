@@ -109,8 +109,9 @@ async function main() {
     const a = d?.audiences.state === 'ok' ? d.audiences.value : []
     check('the audiences in order, each marked scan',
       JSON.stringify(a.map((x) => x.label)) === JSON.stringify(audienceRows(base).map((x) => x.label)) && a.length === 4 && a.every((x) => x.source === 'scan'))
+    // Wave 9: the active cap is five (was three), so a4 also adds the fixture's fourth rival.
     check('the competitors the scan added (a4), and only those',
-      JSON.stringify([...(d?.scanCompetitors ?? [])].sort()) === JSON.stringify(['easy.co.il', 'pipes-pro.co.il', 'rival-plumber.co.il']), JSON.stringify(d?.scanCompetitors))
+      JSON.stringify([...(d?.scanCompetitors ?? [])].sort()) === JSON.stringify(['easy.co.il', 'pipes-pro.co.il', 'rival-plumber.co.il', 'zap.co.il']), JSON.stringify(d?.scanCompetitors))
     check('the latest run: done, not live, and the next scan 24 hours after it started',
       d?.rescan?.latest?.status === 'done' && d.rescan.latest.live === false &&
       d.rescan.availableAt === new Date(new Date(runAt).getTime() + RESCAN_COOLDOWN_MS).toISOString(), JSON.stringify(d?.rescan))

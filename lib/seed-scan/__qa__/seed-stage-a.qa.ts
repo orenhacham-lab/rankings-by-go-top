@@ -132,8 +132,9 @@ async function main() {
     check('social, video, encyclopedias and the site itself (and its subdomains) are never competitors',
       !s.competitors.some((c) => /facebook|wikipedia|youtube|instagram|plumber-tlv/.test(c.domain)))
     const saved = tables.ai_visibility_competitors
-    check('validated competitors are ADDED to the project, within the three-active cap',
-      saved.length === 3 && saved.map((r) => r.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il', saved.map((r) => r.domain).join(','))
+    // Wave 9: the cap is five active (was three): all four validated rivals are added.
+    check('validated competitors are ADDED to the project, within the five-active cap',
+      saved.length === 4 && saved.map((r) => r.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il', saved.map((r) => r.domain).join(','))
     check('…each row owned by this user and project, active', saved.every((r) => r.user_id === USER && r.project_id === PROJECT && r.is_active === true))
 
     const profile = tables.project_profiles[0]
@@ -395,7 +396,7 @@ async function main() {
     searches = search.calls.length
     await captureConsole(() => resumeSeedRun({ admin, scope: SCOPE, runId: created.run.id, deps: { fetchImpl: net.fetch, insight: model.fn, search: search.fn, now: clk.now } }))
     check('answers saved → a4 finishes from them, nothing searched again, competitors not duplicated',
-      stepRow(tables, 'a4').status === 'done' && search.calls.length === searches && tables.ai_visibility_competitors.length === 3, `${statusLine(tables)} ${tables.ai_visibility_competitors.length}`)
+      stepRow(tables, 'a4').status === 'done' && search.calls.length === searches && tables.ai_visibility_competitors.length === 4, `${statusLine(tables)} ${tables.ai_visibility_competitors.length}`)
   }
   {
     // A worker killed while it waits on the model, or on the searches, leaves
