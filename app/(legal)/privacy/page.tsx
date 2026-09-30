@@ -1,8 +1,8 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'מדיניות פרטיות | GO TOP',
-  description: 'מדיניות הפרטיות של GO TOP',
+  title: 'מדיניות פרטיות | Go Top SEO',
+  description: 'מדיניות הפרטיות של Go Top SEO',
   robots: 'noindex, nofollow',
 }
 
@@ -12,12 +12,12 @@ export default function PrivacyPage() {
       locale="he"
       breadcrumbs={[{ label: 'מדיניות פרטיות', href: '/privacy' }]}
       title="מדיניות פרטיות"
-      subtitle="מדיניות הפרטיות של GO TOP"
+      subtitle="מדיניות הפרטיות של Go Top SEO"
     >
       <section>
         <h2>מבוא</h2>
         <p>
-          גו טופ שיווק ופרסום דיגיטלי בע״מ (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;), המפעילה את השירות GO TOP ב-https://www.gotopseo.com (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
+          גו טופ שיווק ופרסום דיגיטלי בע״מ (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;), המפעילה את השירות Go Top SEO ב-https://www.gotopseo.com (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
         </p>
       </section>
 
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
       <section>
         <h2>נתונים שאנו מקבלים מ-Google</h2>
         <p>
-          אפשר לחבר את GO TOP לחשבון Google שלך בשלוש דרכים, וכולן אופציונליות. כל אחת מבקשת הרשאה
+          אפשר לחבר את Go Top SEO לחשבון Google שלך בשלוש דרכים, וכולן אופציונליות. כל אחת מבקשת הרשאה
           משלה במסך ההסכמה של Google, ואנו מבקשים רק את הגישה שמתוארת כאן.
         </p>
 
@@ -136,7 +136,7 @@ export default function PrivacyPage() {
 
         <h3>שימוש מוגבל (Limited Use)</h3>
         <p>
-          השימוש של GO TOP במידע שמתקבל מממשקי ה-API של Google, והעברתו לכל אפליקציה אחרת, יעמדו
+          השימוש של Go Top SEO במידע שמתקבל מממשקי ה-API של Google, והעברתו לכל אפליקציה אחרת, יעמדו
           במדיניות{' '}
           <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
             Google API Services User Data Policy

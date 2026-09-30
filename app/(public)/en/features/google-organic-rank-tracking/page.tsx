@@ -7,7 +7,7 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 
 export const metadata: Metadata = {
-  title: 'Google Organic Rank Tracking | Rankings by Go Top',
+  title: 'Google Organic Rank Tracking | Go Top SEO',
   description: 'Monitor your Google search rankings by keyword, location, language, and device. Scan on demand whenever you need, or automatically once a month, and get detailed trend and competitor reports.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/google-organic-rank-tracking',

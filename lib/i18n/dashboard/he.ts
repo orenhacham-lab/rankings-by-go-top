@@ -2,7 +2,7 @@ import { planLimitLines } from '@/lib/plans/features'
 import { researchCompetitiveHe } from './research-competitive'
 export const dashboardHe = {
   sidebar: {
-    logoAlt: 'הלוגו של Go Top',
+    logoAlt: 'הלוגו של Go Top SEO',
     groupMain: 'ראשי',
     groupResearch: 'מחקר ותוכן',
     groupMonitoring: 'ניטור ודוחות',
@@ -3448,15 +3448,15 @@ export const dashboardHe = {
             'התחברו לחשבון ה-Shopify אם תתבקשו.',
             'סקרו את הרשאות הקריאה בלבד המבוקשות (read_products, read_content).',
             'אשרו את ההתקנה.',
-            'תוחזרו אוטומטית ל-Go Top במצב מחובר.',
+            'תוחזרו אוטומטית ל-Go Top SEO במצב מחובר.',
             'לחצו "בדוק חיבור" ואז "סנכרן עכשיו".',
           ],
           warningsTitle: 'כדאי לדעת',
           warnings: [
             'השתמשו בדומיין *.myshopify.com הקבוע, לא רק בדומיין המותאם הציבורי.',
-            'האישור מתבצע במסך של Shopify — Go Top לעולם לא מבקש טוקן או סיסמה.',
+            'האישור מתבצע במסך של Shopify — Go Top SEO לעולם לא מבקש טוקן או סיסמה.',
             'מבוקשות רק הרשאות קריאה בלבד (read_products, read_content). אין גישת כתיבה.',
-            'Go Top שומר את החיבור בצורה מאובטחת (מוצפן) ולא מציג שום טוקן.',
+            'Go Top SEO שומר את החיבור בצורה מאובטחת (מוצפן) ולא מציג שום טוקן.',
             'מסכי ההתחברות של Shopify עשויים להשתנות לפי החשבון; פשוט השלימו את האישור ותוחזרו.',
           ],
           docsUrl: 'https://help.shopify.com/en/manual/apps',
@@ -3572,7 +3572,7 @@ export const dashboardHe = {
       wpStepsTitle: 'איפה יוצרים סיסמת אפליקציה',
       wpSteps: [
         'בלוח הבקרה של WordPress: משתמשים › פרופיל.',
-        'גוללים ל"סיסמאות אפליקציה", כותבים שם כמו Go Top ולוחצים "הוספת סיסמת אפליקציה".',
+        'גוללים ל"סיסמאות אפליקציה", כותבים שם כמו Go Top SEO ולוחצים "הוספת סיסמת אפליקציה".',
         'מעתיקים את הסיסמה שמופיעה ומדביקים אותה כאן, יחד עם שם המשתמש שלכם ב-WordPress.',
       ],
       wpOpenProfile: 'פתיחת עמוד הפרופיל באתר שלכם',
@@ -5740,8 +5740,8 @@ export const dashboardHe = {
       wixBody: 'אפשר לכתוב לנו, ונעבור על זה יחד בכמה דקות.',
       whatsapp: 'כתבו לנו בוואטסאפ',
       developer: 'שליחת ההוראות למתכנת',
-      developerSubject: 'חיבור האתר ל-Go Top',
-      developerBody: 'היי, אני רוצה שהמאמרים מ-Go Top יעלו לאתר שלנו אוטומטית. צריך כתובת https ציבורית באתר שמקבלת בקשות POST עם המאמר בפורמט JSON, חתומות ב-HMAC-SHA256. את הכתובת מזינים בהגדרות הפרויקט ב-Go Top תחת "חיבורים › אתר בפיתוח עצמאי", ושם מופיע גם כל הפירוט הטכני. תודה!',
+      developerSubject: 'חיבור האתר ל-Go Top SEO',
+      developerBody: 'היי, אני רוצה שהמאמרים מ-Go Top SEO יעלו לאתר שלנו אוטומטית. צריך כתובת https ציבורית באתר שמקבלת בקשות POST עם המאמר בפורמט JSON, חתומות ב-HMAC-SHA256. את הכתובת מזינים בהגדרות הפרויקט ב-Go Top SEO תחת "חיבורים › אתר בפיתוח עצמאי", ושם מופיע גם כל הפירוט הטכני. תודה!',
     },
     wix: {
       siteUrl: 'כתובת האתר',
@@ -6111,10 +6111,10 @@ export const dashboardHe = {
       outroOne: 'אחרי האישור הוא יעלה לאתר בתאריך שבתוכנית. עד שתאשרו, שום דבר לא מתפרסם.',
       button: 'לאישור המאמרים',
       help: 'צריכים עזרה? כתבו לנו ב-WhatsApp: 054-9489377',
-      team: 'צוות Go Top',
-      footer: 'קיבלתם את המייל כי יש לכם פרויקט פעיל ב-Rankings by Go Top. לא רוצים תזכורות כאלה?',
+      team: 'צוות Go Top SEO',
+      footer: 'קיבלתם את המייל כי יש לכם פרויקט פעיל ב-Go Top SEO. לא רוצים תזכורות כאלה?',
       unsubscribe: 'הסרה בלחיצה אחת, בלי להתחבר',
-      company: 'Go Top · oren@gotop.co.il',
+      company: 'Go Top SEO · oren@gotop.co.il',
     },
     unsubscribePage: {
       title: 'הוסרתם מהתזכורות',

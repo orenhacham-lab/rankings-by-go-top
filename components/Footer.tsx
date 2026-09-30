@@ -27,14 +27,7 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
             <div className="mb-4 flex items-center gap-2.5">
               <GoTopMark size={28} className="shrink-0" />
               <h3 className="text-section font-semibold text-contrast-ink" dir="ltr">
-                <span>Rankings by </span>
-                <Link
-                  href="https://www.gotop.co.il"
-                  className="rounded-control text-rail-tagline underline decoration-rail-tagline/40 underline-offset-4 transition-colors duration-150 ease-snappy hover:decoration-rail-tagline"
-                  aria-label={dict.footer.agencyAria}
-                >
-                  Go Top
-                </Link>
+                <span>Go Top SEO</span>
               </h3>
             </div>
             <p className="max-w-xs text-copy text-contrast-ink/70">

@@ -7,7 +7,7 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingHe } from '@/lib/i18n/public/landing-he'
 
 export const metadata: Metadata = {
-  title: 'דוחות SEO/GEO מקצועיים | Rankings by Go Top',
+  title: 'דוחות SEO/GEO מקצועיים | Go Top SEO',
   description: 'הפיקו דוחות PDF ו-Excel פרופסיונליים עם דירוגים, מגמות, תחרות ונראות AI. דוחות ללקוחות ודירוגים בלחיצת כפתור.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/seo-geo-reports',

@@ -124,14 +124,14 @@ const rendered = Object.fromEntries(Object.keys(PAGES).map((p) => [p, renderAuth
 // ── B) primitives ─────────────────────────────────────────────────────────────
 console.log('\nB) the controls are the primitives')
 {
-  // w7 P1-9: sign-up asks for what the account truly needs, an email and a password,
-  // and the terms are a consent line with both links right above the button.
+  // w9: sign-up asks for full name, company (optional), email, phone, a password and its
+  // confirmation; the terms are a consent line with both links right above the button.
   const signupHtml = rendered['/signup']
-  const minimal = (s: string) => count(s, /<input\b/) === 2 && /<input[^>]*type="email"[^>]*autoComplete="email"|<input[^>]*autoComplete="email"[^>]*type="email"/i.test(s)
-    && /autoComplete="new-password"/i.test(s) && !/autoComplete="(?:name|organization|tel)"/i.test(s) && !/id="terms"/.test(s)
-  check('B1: sign-up has two fields, email and password, and nothing else', minimal(signupHtml))
-  check('MUT: a phone field back fails B1', !minimal(signupHtml.replace('</form>', '<input type="tel" autoComplete="tel"/></form>')))
-  check('MUT: a second password field back fails B1', !minimal(signupHtml.replace('</form>', '<input type="password" autoComplete="new-password"/></form>')))
+  const fields = (s: string) => count(s, /<input\b/) === 6 && /autoComplete="name"/.test(s) && /autoComplete="organization"/.test(s)
+    && /autoComplete="email"/.test(s) && /autoComplete="tel"/.test(s) && count(s, /autoComplete="new-password"/) === 2 && !/id="terms"/.test(s)
+  check('B1: sign-up has six fields: name, company, email, phone, password and its confirmation', fields(signupHtml))
+  check('MUT: no phone field fails B1', !fields(signupHtml.replace(/autoComplete="tel"/, 'autoComplete="off"')))
+  check('MUT: no password confirmation fails B1', !fields(signupHtml.replace(/autoComplete="new-password"/, 'autoComplete="off"')))
   const consent = (s: string) => /data-signup-consent[\s\S]*?href="\/terms"[\s\S]*?href="\/privacy"[\s\S]*?<\/p>\s*<button[^>]*type="submit"/.test(s)
   check('B2: the consent line links the terms and the privacy policy, right above the button', consent(signupHtml) && consent(rendered['/en/signup'].replace('href="/en/terms"', 'href="/terms"').replace(/href="\/en\/privacy"([^>]*>Privacy Policy)/, 'href="/privacy"$1')))
   check('MUT: a consent line without the terms link fails B2', !consent(signupHtml.replace('href="/terms"', 'href="/x"')))

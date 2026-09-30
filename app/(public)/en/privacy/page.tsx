@@ -1,12 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Privacy Policy | GO TOP',
-  description: 'Privacy policy for GO TOP — how we collect, use and protect your data.',
+  title: 'Privacy Policy | Go Top SEO',
+  description: 'Privacy policy for Go Top SEO — how we collect, use and protect your data.',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'Privacy Policy | GO TOP',
-    description: 'Privacy policy for GO TOP',
+    title: 'Privacy Policy | Go Top SEO',
+    description: 'Privacy policy for Go Top SEO',
     url: 'https://www.gotopseo.com/en/privacy',
     locale: 'en_US',
   },
@@ -18,12 +18,12 @@ export default function EnglishPrivacyPage() {
       locale="en"
       breadcrumbs={[{ label: 'Privacy Policy', href: '/en/privacy' }]}
       title="Privacy Policy"
-      subtitle="Privacy policy for GO TOP"
+      subtitle="Privacy policy for Go Top SEO"
     >
       <section>
         <h2>Introduction</h2>
         <p>
-          Go Top Digital Marketing &amp; Advertising Ltd. (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the GO TOP service
+          Go Top Digital Marketing &amp; Advertising Ltd. (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
           at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
           use, and disclosure of personal information when you use our Service.
         </p>
@@ -95,7 +95,7 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>Data We Receive from Google</h2>
         <p>
-          GO TOP can connect to your Google account in three optional ways. Each one asks for its own
+          Go Top SEO can connect to your Google account in three optional ways. Each one asks for its own
           permission on Google&rsquo;s consent screen, and we request only the access described here.
         </p>
 
@@ -145,7 +145,7 @@ export default function EnglishPrivacyPage() {
 
         <h3>Limited Use</h3>
         <p>
-          GO TOP&rsquo;s use and transfer of information received from Google APIs to any other app will
+          Go Top SEO&rsquo;s use and transfer of information received from Google APIs to any other app will
           adhere to the{' '}
           <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
             Google API Services User Data Policy

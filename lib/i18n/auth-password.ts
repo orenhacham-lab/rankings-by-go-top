@@ -8,7 +8,7 @@ import type { Locale } from './locales'
 export const PASSWORD_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
-    logoAlt: 'הלוגו של Go Top',
+    logoAlt: 'הלוגו של Go Top SEO',
     backToLogin: 'חזרה לכניסה',
     footer: {
       accessibility: 'נגישות',
@@ -51,7 +51,7 @@ export const PASSWORD_UI = {
   },
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
-    logoAlt: 'Go Top logo',
+    logoAlt: 'Go Top SEO logo',
     backToLogin: 'Back to sign in',
     footer: {
       accessibility: 'Accessibility',

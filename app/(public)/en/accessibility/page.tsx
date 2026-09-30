@@ -1,12 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Accessibility | GO TOP',
-  description: 'Accessibility statement for GO TOP',
+  title: 'Accessibility | Go Top SEO',
+  description: 'Accessibility statement for Go Top SEO',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'Accessibility | GO TOP',
-    description: 'Accessibility statement for GO TOP',
+    title: 'Accessibility | Go Top SEO',
+    description: 'Accessibility statement for Go Top SEO',
     url: 'https://www.gotopseo.com/en/accessibility',
     locale: 'en_US',
   },
@@ -18,12 +18,12 @@ export default function EnglishAccessibilityPage() {
       locale="en"
       breadcrumbs={[{ label: 'Accessibility', href: '/en/accessibility' }]}
       title="Accessibility"
-      subtitle="Accessibility statement for GO TOP"
+      subtitle="Accessibility statement for Go Top SEO"
     >
       <section>
         <h2>Our Accessibility Commitment</h2>
         <p>
-          At GO TOP, we are committed to making our platform accessible to everyone, including people with
+          At Go Top SEO, we are committed to making our platform accessible to everyone, including people with
           disabilities. We strive to meet high standards of digital accessibility and to continuously improve.
         </p>
       </section>

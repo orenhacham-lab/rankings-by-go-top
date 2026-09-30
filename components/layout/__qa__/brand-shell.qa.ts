@@ -58,10 +58,10 @@ async function main() {
     check('MUT: a mark without its accessible name fails A2', !isMark(svg.replace(' aria-label="Go Top"', '')))
 
     // 15px is the `lead` step of the type scale (globals.css), not a bracketed size.
-    const wordmark = (src: string) => /"text-lead font-semibold[^"]*">Rankings</.test(src) && /text-overline font-medium text-rail-tagline">by Go Top</.test(src)
+    const wordmark = (src: string) => /"text-lead font-semibold[^"]*">Go Top</.test(src) && /text-overline font-medium text-rail-tagline">SEO</.test(src)
       && /--text-lead: 0\.9375rem;/.test(read('app/globals.css'))
-    check('A3: the wordmark: "Rankings" 15px/600 (text-lead), "by Go Top" 11px in the tagline blue', wordmark(sidebar))
-    check('MUT: a wordmark in the muted grey fails A3', !wordmark(sidebar.replace('text-rail-tagline">by Go Top', 'text-rail-muted">by Go Top')))
+    check('A3: the wordmark (w9, "Go Top SEO"): "Go Top" 15px/600 (text-lead), "SEO" 11px in the tagline blue', wordmark(sidebar))
+    check('MUT: a wordmark in the muted grey fails A3', !wordmark(sidebar.replace('text-rail-tagline">SEO', 'text-rail-muted">SEO')))
     check('MUT: the bracketed 15px back fails A3', !wordmark(sidebar.replace('"text-lead font-semibold', '"text-[0.9375rem] font-semibold')))
 
     // The icon files are the same drawing: blue mark, navy ground, rounded corners.

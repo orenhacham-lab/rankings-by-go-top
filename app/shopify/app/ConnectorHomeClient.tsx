@@ -264,7 +264,7 @@ export default function ConnectorHomeClient() {
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 20px' }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Rankings by Go Top</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Go Top SEO</h1>
       <p style={{ color: '#616161', marginBottom: 24 }}>{data.shopDomain}</p>
 
       <Card title="Connection">

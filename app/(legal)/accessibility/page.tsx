@@ -1,8 +1,8 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'נגישות | GO TOP',
-  description: 'מידע על נגישות באתר GO TOP',
+  title: 'נגישות | Go Top SEO',
+  description: 'מידע על נגישות באתר Go Top SEO',
   robots: 'noindex, nofollow',
 }
 
@@ -12,12 +12,12 @@ export default function AccessibilityPage() {
       locale="he"
       breadcrumbs={[{ label: 'נגישות', href: '/accessibility' }]}
       title="נגישות"
-      subtitle="עמוד נגישות של GO TOP"
+      subtitle="עמוד נגישות של Go Top SEO"
     >
       <section>
         <h2>התחייבותנו לנגישות</h2>
         <p>
-          ב-GO TOP, אנו מחויבים להנגיש את המערכת שלנו לכולם, כולל אנשים עם מוגבלויות. אנו משתדלים לעמוד בתקנים גבוהים של נגישות דיגיטלית ולהמשיך להשתפר.
+          ב-Go Top SEO, אנו מחויבים להנגיש את המערכת שלנו לכולם, כולל אנשים עם מוגבלויות. אנו משתדלים לעמוד בתקנים גבוהים של נגישות דיגיטלית ולהמשיך להשתפר.
         </p>
       </section>
 

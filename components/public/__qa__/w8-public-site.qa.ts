@@ -8,12 +8,12 @@
  *      footer's contact column starts with WhatsApp, the About close offers the
  *      three as buttons, the floating WhatsApp button and the phone bar stay,
  *      and the English site's WhatsApp message is English;
- *   C) rhythm: the home bands run D S C D E D E B E D (D navy, E deeper navy, S surface,
+ *   C) rhythm: the home bands run D S C D E D E D E D (D navy, E deeper navy, S surface,
  *      C canvas, B cobalt) so from the four-step flow down nothing is light and no two
  *      neighbours share a tone, and About runs D S D C B D; the heroes are navy with the
  *      nav in its inverse tone over them;
  *   D) type: the marketing steps are fluid and land on the sizes the design
- *      gives (hero 40 → 76, About hero 34 → 56, section 28 → 44, lead 17 → 21,
+ *      gives (hero 32 → 54, About hero 34 → 56, section 28 → 44, lead 17 → 21,
  *      numerals 44 → 56) and tailwind-merge knows them; Hebrew is never tracked
  *      wider or uppercased;
  *   E) the rank climb: exactly three uses on the home page (hero, flow, close),
@@ -174,12 +174,12 @@ async function main() {
     about[l] = renderToStaticMarkup(createElement((l === 'he' ? heAbout : enAbout).default as never) as never)
   }
   {
-    const HOME = 'D S C D E D E B E D'
-    const ABOUT = 'D S D C B D'
+    const HOME = 'D S C D E D E D E D'
+    const ABOUT = 'D S D C D C'
     check(`C1: the home bands are ${HOME} in both languages`, tones(home.he) === HOME && tones(home.en) === HOME, `${tones(home.he)} / ${tones(home.en)}`)
     const fromFlow = (t: string) => t.split(' ').slice(4)
     const noTwins = (t: string[]) => t.every((x, i) => i === 0 || x !== t[i - 1])
-    check('C2: from the four-step flow down NOTHING is light (owner) and no two neighbouring bands share a tone (E D E B E D)', noTwins(fromFlow(tones(home.he))) && fromFlow(tones(home.he)).join(' ') === 'E D E B E D' && !/[CS]/.test(fromFlow(tones(home.he)).join('')) && fromFlow(tones(home.en)).join(' ') === 'E D E B E D')
+    check('C2: from the four-step flow down NOTHING is light (owner) and no two neighbouring bands share a tone (E D E D E D)', noTwins(fromFlow(tones(home.he))) && fromFlow(tones(home.he)).join(' ') === 'E D E D E D' && !/[CS]/.test(fromFlow(tones(home.he)).join('')) && fromFlow(tones(home.en)).join(' ') === 'E D E D E D')
     check(`C3: About is ${ABOUT} (no longer a light hero and four light card grids)`, tones(about.he) === ABOUT && tones(about.en) === ABOUT, `${tones(about.he)} / ${tones(about.en)}`)
     check('MUTATION CONTROL: the old all-light flow-to-FAQ run is caught',
       tones(home.he.replace(/class="relative isolate overflow-hidden bg-contrast py-16/, 'class="relative isolate overflow-hidden bg-surface py-16')) !== HOME)
@@ -210,10 +210,10 @@ async function main() {
   {
     const css = read('app/globals.css')
     const at = (t: string, w: number) => Math.round(clampAt(css, t, w))
-    const sizesOk = (c: string) => [['hero', 40, 76], ['hero-page', 34, 56], ['h2-mkt', 28, 44], ['lead-mkt', 17, 21], ['numeral', 44, 56]]
+    const sizesOk = (c: string) => [['hero', 32, 54], ['hero-page', 34, 56], ['h2-mkt', 28, 44], ['lead-mkt', 17, 21], ['numeral', 44, 56]]
       .every(([t, a, b]) => Math.round(clampAt(c, t as string, 390)) === a && Math.round(clampAt(c, t as string, 1440)) === b)
     check(`D1: hero ${at('hero', 390)}→${at('hero', 1440)}, About ${at('hero-page', 390)}→${at('hero-page', 1440)}, section ${at('h2-mkt', 390)}→${at('h2-mkt', 1440)}, lead ${at('lead-mkt', 390)}→${at('lead-mkt', 1440)}, numerals ${at('numeral', 390)}→${at('numeral', 1440)} px`, sizesOk(css))
-    check('MUTATION CONTROL: the old 40px hero at 1440 is caught', !sizesOk(css.replace('clamp(2.5rem, 1.6643rem + 3.4286vw, 4.75rem)', 'clamp(2.5rem, 2.5rem + 0vw, 2.5rem)')))
+    check('MUTATION CONTROL: the old 76px hero at 1440 (the owner found it huge) is caught', !sizesOk(css.replace('clamp(2rem, 1.4893rem + 2.0952vw, 3.5rem)', 'clamp(2.5rem, 1.6643rem + 3.4286vw, 4.75rem)')))
     const { cn } = require(join(ROOT, 'lib/utils.ts'))
     const mergeOk = ['hero', 'hero-page', 'h2-mkt', 'lead-mkt', 'numeral', 'eyebrow'].every((t) => cn(`text-${t} text-ink`) === `text-${t} text-ink`)
     check('D2: tailwind-merge keeps a marketing size beside a colour (it does not drop text-hero for text-ink)', mergeOk)

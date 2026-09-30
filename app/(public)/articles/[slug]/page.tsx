@@ -252,7 +252,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 }
 
 const PROMO: ArticlesPromoCopy = {
-  badge: 'Rankings by Go Top',
+  badge: 'Go Top SEO',
   title: ['עקוב אחר הדירוגים שלך', 'בגוגל, מתי שתרצה'],
   body: 'מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.',
   signup: { label: 'התחל ניסיון חינם', href: authHref('signup', 'he') },

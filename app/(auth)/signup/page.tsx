@@ -21,14 +21,23 @@ import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 const SIGNUP_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
-    logoAlt: 'הלוגו של Go Top',
+    logoAlt: 'הלוגו של Go Top SEO',
     heading: 'פותחים חשבון בחינם',
-    intro: 'אימייל וסיסמה, וזהו. את פרטי העסק נקרא מהאתר שלכם בצעד הבא.',
+    intro: 'כמה פרטים ומתחילים. את פרטי העסק נקרא מהאתר שלכם בצעד הבא.',
+    fullName: 'שם מלא',
+    fullNamePlaceholder: 'ישראל ישראלי',
+    company: 'שם החברה',
+    companyOptional: '(לא חובה)',
+    companyPlaceholder: 'שם העסק או החברה',
+    phone: 'טלפון',
+    phonePlaceholder: '050-1234567',
     email: 'כתובת אימייל',
     emailPlaceholder: 'you@example.com',
     password: 'סיסמה',
     passwordPlaceholder: '••••••••',
     passwordHint: 'לפחות 8 תווים',
+    confirmPassword: 'אימות סיסמה',
+    confirmPasswordPlaceholder: 'מקלידים שוב את הסיסמה',
     showPassword: 'הצגת הסיסמה',
     hidePassword: 'הסתרת הסיסמה',
     consentBefore: 'ביצירת החשבון אתם מאשרים את ',
@@ -52,6 +61,9 @@ const SIGNUP_UI = {
       invalidEmail: 'כתובת אימייל לא תקינה',
       passwordTooShort: 'הסיסמה חייבת להכיל לפחות 8 תווים',
       fieldRequired: 'שדה זה הוא חובה',
+      fullNameInvalid: 'נא להזין שם מלא (לפחות 2 תווים)',
+      phoneInvalid: 'נא להזין מספר טלפון תקין',
+      passwordMismatch: 'הסיסמאות אינן זהות. נא להקליד אותה סיסמה בשני השדות.',
       emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר.',
       emailRateLimit: 'נשלחו יותר מדי בקשות הרשמה בזמן קצר. נסו שוב בעוד כמה דקות או השתמשו בכתובת אימייל אחרת.',
       signupFailed: 'אירעה שגיאה ביצירת החשבון. אנא נסו שוב.',
@@ -69,14 +81,23 @@ const SIGNUP_UI = {
   },
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
-    logoAlt: 'Go Top logo',
+    logoAlt: 'Go Top SEO logo',
     heading: 'Create your free account',
-    intro: 'Just an email and a password. We read your business details from your site in the next step.',
+    intro: 'A few details and you are in. We read your business details from your site in the next step.',
+    fullName: 'Full name',
+    fullNamePlaceholder: 'Jane Smith',
+    company: 'Company',
+    companyOptional: '(optional)',
+    companyPlaceholder: 'Your business or company name',
+    phone: 'Phone',
+    phonePlaceholder: '+972 50 123 4567',
     email: 'Email address',
     emailPlaceholder: 'you@example.com',
     password: 'Password',
     passwordPlaceholder: '••••••••',
     passwordHint: 'At least 8 characters',
+    confirmPassword: 'Confirm password',
+    confirmPasswordPlaceholder: 'Type the password again',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     consentBefore: 'By creating an account you agree to the ',
@@ -100,6 +121,9 @@ const SIGNUP_UI = {
       invalidEmail: 'Invalid email address',
       passwordTooShort: 'Password must be at least 8 characters',
       fieldRequired: 'This field is required',
+      fullNameInvalid: 'Please enter your full name (at least 2 characters)',
+      phoneInvalid: 'Please enter a valid phone number',
+      passwordMismatch: 'The passwords do not match. Type the same password in both fields.',
       emailExists: 'This email is already registered. Please sign in instead.',
       emailRateLimit: 'Too many signup requests were sent in a short time. Please try again in a few minutes or use a different email address.',
       signupFailed: 'An error occurred while creating your account. Please try again.',
@@ -147,36 +171,63 @@ export function SignupForm() {
       })
   }, [claimParam, pathname, router, searchParams])
 
-  // Only what the account truly needs (w7 P1-9): Supabase signs up with an email
-  // and a password; the default client falls back to the email for its name
-  // (lib/clients/ensure-default-client.ts), the business details come from the
-  // site in onboarding, and agreeing to the terms is the consent line above the
-  // button. Name, company, phone, a second password and a checkbox used to stand
-  // between the visitor and the trial.
+  // The fields (w9): full name, company (optional), email, phone, a password and
+  // its confirmation, which must match. The free check stays optional: a visitor who
+  // ran one arrives with ?claim= and it is kept exactly as before. Name, company and
+  // phone go into the auth user's metadata at signUp (full_name, company_name, phone),
+  // which is where the account's default client (lib/clients/ensure-default-client.ts)
+  // and the operator's signup notice already read them. No table, no migration.
   const [formData, setFormData] = useState({
+    fullName: '',
+    company: '',
     email: '',
+    phone: '',
     password: '',
+    confirmPassword: '',
   })
+  type FieldKey = keyof typeof formData
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({})
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Form validation
-  function validateForm(): string[] {
-    const errors: string[] = []
+  function setField(key: FieldKey, value: string) {
+    setFormData((prev) => ({ ...prev, [key]: value }))
+    // An error clears as soon as its field is edited (the confirmation also when the password changes).
+    setFieldErrors((prev) => {
+      if (!prev[key] && !(key === 'password' && prev.confirmPassword)) return prev
+      const next = { ...prev }
+      delete next[key]
+      if (key === 'password') delete next.confirmPassword
+      return next
+    })
+  }
+
+  // Form validation: one message per field, shown under that field.
+  function validateForm(): Partial<Record<FieldKey, string>> {
+    const errors: Partial<Record<FieldKey, string>> = {}
+
+    if (formData.fullName.trim().length < 2) errors.fullName = formData.fullName.trim() ? t.err.fullNameInvalid : t.err.fieldRequired
 
     if (!formData.email.trim()) {
-      errors.push(t.err.fieldRequired)
+      errors.email = t.err.fieldRequired
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.push(t.err.invalidEmail)
+      errors.email = t.err.invalidEmail
     }
 
+    const phone = formData.phone.trim()
+    if (!phone) errors.phone = t.err.fieldRequired
+    else if (!/^\+?[\d\s\-().]{7,20}$/.test(phone) || phone.replace(/\D/g, '').length < 7 || phone.replace(/\D/g, '').length > 15) errors.phone = t.err.phoneInvalid
+
     if (!formData.password) {
-      errors.push(t.err.fieldRequired)
+      errors.password = t.err.fieldRequired
     } else if (formData.password.length < 8) {
-      errors.push(t.err.passwordTooShort)
+      errors.password = t.err.passwordTooShort
     }
+
+    if (!formData.confirmPassword) errors.confirmPassword = t.err.fieldRequired
+    else if (formData.confirmPassword !== formData.password) errors.confirmPassword = t.err.passwordMismatch
 
     return errors
   }
@@ -187,10 +238,8 @@ export function SignupForm() {
     setSuccess('')
 
     const validationErrors = validateForm()
-    if (validationErrors.length > 0) {
-      setError(validationErrors[0])
-      return
-    }
+    setFieldErrors(validationErrors)
+    if (Object.keys(validationErrors).length > 0) return
 
     setLoading(true)
     const email = formData.email.trim()
@@ -206,6 +255,10 @@ export function SignupForm() {
           data: {
             // Agreed by creating the account: the consent line sits right above the button.
             terms_accepted: true,
+            // Who the account is (w9): read by ensure-default-client and the signup notice.
+            full_name: formData.fullName.trim().slice(0, 120),
+            ...(formData.company.trim() ? { company_name: formData.company.trim().slice(0, 120) } : {}),
+            phone: formData.phone.trim().slice(0, 30),
             // Area G — persist the signup-origin language (derived from the route/param,
             // NOT the browser) so a later fresh-device login opens the app in that language.
             locale: lang,
@@ -404,14 +457,55 @@ export function SignupForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate data-signup-form>
           <Input
+            label={t.fullName}
+            type="text"
+            value={formData.fullName}
+            onChange={(e) => setField('fullName', e.target.value)}
+            placeholder={t.fullNamePlaceholder}
+            error={fieldErrors.fullName}
+            required
+            autoComplete="name"
+            autoFocus
+            maxLength={120}
+            className="h-11"
+          />
+
+          <Input
+            label={`${t.company} ${t.companyOptional}`}
+            id="signup-company"
+            type="text"
+            value={formData.company}
+            onChange={(e) => setField('company', e.target.value)}
+            placeholder={t.companyPlaceholder}
+            autoComplete="organization"
+            maxLength={120}
+            className="h-11"
+          />
+
+          <Input
             label={t.email}
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(e) => setField('email', e.target.value)}
             placeholder={t.emailPlaceholder}
+            error={fieldErrors.email}
             required
             autoComplete="email"
-            autoFocus
+            className="h-11"
+          />
+
+          <Input
+            label={t.phone}
+            id="signup-phone"
+            type="tel"
+            inputMode="tel"
+            value={formData.phone}
+            onChange={(e) => setField('phone', e.target.value)}
+            placeholder={t.phonePlaceholder}
+            error={fieldErrors.phone}
+            required
+            autoComplete="tel"
+            maxLength={30}
             className="h-11"
           />
 
@@ -419,9 +513,22 @@ export function SignupForm() {
             id="signup-password"
             label={t.password}
             value={formData.password}
-            onChange={(password) => setFormData({ ...formData, password })}
+            onChange={(password) => setField('password', password)}
             placeholder={t.passwordPlaceholder}
             hint={t.passwordHint}
+            error={fieldErrors.password}
+            showLabel={t.showPassword}
+            hideLabel={t.hidePassword}
+            autoComplete="new-password"
+          />
+
+          <PasswordField
+            id="signup-password-confirm"
+            label={t.confirmPassword}
+            value={formData.confirmPassword}
+            onChange={(confirmPassword) => setField('confirmPassword', confirmPassword)}
+            placeholder={t.confirmPasswordPlaceholder}
+            error={fieldErrors.confirmPassword}
             showLabel={t.showPassword}
             hideLabel={t.hidePassword}
             autoComplete="new-password"

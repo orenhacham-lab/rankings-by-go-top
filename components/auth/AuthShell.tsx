@@ -20,7 +20,7 @@ export interface AuthFooterCopy {
 }
 
 /** The product's name: the same in both languages. */
-const BRAND = 'Rankings by Go Top'
+const BRAND = 'Go Top SEO'
 const MAKER = 'Go Top'
 const MAKER_URL = 'https://www.gotop.co.il'
 
@@ -140,11 +140,10 @@ export default function AuthShell({
             <Link href={footer.articlesHref} className={FOOTER_LINK}>{footer.articles}</Link>
           </nav>
           <p dir="ltr">
-            {BRAND.slice(0, -MAKER.length)}
+            {BRAND} &copy; {new Date().getFullYear()} &middot; by{' '}
             <a href={MAKER_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-body hover:text-ink hover:underline">
               {MAKER}
-            </a>{' '}
-            &copy; {new Date().getFullYear()}
+            </a>
           </p>
         </footer>
       </div>

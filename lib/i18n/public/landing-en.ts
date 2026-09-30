@@ -17,11 +17,11 @@ const TRIAL_DAYS = TRIAL_CATALOG.days
  */
 export const landingEn: LandingCopy = {
   hero: {
-    eyebrow: 'Google and AI search, in one platform',
+    eyebrow: 'Automatic promotion in Google and AI engines, in one system',
     title: 'Your next customers are already searching.',
     accent: 'We make sure they find you.',
     subtitle:
-      'Go Top writes and publishes articles that answer what your customers are searching for, then shows you where you appear in Google, Google Maps, ChatGPT and Gemini. No content team. No guesswork.',
+      'Go Top SEO writes and publishes articles that answer what your customers are searching for, then shows you where you appear in Google, Google Maps, ChatGPT and Gemini. No content team. No guesswork.',
     or: 'or',
     signup: `Start a free ${TRIAL_DAYS}-day trial`,
     dashboard: 'Go to my dashboard',
@@ -96,7 +96,7 @@ export const landingEn: LandingCopy = {
   },
   outcomes: {
     eyebrow: 'What you get',
-    title: 'What Go Top does for you while you run the business',
+    title: 'What Go Top SEO does for you while you run the business',
     body: 'Not another tool to learn. A system that does the work, then shows you the results.',
     items: [
       {
@@ -126,14 +126,14 @@ export const landingEn: LandingCopy = {
     eyebrow: 'Search has changed',
     title: 'Customers no longer just google. They ask AI, and get three recommendations.',
     body: 'If your site doesn\'t answer their questions, in Google or in a ChatGPT answer, that recommendation goes to a competitor. Most businesses have no idea where they stand, because no tool has shown them both at once.',
-    withoutTitle: 'Without Go Top',
+    withoutTitle: 'Without Go Top SEO',
     without: [
       'An article every couple of months, when someone finds time',
       'No clear idea what to write, or which phrase is worth it',
       'Rankings checked by hand, or not at all',
       'No idea whether ChatGPT recommends you or a competitor',
     ],
-    withTitle: 'With Go Top',
+    withTitle: 'With Go Top SEO',
     with: [
       'A steady content calendar that publishes on your schedule',
       'Topics chosen from what your customers actually search for',
@@ -292,7 +292,7 @@ export const landingEn: LandingCopy = {
       },
       {
         q: 'Why not just write it myself with ChatGPT?',
-        a: 'You can, but then you pick topics, check phrases, build Q&A and structured data, link pages together, upload to the site and check whether it worked, all by yourself. Go Top runs the whole chain, and measures the result in Google and AI.',
+        a: 'You can, but then you pick topics, check phrases, build Q&A and structured data, link pages together, upload to the site and check whether it worked, all by yourself. Go Top SEO runs the whole chain, and measures the result in Google and AI.',
       },
       {
         q: 'Which sites does it work with?',

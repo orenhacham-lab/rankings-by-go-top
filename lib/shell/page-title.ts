@@ -1,6 +1,6 @@
 /**
  * The browser tab's title for a dashboard screen: the screen's own name, then
- * the brand ("מחקר ביטויים | Go Top"). Every dashboard screen used to carry the
+ * the brand ("מחקר ביטויים | Go Top SEO"). Every dashboard screen used to carry the
  * marketing site's title, so six open tabs read the same.
  *
  * The screen's name is the one its sidebar entry shows (the same dictionary
@@ -12,7 +12,7 @@
  * Pure: no React, no DOM (lib/shell/__qa__/shell-motion.qa.ts).
  */
 
-export const TITLE_BRAND = 'Go Top'
+export const TITLE_BRAND = 'Go Top SEO'
 
 export interface TitledRoute { href: string; label: string }
 

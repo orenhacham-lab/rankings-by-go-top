@@ -1,12 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Terms of Use | GO TOP',
-  description: 'Terms of use for GO TOP — the terms that govern your use of our service.',
+  title: 'Terms of Use | Go Top SEO',
+  description: 'Terms of use for Go Top SEO — the terms that govern your use of our service.',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'Terms of Use | GO TOP',
-    description: 'Terms of use for GO TOP',
+    title: 'Terms of Use | Go Top SEO',
+    description: 'Terms of use for Go Top SEO',
     url: 'https://www.gotopseo.com/en/terms',
     locale: 'en_US',
   },
@@ -18,12 +18,12 @@ export default function EnglishTermsPage() {
       locale="en"
       breadcrumbs={[{ label: 'Terms of Use', href: '/en/terms' }]}
       title="Terms of Use"
-      subtitle="GO TOP"
+      subtitle="Go Top SEO"
     >
       <section>
         <h2>1. Introduction and Service Definition</h2>
         <p>
-          GO TOP (the &ldquo;Service&rdquo; or the &ldquo;Platform&rdquo;) is a SaaS service
+          Go Top SEO (the &ldquo;Service&rdquo; or the &ldquo;Platform&rdquo;) is a SaaS service
           operated by Go Top Digital Marketing &amp; Advertising Ltd. (the &ldquo;Company&rdquo;). The
           Service allows customers to track keyword rankings on Google search, monitor Google Maps
           visibility, measure visibility on AI engines such as ChatGPT, Gemini and Perplexity, conduct
@@ -304,7 +304,7 @@ export default function EnglishTermsPage() {
       <section id="site-fixes">
         <h2>15C. Site Fixes and the GO TOP SEO Bridge Plugin</h2>
         <p>
-          On a connected WordPress site, the Service can suggest site fixes and apply them through the GO TOP
+          On a connected WordPress site, the Service can suggest site fixes and apply them through the Go Top SEO
           SEO Bridge plugin, only with your consent and your approval of each fix.
         </p>
         <ul>

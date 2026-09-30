@@ -13,7 +13,7 @@ const COPY: AboutCopy = {
   who: {
     title: 'Who is behind the platform',
     paragraphs: [
-      'Rankings by Go Top is built by Go Top, a digital agency with more than 11 years of experience in organic SEO, paid advertising and website building for businesses in Israel and abroad.',
+      'Go Top SEO is built by Go Top, a digital agency with more than 11 years of experience in organic SEO, paid advertising and website building for businesses in Israel and abroad.',
       'The platform grew out of our day-to-day work with clients: we saw which reports people actually understand, which data helps them decide, and where the time goes. So we built one place where content gets written, published and measured, in Google and in AI engines.',
     ],
   },
@@ -65,7 +65,7 @@ const COPY: AboutCopy = {
     ],
   },
   choose: {
-    title: 'Why choose Rankings by Go Top',
+    title: 'Why choose Go Top SEO',
     items: [
       {
         title: 'Personal service, no compromise',

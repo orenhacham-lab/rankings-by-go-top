@@ -4,7 +4,7 @@ import { researchCompetitiveEn } from './research-competitive'
 
 export const dashboardEn = {
   sidebar: {
-    logoAlt: 'Go Top logo',
+    logoAlt: 'Go Top SEO logo',
     groupMain: 'Main',
     groupResearch: 'Research & content',
     groupMonitoring: 'Monitoring & reports',
@@ -3439,15 +3439,15 @@ export const dashboardEn = {
             'Log in to your Shopify account if prompted.',
             'Review the requested read-only permissions (read_products, read_content).',
             'Approve the installation.',
-            'You are returned automatically to Go Top in the connected state.',
+            'You are returned automatically to Go Top SEO in the connected state.',
             'Click Test connection, then Sync now.',
           ],
           warningsTitle: 'Good to know',
           warnings: [
             'Use your permanent *.myshopify.com domain, not only your public custom domain.',
-            'You will approve access on Shopify’s screen — Go Top never asks for a token or password.',
+            'You will approve access on Shopify’s screen — Go Top SEO never asks for a token or password.',
             'Only read-only permissions are requested (read_products, read_content). No write access.',
-            'Go Top stores the connection securely (encrypted) and never shows any token.',
+            'Go Top SEO stores the connection securely (encrypted) and never shows any token.',
             'Shopify’s login screens may vary by account; just complete the approval and you will be redirected back.',
           ],
           docsUrl: 'https://help.shopify.com/en/manual/apps',
@@ -3563,7 +3563,7 @@ export const dashboardEn = {
       wpStepsTitle: 'Where to create an application password',
       wpSteps: [
         'In your WordPress dashboard: Users › Profile.',
-        'Scroll to "Application Passwords", type a name such as Go Top and click "Add New Application Password".',
+        'Scroll to "Application Passwords", type a name such as Go Top SEO and click "Add New Application Password".',
         'Copy the password it shows and paste it here, with your WordPress username.',
       ],
       wpOpenProfile: 'Open the profile page on your site',
@@ -5716,8 +5716,8 @@ export const dashboardEn = {
       wixBody: 'Write to us and we will go through it with you in a few minutes.',
       whatsapp: 'Message us on WhatsApp',
       developer: 'Send the instructions to my developer',
-      developerSubject: 'Connecting our site to Go Top',
-      developerBody: 'Hi, I would like articles from Go Top to be published on our site automatically. It needs a public https address on the site that accepts POST requests with the article as JSON, signed with HMAC-SHA256. The address goes into the project settings in Go Top under "Connections › Custom-built site", where the full technical details are listed too. Thanks!',
+      developerSubject: 'Connecting our site to Go Top SEO',
+      developerBody: 'Hi, I would like articles from Go Top SEO to be published on our site automatically. It needs a public https address on the site that accepts POST requests with the article as JSON, signed with HMAC-SHA256. The address goes into the project settings in Go Top SEO under "Connections › Custom-built site", where the full technical details are listed too. Thanks!',
     },
     wix: {
       siteUrl: 'Site address',
@@ -6085,10 +6085,10 @@ export const dashboardEn = {
       outroOne: 'Once you approve, it goes live on the date in your plan. Nothing is published until you do.',
       button: 'Review articles',
       help: 'Need help? WhatsApp us: +972 54-948-9377',
-      team: 'The Go Top team',
-      footer: "You get this because you have an active project on Rankings by Go Top. Don't want these reminders?",
+      team: 'The Go Top SEO team',
+      footer: "You get this because you have an active project on Go Top SEO. Don't want these reminders?",
       unsubscribe: 'Unsubscribe in one click, no login',
-      company: 'Go Top · oren@gotop.co.il',
+      company: 'Go Top SEO · oren@gotop.co.il',
     },
     unsubscribePage: {
       title: "You're unsubscribed",

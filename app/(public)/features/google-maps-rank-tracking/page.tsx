@@ -6,7 +6,7 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
-  title: 'מעקב דירוג בגוגל מפות | Rankings by Go Top',
+  title: 'מעקב דירוג בגוגל מפות | Go Top SEO',
   description: 'עקבו אחרי המיקום שלכם בגוגל מפות. בדקו נראות מקומית לפי עיר, אזור וביטוי חיפוש. Local SEO מתקדם.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/google-maps-rank-tracking',

@@ -244,7 +244,7 @@ function Rail({ items, active }: { items: string[]; active: number }) {
     <div className="hidden w-48 shrink-0 flex-col gap-1 bg-rail p-3 lg:flex" aria-hidden="true">
       <div className="mb-3 flex items-center gap-2 px-2 pt-1">
         <GoTopMark size={22} />
-        <span dir="ltr" className="text-copy font-semibold text-rail-ink">Rankings</span>
+        <span dir="ltr" className="text-copy font-semibold text-rail-ink">Go Top SEO</span>
       </div>
       {items.map((label, i) => {
         const Icon = RAIL_ICONS[i] ?? LayoutDashboard

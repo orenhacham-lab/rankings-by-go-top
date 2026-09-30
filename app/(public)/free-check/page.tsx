@@ -6,7 +6,7 @@ import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'בדיקת SEO ו-AI חינם לאתר - Rankings by Go Top',
+  title: 'בדיקת SEO ו-AI חינם לאתר - Go Top SEO',
   description:
     'בדיקה חינמית לאתר: אנחנו קוראים את האתר באמת, מבינים במה העסק עוסק, ומראים מה מעכב אתכם בגוגל ובמנועי AI. בלי התחייבות ובלי כרטיס אשראי.',
   openGraph: {

@@ -31,7 +31,7 @@ export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Locale
 
   return (
     <form
-      className={cn('w-full max-w-xl', !inverse && 'mx-auto')}
+      className={cn('w-full', inverse ? 'max-w-2xl' : 'max-w-xl mx-auto')}
       onSubmit={(e) => {
         e.preventDefault()
         const candidate = url.trim()
@@ -44,7 +44,7 @@ export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Locale
       <div
         className={cn(
           'flex flex-col gap-2 rounded-card p-2 sm:flex-row',
-          inverse ? 'bg-white/10 ring-1 ring-white/20 backdrop-blur-sm' : 'border border-line bg-surface shadow-card',
+          inverse ? 'bg-white/15 p-2.5 ring-2 ring-white/40 shadow-[0_12px_40px_rgb(0_0_0/0.3)] backdrop-blur-sm' : 'border border-line bg-surface shadow-card',
         )}
       >
         <div className="min-w-0 flex-1">
@@ -60,17 +60,17 @@ export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Locale
             className={cn(
               'text-start',
               inverse
-                ? 'h-14 border-transparent bg-surface text-lead focus:ring-white/40'
+                ? 'h-16 border-transparent bg-surface text-section focus:ring-white/40'
                 : 'h-11 border-transparent bg-sunk/60 shadow-none hover:border-line focus:bg-surface',
             )}
           />
         </div>
-        <Button type="submit" size="lg" className={cn('shrink-0', inverse && 'h-14 px-6 focus-visible:ring-white/50')}>
+        <Button type="submit" size="lg" className={cn('shrink-0', inverse && 'h-16 px-8 text-section focus-visible:ring-white/50')}>
           {copy.form.submit}
           <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </Button>
       </div>
-      <p className={cn('mt-2.5 text-caption', inverse ? 'text-start text-contrast-ink/75' : 'text-center text-muted')}>{copy.page.badge}</p>
+      <p className={cn('mt-2.5 text-caption', inverse ? 'text-start text-copy text-contrast-ink/80' : 'text-center text-muted')}>{copy.page.badge}</p>
     </form>
   )
 }

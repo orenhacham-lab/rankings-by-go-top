@@ -6,7 +6,7 @@ import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'Free SEO & AI site check - Rankings by Go Top',
+  title: 'Free SEO & AI site check - Go Top SEO',
   description:
     'A free site check: we really read your site, work out what the business does, and show what is holding you back in Google and in AI answers. No card, no commitment.',
   openGraph: {

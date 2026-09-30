@@ -16,7 +16,7 @@ import { ContactMenu, ContactRows } from '@/components/public/ContactMenu'
 
 /**
  * The public site's top bar, in the app's own vocabulary: the Go Top mark and
- * the "Rankings by Go Top" lockup from the rail, copy-sized links, one primary
+ * the "Go Top SEO" lockup from the rail, copy-sized links, one primary
  * button. Transparent over the hero's paper, a hairline and a blur once the page
  * scrolls. The features menu opens on hover AND on keyboard focus.
  *
@@ -142,8 +142,8 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale
           >
             <GoTopMark size={32} className="shrink-0" />
             <span className="flex flex-col" dir="ltr">
-              <span className={cn('text-section font-semibold leading-5', onDark ? 'text-contrast-ink' : 'text-ink')}>Rankings</span>
-              <span className={cn('text-overline font-semibold', onDark ? 'text-rail-tagline' : 'text-action')}>by Go Top</span>
+              <span className={cn('text-section font-semibold leading-5', onDark ? 'text-contrast-ink' : 'text-ink')}>Go Top</span>
+              <span className={cn('text-overline font-semibold', onDark ? 'text-rail-tagline' : 'text-action')}>SEO</span>
             </span>
           </Link>
 

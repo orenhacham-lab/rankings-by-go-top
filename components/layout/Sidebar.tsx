@@ -312,8 +312,8 @@ function Brand({ logoAlt }: { logoAlt: string }) {
     >
       <GoTopMark size={28} label={logoAlt} className="shrink-0" />
       <span className="flex min-w-0 flex-col" dir="ltr">
-        <span className="text-lead font-semibold leading-5 text-rail-ink">Rankings</span>
-        <span className="text-overline font-medium text-rail-tagline">by Go Top</span>
+        <span className="text-lead font-semibold leading-5 text-rail-ink">Go Top</span>
+        <span className="text-overline font-medium text-rail-tagline">SEO</span>
       </span>
     </Link>
   )

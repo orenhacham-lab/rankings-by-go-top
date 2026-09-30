@@ -119,10 +119,10 @@ export function LandingPage({
         <section className={cn(styles.heroDark, 'relative isolate overflow-hidden text-contrast-ink')} data-hero-tone="dark">
           <div aria-hidden="true" className={cn(styles.darkGrid, 'pointer-events-none absolute inset-0')} />
           <HeroClimb chip={copy.hero.climbChip} />
-          <div className={cn(CONTAINER_WIDE, 'relative pt-28 pb-24 sm:pt-32 sm:pb-32 lg:pt-36 lg:pb-[13rem]')}>
+          <div className={cn(CONTAINER_WIDE, 'relative pt-28 pb-20 sm:pt-32 sm:pb-24 lg:pt-36 lg:pb-28')}>
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
               <div className="lg:col-span-7">
-                <div className="mb-6"><Eyebrow icon={Sparkles} inverse>{copy.hero.eyebrow}</Eyebrow></div>
+                <div className="mb-7"><Eyebrow icon={Sparkles} inverse prominent>{copy.hero.eyebrow}</Eyebrow></div>
                 <h1 className="text-hero text-contrast-ink">
                   {copy.hero.title}
                   <span className="block text-rail-tagline">{copy.hero.accent}</span>
@@ -134,9 +134,10 @@ export function LandingPage({
                   <FreeCheckHeroForm locale={locale} tone="inverse" />
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2">
-                  <span className="text-copy text-contrast-ink/75">{copy.hero.or}</span>
-                  <ButtonLink href={startHref} variant="ghost-inverse" arrow className="-ms-2 underline decoration-white/30 underline-offset-4 hover:decoration-white/80">
+                {/* The trial: a real secondary button (outline on navy), as tall as the check's field. */}
+                <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+                  <span className="text-lead text-contrast-ink/80">{copy.hero.or}</span>
+                  <ButtonLink href={startHref} variant="inverse" size="lg" arrow className="h-14 border-2 border-white/60 bg-white/10 px-7 text-lead hover:border-white/90 hover:bg-white/20">
                     {signedIn ? copy.hero.dashboard : copy.hero.signup}
                   </ButtonLink>
                 </div>
@@ -157,9 +158,9 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* The live demo overlaps the hero, over the works-with strip (surface) */}
+        {/* The live demo sits on the light works-with strip with clear air above it: it no longer rides up into the navy hero (w9) */}
         <div className="relative border-b border-line bg-surface">
-          <div className={cn(CONTAINER, 'relative z-10 -mt-12 lg:-mt-[7.5rem]')}>
+          <div className={cn(CONTAINER, 'relative z-10 pt-12 sm:pt-16 lg:pt-20')}>
             <div className="mx-auto max-w-5xl">
               <HeroDemo copy={copy.demo} rtl={rtl} />
             </div>
@@ -320,16 +321,18 @@ export function LandingPage({
           </div>
         </Section>
 
-        {/* What the free check shows, before anyone signs up (the cobalt band) */}
-        <section className={cn(styles.bandBrand, 'relative overflow-hidden py-16 text-action-ink sm:py-20 lg:py-28')} data-check-tone="brand">
+        {/* What the free check shows, before anyone signs up (the navy band, the same ground as "everything you need") */}
+        <section className="relative isolate overflow-hidden bg-contrast py-16 text-contrast-ink sm:py-20 lg:py-28" data-check-tone="dark">
+          <div aria-hidden="true" className={cn(styles.darkGrid, 'pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px]')} />
+          <div aria-hidden="true" className={cn(styles.topLight, 'pointer-events-none absolute inset-x-8 top-0 h-px')} />
           <div className={cn(CONTAINER, 'grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16')}>
             <Rise>
-              <p className="mb-3 text-eyebrow text-action-ink ltr:uppercase ltr:tracking-wide">{copy.check.eyebrow}</p>
-              <h2 className="text-h2-mkt text-balance text-action-ink">{copy.check.title}</h2>
-              <p className="mt-4 text-lead-mkt font-normal text-action-ink text-pretty">{copy.check.body}</p>
+              <p className="mb-3 text-eyebrow text-rail-tagline ltr:uppercase ltr:tracking-wide">{copy.check.eyebrow}</p>
+              <h2 className="text-h2-mkt text-balance text-contrast-ink">{copy.check.title}</h2>
+              <p className="mt-4 text-lead-mkt font-normal text-contrast-ink/80 text-pretty">{copy.check.body}</p>
               <ul className="mt-6 space-y-3">
                 {copy.check.items.map((line) => (
-                  <li key={line} className="flex items-start gap-2.5 text-section font-normal text-action-ink">
+                  <li key={line} className="flex items-start gap-2.5 text-section font-normal text-contrast-ink/90">
                     <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-pill bg-surface text-action" aria-hidden="true">
                       <Check className="size-3" strokeWidth={3} />
                     </span>
@@ -339,7 +342,7 @@ export function LandingPage({
               </ul>
               <div className="mt-8 flex flex-col items-start gap-2.5">
                 <ButtonLink href={checkHref} variant="light" size="lg" arrow className={cn(styles.cta, 'h-12 px-7')}>{copy.check.cta}</ButtonLink>
-                <span className="text-caption text-action-ink">{copy.check.note}</span>
+                <span className="text-caption text-contrast-ink/75">{copy.check.note}</span>
               </div>
             </Rise>
             <Rise delay={120}>

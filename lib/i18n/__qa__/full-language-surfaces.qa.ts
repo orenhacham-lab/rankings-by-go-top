@@ -137,7 +137,7 @@ async function main() {
     check('B3: without ?error the sign-in form shows no alert', !/role="alert"/.test(render(LOGIN.default, 'he', '/login', 'lang=he')))
     const heLogin = render(LOGIN.default, 'he', '/login', 'lang=he')
     const heSignup = render(SIGNUP.default, 'he', '/signup', 'lang=he')
-    check('B4: the logo\'s alt text is Hebrew on the Hebrew pages', heLogin.includes('alt="הלוגו של Go Top"') && heSignup.includes('alt="הלוגו של Go Top"'))
+    check('B4: the logo\'s alt text is Hebrew on the Hebrew pages', heLogin.includes('alt="הלוגו של Go Top SEO"') && heSignup.includes('alt="הלוגו של Go Top SEO"'))
     check('B5: the cross-links stay in Hebrew (/signup?lang=he, /login?lang=he)', heLogin.includes('href="/signup?lang=he"') && heSignup.includes('href="/login?lang=he"'))
     const enSignup = render(SIGNUP.default, 'en', '/en/signup')
     check('B6: the English sign-up links to /en/login and carries no Hebrew', enSignup.includes('href="/en/login"') && !HEBREW.test(enSignup))

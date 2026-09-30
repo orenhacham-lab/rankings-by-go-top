@@ -8,7 +8,7 @@ import { TRIAL_CATALOG } from '@/lib/plans/catalog'
 import { landingHe } from '@/lib/i18n/public/landing-he'
 
 export const metadata: Metadata = {
-  title: 'יצירת, תזמון ופרסום מאמרי SEO ו-GEO | Rankings by Go Top',
+  title: 'יצירת, תזמון ופרסום מאמרי SEO ו-GEO | Go Top SEO',
   description:
     'תכננו נושאים, קבלו טיוטת מאמר מוכנה מ-AI, ערכו אותה, תזמנו אותה ופרסמו ישירות ל-WordPress או Shopify - הכול מתוך מקום אחד.',
   alternates: {
