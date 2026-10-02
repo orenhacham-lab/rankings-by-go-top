@@ -190,6 +190,103 @@ async function main() {
     { wp: wpDeps, readLive: async () => live({ title: `${F.PERFUME_PRODUCT_TITLE} - פרפיום קלאב`, h1: F.PERFUME_PRODUCT_TITLE }), generate: gen(fakeGemini(titleAnswer)) } as any) as any
   check('C7: "title too long" on his product now previews a 30–60 character title instead of "not in WordPress"', c7.ok && c7.type === 'seo_title' && c7.after.length >= 30 && c7.after.length <= 60, c7)
 
+  console.log('D. "Fix in one click" (japan4u.co.il, the plugin): every safe fix goes in, every other row says why')
+  const B = require('../bulk') as typeof import('../bulk')
+  const API = require('../api') as typeof import('../api')
+  const { FakeAdmin } = require('../../__qa__/_fake-admin')
+  const { FIX_TYPE } = require('../../site-health/rules')
+  // His pages: the title of "when to visit" was fixed on 2026-09-29 (site_fix_jobs), the rest is open.
+  const WHEN = 'https://japan4u.co.il/when-to-visit-japan-seasons-cherry-blossom/'
+  const INSURANCE = 'https://japan4u.co.il/%d7%91%d7%99%d7%98%d7%95%d7%97-%d7%98%d7%99%d7%95%d7%9c-%d7%9c%d7%99%d7%a4%d7%9f/'
+  const pg = (url: string, kind = 'article') => ({ url, kind })
+  const findings = [
+    { id: 'title_short', pages: F.JAPAN_TITLES.slice(0, 4).map((t) => pg(t.url)) },
+    { id: 'title_long', pages: [pg(WHEN), pg(F.JAPAN_SITE + '/', 'home')] },
+    { id: 'description_missing', pages: [pg(WHEN), pg(F.JAPAN_SHOPPING_URL)] },
+    { id: 'images_alt', pages: [pg(INSURANCE)] },
+    { id: 'faq_missing', pages: [pg(F.JAPAN_SHOPPING_URL)] },
+    { id: 'sitemap_missing', pages: [] },
+  ].map((f) => ({ ...f, fixType: FIX_TYPE[f.id] ?? null }))
+  const day = 86_400_000
+  const jobs = [
+    { id: 'j1', type: 'seo_title', pageUrl: WHEN, status: 'applied', appliedAt: new Date(Date.now() - 3 * day).toISOString(), approvedAt: new Date(Date.now() - 3 * day).toISOString(), batchId: null },
+    { id: 'j2', type: 'image_alt', pageUrl: INSURANCE, status: 'applied', appliedAt: new Date(Date.now() - 3 * day).toISOString(), approvedAt: new Date(Date.now() - 3 * day).toISOString(), batchId: null },
+  ] as any[]
+  // The screen's own answer: the row can be fixed now and no job holds that same place.
+  const fixable = (id: string, url: string) => !jobs.some((j) => j.type === FIX_TYPE[id] && j.pageUrl === url)
+  // The title of WHEN is "held" (applied) for the screen too, but the batch rule is what is tested here: ask with everything open.
+  const plan = B.bulkPlan(findings as any, { fixable: () => true, jobs, now: Date.now() })
+  const has = (type: string, url: string) => plan.rows.some((r) => r.type === type && r.url === url)
+  check('D1: his too-short titles and both descriptions go in, the one of the page whose TITLE was fixed 3 days ago included', F.JAPAN_TITLES.slice(0, 4).every((t) => has('seo_title', t.url)) && has('meta_description', WHEN) && has('meta_description', F.JAPAN_SHOPPING_URL), plan.rows)
+  const why = (type: string, url: string) => plan.skipped.find((r) => r.type === type && r.url === url)?.reason
+  check('D2: every row left out says why: same type fixed recently, the home page, FAQ needs one-by-one review', why('seo_title', WHEN) === 'recent' && why('image_alt', INSURANCE) === 'recent' && why('seo_title', F.JAPAN_SITE + '/') === 'home' && why('faq_block', F.JAPAN_SHOPPING_URL) === 'review', plan.skipped)
+  check('D3: a row with no automatic fix (sitemap) is not listed as "not fixed"', !plan.skipped.some((r) => r.kind === 'sitemap_missing'))
+  const screenPlan = B.bulkPlan(findings as any, { fixable, jobs, now: Date.now() })
+  check('D4: rows the queue already holds are neither in the batch nor in the list (they are done)', !screenPlan.rows.some((r) => r.type === 'seo_title' && r.url === WHEN) && !screenPlan.skipped.some((r) => r.type === 'seo_title' && r.url === WHEN))
+  await withMutant<typeof B, void>('lib/site-fix/bulk.ts', [['if (type && j.type && j.type !== type) return false', '']], async (MB) => {
+    const m = MB.bulkPlan(findings as any, { fixable: () => true, jobs, now: Date.now() })
+    check('D-MUT1: any fix on the page keeps all its rows out (wave 9) → D1 fails: WHEN\'s description is left out', !m.rows.some((r) => r.type === 'meta_description' && r.url === WHEN))
+  })
+  check('D5: the nudge count and the button stay one rule (bulkCandidates = bulkPlan rows)', B.bulkCandidates(findings as any, { fixable: () => true, jobs, now: Date.now() }).length === plan.rows.length)
+
+  // The server checks every approval again: the same rule, per type.
+  const U = '11111111-1111-4111-8111-111111111111'
+  const P = 'a1111111-2222-4333-8444-555555555555'
+  const KEY = { keyId: 'gtk_0123456789abcdef', secret: 'A'.repeat(43) }
+  let n = 0
+  const newId = () => `${String(++n).padStart(8, '0')}-aaaa-4bbb-8ccc-${String(n).padStart(12, '0')}`
+  const priorJob = (fix_type: string, page_url: string) => ({
+    id: newId(), user_id: U, project_id: P, fix_type, finding_kind: 'title_long', page_url, payload: { value: 'x' }, before_value: 'Old', after_summary: 'x', channel: 'plugin', status: 'applied',
+    error_code: null, undo: { expected: null, via: null }, remote_ref: null, approved_by: U, approved_at: new Date(Date.now() - 3 * day).toISOString(), approved_ip: null,
+    applied_at: new Date(Date.now() - 3 * day).toISOString(), reverted_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  })
+  const sends: string[] = []
+  const plugin = (async (_s: string, route: string) => {
+    sends.push(route)
+    if (route === '/fix') return { status: 200, body: JSON.stringify({ ok: true, status: 'applied', fix_id: 'f', post_id: 11, previous: '' }) }
+    return { status: 404, body: '{}' }
+  }) as any
+  const serverRun = async (api: typeof API) => {
+    const admin = new FakeAdmin({
+      projects: [{ id: P, user_id: U, target_domain: 'japan4u.co.il', business_name: 'Japan4U', name: 'יפן' }],
+      project_profiles: [{ project_id: P, user_id: U, detected_platform: 'wordpress' }],
+      site_fix_plugin_links: [{ project_id: P, user_id: U, site_url: F.JAPAN_SITE, key_id: KEY.keyId, secret_encrypted: 'enc:secret', secret_hint: '••••AAAA', status: 'connected', plugin_version: '2.1.0', seo_plugin: 'yoast', last_seen_at: null, last_error_code: null }],
+      site_fix_jobs: [priorJob('seo_title', WHEN)], site_fix_audit: [],
+    })
+    const deps = { userId: U, ip: '203.0.113.9', admin, decrypt: (x: string) => (x === 'enc:secret' ? KEY.secret : 'p'), encrypt: (x: string) => `enc:${x.length}`, wp: {} as any, readLive: async () => null, newId, pluginPost: plugin } as any
+    const batch = { batch: '0b0b0b0b-1111-4222-8333-444444444444' }
+    const desc = 'מתי כדאי לטוס ליפן? מדריך לעונות השנה, למזג האוויר ולעונת פריחת הדובדבן, עם המלצות מעשיות לכל חודש בשנה ולכל סוג של מטייל.'
+    const d = await api.handleFixesPost({ projectId: P, action: 'approve', approved: true, kind: 'description_missing', pageUrl: WHEN, fix: { type: 'meta_description', value: desc }, expected: '', via: null, before: '', bulk: batch }, deps)
+    const t = await api.handleFixesPost({ projectId: P, action: 'approve', approved: true, kind: 'title_long', pageUrl: WHEN, fix: { type: 'seo_title', value: 'מתי כדאי לטוס ליפן – מדריך עונות ועונת הפריחה | Japan4U' }, expected: 'x', via: null, before: 'x', bulk: batch }, deps)
+    return { d, t }
+  }
+  const srv = await serverRun(API)
+  check('D6: the server applies the description of his page whose title was fixed 3 days ago', srv.d.status === 200 && (srv.d.body as any).job?.status === 'applied', srv.d)
+  check('D7: …and still refuses a second title on it within 30 days (not_bulk_safe)', srv.t.status === 409 && (srv.t.body as any).code === 'not_bulk_safe', srv.t)
+  await withMutant<typeof API, void>('lib/site-fix/api.ts', [[' && r.fix_type === a.type && batchOf(r)', ' && batchOf(r)']], async (MA) => {
+    const m = await serverRun(MA)
+    check('D-MUT2: any fix on the page refuses the batch (wave 9) → D6 fails', m.d.status === 409)
+  })
+
+  // The words for every reason, in both languages, and the list under the result.
+  const { getDashboardDictionary } = require('../../i18n/dashboard/getDashboardDictionary')
+  const he = getDashboardDictionary('he').siteHealth.autofix
+  const en = getDashboardDictionary('en').siteHealth.autofix
+  const reasons = ['review', 'home', 'recent', 'batch_full', 'not_safe', 'failed']
+  check('D8: every reason has a sentence in Hebrew and English', reasons.every((r) => /\p{Script=Hebrew}/u.test(he.bulk.reasons[r] ?? '') && /^[A-Z]/.test(en.bulk.reasons[r] ?? '')))
+  const UI = require('../../../components/site-health/useSafeFixes') as typeof import('../../../components/site-health/useSafeFixes')
+  check('D9: a preview or approval code reads as its usual sentence (no raw code)', UI.bulkReasonText('no_valid_suggestion', he) === he.errors.no_valid_suggestion && UI.bulkReasonText('recent', he) === he.bulk.reasons.recent && !/_/.test(UI.bulkReasonText('plugin_unreachable', he)))
+  const { renderToStaticMarkup } = require('react-dom/server') as typeof import('react-dom/server')
+  const { createElement } = require('react') as { createElement: (...a: any[]) => any }
+  const html = renderToStaticMarkup(createElement(UI.BulkResultList, { results: plan.skipped, copy: he }))
+  check('D10: after the click the strip offers "what was not fixed and why (n)"', html.includes(he.bulk.showLeft(plan.skipped.length)) && html.includes(`data-bulk-results="${plan.skipped.length}"`), html.slice(0, 200))
+  const stripSrc = read('components/site-health/AutoFixStrip.tsx')
+  check('D11: the strip renders that list in its "done" state', /<BulkResultList results=\{bulk\.phase\.results\}/.test(stripSrc))
+  const hook = read('components/site-health/useSafeFixes.tsx')
+  check('D12: a preview that fails or does not pass the check is reported, not dropped silently', /if \(!ready\[i\]\) notReady\.push\(/.test(hook) && /failedRows\.push\(\{ type: r\.row\.type, url: r\.row\.url, reason: answer\.code/.test(hook))
+  const mutHook = hook.replace('if (!ready[i]) notReady.push(', 'if (false) notReady.push(')
+  check('D12-MUT: the wave-9 hook (silent drop) fails D12', !/if \(!ready\[i\]\) notReady\.push\(/.test(mutHook))
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }

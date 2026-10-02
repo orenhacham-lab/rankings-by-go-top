@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { PLUGIN_LATEST_VERSION, versionAtLeast, type FixCapabilities, type FixErrorCode } from '@/lib/site-fix/types'
 import { postFix } from './useSiteFixes'
-import type { SafePhase } from './useSafeFixes'
+import { BulkResultList, type SafePhase } from './useSafeFixes'
 
 type Copy = DashboardDictionary['siteHealth']['autofix']
 type View = 'none' | 'appPassword' | 'pending' | 'connected' | 'disconnected' | 'rekey' | 'webhook'
@@ -120,8 +120,9 @@ export default function AutoFixStrip({
             )}
             {bulk && bulk.phase.kind === 'done' && (
               <div className="mt-3 space-y-1" role="status" data-safe-fixes="done">
-                <p className="text-copy font-semibold text-ink">{copy.bulk.summary(bulk.phase.ok, bulk.phase.n)}</p>
+                <p className="text-copy font-semibold text-ink">{bulk.phase.n > 0 ? copy.bulk.summary(bulk.phase.ok, bulk.phase.n) : copy.bulk.nothingReady}</p>
                 {bulk.phase.failed > 0 && <p className="text-caption text-warn">{copy.bulk.failed(bulk.phase.failed)}</p>}
+                <BulkResultList results={bulk.phase.results} copy={copy} />
               </div>
             )}
             {error && <p role="alert" className="mt-2 text-caption font-medium text-warn">{copy.errors[error]}</p>}
