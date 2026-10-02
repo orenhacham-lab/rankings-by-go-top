@@ -2,13 +2,13 @@
 
 /**
  * "Waiting for you": under the dashboard's hero, up to three things that only the owner
- * can move (the site connection, articles to approve, topics to approve, safe fixes),
+ * can move (the site connection, a missing site or Search Console connection, articles to approve, topics to approve, safe fixes),
  * each with one sentence and one button to the exact screen. Hidden when nothing waits;
  * no modal, no toast; a failed read is the same as nothing waiting.
  *
  * The rows come from lib/nudges/rows.ts (the same rule the sidebar's count pills use).
  */
-import { AlertTriangle, FileCheck2, Lightbulb, Wrench, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, FileCheck2, Lightbulb, LineChart, Plug, Wrench, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Locale } from '@/lib/i18n/locales'
@@ -20,6 +20,8 @@ type Copy = DashboardDictionary['waitingCard']
 
 const ICONS: Record<WaitingRowKind, LucideIcon> = {
   connection: AlertTriangle,
+  site: Plug,
+  gsc: LineChart,
   articles: FileCheck2,
   topics: Lightbulb,
   fixes: Wrench,
@@ -28,6 +30,8 @@ const ICONS: Record<WaitingRowKind, LucideIcon> = {
 export function waitingSentence(t: Copy, row: WaitingRow): string {
   switch (row.kind) {
     case 'connection': return t.connection
+    case 'site': return t.site
+    case 'gsc': return t.gsc
     case 'articles': return t.articles(row.n)
     case 'topics': return t.topics(row.n)
     case 'fixes': return t.fixes(row.n)
@@ -35,7 +39,7 @@ export function waitingSentence(t: Copy, row: WaitingRow): string {
 }
 
 export function waitingAction(t: Copy, kind: WaitingRowKind): string {
-  return { connection: t.connectionAction, articles: t.articlesAction, topics: t.topicsAction, fixes: t.fixesAction }[kind]
+  return { connection: t.connectionAction, site: t.siteAction, gsc: t.gscAction, articles: t.articlesAction, topics: t.topicsAction, fixes: t.fixesAction }[kind]
 }
 
 export default function WaitingCard({ t, rows, language }: { t: Copy; rows: readonly WaitingRow[]; language: Locale }) {
@@ -51,7 +55,7 @@ export default function WaitingCard({ t, rows, language }: { t: Copy; rows: read
       <ul className="divide-y divide-line px-5 pb-1 pt-2">
         {rows.map((row, i) => {
           const Icon = ICONS[row.kind]
-          const down = row.kind === 'connection'
+          const down = row.kind === 'connection' || row.kind === 'site'
           return (
             <li key={row.kind} data-waiting-row={row.kind} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3">
               <span

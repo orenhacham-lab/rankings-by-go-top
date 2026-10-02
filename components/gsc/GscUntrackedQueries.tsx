@@ -18,6 +18,7 @@ import { useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
+import Segmented from '@/components/ui/Segmented'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { UntrackedQuery } from '@/lib/gsc/tab-metrics'
@@ -26,6 +27,27 @@ import { formatCompact, formatCount, formatWholePosition } from './format'
 /** How the add ended: added, already tracked, the plan's limit, or a failure. */
 export type TrackOutcome = 'added' | 'exists' | 'quota' | 'failed'
 export type TrackQuery = (query: string) => Promise<TrackOutcome>
+
+/** How the list is ordered: Google's own figures, most impressions first unless chosen. */
+export type UntrackedSort = 'impressions' | 'clicks' | 'position'
+
+/**
+ * Orders the rows for the chosen sort. Impressions and clicks: most first. Position:
+ * best (smallest) first, a search without a position last. Every sort breaks a tie by
+ * impressions then clicks then the query, so the order is stable and never jumps.
+ */
+export function sortUntrackedRows<T extends UntrackedQuery>(rows: readonly T[], sort: UntrackedSort): T[] {
+  const tie = (a: T, b: T) => b.impressions - a.impressions || b.clicks - a.clicks || (a.query < b.query ? -1 : a.query > b.query ? 1 : 0)
+  return [...rows].sort((a, b) => {
+    if (sort === 'clicks') return b.clicks - a.clicks || tie(a, b)
+    if (sort === 'position') {
+      const pa = a.position == null ? Infinity : a.position
+      const pb = b.position == null ? Infinity : b.position
+      if (pa !== pb) return pa < pb ? -1 : 1
+    }
+    return tie(a, b)
+  })
+}
 
 /** Rows shown before "show more". */
 export const UNTRACKED_VISIBLE = 8
@@ -72,6 +94,7 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets.untracked
   const [expanded, setExpanded] = useState(false)
+  const [sort, setSort] = useState<UntrackedSort>('impressions')
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
   // One add at a time, decided synchronously: two clicks in one tick are one request.
@@ -93,10 +116,10 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
     )
   }
 
-  const rows: Row[] = [
+  const rows: Row[] = sortUntrackedRows([
     ...tracked.filter((q) => q.impressions > 0).map((q) => ({ ...q, tracked: true })),
     ...insights.untracked.map((q) => ({ ...q, tracked: false })),
-  ].sort((a, b) => b.impressions - a.impressions || b.clicks - a.clicks)
+  ], sort)
   const trackedCount = rows.length - insights.untracked.length
   if (rows.length === 0) {
     return (
@@ -124,6 +147,22 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
 
   return (
     <div data-gsc-untracked="list">
+      {/* Sort: a radiogroup (one tab stop, arrows choose); the result is announced politely. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-3 sm:px-6" data-gsc-untracked-sort={sort}>
+        <span className="text-caption font-semibold text-muted">{t.sortLabel}</span>
+        <Segmented
+          ariaLabel={t.sortLabel}
+          value={sort}
+          onChange={(v) => { setSort(v); setExpanded(false) }}
+          className="max-w-full overflow-x-auto"
+          options={[
+            { value: 'impressions', label: t.sortImpressions },
+            { value: 'clicks', label: t.sortClicks },
+            { value: 'position', label: t.sortPosition },
+          ]}
+        />
+        <span className="sr-only" role="status" aria-live="polite">{t.sortedBy(sort === 'clicks' ? t.sortClicks : sort === 'position' ? t.sortPosition : t.sortImpressions)}</span>
+      </div>
       {/* Column names for the figures, from a tablet up; on a phone each figure names itself. */}
       <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1fr)_7rem_5rem_6rem_8.5rem] items-center gap-4 border-b border-line bg-sunk/40 px-6 py-2 text-caption font-semibold text-muted md:grid">
         <span />

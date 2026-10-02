@@ -46,6 +46,19 @@ export interface WaitingAnswer {
   queueEndsAt: string | null
   /** The Go Top plugin is paired and answering: safe fixes can be written to the site. */
   pluginConnected: boolean
+  /**
+   * The project has a site connection (WordPress, Shopify, Wix or a custom site; a row that
+   * exists, even one that last failed a check: that one is `connectionDown`). False: none yet,
+   * so no article can be published. Null: it could not be read, and nothing is claimed.
+   * Absent on an answer from before wave 10: no row is made from it.
+   */
+  siteConnected?: boolean | null
+  /**
+   * Search Console is connected for this project (a live Google connection AND a property
+   * assigned to it). False: not yet, or it needs approving again. Null: could not be read,
+   * or Search Console is switched off on the server: no row is made from it.
+   */
+  gscConnected?: boolean | null
 }
 
 export interface WaitingDeps {
@@ -121,6 +134,53 @@ async function readConnection({ projectId, userId }: Scope, db: SupabaseClient, 
   }
 }
 
+const isMissingTable = (e: unknown): boolean => {
+  const err = e as { code?: string; message?: string } | null
+  return !!err && (err.code === '42P01' || err.code === 'PGRST205' || err.code === '42703' || /does not exist|schema cache/i.test(err.message ?? ''))
+}
+
+/**
+ * Is there a site connection row of any platform? 'present' | 'absent' | 'unknown' per
+ * table; a table that does not exist yet (its migration not applied) is 'absent'. Shopify's
+ * archived connections do not count. Every read is by project AND owner.
+ */
+async function readSiteConnected({ projectId, userId }: Scope, db: SupabaseClient): Promise<boolean | null> {
+  const one = async (run: () => PromiseLike<{ data?: unknown; error?: unknown }>): Promise<'present' | 'absent' | 'unknown'> => {
+    try {
+      const r = await run()
+      if (r.error) return isMissingTable(r.error) ? 'absent' : 'unknown'
+      return r.data ? 'present' : 'absent'
+    } catch { return 'unknown' }
+  }
+  const answers = await Promise.all([
+    one(() => db.from('wordpress_connections').select('project_id').eq('project_id', projectId).eq('user_id', userId).maybeSingle()),
+    one(() => db.from('site_platform_connections').select('project_id').eq('project_id', projectId).eq('user_id', userId).maybeSingle()),
+    one(() => db.from('shopify_connections').select('project_id').eq('project_id', projectId).eq('user_id', userId).is('archived_at', null).maybeSingle()),
+  ])
+  if (answers.includes('present')) return true
+  return answers.includes('unknown') ? null : false
+}
+
+/**
+ * Search Console for the project: a property assigned to THIS project and the owner's Google
+ * connection alive. Service role (the connection row holds tokens that browser roles never
+ * read): only the status is selected, filtered by project AND owner. Null when switched off
+ * on the server or unreadable.
+ */
+async function readGscConnected({ projectId, userId }: Scope, admin: () => ServiceRoleClient, env: Record<string, string | undefined>): Promise<boolean | null> {
+  if (env.GSC_READ_ONLY_ENABLED !== 'true') return null
+  try {
+    const db = admin()
+    const [prop, conn] = await Promise.all([
+      db.from('project_gsc_properties').select('connection_id').eq('project_id', projectId).maybeSingle(),
+      db.from('gsc_connections').select('status').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    if (prop.error || conn.error) return null
+    const status = (conn.data as { status?: unknown } | null)?.status
+    return !!prop.data && status === 'connected'
+  } catch { return null }
+}
+
 export async function handleWaitingGet(projectId: string, deps: WaitingDeps): Promise<Response> {
   let session: { userId: string | null; db: SupabaseClient }
   try {
@@ -141,8 +201,10 @@ export async function handleWaitingGet(projectId: string, deps: WaitingDeps): Pr
 
     const scope: Scope = { projectId: project.id, userId }
     const content = deps.env.ENABLE_CONTENT === 'true'
-    const [connection, articles, topics, queue] = await Promise.all([
+    const [connection, siteConnected, gscConnected, articles, topics, queue] = await Promise.all([
       readConnection(scope, session.db, deps.admin),
+      readSiteConnected(scope, session.db),
+      readGscConnected(scope, deps.admin, deps.env),
       content ? readArticles(scope, session.db) : Promise.resolve(0),
       content ? readTopics(scope, session.db) : Promise.resolve(0),
       content ? readQueue(scope, session.db) : Promise.resolve({ queued: 0, endsAt: null }),
@@ -155,6 +217,8 @@ export async function handleWaitingGet(projectId: string, deps: WaitingDeps): Pr
       queued: queue.queued,
       queueEndsAt: queue.endsAt,
       pluginConnected: connection.pluginConnected,
+      siteConnected,
+      gscConnected,
     }
     return Response.json(answer, { status: 200, headers: NO_STORE })
   } catch {

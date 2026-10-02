@@ -117,7 +117,7 @@ async function main() {
     check('A2: 2 topics await approval (not approved or rejected)', b.topics === 2)
     check('A3: 1 topic already queued, and the last dated one is known', b.queued === 1 && b.queueEndsAt === '2026-10-05T08:00:00.000Z')
     check('A4: a connected site and plugin: nothing down, fixes possible', b.connectionDown === null && b.pluginConnected === true)
-    check('A5: the answer carries numbers and one date, no ids or titles', JSON.stringify(Object.keys(b).sort()) === JSON.stringify(['articles', 'connectionDown', 'ok', 'pluginConnected', 'queueEndsAt', 'queued', 'topics']))
+    check('A5: the answer carries numbers and one date, no ids or titles', JSON.stringify(Object.keys(b).sort()) === JSON.stringify(['articles', 'connectionDown', 'gscConnected', 'ok', 'pluginConnected', 'queueEndsAt', 'queued', 'siteConnected', 'topics']))
     const scoped = (x: { table: string; filters: string[] }) => x.table === 'projects'
       ? x.filters.includes('eq:id') && x.filters.includes('eq:user_id')
       : x.filters.includes('eq:project_id') && x.filters.includes('eq:user_id')
@@ -191,7 +191,7 @@ async function main() {
   for (const [k, v] of Object.entries(rules(waitingRows))) check(k, v)
   const rowsMut = await withMutant<{ waitingRows: typeof waitingRows }, boolean>(
     'lib/nudges/rows.ts',
-    [['return rows.slice(0, MAX_WAITING_ROWS)', 'return rows'], [/if \(pos\(w\.articles\) > 0\)/, 'if (true)']],
+    [['.slice(0, MAX_WAITING_ROWS)]', ']'], [/if \(pos\(w\.articles\) > 0\)/, 'if (true)']],
     (m) => Object.values(rules(m.waitingRows)).some((v) => !v),
   )
   check('B-MUT: a card with no cap that shows a row at 0 fails B1/B3', rowsMut)

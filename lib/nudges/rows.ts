@@ -8,7 +8,7 @@
  * ONE internal screen. Nothing here reads, writes or sends anything.
  */
 import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
-import { platformSetupHref } from '@/lib/content/content-hub-setup'
+import { platformSetupHref, settingsGscHref } from '@/lib/content/content-hub-setup'
 import { strategyHref } from '@/lib/content/strategy/view'
 import { FIX_TYPE } from '@/lib/site-health/rules'
 import type { FindingKind } from '@/lib/site-health/types'
@@ -20,7 +20,12 @@ export const MAX_WAITING_ROWS = 3
 /** The status filter the articles screen opens with when it arrives from a nudge. */
 export const ARTICLES_WAITING_STATUS = 'ready'
 
-export type WaitingRowKind = 'connection' | 'articles' | 'topics' | 'fixes'
+/**
+ * `site` (no site connection yet) and `gsc` (no Search Console connection) are the two
+ * setup rows of wave 10: always present while the thing is missing, each with a call to the
+ * right settings section, and never counted in the card's cap of three.
+ */
+export type WaitingRowKind = 'connection' | 'site' | 'gsc' | 'articles' | 'topics' | 'fixes'
 export interface WaitingRow {
   kind: WaitingRowKind
   /** The count the sentence is about (0 for the connection). */
@@ -40,9 +45,13 @@ export const FIXES_HREF = '/site-health#fixes'
 /** `null` (the fix queue could not be read) counts as nothing: the row and the badge stay hidden, never a guess. */
 const pos = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0)
 
+const SETUP_ROWS: ReadonlySet<WaitingRowKind> = new Set<WaitingRowKind>(['site', 'gsc'])
+
 export function waitingRows(projectId: string, w: WaitingAnswer | null, safeFixes: number | null): WaitingRow[] {
   const rows = allWaitingRows(projectId, w, safeFixes)
-  return rows.slice(0, MAX_WAITING_ROWS)
+  // The setup rows (a missing connection) always show; the cap is for the rest, as before.
+  const setup = rows.filter((r) => SETUP_ROWS.has(r.kind))
+  return [...setup, ...rows.filter((r) => !SETUP_ROWS.has(r.kind)).slice(0, MAX_WAITING_ROWS)]
 }
 
 /**
@@ -55,6 +64,10 @@ export function allWaitingRows(projectId: string, w: WaitingAnswer | null, safeF
   if (w.connectionDown) {
     rows.push({ kind: 'connection', n: 0, href: w.connectionDown === 'plugin' ? '/site-health' : platformSetupHref(projectId), dryOn: null })
   }
+  // Nothing goes live without a site, so its absence comes first; Search Console follows it,
+  // and stays until it is connected too. `false` only: an unread answer (null) makes no row.
+  if (w.siteConnected === false) rows.push({ kind: 'site', n: 0, href: platformSetupHref(projectId), dryOn: null })
+  if (w.gscConnected === false) rows.push({ kind: 'gsc', n: 0, href: settingsGscHref(projectId), dryOn: null })
   if (pos(w.articles) > 0) rows.push({ kind: 'articles', n: pos(w.articles), href: waitingArticlesHref(), dryOn: null })
   if (pos(w.topics) > 0) {
     const low = pos(w.queued) < LOW_QUEUE && !!w.queueEndsAt
@@ -67,7 +80,7 @@ export function allWaitingRows(projectId: string, w: WaitingAnswer | null, safeF
 
 /** The bell's badge: one per thing to do (a lost connection is one, however many articles wait behind it). */
 export function bellCount(rows: readonly WaitingRow[]): number {
-  return rows.reduce((sum, r) => sum + (r.kind === 'connection' ? 1 : Math.max(0, r.n)), 0)
+  return rows.reduce((sum, r) => sum + (r.kind === 'connection' || r.kind === 'site' || r.kind === 'gsc' ? 1 : Math.max(0, r.n)), 0)
 }
 
 export interface RailCounts { articles: number; strategy: number; siteHealth: number }

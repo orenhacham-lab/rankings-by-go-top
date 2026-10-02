@@ -150,12 +150,14 @@ async function main() {
     check('MUTATION CONTROL: a footer without the WhatsApp row is caught', !footOk(footer('he').replace('data-footer-whatsapp', 'data-x')))
     // The credit to the agency site (the owner, 2026-09-29): a plain, followed link to https://gotop.co.il.
     const creditOk = (html: string, text: string) => { const m = /<a href="https:\/\/gotop\.co\.il"([^>]*)data-footer-credit="[^"]*">([^<]*)<\/a>/.exec(html)
-      return !!m && m[2] === text && !/rel="[^"]*nofollow/.test(m[1]) }
+      // Wave 10: only "GO TOP" is the anchor; the words before it ("מבית" / "By") are plain text in the same line.
+      const line = /data-footer-credit-line="[^"]*">([^<]*)<a /.exec(html)
+      return !!m && m[2] === 'GO TOP' && !!line && (line[1] + m[2]) === text && !/rel="[^"]*nofollow/.test(m[1]) }
     check('B4b: the footer credits "מבית GO TOP" / "By GO TOP", a followed link to https://gotop.co.il', creditOk(footer('he'), 'מבית GO TOP') && creditOk(footer('en'), 'By GO TOP'))
     check('MUTATION CONTROL: a nofollow credit is caught', !creditOk(footer('he').replace('<a href="https://gotop.co.il"', '<a href="https://gotop.co.il" rel="nofollow"'), 'מבית GO TOP'))
 
     const widgets = strip(read('components/public/PublicSiteWidgets.tsx'))
-    const floatOk = /<WhatsAppFloat hidden=\{cookieOpen\} \/>/.test(widgets) && /<MobileContactBar \/>/.test(widgets)
+    const floatOk = /<WhatsAppFloat \/>/.test(widgets) && /<MobileContactBar \/>/.test(widgets)
       && /href=\{whatsappHelpUrl\(t\.whatsappMessage\)\}/.test(strip(read('components/public/WhatsAppFloat.tsx')))
       && /href=\{whatsappHelpUrl\(t\.whatsappMessage\)\}/.test(strip(read('components/public/MobileContactBar.tsx')))
     check('B5: the floating WhatsApp button and the phone contact bar stay, in the page\'s language', floatOk)

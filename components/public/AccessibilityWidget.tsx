@@ -371,6 +371,7 @@ export function AccessibilityWidget() {
         aria-expanded={open}
         aria-haspopup="dialog"
         data-a11y-trigger
+        data-public-float
         className={cn(
           'fixed start-4 z-[60] flex size-10 items-center justify-center rounded-pill border shadow-pop',
           'transition-[bottom,background-color,border-color] duration-150 ease-snappy',

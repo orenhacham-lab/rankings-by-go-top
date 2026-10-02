@@ -17,7 +17,7 @@ import { AccessibilityWidget } from './AccessibilityWidget'
  *
  * The cookie banner is bundled here so it coordinates spacing with the mobile
  * contact bar and never overlaps form actions on the login/signup screens.
- * While it is open the WhatsApp button that shares its corner steps aside. On a
+ * The WhatsApp button is never hidden by it: the card sits beside the button. On a
  * phone the notice, the contact bar and the accessibility button share ONE
  * bottom strip: the sheet lies over the bar, and both keep the start slot free
  * for the accessibility button, so none of them floats over the page.
@@ -80,7 +80,7 @@ export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated
   return (
     <>
       <AccessibilityWidget />
-      <WhatsAppFloat hidden={cookieOpen} />
+      <WhatsAppFloat />
       <MobileContactBar />
       <CookieConsent onOpenChange={setCookieOpen} />
     </>

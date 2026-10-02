@@ -12,7 +12,10 @@ import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
  * the physical left in both languages: from `sm` a 340px card at the bottom-left
  * corner, on a phone a 240px card lifted above the contact bar. It never spans
  * the page, so it needs no bottom padding. The WhatsApp button, which also sits
- * at the bottom-left, steps aside while it is open (PublicSiteWidgets), and
+ * at the bottom-left in Hebrew, is NEVER covered or hidden by it (wave 10): from `sm`
+ * the card is offset past the button's 6rem slot (left-24), so it clears the WhatsApp
+ * button at the bottom-left (Hebrew) and the accessibility button at the left (English);
+ * on a phone the WhatsApp action is in the contact bar the card sits above.
  * `onOpenChange` tells the other widgets.
  *
  * Consent logic and storage are untouched: the key `cookie-consent-accepted` in
@@ -60,6 +63,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       {/* Phone: ultra compact, 240px, no title, lifted above the contact bar */}
       <div
         data-cookie-compact
+        data-public-float
         className="fixed left-3.5 z-[58] flex w-[240px] max-w-[calc(100vw-1.75rem)] flex-col items-stretch rounded-card border border-white/10 bg-contrast px-2.5 pb-2 pt-1.5 shadow-pop animate-pop-in sm:hidden"
         style={{ bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))' }}
       >
@@ -79,7 +83,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       </div>
 
       {/* From sm: compact but readable, 340px, at the bottom-left corner */}
-      <div className="fixed bottom-6 left-6 z-[58] hidden w-[340px] max-w-[340px] rounded-card border border-white/10 bg-contrast px-4 py-3.5 shadow-pop animate-pop-in sm:block">
+      <div data-public-float data-cookie-desktop className="fixed bottom-6 left-24 z-[58] hidden w-[340px] max-w-[340px] rounded-card border border-white/10 bg-contrast px-4 py-3.5 shadow-pop animate-pop-in sm:block">
         <div className="flex items-start gap-2.5">
           <div className="flex size-[30px] shrink-0 items-center justify-center rounded-pill bg-white/10 text-contrast-ink" aria-hidden="true">
             <Cookie className="size-4" />

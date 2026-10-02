@@ -30,6 +30,7 @@ export function MobileContactBar() {
       role="region"
       aria-label={t.region}
       data-mobile-contact-bar
+      data-public-float
     >
       <div className="flex w-full items-stretch gap-2 ps-[4.25rem] pe-4 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
         <a

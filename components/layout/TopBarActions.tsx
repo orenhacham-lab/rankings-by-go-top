@@ -20,7 +20,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { AlertTriangle, Bell, FileCheck2, Lightbulb, Settings2, Wrench, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Bell, FileCheck2, Lightbulb, LineChart, Plug, Settings2, Wrench, type LucideIcon } from 'lucide-react'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -31,7 +31,7 @@ import { waitingAction, waitingSentence } from '@/components/dashboard/WaitingCa
 import { useWaiting } from '@/components/nudges/useWaiting'
 import { cn } from '@/lib/utils'
 
-const ICONS: Record<WaitingRowKind, LucideIcon> = { connection: AlertTriangle, articles: FileCheck2, topics: Lightbulb, fixes: Wrench }
+const ICONS: Record<WaitingRowKind, LucideIcon> = { connection: AlertTriangle, site: Plug, gsc: LineChart, articles: FileCheck2, topics: Lightbulb, fixes: Wrench }
 
 const ICON_BUTTON = cn(
   'relative inline-flex size-9 shrink-0 items-center justify-center rounded-pill text-muted',
@@ -151,7 +151,7 @@ export default function TopBarActions() {
               <div className="p-1">
                 {rows.map((row) => {
                   const Icon = ICONS[row.kind]
-                  const down = row.kind === 'connection'
+                  const down = row.kind === 'connection' || row.kind === 'site'
                   return (
                     <Link
                       key={row.kind}

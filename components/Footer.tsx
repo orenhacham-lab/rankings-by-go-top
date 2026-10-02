@@ -11,8 +11,13 @@ import { whatsappHelpUrl } from '@/components/public/contact'
  * The public footer: the navy band (bg-contrast), the same navy as the app's
  * rail, so the site and the product close on the same colour.
  */
+/** The only words of the credit line that are the link. */
+const CREDIT_ANCHOR = 'GO TOP'
+
 export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
   const dict = getPublicDictionary(locale)
+  // "מבית GO TOP" / "By GO TOP": the text around the agency's name stays plain, the name is the link.
+  const [creditBefore, creditAfter = ''] = dict.footer.credit.split(CREDIT_ANCHOR)
   const prefix = locale === 'en' ? '/en' : ''
   const homeHref = prefix === '/en' ? '/en' : '/'
   const linkClass = 'rounded-control text-copy text-contrast-ink/70 transition-colors duration-150 ease-snappy hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20'
@@ -126,13 +131,18 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
           <p className="text-center text-caption text-contrast-ink/60">
             {dict.footer.copyright}
           </p>
-          <a
-            href="https://gotop.co.il"
-            className="rounded-control text-caption font-semibold text-contrast-ink/80 underline decoration-white/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:text-contrast-ink hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
-            data-footer-credit
-          >
-            {dict.footer.credit}
-          </a>
+          {/* Wave 10 (owner): only the words "GO TOP" are the link; "מבית" / "By" is plain text. */}
+          <p className="text-caption font-semibold text-contrast-ink/80" data-footer-credit-line>
+            {creditBefore}
+            <a
+              href="https://gotop.co.il"
+              className="rounded-control underline decoration-white/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:text-contrast-ink hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
+              data-footer-credit
+            >
+              {CREDIT_ANCHOR}
+            </a>
+            {creditAfter}
+          </p>
         </div>
       </div>
     </footer>

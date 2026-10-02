@@ -46,6 +46,15 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [scrollThreshold])
+  // While the menu is open, the floating widgets (contact bar, WhatsApp, accessibility, privacy
+  // notice: [data-public-float]) step aside, so none of them covers the menu's "start free"
+  // button (owner, wave 10). globals.css hides them under this attribute.
+  useEffect(() => {
+    if (!mobileOpen) return
+    const root = document.documentElement
+    root.setAttribute('data-public-menu', 'open')
+    return () => root.removeAttribute('data-public-menu')
+  }, [mobileOpen])
   // White ink while the bar is still over a navy hero.
   const onDark = tone === 'inverse' && !scrolled && !mobileOpen
 
@@ -159,7 +168,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale
                 <ChevronDown className="size-4 transition-transform duration-150 ease-snappy group-focus-within:rotate-180 group-hover:rotate-180" aria-hidden="true" />
               </button>
               <div className="invisible absolute start-0 top-full z-50 pt-2 opacity-0 transition-[opacity,visibility] duration-150 ease-snappy group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-                <div className="grid w-[30rem] grid-cols-1 gap-0.5 rounded-card border border-line bg-surface p-2 shadow-pop">
+                <div data-features-panel className="grid w-[30rem] grid-cols-1 gap-0.5 whitespace-normal rounded-card border border-line bg-surface p-2 shadow-pop">
                   {featureItems.map((item) => (
                     <Link
                       key={item.id}
@@ -170,8 +179,8 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale
                         <item.icon className="size-4" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-copy font-semibold text-ink">{item.label}</span>
-                        <span className="mt-0.5 block text-caption text-muted">{item.description}</span>
+                        <span className="block text-copy font-semibold text-ink text-pretty">{item.label}</span>
+                        <span className="mt-0.5 block text-caption text-muted text-pretty">{item.description}</span>
                       </span>
                     </Link>
                   ))}

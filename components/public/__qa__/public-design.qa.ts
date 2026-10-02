@@ -142,12 +142,12 @@ function main() {
   const DOCKED = "'bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-24'"
   const overlaysOk = (widgets: string, cookie: string, a11y: string, whatsapp: string, bar: string) => {
     const w = strip(widgets), c = strip(cookie), a = strip(a11y), wa = strip(whatsapp), b = strip(bar)
-    return /<WhatsAppFloat hidden=\{cookieOpen\} \/>/.test(w)
+    return /<WhatsAppFloat \/>/.test(w)
       && /<AccessibilityWidget \/>/.test(w)
       && /<CookieConsent onOpenChange=\{setCookieOpen\} \/>/.test(w)
       // w9 (the owner): the ORIGINAL small popup at the left side, back from the full-width sheet/bar.
       // From sm a 340px card at the bottom-left corner; on a phone a 240px card above the contact bar.
-      && /fixed bottom-6 left-6 z-\[58\] hidden w-\[340px\] max-w-\[340px\]/.test(c) && /sm:block/.test(c)
+      && /fixed bottom-6 left-24 z-\[58\] hidden w-\[340px\] max-w-\[340px\]/.test(c) && /sm:block/.test(c)
       && /fixed left-3\.5 z-\[58\] flex w-\[240px\] max-w-\[calc\(100vw-1\.75rem\)\]/.test(c) && /sm:hidden/.test(c)
       && c.includes("bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))'")
       // never a page-wide bar or sheet again, and no bottom padding on the page
@@ -157,7 +157,8 @@ function main() {
       && /fixed start-4 z-\[60\] flex size-10/.test(a) && a.includes(DOCKED) && !/\braised\b/.test(a)
       // the contact bar keeps the same slot free, under the sheet
       && b.includes(SLOT) && /z-\[55\]/.test(b) && /md:hidden/.test(b)
-      && /if \(hidden\) return null/.test(wa)
+      // wave 10 (the owner): the WhatsApp button is never hidden by the notice (the card sits beside it)
+      && !/hidden\?: boolean|if \(hidden\) return null/.test(wa)
   }
   {
     const widgets = read('components/public/PublicSiteWidgets.tsx')
@@ -167,8 +168,8 @@ function main() {
     const bar = read('components/public/MobileContactBar.tsx')
     check('D1: the cookie notice is the small left popup (w9); the accessibility button and contact bar keep their strip', overlaysOk(widgets, cookie, a11y, whatsapp, bar))
     check('D2: the contact bar stays under the cookie sheet (z-55 < z-58)', /z-\[55\]/.test(strip(bar)))
-    check('MUTATION CONTROL: WhatsApp no longer stepping aside is caught',
-      !overlaysOk(widgets.replace('<WhatsAppFloat hidden={cookieOpen} />', '<WhatsAppFloat />'), cookie, a11y, whatsapp, bar))
+    check('MUTATION CONTROL (w10): WhatsApp stepping aside for the notice again is caught',
+      !overlaysOk(widgets.replace('<WhatsAppFloat />', '<WhatsAppFloat hidden={cookieOpen} />'), cookie, a11y, whatsapp.replace('export function WhatsAppFloat() {', 'export function WhatsAppFloat({ hidden = false }: { hidden?: boolean } = {}) {\n  if (hidden) return null'), bar))
     check('MUTATION CONTROL: the accessibility button floating over the hero again (bottom-48 over the sheet) is caught',
       !overlaysOk(widgets, cookie, a11y.replace(DOCKED, "raised ? 'bottom-48 sm:bottom-24' : 'bottom-24'"), whatsapp, bar))
     check('MUTATION CONTROL: a contact bar that no longer keeps the slot free is caught',
@@ -176,7 +177,7 @@ function main() {
     check('MUTATION CONTROL (w9): the full-width phone sheet back is caught',
       !overlaysOk(widgets, cookie.replace('fixed left-3.5 z-[58] flex w-[240px]', 'fixed inset-x-0 bottom-0 z-[58] flex w-[240px]'), a11y, whatsapp, bar))
     check('MUTATION CONTROL (w9): the centred desktop bar back is caught',
-      !overlaysOk(widgets, cookie.replace('fixed bottom-6 left-6 z-[58] hidden w-[340px] max-w-[340px]', 'fixed bottom-5 z-[58] hidden md:mx-auto md:max-w-3xl'), a11y, whatsapp, bar))
+      !overlaysOk(widgets, cookie.replace('fixed bottom-6 left-24 z-[58] hidden w-[340px] max-w-[340px]', 'fixed bottom-5 z-[58] hidden md:mx-auto md:max-w-3xl'), a11y, whatsapp, bar))
     check('MUTATION CONTROL (w9): the phone card no longer lifted above the contact bar is caught',
       !overlaysOk(widgets, cookie.replace('calc(76px + env(safe-area-inset-bottom, 0px))', '0px'), a11y, whatsapp, bar))
     const short = (l: 'he' | 'en') => (l === 'he' ? publicHe : publicEn).cookie.short

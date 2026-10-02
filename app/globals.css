@@ -1039,3 +1039,8 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
 @media (max-width: 640px) {
   .article-content table { display: block; overflow-x: auto; white-space: nowrap; }
 }
+
+/* Public site, menu open: the floating widgets (contact bar, WhatsApp, accessibility button,
+   privacy notice) step aside so none of them covers the menu's "start free" button. PublicNav
+   sets the attribute on <html> while its menu is open. */
+html[data-public-menu='open'] [data-public-float] { display: none !important; }

@@ -179,8 +179,10 @@ export function AboutPage({ locale, copy }: { locale: Locale; copy: AboutCopy })
             <h2 className="mx-auto max-w-3xl text-h2-mkt text-balance text-ink">{copy.cta.title}</h2>
             <p className="mx-auto mt-4 max-w-[58ch] text-lead-mkt font-normal text-body text-pretty">{copy.cta.body}</p>
             <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-              <ButtonLink href={c.check.href} size="lg" arrow className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}>{c.check.label}</ButtonLink>
-              <ButtonLink href={c.trial.href} variant="inverse" size="lg" className="h-12 px-7">{c.trial.label}</ButtonLink>
+              <ButtonLink href={c.check.href} size="lg" arrow className={cn(styles.cta, 'h-12 px-7')}>{c.check.label}</ButtonLink>
+              {/* Light ground: the bordered "secondary" button. The "inverse" one is white ink on a
+                  faint white border, which is invisible on this paper (owner, wave 10). */}
+              <ButtonLink href={c.trial.href} variant="secondary" size="lg" className="h-12 px-7">{c.trial.label}</ButtonLink>
             </div>
             <div className="mx-auto mt-12 max-w-xl border-t border-line pt-8">
               <p className="text-copy text-body">{copy.cta.contact}</p>
