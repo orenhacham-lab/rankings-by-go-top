@@ -509,17 +509,33 @@ async function main() {
     check('H2: the replacement line says both kinds count toward the same allowance', heD.includes('חוץ מהבדיקה החודשית האוטומטית, בדיקות AI רצות רק כשאתם מפעילים אותן. כל בדיקה, אוטומטית או ידנית, נספרת מאותה מכסה.')
       && enD.includes('Apart from the automatic monthly check, AI checks run only when you start them. Every check, automatic or manual, counts toward the same allowance.'))
     const { execSync } = require('child_process')
-    // "Up to X" is a ceiling, not a promise to spend it: the pricing definition and the billing note stay exactly as they were.
-    const base = (f: string) => { try { return execSync(`git show 8b468a8:${f}`, { cwd: ROOT }).toString() } catch { return '' } }
+    // "Up to X" is a ceiling, not a promise to spend it. The billing note and the pricing definitions were rewritten in
+    // plain words (w16-plancopy), so they are no longer byte-identical to 8b468a8; what must survive is the ceiling
+    // wording: every plan line says "up to", the note still says unused allowance does not roll over, and neither
+    // says a check runs on its own.
     const note = (src: string) => (src.match(/keywordCheckNote:[^\n]*/g) ?? []).join('\n')
-    const pricingDiff = (() => { try { return execSync('git diff --name-only 8b468a8 -- lib/i18n/public/pricing-he.ts lib/i18n/public/pricing-en.ts', { cwd: ROOT }).toString().trim() } catch { return 'git unavailable' } })()
-    check('H3: the pricing definition and the billing note are untouched (he/en)',
-      pricingDiff === '' && note(heD) !== '' && note(heD) === note(base('lib/i18n/dashboard/he.ts')) && note(enD) === note(base('lib/i18n/dashboard/en.ts'))
-      && !heD.includes('ואפשר לכבות אותה') && !enD.includes('and you can turn it off'), pricingDiff)
-    check('H3b: MUT a sentence added to the billing note fails H3', note(heD.replace("keywordCheckNote: '", "keywordCheckNote: 'X ")) !== note(base('lib/i18n/dashboard/he.ts')))
+    const featuresSrc = read('lib/plans/features.ts')
+    check('H3: the billing note keeps "unused allowance does not roll over" (he/en)',
+      /לא עוברת הלאה/.test(note(heD)) && /do not roll over/.test(note(enD)), note(heD))
+    check('H3a: the plan lines keep the "up to" ceiling for the three allowances (he/en)',
+      (featuresSrc.match(/`עד \$\{c\.max(Google|AI)Checks/g) ?? []).length === 4 && (featuresSrc.match(/`Up to \$\{c\.max(Google|AI)Checks/g) ?? []).length === 4)
+    check('H3b: MUT dropping the rollover sentence from the billing note fails H3',
+      !/לא עוברת הלאה/.test(note(heD.replace(' יתרה שלא נוצלה לא עוברת הלאה.', ''))))
+    let pricingFiles = ''
+    try { pricingFiles = execSync('git diff --name-only 8b468a8 -- lib/plans/catalog.ts', { cwd: ROOT }).toString().trim() } catch { pricingFiles = 'git unavailable' }
+    check('H3c: the catalog (every number the lines print) is untouched', pricingFiles === '', pricingFiles)
     let untouched = ''
-    try { untouched = execSync('git diff --name-only 8b468a8 -- lib/plans lib/shopify lib/billing lib/subscription.ts lib/quota.ts supabase/migrations/20260829000000_add_usage_reservations_and_billing_periods.sql', { cwd: ROOT }).toString().trim() } catch { untouched = 'git unavailable' }
+    try { untouched = execSync('git diff --name-only 8b468a8 -- lib/plans/catalog.ts lib/shopify lib/billing lib/quota.ts supabase/migrations/20260829000000_add_usage_reservations_and_billing_periods.sql', { cwd: ROOT }).toString().trim() } catch { untouched = 'git unavailable' }
+    // w17 (owner decision 2026-10-02, currency by country) deliberately changed the billing MARKET files only;
+    // every other plan/price/quota/billing/entitlement/Shopify file must still be untouched.
+    const W17 = /^(lib\/billing\/(market\.ts|server-market\.ts|billing-market-selection\.ts|__qa__\/(w17-billing-market|billing-market-selection|billing-market-select-route)\.qa\.ts)|lib\/plans\/__qa__\/pricing-copy-and-layout\.qa\.ts)$/
+    untouched = untouched.split('\n').filter((f) => f && !W17.test(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
+    // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
+    let subDiff = ''
+    try { subDiff = execSync('git diff -U0 8b468a8 -- lib/subscription.ts', { cwd: ROOT }).toString() } catch { subDiff = 'git unavailable' }
+    const changed = subDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    check('H4b: lib/subscription.ts changed only the display-only trial lines and their import', changed.every((l: string) => /trial:|trialLimitLines|planLimitLines/.test(l)), changed.join(' ;; ').slice(0, 300))
   }
 
   say(`\n${pass} passed, ${fail} failed`)

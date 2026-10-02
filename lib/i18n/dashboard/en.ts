@@ -1,4 +1,5 @@
-import { planLimitLines } from '@/lib/plans/features'
+import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '@/lib/plans/features'
+import type { BillingMarket } from '@/lib/billing/market'
 import type { DashboardDictionary } from './he'
 import { researchCompetitiveEn } from './research-competitive'
 
@@ -5664,27 +5665,20 @@ export const dashboardEn = {
     // can never promise more than the server grants. These were hand-written and
     // had already drifted — Advanced still said 10 projects and 20 articles.
     features: {
-      trial: ['1 project', 'Up to 30 keywords', 'Up to 30 Google checks during the trial', 'Up to 3 AI checks during the trial', 'One AI-generated article during the trial', '7-day trial'],
+      trial: trialLimitLines('en'),
       regular: planLimitLines('regular', 'en'),
       advanced: planLimitLines('advanced', 'en'),
       premium: planLimitLines('premium', 'en'),
       large_agency: planLimitLines('large_agency', 'en'),
     },
-    keywordCheckNote: 'A Google check means checking one keyword in one Google destination (Organic or Maps). An AI check means running one query in one AI engine. Article allowances are shared across all projects in your account and reset each billing cycle. Unused allowances do not roll over.',
+    keywordCheckNote: `${CHECKS_EXPLAINER.en} Article allowances are shared across all websites in your account, and every allowance renews each month. Unused allowances do not roll over.`,
     trialNoChargeNotice: 'No payment method was added, and you will not be charged automatically.',
+    // w17 — the billing currency is decided by the server (by country; fixed at
+    // the first payment). One quiet line, no switcher. Keyed by billing market.
     marketPrompt: {
-      title: 'Payment currency',
-      shownIn: (currency: string) => `Prices are shown in ${currency}. The currency is saved to your account when you continue to payment, and it can’t be changed after that.`,
-      ilsName: 'shekels',
-      usdName: 'US dollars',
-      continueToPayment: 'Continue to payment',
-      saveFailed: 'We couldn’t save the currency. Try again.',
-      ilsOption: '₪ ILS (Israeli Shekel)',
-      usdOption: '$ USD (US Dollar)',
-      saving: 'Saving...',
-      currentMarketPrefix: 'Your billing currency:',
-      ilsLabel: '₪ ILS',
-      usdLabel: '$ USD',
+      currencyName: { ILS: 'Israeli shekels (₪)', USD: 'US dollars ($)' } satisfies Record<BillingMarket, string>,
+      byLocation: (currency: string) => `Prices are shown in ${currency}, based on your location. The currency is set at your first payment.`,
+      locked: (currency: string) => `Your account is billed in ${currency}.`,
     },
     manage: {
       title: 'Manage subscription',

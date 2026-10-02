@@ -7,7 +7,7 @@ import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 // service-role factory — or its key — into a browser bundle. `import type`
 // is erased at compile time and does neither.
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { planLimitLines } from '@/lib/plans/features'
+import { planLimitLines, trialLimitLines } from '@/lib/plans/features'
 
 /**
  * Phase 2 (blocker fix) — 'shopify_billing_required' is a DISTINCT state
@@ -130,7 +130,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
  * class of drift impossible rather than merely fixed once.
  */
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
-  trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות גוגל בתקופת הניסיון', 'עד 3 בדיקות AI בתקופת הניסיון', 'מאמר AI אחד בתקופת הניסיון', '7 ימי ניסיון'],
+  trial: trialLimitLines('he'),
   shopify_billing_required: ['יש לבחור תוכנית ב-Shopify App Pricing כדי להשתמש במערכת'],
   entitlement_unavailable: ['לא ניתן לאמת כרגע את ההרשאות. נסו שוב בעוד רגע.'],
   regular: planLimitLines('regular', 'he'),

@@ -95,10 +95,12 @@ console.log('\nB) P2-13 billing cards (display only)')
     && /const navy = isPopular/.test(s) && /'border-contrast bg-contrast text-contrast-ink /.test(s) && /<Star className="size-3"/.test(s)
   check('B2: every card has the pricing page\'s audience and sentence; the recommended plan is the one navy card with the star', pricingLook(src))
   check('MUT: a card without its audience fails B2', !pricingLook(src.replace(/audience=\{PLAN_AUDIENCE_LABEL\.premium\[language\]\}/, '')))
-  // Display only: the actions, the PayPal containers and the market choice are the ones the screen had.
-  const logicKept = (s: string) => /id=\{`paypal-button-\$\{plan\}`\}/.test(s) && /fetch\('\/api\/billing-market\/select'/.test(s) && /fetch\('\/api\/paypal\/cancel', \{ method: 'POST' \}\)/.test(s)
-    && (s.match(/planAction\('[a-z_]+'(?:, true)?\)/g) ?? []).length === 4 && /planAction\('advanced', true\)/.test(s)
-  check('B3: display only: the PayPal containers, the market choice, the cancel request and the one primary action are unchanged', logicKept(src))
+  // Display only: the actions and the PayPal containers are the ones the screen had.
+  // w17: the market choice (switch + continue buttons + /api/billing-market/select)
+  // is gone by the owner's decision; the currency is the server's.
+  const logicKept = (s: string) => /id=\{`paypal-button-\$\{plan\}`\}/.test(s) && !/\/api\/billing-market\/select/.test(s) && /fetch\('\/api\/paypal\/cancel', \{ method: 'POST' \}\)/.test(s)
+    && !/planAction\(/.test(s)
+  check('B3: display only: the PayPal containers and the cancel request are unchanged; no client market choice (w17)', logicKept(src))
   check('MUT: a PayPal container dropped fails B3', !logicKept(src.replace('id={`paypal-button-${plan}`}', 'id="x"')))
 }
 

@@ -228,10 +228,12 @@ console.log('\nC) screen specifics')
   check('MUTATION CONTROL: a hand-drawn ▲ in the monthly view fails C3', !usesChange([monthly[0] + '<span>▲ 3</span>', monthly[1]]))
 
   const billing = stripComments(read('app/(dashboard)/billing/BillingView.tsx'))
-  const onePrimary = (s: string) => /variant=\{recommended \? 'primary' : 'secondary'\}/.test(s)
-    && (s.match(/planAction\('[a-z_]+', true\)/g) ?? []).length === 1 && /planAction\('advanced', true\)/.test(s)
-  check('C4: billing has one primary plan action, on the recommended plan', onePrimary(billing))
-  check('MUTATION CONTROL: a second primary plan fails C4', !onePrimary(billing.replace("planAction('premium')", "planAction('premium', true)")))
+  // w17: the plan "continue" buttons belonged to the currency switcher, which the
+  // owner removed; the plans' only actions are now the PayPal buttons, so no
+  // second competing primary can appear on a plan card.
+  const onePrimary = (s: string) => !/planAction\(/.test(s) && !/variant=\{recommended \? 'primary' : 'secondary'\}/.test(s) && /<BillingClient market=\{market\} \/>/.test(s)
+  check('C4: billing plan cards carry no competing primary buttons (PayPal is the action)', onePrimary(billing))
+  check('MUTATION CONTROL: a per-plan primary button fails C4', !onePrimary(billing + "\naction={planAction('premium', true)}"))
   // Since w7 P2-13 the popular plan is set apart the pricing page's way, as the one navy card,
   // instead of by an accent ring; the trial row and the current plan still are not set apart.
   const ringOnlyPopular = (s: string) => !/ring-1 ring-action/.test(s) && /const navy = isPopular/.test(s)

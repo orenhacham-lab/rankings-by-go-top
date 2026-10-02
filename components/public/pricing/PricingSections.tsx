@@ -34,6 +34,8 @@ export type PricingCopy = {
     dashboard: string
     /** Under each card's button, for visitors who are not signed in. */
     noCard: string
+    /** One plain sentence under the grid saying what a Google check and an AI check are. */
+    checksNote: string
     everyPlanLabel: string
     everyPlan: string[]
   }
@@ -56,6 +58,14 @@ const INCLUDED_ICONS: LucideIcon[] = [FileText, MapPin, Sparkles, Search, ChartC
 const VALUE_ICONS: LucideIcon[] = [Layers, LineChart, Unlock]
 /** Icons for `usage.items`, in order. */
 const USAGE_ICONS: LucideIcon[] = [FileText, Search, Sparkles]
+
+/** Under the grid: what a "check" in the plan lines is, in one visible sentence
+ *  (no tooltip, so it works on a phone and with a keyboard). */
+export function PricingChecksNote({ copy }: { copy: PricingCopy }) {
+  return (
+    <p className="mx-auto mt-8 max-w-3xl text-center text-caption text-muted" data-checks-note>{copy.plans.checksNote}</p>
+  )
+}
 
 /** Right under the grid: the undecided visitor goes to the free check, not away. */
 export function PricingUnsure({ copy, checkHref }: { copy: PricingCopy; checkHref: string }) {

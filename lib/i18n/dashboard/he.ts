@@ -1,4 +1,5 @@
-import { planLimitLines } from '@/lib/plans/features'
+import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '@/lib/plans/features'
+import type { BillingMarket } from '@/lib/billing/market'
 import { researchCompetitiveHe } from './research-competitive'
 export const dashboardHe = {
   sidebar: {
@@ -5688,27 +5689,20 @@ export const dashboardHe = {
     // can never promise more than the server grants. These were hand-written and
     // had already drifted — Advanced still said 10 projects and 20 articles.
     features: {
-      trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות גוגל בתקופת הניסיון', 'עד 3 בדיקות AI בתקופת הניסיון', 'מאמר AI אחד בתקופת הניסיון', '7 ימי ניסיון'],
+      trial: trialLimitLines('he'),
       regular: planLimitLines('regular', 'he'),
       advanced: planLimitLines('advanced', 'he'),
       premium: planLimitLines('premium', 'he'),
       large_agency: planLimitLines('large_agency', 'he'),
     },
-    keywordCheckNote: 'בדיקת גוגל = בדיקה של מילת מפתח אחת ביעד גוגל אחד (אורגני או מפות). בדיקת AI = הרצת שאילתה אחת במנוע AI אחד. מכסת המאמרים משותפת לכל הפרויקטים בחשבון ומתחדשת בכל מחזור חיוב. יתרה שלא נוצלה לא עוברת הלאה.',
+    keywordCheckNote: `${CHECKS_EXPLAINER.he} מכסת המאמרים משותפת לכל האתרים בחשבון, והמכסות מתחדשות מדי חודש. יתרה שלא נוצלה לא עוברת הלאה.`,
     trialNoChargeNotice: 'לא הוזן אמצעי תשלום, ולא יתבצע חיוב אוטומטי.',
+    // w17 — the billing currency is decided by the server (by country; fixed at
+    // the first payment). One quiet line, no switcher. Keyed by billing market.
     marketPrompt: {
-      title: 'מטבע התשלום',
-      shownIn: (currency: string) => `המחירים מוצגים ב${currency}. המטבע נשמר בחשבון כשממשיכים לתשלום, ואחר כך אי אפשר להחליף אותו.`,
-      ilsName: 'שקלים',
-      usdName: 'דולרים',
-      continueToPayment: 'המשיכו לתשלום',
-      saveFailed: 'לא הצלחנו לשמור את המטבע. נסו שוב.',
-      ilsOption: '₪ שקלים (ILS)',
-      usdOption: '$ דולר (USD)',
-      saving: 'שומרים...',
-      currentMarketPrefix: 'מטבע החיוב שלכם:',
-      ilsLabel: '₪ שקלים (ILS)',
-      usdLabel: '$ דולר (USD)',
+      currencyName: { ILS: 'שקלים (₪)', USD: 'דולרים ($)' } satisfies Record<BillingMarket, string>,
+      byLocation: (currency: string) => `המחירים מוצגים ב${currency} לפי המיקום שלכם. המטבע נקבע בתשלום הראשון.`,
+      locked: (currency: string) => `החשבון שלכם מחויב ב${currency}.`,
     },
     manage: {
       title: 'ניהול מנוי',

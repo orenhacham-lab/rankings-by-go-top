@@ -4,6 +4,9 @@ import { isKnownPlanCode, verifyPayPalActivation } from '@/lib/paypal/client'
 import { transitionSubscriptionToActivePlan } from '@/lib/paypal/activation-processing'
 import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
 import { hasPendingShopifyLinkCookie } from '@/lib/shopify/pending-link'
+import { marketForPayPalPlanId } from '@/lib/paypal/checkout-plans'
+import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
+import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 
 /**
  * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
@@ -70,6 +73,12 @@ export async function POST(request: Request) {
       return Response.json({ error: 'PayPal verification failed', reason: verified.reason }, { status: 400 })
     }
 
+    // w17 — the market this request would be priced in (stored, legacy, then
+    // country), read BEFORE the new row exists. Used only to log a mismatch:
+    // what is stored below is what PayPal really charges.
+    const expected = await resolveBillingMarket(supabase, user).catch(() => null)
+    const paidMarket = marketForPayPalPlanId(verified.planId)
+
     // Phase 3 — current_period_end/current_period_start are the AUTHORITATIVE
     // values PayPal itself reported in the SAME verified fetch above — never
     // now()/now()+1 month. trial_ends_at is intentionally omitted (NULL): a
@@ -96,6 +105,41 @@ export async function POST(request: Request) {
       // which row is "the" entitlement. Surfaced loudly, not silently fixed.
       console.error('[paypal-activate] invariant violated: multiple current trial/active rows', { userId: user.id, count: result.count })
       return Response.json({ error: 'Account has more than one active entitlement record — contact support.' }, { status: 500 })
+    }
+
+    // w17 — the market LOCKS at the first PayPal checkout. After the
+    // entitlement is saved (the customer has paid; a lock failure must never
+    // cost them the plan), store the market of the VERIFIED plan id in
+    // app_metadata — never user_metadata.locale, never a client value.
+    if (paidMarket && expected && paidMarket !== expected.market) {
+      console.warn('[paypal-activate] paid market differs from the server market', { userId: user.id, paidMarket, expected: expected.market, source: expected.source })
+    }
+    const lock = await lockBillingMarket(storedMarketOf(user), paidMarket, {
+      // Already refused above; repeated so the lock never runs for Shopify.
+      isShopifyGoverned: async () => hasPendingShopifyLinkCookie(request) || await isShopifyBillingRequiredForUser(admin, user.id),
+      claimSelectionSlot: async () => {
+        const { data, error } = await admin
+          .from('profiles')
+          .update({ billing_market_claimed_at: new Date().toISOString() })
+          .eq('id', user.id)
+          .is('billing_market_claimed_at', null)
+          .select('id')
+        if (error) return { ok: false, message: error.message }
+        return { ok: true, wonClaim: !!data && data.length > 0 }
+      },
+      releaseSelectionSlot: async () => {
+        await admin.from('profiles').update({ billing_market_claimed_at: null }).eq('id', user.id)
+      },
+      persistMarket: async (market) => {
+        const { error } = await admin.auth.admin.updateUserById(user.id, { app_metadata: { [STORED_MARKET_KEY]: market } })
+        if (error) return { ok: false, message: error.message }
+        return { ok: true }
+      },
+    })
+    if (lock.kind === 'claim_failed' || lock.kind === 'persist_failed') {
+      console.error('[paypal-activate] could not lock the billing market', { userId: user.id, kind: lock.kind, message: lock.message })
+    } else if (lock.kind === 'unknown_market') {
+      console.warn('[paypal-activate] verified plan id belongs to no billing market (legacy plan?); market not locked', { userId: user.id })
     }
 
     return Response.json({ success: true })
