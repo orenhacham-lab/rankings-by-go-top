@@ -17,7 +17,7 @@
  *      waiting for a manual update; ./job-match.ts)             409 already_fixed
  *  10. approve with `bulk` ("apply all safe fixes", one confirmation): only BULK_SAFE_TYPES,
  *      only through the plugin, never the home page, only a value that passes its check and is not
- *      the current one, only a page with nothing pending and nothing applied in 30 days, at most
+ *      the current one, only a page with no fix of that type pending or applied in 30 days, at most
  *      25 pages per batch                                         409 not_bulk_safe
  *  11. a type newer than the installed plugin (2.1.0) is never sent to it: the plugin's version is
  *      read again once, then                                     409 needs_update
@@ -295,8 +295,9 @@ async function bulkRefusal(
   const since = new Date(now - BULK_RECENT_DAYS * 86_400_000).toISOString()
   const recent = await listJobsSince(deps.admin, l.scope, since)
   const page = urlKey(a.pageUrl)
-  // Nothing pending or applied on this page in 30 days, except what this same batch just did.
-  const busy = recent.some((r) => urlKey(r.page_url) === page && batchOf(r) !== a.batch
+  // Nothing of this same type pending or applied on this page in 30 days, except what this same
+  // batch just did (bulk.ts pageBusy: another field of the page is independent of this one).
+  const busy = recent.some((r) => urlKey(r.page_url) === page && r.fix_type === a.type && batchOf(r) !== a.batch
     && (r.status === 'pending' || r.status === 'manual' || r.status === 'applied' || r.status === 'sent'))
   if (busy) return 'recent'
   const pages = new Set(recent.filter((r) => batchOf(r) === a.batch).map((r) => urlKey(r.page_url)))

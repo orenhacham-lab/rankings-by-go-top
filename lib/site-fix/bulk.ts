@@ -6,8 +6,10 @@
  *   - its type is one of BULK_SAFE_TYPES (Google title, Google description, image alt text);
  *   - the plugin would write it now (channel `plugin`);
  *   - it is not the home page;
- *   - its page has no fix pending and none applied in the last 30 days (a fix of this same batch
- *     aside);
+ *   - its page has no fix OF THE SAME TYPE pending and none applied in the last 30 days (a fix of
+ *     this same batch aside). Wave 10: any fix on the page used to keep all its other rows out, so a
+ *     page whose title was fixed yesterday never got its description or image alt text in one
+ *     click; the fields are independent and each keeps its own undo;
  *   - its suggestion passed: never the current value (trimmed, case folded), a title of 30–60
  *     characters, a description of 120–155 (the generator aims at 120–140);
  *   - at most 25 pages per batch.
@@ -45,12 +47,19 @@ export function bulkValueProblem(p: FixPayload, before: string | null): string |
   }
 }
 
-/** A page is busy when a fix is waiting on it, or one was applied (or sent) in the last 30 days. */
-export function pageBusy(jobs: readonly Pick<FixJobView, 'pageUrl' | 'status' | 'appliedAt' | 'approvedAt' | 'batchId'>[], pageUrl: string, now: number, batch?: string | null): boolean {
+/**
+ * A page is busy for one type of fix when a fix of that type is waiting on it, or one was applied
+ * (or sent) in the last 30 days. Without `type`, any fix counts.
+ */
+export function pageBusy(
+  jobs: readonly (Pick<FixJobView, 'pageUrl' | 'status' | 'appliedAt' | 'approvedAt' | 'batchId'> & { type?: FixType })[],
+  pageUrl: string, now: number, batch?: string | null, type?: FixType | null,
+): boolean {
   const key = urlKey(pageUrl)
   const since = now - BULK_RECENT_DAYS * 86_400_000
   return jobs.some((j) => {
     if (urlKey(j.pageUrl) !== key || (batch && j.batchId === batch)) return false
+    if (type && j.type && j.type !== type) return false
     if (j.status === 'pending' || j.status === 'manual') return true
     if (j.status === 'applied' || j.status === 'sent') return Date.parse(j.appliedAt ?? j.approvedAt) >= since
     return false
@@ -79,29 +88,52 @@ export function rowOpenForBulk(jobs: Parameters<typeof rowStateFrom>[0], type: F
 export interface BulkRow { type: FixType; kind: string; url: string }
 
 /**
- * The rows a batch would try, in the findings' order, at most BULK_MAX_PAGES pages. `fixable` says
- * whether the plugin would fix this row now and no job holds it (the screen's own answer).
+ * Why a row the merchant could fix is not in the one-click batch (shown, row by row, after it):
+ *   review      its type changes what visitors see or is a choice (BULK_SAFE_TYPES): approved one by one
+ *   home        the home page: approved one by one
+ *   recent      a fix of this same type was applied on this page in the last 30 days, or is waiting
+ *   batch_full  over BULK_MAX_PAGES pages: the next click takes it
  */
-export function bulkCandidates(
+export type BulkSkipReason = 'review' | 'home' | 'recent' | 'batch_full'
+export interface BulkSkip extends BulkRow { reason: BulkSkipReason }
+
+/**
+ * The rows a batch would try, in the findings' order, at most BULK_MAX_PAGES pages, and every other
+ * row that could be fixed with the reason it is not in the batch. `fixable` says whether this row
+ * can be fixed now and no job holds it (the screen's own answer); a row that cannot is not listed.
+ */
+export function bulkPlan(
   findings: readonly { id: string; fixType?: FixType | null; pages: readonly { url: string; kind: string }[] }[],
   opts: { fixable: (findingId: string, pageUrl: string) => boolean; jobs: Parameters<typeof pageBusy>[0]; now: number },
-): BulkRow[] {
+): { rows: BulkRow[]; skipped: BulkSkip[] } {
   const out: BulkRow[] = []
+  const skipped: BulkSkip[] = []
   const pages = new Set<string>()
   for (const f of findings) {
     const type = f.fixType
-    if (!type || !BULK_SAFE_TYPES.includes(type)) continue
+    if (!type) continue
     for (const p of f.pages) {
-      if (p.kind === 'home' || isHomeUrl(p.url)) continue
-      if (!opts.fixable(f.id, p.url) || pageBusy(opts.jobs, p.url, opts.now)) continue
+      if (!opts.fixable(f.id, p.url)) continue
+      const row = { type, kind: f.id, url: p.url }
+      if (!BULK_SAFE_TYPES.includes(type)) { skipped.push({ ...row, reason: 'review' }); continue }
+      if (p.kind === 'home' || isHomeUrl(p.url)) { skipped.push({ ...row, reason: 'home' }); continue }
+      if (pageBusy(opts.jobs, p.url, opts.now, null, type)) { skipped.push({ ...row, reason: 'recent' }); continue }
       const key = urlKey(p.url)
-      if (!pages.has(key) && pages.size >= BULK_MAX_PAGES) continue
       if (out.some((r) => r.type === type && urlKey(r.url) === key)) continue
+      if (!pages.has(key) && pages.size >= BULK_MAX_PAGES) { skipped.push({ ...row, reason: 'batch_full' }); continue }
       pages.add(key)
-      out.push({ type, kind: f.id, url: p.url })
+      out.push(row)
     }
   }
-  return out
+  return { rows: out, skipped }
+}
+
+/** The rows a batch would try (bulkPlan's rows): the screen's button and the dashboard nudge count these. */
+export function bulkCandidates(
+  findings: Parameters<typeof bulkPlan>[0],
+  opts: Parameters<typeof bulkPlan>[1],
+): BulkRow[] {
+  return bulkPlan(findings, opts).rows
 }
 
 /** A batch in the queue: its jobs, when it was approved, and whether it can still be undone as a whole. */

@@ -4787,6 +4787,17 @@ export const dashboardEn = {
         nothingReady: 'We checked the pages again and none of the safe fixes is needed right now.',
         recheck: 'Re-check the site',
         openQueue: 'Open fix queue',
+        leftOut: (n: number) => (n === 1 ? 'One fix is not included here. After the fix we show you exactly which one and why.' : `${n} fixes are not included here. After the fix we show you exactly which ones and why.`),
+        showLeft: (n: number) => `What was not fixed and why (${n})`,
+        hideLeft: 'Hide the list',
+        reasons: {
+          review: 'This fix changes what visitors see on the page, so it is approved one by one in the list below.',
+          home: 'The home page is never changed in one click. You can approve its fix on its own in the list below.',
+          recent: 'A fix of this same type was made on this page in the last 30 days, or is still waiting in the queue.',
+          batch_full: 'Each click fixes up to 25 pages. This page goes in with the next click.',
+          not_safe: 'The suggestion we wrote did not pass the safety check (length, or the same as now), so nothing was changed.',
+          failed: 'We sent the fix, but the site did not confirm it. It waits for another try in the fix queue.',
+        },
       },
     },
     findings: {

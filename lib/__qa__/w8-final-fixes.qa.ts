@@ -125,7 +125,8 @@ async function main() {
       const nudge = rows.safeFixCountFromScan(raw, { capabilities: caps, jobs })
       check(`B1: ${jobs.length} job(s) in the queue: the nudge (${nudge}) equals the button (${button(jobs)})`, nudge === button(jobs))
     }
-    const all = [job('seo_title', 'https://s.co/a'), job('seo_title', 'https://s.co/b'), job('meta_description', 'https://s.co/c'), job('image_alt', 'https://s.co/c')]
+    // Wave 10: a page's other fields stay open after one is fixed, so the whole batch includes /a's description.
+    const all = [job('seo_title', 'https://s.co/a'), job('seo_title', 'https://s.co/b'), job('meta_description', 'https://s.co/a'), job('meta_description', 'https://s.co/c'), job('image_alt', 'https://s.co/c')]
     const w: any = { ok: true, connectionDown: null, articles: 0, topics: 0, queued: 5, queueEndsAt: null, pluginConnected: true }
     check('B2: after the whole batch is applied: count 0, no row, no badge', rows.safeFixCountFromScan(raw, { capabilities: caps, jobs: all }) === 0 && rows.waitingRows('p', w, 0).length === 0 && rows.railCounts(w, 0).siteHealth === 0)
     check('B3: an unreadable queue is null: no row and no badge (never a guess)', rows.safeFixCountFromScan(raw, null) === null && rows.waitingRows('p', w, null).length === 0 && rows.railCounts(w, null).siteHealth === 0)

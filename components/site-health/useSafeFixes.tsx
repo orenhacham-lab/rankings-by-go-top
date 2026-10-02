@@ -20,8 +20,8 @@ import type { useToasts } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Finding, FindingPage } from '@/lib/site-health/types'
-import { bulkCandidates, bulkValueProblem, type BulkRow } from '@/lib/site-fix/bulk'
-import type { FixJobView, FixPayload } from '@/lib/site-fix/types'
+import { bulkPlan, bulkValueProblem, type BulkRow, type BulkSkipReason } from '@/lib/site-fix/bulk'
+import type { FixErrorCode, FixJobView, FixPayload } from '@/lib/site-fix/types'
 import { postFix } from './useSiteFixes'
 
 type Copy = DashboardDictionary['siteHealth']['autofix']
@@ -36,11 +36,22 @@ export interface ReadyFix {
   via: string | null
 }
 
+/**
+ * Why one row was not fixed by the click (wave 10: rows used to drop out of the batch silently, so
+ * "fix in one click" looked like it did not fix everything, with no word on what or why):
+ *   a BulkSkipReason   never in the batch (lib/site-fix/bulk.ts bulkPlan)
+ *   not_safe           the suggestion did not pass the batch's check (length, or the current text)
+ *   failed             approved, but the site did not confirm it: it waits in the fix queue
+ *   a FixErrorCode     the preview or the approval answered with this code (its usual sentence)
+ */
+export type BulkResultReason = BulkSkipReason | 'not_safe' | 'failed' | FixErrorCode
+export interface BulkResult { type: BulkRow['type']; url: string; reason: BulkResultReason }
+
 export type SafePhase =
   | { kind: 'idle' }
   | { kind: 'preparing' }
   | { kind: 'running'; done: number; n: number }
-  | { kind: 'done'; ok: number; n: number; failed: number }
+  | { kind: 'done'; ok: number; n: number; failed: number; results: BulkResult[] }
 
 type PreviewAnswer = {
   type: string
@@ -74,7 +85,7 @@ export function readyFrom(row: BulkRow, p: PreviewAnswer): ReadyFix | null {
   return null
 }
 
-function BulkChanges({ list, copy }: { list: ReadyFix[]; copy: Copy }) {
+function BulkChanges({ list, copy, left }: { list: ReadyFix[]; copy: Copy; left: number }) {
   const [open, setOpen] = useState(false)
   const b = copy.bulk
   return (
@@ -112,7 +123,49 @@ function BulkChanges({ list, copy }: { list: ReadyFix[]; copy: Copy }) {
           ))}
         </ul>
       )}
-      <p className="text-caption text-muted">{b.excluded}</p>
+      <p className="text-caption text-muted">{left > 0 ? b.leftOut(left) : b.excluded}</p>
+    </div>
+  )
+}
+
+/** The text for one row's reason: the batch's own words, else the fix's usual sentence for that code. */
+export function bulkReasonText(reason: BulkResultReason, copy: Copy): string {
+  const own = (copy.bulk.reasons as Record<string, string>)[reason]
+  if (own) return own
+  return (copy.errors as Record<string, string>)[reason] ?? copy.errors.store_failed
+}
+
+/** Every row the click did not fix, each with its page, what it is and why (wave 10). */
+export function BulkResultList({ results, copy }: { results: readonly BulkResult[]; copy: Copy }) {
+  const [open, setOpen] = useState(false)
+  if (results.length === 0) return null
+  const b = copy.bulk
+  return (
+    <div className="mt-2" data-bulk-results={results.length}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-control text-caption font-semibold text-action hover:text-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+        data-bulk-results-toggle=""
+      >
+        {open ? b.hideLeft : b.showLeft(results.length)}
+        <ChevronDown size={16} strokeWidth={2} aria-hidden="true" className={cn('transition-transform duration-200 ease-snappy motion-reduce:transition-none', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <ul className="mt-2 max-h-80 divide-y divide-line overflow-auto rounded-inset border border-line bg-surface" role="list">
+          {results.map((r) => (
+            <li key={`${r.type}|${r.url}|${r.reason}`} className="px-3 py-2.5 text-caption" data-bulk-result={r.reason}>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <bdi dir="ltr" className="font-medium text-ink">{pathLabel(r.url)}</bdi>
+                <span aria-hidden="true" className="text-muted">·</span>
+                <span className="text-muted">{copy.approve.title[r.type]}</span>
+              </p>
+              <p className="mt-1 text-body text-pretty">{bulkReasonText(r.reason, copy)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -136,10 +189,10 @@ export function useSafeFixes({
   const [phase, setPhase] = useState<SafePhase>({ kind: 'idle' })
   const [now] = useState(() => Date.now())
 
-  const candidates = useMemo(() => {
-    if (!enabled) return []
+  const plan = useMemo(() => {
+    if (!enabled) return { rows: [], skipped: [] }
     const byId = new Map(findings.map((f) => [f.id, f]))
-    return bulkCandidates(findings, {
+    return bulkPlan(findings, {
       fixable: (id, url) => {
         const f = byId.get(id as Finding['id'])
         const page = f?.pages.find((p) => p.url === url)
@@ -149,12 +202,15 @@ export function useSafeFixes({
       now,
     })
   }, [enabled, findings, jobs, fixable, now])
+  const candidates = plan.rows
 
   const start = useCallback(async () => {
     if (phase.kind === 'preparing' || phase.kind === 'running' || candidates.length === 0) return
     setPhase({ kind: 'preparing' })
     // Every candidate is read again through the plugin, three at a time.
     const ready: (ReadyFix | null)[] = new Array(candidates.length).fill(null)
+    const results: BulkResult[] = plan.skipped.map((r) => ({ type: r.type, url: r.url, reason: r.reason }))
+    const notReady: BulkResult[] = []
     let next = 0
     await Promise.all(Array.from({ length: Math.min(3, candidates.length) }, async () => {
       while (next < candidates.length) {
@@ -162,11 +218,16 @@ export function useSafeFixes({
         const row = candidates[i]
         const r = await postFix<PreviewAnswer>('/api/site-health/fixes', { projectId, action: 'preview', type: row.type, kind: row.kind, url: row.url })
         if (r.ok && (r as unknown as { channel?: string }).channel === 'plugin') ready[i] = readyFrom(row, r as unknown as PreviewAnswer)
+        if (!ready[i]) notReady.push({ type: row.type, url: row.url, reason: r.ok ? 'not_safe' : (r.code as FixErrorCode) })
       }
     }))
+    // In the findings' order, whatever order the previews came back in.
+    const order = new Map(candidates.map((c, i) => [`${c.type}|${c.url}`, i]))
+    results.unshift(...notReady.sort((a, b) => (order.get(`${a.type}|${a.url}`) ?? 0) - (order.get(`${b.type}|${b.url}`) ?? 0)))
     const list = ready.filter((x): x is ReadyFix => !!x)
     if (list.length === 0) {
-      setPhase({ kind: 'idle' })
+      // Nothing to approve: the strip still says, row by row, why nothing was fixed.
+      setPhase(results.length > 0 ? { kind: 'done', ok: 0, n: 0, failed: 0, results } : { kind: 'idle' })
       toasts.success(copy.bulk.nothingReady)
       return
     }
@@ -174,7 +235,7 @@ export function useSafeFixes({
     const ok = await confirm({
       title: copy.bulk.confirmTitle(list.length),
       body: copy.bulk.confirmBody(count('seo_title'), count('meta_description'), count('image_alt')),
-      details: <BulkChanges list={list} copy={copy} />,
+      details: <BulkChanges list={list} copy={copy} left={results.length} />,
       confirmLabel: copy.bulk.confirm(list.length),
       cancelLabel: copy.bulk.cancel,
       size: 'lg',
@@ -183,6 +244,7 @@ export function useSafeFixes({
 
     const batch = crypto.randomUUID()
     let applied = 0
+    const failedRows: BulkResult[] = []
     setPhase({ kind: 'running', done: 0, n: list.length })
     for (let i = 0; i < list.length; i++) {
       const r = list[i]
@@ -193,16 +255,19 @@ export function useSafeFixes({
       if (answer.ok) {
         onJob(answer.job)
         if (answer.job.status === 'applied') applied++
+        else failedRows.push({ type: r.row.type, url: r.row.url, reason: 'failed' })
+      } else {
+        failedRows.push({ type: r.row.type, url: r.row.url, reason: answer.code as FixErrorCode })
       }
       setPhase({ kind: 'running', done: i + 1, n: list.length })
     }
     const failed = list.length - applied
-    setPhase({ kind: 'done', ok: applied, n: list.length, failed })
+    setPhase({ kind: 'done', ok: applied, n: list.length, failed, results: [...failedRows, ...results] })
     const summary = copy.bulk.summary(applied, list.length)
     if (failed > 0) toasts.error(`${summary} ${copy.bulk.failed(failed)}`)
     else toasts.success(summary)
     await onFinished()
-  }, [phase.kind, candidates, projectId, confirm, copy, toasts, onJob, onFinished])
+  }, [phase.kind, candidates, plan.skipped, projectId, confirm, copy, toasts, onJob, onFinished])
 
   return { count: candidates.length, phase, start, dialog }
 }
