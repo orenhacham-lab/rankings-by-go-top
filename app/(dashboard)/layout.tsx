@@ -25,6 +25,17 @@ import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
+
+/**
+ * Nothing behind the sign-in is for search engines: no index, no follow, no
+ * cached copy. An extra layer on top of the auth wall, so the links an owner
+ * imports (site-links) are never crawled from here. Guarded by
+ * lib/site-links/gsc-import/__qa__/gsc-import.qa.ts (section K).
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
+}
 
 /**
  * The trial bar's answer, read on the server for the signed-in user only. Its
