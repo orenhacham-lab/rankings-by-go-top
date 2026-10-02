@@ -94,10 +94,10 @@ function main() {
   console.log('A) Advanced is a ONE-website plan, everywhere')
   {
     check('A1: the approved Hebrew description is exactly the agreed sentence',
-      PLAN_AUDIENCE_DESCRIPTION.advanced.he === 'לאתר אחד עם צרכי תוכן ומעקב מתקדמים',
+      PLAN_AUDIENCE_DESCRIPTION.advanced.he === 'לאתר אחד שצריך יותר מאמרים ויותר מעקב',
       PLAN_AUDIENCE_DESCRIPTION.advanced.he)
     check('A2: the approved English description is exactly the agreed sentence',
-      PLAN_AUDIENCE_DESCRIPTION.advanced.en === 'For one website with higher content and tracking needs',
+      PLAN_AUDIENCE_DESCRIPTION.advanced.en === 'For one website that needs more articles and more tracking',
       PLAN_AUDIENCE_DESCRIPTION.advanced.en)
     check('A3: the catalog agrees — Advanced grants exactly one project',
       PLAN_CATALOG.advanced.maxProjects === 1 && PLAN_LIMITS.advanced.maxProjects === 1)
@@ -146,16 +146,16 @@ function main() {
   console.log('\nB) the article quota states the account-wide scope only where it is real')
   {
     const EXPECT_EN: Record<PlanCode, string> = {
-      regular: '4 articles per monthly billing period',
-      advanced: '12 articles per monthly billing period',
-      premium: '50 articles per monthly billing period, shared across your account',
-      large_agency: '200 articles per monthly billing period, shared across your account',
+      regular: '4 articles a month, written and published to your website automatically',
+      advanced: '12 articles a month, written and published to your website automatically',
+      premium: '50 articles a month, written and published automatically, shared across all your websites',
+      large_agency: '200 articles a month, written and published automatically, shared across all your websites',
     }
     const EXPECT_HE: Record<PlanCode, string> = {
-      regular: '4 מאמרים בכל מחזור חיוב חודשי',
-      advanced: '12 מאמרים בכל מחזור חיוב חודשי',
-      premium: '50 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
-      large_agency: '200 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+      regular: '4 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
+      advanced: '12 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
+      premium: '50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
+      large_agency: '200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
     }
     for (const code of PLAN_CODES) {
       check(`B1-en-${code}: the exact agreed English article line`,
@@ -174,50 +174,50 @@ function main() {
     // THE CONDITION, stated as a rule rather than as four literals.
     check('B4: the account-wide clause appears exactly on the multi-project plans',
       PLAN_CODES.every((c) => {
-        const shared = planArticleLine(c, 'en').includes('shared across your account')
-          && planArticleLine(c, 'he').includes('משותפים לכל החשבון')
+        const shared = planArticleLine(c, 'en').includes('shared across all your websites')
+          && planArticleLine(c, 'he').includes('משותפים לכל האתרים שלכם')
         const plain = !planArticleLine(c, 'en').includes('shared across')
           && !planArticleLine(c, 'he').includes('משותפים')
         return PLAN_CATALOG[c].maxProjects > 1 ? shared : plain
       }))
-    check('B5: every plan still states the MONTHLY period explicitly',
-      PLAN_CODES.every((c) => planArticleLine(c, 'en').includes('per monthly billing period')
-        && planArticleLine(c, 'he').includes('בכל מחזור חיוב חודשי')))
+    check('B5: every plan still states the MONTHLY period explicitly, in plain words',
+      PLAN_CODES.every((c) => planArticleLine(c, 'en').includes(' articles a month')
+        && planArticleLine(c, 'he').includes(' מאמרים בחודש')))
     check('B6: the article NUMBERS are untouched by the rewording',
       PLAN_CODES.every((c) => planArticleLine(c, 'en').startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)
         && planArticleLine(c, 'he').startsWith(`${PLAN_CATALOG[c].maxArticlesPerPeriodAccountWide} `)))
   }
 
   // ── B7-B12) THE ORDER OF THE LIMIT LINES ──────────────────────────────────
-  console.log('\nB-order) the article allowance is read second on a one-website plan')
+  console.log('\nB-order) the article allowance is the FIRST line on every plan')
   {
     // The full ordered list, written out independently of the builder so a
     // reordering in either place fails.
     const ORDER_EN: Record<PlanCode, string[]> = {
-      regular: ['1 project', '4 articles per monthly billing period', 'Up to 50 keywords',
-        'Up to 50 Google checks per billing period', 'Up to 10 AI checks per billing period'],
-      advanced: ['1 project', '12 articles per monthly billing period', 'Up to 100 keywords',
-        'Up to 100 Google checks per billing period', 'Up to 20 AI checks per billing period'],
-      premium: ['Up to 10 projects', 'Up to 100 keywords per project',
-        'Up to 200 Google checks per billing period per project',
-        'Up to 20 AI checks per billing period per project',
-        '50 articles per monthly billing period, shared across your account'],
-      large_agency: ['Up to 100 projects', 'Up to 200 keywords per project',
-        'Up to 400 Google checks per billing period per project',
-        'Up to 50 AI checks per billing period per project',
-        '200 articles per monthly billing period, shared across your account'],
+      regular: ['4 articles a month, written and published to your website automatically', '1 website',
+        'Track up to 50 keywords', 'Up to 50 Google ranking checks a month', 'Up to 10 AI visibility checks a month'],
+      advanced: ['12 articles a month, written and published to your website automatically', '1 website',
+        'Track up to 100 keywords', 'Up to 100 Google ranking checks a month', 'Up to 20 AI visibility checks a month'],
+      premium: ['50 articles a month, written and published automatically, shared across all your websites',
+        'Up to 10 websites', 'Track up to 100 keywords per website',
+        'Up to 200 Google ranking checks a month per website',
+        'Up to 20 AI visibility checks a month per website'],
+      large_agency: ['200 articles a month, written and published automatically, shared across all your websites',
+        'Up to 100 websites', 'Track up to 200 keywords per website',
+        'Up to 400 Google ranking checks a month per website',
+        'Up to 50 AI visibility checks a month per website'],
     }
     const ORDER_HE: Record<PlanCode, string[]> = {
-      regular: ['פרויקט אחד', '4 מאמרים בכל מחזור חיוב חודשי', 'עד 50 מילות מפתח',
-        'עד 50 בדיקות גוגל בכל מחזור חיוב', 'עד 10 בדיקות AI בכל מחזור חיוב'],
-      advanced: ['פרויקט אחד', '12 מאמרים בכל מחזור חיוב חודשי', 'עד 100 מילות מפתח',
-        'עד 100 בדיקות גוגל בכל מחזור חיוב', 'עד 20 בדיקות AI בכל מחזור חיוב'],
-      premium: ['עד 10 פרויקטים', 'עד 100 מילות מפתח לפרויקט',
-        'עד 200 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 20 בדיקות AI בכל מחזור חיוב לפרויקט',
-        '50 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון'],
-      large_agency: ['עד 100 פרויקטים', 'עד 200 מילות מפתח לפרויקט',
-        'עד 400 בדיקות גוגל בכל מחזור חיוב לפרויקט', 'עד 50 בדיקות AI בכל מחזור חיוב לפרויקט',
-        '200 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון'],
+      regular: ['4 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית', 'אתר אחד', 'מעקב אחרי עד 50 מילות מפתח',
+        'עד 50 בדיקות מיקום בגוגל בחודש', 'עד 10 בדיקות נראות ב-AI בחודש'],
+      advanced: ['12 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית', 'אתר אחד', 'מעקב אחרי עד 100 מילות מפתח',
+        'עד 100 בדיקות מיקום בגוגל בחודש', 'עד 20 בדיקות נראות ב-AI בחודש'],
+      premium: ['50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם', 'עד 10 אתרים',
+        'מעקב אחרי עד 100 מילות מפתח לכל אתר', 'עד 200 בדיקות מיקום בגוגל בחודש לכל אתר',
+        'עד 20 בדיקות נראות ב-AI בחודש לכל אתר'],
+      large_agency: ['200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם', 'עד 100 אתרים',
+        'מעקב אחרי עד 200 מילות מפתח לכל אתר', 'עד 400 בדיקות מיקום בגוגל בחודש לכל אתר',
+        'עד 50 בדיקות נראות ב-AI בחודש לכל אתר'],
     }
     for (const code of PLAN_CODES) {
       check(`B7-en-${code}: the five lines are the exact agreed English list, in order`,
@@ -228,26 +228,19 @@ function main() {
         JSON.stringify(planLimitLines(code, 'he')))
     }
 
-    // THE RULE, stated as a rule: on a one-project plan the article line comes
-    // IMMEDIATELY after the project line; on a multi-project plan it comes last.
+    // THE RULE, stated as a rule: the article line is FIRST on every plan, the
+    // website line is second, then keywords, Google and AI in that order.
     for (const code of PLAN_CODES) {
-      const single = PLAN_CATALOG[code].maxProjects === 1
       for (const locale of ['en', 'he'] as const) {
         const lines = planLimitLines(code, locale)
         const at = lines.indexOf(planArticleLine(code, locale))
-        check(`B8-${locale}-${code}: the article line sits at index ${single ? 1 : 4}`,
-          at === planArticleLineIndex(code) && at === (single ? 1 : 4), `index ${at}`)
-        if (single) {
-          check(`B9-${locale}-${code}: it is immediately after the project line`,
-            at === 1 && /^(1 project|פרויקט אחד)$/.test(lines[0]), `${lines[0]} → ${lines[1]}`)
-          check(`B10-${locale}-${code}: the keyword, Google and AI lines follow it, in that order`,
-            /keywords|מילות מפתח/.test(lines[2]) && /Google checks|בדיקות גוגל/.test(lines[3])
-            && /AI checks|בדיקות AI/.test(lines[4]), JSON.stringify(lines.slice(2)))
-        } else {
-          check(`B9-${locale}-${code}: the multi-project order is unchanged — articles last`,
-            at === 4 && /projects|פרויקטים/.test(lines[0]) && /keywords|מילות מפתח/.test(lines[1]),
-            JSON.stringify(lines))
-        }
+        check(`B8-${locale}-${code}: the article line sits at index 0`,
+          at === planArticleLineIndex(code) && at === 0, `index ${at}`)
+        check(`B9-${locale}-${code}: the website line comes right after it`,
+          /^(1 website|Up to \d+ websites|אתר אחד|עד \d+ אתרים)$/.test(lines[1]), `${lines[0]} → ${lines[1]}`)
+        check(`B10-${locale}-${code}: the keyword, Google and AI lines follow it, in that order`,
+          /keywords|מילות מפתח/.test(lines[2]) && /Google ranking checks|בדיקות מיקום בגוגל/.test(lines[3])
+          && /AI visibility checks|בדיקות נראות ב-AI/.test(lines[4]), JSON.stringify(lines.slice(2)))
       }
     }
 

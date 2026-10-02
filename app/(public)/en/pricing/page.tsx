@@ -6,7 +6,7 @@ import { ButtonLink, Section } from '@/components/public/marketing'
 import { MarketingHero } from '@/components/public/landing/MarketingHero'
 import styles from '@/components/public/landing/landing.module.css'
 import {
-  PricingClose, PricingFaq, PricingIncluded, PricingUnsure, PricingUsage, PricingValue,
+  PricingChecksNote, PricingClose, PricingFaq, PricingIncluded, PricingUnsure, PricingUsage, PricingValue,
 } from '@/components/public/pricing/PricingSections'
 import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
@@ -150,6 +150,7 @@ export default async function EnglishPricingPage() {
             })}
           </div>
 
+          <PricingChecksNote copy={copy} />
           <PricingUnsure copy={copy} checkHref="/en/free-check" />
         </Section>
 
