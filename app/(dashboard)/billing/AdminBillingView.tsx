@@ -1,5 +1,6 @@
 'use client'
 
+import Header from '@/components/layout/Header'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -23,10 +24,5 @@ export default function AdminBillingView() {
   const dict = getDashboardDictionary(language)
   const t = dict.billing.admin
 
-  return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
-      <p className="text-slate-600 dark:text-slate-300">{t.description}</p>
-    </div>
-  )
+  return <Header title={t.title} subtitle={t.description} />
 }

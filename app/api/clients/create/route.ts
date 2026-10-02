@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
-import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
+import { buildEntitlementUnavailableError, EN_PLAN_LABEL, isEntitlementUnknown } from '@/lib/quota'
+import { ACTION_MESSAGES, bilingualError } from '@/lib/i18n/action-messages'
 
 // API Route for creating new clients
 // Replaces deprecated Server Action approach to avoid production crashes
@@ -18,14 +19,14 @@ export async function POST(request: NextRequest) {
     if (userError) {
       console.error('[API] Auth error:', userError.message)
       return NextResponse.json(
-        { error: 'שגיאה בקבלת פרטי משתמש' },
+        bilingualError('userLookupFailed'),
         { status: 401 }
       )
     }
     if (!user) {
       console.error('[API] No authenticated user')
       return NextResponse.json(
-        { error: 'משתמש לא מחובר' },
+        bilingualError('notSignedIn'),
         { status: 401 }
       )
     }
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     if (countError) {
       console.error('[API] Error counting clients:', countError.message)
       return NextResponse.json(
-        { error: 'שגיאה בבדיקת הלקוחות הקיימים' },
+        bilingualError('clientsCheckFailed'),
         { status: 500 }
       )
     }
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     if ((clientCount || 0) >= planLimits.maxClients) {
       console.log('[API] User reached client quota:', { userId: user.id, plan: entitlement.plan, limit: planLimits.maxClients })
       return NextResponse.json(
-        { error: `הגעת למכסה של ${planLimits.maxClients} לקוחות בתוכנית ${planLimits.label}. שדרג את התוכנית כדי להוסיף עוד לקוחות.` },
+        { error: ACTION_MESSAGES.he.clientsLimit(planLimits.maxClients, planLimits.label), errorEn: ACTION_MESSAGES.en.clientsLimit(planLimits.maxClients, EN_PLAN_LABEL[entitlement.plan]) },
         { status: 403 }
       )
     }
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     if (!name) {
       console.error('[API] Missing required field: name')
       return NextResponse.json(
-        { error: 'שם הלקוח הוא שדה חובה' },
+        bilingualError('clientNameRequired'),
         { status: 400 }
       )
     }
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
         code: error.code,
       })
       return NextResponse.json(
-        { error: 'שגיאה בהוספת לקוח' },
+        bilingualError('clientCreateFailed'),
         { status: 400 }
       )
     }
@@ -118,10 +119,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'שגיאה בעיבוד הבקשה'
-    console.error('[API] Unexpected error:', message, err)
+    // Logged here; never returned — a thrown message is not written for the merchant.
+    console.error('[API] Unexpected error:', err instanceof Error ? err.message : 'unknown', err)
     return NextResponse.json(
-      { error: message },
+      bilingualError('requestFailed'),
       { status: 500 }
     )
   }

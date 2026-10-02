@@ -11,9 +11,17 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
+import { ChevronDown, ChevronUp, ExternalLink, FileText, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
+import Segmented from '@/components/ui/Segmented'
+import Select from '@/components/ui/Select'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { presentAlert } from '@/lib/content/automation/alert-presentation'
 import { alertReasonCode, type ActiveAlert } from '@/lib/content/automation/alert-read-model'
@@ -34,6 +42,10 @@ interface Pool {
 
 const DEFAULT_DAYS_1 = [0]      // Sunday
 const DEFAULT_DAYS_2 = [0, 3]   // Sunday + Wednesday (never Saturday by default)
+/** Nothing is published on Friday or Saturday, so they are never offered. */
+const WORKING_WEEKDAYS = [0, 1, 2, 3, 4]
+/** Who sets the rhythm: the plan (paid plans) or the owner's own choice (admin, trial). */
+type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[] } | { source: 'owner' }
 interface QueueItem {
   id: string
   topicId: string | null
@@ -117,10 +129,13 @@ export default function AutomationSchedule({
 
   // Settings form.
   const [preset, setPreset] = useState<Preset>('weekly1')
+  const cadenceOptions: { value: Preset; label: string }[] = [{ value: 'weekly1', label: t.weekly1 }, { value: 'weekly2', label: t.weekly2 }, { value: 'custom', label: t.customLabel }]
   const [customDays, setCustomDays] = useState(3)
   const [publishTime, setPublishTime] = useState('09:00')
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
   const [weekdays, setWeekdays] = useState<number[]>(DEFAULT_DAYS_1)
+  const [rhythm, setRhythm] = useState<Rhythm | null>(null)
+  const weekdayOptions = WORKING_WEEKDAYS.map((i) => ({ value: String(i), label: t.weekdays[i] as string }))
   const [approvedExpanded, setApprovedExpanded] = useState(false)
   const [queueExpanded, setQueueExpanded] = useState(false)
 
@@ -144,8 +159,9 @@ export default function AutomationSchedule({
       setPool(p)
       setItems(Array.isArray(pd.items) ? pd.items : [])
       setHealth(pd.health ?? null)
+      setRhythm(pd.rhythm && typeof pd.rhythm === 'object' ? pd.rhythm as Rhythm : null)
       if (p) {
-        const days = Array.isArray(p.publishDays) ? p.publishDays : []
+        const days = (Array.isArray(p.publishDays) ? p.publishDays : []).filter((d) => WORKING_WEEKDAYS.includes(d))
         // Preset from weekday count first, else fall back to interval-days.
         const nextPreset: Preset = days.length === 1 ? 'weekly1' : days.length === 2 ? 'weekly2' : p.intervalDays === 7 ? 'weekly1' : p.intervalDays === 3 ? 'weekly2' : 'custom'
         setPreset(nextPreset)
@@ -383,38 +399,64 @@ export default function AutomationSchedule({
   const toggle = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const active = pool?.isActive ?? false
+  // The plan sets the rhythm for a paid plan: the day picker does not apply, the
+  // screen says what the plan gives (the dates below are the real ones).
+  const planRhythm = rhythm?.source === 'plan' ? rhythm : null
+  const rhythmLine = planRhythm
+    ? (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
+      .replace('{n}', String(planRhythm.perWeek))
+      .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
+    : null
 
+  // Flat inside the strategy's "advanced" card, below a divider (final review R14).
   return (
-    <Card className="hover:translate-y-0">
+    <div data-auto-schedule="">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={active ? 'success' : 'neutral'}>{active ? t.active : t.paused}</Badge>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.intro}</p>
+      <p className="mt-1 mb-4 max-w-prose text-copy text-muted">{t.intro}</p>
 
-      {message && <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>}
+      {message && <Notice tone={message.ok ? 'ok' : 'bad'} className="mb-3">{message.text}</Notice>}
 
       {/* Part א — schedule settings. Compact single row (cadence · publish day(s) ·
           actions); stacks on mobile. Exact time/timezone stay internal (hidden).
-          Subtle tint marks it as a distinct panel without adding a heavy card. */}
-      <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">{t.settingsTitle}</div>
-      <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 p-3 space-y-2">
+          It sits on the page surface; no inner panel (final review R14). */}
+      <div className="mb-2 text-copy font-semibold text-ink">{t.settingsTitle}</div>
+      <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-          {/* Cadence */}
-          <div className="min-w-[11rem]">
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.cadenceLabel}</div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {([['weekly1', t.weekly1], ['weekly2', t.weekly2], ['custom', t.customLabel]] as [Preset, string][]).map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setPreset(key)}
-                  className={`text-xs font-medium rounded-full px-3 py-1.5 border ${preset === key ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                  {label}
-                </button>
-              ))}
+          {/* Cadence — the owner's choice only when the plan does not set it */}
+          {rhythm?.source === 'plan' ? (
+            <p className="min-w-0 max-w-prose text-copy text-body" data-plan-rhythm="">{rhythmLine}</p>
+          ) : (<>
+          <div className="min-w-0 max-w-full">
+            <div className="mb-1.5 text-caption font-semibold text-ink">{t.cadenceLabel}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Three long options do not fit a phone: a Select below sm, the
+                  Segmented from sm (same state, same values). */}
+              <div className="w-full sm:hidden" data-cadence-select="">
+                <Select
+                  id="automation-cadence"
+                  aria-label={t.cadenceLabel}
+                  value={preset}
+                  onChange={(e) => setPreset(e.target.value as Preset)}
+                  options={cadenceOptions}
+                />
+              </div>
+              <div className="hidden sm:block">
+                <Segmented<Preset>
+                  ariaLabel={t.cadenceLabel}
+                  value={preset}
+                  onChange={setPreset}
+                  options={cadenceOptions}
+                  className="max-w-full"
+                />
+              </div>
               {preset === 'custom' && (
-                <label className="text-xs text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                <label className="inline-flex items-center gap-1.5 text-caption text-body">
                   {t.customDays}
                   <input type="number" min={1} max={365} value={customDays} onChange={(e) => setCustomDays(Number(e.target.value) || 1)}
-                    className="w-16 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" />
+                    className={cn(FIELD_CLASSES, 'h-9 w-20 py-1')} />
                 </label>
               )}
             </div>
@@ -423,36 +465,33 @@ export default function AutomationSchedule({
           {/* Publish day(s) — only for the weekly presets */}
           {(preset === 'weekly1' || preset === 'weekly2') && (
             <div>
-              <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.weekdayLabel}</div>
+              <div className="mb-1.5 text-caption font-semibold text-ink">{t.weekdayLabel}</div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <select value={weekdays[0] ?? 0}
+                <Select value={String(weekdays[0] ?? 0)} aria-label={t.weekdayLabel}
                   onChange={(e) => setWeekdays(preset === 'weekly1' ? [Number(e.target.value)] : [Number(e.target.value), weekdays[1] ?? DEFAULT_DAYS_2[1]!])}
-                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
-                  {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
-                </select>
+                  options={weekdayOptions} className="h-9 w-auto" />
                 {preset === 'weekly2' && (
-                  <select value={weekdays[1] ?? DEFAULT_DAYS_2[1]!}
+                  <Select value={String(weekdays[1] ?? DEFAULT_DAYS_2[1]!)} aria-label={t.weekdayLabel}
                     onChange={(e) => setWeekdays([weekdays[0] ?? DEFAULT_DAYS_2[0]!, Number(e.target.value)])}
-                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
-                    {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
-                  </select>
+                    options={weekdayOptions} className="h-9 w-auto" />
                 )}
               </div>
             </div>
           )}
+          </>)}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 ms-auto">
-            <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
-            <Button size="sm" variant="outline" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
+          <div className="ms-auto flex items-center gap-2">
+            {!planRhythm && <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>}
+            <Button size="sm" variant="secondary" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
           </div>
         </div>
 
         {/* Publish-day note + next publish on one compact line */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-0.5">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.publishDayNote}</p>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {t.nextPublish}: <span className="font-medium">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
+          <p className="text-caption text-muted">{planRhythm ? t.noWeekendNote : `${t.publishDayNote} ${t.noWeekendNote}`}</p>
+          <div className="text-caption text-muted">
+            {t.nextPublish}: <span className="font-semibold text-ink">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
           </div>
         </div>
 
@@ -460,26 +499,21 @@ export default function AutomationSchedule({
             attention (a scheduled publish/generation failed, an item is stuck, or
             the queue is overdue with nothing to publish). */}
         {health?.needsAttention && (
-          <div className="mt-2 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{t.alertNeedsAttention}</p>
-            <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-              {[
-                health.failedCount > 0 ? t.alertFailed.replace('{n}', String(health.failedCount)) : null,
-                health.stuckCount > 0 ? t.alertStuck.replace('{n}', String(health.stuckCount)) : null,
-                health.overdue ? t.alertOverdue : null,
-              ].filter(Boolean).join(' · ')}
-            </p>
-            {health.latestError && <p className="mt-0.5 text-[11px] text-amber-700/90 dark:text-amber-400/90 break-words">{reasonLabel(health.latestError)}</p>}
-            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{t.alertHint}</p>
-          </div>
+          <Notice tone="warn" items={[
+            health.failedCount > 0 ? t.alertFailed.replace('{n}', String(health.failedCount)) : null,
+            health.stuckCount > 0 ? t.alertStuck.replace('{n}', String(health.stuckCount)) : null,
+            health.overdue ? t.alertOverdue : null,
+            health.latestError ? reasonLabel(health.latestError) : null,
+          ].filter((x): x is string => !!x)}>
+            <span className="block font-semibold">{t.alertNeedsAttention}</span>
+            <span className="block text-body">{t.alertHint}</span>
+          </Notice>
         )}
 
         {/* Safety A — the alert store is a required dependency; if its migration
             is missing, say so clearly instead of showing a healthy-looking zero. */}
         {alertsMigrationMissing && (
-          <div className="mt-2 rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/20 px-3 py-2">
-            <p className="text-xs font-semibold text-red-800 dark:text-red-300">{t.alertsMigrationMissing}</p>
-          </div>
+          <Notice tone="bad">{t.alertsMigrationMissing}</Notice>
         )}
 
         {/* Phase 4B.1 — persisted final-failure alerts: one per item after the
@@ -487,31 +521,20 @@ export default function AutomationSchedule({
         {alerts.length > 0 && (
           <div className="mt-2 space-y-2">
             {alerts.map((a) => (
-              <div key={a.id} className="rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/20 px-3 py-2">
-                <p className="text-xs font-semibold text-red-800 dark:text-red-300">
-                  {presentAlert(a, alertDict).heading}
-                </p>
-                <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-400 break-words">
-                  {presentAlert(a, alertDict).detail}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  {a.articleId && (
-                    <Link href={`/content/articles/${a.articleId}`} className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                      {t.alertViewArticle}
-                    </Link>
-                  )}
-                  {a.poolItemId && (
-                    <button type="button" onClick={() => retryFromAlert(a.poolItemId!)} disabled={busyItem === a.poolItemId}
-                      className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline disabled:opacity-50">
-                      {t.alertRetryNow}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => dismissAlert(a.id)}
-                    className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:underline">
-                    {t.alertDismiss}
-                  </button>
-                </div>
-              </div>
+              <Notice
+                key={a.id}
+                tone="bad"
+                onDismiss={() => dismissAlert(a.id)}
+                action={a.poolItemId && busyItem !== a.poolItemId ? { label: t.alertRetryNow, onClick: () => retryFromAlert(a.poolItemId!) } : null}
+              >
+                <span className="block font-semibold">{presentAlert(a, alertDict).heading}</span>
+                <span className="block break-words text-body">{presentAlert(a, alertDict).detail}</span>
+                {a.articleId && (
+                  <Link href={`/content/articles/${a.articleId}`} className="mt-1 inline-flex text-caption font-semibold text-action hover:underline">
+                    {t.alertViewArticle}
+                  </Link>
+                )}
+              </Notice>
             ))}
           </div>
         )}
@@ -519,30 +542,29 @@ export default function AutomationSchedule({
 
       {/* Part ב — publishing queue (add approved topics + the queue list below).
           A thin top divider separates it from the settings panel above. */}
-      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-        <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.addApprovedTitle}</div>
+      <div className="mt-6 border-t border-line pt-6">
+        <h4 className="mb-2 text-copy font-semibold text-ink">{t.addApprovedTitle}</h4>
         {approved.length === 0 ? (
-          <p className="text-xs text-slate-400">{t.noApproved}</p>
+          <p className="text-caption text-muted">{t.noApproved}</p>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {(approvedExpanded ? approved : approved.slice(0, 3)).map((tp) => (
-              <label key={tp.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} className="h-4 w-4 accent-indigo-600" />
-                <span className="truncate">{tp.topic}</span>
-              </label>
+              <div key={tp.id} className="rounded-control px-2 py-1.5 transition-colors hover:bg-sunk/60">
+                <Checkbox checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} label={<span className="text-copy text-body">{tp.topic}</span>} />
+              </div>
             ))}
             {approved.length > 3 && (
               <div className="pt-0.5">
                 <button
                   type="button"
                   onClick={() => setApprovedExpanded((v) => !v)}
-                  className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
                 >
                   {approvedExpanded ? t.showLess : `${t.showMore} (${approved.length - 3})`}
                 </button>
               </div>
             )}
-            <Button size="sm" onClick={addSelected} loading={saving} disabled={saving || selected.size === 0}>
+            <Button size="sm" variant="secondary" onClick={addSelected} loading={saving} disabled={saving || selected.size === 0}>
               {t.addSelected} ({selected.size})
             </Button>
           </div>
@@ -550,73 +572,62 @@ export default function AutomationSchedule({
       </div>
 
       {/* Queue */}
-      <div className="mt-4">
-        <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.queueTitle}</div>
+      <div className="mt-6">
+        <h4 className="mb-2 text-copy font-semibold text-ink">{t.queueTitle}</h4>
         {loading ? (
-          <p className="text-xs text-slate-400">…</p>
+          <div role="status" aria-busy="true" className="space-y-2">
+            <span className="sr-only">{t.queueTitle}</span>
+            {[0, 1].map((i) => <Skeleton key={i} className="h-16 rounded-inset" />)}
+          </div>
         ) : items.length === 0 ? (
-          <p className="text-xs text-slate-400">{t.queueEmpty}</p>
+          <p className="rounded-inset border border-dashed border-line-strong px-4 py-5 text-center text-copy text-muted">{t.queueEmpty}</p>
         ) : (
-          <div className="space-y-2">
+          <div className="list-enter divide-y divide-line border-y border-line">
             {(queueExpanded ? items : items.slice(0, 3)).map((it, idx) => (
-              <div key={it.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5 flex flex-wrap items-center gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} className="text-slate-400 hover:text-slate-600 disabled:opacity-30 leading-none">↑</button>
-                  <button type="button" onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="text-slate-400 hover:text-slate-600 disabled:opacity-30 leading-none">↓</button>
+              <div key={it.id} className="flex flex-wrap items-center gap-3 py-3">
+                <div className="flex flex-col">
+                  <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={t.moveUp}
+                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronUp aria-hidden="true" className="size-4" /></button>
+                  <button type="button" onClick={() => move(idx, 1)} disabled={idx === items.length - 1} aria-label={t.moveDown}
+                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronDown aria-hidden="true" className="size-4" /></button>
                 </div>
                 <div className="flex-1 min-w-[10rem]">
-                  <div className="text-sm text-slate-800 dark:text-slate-100 truncate">{it.topicTitle}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{fmtDay(it.projectedPublishAt, ['queued', 'scheduled', 'generated', 'generating', 'publishing'].includes(it.status))}{it.lastError ? ` · ${reasonLabel(it.lastError)}` : ''}</div>
+                  <div className="truncate text-copy font-medium text-ink">{it.topicTitle}</div>
+                  <div className="text-caption text-muted">{fmtDay(it.projectedPublishAt, ['queued', 'scheduled', 'generated', 'generating', 'publishing'].includes(it.status))}{it.lastError ? ` · ${reasonLabel(it.lastError)}` : ''}</div>
                 </div>
                 <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
                 <div className="flex items-center gap-1">
-                  {it.status === 'publishing' && <span className="text-[11px] text-slate-500 dark:text-slate-400">{t.publishingNow}</span>}
-                  {it.status === 'published' && (
-                    <>
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">{t.publishedDone}</span>
-                      {it.wpPostUrl && (
-                        <a href={it.wpPostUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{t.openPost}</a>
-                      )}
-                    </>
-                  )}
-                  {it.status === 'generated' && (
-                    <>
-                      {it.articleId && (
-                        <a href={`/content/articles/${it.articleId}`} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{t.openEditor}</a>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
-                        {busyItem === it.id ? t.publishingNow : t.publishNow}
-                      </Button>
-                    </>
-                  )}
-                  {it.status === 'failed' && it.articleId && (
-                    <Button size="sm" variant="outline" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                  {it.status === 'publishing' && <span className="text-caption text-muted">{t.publishingNow}</span>}
+                  {it.status === 'published' && <span className="text-caption text-ok">{t.publishedDone}</span>}
+                  {/* The row's one inline action; the rest is in the row menu. */}
+                  {(it.status === 'generated' || (it.status === 'failed' && it.articleId)) && (
+                    <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                       {busyItem === it.id ? t.publishingNow : t.publishNow}
                     </Button>
                   )}
                   {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
-                    <Button size="sm" variant="outline" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                    <Button size="sm" variant="secondary" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                       {busyItem === it.id ? t.generatingArticle : t.generateNow}
                     </Button>
                   )}
-                  {(it.status === 'skipped' || it.status === 'paused') && (
-                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'unskip')} disabled={busyItem === it.id}>{t.retry}</Button>
-                  )}
-                  {it.status === 'queued' && (
-                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'skip')} disabled={busyItem === it.id}>{t.skip}</Button>
-                  )}
-                  {it.status !== 'publishing' && (
-                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'remove')} disabled={busyItem === it.id} className="text-red-600 dark:text-red-400">{t.remove}</Button>
-                  )}
+                  {(() => {
+                    const menu: RowMenuItem[] = []
+                    if (it.status === 'published' && it.wpPostUrl) menu.push({ key: 'post', label: t.openPost, onSelect: () => window.open(it.wpPostUrl!, '_blank', 'noopener,noreferrer'), icon: <ExternalLink className="size-4" aria-hidden="true" /> })
+                    if (it.status === 'generated' && it.articleId) menu.push({ key: 'editor', label: t.openEditor, href: `/content/articles/${it.articleId}`, icon: <FileText className="size-4" aria-hidden="true" /> })
+                    if (it.status === 'skipped' || it.status === 'paused') menu.push({ key: 'unskip', label: t.retry, onSelect: () => itemAction(it.id, 'unskip'), disabled: busyItem === it.id, icon: <RotateCcw className="size-4" aria-hidden="true" /> })
+                    if (it.status === 'queued') menu.push({ key: 'skip', label: t.skip, onSelect: () => itemAction(it.id, 'skip'), disabled: busyItem === it.id, icon: <SkipForward className="size-4 rtl:-scale-x-100" aria-hidden="true" /> })
+                    if (it.status !== 'publishing') menu.push({ key: 'remove', label: t.remove, danger: true, onSelect: () => itemAction(it.id, 'remove'), disabled: busyItem === it.id, icon: <Trash2 className="size-4" aria-hidden="true" /> })
+                    return menu.length > 0 ? <RowMenu label={`${t.queueTitle}: ${it.topicTitle}`} items={menu} /> : null
+                  })()}
                 </div>
               </div>
             ))}
             {items.length > 3 && (
-              <div className="pt-0.5">
+              <div className="py-3">
                 <button
                   type="button"
                   onClick={() => setQueueExpanded((v) => !v)}
-                  className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
                 >
                   {queueExpanded ? t.showLess : `${t.showMore} (${items.length - 3})`}
                 </button>
@@ -628,23 +639,26 @@ export default function AutomationSchedule({
 
       {/* Admin/QA tools — collapsed by default so normal clients aren't confused
           by the manual run action. */}
-      <details className="mt-4">
-        <summary className="text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">{t.advancedTitle}</summary>
+      <details className="group mt-6 border-t border-line pt-4">
+        <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1.5 rounded-control text-caption font-semibold text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" />
+          {t.advancedTitle}
+        </summary>
         {/* Distinct soft block: this acts on the EXISTING publishing queue only —
             visually separated from the "add approved topics to queue" area above. */}
-        <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/40 dark:bg-indigo-900/10 p-3 space-y-2">
-          <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.runNowSectionTitle}</p>
-          <Button size="sm" variant="outline" onClick={runNow} loading={runningNow} disabled={runningNow}>
+        <div className="mt-3 space-y-2">
+          <p className="text-caption font-medium text-body">{t.runNowSectionTitle}</p>
+          <Button size="sm" variant="secondary" onClick={runNow} loading={runningNow} disabled={runningNow}>
             {runningNow ? t.runNowRunning : t.runNowLabel}
           </Button>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.runNowHelper}</p>
+          <p className="text-caption text-muted">{t.runNowHelper}</p>
           {runMsg && (
-            <p className={`text-[11px] ${runMsg.tone === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : runMsg.tone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
+            <Notice tone={runMsg.tone === 'ok' ? 'ok' : runMsg.tone === 'error' ? 'bad' : 'info'}>
               {runMsg.text}
-            </p>
+            </Notice>
           )}
         </div>
       </details>
-    </Card>
+    </div>
   )
 }

@@ -8,7 +8,8 @@
 
 import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { authPool, toPoolDTO, type PoolRow } from '@/lib/content/automation/api'
-import { computeNextPublishAt, nextPublishAtWeekdays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { makeSlotAfter, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { readPublishRhythmForProject } from '@/lib/content/automation/plan-rhythm'
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'custom']
 const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at, publish_days'
@@ -52,7 +53,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const nextTime = (patch.publish_time as string) ?? pool.publish_time ?? DEFAULT_PUBLISH_TIME
   const nextTz = (patch.timezone as string) ?? pool.timezone ?? DEFAULT_TIMEZONE
   const nextDays = 'publish_days' in patch ? ((patch.publish_days as number[] | null) ?? []) : (Array.isArray(pool.publish_days) ? pool.publish_days : [])
-  patch.next_publish_at = nextActive ? (nextDays.length ? nextPublishAtWeekdays(nextTime, nextTz, nextDays) : computeNextPublishAt(nextTime, nextTz)) : null
+  // The plan's rhythm when there is one (read only), else the owner's own
+  // schedule; never Friday or Saturday.
+  const nextInterval = resolveIntervalDays(((patch.cadence as Cadence) ?? pool.cadence) as Cadence, 'interval_days' in patch ? (patch.interval_days as number | null) : pool.interval_days)
+  const rhythm = nextActive ? await readPublishRhythmForProject(auth.admin, pool.project_id, { countThisQueue: !pool.is_active }) : null
+  patch.next_publish_at = nextActive && rhythm
+    ? makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: rhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null })(Date.now())
+    : null
 
   const { data, error } = await auth.admin.from('article_pools').update(patch).eq('id', id).select(POOL_SELECT).single()
   if (error || !data) {

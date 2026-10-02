@@ -1,4 +1,4 @@
-# LLMs.txt - AI Agent Guidelines for Rankings by Go Top
+# LLMs.txt - AI Agent Guidelines for Go Top SEO
 # https://llms.txt
 
 User-agent: *
@@ -18,7 +18,7 @@ Contact: oren@gotop.co.il
 Phone: 054-9489377
 
 # Company Information
-Name: Rankings by Go Top
+Name: Go Top SEO (previously Rankings by Go Top)
 Description: Advanced location tracking system for SEO promotion - Google organic results and Google Maps rankings
 Website: https://www.gotopseo.com
 Language: he

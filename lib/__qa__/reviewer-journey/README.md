@@ -83,3 +83,24 @@ Measured at the time of commit, same stub, fresh database each run:
 | `next=https://evil.com` / `//evil.com` / `/\evil.com` | followed | replaced with a safe internal page |
 | cookie persisted through the redirect | no | yes |
 | **totals** | **12 passed, 10 failed** | **22 passed, 0 failed** |
+
+## Search Console, connected or not
+
+Search Console feeds widgets on the dashboard, reports, keywords and Topics.
+Keyword research's raw opportunity browser is a dev-only diagnostic behind
+`NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED`, which the journey build does not set, so
+merchants never see it. The stub starts every journey with Search Console NOT
+connected (every GSC table empty) and switches to a connected fixture on request,
+leaving every other table alone: one Google connection, a property on the
+project, ten weekly 28-day syncs with their property totals (stored newest first,
+because the stub ignores `order`), and the query+page rows of the latest sync.
+
+    curl http://127.0.0.1:5555/__stub/fixture?gsc=connected      # or gsc=disconnected
+
+`journey.js` checks the retired `/content/search-console` address (a 307 to the
+Search Console section of settings, `#search-console`, with every parameter, for a
+connection result too; a browser following it lands there), then visits each
+screen in both states: without a connection every widget keeps its title and
+offers one link to settings; with one it shows its figures; keyword research
+shows no Search Console section and asks for no Search Console data in either
+state; and no screen logs a console error.

@@ -37,6 +37,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { readUsageAllowance } from '@/lib/billing/usage-allowance'
+import { countAIScansTrialLifetime } from '@/lib/quota'
 
 /** Exactly what the UI renders — see AIVisibilitySection's `allowance` state. */
 type AllowanceResponse =
@@ -60,6 +61,16 @@ export async function GET() {
       userId: user.id,
       usageType: 'ai_check',
       limitFor: (limits) => limits.maxAIScansPerPeriodPerProject,
+      // THE SAME RULE THE DISPATCHER APPLIES. app/api/ai-visibility/runs lets a
+      // `trial` plan run up to `maxAIScansTotal` checks over the account's
+      // lifetime, counted by `countAIScansTrialLifetime`; the period limit above
+      // is 0 for that plan. Reading only the period limit told a trial merchant
+      // "not included" while the dispatcher would run all three. This changes
+      // what is REPORTED, never what is allowed.
+      trialLifetime: {
+        limitFor: (limits) => limits.maxAIScansTotal,
+        countUsed: (admin, userId) => countAIScansTrialLifetime(userId, admin),
+      },
     })
 
     if (allowance.state === 'unknown') {

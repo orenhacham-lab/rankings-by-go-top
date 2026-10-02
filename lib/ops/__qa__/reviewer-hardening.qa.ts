@@ -119,18 +119,29 @@ async function main() {
   say('A1) the AI-check trigger — it existed; what was missing was that it looked like one')
   {
     const src = read('components/ai-visibility/AIVisibilitySection.tsx')
-    check('A1a: every query card renders one dispatch button per engine',
-      /onClick=\{\(\) => !scanning && scanEngine\(p\.id, engine\)\}/.test(src))
+    // Updated 2026-09-29 (UX review B, owner approval): the customer no longer
+    // picks an engine on the card. Each card has ONE recheck button (the monthly
+    // engines, through the same route) and every engine, one check each, in its
+    // ⋯ menu. The chips are the status of the last check.
+    const trigger = (s: string) => /onClick=\{\(\) => \{ if \(!busy && !notEnough\) void recheckQuestion\(p\.id\) \}\}/.test(s)
+      && /SUPPORTED_ENGINES\.filter\(\(e\) => engineSupportsCountry\(e, projectCountry\)\)\.map\(\(engine\) => \(\{[\s\S]{0,420}onSelect: \(\) => \{ if \(!busy\) void scanEngine\(p\.id, engine\) \}/.test(s)
+    check('A1a: every query card has one recheck button and each engine in its menu',
+      trigger(src))
+    check('A1a-MUT: a card without the recheck button fails A1a', !trigger(src.replace('void recheckQuestion(p.id)', 'void 0')))
+    check('A1a-2: the recheck posts one check per engine to the same dispatch route',
+      /const recheckQuestion = useCallback\([\s\S]{0,400}engines\.map\(async \(engine\) => \{[\s\S]{0,120}fetch\('\/api\/ai-visibility\/runs', \{[\s\S]{0,60}method: 'POST'/.test(src))
     check('A1b: which posts one check to the real dispatch route',
       /scanEngine[\s\S]{0,2400}fetch\('\/api\/ai-visibility\/runs', \{[\s\S]{0,200}method: 'POST'/.test(src))
     check('A1c: six engines, so a reviewer has a choice of which to run',
-      /SUPPORTED_ENGINES = \['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'\]/.test(src))
+      // The list lives in the shared score (lib/ai-visibility/score.ts) since the score was unified.
+      /SUPPORTED_ENGINES = SCORED_ENGINES\b/.test(src)
+      && /SCORED_ENGINES = \['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'\]/.test(read('lib/ai-visibility/score.ts')))
     // The fix: an instruction, and an accessible name that states the ACTION.
     check('A1d: the section now tells the reader the chips are the run control',
       /t\('run_a_check_hint'\)/.test(src))
-    check('A1e: the button’s accessible name names the ACTION and the engine, not a status',
-      /const actionLabel = scanning[\s\S]{0,220}run_check_on/.test(src)
-      && /aria-label=\{actionLabel\}/.test(src))
+    check('A1e: the button names the action and its cost; a chip names the engine and its status',
+      /t\(checkedBefore \? 'recheck_question_all' : 'check_question_all'\)\.replace\('\{n\}', String\(n\)\)/.test(src)
+      && /aria-label=\{statusLabel\}/.test(src) && /t\('check_on_engine_menu'\)\.replace\('\{engine\}'/.test(src))
     const i18n = read('lib/ai-visibility/i18n.ts')
     for (const key of ['run_a_check_hint', 'run_check_on', 'rerun_check_on',
       'ai_allowance', 'ai_allowance_unknown', 'ai_allowance_exhausted']) {
@@ -138,8 +149,9 @@ async function main() {
         new RegExp(`${key}: \\{ he: '[^']+', en: '[^']+' \\}`).test(i18n)
         || new RegExp(`${key}: \\{[\\s\\S]{0,180}he: '[^']+',[\\s\\S]{0,180}en: '[^']+',`).test(i18n))
     }
-    check('A1g: the in-flight button is disabled, so one click cannot become two',
-      /disabled=\{scanning\}/.test(src))
+    check('A1g: while a check runs every check control is disabled, so one click cannot become two',
+      /const busy = scanningKey !== null \|\| recheck !== null/.test(src) && /disabled=\{busy \|\| notEnough\}/.test(src)
+      && /disabled: busy \|\| \(knownLeft !== null && knownLeft < 1\)/.test(src))
   }
 
   // ── A2) the allowance is the ledger's, not a decoration ──────────────────
@@ -234,25 +246,48 @@ async function main() {
     }
   }
 
-  // ── B) the project page reaches a terminal state, promptly ───────────────
-  say('\nB) the project page: a shell that does not wait, and a load that always ends')
+  // ── B) a project's tabs reach a terminal state, promptly ────────────────
+  // These rules were earned on the project page, which loaded the row and the
+  // keyword table in one effect and could hang on either. The page is tabs now:
+  // the row comes from useProjectRow through WorkspaceGate, the keyword table from
+  // ProjectKeywordsPanel, AI visibility from its own tab. Each rule is checked
+  // where it lives now, with a mutation control that breaks it on purpose.
+  say('\nB) the project tabs: a shell that does not wait, and a load that always ends')
   {
-    const page = read('app/(dashboard)/projects/[id]/page.tsx')
-    check('B1: the project row is fetched on its own, so the header does not queue behind the table',
-      /const projectRes = await deadline\(/.test(page)
-      && /setProject\(projectRes\.data\)\s*\n\s*setLoading\(false\)/.test(page))
-    check('B2: every call is bounded — a hanging request can no longer hold the page',
-      /const deadline = <T,>\(work: PromiseLike<T>, ms = 15000\)/.test(page))
-    check('B3: a failure ends in a TERMINAL state, checked before the spinner',
-      /if \(dataError && !project\) \{/.test(page)
-      && page.indexOf('if (dataError && !project)') < page.indexOf('if (loading) {'))
-    check('B4: with a localized message and a retry, not a dead end',
-      /k\.messages\.loadFailed/.test(page) && /k\.messages\.retry/.test(page)
-      && /void loadData\(\)/.test(page))
-    check('B5: the effect cannot leave `loading` true even if loadData ever rejects',
-      /loadData\(\)\.catch\(\(\) => \{ setDataError\(true\); setLoading\(false\)/.test(page))
-    check('B6: the keyword list reports its OWN state instead of holding the page',
-      /targetsLoading=\{secondaryLoading\}/.test(page) && /targetsError=\{secondaryError\}/.test(page))
+    const rowHook = readCode('lib/active-project/useProjectRow.ts')
+    const gate = readCode('components/layout/WorkspaceGate.tsx')
+    const panel = readCode('components/keywords/ProjectKeywordsPanel.tsx')
+    const aiPage = readCode('app/(dashboard)/ai-visibility/page.tsx')
+    const rule = {
+      ownRow: (hook: string, g: string, kp: string) =>
+        /from\('projects'\)\.select\('\*'\)\.eq\('id', projectId\)\.maybeSingle\(\)/.test(hook)
+        && !/tracking_targets/.test(hook) && !/tracking_targets/.test(g)
+        && /from\('tracking_targets'\)/.test(kp),
+      bounded: (hook: string, kp: string) =>
+        /export const PROJECT_ROW_DEADLINE_MS = 15000/.test(hook)
+        && /withDeadline\(createClient\(\)\.from\('projects'\)/.test(hook)
+        && (kp.match(/await withDeadline\(/g) ?? []).length >= 2
+        && !/await supabase\s*\.from\(/.test(kp),
+      terminalFirst: (g: string) => g.indexOf("if (status === 'error')") > 0
+        && g.indexOf("if (status === 'error')") < g.indexOf("status === 'loading'"),
+      retry: (g: string) => /title=\{t\.projectLoadError\} action=\{<Button onClick=\{reload\}>\{t\.retry\}<\/Button>\}/.test(g),
+      neverStuck: (kp: string) => /loadTargets\(\)\.catch\(\(\) => \{ setTargetsError\(true\); setTargetsLoading\(false\) \}\)/.test(kp),
+      ownState: (kp: string) => /targetsLoading=\{targetsLoading\}/.test(kp) && /targetsError=\{targetsError\}/.test(kp),
+      memo: (ai: string) => /const projectKeywords = useMemo\(\(\) => keywords\.filter\(Boolean\), \[keywords\]\)/.test(ai)
+        && /projectKeywords=\{projectKeywords\}/.test(ai),
+      hooksFirst: (ai: string) => ai.indexOf('useMemo(() => createI18n(language)') > 0
+        && ai.indexOf('useMemo(() => createI18n(language)') < ai.indexOf("if (process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true')"),
+      failureIsTerminal: (hook: string) => /if \(!res \|\| res\.error\) \{/.test(hook)
+        && /row: null, failed: true/.test(hook)
+        && /if \(read\.failed\) return \{ project: null, status: read\.attempt === attempt \? 'error' : 'loading' \}/.test(hook),
+    }
+    check('B1: the project row is fetched on its own, so a tab does not queue behind the keyword table',
+      rule.ownRow(rowHook, gate, panel))
+    check('B2: every call is bounded — a hanging request can no longer hold a tab', rule.bounded(rowHook, panel))
+    check('B3: a failure ends in a TERMINAL state, checked before the spinner', rule.terminalFirst(gate))
+    check('B4: with a localized message and a retry, not a dead end', rule.retry(gate))
+    check('B5: the effect cannot leave the table loading even if its load ever rejects', rule.neverStuck(panel))
+    check('B6: the keyword list reports its OWN state instead of holding the tab', rule.ownState(panel))
     const table = read('components/keywords/TrackingTargetsTable.tsx')
     check('B7: and the table distinguishes loading, failed and genuinely empty',
       /targets\.length === 0 && targetsLoading/.test(table)
@@ -262,21 +297,41 @@ async function main() {
     for (const dict of ['he', 'en']) {
       const d = read(`lib/i18n/dashboard/${dict}.ts`)
       check(`B9-${dict}: every new state has ${dict} copy`,
-        /loadFailed:/.test(d) && /retry:/.test(d) && /keywordsLoading:/.test(d) && /keywordsLoadFailed:/.test(d))
+        /projectLoadError:/.test(d) && /projectMissing:/.test(d) && /loadingProject:/.test(d)
+        && /retry:/.test(d) && /keywordsLoading:/.test(d) && /keywordsLoadFailed:/.test(d))
     }
-    check('B11: the keyword array is memoized, so a re-render is not a new dependency',
-      /const projectKeywords = useMemo\(\s*\n\s*\(\) => targets\.map/.test(page)
-      && /projectKeywords=\{projectKeywords\}/.test(page))
-    check('B12: …and the hook sits ABOVE every early return',
-      page.indexOf('const projectKeywords = useMemo(') < page.indexOf('if (dataError && !project)'),
-      'a hook after a conditional return is React error #310 — measured, not theorised')
+    check('B11: the keyword array is memoized, so a re-render is not a new dependency', rule.memo(aiPage))
+    check('B12: …and every hook sits ABOVE the early return',
+      rule.hooksFirst(aiPage), 'a hook after a conditional return is React error #310 — measured, not theorised')
     const ai = read('components/ai-visibility/AIVisibilitySection.tsx')
     check('B13: the suggestions effect is keyed by the keywords’ VALUE, not the array identity',
-      /projectKeywordsKey, manualProfile, projectId\]/.test(ai)
+      // w7-ai-profile: the effect also waits for the resolved business identity.
+      /projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId\]/.test(ai)
       && /const projectKeywordsKey = \(projectKeywords \|\| \[\]\)\.join/.test(ai))
-    // The behaviour this replaces must be gone, not merely covered up.
-    check('B10: `loading` is no longer cleared only on the success path',
-      !/setTargets\(targetsData \|\| \[\]\)[\s\S]{0,400}setLoading\(false\)\s*\n\s*\}, \[id\]\)/.test(page))
+    check('B13b: MUT keying the effect by the array identity fails B13',
+      !/projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId\]/.test(ai.replace('projectKeywordsKey, manualProfile, identityCategory', 'projectKeywords, manualProfile, identityCategory')))
+    check('B10: a failed read of the row is a terminal state, not a spinner', rule.failureIsTerminal(rowHook))
+
+    // Mutation controls: each rule, broken on purpose, must fail.
+    check('B-MUT1: a gate that also loads the keyword table fails B1',
+      !rule.ownRow(rowHook, gate + "\ncreateClient().from('tracking_targets')", panel))
+    check('B-MUT2: an unbounded read in the keyword panel fails B2',
+      !rule.bounded(rowHook, panel.replace('await withDeadline(', 'await (')
+        .replace("await withDeadline(", 'await (') + '\nawait supabase.from(\'scan_results\')'))
+    check('B-MUT3: a spinner checked before the error fails B3',
+      !rule.terminalFirst(gate.replace("if (status === 'error')", "if (status === 'loading') {}\n  if (status === 'error')")))
+    check('B-MUT4: an error with no retry fails B4',
+      !rule.retry(gate.replace('action={<Button onClick={reload}>{t.retry}</Button>}', '')))
+    check('B-MUT5: dropping the catch fails B5',
+      !rule.neverStuck(panel.replace('loadTargets().catch(() => { setTargetsError(true); setTargetsLoading(false) })', 'void loadTargets()')))
+    check('B-MUT6: an inline keyword array fails B11',
+      !rule.memo(aiPage.replace('projectKeywords={projectKeywords}', 'projectKeywords={keywords.filter(Boolean)}')))
+    // The hook moved from above the flag return to below it.
+    check('B-MUT7: a hook after the flag return fails B12',
+      !rule.hooksFirst(aiPage.replace('const t = useMemo(() => createI18n(language), [language])', 'const t = null')
+        + '\nconst late = useMemo(() => createI18n(language), [language])'))
+    check('B-MUT8: a failure that keeps the spinner fails B10',
+      !rule.failureIsTerminal(rowHook.replace("read.attempt === attempt ? 'error' : 'loading'", "'loading'")))
   }
 
   // ── A3) two clicks cannot dispatch or charge twice ───────────────────────

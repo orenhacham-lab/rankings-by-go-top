@@ -10,6 +10,21 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 // Types that should render LTR (URLs, domains, email, phone numbers, passwords)
 const LTR_TYPES = new Set(['email', 'url', 'tel', 'password', 'number'])
 
+/**
+ * The one field style (Select and Textarea share it): a white well with a hairline
+ * border that darkens on hover, and on focus an accent border with a soft halo —
+ * visible from across the screen without shouting. An error swaps both to `bad`.
+ */
+export const FIELD_CLASSES =
+  'w-full rounded-control border border-line bg-surface px-3 text-copy text-ink shadow-control placeholder:text-muted ' +
+  'transition-[border-color,box-shadow] duration-150 ease-snappy hover:border-line-strong ' +
+  'focus:outline-none focus:border-action focus:ring-4 focus:ring-action/20 ' +
+  'disabled:cursor-not-allowed disabled:bg-sunk disabled:text-muted'
+
+export const FIELD_ERROR_CLASSES = 'border-bad hover:border-bad focus:border-bad focus:ring-bad/20'
+
+export const FIELD_LABEL_CLASSES = 'text-caption font-semibold text-ink'
+
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, className, id, type, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
@@ -17,9 +32,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const directionClass = type && LTR_TYPES.has(type) ? 'dir-ltr text-left' : ''
 
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={inputId} className={FIELD_LABEL_CLASSES}>
             {label}
           </label>
         )}
@@ -28,17 +43,18 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           type={type}
           dir={type && LTR_TYPES.has(type) ? 'ltr' : undefined}
+          aria-invalid={error ? true : undefined}
           className={cn(
-            'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 placeholder-slate-400 dark:placeholder-slate-400 text-slate-900 dark:text-slate-100 transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent dark:focus:border-blue-600',
-            error && 'border-red-400 dark:border-red-600 focus:ring-red-400 dark:focus:ring-red-500',
+            FIELD_CLASSES,
+            'py-2',
+            error && FIELD_ERROR_CLASSES,
             directionClass,
             className
           )}
           {...props}
         />
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-        {hint && !error && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
+        {error && <p className="text-caption text-bad">{error}</p>}
+        {hint && !error && <p className="text-caption text-muted">{hint}</p>}
       </div>
     )
   }

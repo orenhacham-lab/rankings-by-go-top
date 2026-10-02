@@ -1,16 +1,21 @@
 /**
- * K4 — GSC connect + per-project property assignment from the Content Hub.
+ * K4 — GSC connect + per-project property assignment.
  *
  * Reuses the existing user-scoped OAuth (connect/callback) and per-project property
  * routes — no duplicated OAuth/token logic, the per-user onConflict(user_id) upsert
- * preserved, reauth_required handled. The only new behavior is a return-to-hub
- * redirect, which must meet the K1 safety bar: server-built internal path from the
- * VALIDATED state's project id, after all verification, never a client URL.
+ * preserved, reauth_required handled. The return redirect must meet the K1 safety bar:
+ * server-built internal path from the VALIDATED state's project id, after all
+ * verification, never a client URL.
+ *
+ * K4 added a second return address, the content workspace's Search Console screen, for
+ * a connect started there. That screen is gone (Search Console feeds the other screens
+ * now), so every return lands where the panel lives: the project's settings, at its
+ * Search Console section. The connect route and GscPanel are unchanged.
  *
  * DB/OAuth-coupled routes → source-contract (same approach as K1's Shopify callback).
  */
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { readdirSync, readFileSync, statSync } from 'fs'
+import { join, relative } from 'path'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -21,12 +26,11 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
 
 function main() {
-  console.log('K4 — GSC connect/property from the Content Hub')
+  console.log('K4 — GSC connect/property: every return lands on the settings section')
 
   const connect = strip(read('app/api/gsc/connect/route.ts'))
   const callback = strip(read('app/api/gsc/callback/route.ts'))
   const panel = strip(read('components/content/GscPanel.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
   const oauth = strip(read('lib/gsc/oauth.ts'))
 
   // ── connect: sets the return cookie ONLY for a hub origin; still fully gated.
@@ -38,8 +42,30 @@ function main() {
   check('return cookie is httpOnly + sameSite lax (not a URL)', /httpOnly: true,[^\n]*sameSite: 'lax'/.test(connect))
 
   // ── callback: return path is server-built from the VALIDATED project id, after verification.
-  check('callback reads the return cookie as a fixed enum (=== hub)', /request\.cookies\.get\(GSC_RETURN_COOKIE\)\?\.value === 'hub'/.test(callback))
-  check('hub return path is /content?projectId built from the consumed projectId', /new URL\('\/content', origin\)[\s\S]{0,160}searchParams\.set\('projectId', projectId\)/.test(callback))
+  // Every project return lands on the one screen that mounts the panel reading the
+  // result, the project's settings (the project page and the Search Console screen that
+  // used to hold that panel are redirects now). A fixed path, and nothing else.
+  const returnsToSettings = (src: string) =>
+    /const url = projectId \? new URL\('\/settings', origin\) : new URL\('\/projects', origin\)/.test(src)
+    && /if \(projectId\) url\.searchParams\.set\('projectId', projectId\)/.test(src)
+    && !/\/content\/search-console/.test(src)
+  check("every return with a project lands on the project's settings, with the consumed projectId as a param",
+    returnsToSettings(callback))
+  check('MUT: a return to the retired Search Console screen fails that check',
+    !returnsToSettings(callback.replace("new URL('/settings', origin)", "new URL(returnHub ? '/content/search-console' : '/settings', origin)")))
+  check('MUT: a return to the retired project page fails it too',
+    !returnsToSettings(callback.replace("new URL('/settings', origin)", 'new URL(`/projects/${projectId}`, origin)')))
+  // Settings is a long screen: every return opens at the Search Console section.
+  const opensAtSection = (src: string) => /if \(projectId\) url\.hash = SETTINGS_GSC_ANCHOR/.test(src)
+  check('…and opens at its Search Console section', opensAtSection(callback))
+  check('MUT: without the anchor that check fails',
+    !opensAtSection(callback.replace('url.hash = SETTINGS_GSC_ANCHOR', 'void 0')))
+  // A connect started from the retired screen set a 'hub' return cookie; one still in a
+  // browser must not be able to choose a destination.
+  const cookieChoosesNothing = (src: string) => !/request\.cookies\.get\(GSC_RETURN_COOKIE\)/.test(src)
+  check('the return cookie chooses no destination any more (a stale hub value is inert)', cookieChoosesNothing(callback))
+  check('MUT: a callback that reads it again fails that check',
+    !cookieChoosesNothing(callback.replace('const back =', "const returnHub = request.cookies.get(GSC_RETURN_COOKIE)?.value === 'hub'\n  const back =")))
   check('projectId comes ONLY from the validated one-time state (never client input)',
     /consumeOAuthState\(admin, \{ rawState, userId: user\.id \}\)/.test(callback) && /projectId = consumed\?\.projectId/.test(callback))
   check('every terminal redirect CLEARS the cookie (maxAge 0)', /res\.cookies\.set\(GSC_RETURN_COOKIE, '',[^\n]*maxAge: 0/.test(callback))
@@ -54,19 +80,34 @@ function main() {
 
   // ── no duplicate gsc_connections: the per-user upsert path is unchanged.
   check('callback still stores via storeConnectionFromTokens (per-user onConflict preserved)', /storeConnectionFromTokens\(admin, user\.id/.test(callback))
-  check('errors route through the SAME origin-aware back() (return to hub on failure too)',
+  check('errors route through the SAME back() (a failure returns to the same settings section)',
     /return back\(projectId, \{ gsc_error/.test(callback))
 
   // ── panel reuse: connect origin + property assignment/reauth all preserved.
   check('GscPanel forwards origin (connectOrigin) in the connect body', /body: JSON\.stringify\(\{ projectId, origin: connectOrigin \}\)/.test(panel))
-  check('GscPanel default origin is project (project page unchanged)', /connectOrigin = 'project'/.test(panel))
+  check('GscPanel default origin is project (not the hub)', /connectOrigin = 'project'/.test(panel))
+  check("the project's settings mount GscPanel with the default origin, so they get the /settings return",
+    /<GscPanel projectId=\{project\.id\} \/>/.test(strip(read('app/(dashboard)/settings/page.tsx'))))
   check('per-project property assignment reused (POST /api/gsc/property)', /'\/api\/gsc\/property', \{ method: 'POST'/.test(panel))
   check('reauth_required is still handled in the panel', /reauth_required/.test(panel))
   check('existing-connection-no-property path is preserved (property picker)', /openPicker|\/api\/gsc\/properties\?projectId=/.test(panel))
 
-  // ── hub mounts the reused panel with the hub origin (no duplicated GSC logic in the hub).
-  check('hub mounts GscPanel with connectOrigin="hub"', /<GscPanel projectId=\{projectId\} connectOrigin="hub"/.test(hub))
-  check('hub adds no GSC OAuth/token logic of its own', !/oauth|refresh_token|access_token|storeConnection/i.test(hub))
+  // ── the panel's one home: nothing mounts it with the hub origin any more.
+  const sources: [string, string][] = []
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      if (name === 'node_modules' || name === '__qa__') continue
+      if (statSync(full).isDirectory()) walk(full)
+      else if (name.endsWith('.tsx')) sources.push([relative(ROOT, full), strip(readFileSync(full, 'utf8'))])
+    }
+  }
+  walk(join(ROOT, 'app'))
+  walk(join(ROOT, 'components'))
+  const hubMounts = (list: [string, string][]) => list.filter(([, src]) => /<GscPanel\b[^>]*connectOrigin="hub"/.test(src)).map(([p]) => p)
+  check('no screen mounts GscPanel with connectOrigin="hub" (its screen is gone)', hubMounts(sources).length === 0, hubMounts(sources).join(', '))
+  check('MUT: a screen mounting it that way fails that check',
+    hubMounts([...sources, ['components/content/workspace/SearchConsoleScreen.tsx', '<GscPanel projectId={projectId} connectOrigin="hub" />']]).length === 1)
 
   // ── the return cookie constant lives in the shared oauth module.
   check('GSC_RETURN_COOKIE is defined once in lib/gsc/oauth', /export const GSC_RETURN_COOKIE =/.test(oauth))

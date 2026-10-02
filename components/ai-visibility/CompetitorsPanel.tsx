@@ -3,7 +3,7 @@
 /**
  * CompetitorsPanel — Phase 1 of AI Visibility competitor tracking.
  *
- * Lets the user define up to 3 active competitors per project (name, optional
+ * Lets the user define up to 5 active competitors per project (name, optional
  * domain, optional alternative names). Competitors are stored in
  * ai_visibility_competitors via /api/projects/[id]/ai-visibility/competitors.
  *
@@ -12,13 +12,23 @@
  * stable for future Share of Voice / Timeline phases.
  */
 
+import SiteAvatar from '@/components/ui/SiteAvatar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Plus, Trash2, RotateCcw, X, Check } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import Notice from '@/components/ui/Notice'
+import RowMenu from '@/components/ui/RowMenu'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import { CompetitorIcon } from '@/components/competitors/CompetitorIcon'
+import { cn } from '@/lib/utils'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
-const MAX_ACTIVE = 3
+const MAX_ACTIVE = 5
 
 type Competitor = {
   id: string
@@ -43,6 +53,22 @@ function parseAliases(text: string): string[] {
     .filter((s) => s.length > 0)
 }
 
+/**
+ * A failed write, in our words. The route's own `error` text is never shown; only its
+ * machine `code` is read, so the one limit a merchant can act on gets its own sentence.
+ */
+type ActionFailure = 'max' | 'save' | 'remove' | 'reactivate'
+function failureOf(body: unknown, fallback: Exclude<ActionFailure, 'max'>): ActionFailure {
+  const code = body && typeof body === 'object' ? (body as { code?: unknown }).code : null
+  return code === 'max_competitors_reached' ? 'max' : fallback
+}
+const FAILURE_KEY = {
+  max: 'competitor_max_reached',
+  save: 'competitor_save_failed',
+  remove: 'competitor_remove_failed',
+  reactivate: 'competitor_reactivate_failed',
+} as const
+
 function aliasesToText(aliases: string[]): string {
   return aliases.join(', ')
 }
@@ -64,6 +90,9 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
   const [draft, setDraft] = useState<DraftForm>(emptyDraft)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // A failed remove or reactivate: an inline notice above the list, not a browser alert.
+  const [actionError, setActionError] = useState<ActionFailure | null>(null)
+  const { confirm, dialog } = useConfirm()
 
   const activeCount = useMemo(
     () => competitors.filter((c) => c.is_active).length,
@@ -76,8 +105,8 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
     try {
       const res = await fetch(`/api/projects/${projectId}/ai-visibility/competitors`)
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setLoadError(body.error || t('competitor_load_failed'))
+        // The route's text is not the merchant's to read; ours is.
+        setLoadError(t('competitor_load_failed'))
         setCompetitors([])
         return
       }
@@ -144,41 +173,49 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setSaveError(body.error || t('competitor_load_failed'))
+        setSaveError(t(FAILURE_KEY[failureOf(body, 'save')]))
         return
       }
       await load()
       closeForm()
       onCompetitorsChanged?.()
     } catch {
-      setSaveError(t('competitor_load_failed'))
+      setSaveError(t('competitor_save_failed'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleSoftDelete = async (id: string) => {
-    if (!confirm(t('competitor_delete_confirm'))) return
+    const ok = await confirm({
+      title: t('competitor_remove_title'),
+      body: t('competitor_delete_confirm'),
+      confirmLabel: t('competitor_remove_action'),
+      cancelLabel: t('competitor_cancel'),
+      tone: 'danger',
+    })
+    if (!ok) return
+    setActionError(null)
     try {
       const res = await fetch(
         `/api/projects/${projectId}/ai-visibility/competitors/${id}`,
         { method: 'DELETE' },
       )
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        alert(body.error || t('competitor_load_failed'))
+        setActionError(failureOf(await res.json().catch(() => ({})), 'remove'))
         return
       }
       await load()
       onCompetitorsChanged?.()
     } catch {
-      alert(t('competitor_load_failed'))
+      setActionError('remove')
     }
   }
 
   const handleReactivate = async (id: string) => {
+    setActionError(null)
     if (activeCount >= MAX_ACTIVE) {
-      alert(t('competitor_max_reached'))
+      setActionError('max')
       return
     }
     try {
@@ -191,14 +228,13 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
         },
       )
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        alert(body.error || t('competitor_load_failed'))
+        setActionError(failureOf(await res.json().catch(() => ({})), 'reactivate'))
         return
       }
       await load()
       onCompetitorsChanged?.()
     } catch {
-      alert(t('competitor_load_failed'))
+      setActionError('reactivate')
     }
   }
 
@@ -207,13 +243,13 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
 
   if (isCollapsed && !loadError && !loading) {
     return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 sm:p-4">
+      <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
         <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <div className={isRTL ? 'text-right' : 'text-left'}>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h4 className="text-copy font-semibold text-ink">
               {t('competitors_title')}
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-caption text-muted mt-0.5">
               {t('competitor_active_count')}: <span className="font-semibold">{activeCount}</span> / {MAX_ACTIVE}
             </p>
           </div>
@@ -230,30 +266,30 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5">
+    <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
       <div className={`flex items-start justify-between gap-3 mb-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
         <div className={isRTL ? 'text-right' : 'text-left'}>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-section font-semibold text-ink">
               {t('competitors_title')}
             </h3>
             {!loading && !loadError && (
               <button
+                type="button"
                 onClick={() => setIsCollapsed(true)}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                className="grid size-8 place-items-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
                 title={t('close_panel')}
+                aria-label={t('close_panel')}
               >
-                <X size={16} />
+                <X aria-hidden="true" className="size-4" />
               </button>
             )}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-caption text-muted mt-0.5">
             {t('competitors_subtitle')}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {isRTL ? 'המתחרים ישמשו להשוואת נראות בתשובות AI.' : 'These competitors are used to compare AI visibility.'}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-caption text-muted mt-1">{t('competitors_used_for')}</p>
+          <p className="text-caption text-muted mt-1">
             {t('competitor_active_count')}: <span className="font-semibold">{activeCount}</span> / {MAX_ACTIVE}
           </p>
         </div>
@@ -265,27 +301,33 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
             disabled={!canAddMore}
             title={!canAddMore ? t('competitor_max_reached') : undefined}
           >
-            <Plus size={14} />
+            <Plus aria-hidden="true" className="size-4" />
             <span>{t('competitor_add')}</span>
           </Button>
         )}
       </div>
 
       {loading && (
-        <p className="text-sm text-slate-500 dark:text-slate-400 py-4">{t('competitor_loading')}</p>
+        <div role="status" aria-busy="true" className="space-y-2 py-2" data-skeleton="">
+          <span className="sr-only">{t('competitor_loading')}</span>
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
       )}
 
-      {!loading && loadError && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-400">
-          {loadError}
-        </div>
+      {!loading && loadError && <Notice tone="bad">{loadError}</Notice>}
+
+      {actionError && (
+        <Notice tone={actionError === 'max' ? 'warn' : 'bad'} onDismiss={() => setActionError(null)} className="mb-4">
+          <span data-competitor-action-error={actionError}>{t(FAILURE_KEY[actionError])}</span>
+        </Notice>
       )}
 
       {/* Form (add or edit) */}
       {isFormOpen && (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 mb-3 space-y-3">
+        <div className="mb-4 space-y-4 rounded-inset border border-line bg-sunk p-4">
           <div>
-            <label className={`block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+            <label className={`mb-1.5 block ${FIELD_LABEL_CLASSES}`}>
               {t('competitor_name')} *
             </label>
             <input
@@ -293,12 +335,12 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               placeholder={t('competitor_name_placeholder')}
-              className={`w-full px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isRTL ? 'text-right' : 'text-left'}`}
+              className={cn(FIELD_CLASSES, 'py-2')}
               maxLength={120}
             />
           </div>
           <div>
-            <label className={`block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+            <label className={`mb-1.5 block ${FIELD_LABEL_CLASSES}`}>
               {t('competitor_domain')}
             </label>
             <input
@@ -306,13 +348,13 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
               value={draft.domain}
               onChange={(e) => setDraft({ ...draft, domain: e.target.value })}
               placeholder={t('competitor_domain_placeholder')}
-              className={`w-full px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isRTL ? 'text-right' : 'text-left'}`}
+              className={cn(FIELD_CLASSES, 'py-2')}
               dir="ltr"
               maxLength={255}
             />
           </div>
           <div>
-            <label className={`block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+            <label className={`mb-1.5 block ${FIELD_LABEL_CLASSES}`}>
               {t('competitor_aliases')}
             </label>
             <input
@@ -320,22 +362,21 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
               value={draft.aliasesText}
               onChange={(e) => setDraft({ ...draft, aliasesText: e.target.value })}
               placeholder={t('competitor_aliases_placeholder')}
-              className={`w-full px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isRTL ? 'text-right' : 'text-left'}`}
+              className={cn(FIELD_CLASSES, 'py-2')}
             />
-            <p className={`text-[11px] text-slate-500 dark:text-slate-400 mt-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+            <p className="mt-1.5 text-caption text-muted">
               {t('competitor_aliases_help')}
             </p>
           </div>
           {saveError && (
-            <div className="text-xs text-red-700 dark:text-red-400">{saveError}</div>
+            <Notice tone="bad">{saveError}</Notice>
           )}
           <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <Button variant="primary" size="sm" onClick={handleSave} loading={saving} disabled={saving}>
-              <Check size={14} />
+              <Check aria-hidden="true" className="size-4" />
               <span>{t('competitor_save')}</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={closeForm} disabled={saving}>
-              <X size={14} />
+            <Button variant="secondary" size="sm" onClick={closeForm} disabled={saving}>
               <span>{t('competitor_cancel')}</span>
             </Button>
           </div>
@@ -344,9 +385,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
 
       {/* List */}
       {!loading && !loadError && competitors.length === 0 && !isFormOpen && (
-        <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
-          {t('competitor_empty')}
-        </p>
+        <EmptyState icon={<CompetitorIcon />} title={t('competitor_empty')} className="py-8" />
       )}
 
       {!loading && competitors.length > 0 && (
@@ -356,32 +395,28 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
             return (
               <li
                 key={c.id}
-                className={`rounded-lg border ${isInactive ? 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 opacity-70' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'} p-3`}
+                className={`rounded-inset border border-line p-4 ${isInactive ? 'bg-sunk' : 'bg-surface'}`}
               >
                 <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
                     <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                      <SiteAvatar domain={c.domain} name={c.name} size="sm" />
+                      <span className="font-semibold text-copy text-ink truncate">
                         {c.name}
                       </span>
                       {isInactive && (
-                        <span className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">
-                          {t('competitor_inactive')}
-                        </span>
+                        <Badge variant="neutral">{t('competitor_inactive')}</Badge>
                       )}
                     </div>
                     {c.domain && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5" dir="ltr">
+                      <div className="text-caption text-muted mt-0.5" dir="ltr">
                         {c.domain}
                       </div>
                     )}
                     {c.aliases.length > 0 && (
                       <div className={`mt-1.5 flex flex-wrap gap-1 ${isRTL ? 'justify-end' : ''}`}>
                         {c.aliases.map((a) => (
-                          <span
-                            key={a}
-                            className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                          >
+                          <span key={a} className="rounded-pill bg-sunk px-2 py-0.5 text-caption text-body">
                             {a}
                           </span>
                         ))}
@@ -390,35 +425,18 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
                   </div>
                   <div className={`flex items-center gap-1 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
                     {isInactive ? (
-                      <button
-                        type="button"
-                        onClick={() => handleReactivate(c.id)}
-                        className="p-1.5 rounded text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                        title={t('competitor_reactivate')}
-                      >
-                        <RotateCcw size={14} />
-                      </button>
+                      <Button variant="ghost" size="sm" onClick={() => handleReactivate(c.id)}>
+                        <RotateCcw aria-hidden="true" className="size-4" />
+                        {t('competitor_reactivate')}
+                      </Button>
                     ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(c)}
-                          disabled={isFormOpen}
-                          className="p-1.5 rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
-                          title={t('competitor_edit')}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSoftDelete(c.id)}
-                          disabled={isFormOpen}
-                          className="p-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
-                          title={t('competitor_delete')}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
+                      <RowMenu
+                        label={`${t('competitor_edit')}: ${c.name}`}
+                        items={[
+                          { key: 'edit', label: t('competitor_edit'), disabled: isFormOpen, icon: <Pencil aria-hidden="true" className="size-4" />, onSelect: () => openEdit(c) },
+                          { key: 'delete', label: t('competitor_delete'), disabled: isFormOpen, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => handleSoftDelete(c.id) },
+                        ]}
+                      />
                     )}
                   </div>
                 </div>
@@ -427,6 +445,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true, o
           })}
         </ul>
       )}
+      {dialog}
     </div>
   )
 }

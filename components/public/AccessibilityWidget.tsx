@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import {
+  AArrowDown, AArrowUp, Accessibility, Captions, CirclePause, Contrast, Droplet, Heading, Highlighter, Keyboard,
+  Link as LinkIcon, MessageSquareText, MousePointer2, MousePointerClick, Palette, RotateCcw, SunMoon, Type, X, ZoomIn, ZoomOut,
+  type LucideIcon,
+} from 'lucide-react'
+import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'a11y-settings-v2'
 
@@ -10,6 +18,9 @@ const STORAGE_KEY = 'a11y-settings-v2'
 // access them without a React ref.
 let _descTooltip: HTMLDivElement | null = null
 let _descCleanup: Array<() => void> = []
+/** The hover label for an image without alt text, in the page's language. */
+let _noAltLabel = '(ללא תיאור alt)'
+function _setNoAltLabel(label: string) { _noAltLabel = label }
 
 function _positionTip(x: number, y: number) {
   if (!_descTooltip) return
@@ -27,14 +38,14 @@ function _setupDescTooltip() {
   const tip = document.createElement('div')
   tip.id = 'a11y-hover-tip'
   tip.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;display:none;' +
-    'background:#1e293b;color:#f8fafc;padding:4px 10px;border-radius:5px;font-size:12px;' +
-    'line-height:1.5;max-width:250px;box-shadow:0 2px 10px rgba(0,0,0,.45);word-break:break-word'
+    'background:var(--color-ink);color:var(--color-surface);padding:4px 10px;border-radius:var(--radius-control);font-size:12px;' +
+    'line-height:1.5;max-width:250px;box-shadow:var(--shadow-pop);word-break:break-word'
   document.body.appendChild(tip)
   _descTooltip = tip
 
   document.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
     const alt   = img.getAttribute('alt')?.trim()   ?? ''
-    const label = alt || '(ללא תיאור alt)'
+    const label = alt || _noAltLabel
 
     const onEnter = (e: MouseEvent) => {
       tip.textContent = label
@@ -199,9 +210,9 @@ function applyState(s: A11yState) {
   // ── Keyboard navigation (enhanced focus ring) ─────────────────────────
   injectStyle('a11y-kb-nav', s.keyboardNav ? `
     *:focus,*:focus-visible{
-      outline:3px solid #2563eb!important;
+      outline:3px solid var(--color-action)!important;
       outline-offset:2px!important;
-      box-shadow:0 0 0 5px rgba(37,99,235,.25)!important
+      box-shadow:0 0 0 5px rgb(0 112 214/.25)!important
     }
   ` : null)
 
@@ -224,11 +235,29 @@ function applyState(s: A11yState) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * The accessibility menu: a 40px button in the start corner, and a panel of
+ * eighteen adjustments. Labels follow the page's language (/en is English).
+ *
+ * Below `md` the button docks INTO the bottom strip, in the start slot that the
+ * contact bar and the privacy sheet both keep free for it, so on a phone it
+ * never floats over the page (it used to sit on the hero's buttons), and the
+ * privacy sheet, laid over the same strip, does not move it: it stays in its
+ * slot, above the sheet in the stacking order (z-60 over z-58). From `md` there
+ * is no contact bar and it floats at bottom-24.
+ */
 export function AccessibilityWidget() {
+  const pathname = usePathname()
+  const isEn = pathname === '/en' || !!pathname?.startsWith('/en/')
+  const t = getPublicDictionary(isEn ? 'en' : 'he').a11y
   const [open, setOpen]   = useState(false)
   const [state, setState] = useState<A11yState>(DEFAULT_STATE)
   const panelRef  = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+
+  // Declared before the effect that restores saved settings, so the image
+  // descriptions it may switch on already speak the page's language.
+  useEffect(() => { _setNoAltLabel(t.noAlt) }, [t.noAlt])
 
   // Load persisted state on mount
   useEffect(() => {
@@ -310,39 +339,53 @@ export function AccessibilityWidget() {
     state.bigCursor,
   ].filter(Boolean).length
 
+  const tiles: { key: string; label: string; icon: LucideIcon; active: boolean; badge?: number; onClick: () => void }[] = [
+    { key: 'fontUp', label: t.fontUp, icon: AArrowUp, active: state.textLevel > 0, badge: state.textLevel > 0 ? state.textLevel : undefined, onClick: () => adjustText(1) },
+    { key: 'fontDown', label: t.fontDown, icon: AArrowDown, active: state.textLevel < 0, badge: state.textLevel < 0 ? Math.abs(state.textLevel) : undefined, onClick: () => adjustText(-1) },
+    { key: 'readableFont', label: t.readableFont, icon: Type, active: state.readableFont, onClick: () => toggle('readableFont') },
+    { key: 'persistentDesc', label: t.persistentDesc, icon: Captions, active: state.persistentDesc, onClick: () => toggle('persistentDesc') },
+    { key: 'showDescriptions', label: t.showDescriptions, icon: MessageSquareText, active: state.showDescriptions, onClick: () => toggle('showDescriptions') },
+    { key: 'highlightLinks', label: t.highlightLinks, icon: LinkIcon, active: state.highlightLinks, onClick: () => toggle('highlightLinks') },
+    { key: 'highlightHeadings', label: t.highlightHeadings, icon: Heading, active: state.highlightHeadings, onClick: () => toggle('highlightHeadings') },
+    { key: 'invertColors', label: t.invertColors, icon: SunMoon, active: state.invertColors, onClick: () => toggle('invertColors') },
+    { key: 'blackYellow', label: t.blackYellow, icon: Highlighter, active: state.blackYellow, onClick: () => toggle('blackYellow') },
+    { key: 'highContrast', label: t.highContrast, icon: Contrast, active: state.highContrast, onClick: () => toggle('highContrast') },
+    { key: 'sepia', label: t.sepia, icon: Palette, active: state.sepia, onClick: () => toggle('sepia') },
+    { key: 'grayscale', label: t.grayscale, icon: Droplet, active: state.grayscale, onClick: () => toggle('grayscale') },
+    { key: 'stopAnimations', label: t.stopAnimations, icon: CirclePause, active: state.stopAnimations, onClick: () => toggle('stopAnimations') },
+    { key: 'keyboardNav', label: t.keyboardNav, icon: Keyboard, active: state.keyboardNav, onClick: () => toggle('keyboardNav') },
+    { key: 'blackCursor', label: t.blackCursor, icon: MousePointer2, active: state.blackCursor, onClick: () => toggle('blackCursor') },
+    { key: 'bigCursor', label: t.bigCursor, icon: MousePointerClick, active: state.bigCursor, onClick: () => toggle('bigCursor') },
+    { key: 'zoomOut', label: t.zoomOut, icon: ZoomOut, active: state.zoomLevel < 0, badge: state.zoomLevel < 0 ? Math.abs(state.zoomLevel) : undefined, onClick: () => adjustZoom(-1) },
+    { key: 'zoomIn', label: t.zoomIn, icon: ZoomIn, active: state.zoomLevel > 0, badge: state.zoomLevel > 0 ? state.zoomLevel : undefined, onClick: () => adjustZoom(1) },
+  ]
+
   return (
     <>
-      {/* ── Floating trigger ── */}
+      {/* ── Floating trigger: 40px, start corner, above the contact bar ── */}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="פתיחת תפריט נגישות"
+        aria-label={t.open}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`fixed left-3 top-1/2 z-[60] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full ring-1 backdrop-blur transition-all duration-200 focus:outline-none focus-visible:ring-4 ${anyColorFilter ? 'text-slate-900 ring-black/30 focus-visible:ring-slate-800' : 'text-white ring-white/10 focus-visible:ring-blue-300'}`}
-        style={anyColorFilter
-          ? { background: 'rgba(255,255,255,0.95)', opacity: 1, boxShadow: '0 2px 12px rgba(0,0,0,0.35)', border: '2px solid rgba(0,0,0,0.25)' }
-          : { background: 'rgba(59,130,246,0.2)',   opacity: 0.5, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid rgba(255,255,255,0.1)' }
-        }
-        onMouseEnter={(e) => {
-          if (anyColorFilter) return
-          e.currentTarget.style.opacity = '0.92'
-          e.currentTarget.style.background = 'rgba(59,130,246,0.26)'
-        }}
-        onMouseLeave={(e) => {
-          if (anyColorFilter) return
-          e.currentTarget.style.opacity = '0.5'
-          e.currentTarget.style.background = 'rgba(59,130,246,0.2)'
-        }}
-        onFocus={(e) => { if (!anyColorFilter) e.currentTarget.style.opacity = '0.95' }}
-        onBlur={(e)  => { if (!anyColorFilter) e.currentTarget.style.opacity = '0.5'  }}
+        data-a11y-trigger
+        data-public-float
+        className={cn(
+          'fixed start-4 z-[60] flex size-10 items-center justify-center rounded-pill border shadow-pop',
+          'transition-[bottom,background-color,border-color] duration-150 ease-snappy',
+          'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+          // phone: docked in the bottom strip's start slot (centred on its 40px controls); md+: floating
+          'bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-24',
+          // Solid on purpose: under an invert / sepia / grayscale filter a tinted
+          // button would disappear.
+          anyColorFilter ? 'border-ink bg-surface text-ink' : 'border-transparent bg-action text-action-ink hover:bg-action-hover',
+        )}
       >
-        <svg viewBox="0 0 24 24" className="h-7 w-7 fill-current" aria-hidden="true">
-          <path d="M12 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm8 5.5c0 .6-.4 1-1 1-1.9.3-3.8.5-5 .6V12l1.8 6.3a1 1 0 0 1-1.9.6L12 14.5l-1.9 4.4a1 1 0 0 1-1.9-.6L10 12V9.1c-1.2-.1-3.1-.3-5-.6a1 1 0 0 1 .3-2c2.4.4 5 .6 6.7.6 1.7 0 4.3-.2 6.7-.6.6-.1 1.1.4 1.3 1Z" />
-        </svg>
+        <Accessibility className="size-5" aria-hidden="true" />
         {activeCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold text-slate-900">
+          <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-pill bg-commit px-1 text-overline font-bold tabular-nums text-commit-ink">
             {activeCount}
           </span>
         )}
@@ -353,155 +396,51 @@ export function AccessibilityWidget() {
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="תפריט נגישות"
-          dir="rtl"
-          className="fixed left-3 top-1/2 z-[61] max-h-[90vh] w-72 max-w-[calc(100vw-1.5rem)] -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
+          aria-label={t.title}
+          dir={isEn ? 'ltr' : 'rtl'}
+          className={cn(
+            'fixed start-4 z-[61] max-h-[calc(100dvh-8rem)] w-80 max-w-[calc(100vw-2rem)] animate-pop-in overflow-y-auto',
+            'rounded-card border border-line bg-surface p-4 shadow-pop',
+            // Opens above the bottom strip on a phone, above the button from md.
+            'bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-36',
+          )}
         >
           {/* Header */}
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">תפריט נגישות</h2>
+            <h2 className="text-section font-semibold text-ink">{t.title}</h2>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="סגירת תפריט נגישות"
-              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              aria-label={t.close}
+              className="flex size-8 items-center justify-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-              </svg>
+              <X className="size-4" aria-hidden="true" />
             </button>
           </div>
 
           {/* Tile grid */}
-          <div className="grid grid-cols-2 gap-2">
-
-            {/* 1 — הגדלת גופן */}
-            <A11yTile
-              label="הגדלת גופן"
-              active={state.textLevel > 0}
-              badge={state.textLevel > 0 ? state.textLevel : undefined}
-              onClick={() => adjustText(1)}
-            >
-              <IcoFontUp />
-            </A11yTile>
-
-            {/* 2 — הקטנת גופן */}
-            <A11yTile
-              label="הקטנת גופן"
-              active={state.textLevel < 0}
-              badge={state.textLevel < 0 ? Math.abs(state.textLevel) : undefined}
-              onClick={() => adjustText(-1)}
-            >
-              <IcoFontDown />
-            </A11yTile>
-
-            {/* 3 — גופן קריא */}
-            <A11yTile label="גופן קריא" active={state.readableFont} onClick={() => toggle('readableFont')}>
-              <IcoReadableFont />
-            </A11yTile>
-
-            {/* 4 — תיאור קבוע */}
-            <A11yTile label="תיאור קבוע" active={state.persistentDesc} onClick={() => toggle('persistentDesc')}>
-              <IcoPersistDesc />
-            </A11yTile>
-
-            {/* 5 — הצגת תיאור */}
-            <A11yTile label="הצגת תיאור" active={state.showDescriptions} onClick={() => toggle('showDescriptions')}>
-              <IcoShowDesc />
-            </A11yTile>
-
-            {/* 6 — הדגשת קישורים */}
-            <A11yTile label="הדגשת קישורים" active={state.highlightLinks} onClick={() => toggle('highlightLinks')}>
-              <IcoLinks />
-            </A11yTile>
-
-            {/* 7 — הדגשת כותרות */}
-            <A11yTile label="הדגשת כותרות" active={state.highlightHeadings} onClick={() => toggle('highlightHeadings')}>
-              <IcoHeadings />
-            </A11yTile>
-
-            {/* 8 — היפוך צבעים */}
-            <A11yTile label="היפוך צבעים" active={state.invertColors} onClick={() => toggle('invertColors')}>
-              <IcoInvert />
-            </A11yTile>
-
-            {/* 9 — שחור צהוב */}
-            <A11yTile label="שחור צהוב" active={state.blackYellow} onClick={() => toggle('blackYellow')}>
-              <IcoBlackYellow />
-            </A11yTile>
-
-            {/* 10 — ניגודיות גבוהה */}
-            <A11yTile label="ניגודיות גבוהה" active={state.highContrast} onClick={() => toggle('highContrast')}>
-              <IcoHighContrast />
-            </A11yTile>
-
-            {/* 11 — ספיה */}
-            <A11yTile label="ספיה" active={state.sepia} onClick={() => toggle('sepia')}>
-              <IcoSepia />
-            </A11yTile>
-
-            {/* 12 — מונוכרום */}
-            <A11yTile label="מונוכרום" active={state.grayscale} onClick={() => toggle('grayscale')}>
-              <IcoGrayscale />
-            </A11yTile>
-
-            {/* 13 — ביטול הבהובים */}
-            <A11yTile label="ביטול הבהובים" active={state.stopAnimations} onClick={() => toggle('stopAnimations')}>
-              <IcoStopAnim />
-            </A11yTile>
-
-            {/* 14 — ניווט מקלדת */}
-            <A11yTile label="ניווט מקלדת" active={state.keyboardNav} onClick={() => toggle('keyboardNav')}>
-              <IcoKeyboard />
-            </A11yTile>
-
-            {/* 15 — סמן שחור */}
-            <A11yTile label="סמן שחור" active={state.blackCursor} onClick={() => toggle('blackCursor')}>
-              <IcoCursorBlack />
-            </A11yTile>
-
-            {/* 16 — סמן גדול */}
-            <A11yTile label="סמן גדול" active={state.bigCursor} onClick={() => toggle('bigCursor')}>
-              <IcoCursorBig />
-            </A11yTile>
-
-            {/* 17 — הקטנת מסך */}
-            <A11yTile
-              label="הקטנת מסך"
-              active={state.zoomLevel < 0}
-              badge={state.zoomLevel < 0 ? Math.abs(state.zoomLevel) : undefined}
-              onClick={() => adjustZoom(-1)}
-            >
-              <IcoZoomOut />
-            </A11yTile>
-
-            {/* 18 — הגדלת מסך */}
-            <A11yTile
-              label="הגדלת מסך"
-              active={state.zoomLevel > 0}
-              badge={state.zoomLevel > 0 ? state.zoomLevel : undefined}
-              onClick={() => adjustZoom(1)}
-            >
-              <IcoZoomIn />
-            </A11yTile>
-
+          <div className="grid grid-cols-3 gap-2">
+            {tiles.map((tile) => (
+              <A11yTile key={tile.key} label={tile.label} icon={tile.icon} active={tile.active} badge={tile.badge} onClick={tile.onClick} />
+            ))}
           </div>
 
           {/* Accessibility statement link */}
           <Link
-            href="/accessibility"
-            className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            href={isEn ? '/en/accessibility' : '/accessibility'}
+            className="mt-3 flex h-10 items-center justify-center gap-2 rounded-control border border-line bg-surface text-copy font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:border-line-strong hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
           >
-            הצהרת נגישות
+            {t.statement}
           </Link>
 
           {/* Reset */}
           <button
             type="button"
             onClick={reset}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+            className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-control text-copy font-semibold text-bad transition-colors duration-150 ease-snappy hover:bg-bad-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-bad/20"
           >
-            ביטול נגישות / איפוס
+            <RotateCcw className="size-4" aria-hidden="true" />
+            {t.reset}
           </button>
         </div>
       )}
@@ -514,232 +453,35 @@ export function AccessibilityWidget() {
 // ─────────────────────────────────────────────────────────────────────────────
 function A11yTile({
   label,
+  icon: Icon,
   active,
   badge,
   onClick,
-  children,
 }: {
   label: string
+  icon: LucideIcon
   active: boolean
   badge?: number
   onClick: () => void
-  children: React.ReactNode
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`relative flex h-20 flex-col items-center justify-center gap-1 rounded-xl border p-2 text-center text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
-        active
-          ? 'border-blue-600 bg-blue-50 text-blue-800'
-          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-      }`}
+      className={cn(
+        'relative flex h-20 flex-col items-center justify-center gap-1.5 rounded-inset border p-2 text-center text-caption font-medium',
+        'transition-[background-color,border-color,color] duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20',
+        active ? 'border-action bg-action-soft text-action' : 'border-line bg-surface text-body hover:border-line-strong hover:bg-sunk/60',
+      )}
     >
-      <span aria-hidden="true">{children}</span>
+      <Icon className="size-5" aria-hidden="true" />
       <span className="leading-tight">{label}</span>
       {badge != null && (
-        <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+        <span className="absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-pill bg-action px-1 text-overline font-bold tabular-nums text-action-ink">
           {badge}
         </span>
       )}
     </button>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Icons — all 24 × 24 inline SVG
-// ─────────────────────────────────────────────────────────────────────────────
-
-function IcoFontUp() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <text x="1" y="18" fontSize="17" fontWeight="800" fontFamily="Arial,sans-serif" fill="currentColor">A</text>
-      <polyline points="20,14 20,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-      <polyline points="17,9 20,6 23,9"  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
-function IcoFontDown() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <text x="1" y="18" fontSize="17" fontWeight="800" fontFamily="Arial,sans-serif" fill="currentColor">A</text>
-      <polyline points="20,6 20,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-      <polyline points="17,11 20,14 23,11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
-function IcoReadableFont() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <text x="1" y="15" fontSize="13" fontWeight="700" fontFamily="Arial,sans-serif" fill="currentColor">A</text>
-      <text x="11" y="19" fontSize="10" fontWeight="400" fontFamily="Arial,sans-serif" fill="currentColor">a</text>
-      <line x1="1" y1="21" x2="21" y2="21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function IcoPersistDesc() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="3" width="14" height="11" rx="1.5"/>
-      <line x1="5" y1="7" x2="13" y2="7"/>
-      <line x1="5" y1="10" x2="10" y2="10"/>
-      <path d="M17 10l2-2 3 3-5 5-3-3 1-1" fill="currentColor" stroke="none"/>
-      <path d="M21 8l-2-2" strokeWidth="1.5"/>
-    </svg>
-  )
-}
-
-function IcoShowDesc() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="14" rx="2"/>
-      <circle cx="12" cy="11" r="2.5"/>
-      <path d="M4 11c2-4 12-4 16 0"/>
-      <line x1="12" y1="18" x2="12" y2="22"/>
-      <line x1="9"  y1="22" x2="15" y2="22"/>
-    </svg>
-  )
-}
-
-function IcoLinks() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-    </svg>
-  )
-}
-
-function IcoHeadings() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <text x="2" y="17" fontSize="16" fontWeight="900" fontFamily="Arial,sans-serif" fill="currentColor">H</text>
-      <text x="14" y="19" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="currentColor">1</text>
-      <line x1="2" y1="20" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function IcoInvert() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8"/>
-      <path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor"/>
-      <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" strokeWidth="1.5"/>
-    </svg>
-  )
-}
-
-function IcoBlackYellow() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <rect x="2"  y="4" width="10" height="16" rx="1" fill="currentColor"/>
-      <rect x="12" y="4" width="10" height="16" rx="1" fill="#facc15"/>
-      <rect x="2"  y="4" width="20" height="16" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
-    </svg>
-  )
-}
-
-function IcoHighContrast() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8"/>
-      <rect x="2" y="4" width="10" height="16" rx="2" fill="currentColor"/>
-      <circle cx="15" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/>
-    </svg>
-  )
-}
-
-function IcoSepia() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <defs>
-        <radialGradient id="sepia-grad" cx="40%" cy="40%">
-          <stop offset="0%"   stopColor="#d4a96a"/>
-          <stop offset="100%" stopColor="#7c4a1e"/>
-        </radialGradient>
-      </defs>
-      <circle cx="12" cy="12" r="9" fill="url(#sepia-grad)" stroke="currentColor" strokeWidth="1.5"/>
-      <circle cx="12" cy="12" r="4" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-    </svg>
-  )
-}
-
-function IcoGrayscale() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <defs>
-        <linearGradient id="gray-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stopColor="#f1f5f9"/>
-          <stop offset="100%" stopColor="#1e293b"/>
-        </linearGradient>
-      </defs>
-      <circle cx="12" cy="12" r="9" fill="url(#gray-grad)" stroke="currentColor" strokeWidth="1.5"/>
-    </svg>
-  )
-}
-
-function IcoStopAnim() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9"/>
-      <line x1="10" y1="8"  x2="10" y2="16"/>
-      <line x1="14" y1="8"  x2="14" y2="16"/>
-    </svg>
-  )
-}
-
-function IcoKeyboard() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="6" width="20" height="13" rx="2"/>
-      <line x1="6"  y1="10" x2="6"  y2="10.01"/>
-      <line x1="10" y1="10" x2="10" y2="10.01"/>
-      <line x1="14" y1="10" x2="14" y2="10.01"/>
-      <line x1="18" y1="10" x2="18" y2="10.01"/>
-      <line x1="8"  y1="14" x2="16" y2="14"/>
-    </svg>
-  )
-}
-
-function IcoCursorBlack() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <path d="M5 3L5 19L9 14L12 21L15 19.5L12 12.5L18 12.5Z" fill="currentColor" stroke="white" strokeWidth="1" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
-function IcoCursorBig() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <path d="M3 2L3 17L7 12.5L10 19L13 17.5L10 11L16 11Z" fill="currentColor" stroke="white" strokeWidth="0.8" strokeLinejoin="round"/>
-      <path d="M18 14l2-2M18 18l2 2M16 16h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function IcoZoomOut() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="10" cy="10" r="7"/>
-      <line x1="21" y1="21" x2="15" y2="15"/>
-      <line x1="7"  y1="10" x2="13" y2="10"/>
-    </svg>
-  )
-}
-
-function IcoZoomIn() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="10" cy="10" r="7"/>
-      <line x1="21" y1="21" x2="15" y2="15"/>
-      <line x1="10" y1="7"  x2="10" y2="13"/>
-      <line x1="7"  y1="10" x2="13" y2="10"/>
-    </svg>
   )
 }

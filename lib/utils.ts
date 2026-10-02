@@ -1,44 +1,50 @@
 import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { extendTailwindMerge } from 'tailwind-merge'
+import { formatDate as formatDateIn } from '@/lib/format/date'
+import type { Locale } from '@/lib/i18n/locales'
+
+/**
+ * tailwind-merge only knows Tailwind's own scale, so it read the design tokens'
+ * type steps (`text-copy`, `text-caption`, …) as COLOURS: `cn('text-caption
+ * text-muted')` kept the colour and silently dropped the size. It is told the
+ * token names here — the same names as the @theme block in app/globals.css —
+ * so a size and a colour are two things again, and a later radius or shadow
+ * still replaces an earlier one.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: ['display', 'title', 'metric', 'section', 'lead', 'copy', 'caption', 'overline',
+        // the public site's marketing steps (wave 8)
+        'hero', 'hero-page', 'h2-mkt', 'lead-mkt', 'numeral', 'eyebrow'],
+      radius: ['card', 'inset', 'control', 'pill'],
+      shadow: ['card', 'control', 'pop', 'lift', 'glow', 'edge-ltr', 'edge-rtl'],
+    },
+  },
+})
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(date: string | Date | null, options?: Intl.DateTimeFormatOptions): string {
-  if (!date) return '—'
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString('he-IL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    ...options,
-  })
+/**
+ * A day, in the screen's language. Both helpers are the one date formatter
+ * (lib/format/date.ts); a caller that does not pass the language gets Hebrew,
+ * as every caller did before the language was a parameter.
+ */
+export function formatDate(date: string | Date | null, lang: Locale = 'he'): string {
+  return formatDateIn(date, lang, 'full')
 }
 
-export function formatDateTime(date: string | Date | null): string {
-  if (!date) return '—'
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleString('he-IL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+/** A day and its time, in the screen's language (lib/format/date.ts). */
+export function formatDateTime(date: string | Date | null, lang: Locale = 'he'): string {
+  return formatDateIn(date, lang, 'dateTime')
 }
 
 export function positionChange(current: number | null, previous: number | null): number | null {
   if (current === null || previous === null) return null
   // Lower position number = better ranking, so improvement = positive change
   return previous - current
-}
-
-export function getChangeLabel(change: number | null): string {
-  if (change === null) return '—'
-  if (change > 0) return `▲ ${change}`
-  if (change < 0) return `▼ ${Math.abs(change)}`
-  return '='
 }
 
 export function getEngineLabel(engine: string): string {
@@ -55,8 +61,8 @@ export function getDeviceLabel(device: string | null | undefined): string {
 
 export function getSearchTypeLabel(engine: string, device: string | null | undefined): string {
   if (engine === 'google_search') {
-    if (device === 'mobile') return 'גוגל אורגני — מובייל'
-    return 'גוגל אורגני — מחשב'
+    if (device === 'mobile') return 'גוגל אורגני · מובייל'
+    return 'גוגל אורגני · מחשב'
   }
   if (engine === 'google_maps') return 'גוגל מפות'
   return engine

@@ -17,6 +17,9 @@ const STRINGS = {
   selected: { he: 'נבחרו', en: 'selected' },
   of: { he: 'מתוך', en: 'of' },
   delete: { he: 'מחק', en: 'Delete' },
+  remove_tag: { he: 'הסרת התגית', en: 'Remove tag' },
+  priority_tag_help_label: { he: 'מה המשמעות של גבוה/טוב?', en: 'What do High and Good mean?' },
+  priority_tag_help: { he: 'התגית מציינת עדיפות למעקב, לא ציון הסריקה.', en: 'The tag marks tracking priority, not the scan score.' },
   delete_permanently: { he: 'מחק לצמיתות', en: 'Delete permanently' },
 
   // Header
@@ -24,9 +27,9 @@ const STRINGS = {
   ai_visibility_platform: { he: 'נראות ב-AI', en: 'AI Search Visibility Platform' },
   monitor_engines: { he: 'מעקב אחר 6 מנועי AI', en: 'Monitor across 6 AI engines' },
   beta: { he: 'בטא', en: 'Beta' },
-  suggest: { he: '✨ הצע', en: '✨ Suggest' },
-  new_query: { he: '+ שאלת AI חדשה', en: '+ New AI Query' },
-  recommend_questions: { he: '💡 שאלות מומלצות', en: '💡 Recommended Questions' },
+  suggest: { he: 'הצע', en: 'Suggest' },
+  new_query: { he: 'שאלת AI חדשה', en: 'New AI query' },
+  recommend_questions: { he: 'שאלות מומלצות', en: 'Recommended questions' },
 
   // KPI labels
   visibility_score: { he: 'ציון נראות', en: 'Visibility Score' },
@@ -35,7 +38,7 @@ const STRINGS = {
   citation_share: { he: '% נתח ציטוט', en: 'Citation Share' },
   engine_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
   engines_coverage_help: { he: 'מספר מנועי AI שמצאו לפחות הזכרה אחת של העסק', en: 'Number of AI engines that found at least one mention of the business' },
-  share_of_voice: { he: 'Share of Voice', en: 'Share of Voice' },
+  share_of_voice: { he: 'נתח מהאזכורים', en: 'Share of mentions' },
   recommendation_present: { he: 'המלצה נוכחת', en: 'Recommendation Present' },
   mentioned: { he: 'הוזכר', en: 'Mentioned' },
   not_mentioned: { he: 'לא הוזכר', en: 'Not mentioned' },
@@ -86,6 +89,19 @@ const STRINGS = {
 
   // Empty states
   no_queries: { he: 'אין שאלות עדיין', en: 'No AI queries yet' },
+  // The questions tab, for an owner who never used an AI tool for business:
+  // what a question is, and the one next step on an empty list.
+  queries_explainer: {
+    he: 'שאלה היא מה שלקוח היה כותב ל-ChatGPT או ל-Gemini כשהוא מחפש את מה שאתם מציעים, למשל בקשה להמלצה על עסק בתחום שלכם. אנחנו שואלים את המנועים את השאלה ובודקים אם העסק שלכם מופיע בתשובה. שאלות טובות הן כאלה שלקוחות באמת שואלים, בלי שם העסק.',
+    en: 'A question is what a customer would type into ChatGPT or Gemini when looking for what you offer, for example asking for a recommended business in your field. We ask the engines that question and check whether your business shows up in the answer. Good questions are ones real customers ask, without your business name.',
+  },
+  no_queries_title: { he: 'עוד אין שאלות במעקב', en: 'No questions tracked yet' },
+  no_queries_body: {
+    he: 'הצעד הראשון: בחרו שאלה אחת או שתיים שלקוחות שלכם שואלים. אפשר לבחור מהשאלות המוצעות למטה או לכתוב שאלה משלכם. הוספת שאלה לא עולה כלום, רק בדיקה נספרת במכסה.',
+    en: 'First step: pick one or two questions your customers ask. Choose from the suggestions below or write your own. Adding a question costs nothing; only a check counts toward your allowance.',
+  },
+  no_queries_pick: { he: 'בחירה מהשאלות המוצעות', en: 'Pick a suggested question' },
+  no_queries_write: { he: 'כתיבת שאלה משלכם', en: 'Write your own question' },
   no_queries_help: {
     he: 'צור שאלות חכמות מותאמות לעסק שלך, או צור שאלה באופן ידני.',
     en: 'Generate smart AI questions tailored to your business, or create one manually.',
@@ -116,8 +132,8 @@ const STRINGS = {
   // Smart AI questions modal
   smart_questions_title: { he: 'שאלות AI מומלצות', en: 'Recommended AI Questions' },
   smart_questions_subtitle: {
-    he: 'שאלות שכדאי להוסיף למעקב כדי לבדוק עוד הזדמנויות נראות.',
-    en: 'Suggested questions to track for additional visibility opportunities.',
+    he: 'רק שאלות שהעסק יכול לזכות בהן: בתחום שלו, עם לקוח שעומד להחליט, ועם עמוד שעונה או מאמר שאפשר לכתוב. בדיקה רצה רק על שאלה שהוספתם.',
+    en: 'Only questions the business can win: in its field, asked by someone about to decide, with a page that answers or an article to write. A check runs only on a question you add.',
   },
   smart_questions_help: {
     he: 'שאלות מוכנות מותאמות לעסק שלך. בחר מרובה, ערוך, או הוסף בודד.',
@@ -155,19 +171,44 @@ const STRINGS = {
   // reviewer looking for a "Run" action found only the delete icon. A visible
   // instruction above them, and an accessible name that says what the click
   // does, is what makes an existing control discoverable.
+  // The automatic monthly check (UX review B): the customer no longer picks an
+  // engine. One button checks a question on the three main engines; single
+  // engines (all six) sit in the question's ⋯ menu.
   run_a_check_hint: {
-    he: 'לחצו על מנוע כדי להריץ בדיקת AI לשאילתה הזו',
-    en: 'Click an engine to run an AI check for this query',
+    he: 'כל שאלה נבדקת ב-ChatGPT, ב-Gemini וב-Google AI בלחיצה אחת. בדיקה במנוע אחד, או במנועים נוספים (Perplexity, Copilot, Grok), נמצאת בתפריט ⋯ של השאלה. כל מנוע הוא בדיקה אחת מהמכסה.',
+    en: 'Each question is checked on ChatGPT, Gemini and Google AI in one click. A check on a single engine, or on more engines (Perplexity, Copilot, Grok), is in the ⋯ menu of the question. Each engine is one check from your allowance.',
   },
+  check_question_all: { he: 'בדיקה עכשיו ({n} בדיקות)', en: 'Check now ({n} checks)' },
+  recheck_question_all: { he: 'בדיקה חוזרת ({n} בדיקות)', en: 'Recheck ({n} checks)' },
+  recheck_not_enough: { he: 'אין מספיק בדיקות החודש', en: 'Not enough checks left this month' },
+  recheck_running: { he: 'בודקים… {done}/{n}', en: 'Checking… {done}/{n}' },
+  recheck_partial_failed: { he: 'חלק מהבדיקות לא הושלמו. אפשר לנסות שוב בעוד רגע.', en: 'Some of the checks did not finish. You can try again in a moment.' },
+  check_on_engine_menu: { he: 'בדיקה ב-{engine} (בדיקה אחת)', en: 'Check on {engine} (1 check)' },
+  engine_status_label: { he: '{engine}: {status}', en: '{engine}: {status}' },
+  run_tag_automatic: { he: 'אוטומטית', en: 'Automatic' },
   run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
   rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ' },
-  ai_allowance: { he: 'בדיקות AI במחזור הנוכחי', en: 'AI checks this billing period' },
+  engines_show_rest: { he: 'הצגת כל המנועים (עוד {n})', en: 'Show all engines ({n} more)' },
+  ai_allowance: { he: 'בדיקות AI שנוצלו', en: 'AI checks used' },
   ai_allowance_unknown: { he: 'לא ניתן לאמת כרגע את המכסה', en: 'The allowance could not be read right now' },
   ai_allowance_unmetered: { he: 'ללא מגבלה', en: 'Unmetered' },
   ai_allowance_exhausted: {
-    he: 'ניצלתם את כל בדיקות ה-AI במחזור החיוב הזה',
-    en: 'You have used every AI check in this billing period',
+    he: 'ניצלתם את כל בדיקות ה-AI שכלולות בחבילה',
+    en: 'You have used every AI check your plan includes',
   },
+  ai_allowance_not_included: { he: 'לא כלולות בחבילה', en: 'not included in your plan' },
+  ai_allowance_none_body: {
+    he: 'החבילה הנוכחית לא כוללת בדיקות AI, לכן אי אפשר להריץ בדיקה כרגע. אפשר כבר עכשיו להוסיף שאלות, ולבדוק אותן אחרי שדרוג.',
+    en: 'Your current plan does not include AI checks, so a check cannot run right now. You can add questions now and check them after upgrading.',
+  },
+  ai_allowance_upgrade: { he: 'לשדרוג החבילה', en: 'Upgrade your plan' },
+  chip_legend: {
+    he: 'סימן ✓ ליד מנוע: הוא הזכיר אתכם בבדיקה האחרונה. סימן –: נבדק ולא הזכיר אתכם. בלי סימן: עוד לא נבדק.',
+    en: 'A ✓ by an engine: it mentioned you in the last check. A –: checked, and it did not mention you. No mark: not checked yet.',
+  },
+  chip_mentioned: { he: 'הזכיר אתכם', en: 'mentioned you' },
+  chip_not_mentioned: { he: 'נבדק, לא הזכיר אתכם', en: 'checked, did not mention you' },
+  chip_not_checked: { he: 'עוד לא נבדק', en: 'not checked yet' },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },
@@ -201,6 +242,10 @@ const STRINGS = {
   all_engines: { he: 'כל המנועים', en: 'All engines' },
   all_mention: { he: 'כל האזכורים', en: 'All mentions' },
   all_citations: { he: 'כל הציטוטים', en: 'All citations' },
+  // The results filter's selects, by name (axe: a select needs an accessible name).
+  filter_engine: { he: 'סינון לפי מנוע', en: 'Filter by engine' },
+  filter_mention: { he: 'סינון לפי אזכור', en: 'Filter by mention' },
+  filter_citation: { he: 'סינון לפי ציטוט', en: 'Filter by citation' },
   overall: { he: 'כולל', en: 'Overall' },
   search: { he: 'חיפוש', en: 'Search' },
 
@@ -225,7 +270,8 @@ const STRINGS = {
   mentions_by_engine: { he: 'אזכורים לפי מנוע AI', en: 'Mentions by AI Engine' },
   total_mentions: { he: 'סה״כ אזכורים', en: 'Total mentions' },
   visibility_percent: { he: 'אחוז נראות', en: 'Visibility' },
-  out_of_results: { he: 'מתוך {count} תוצאות', en: 'out of {count} results' },
+  out_of_one_result: { he: 'מתוך תשובה אחת', en: 'out of 1 answer' },
+  out_of_results: { he: 'מתוך {count} תשובות', en: 'out of {count} answers' },
 
   // Delete AI question
   delete_question_title: { he: 'למחוק שאלה?', en: 'Delete question?' },
@@ -303,6 +349,62 @@ const STRINGS = {
   open_ai_profile: { he: 'פתח הגדרות פרופיל', en: 'Open profile settings' },
   close_panel: { he: 'סגור', en: 'Close' },
   category_suggestions: { he: 'הצעות', en: 'Suggestions' },
+  // What the business is (business-identity.ts): one line on the questions tab, editable.
+  profile_identified_as: { he: 'העסק זוהה כ־', en: 'Identified as' },
+  profile_source_manual: { he: 'הגדרתם בעצמכם', en: 'Set by you' },
+  profile_source_scan: { he: 'לפי סריקת האתר', en: 'From the site scan' },
+  profile_source_site: { he: 'לפי שם העסק והדומיין', en: 'From the business name and domain' },
+  profile_source_keywords: { he: 'לפי רוב מילות המפתח במעקב', en: 'From most of your tracked keywords' },
+  profile_change: { he: 'שינוי', en: 'Change' },
+  profile_unknown_title: { he: 'עוד לא ברור לנו במה העסק עוסק', en: 'We are not sure yet what the business does' },
+  profile_unknown_help: {
+    he: 'כתבו במילים שלכם במה העסק עוסק, והשאלות המוצעות יתאימו לעסק במקום לניחוש.',
+    en: 'Say in your own words what the business does, so the suggested questions fit it instead of a guess.',
+  },
+  profile_set: { he: 'הגדרת העסק', en: 'Describe the business' },
+  profile_scan_found: { he: 'מה הסריקה מצאה באתר', en: 'What the site scan found' },
+  profile_what_business: { he: 'במה העסק עוסק?', en: 'What does the business do?' },
+  profile_what_business_placeholder: {
+    he: 'לדוגמה: מדריך טיולים ליפן, משלוחי פרחים, ניקיון משרדים',
+    en: 'e.g. Japan travel guide, flower delivery, office cleaning',
+  },
+  profile_more_topics: { he: 'תחומים נוספים ונושאים לא רצויים', en: 'More topics and excluded topics' },
+  profile_saved_questions: {
+    he: 'הפרופיל נשמר והשאלות המוצעות עודכנו לפי העסק.',
+    en: 'Profile saved. The suggested questions now follow it.',
+  },
+  profile_regenerate: { he: 'יצירת שאלות חדשות', en: 'Generate new questions' },
+  profile_loading: { he: 'בודקים במה העסק עוסק', en: 'Checking what the business does' },
+  // Why a suggested question is worth it (question-worth.ts), one line.
+  worth_rel_brand: { he: 'שאלה על העסק עצמו', en: 'About the business itself' },
+  worth_rel_keyword: { he: 'קשורה ל„{term}״ שאתם עוקבים אחריה', en: 'Tied to "{term}", which you track' },
+  worth_rel_business: { he: 'בדיוק בתחום של העסק', en: 'Right in the business\'s field' },
+  worth_rel_gap: { he: 'האתר כבר כותב על „{term}״, ואין עדיין עמוד שעונה על זה', en: 'Your site covers "{term}", and no page answers this yet' },
+  worth_value_buy: { he: 'מי ששואל עומד לקנות או להזמין', en: 'The asker is about to buy or book' },
+  worth_value_choose: { he: 'מבקשים המלצה, ו-AI עונה בשמות של עסקים', en: 'They ask for a recommendation, and AI answers with names' },
+  worth_value_compare: { he: 'משווים אפשרויות לפני החלטה', en: 'They compare options before deciding' },
+  worth_value_learn: { he: 'שאלת מידע ש-AI עונה עליה עם מקורות', en: 'An information question AI answers with sources' },
+  worth_value_brand: { he: 'כך לקוחות בודקים אתכם לפני שהם פונים', en: 'How customers check you before they get in touch' },
+  // A suggested question → an article that answers it (question-article.ts).
+  qa_track_brand: { he: 'הוסיפו לשאלות AI', en: 'Add to AI questions' },
+  qa_write_article: { he: 'כתוב מאמר שיענה על השאלה', en: 'Write an article that answers it' },
+  qa_write_failed: { he: 'לא הצלחנו ליצור את הנושא. נסו שוב.', en: 'We could not create the topic. Try again.' },
+  qa_page_answers: { he: 'עונה עליה באתר: {title}', en: 'Answered on your site: {title}' },
+  qa_improve_page: { he: 'שיפור העמוד הקיים', en: 'Improve that page' },
+  qa_status_topic: { he: 'נושא נוצר באסטרטגיית התוכן', en: 'Topic created in the content strategy' },
+  qa_status_written: { he: 'מאמר נכתב', en: 'Article written' },
+  qa_status_published: { he: 'המאמר פורסם', en: 'Article published' },
+  qa_status_cited: { he: 'צוטט בתשובת AI', en: 'Cited in an AI answer' },
+  qa_open_topic: { he: 'לנושא', en: 'Open topic' },
+  qa_open_article: { he: 'למאמר', en: 'Open article' },
+  article_brief_note: {
+    he: 'המאמר צריך לענות ישירות ובבהירות על השאלה „{q}״, כבר בפסקה הראשונה, כדי שמנועי AI יצטטו אותו כמקור.',
+    en: 'The article must answer the question "{q}" directly and clearly, in its first paragraph, so AI engines cite it as a source.',
+  },
+  worth_ask_business: {
+    he: 'כדי להציע רק שאלות שהעסק יכול לזכות בהן, ספרו לנו למעלה במה העסק עוסק.',
+    en: 'To suggest only questions the business can win, say above what the business does.',
+  },
 
   // Misc UI labels
   show_all: { he: 'הצג הכל', en: 'Show all' },
@@ -334,23 +436,15 @@ const STRINGS = {
   profile_save_failed: { he: 'שמירת הפרופיל נכשלה. נסה שוב.', en: 'Failed to save profile. Please try again.' },
   profile_reset_failed: { he: 'איפוס הפרופיל נכשל. נסה שוב.', en: 'Failed to reset profile. Please try again.' },
 
-  // Global AI Visibility page
+  // The AI visibility tab (one project: the one the top bar names)
   page_subtitle: {
-    he: 'ההופעות של האתר שלך בתוצאות AI לפי פרויקט',
-    en: 'How your site appears in AI results, per project',
+    he: 'איך מנועי ה-AI עונים על שאלות בתחום של העסק, והאם הם מזכירים ומצטטים את האתר',
+    en: 'How AI assistants answer questions in your field, and whether they mention and cite your site',
   },
-  no_projects_available: { he: 'אין פרויקטים זמינים', en: 'No projects available' },
-  add_project: { he: '+ הוסף פרויקט', en: '+ Add project' },
-  total_projects: { he: 'סה״כ פרויקטים', en: 'Total projects' },
-  total_queries: { he: 'סה״כ שאילתות', en: 'Total queries' },
-  total_scans: { he: 'סה״כ סריקות', en: 'Total scans' },
-  total_citations: { he: 'סה״כ ציטוטים', en: 'Total citations' },
-  avg_visibility: { he: 'ממוצע נראות', en: 'Avg. visibility' },
-  projects_heading: { he: 'פרויקטים', en: 'Projects' },
+  not_available: { he: 'נראות ב-AI לא זמינה בחשבון הזה.', en: 'AI visibility is not available on this account.' },
   no_data: { he: 'אין נתונים', en: 'No data' },
   queries: { he: 'שאילתות', en: 'Queries' },
   last_scan: { he: 'סריקה אחרונה', en: 'Last scan' },
-  open_ai_visibility: { he: 'פתח נראות ב-AI ←', en: 'Open AI Visibility →' },
   failed_to_load: { he: 'טעינה נכשלה', en: 'Failed to load' },
 
   // Category labels for the dropdown (BusinessCategory → display name)
@@ -362,6 +456,8 @@ const STRINGS = {
   cat_appliance_store: { he: 'חנות מוצרי חשמל', en: 'Appliance store' },
   cat_ecommerce: { he: 'חנות אונליין', en: 'Online store' },
   cat_local_service: { he: 'שירות מקומי', en: 'Local service' },
+  cat_home_improvement_service: { he: 'בעלי מקצוע לבית (אינסטלציה, חשמל, שיפוצים)', en: 'Home services (plumbing, electrical, renovation)' },
+  cat_product_brand: { he: 'מותג מוצרים', en: 'Product brand' },
   cat_cleaning: { he: 'חברת ניקיון', en: 'Cleaning company' },
   cat_saas: { he: 'מוצר SaaS', en: 'SaaS product' },
   cat_restaurant: { he: 'מסעדה', en: 'Restaurant' },
@@ -372,13 +468,14 @@ const STRINGS = {
   cat_beauty: { he: 'יופי וטיפוח', en: 'Beauty & wellness' },
   cat_education: { he: 'הכשרה והוראה', en: 'Education' },
   cat_second_hand_fashion: { he: 'בגדי יד שנייה לנשים', en: 'Second-hand women\'s fashion' },
+  cat_travel: { he: 'תיירות וטיולים', en: 'Travel & tourism' },
   cat_generic: { he: 'אחר', en: 'Other' },
 
   // Competitors panel (Phase 1)
   competitors_title: { he: 'מתחרים למעקב', en: 'Tracked competitors' },
   competitors_subtitle: {
-    he: 'הגדירו עד 3 מתחרים שאתם רוצים לעקוב אחריהם בתשובות AI.',
-    en: 'Define up to 3 competitors you want to track in AI answers.',
+    he: 'הגדירו עד 5 מתחרים שאתם רוצים לעקוב אחריהם בתשובות AI.',
+    en: 'Define up to 5 competitors you want to track in AI answers.',
   },
   competitor_name: { he: 'שם המתחרה', en: 'Competitor name' },
   competitor_name_placeholder: { he: 'לדוגמה: Adidas', en: 'e.g. Adidas' },
@@ -396,28 +493,33 @@ const STRINGS = {
   competitor_edit: { he: 'עריכה', en: 'Edit' },
   competitor_delete: { he: 'מחיקה', en: 'Delete' },
   competitor_max_reached: {
-    he: 'הגעת למקסימום של 3 מתחרים פעילים. השבת אחד כדי להוסיף חדש.',
-    en: 'You\'ve reached the limit of 3 active competitors. Deactivate one to add another.',
+    he: 'הגעת למקסימום של 5 מתחרים פעילים. השבת אחד כדי להוסיף חדש.',
+    en: 'You\'ve reached the limit of 5 active competitors. Deactivate one to add another.',
   },
   competitor_empty: {
     he: 'עדיין לא הוגדרו מתחרים. הוסיפו מתחרה ראשון כדי להתחיל.',
     en: 'No competitors defined yet. Add your first competitor to get started.',
   },
   competitor_delete_confirm: {
-    he: 'להסיר את המתחרה מהמעקב הפעיל? ההיסטוריה תישמר.',
-    en: 'Remove this competitor from active tracking? History will be kept.',
+    he: 'הוא יפסיק להופיע בהשוואות של הבדיקות הבאות. התוצאות שכבר נאספו נשמרות.',
+    en: 'It stops appearing in the comparisons of future checks. Results already collected are kept.',
   },
   competitor_loading: { he: 'טוען מתחרים…', en: 'Loading competitors…' },
   competitor_load_failed: { he: 'טעינת המתחרים נכשלה.', en: 'Failed to load competitors.' },
+  competitor_save_failed: { he: 'לא הצלחנו לשמור את המתחרה. נסו שוב בעוד רגע.', en: 'We could not save the competitor. Try again in a moment.' },
+  competitor_remove_failed: { he: 'לא הצלחנו להסיר את המתחרה מהמעקב. נסו שוב בעוד רגע.', en: 'We could not remove the competitor from tracking. Try again in a moment.' },
+  competitor_reactivate_failed: { he: 'לא הצלחנו להחזיר את המתחרה למעקב. נסו שוב בעוד רגע.', en: 'We could not bring the competitor back into tracking. Try again in a moment.' },
+  competitor_remove_title: { he: 'להסיר את המתחרה מהמעקב?', en: 'Remove this competitor from tracking?' },
+  competitor_remove_action: { he: 'הסרה מהמעקב', en: 'Remove from tracking' },
   competitor_active_count: { he: 'מתחרים פעילים', en: 'Active competitors' },
   competitor_inactive: { he: 'לא פעיל', en: 'Inactive' },
   competitor_reactivate: { he: 'הפעלה מחדש', en: 'Reactivate' },
 
   // Competitor analysis (Phase 2)
-  competitor_analysis_title: { he: 'השוואת מתחרים', en: 'Competitor comparison' },
+  competitor_analysis_title: { he: 'באיזה חלק מהתשובות כל עסק מוזכר', en: 'How many of the answers name each business' },
   competitor_analysis_help: {
-    he: 'כמה פעמים כל עסק מוזכר בתשובות AI מתוך התוצאות שנבדקו.',
-    en: 'How often each business is mentioned in AI answers across the checked results.',
+    he: 'לכל עסק בנפרד: בכמה מהתשובות שנבדקו הוא הוזכר. כל עסק נמדד מול כל התשובות, ולכן כמה עסקים יכולים להגיע כל אחד ל-100%.',
+    en: 'For each business on its own: how many of the checked answers named it. Each is measured against all the answers, so several businesses can each reach 100%.',
   },
   competitor_analysis_no_competitors: {
     he: 'הוסיפו מתחרים כדי להשוות את הנראות שלכם במנועי AI.',
@@ -433,21 +535,21 @@ const STRINGS = {
   },
   competitor_analysis_loading: { he: 'טוען נתונים…', en: 'Loading…' },
   competitor_analysis_failed: { he: 'טעינת הנתונים נכשלה.', en: 'Failed to load data.' },
-  competitor_visibility: { he: 'נראות', en: 'Visibility' },
+  competitor_visibility: { he: 'מהתשובות', en: 'of answers' },
   competitor_mentions: { he: 'אזכורים', en: 'Mentions' },
   competitor_by_engine: { he: 'פירוט לפי מנוע', en: 'Breakdown by engine' },
   competitor_your_business: { he: 'העסק שלכם', en: 'Your business' },
   competitor_zero_mentions: { he: 'אין אזכורים', en: 'No mentions' },
 
   // AI Share of Voice (Phase 3)
-  share_of_voice_title: { he: 'AI Share of Voice', en: 'AI Share of Voice' },
+  share_of_voice_title: { he: 'נתח מכלל האזכורים בתשובות AI', en: 'Share of all mentions in AI answers' },
   share_of_voice_help: {
-    he: 'חלק יחסי מכלל האזכורים שנמצאו בתשובות AI.',
-    en: 'Relative share of all mentions found in AI answers.',
+    he: 'כל תשובה שמזכירה עסק נספרת לו פעם אחת. האחוז הוא החלק של כל עסק מכל האזכורים יחד, ולכן האחוזים כאן מסתכמים ל-100%.',
+    en: 'Each answer that names a business counts once for it. The percentage is each business\'s part of all mentions together, so the percentages here add up to 100%.',
   },
   share_of_voice_empty: {
-    he: 'אין עדיין אזכורים בתשובות AI עבור העסק או המתחרים. הריצו סריקות נוספות כדי לראות נתח שיח.',
-    en: 'No mentions yet for your business or competitors. Run more scans to see share of voice.',
+    he: 'עדיין אף תשובה לא הזכירה את העסק או מתחרה. בדקו עוד שאלות כדי לראות מי מוזכר יותר.',
+    en: 'No answer has named your business or a competitor yet. Check more questions to see who is named more.',
   },
   share_of_voice_mentions: { he: 'אזכורים', en: 'mentions' },
 
@@ -534,7 +636,7 @@ const STRINGS = {
   prompt_status_good: { he: 'טוב', en: 'Good' },
 
   // GEO Insights (Phase 1A — drawer-only compact section)
-  geo_insights_title: { he: 'תובנות GEO', en: 'GEO Insights' },
+  geo_insights_title: { he: 'למה זו התשובה', en: 'Why this answer' },
   geo_query_intent: { he: 'כוונת שאלה', en: 'Query intent' },
   geo_citation_types: { he: 'סוגי מקורות', en: 'Source types' },
   geo_content_signals: { he: 'דפוסי תוכן', en: 'Content patterns' },
@@ -743,6 +845,68 @@ const STRINGS = {
   // buildFallbackSuggestions). It was missing here, so t('starter_questions') threw and
   // crashed the AI Questions tab for new projects.
   starter_questions: { he: 'שאלות התחלה', en: 'Starter questions' },
+
+  // Premium design pass (WP2): words the restyled tab needed, so none are hard-coded.
+  something_went_wrong: { he: 'משהו השתבש. נסו שוב בעוד רגע.', en: 'Something went wrong. Please try again in a moment.' },
+  result_more_actions: { he: 'פעולות נוספות לתוצאה', en: 'More actions for this result' },
+  question_more_actions: { he: 'פעולות נוספות לשאלה', en: 'More actions for this question' },
+  question_auto_monthly: { he: 'נבדקת אוטומטית כל חודש', en: 'Checked automatically every month' },
+  archive_result: { he: 'העברה לארכיון', en: 'Archive' },
+  restore_result: { he: 'החזרה לחישוב הציון', en: 'Restore to the score' },
+  not_in_score: { he: 'לא נכלל בציון', en: 'Not in score' },
+  show_archive: { he: 'הצגת הארכיון ({count})', en: 'Show archive ({count})' },
+  archive_note: { he: 'תוצאות בארכיון אינן נכללות בחישוב הציון.', en: 'Archived results are not included in the score.' },
+  archive_update_failed: { he: 'לא הצלחנו לעדכן את הארכיון. נסו שוב.', en: 'We could not update the archive. Please try again.' },
+  archived_toast: { he: 'התוצאה הועברה לארכיון ולא תשפיע על ציון הנראות.', en: 'Result archived and left out of the score.' },
+  restored_toast: { he: 'התוצאה שוחזרה וחזרה לחישוב ציון הנראות.', en: 'Result restored and counted in the score again.' },
+  scan_failed: { he: 'הבדיקה נכשלה', en: 'Check failed' },
+  scan_failed_body: { he: 'הבדיקה נכשלה זמנית. אפשר לנסות שוב.', en: 'The check failed for now. You can try again.' },
+  retry_check: { he: 'ניסיון חוזר', en: 'Try again' },
+  how_it_works: { he: 'איך זה עובד?', en: 'How does it work?' },
+  more_items: { he: 'עוד {count}', en: '{count} more' },
+  geo_opp_based_on: {
+    he: '{success} מתוך {total} תשובות הזכירו את העסק או ציטטו את האתר',
+    en: '{success} of {total} answers mentioned the business or cited the site',
+  },
+  geo_comp_loss_badge: { he: 'דורש תשומת לב', en: 'Needs attention' },
+  geo_card_content: { he: 'תוכן שכדאי לחזק', en: 'Content to strengthen' },
+  geo_card_questions: { he: 'שאלות שבהן העסק לא הופיע', en: 'Questions where the business is weak' },
+  geo_card_engines: { he: 'מנועים שכדאי לחזק', en: 'Engines worth strengthening' },
+  geo_card_missing: { he: 'מה חסר כשהעסק לא מופיע', en: 'What is missing when the business does not appear' },
+  geo_opp_fallback: {
+    he: 'כרגע לא זוהתה חולשה ברורה. כדי לקבל המלצות מדויקות יותר, מומלץ להריץ עוד שאלות ומנועים.',
+    en: 'No clear weakness detected at the moment. To get more accurate recommendations, run more questions and engines.',
+  },
+  no_recommended_yet: { he: 'עדיין אין שאלות מומלצות לפרויקט הזה', en: 'No recommended questions yet for this project' },
+  generate_recommended: { he: 'יצירת שאלות מומלצות', en: 'Generate recommended questions' },
+  generating_recommended: { he: 'יוצר שאלות מומלצות…', en: 'Generating recommended questions…' },
+  fallback_questions_notice: {
+    he: 'לא הצלחנו ליצור שאלות דרך AI כרגע, ולכן הצגנו שאלות בסיסיות להתחלה.',
+    en: 'We could not generate AI questions right now, so these are basic starter questions.',
+  },
+  more_questions_short: { he: 'עוד שאלות', en: 'More questions' },
+  competitor_results_of: { he: '{mentions} מתוך {total} תשובות', en: '{mentions} of {total} answers' },
+  share_of_voice_of_all: { he: 'מכלל האזכורים', en: 'of all mentions' },
+  share_of_voice_answers: { he: '{count} תשובות', en: '{count} answers' },
+  competitor_updated: { he: 'עודכן {date}', en: 'Updated {date}' },
+  competitor_small_sample: {
+    he: 'ההשוואה מבוססת על מעט תשובות. לתמונה מדויקת יותר, הוסיפו שאלות AI והריצו עוד בדיקות.',
+    en: 'This comparison rests on only a few answers. Add AI questions and run more checks for a fuller picture.',
+  },
+  drawer_summary_both: { he: 'העסק אוזכר בתשובה, והאתר הופיע כמקור.', en: 'The business was mentioned in the answer, and the site was cited as a source.' },
+  drawer_summary_mentioned: { he: 'העסק אוזכר בתשובה, אבל האתר לא הופיע כמקור.', en: 'The business was mentioned in the answer, but the site was not cited as a source.' },
+  drawer_summary_cited: { he: 'האתר הופיע כמקור, אבל העסק לא אוזכר בגוף התשובה.', en: 'The site was cited as a source, but the business was not named in the answer.' },
+  drawer_summary_none: { he: 'העסק לא אוזכר בתשובה, והאתר לא הופיע כמקור.', en: 'The business was not mentioned in the answer, and the site was not cited.' },
+  drawer_keep_going: {
+    he: 'שמרו על תוכן ברור עם מחירים, ביקורות והמלצות כדי לחזק את הופעתכם בתוצאות דומות.',
+    en: 'Keep your content clear with pricing, reviews and recommendations to strengthen your visibility in similar queries.',
+  },
+  drawer_no_improvements: { he: 'לא זוהו פעולות שיפור ברורות בתוצאה הזו.', en: 'No clear improvements were detected in this result.' },
+  ai_summary_strong_low: { he: 'העסק הופיע בעיקר ב־{names}.', en: 'The business did appear mainly on {names}.' },
+  ai_summary_strong_high: { he: 'הנראות חזקה בעיקר ב־{names}.', en: 'Visibility is strong mainly on {names}.' },
+  ai_summary_weak: { he: 'החולשה המרכזית היא ב־{names}.', en: 'The main weakness is on {names}.' },
+  competitors_used_for: { he: 'המתחרים ישמשו להשוואת נראות בתשובות AI.', en: 'These competitors are used to compare AI visibility.' },
+  open_source: { he: 'פתיחת המקור בכרטיסייה חדשה', en: 'Open the source in a new tab' },
 } as const
 
 type StringKey = keyof typeof STRINGS

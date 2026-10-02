@@ -1,7 +1,12 @@
 'use client'
 
 /**
- * TopicPlanDrawer — per-topic internal-link planning modal (Phase 2E.2).
+ * TopicPlanDrawer — per-topic internal-link planning side sheet (Phase 2E.2).
+ *
+ * A sheet from the inline end, like the AI result sheet: the topics list stays in
+ * view beside it. Its one primary action adds the topic to the queue WITH the
+ * recommended links; "without links" is the quiet alternative, offered only when
+ * the site has no index to suggest links from (final review R17).
  *
  * MANUAL, read/plan/review only. Reuses existing endpoints:
  *   GET  …/plan?topicIds=…            (dry-run, no write)
@@ -11,10 +16,13 @@
  * No content mutation, no apply UI, no auto actions — every call is a button.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Modal from '@/components/ui/Modal'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { ChevronDown, ExternalLink, RefreshCw, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
@@ -217,7 +225,9 @@ export default function TopicPlanDrawer({
       const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`, { signal })
       const data = await res.json().catch(() => ({}))
       if (!current()) return
-      if (!res.ok) {
+      // A missing site index answers 200 { ok: false, cacheState: 'missing' } (an
+      // expected state, not an error); a real failure is a non-2xx. Both say no plan.
+      if (!res.ok || data.ok === false) {
         // A non-2xx counts as a LOADED preview only when the response itself
         // states the cache state (e.g. an explicit 'missing'). Defaulting to
         // 'missing' here — which this used to do — turned any server error into
@@ -319,7 +329,7 @@ export default function TopicPlanDrawer({
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve, reviewedSnapshot: reviewedSnapshotRef.current ?? undefined }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.reason === 'cache_changed_replan_required' ? t.cacheChanged : (d.warning || d.error || t.saveError)); return { ok: false, warning: null } }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.reason === 'cache_changed_replan_required' ? t.cacheChanged : d.cacheState === 'missing' ? t.cacheMissing : t.saveError); return { ok: false, warning: null } }
       if (approve) {
         const d = await res.json().catch(() => ({}))
         const r0 = Array.isArray(d.results) ? d.results[0] : null
@@ -335,7 +345,7 @@ export default function TopicPlanDrawer({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, topicId: topic.id, approve }),
     })
-    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return { ok: false, warning: null } }
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.cacheState === 'missing' ? t.cacheMissing : t.saveError); return { ok: false, warning: null } }
     if (approve) {
       const d = await res.json().catch(() => ({}))
       if (typeof d.linkCount === 'number' && typeof d.approvedCount === 'number' && d.approvedCount < d.linkCount) {
@@ -421,21 +431,22 @@ export default function TopicPlanDrawer({
   }, [projectId, busyLink, emitStatus])
 
   if (!topic) return null
+  const closeLabel = getDashboardDictionary(language).common.close
 
   const statusHe = (s: string) => (t.linkStatus as Record<string, string>)[s] ?? s
   const linkRow = (l: SavedLink) => (
-    <div key={l.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
+    <div key={l.id} className="rounded-inset border border-line px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{l.anchor_text || '—'}</span>
+        <span className="text-copy font-medium text-ink">{l.anchor_text || '—'}</span>
         <Badge variant={l.status === 'approved' ? 'success' : l.status === 'rejected' ? 'danger' : 'neutral'}>{statusHe(l.status)}</Badge>
-        <span className="text-[10px] text-slate-400">{t.confidence} {l.confidence ?? '—'}</span>
+        <span className="text-caption text-muted tabular-nums">{t.confidence} {l.confidence ?? '—'}</span>
         <div className="flex items-center gap-1 ms-auto">
-          <Button size="sm" variant="outline" onClick={() => setLinkStatus(l.id, 'approved')} disabled={busyLink === l.id || l.status === 'approved' || l.status === 'superseded'}>{t.approve}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setLinkStatus(l.id, 'rejected')} disabled={busyLink === l.id || l.status === 'rejected' || l.status === 'superseded'} className="text-red-600 dark:text-red-400">{t.reject}</Button>
+          <Button size="sm" variant="secondary" onClick={() => setLinkStatus(l.id, 'approved')} disabled={busyLink === l.id || l.status === 'approved' || l.status === 'superseded'}>{t.approve}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setLinkStatus(l.id, 'rejected')} disabled={busyLink === l.id || l.status === 'rejected' || l.status === 'superseded'} className="text-bad">{t.reject}</Button>
         </div>
       </div>
-      <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-        <a href={l.target_url} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-indigo-600 dark:text-indigo-400 hover:underline">{l.target_title || l.target_url}</a>
+      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 text-caption text-muted">
+        <a href={l.target_url} target="_blank" rel="noopener noreferrer" dir="ltr" title={l.target_url} className="inline-flex max-w-64 items-center gap-1 hover:text-action hover:underline"><span className="truncate">{l.target_title || l.target_url}</span><ExternalLink aria-hidden="true" className="size-3.5 shrink-0" /></a>
         <span> · {l.target_priority}</span>
         {l.anchor_source ? <span> · {l.anchor_source}</span> : null}
       </div>
@@ -465,109 +476,135 @@ export default function TopicPlanDrawer({
     const k = dmkey(d)
     const inPlan = savedKeys.has(k)
     return (
-      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex flex-wrap items-start gap-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-900/10 p-2 text-[11px] cursor-pointer">
-        <input type="checkbox" checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })} className="mt-0.5 accent-emerald-600" />
+      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex cursor-pointer items-start gap-2.5 rounded-inset bg-sunk/60 px-3 py-2.5 text-caption">
+        <span className="flex h-5 items-center"><Checkbox checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} /></span>
         <span className="flex-1 min-w-0">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{d.anchorText || '—'}</span>
+            <span className="font-medium text-ink break-words">{d.anchorText || '—'}</span>
             <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
             {inPlan ? <Badge variant="success">{t.alreadyInPlan}</Badge> : null}
-            <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+            <span className="text-muted tabular-nums">{t.confidence} {d.confidence}</span>
           </span>
-          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={d.targetUrl} className="block max-w-64 truncate text-muted hover:text-action hover:underline">{d.targetTitle || d.targetUrl}</a>
         </span>
       </label>
     )
   }
 
   const dryItemRow = (d: DryItem, rejected: boolean) => (
-    <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2 text-[11px]">
+    <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-inset border border-line px-3 py-2.5 text-caption">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-slate-800 dark:text-slate-100 font-medium">{d.anchorText || '—'}</span>
+        <span className="text-ink font-medium">{d.anchorText || '—'}</span>
         <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
-        <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+        <span className="text-muted tabular-nums">{t.confidence} {d.confidence}</span>
       </div>
-      <div className="mt-0.5 text-slate-500 dark:text-slate-400">
-        <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:underline">{d.targetTitle || d.targetUrl}</a>
-        {rejected && d.rejectedReasons?.length ? <span className="text-amber-700 dark:text-amber-400"> · {d.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
+      <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-muted">
+        <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={d.targetUrl} className="max-w-64 truncate hover:underline">{d.targetTitle || d.targetUrl}</a>
+        {rejected && d.rejectedReasons?.length ? <span> · {d.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
       </div>
     </div>
   )
 
+  // The footer's two queue actions. The primary always means "with the recommended
+  // links"; with no site index there is nothing to recommend, so it waits (disabled,
+  // with the reason) and the link-free queue is the bordered alternative.
+  const noIndexPath = queueDecision.canQueue && !queueDecision.expectsLinks
+  const queueFooter = onSaveAndQueue ? (
+    <>
+      <Button
+        onClick={saveAndQueue}
+        loading={savingQueue && !noIndexPath}
+        disabled={saving || savingQueue || !queueDecision.canQueue || noIndexPath}
+        aria-describedby={noIndexPath ? 'topic-plan-with-links-why' : undefined}
+        data-plan-action="queue-with-links"
+      >
+        {savingQueue && !noIndexPath ? t.savingQueue : checkedCount > 0 ? `${t.queueWithLinks} (${checkedCount})` : t.saveAndQueue}
+      </Button>
+      {noIndexPath && (
+        <Button variant="secondary" onClick={saveAndQueue} loading={savingQueue} disabled={saving || savingQueue} data-plan-action="queue-without-links">
+          {savingQueue ? t.savingQueue : t.queueWithoutLinks}
+        </Button>
+      )}
+      {noIndexPath && <p id="topic-plan-with-links-why" className="basis-full text-caption text-muted">{t.withLinksUnavailable}</p>}
+    </>
+  ) : (
+    <Button onClick={savePlan} loading={saving} disabled={saving}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
+  )
+
   return (
-    <Modal open={open} onClose={onClose} title={t.drawerTitle} size="lg">
-      <div dir={language === 'he' ? 'rtl' : 'ltr'}>
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{topic.topic}</p>
-        {topic.primary_keyword && <p className="text-xs text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {topic.primary_keyword}</p>}
+    <PlanSheet
+      open={open}
+      onClose={onClose}
+      dir={language === 'he' ? 'rtl' : 'ltr'}
+      overline={t.drawerTitle}
+      title={topic.topic}
+      subtitle={topic.primary_keyword ? `${t.primaryKeyword}: ${topic.primary_keyword}` : null}
+      closeLabel={closeLabel}
+      footer={queueFooter}
+    >
+      <div>
 
         {/* Persistent completion state after a successful save (Phase 3F.3.3f) —
             placed at the top so it is always visible, and stays until the user
             returns / keeps editing / closes / starts a new search. */}
         {justSaved && (
-          <div className="mt-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-3">
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">✓ {t.savedOk}</p>
-            <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.savedBody}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => { onReturnToQueue?.(); onClose() }}>{t.returnToQueue}</Button>
-              <Button size="sm" variant="outline" onClick={() => setJustSaved(false)}>{t.keepEditing}</Button>
-            </div>
-          </div>
+          <Notice tone="ok" action={{ label: t.returnToQueue, onClick: () => { onReturnToQueue?.(); onClose() } }}>
+            <p className="font-semibold">{t.savedOk}</p>
+            <p className="text-caption">{t.savedBody}</p>
+            <button type="button" onClick={() => setJustSaved(false)} className="mt-1 rounded-control text-caption font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.keepEditing}</button>
+          </Notice>
         )}
 
         {/* Purpose + step hint (hidden once saved, to keep the completion clear). */}
         {!justSaved && (
-          <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
-            <p className="text-xs text-slate-600 dark:text-slate-300">{t.drawerIntro1}</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.drawerIntro2}</p>
-            <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <li>1. {t.step1}</li>
-              <li>2. {t.step2}</li>
-              <li>3. {t.step3}</li>
-              <li>4. {t.step4}</li>
-            </ol>
+          <div className="max-w-prose">
+            <p className="text-copy text-body">{t.drawerIntro1} <span className="text-muted">{t.drawerIntro2}</span></p>
+            <details className="group mt-1">
+              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                {t.stepsTitle}
+                <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+              </summary>
+              <ol className="mt-2 list-decimal space-y-0.5 ps-5 text-caption text-muted">
+                <li>{t.step1}</li>
+                <li>{t.step2}</li>
+                <li>{t.step3}</li>
+                <li>{t.step4}</li>
+              </ol>
+            </details>
           </div>
         )}
 
         {/* Warnings */}
-        {saved?.stale && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.staleWarn}{saved.staleReasons.length ? ` (${saved.staleReasons.join(', ')})` : ''}</p>}
-        {dry?.cacheState === 'missing' && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.cacheMissing}</p>}
-        {dry?.warnings?.includes('cache_stale') && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{t.cacheStale}</p>}
-        {dry?.warnings?.includes('cache_version_stale') && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{t.versionStale}</p>}
-        {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {saved?.stale && <Notice tone="warn" className="mt-3">{t.staleWarn}</Notice>}
+        {dry?.cacheState === 'missing' && <Notice tone="warn" className="mt-3">{t.cacheMissing}</Notice>}
+        {dry?.warnings?.includes('cache_stale') && <Notice tone="warn" className="mt-3">{t.cacheStale}</Notice>}
+        {dry?.warnings?.includes('cache_version_stale') && <Notice tone="warn" className="mt-3">{t.versionStale}</Notice>}
+        {error && <Notice tone="bad" className="mt-3">{error}</Notice>}
 
-        {/* Actions — all manual */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={runPlan} loading={running} disabled={running || savingQueue}>{running ? t.running : t.runPlan}</Button>
-          <Button size="sm" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
-          {/* Phase 3F.3.6 (Part G) — streamlined save + enqueue in one click. */}
+        {/* The plan's own tools — all manual. The queue actions are in the footer; the
+            labels there state what the click will actually do (with no site index and
+            nothing selected there is no plan to save, so "with the recommended links"
+            waits and "without links" is offered), and they stay disabled until the
+            preview resolves, so a label can never describe the wrong path. */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={runPlan} loading={running} disabled={running || savingQueue}>{!running && <RefreshCw aria-hidden="true" className="size-4" />}{running ? t.running : t.runPlan}</Button>
           {onSaveAndQueue && (
-            /* The label states what the click will actually do. With no site
-               index and nothing selected there is no plan to save, so promising
-               "save links and add to queue" would be untrue. Disabled until the
-               preview resolves, so the label can never describe the wrong path. */
-            <Button
-              size="sm"
-              onClick={saveAndQueue}
-              loading={savingQueue}
-              disabled={saving || savingQueue || !queueDecision.canQueue}
-            >
-              {savingQueue ? t.savingQueue : queueDecision.canQueue && !queueDecision.expectsLinks ? t.queueWithoutLinks : t.saveAndQueue}
-            </Button>
+            <Button size="sm" variant="ghost" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
           )}
-          {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
+          {hasUnsavedChanges && <span className="basis-full text-caption font-medium text-ink">{t.unsavedChanges}</span>}
         </div>
 
         {loading ? (
-          <div className="py-4"><span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="mt-4 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" /></div>
         ) : (
           <>
             {/* Saved plan */}
             <div className="mt-4">
-              <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.plannedLinksTitle}</div>
+              <div className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.plannedLinksTitle}</div>
               {!saved?.exists ? (
-                <p className="text-xs text-slate-400">{t.noSavedPlan}</p>
+                <p className="text-caption text-muted">{t.noSavedPlan}</p>
               ) : saved.links.length === 0 ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
+                <p className="text-caption text-muted">{t.zeroLink}</p>
               ) : (
                 <div className="space-y-2">{saved.links.map(linkRow)}</div>
               )}
@@ -581,12 +618,12 @@ export default function TopicPlanDrawer({
               const blocked = dry.rejected.filter((r) => r.reviewability !== 'reviewable' && r.displayBlocked !== false)
               return (
               <div className="mt-4">
-                <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.recommendedTitle}</div>
+                <div className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.recommendedTitle}</div>
                 {dry.selected.length === 0 ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
+                  <p className="text-caption text-muted">{t.zeroLink}</p>
                 ) : (
                   <>
-                    <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{t.recommendedCheckNote}</p>
+                    <p className="mb-1 text-caption text-muted">{t.recommendedCheckNote}</p>
                     {(() => {
                       // Phase 3F.3.6 — primary commercial link first, supporting below.
                       const money = dry.moneyTargetUrl ? dry.selected.find((d) => d.targetUrl === dry.moneyTargetUrl) : null
@@ -595,14 +632,14 @@ export default function TopicPlanDrawer({
                         <>
                           {money && (
                             <div className="mb-2">
-                              <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 mb-0.5">{t.primaryCommercialLink}</div>
+                              <div className="mb-1 text-caption font-semibold text-ink">{t.primaryCommercialLink}</div>
                               {recommendedRow(money)}
                             </div>
                           )}
-                          {!money && <p className="mb-1 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                          {!money && <p className="mb-2 text-caption text-muted">{t.noMoneyTargetNote}</p>}
                           {supporting.length > 0 && (
                             <>
-                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{t.supportingLinks}</div>
+                              <div className="mb-1 text-caption font-semibold text-muted">{t.supportingLinks}</div>
                               <div className="space-y-1.5">{supporting.map((d) => recommendedRow(d))}</div>
                             </>
                           )}
@@ -614,24 +651,26 @@ export default function TopicPlanDrawer({
 
                 {/* Reviewable — manual-override candidates */}
                 {reviewable.length > 0 && (
-                  <details className="mt-3" open={dry.selected.length === 0}>
-                    <summary className="cursor-pointer select-none text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</summary>
-                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableNote}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableSelectNote}</p>
+                  <details className="group mt-4" open={dry.selected.length === 0}>
+                    <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                      {t.reviewableTitle} ({reviewable.length})
+                      <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                    </summary>
+                    <p className="mt-1 max-w-prose text-caption text-muted">{t.reviewableNote} {t.reviewableSelectNote}</p>
                     <div className="mt-1.5 space-y-1.5">
                       {reviewable.map((d, i) => {
                         const k = dmkey(d)
                         return (
-                          <label key={`${d.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
-                            <input type="checkbox" checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })} className="mt-0.5 accent-indigo-600" />
+                          <label key={`${d.targetUrl}-rv-${i}`} className="flex cursor-pointer items-start gap-2.5 rounded-inset border border-line px-3 py-2.5 text-caption">
+                            <span className="flex h-5 items-center"><Checkbox checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })} /></span>
                             <span className="flex-1 min-w-0">
                               <span className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{d.anchorText || '—'}</span>
+                                <span className="font-medium text-ink break-words">{d.anchorText || '—'}</span>
                                 <Badge variant="neutral">{t.manualBadge}</Badge>
-                                <span className="text-amber-700 dark:text-amber-400">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
-                                <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+                                <span className="text-muted">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
+                                <span className="text-muted tabular-nums">{t.confidence} {d.confidence}</span>
                               </span>
-                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={d.targetUrl} className="block max-w-64 truncate text-muted hover:text-action hover:underline">{d.targetTitle || d.targetUrl}</a>
                             </span>
                           </label>
                         )
@@ -643,13 +682,16 @@ export default function TopicPlanDrawer({
                 {/* Phase 3G.7 — honest empty state: no manual alternatives passed
                     the quality filter (instead of looking broken/empty). */}
                 {reviewable.length === 0 && dry.selected.length > 0 && (
-                  <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t.noManualOptions}</p>
+                  <p className="mt-2 text-caption text-muted">{t.noManualOptions}</p>
                 )}
 
                 {/* Blocked — advanced diagnostics, not selectable */}
                 {blocked.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.blockedTitle} ({blocked.length})</summary>
+                  <details className="group mt-3">
+                    <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                      {t.blockedTitle} ({blocked.length})
+                      <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                    </summary>
                     <div className="mt-1.5 space-y-1.5 opacity-70">{blocked.slice(0, 30).map((d) => dryItemRow(d, true))}</div>
                   </details>
                 )}
@@ -659,9 +701,12 @@ export default function TopicPlanDrawer({
 
             {/* Advanced diagnostics */}
             {(saved?.exists || dry) && (
-              <details className="mt-3">
-                <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.techDetails}</summary>
-                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+              <details className="group mt-4">
+                <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                  {t.techDetails}
+                  <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                </summary>
+                <div className="mt-2 space-y-0.5 rounded-inset bg-sunk/60 p-4 text-caption text-muted">
                   {saved?.batch && <div>{t.savedStatus}: {statusHe(saved.batch.status)} · {saved.batch.linkCount} · cache: {saved.batch.cacheState ?? '—'}</div>}
                   {saved?.staleReasons?.length ? <div>stale: {saved.staleReasons.join(', ')}</div> : null}
                   {dry && <div>dry-run cache: {dry.cacheState}{dry.warnings.length ? ` · ${dry.warnings.join(', ')}` : ''}</div>}
@@ -671,6 +716,61 @@ export default function TopicPlanDrawer({
           </>
         )}
       </div>
-    </Modal>
+    </PlanSheet>
+  )
+}
+
+/**
+ * The side sheet: a native modal dialog (focus stays inside, Escape closes, the page
+ * behind is inert) drawn from the inline end at full height, with a sticky footer for
+ * the queue actions. Same shape as the AI result sheet.
+ */
+function PlanSheet({ open, onClose, dir, overline, title, subtitle, closeLabel, footer, children }: {
+  open: boolean
+  onClose: () => void
+  dir: 'rtl' | 'ltr'
+  overline: string
+  title: string
+  subtitle: string | null
+  closeLabel: string
+  footer: ReactNode
+  children: ReactNode
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const d = ref.current
+    if (!d) return
+    if (open && !d.open) d.showModal()
+    if (!open && d.open) d.close()
+  }, [open])
+  return (
+    <dialog
+      ref={ref}
+      dir={dir}
+      aria-labelledby="topic-plan-sheet-title"
+      data-topic-plan-sheet=""
+      onCancel={(e) => { e.preventDefault(); onClose() }}
+      // A click on the scrim lands on the dialog element itself.
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className="fixed inset-y-0 end-0 start-auto m-0 h-dvh max-h-dvh w-full max-w-xl border-0 border-s border-line bg-surface p-0 text-body shadow-pop backdrop:bg-scrim open:flex open:flex-col motion-safe:open:animate-pop-in"
+    >
+      <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+        <div className="min-w-0">
+          <p className="text-overline font-semibold uppercase tracking-wide text-muted">{overline}</p>
+          <h2 id="topic-plan-sheet-title" className="mt-1 text-section font-semibold text-ink [overflow-wrap:anywhere]">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-caption text-muted">{subtitle}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={closeLabel}
+          className="grid size-9 shrink-0 place-items-center rounded-control text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+        >
+          <X aria-hidden="true" className="size-5" />
+        </button>
+      </header>
+      <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+      <footer className="flex flex-wrap items-center gap-2 border-t border-line bg-surface px-5 py-4 sm:px-6">{footer}</footer>
+    </dialog>
   )
 }

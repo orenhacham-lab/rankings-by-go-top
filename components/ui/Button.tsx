@@ -1,10 +1,52 @@
 import { cn } from '@/lib/utils'
 import { ButtonHTMLAttributes, forwardRef } from 'react'
 
+/**
+ * The button, in the app's two action colours and nothing else.
+ *
+ * It used to be a gradient with a coloured glow and a hover lift, which made
+ * every button on a screen compete with every other one. A filled button now
+ * means one of exactly two things:
+ *   `primary` — an ordinary action: save, generate, connect, publish.
+ *   `commit`  — an action that costs money or cannot be taken back: upgrade, buy.
+ * Everything else is quiet: `secondary` and `outline` are bordered surfaces,
+ * `ghost` is text. `danger` stays filled because a destructive confirm has to
+ * read as destructive, and it is never the page's own call to action.
+ *
+ * The feel is in the details, not in decoration: a hairline top highlight on the
+ * filled variants, a one-pixel drop on the bordered ones, a 2% press, and a focus
+ * ring that shows for the keyboard and never for the mouse.
+ */
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline'
+  variant?: 'primary' | 'commit' | 'secondary' | 'danger' | 'ghost' | 'outline'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
+}
+
+/**
+ * The button's classes, for a control that must be another element — a Next
+ * <Link> that should look like a button (the 404 and error pages' way home).
+ */
+export function buttonClasses({ variant = 'primary', size = 'md', className }: { variant?: ButtonProps['variant']; size?: ButtonProps['size']; className?: string } = {}) {
+  return cn(
+    'inline-flex select-none items-center justify-center gap-2 font-semibold rounded-control',
+    'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-snappy active:scale-[0.98]',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+    {
+      'bg-action text-action-ink hover:bg-action-hover shadow-control': variant === 'primary',
+      'bg-commit text-commit-ink hover:bg-commit-hover shadow-control': variant === 'commit',
+      'bg-surface text-ink border border-line shadow-control hover:border-line-strong hover:bg-sunk/60': variant === 'secondary' || variant === 'outline',
+      'bg-bad text-bad-ink hover:opacity-90 shadow-control': variant === 'danger',
+      'text-body hover:bg-sunk hover:text-ink': variant === 'ghost',
+    },
+    {
+      'text-caption px-3 h-8': size === 'sm',
+      'text-copy px-4 h-10': size === 'md',
+      'text-lead px-5 h-11': size === 'lg',
+    },
+    className
+  )
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -13,26 +55,12 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={cn(
-          'inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed',
-          {
-            'bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-600 dark:to-indigo-600 text-white hover:shadow-[0_12px_28px_rgba(79,70,229,0.25)] active:from-blue-700 active:to-indigo-700 shadow-[0_10px_24px_rgba(79,70,229,0.22)] hover:-translate-y-0.5': variant === 'primary',
-            'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:bg-slate-100 dark:active:bg-slate-600 shadow-sm hover:shadow-md': variant === 'secondary',
-            'bg-red-600 dark:bg-red-600 text-white hover:bg-red-700 dark:hover:bg-red-700 active:bg-red-800 dark:active:bg-red-900 shadow-[0_8px_20px_rgba(220,38,38,0.2)] hover:shadow-[0_12px_28px_rgba(220,38,38,0.3)] hover:-translate-y-0.5': variant === 'danger',
-            'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:bg-slate-200 dark:active:bg-slate-700': variant === 'ghost',
-            'border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-800 hover:shadow-sm dark:hover:shadow-sm hover:border-slate-300/80 dark:hover:border-slate-600': variant === 'outline',
-          },
-          {
-            'text-xs px-3 py-1.5 h-7': size === 'sm',
-            'text-sm px-4 py-2 h-9': size === 'md',
-            'text-base px-5 py-2.5 h-11': size === 'lg',
-          },
-          className
-        )}
+        aria-busy={loading || undefined}
+        className={buttonClasses({ variant, size, className })}
         {...props}
       >
         {loading && (
-          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          <span aria-hidden="true" className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
         )}
         {children}
       </button>

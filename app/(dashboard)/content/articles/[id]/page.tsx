@@ -7,27 +7,40 @@
  */
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Textarea from '@/components/ui/Textarea'
+import EmptyState from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import Badge from '@/components/ui/Badge'
+import BackLink from '@/components/ui/BackLink'
+import Notice from '@/components/ui/Notice'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
+import ArticleReadView from '@/components/content/ArticleReadView'
 import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
-import ArticleEditorPublishGate from '@/components/content/ArticleEditorPublishGate'
+import ArticleEditorPublishGate, { usePublishPlatform } from '@/components/content/ArticleEditorPublishGate'
+import ArticleTopBar, { type ArticleViewerTab } from '@/components/content/ArticleTopBar'
+import ArticleSchemaPanel from '@/components/content/ArticleSchemaPanel'
+import ArticleAiVisibilityCard, { CitedBadge, type ArticleVisibilityData } from '@/components/content/ArticleAiVisibilityCard'
+import { articleHtmlForCopy, browserClipboardEnv, copyHtml, featuredImageFileName } from '@/lib/content/article-export'
+import { injectInlineImages } from '@/lib/content/inline-images-compose'
+import type { StructuredDataInput } from '@/lib/content/structured-data'
 import ShopifyPublishSettings from '@/components/content/ShopifyPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
+import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
+import { autoLinksShown, hasAutoLinks } from '@/lib/content/auto-internal-links/entries'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { AlertTriangle } from 'lucide-react'
+import { AlertCircle, Check, FileQuestion, TriangleAlert } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
 type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
@@ -43,6 +56,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const auditLabel = (code: string) => (e.auditCodes as Record<string, string>)[code] || code
   const toast = useToasts()
   const router = useRouter()
+  // Every question this page asks goes through the app's own dialog, never the browser's.
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const cf = c.confirms
 
   const enabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 
@@ -72,6 +88,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpPostUrl, setWpPostUrl] = useState<string | null>(null)
   const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
   const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
+  /** The article is a live post on the WordPress site (not a draft there). */
+  const wpLive = !!wpPostId && wpStatus === 'publish'
   // Phase 4D — current inline-image rows (emitted by the panel) so the body
   // preview composes figures without mutating stored content_html.
   const [inlineImages, setInlineImages] = useState<ComposableInlineImage[]>([])
@@ -92,6 +110,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   // insert its link. Planning/selection happens pre-generation in the brief.
   const [addedLinks, setAddedLinks] = useState<Set<string>>(new Set())
   const [plannedLinks, setPlannedLinks] = useState<PlannedInternalLink[]>([])
+  // Wave 8 — the links the automatic step added at generation (internal_links_json,
+  // source 'auto'). An article that has them does not need the older planned-link
+  // panels below: those stay for older articles only.
+  const [linksJson, setLinksJson] = useState<unknown>(null)
+  const autoLinked = hasAutoLinks(linksJson)
 
   // Phase 2E.3 apply-panel SESSION state, lifted here so a successful apply's
   // outcome + session rollback survive the contentHtml resync re-render (the
@@ -103,6 +126,20 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   // Session-only preview summary (from the last manual preview) — powers the
   // client-side "mark ready" guard. Never fetched automatically.
   const [ilpPreviewSummary, setIlpPreviewSummary] = useState<{ hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number } | null>(null)
+
+  // C1 / C3 / C9 — the top bar's tab, copy/download state, and the article's
+  // publication facts (live URL, dates, stored AI citations, suggested question).
+  const [tab, setTab] = useState<ArticleViewerTab>('article')
+  // The article opens as the reader sees it; the edit form is one click away
+  // and stays mounted (hidden) so its panels and unsaved edits survive.
+  const [editing, setEditing] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [visibility, setVisibility] = useState<(ArticleVisibilityData & {
+    schema: { publisherName: string | null; publisherUrl: string | null; language: 'he' | 'en'; sameAs?: string[] }
+    dates: { published: string | null; modified: string | null }
+  }) | null>(null)
+  const detected = usePublishPlatform(projectId, !!projectId)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -119,6 +156,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setMetaDescription(a.meta_description ?? '')
       setExcerpt(a.excerpt ?? '')
       setContentHtml(a.content_html ?? '')
+      setLinksJson(Array.isArray(a.auto_internal_links) ? a.auto_internal_links : null)
       setImagePrompt(a.image_prompt ?? '')
       setFaq(Array.isArray(a.faq_json) ? a.faq_json : [])
       setStatus(a.status === 'ready' ? 'ready' : 'draft')
@@ -152,6 +190,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }, [id])
 
   useEffect(() => { if (enabled) load() }, [enabled, load])
+
+  const loadVisibility = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/content/articles/${id}/visibility`)
+      if (res.ok) setVisibility(await res.json())
+    } catch { /* optional: the viewer works without it */ }
+  }, [id])
+  useEffect(() => { if (enabled && !loading && !notFound) void loadVisibility() }, [enabled, loading, notFound, loadVisibility])
 
   // Phase 2E.3: after a successful internal-link apply/rollback the server has
   // already written content_html/internal_links_json. Re-sync ONLY content_html
@@ -204,8 +250,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     // Client-side guard only (does NOT change ready/publish backend behavior):
     // if the last manual preview this session found approved links not yet
     // applied, confirm before marking ready. Never triggers a fetch.
-    if (nextStatus === 'ready' && linkPlanningOn && ilpPreviewSummary && ilpPreviewSummary.wouldInsert > 0) {
-      if (!window.confirm(c.editor.linkApply.readyHasUnappliedConfirm)) return
+    if (nextStatus === 'ready' && linkPlanningOn && !autoLinked && ilpPreviewSummary && ilpPreviewSummary.wouldInsert > 0) {
+      if (!(await confirm({ title: cf.readyTitle, body: c.editor.linkApply.readyHasUnappliedConfirm, confirmLabel: e.markReady }))) return
     }
     setSaving(true)
     setMessage(null)
@@ -222,7 +268,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         return
       }
       if (!res.ok) {
-        setMessage({ text: data.error || e.saveError, ok: false })
+        // Never the server's own error text: our sentence (design contract §8).
+        setMessage({ text: e.saveError, ok: false })
         return
       }
       if (data.article?.status) setStatus(data.article.status === 'ready' ? 'ready' : 'draft')
@@ -240,7 +287,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   async function deleteArticle() {
-    if (!window.confirm(c.confirmDeleteArticle)) return
+    if (!(await confirm({ title: cf.deleteArticleTitle, body: c.confirmDeleteArticle, confirmLabel: cf.deleteAction, tone: 'danger' }))) return
     try {
       const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
       if (res.ok) { window.location.href = backHref; return }
@@ -272,7 +319,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   async function removeImage() {
-    if (!window.confirm(e.imageRemoveConfirm)) return
+    if (!(await confirm({ title: e.imageRemoveConfirm, confirmLabel: cf.deleteAction, tone: 'danger' }))) return
     setImageBusy(true)
     setMessage(null)
     try {
@@ -288,8 +335,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
   async function exportWordPress(status: 'draft' | 'publish') {
     if (wpBusy) return // one export at a time
-    // Publishing goes live → confirm. Draft needs no dangerous confirmation.
-    if (status === 'publish' && !window.confirm(e.wpPublishConfirm)) return
+    // A live post: "publish" updates it in place and keeps it live; "draft" would take it OFF the
+    // site, so it is never a quiet click (the card offers no draft button for a live post at all).
+    const wasLive = wpLive
+    if (wasLive && status === 'draft') {
+      if (!(await confirm({ title: e.wpUnpublishTitle, body: e.wpUnpublishConfirm, confirmLabel: e.wpUnpublishAction, tone: 'danger' }))) return
+    } else if (wasLive) {
+      if (!(await confirm({ title: e.wpUpdateLiveTitle, body: e.wpUpdateLiveConfirm, confirmLabel: e.wpUpdateLiveAction }))) return
+    } else if (status === 'publish' && !(await confirm({ title: cf.publishTitle, body: e.wpPublishConfirm, confirmLabel: cf.publishAction }))) return
     // Phase 4E — once exported, a re-export UPDATES the same post in place
     // (idempotent: no duplicate post/taxonomy). A brand-new separate post is no
     // longer the default; the existing post is reconciled by wp_post_id.
@@ -300,7 +353,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}) }),
+        body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}), ...(wasLive && status === 'draft' ? { unpublish: true } : {}) }),
       })
       // F — read content-type + parse the JSON body EVEN on a non-ok response, so a
       // typed { error, message, diagnosticId } is surfaced instead of a generic 500.
@@ -323,7 +376,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           invalidCategoryIds: data.taxonomy?.invalidCategoryIds,
           invalidTagIds: data.taxonomy?.invalidTagIds,
         })
-        let base: string = status === 'publish' ? e.wpPublished : e.wpExported
+        let base: string = wasLive && status === 'publish' ? e.wpUpdated : status === 'publish' ? e.wpPublished : e.wpExported
         if (data.imageWarning) base = `${base} · ${e.wpImageWarn}`
         if (data.taxonomyWarning) base = `${base} · ${e.wpTax.taxonomyWarning}`
         if (data.seoStatus && data.seoStatus !== 'verified') base = `${base} · ${e.wpTax.seoMetaWarn}`
@@ -331,8 +384,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         if (status === 'publish' && data.keywordAdded) base = `${base} · ${e.wpKeywordAdded}`
         setMessage({ text: base, ok: true })
         toast.success(base)
-        // Publish returns to the hub; draft keeps the user here to review/open.
-        if (status === 'publish') setTimeout(() => router.push(backHref), 900)
+        // A first publish returns to the hub; a draft or an update of the live post keeps the user here.
+        if (status === 'publish' && !wasLive) setTimeout(() => router.push(backHref), 900)
         return
       }
       if (res.status === 409 && data.reason === 'already_exported') {
@@ -357,112 +410,269 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // ---- C1: copy the article / download the featured image -----------------
+  async function copyArticle() {
+    setCopying(true)
+    try {
+      const html = articleHtmlForCopy(title, injectInlineImages(contentHtml, inlineImages, 'preview'))
+      const how = await copyHtml(html, browserClipboardEnv())
+      if (how === 'none') { setMessage({ text: e.topBar.copyFailed, ok: false }); return }
+      toast.success(e.topBar.copied)
+    } finally {
+      setCopying(false)
+    }
+  }
+
+  async function downloadImage() {
+    if (!featuredImageUrl) return
+    setDownloading(true)
+    try {
+      const res = await fetch(featuredImageUrl)
+      if (!res.ok) throw new Error('image')
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = featuredImageFileName(slug, blob.type)
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(href), 1000)
+    } catch {
+      // A storage host that refuses a cross-origin read: open the image instead.
+      window.open(featuredImageUrl, '_blank', 'noopener,noreferrer')
+      setMessage({ text: e.topBar.downloadFailed, ok: false })
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  // The top bar's "publish": the platform's own panel owns the choices (blog,
+  // draft or live, confirmation), so the bar takes the owner there.
+  function goToPublish() {
+    setTab('article')
+    requestAnimationFrame(() => {
+      const el = document.getElementById('publish')
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.focus({ preventScroll: true })
+    })
+  }
+
   if (!enabled) {
-    return <div className="py-20 text-center text-slate-400 text-sm">Not available.</div>
+    return <div className="py-20 text-center text-muted text-copy">{getDashboardDictionary(language).common.notAvailable}</div>
   }
   if (loading) {
-    return <div className="py-20 text-center text-slate-400 text-sm">{e.loading}</div>
-  }
-  if (notFound) {
     return (
-      <div className="py-20 text-center text-slate-500">
-        <p className="mb-4">{e.notFound}</p>
-        <Link href={backHref}><Button variant="outline">{e.back}</Button></Link>
+      <div role="status" aria-busy="true" className="space-y-4">
+        <span className="sr-only">{e.loading}</span>
+        <Skeleton className="h-16 rounded-card" />
+        <Skeleton className="h-44 rounded-card" />
+        <Skeleton className="h-72 rounded-card" />
       </div>
     )
   }
+  if (notFound) {
+    return (
+      <Card padding={false}>
+        <EmptyState icon={<FileQuestion />} title={e.notFound} action={<BackLink href={backHref}>{e.back}</BackLink>} />
+      </Card>
+    )
+  }
 
-  const inputCls =
-    'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+  const publishedUrl = visibility?.publishedUrl ?? (isPublished ? (shopifyArticleUrl || wpPostUrl) : null)
+  const schemaInput: StructuredDataInput = {
+    headline: title,
+    description: metaDescription || excerpt,
+    imageUrl: featuredImageUrl,
+    datePublished: visibility?.dates.published ?? null,
+    dateModified: visibility?.dates.modified ?? null,
+    url: publishedUrl,
+    language: visibility?.schema.language ?? language,
+    publisher: visibility ? { name: visibility.schema.publisherName, url: visibility.schema.publisherUrl, sameAs: visibility.schema.sameAs ?? [] } : null,
+    faq,
+  }
+
+  /** The AI visibility card (a published article with visibility data). */
+  const aiCard = isPublished && visibility ? (
+    <div className={editing ? 'mb-4' : ''}>
+      <ArticleAiVisibilityCard
+        t={e.aiVisibility}
+        language={language}
+        projectId={projectId}
+        data={visibility}
+        onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+        onTracked={() => void loadVisibility()}
+      />
+    </div>
+  ) : null
+
+  /** The quality checks: on top while editing, beside the article (side panel) while reading. */
+  const renderAudit = (side: boolean) => audit && (
+    <Card className={side ? '' : 'mb-4'} data-audit-card={side ? 'side' : 'top'}>
+      <div className={`${side ? 'mb-2' : 'mb-4'} flex items-center justify-between gap-3`}>
+        <h3 className="text-section font-semibold text-ink">{e.auditTitle}</h3>
+        <div className={`inline-flex items-baseline gap-1 rounded-pill px-3 py-1 ${audit.score >= 80 ? 'bg-ok-soft text-ok' : audit.score >= 55 || isPublished ? 'bg-warn-soft text-warn' : 'bg-bad-soft text-bad'}`}>
+          <span className="text-section font-semibold tabular-nums">{audit.score}</span>
+          <span className="text-caption">/ 100</span>
+        </div>
+      </div>
+
+      {/* The article's anatomy as one compact definition list (final review R23):
+          seven grey tiles made a count of lists look as weighty as the score. */}
+      {/* In the side panel the score explains itself first: it measures structure, not the writing. */}
+      {side && <p className="mb-3 text-caption text-muted text-pretty" data-audit-explain="">{e.auditExplain}</p>}
+      <dl data-audit-counts="" className={`mb-4 grid grid-cols-2 gap-x-6 border-y border-line py-3 ${side ? '' : 'sm:grid-cols-4 lg:grid-cols-7'}`}>
+        {[
+          { l: e.auditWords, v: audit.counts.words },
+          { l: e.auditH2, v: audit.counts.h2 },
+          { l: e.auditH3, v: audit.counts.h3 },
+          { l: e.auditParagraphs, v: audit.counts.p },
+          { l: e.auditFaq, v: audit.counts.faq },
+          { l: e.auditTables, v: audit.counts.tables },
+          { l: e.auditLists, v: audit.counts.lists },
+        ].map((c) => (
+          <div key={c.l} className={`flex items-baseline justify-between gap-3 py-1.5 ${side ? '' : 'lg:flex-col lg:items-start lg:gap-0.5'}`}>
+            <dt className="text-caption text-muted">{c.l}</dt>
+            <dd className="text-copy font-semibold tabular-nums text-ink">{c.v.toLocaleString(language)}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <p className={`mb-3 inline-flex items-center gap-1.5 text-caption ${audit.tocReady ? 'text-ok' : 'text-muted'}`}>
+        {audit.tocReady && <Check aria-hidden="true" className="size-4 shrink-0" />}
+        {audit.tocReady ? e.tocReady : e.tocNotReady}
+      </p>
+
+      {audit.anchorQuality && audit.anchorQuality.count > 0 && (() => {
+        const aq = audit.anchorQuality
+        const isBlock = aq.anchorTooEarly || aq.mechanicalAnchorPhrase
+        const isWarn = aq.anchorsTooClose || aq.anchorsInSameParagraph
+        const msg = aq.anchorTooEarly ? e.anchorEarly : aq.mechanicalAnchorPhrase ? e.anchorMechanical : isWarn ? e.anchorTooCloseMsg : e.anchorQualityOk
+        const cls = isBlock && !isPublished ? 'text-bad' : isBlock || isWarn ? 'text-warn' : 'text-ok'
+        return (
+          <div className="mb-3 text-caption">
+            <span className={cls}>{`${e.anchorQualityLabel}: ${msg}`}</span>
+            {aq.firstAnchorWordIndex >= 0 && (
+              <span className="text-muted"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
+            )}
+          </div>
+        )
+      })()}
+
+      {audit.blockers.length > 0 && (
+        // On a published article nothing is blocked any more: the same items
+        // read as advice, in the warning tone, not as a red "must fix".
+        <AuditList
+          tone={isPublished ? 'warn' : 'bad'}
+          title={isPublished ? e.auditBlockersPublished : e.auditBlockers}
+          items={audit.blockers.map((b) => auditLabel(b))}
+          moreLabel={getDashboardDictionary(language).uiKit.noticeMore}
+        />
+      )}
+      {audit.warnings.length > 0 && (
+        <AuditList tone="warn" title={e.auditWarnings} items={audit.warnings.map((w) => auditLabel(w))} moreLabel={getDashboardDictionary(language).uiKit.noticeMore} />
+      )}
+      {audit.blockers.length === 0 && audit.warnings.length === 0 && (
+        <Notice tone="ok">{e.auditAllGood}</Notice>
+      )}
+    </Card>
+  )
 
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <Link href={backHref} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{e.back}</Link>
-        <Badge variant={status === 'ready' ? 'success' : 'neutral'}>{status === 'ready' ? e.statusReady : e.statusDraft}</Badge>
-      </div>
-      <Header title={title || '—'} />
+      <ArticleTopBar
+        t={e.topBar}
+        title={title}
+        statusLabel={isPublished ? e.topBar.published : status === 'ready' ? e.statusReady : e.statusDraft}
+        statusTone={isPublished ? 'success' : status === 'ready' ? 'info' : 'neutral'}
+        backHref={backHref}
+        projectId={projectId}
+        detected={detected}
+        isPublished={isPublished}
+        publishedUrl={publishedUrl}
+        featuredImageUrl={featuredImageUrl}
+        citedBadge={visibility ? <CitedBadge t={e.aiVisibility} engines={visibility.citations.map((x) => x.engine)} /> : null}
+        onPublish={goToPublish}
+        onCopy={() => void copyArticle()}
+        copying={copying}
+        onDownloadImage={() => void downloadImage()}
+        downloading={downloading}
+        tab={tab}
+        onTabChange={setTab}
+        quiet={editing}
+      />
 
       {message && (
-        <div className={`mb-4 text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+        <Notice tone={message.ok ? 'ok' : 'bad'} className="mb-4" onDismiss={() => setMessage(null)}>
           {message.text}
-        </div>
+        </Notice>
       )}
 
-      {audit && (
-        <Card className="mb-4 hover:translate-y-0">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.auditTitle}</h3>
-            <div className="flex items-center gap-2">
-              <span className={`text-lg font-bold ${audit.score >= 80 ? 'text-green-600 dark:text-green-400' : audit.score >= 55 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{audit.score}</span>
-              <span className="text-xs text-slate-400">/ 100</span>
-            </div>
+      <div id="article-panel-schema" role="tabpanel" aria-labelledby="article-tab-schema" hidden={tab !== 'schema'} className="mb-6">
+        {tab === 'schema' && (
+          <ArticleSchemaPanel
+            t={e.schema}
+            failText={e.topBar.copyFailed}
+            input={schemaInput}
+            isWebhook={detected.platform === 'webhook'}
+            onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+          />
+        )}
+      </div>
+
+      <div id="article-panel-article" role="tabpanel" aria-labelledby="article-tab-article" hidden={tab !== 'article'}>
+      {/* Editing: the checks sit on top, as the list of what to fix while writing. */}
+      {editing && aiCard}
+      {editing && audit && renderAudit(false)}
+
+      {!editing ? (
+        // Reading: the article comes first. The quality checks and the AI card sit beside it on a
+        // wide screen and under it on a phone, where the score explains what it measures, so a low
+        // number is not read as "the article is bad" before the article itself was seen.
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6" data-article-layout="read">
+          <div className="min-w-0">
+            <ArticleReadView
+              t={e.readView}
+              faqTitle={e.faqTitle}
+              title={title}
+              metaTitle={metaTitle}
+              metaDescription={metaDescription}
+              slug={slug}
+              publishedUrl={publishedUrl}
+              featuredImageUrl={featuredImageUrl}
+              html={contentHtml}
+              images={inlineImages}
+              faq={faq}
+              dir={isHebrew ? 'rtl' : 'ltr'}
+              onEdit={() => setEditing(true)}
+              projectId={projectId}
+            />
           </div>
-
-          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 mb-3 text-center">
-            {[
-              { l: e.auditWords, v: audit.counts.words },
-              { l: 'H2', v: audit.counts.h2 },
-              { l: 'H3', v: audit.counts.h3 },
-              { l: e.auditParagraphs, v: audit.counts.p },
-              { l: 'FAQ', v: audit.counts.faq },
-              { l: e.auditTables, v: audit.counts.tables },
-              { l: e.auditLists, v: audit.counts.lists },
-            ].map((c) => (
-              <div key={c.l} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-2">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400">{c.l}</div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{c.v}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mb-3 text-xs">
-            <span className={audit.tocReady ? 'text-green-700 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}>
-              {audit.tocReady ? `✓ ${e.tocReady}` : e.tocNotReady}
-            </span>
-          </div>
-
-          {audit.anchorQuality && audit.anchorQuality.count > 0 && (() => {
-            const aq = audit.anchorQuality
-            const isBlock = aq.anchorTooEarly || aq.mechanicalAnchorPhrase
-            const isWarn = aq.anchorsTooClose || aq.anchorsInSameParagraph
-            const msg = aq.anchorTooEarly ? e.anchorEarly : aq.mechanicalAnchorPhrase ? e.anchorMechanical : isWarn ? e.anchorTooCloseMsg : e.anchorQualityOk
-            const cls = isBlock ? 'text-red-700 dark:text-red-400' : isWarn ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'
-            return (
-              <div className="mb-3 text-xs">
-                <span className={cls}>{`${e.anchorQualityLabel}: ${msg}`}</span>
-                {aq.firstAnchorWordIndex >= 0 && (
-                  <span className="text-slate-400 dark:text-slate-500"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
-                )}
-              </div>
-            )
-          })()}
-
-          {audit.blockers.length > 0 && (
-            <div className="mb-2">
-              <div className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400 mb-1">
-                <AlertTriangle size={14} /> {e.auditBlockers}
-              </div>
-              <ul className="text-xs text-red-600 dark:text-red-400 list-disc ps-5 space-y-0.5">
-                {audit.blockers.map((b) => <li key={b}>{auditLabel(b)}</li>)}
-              </ul>
-            </div>
+          {(audit || aiCard || autoLinksShown(linksJson, contentHtml).length > 0) && (
+            <aside aria-label={e.sidePanelLabel} className="mb-4 space-y-4 lg:sticky lg:top-24" data-article-side="">
+              {audit && renderAudit(true)}
+              <ArticleAutoLinksCard
+                t={e.autoLinks}
+                articleId={id}
+                linksJson={linksJson}
+                html={contentHtml}
+                isPublished={isPublished}
+                onRemoved={(next) => { setContentHtml(next.html); setLinksJson(next.linksJson) }}
+                onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
+              />
+              {aiCard}
+            </aside>
           )}
-          {audit.warnings.length > 0 && (
-            <div>
-              <div className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-1">{e.auditWarnings}</div>
-              <ul className="text-xs text-amber-600 dark:text-amber-400 list-disc ps-5 space-y-0.5">
-                {audit.warnings.map((w) => <li key={w}>{auditLabel(w)}</li>)}
-              </ul>
-            </div>
-          )}
-          {audit.blockers.length === 0 && audit.warnings.length === 0 && (
-            <div className="text-sm text-green-700 dark:text-green-400">{e.auditAllGood}</div>
-          )}
-        </Card>
+        </div>
+      ) : (
+        <Notice tone="info" className="mb-4" action={{ label: e.readView.done, onClick: () => setEditing(false) }}>
+          {e.readView.editingNote}
+        </Notice>
       )}
 
       <div className="space-y-4">
+        <div hidden={!editing} className="space-y-4">
         <Card>
           <div className="space-y-3">
             <Input label={e.title} value={title} onChange={(ev) => setTitle(ev.target.value)} />
@@ -470,66 +680,59 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <div>
               <Input label={e.metaTitle} value={metaTitle} onChange={(ev) => setMetaTitle(ev.target.value)} hint={`${metaTitle.length}/60 · ${e.metaTitleHint}`} />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{e.metaDescription}</label>
-              <textarea value={metaDescription} onChange={(ev) => setMetaDescription(ev.target.value)} rows={2} className={inputCls} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">{metaDescription.length}/155 · {e.metaDescriptionHint}</p>
+            <div className="flex flex-col gap-1.5">
+              <Textarea id="article-meta-description" label={e.metaDescription} value={metaDescription} onChange={(ev) => setMetaDescription(ev.target.value)} rows={2} />
+              <p className="text-caption text-muted">{metaDescription.length}/155 · {e.metaDescriptionHint}</p>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{e.excerpt}</label>
-              <textarea value={excerpt} onChange={(ev) => setExcerpt(ev.target.value)} rows={2} className={inputCls} />
-            </div>
+            <Textarea id="article-excerpt" label={e.excerpt} value={excerpt} onChange={(ev) => setExcerpt(ev.target.value)} rows={2} />
           </div>
         </Card>
 
         <Card>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{e.content}</label>
+          <h3 className="mb-3 text-section font-semibold text-ink">{e.content}</h3>
           <ArticleContentEditor value={contentHtml} onChange={setContentHtml} dir={isHebrew ? 'rtl' : 'ltr'} />
         </Card>
 
         <Card>
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.faqTitle}</h3>
-            <Button size="sm" variant="outline" onClick={() => setFaq((p) => [...p, { question: '', answer: '' }])}>{e.addFaq}</Button>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <h3 className="text-section font-semibold text-ink">{e.faqTitle}</h3>
+            <Button size="sm" variant="secondary" onClick={() => setFaq((p) => [...p, { question: '', answer: '' }])}>{e.addFaq}</Button>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{e.faqSchemaReadyHint}</p>
-          <div className="space-y-3">
+          <p className="text-caption text-muted mb-3">{e.faqSchemaReadyHint}</p>
+          <div className="list-enter space-y-3">
             {faq.map((f, i) => (
-              <div key={i} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+              <div key={i} className="space-y-3 rounded-inset border border-line bg-sunk/40 p-4">
                 <Input label={e.faqQuestion} value={f.question} onChange={(ev) => setFaq((p) => p.map((x, idx) => idx === i ? { ...x, question: ev.target.value } : x))} />
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{e.faqAnswer}</label>
-                  <textarea value={f.answer} onChange={(ev) => setFaq((p) => p.map((x, idx) => idx === i ? { ...x, answer: ev.target.value } : x))} rows={2} className={inputCls} />
-                </div>
-                <button type="button" onClick={() => setFaq((p) => p.filter((_, idx) => idx !== i))} className="text-xs text-red-600 dark:text-red-400 hover:underline">{e.removeFaq}</button>
+                <Textarea id={`article-faq-answer-${i}`} label={e.faqAnswer} value={f.answer} onChange={(ev) => setFaq((p) => p.map((x, idx) => idx === i ? { ...x, answer: ev.target.value } : x))} rows={2} />
+                <Button type="button" size="sm" variant="ghost" onClick={() => setFaq((p) => p.filter((_, idx) => idx !== i))} className="text-bad hover:bg-bad-soft hover:text-bad">{e.removeFaq}</Button>
               </div>
             ))}
           </div>
         </Card>
 
-        <Card className="hover:translate-y-0">
+        <Card>
           <Input label={e.imagePrompt} value={imagePrompt} onChange={(ev) => setImagePrompt(ev.target.value)} hint={e.imagePromptHint} />
         </Card>
 
         {/* Featured image — generate/regenerate/remove. */}
-        <Card className="hover:translate-y-0">
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.imageTitle}</h3>
+        <Card>
+          <h3 className="text-section font-semibold text-ink mb-2">{e.imageTitle}</h3>
           {featuredImageUrl ? (
             <div className="space-y-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={featuredImageUrl} alt={title} className="w-full max-h-72 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+              <img src={featuredImageUrl} alt={title} className="w-full max-h-72 object-cover rounded-control border border-line" />
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageRegenerate}</Button>
-                <Button size="sm" variant="ghost" onClick={removeImage} disabled={imageBusy} className="text-red-600 dark:text-red-400">{e.imageRemove}</Button>
+                <Button size="sm" variant="secondary" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageRegenerate}</Button>
+                <Button size="sm" variant="ghost" onClick={removeImage} disabled={imageBusy} className="text-bad">{e.imageRemove}</Button>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{e.imageHint}</p>
-              <Button size="sm" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
+              <p className="text-caption text-muted">{e.imageHint}</p>
+              <Button size="sm" variant="secondary" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
             </div>
           )}
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{e.imageSafetyNote}</p>
+          <p className="text-caption text-muted mt-2">{e.imageSafetyNote}</p>
         </Card>
 
         {/* Phase 4D — inline article images (in-body <figure>s, separate from the
@@ -546,7 +749,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         {/* Read-only body preview with inline figures composed in (content_html
             itself stays image-free). Refreshes on any image add/edit/move/etc. */}
         {inlineImages.length > 0 && (
-          <Card className="hover:translate-y-0">
+          <Card>
             <ArticleBodyPreview
               html={contentHtml}
               images={inlineImages}
@@ -557,12 +760,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           </Card>
         )}
 
+        </div>
+
         {/* Phase 4F.1 — platform gate: WordPress publishing controls render only
             for a WordPress project. A Shopify project sees an info card; neither
             → connect prompt; both → conflict. Detection uses the project's
             connection state (never the WordPress post id). */}
+        <section id="publish" tabIndex={-1} aria-label={e.topBar.publish} className="scroll-mt-40 rounded-card focus:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
         <ArticleEditorPublishGate
           projectId={projectId}
+          articleId={id}
+          detected={detected}
           shopifyPanel={projectId && (
             <ShopifyPublishSettings
               projectId={projectId}
@@ -591,20 +799,32 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* WordPress export — draft (safe) or publish now (confirmed). */}
-          <Card className="hover:translate-y-0">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.wpTitle}</h3>
-            {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNoImageWarn}</p>}
+          <Card>
+            <h3 className="text-section font-semibold text-ink mb-2">{e.wpTitle}</h3>
+            {!featuredImageUrl && <Notice tone="warn" className="mb-3">{e.wpNoImageWarn}</Notice>}
+            {wpLive && <p className="mb-3 text-caption text-muted" data-wp-live-note="">{e.wpLiveNote}</p>}
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
-                {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
-                {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
-              </Button>
+              {/* Bordered: the top bar's publish call is the page's one primary, and it leads here.
+                  A live post gets ONE action, "update the live post": sending a live post as a
+                  draft would take the page off the site. */}
+              {wpLive ? (
+                <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy} data-wp-update-live="">
+                  {wpBusy === 'publish' ? e.wpUpdatingLive : e.wpUpdateLive}
+                </Button>
+              ) : (
+                <>
+                  <Button size="sm" variant="secondary" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy} data-wp-send-draft="">
+                    {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy} data-wp-publish="">
+                    {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
+                  </Button>
+                </>
+              )}
               {wpPostId && wpPostUrl && (
-                <span className="inline-flex items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-2 text-copy">
                   <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>
-                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-action hover:underline">
                     {wpStatus === 'publish' ? e.wpOpenLive : e.wpOpenDraft}
                   </a>
                 </span>
@@ -612,15 +832,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </Card>
         </ArticleEditorPublishGate>
+        </section>
 
+        <div hidden={!editing} className="space-y-4">
         {/* Planned internal links — QA/insertion only. Hidden entirely when the
             article has no planned links (no ad-hoc suggestions here anymore). */}
-        {plannedLinks.length > 0 && (
-          <Card className="hover:translate-y-0">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.internal.planQaTitle}</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.planQaHint}</p>
+        {plannedLinks.length > 0 && !autoLinked && (
+          <Card>
+            <h3 className="text-section font-semibold text-ink">{e.internal.planQaTitle}</h3>
+            <p className="text-caption text-muted mb-2">{e.internal.planQaHint}</p>
             {isPublished && (
-              <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.internal.publishedNote}</p>
+              <Notice tone="warn" className="mb-3">{e.internal.publishedNote}</Notice>
             )}
             <div className="space-y-2">
               {plannedLinks.map((link) => {
@@ -628,24 +850,24 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                 const done = addedLinks.has(key)
                 const st = done ? 'linked' : plannedStatus(link)
                 return (
-                  <div key={key} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-1.5">
+                  <div key={key} className="space-y-1.5 rounded-inset border border-line p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="flex-1 min-w-[12rem]">
-                        <div className="text-sm text-slate-800 dark:text-slate-100">{link.targetTitle}</div>
-                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200 mt-1">
+                        <div className="text-copy text-ink">{link.targetTitle}</div>
+                        <span className="inline-flex items-center rounded-control bg-sunk px-2 py-0.5 text-caption text-body mt-1">
                           {e.internal.anchorLabel}: {link.anchorText}
                         </span>
-                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetUrl}</a>
+                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={link.targetUrl} className="mt-1 block max-w-64 truncate text-start text-caption text-muted hover:text-action hover:underline">{link.targetUrl}</a>
                       </div>
                       {st === 'linked' && <Badge variant="success">{e.internal.statusLinked}</Badge>}
                       {st === 'ready' && (
-                        <Button size="sm" variant="outline" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
+                        <Button size="sm" variant="secondary" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
                       )}
                       {st === 'missing' && (
                         <Button size="sm" variant="ghost" onClick={() => copyAnchor(link.anchorText)}>{e.internal.copy}</Button>
                       )}
                     </div>
-                    <p className={`text-[11px] ${st === 'missing' ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <p className={`text-caption ${st === 'missing' ? 'font-medium text-ink' : 'text-muted'}`}>
                       {st === 'ready' ? e.internal.statusReady : st === 'linked' ? e.internal.statusLinked : e.internal.statusMissing}
                     </p>
                   </div>
@@ -657,7 +879,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
         {/* Phase 2E.3 — automation/draft apply flow (distinct from the QA card
             above). Flag-gated, collapsed by default, draft-only, manual only. */}
-        {linkPlanningOn && projectId && (
+        {linkPlanningOn && projectId && !autoLinked && (
           <ArticleInternalLinkApplyPanel
             projectId={projectId}
             generatedArticleId={id}
@@ -676,32 +898,69 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           />
         )}
 
-        <div className="pb-8">
+
+        </div>
+
+        {/* The save bar stays in reach while the editor scrolls. */}
+        <div hidden={!editing} data-article-save-bar="" className="sticky bottom-4 z-10 rounded-card border border-line bg-surface/95 p-4 shadow-pop backdrop-blur-md">
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
             {/* Hidden once the article is published to WordPress — "ready" must not
                 downgrade a live published article. */}
             {!isPublished && (
-              <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
+              <Button variant="secondary" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
             )}
-            <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
+            <Button variant="ghost" onClick={deleteArticle} className="ms-auto text-bad hover:bg-bad-soft hover:text-bad">{c.deleteArticle}</Button>
           </div>
           {/* Client-side neutral hint — no fetch. Nudges a manual preview before
               marking ready when the planning feature is on and nothing was applied. */}
-          {linkPlanningOn && !isPublished && status === 'draft' && !ilpApplyOutcome && (
-            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{c.editor.linkApply.readyHint}</p>
+          {linkPlanningOn && !autoLinked && !isPublished && status === 'draft' && !ilpApplyOutcome && (
+            <p className="mt-2 text-caption text-muted">{c.editor.linkApply.readyHint}</p>
           )}
         </div>
 
-        {/* Single, prominent return to the Content Hub for this project. */}
-        <div className="pb-10">
-          <Link href={backHref} className="block">
-            <Button variant="outline" className="w-full sm:w-auto">{e.backToHub}</Button>
-          </Link>
+        {/* Single return to the project's articles. */}
+        <div className="pt-4 pb-10">
+          <BackLink href={backHref}>{e.backToHub}</BackLink>
         </div>
+      </div>
       </div>
 
       <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />
+      {confirmDialog}
     </div>
+  )
+}
+
+/**
+ * One group of quality findings (final review R3): a neutral panel on the card's own
+ * surface. The tone lives only on the icon and the title, never as a tinted box, so a
+ * long list of advice does not paint half the page orange. Three items show; the
+ * rest open behind "N more", as in the Notice primitive.
+ */
+function AuditList({ tone, title, items, moreLabel }: { tone: 'warn' | 'bad'; title: string; items: string[]; moreLabel: string }) {
+  const [open, setOpen] = useState(false)
+  const shown = open ? items : items.slice(0, 3)
+  const hidden = items.length - shown.length
+  const Icon = tone === 'bad' ? AlertCircle : TriangleAlert
+  return (
+    <section data-audit-list={tone} className="mb-3 rounded-inset border border-line bg-surface px-4 py-3">
+      <h4 className="flex items-center gap-2 text-copy font-semibold text-ink">
+        <Icon aria-hidden="true" className={tone === 'bad' ? 'size-4 shrink-0 text-bad' : 'size-4 shrink-0 text-warn'} />
+        {title}
+      </h4>
+      <ul className="mt-2 list-disc space-y-1 ps-10 text-copy text-body marker:text-muted">
+        {shown.map((item, i) => <li key={i}>{item}</li>)}
+      </ul>
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-1.5 ms-6 rounded-control text-caption font-semibold text-action underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+        >
+          {moreLabel.replace('{n}', String(hidden))}
+        </button>
+      )}
+    </section>
   )
 }

@@ -54,16 +54,16 @@ export async function generateMetadata(
 
   if (!article) {
     return {
-      title: 'מאמר לא נמצא | Rankings by Go Top',
+      title: 'מאמר לא נמצא | Go Top SEO',
       description: 'המאמר המבוקש אינו קיים או הוסר',
     }
   }
 
-  const description = article.meta_description || article.excerpt || `מאמר בנושא ${article.title} מאת Rankings by Go Top`
+  const description = article.meta_description || article.excerpt || `מאמר בנושא ${article.title} מאת Go Top SEO`
   const url = `https://www.gotopseo.com/articles/${slug}`
 
   return {
-    title: `${article.title} | Rankings by Go Top`,
+    title: `${article.title} | Go Top SEO`,
     description,
     openGraph: {
       title: article.title,
@@ -158,7 +158,8 @@ export default async function ArticleLayout({
         }),
         publisher: {
           '@type': 'Organization',
-          name: 'Rankings by Go Top',
+          name: 'GO TOP',
+          url: 'https://gotop.co.il',
           logo: {
             '@type': 'ImageObject',
             url: 'https://www.gotopseo.com/gotop-primary.png',

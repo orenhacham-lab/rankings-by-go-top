@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -61,9 +62,9 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       onCancel={handleCancel}
       // No onClose binding here — we manage state ourselves
       className={cn(
-        'rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-0 m-auto bg-white dark:bg-slate-800',
-        // Backdrop styled via globals.css (dialog::backdrop)
-        'backdrop:bg-slate-900/40 dark:backdrop:bg-black/60 backdrop:backdrop-blur-sm',
+        'rounded-card shadow-pop border border-line p-0 m-auto bg-surface text-body max-w-[calc(100vw-2rem)] dialog-spring',
+        // The backdrop is the one `backdrop` token (globals.css), dimmer in dark mode.
+        'backdrop:bg-backdrop backdrop:backdrop-blur-[3px]',
         {
           'w-full max-w-sm': size === 'sm',
           'w-full max-w-lg': size === 'md',
@@ -73,20 +74,20 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">{title}</h2>
+      <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-line">
+        <h2 className="text-section font-semibold text-ink">{title}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm leading-none"
+          className="-me-2 size-8 shrink-0 flex items-center justify-center rounded-control text-muted hover:text-ink hover:bg-sunk transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
           aria-label={dict.common.close}
         >
-          ✕
+          <X aria-hidden="true" className="size-4" />
         </button>
       </div>
 
       {/* Content */}
-      <div className="p-5">{children}</div>
+      <div className="px-6 py-5">{children}</div>
     </dialog>
   )
 }

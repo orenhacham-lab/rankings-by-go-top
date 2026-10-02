@@ -1,0 +1,272 @@
+/*
+ * The landing page's own motion and backdrops (components/public/landing/*).
+ *
+ * Rule of the page: everything is COMPLETE AT REST. The server renders every
+ * block in its final state; motion only ever starts from the client, and only
+ * with `prefers-reduced-motion: no-preference`. A block that is hidden to be
+ * revealed is one the client itself moved into the waiting state after
+ * checking that it is below the fold, so nothing can be left invisible by a
+ * failed script, a print, a crawler or a reduced-motion setting.
+ */
+
+/* ── The hero backdrop: a faint drafting grid fading out from the centre, and
+      two soft cobalt glows. Decoration only (aria-hidden in the markup). ── */
+.heroGrid {
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(70% 60% at 50% 30%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 30%, #000 20%, transparent 75%);
+  opacity: 0.7;
+}
+.glowA,
+.glowB {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  pointer-events: none;
+}
+.glowA {
+  width: 520px;
+  height: 520px;
+  inset-block-start: -160px;
+  left: 50%;
+  translate: -50% 0;
+  background: rgb(0 112 214 / 0.14);
+}
+.glowB {
+  width: 380px;
+  height: 380px;
+  inset-block-start: 520px;
+  inset-inline-end: -120px;
+  background: rgb(0 134 245 / 0.12);
+}
+
+/* The stage behind the product window: a navy plate with a cobalt bloom. */
+.stage {
+  background-color: var(--color-contrast);
+  background-image:
+    radial-gradient(60% 80% at 85% 0%, rgb(0 134 245 / 0.35), transparent 60%),
+    radial-gradient(50% 70% at 10% 100%, rgb(127 195 255 / 0.18), transparent 65%);
+}
+.stageGrid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, #000, transparent 85%);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 85%);
+}
+
+/* The navy "search changed" band and the closing band share this bloom. */
+.bandBloom {
+  background-image:
+    radial-gradient(55% 90% at 100% 0%, rgb(0 134 245 / 0.28), transparent 60%),
+    radial-gradient(45% 80% at 0% 100%, rgb(127 195 255 / 0.12), transparent 60%);
+}
+
+/* ── Rise: a block that enters once as it scrolls into view ── */
+@media (prefers-reduced-motion: no-preference) {
+  .rise[data-rise='wait'] {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  .rise[data-rise='in'] {
+    transition:
+      opacity 640ms var(--ease-snappy) var(--rise-delay, 0ms),
+      transform 640ms var(--ease-snappy) var(--rise-delay, 0ms);
+  }
+}
+
+/* ── Flow: the "how it works" line fills from the first step to the last, and
+      each node lights up as the fill reaches it. At rest (static) it is full. ── */
+.flowFill {
+  transform-origin: var(--flow-origin, right);
+}
+.flowFillV {
+  transform-origin: top;
+}
+.flowNode {
+  transition:
+    background-color 300ms var(--ease-snappy) var(--node-delay, 0ms),
+    color 300ms var(--ease-snappy) var(--node-delay, 0ms),
+    box-shadow 300ms var(--ease-snappy) var(--node-delay, 0ms);
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-flow='wait'] .flowFill {
+    transform: scaleX(0);
+  }
+  [data-flow='wait'] .flowFillV {
+    transform: scaleY(0);
+  }
+  [data-flow='in'] .flowFill,
+  [data-flow='in'] .flowFillV {
+    transition: transform 1600ms var(--ease-snappy) 150ms;
+  }
+  [data-flow='wait'] .flowNode {
+    background-color: var(--color-surface);
+    color: var(--color-muted);
+    box-shadow: 0 0 0 1px var(--color-line-strong);
+  }
+}
+
+/* ── CTA micro-interaction: a light sweep across the primary button on hover,
+      and a press. Transform and opacity only; nothing loops. ── */
+.cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.cta::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -60%;
+  width: 45%;
+  z-index: -1;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  transform: translateX(0) skewX(-18deg);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cta:hover::after {
+    opacity: 1;
+    transform: translateX(-420%) skewX(-18deg);
+    transition: transform 700ms var(--ease-snappy), opacity 120ms linear;
+  }
+  :global([dir='ltr']) .cta::after {
+    inset-inline-start: auto;
+    inset-inline-end: -60%;
+  }
+  :global([dir='ltr']) .cta:hover::after {
+    transform: translateX(420%) skewX(-18deg);
+  }
+}
+
+/* A typing caret in the demo. Shown only while the demo is typing. */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-inline-start: 2px;
+  vertical-align: -0.15em;
+  background: var(--color-action);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .caret {
+    animation: caret-blink 900ms steps(1) infinite;
+  }
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* The ambient drift of the hero glows: slow, small, and only with no-preference. */
+@media (prefers-reduced-motion: no-preference) {
+  .glowA {
+    animation: drift 14s ease-in-out infinite alternate;
+  }
+  .glowB {
+    animation: drift 18s ease-in-out -6s infinite alternate;
+  }
+}
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-40px, 30px, 0);
+  }
+}
+
+/* ── Wave 8 (UX decision D): the dark hero, the cobalt band and the one
+      signature element, "the rank climb". ── */
+
+/* The navy hero: the app's HeroPanel glow (action in the end corner, brand
+   low in the start corner) on the contrast navy. */
+.heroDark {
+  background-color: var(--color-contrast);
+  background-image:
+    radial-gradient(46rem 30rem at 88% 4%, color-mix(in srgb, var(--color-action) 46%, transparent), transparent 70%),
+    radial-gradient(34rem 24rem at 4% 100%, color-mix(in srgb, var(--color-brand) 22%, transparent), transparent 70%);
+}
+:global([dir='rtl']) .heroDark {
+  background-image:
+    radial-gradient(46rem 30rem at 12% 4%, color-mix(in srgb, var(--color-action) 46%, transparent), transparent 70%),
+    radial-gradient(34rem 24rem at 96% 100%, color-mix(in srgb, var(--color-brand) 22%, transparent), transparent 70%);
+}
+/* A fine light grid on navy, fading out downwards. */
+.darkGrid {
+  background-image:
+    linear-gradient(to right, rgb(245 246 248 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(245 246 248 / 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, #000 10%, transparent 90%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent 90%);
+}
+/* The hairline of light along the top edge of a navy band. */
+.topLight {
+  background: linear-gradient(90deg, transparent, rgb(245 246 248 / 0.28), transparent);
+}
+
+/* The cobalt band (#0070d6: white on it is 4.9:1). Its blooms only DARKEN the
+   blue (navy tints), so white text keeps at least that contrast everywhere. */
+.bandBrand {
+  background-color: var(--color-action);
+  background-image:
+    radial-gradient(44rem 26rem at 100% 0%, rgb(10 27 61 / 0.16), transparent 70%),
+    radial-gradient(34rem 22rem at 0% 100%, rgb(10 27 61 / 0.24), transparent 70%);
+}
+
+/* The rank climb: a stepped polyline, horizontal steps only, drawn ONCE with
+   stroke-dasharray over pathLength="1" (so the stroke scales with its box: a
+   non-scaling stroke would measure the dash in screen pixels and cut the line
+   short). At rest it is whole; the draw is a no-preference enhancement, so
+   reduced motion sees it complete and still. */
+.climbPath {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .climbDraw {
+    animation: climb-draw 2200ms var(--ease-snappy) 250ms both;
+  }
+  .climbPop {
+    animation: climb-pop 420ms var(--ease-snappy) 2300ms both;
+  }
+  /* In the flow the line waits for the section, then draws as it scrolls in. */
+  [data-flow='wait'] .climbFlow {
+    stroke-dashoffset: 1;
+  }
+  [data-flow='in'] .climbFlow {
+    transition: stroke-dashoffset 1800ms var(--ease-snappy) 150ms;
+  }
+  [data-flow='wait'] .climbDot {
+    opacity: 0;
+  }
+  [data-flow='in'] .climbDot {
+    transition: opacity 300ms var(--ease-snappy) var(--node-delay, 0ms);
+  }
+}
+@keyframes climb-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes climb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

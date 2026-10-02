@@ -1,7 +1,15 @@
 'use client'
 
 /**
- * Stage E2A surface + Stage E2B controlled decisions (RTL, Hebrew-first).
+ * Stage E2A surface + Stage E2B controlled decisions.
+ *
+ * The raw opportunity browser: an internal/dev-only DIAGNOSTIC, never the merchant-facing
+ * view. Keyword research mounts it only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED (a
+ * merchant-grade presentation of these opportunities is a later package). When mounted,
+ * until Search Console can feed it, it says what it will show and offers the one step
+ * that is missing (the shared status decides which), and it asks for opportunities only
+ * once there is a sync to read them from; with Search Console switched off on the
+ * server it renders nothing.
  *
  * E2A remains fully read-only. E2B adds human-triggered decisions — Create reviewed topic /
  * Already covered / Not relevant — gated behind NEXT_PUBLIC_GSC_ACTIONS_ENABLED (the server
@@ -13,11 +21,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { settingsGscHref } from '@/lib/content/content-hub-setup'
 import { Lightbulb, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
+import GscSetupPrompt, { GscLoadError, GscLoading } from '@/components/gsc/GscSetupPrompt'
+import { useGscStatus } from '@/components/gsc/gsc-data'
+import { isGscSetupState } from '@/lib/gsc/widget-state'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -67,6 +79,10 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
 }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscOpportunities, [language])
+  const w = useMemo(() => getDashboardDictionary(language).gscWidgets.opportunities, [language])
+  // Whether there is anything to read at all: connection, property and a sync.
+  const gsc = useGscStatus(projectId)
+  const gscReady = gsc.view.state === 'ready'
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
   const [typeFilter, setTypeFilter] = useState<FilterValue | null>(null)
@@ -101,7 +117,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
     } catch { setErrored(true); setData(null) } finally { setLoading(false) }
   }, [projectId, activeWindow, typeFilter, page, decisionState])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (gscReady) load() }, [load, gscReady])
   useEffect(() => { setPage(0) }, [activeWindow, typeFilter, decisionState])
 
   const reasonText = (r: ReasonCode) => (t.reasons as Record<string, string>)[r.code] ?? r.detail
@@ -116,12 +132,12 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
   const allTypes: FilterValue[] = ['improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate', 'multi_page_signal']
   const scoreBadgeVariant = (s: number): 'success' | 'info' | 'neutral' => (s >= 66 ? 'success' : s >= 33 ? 'info' : 'neutral')
 
-  const gscHref = `/projects/${projectId}#gsc-section`
+  const gscHref = settingsGscHref(projectId)
   const ctaFor = (s: string): string | null => (s === 'not_connected' ? t.ctaConnect : s === 'no_property' ? t.ctaSelectProperty : s === 'never_synced' ? t.ctaSync : null)
   const renderStateCta = (message: string, ctaText: string) => (
     <div className="py-4">
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{message}</p>
-      <Link href={gscHref} className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{ctaText}</Link>
+      <p className="text-copy text-muted mb-3">{message}</p>
+      <Link href={gscHref} className="inline-flex items-center justify-center h-8 px-3 rounded-control text-caption font-medium bg-action text-action-ink hover:bg-action-hover transition-colors">{ctaText}</Link>
     </div>
   )
 
@@ -187,30 +203,41 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
 
   const decidedLabel = (d: DecisionKind) => (d === 'created_topic' ? t.decidedCreatedTopic : d === 'already_covered' ? t.decidedAlreadyCovered : t.decidedIrrelevant)
 
+  if (gsc.view.state === 'disabled') return null
   return (
+    <section data-gsc-widget="opportunities" data-gsc-state={gsc.view.state}>
     <Card className="hover:translate-y-0">
       <div className="flex items-center gap-2 mb-1">
-        <Lightbulb size={18} className="text-amber-500 dark:text-amber-400" />
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <Lightbulb size={18} className="text-warn" />
+        <h3 className="text-section font-semibold text-ink">{w.title}</h3>
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.subtitle}</p>
+
+      {isGscSetupState(gsc.view.state) ? (
+        <GscSetupPrompt state={gsc.view.state} about={w.about} projectId={projectId} className="mt-2" />
+      ) : gsc.view.state === 'error' ? (
+        <GscLoadError onRetry={gsc.reload} className="mt-2" />
+      ) : gsc.view.state === 'loading' ? (
+        <GscLoading className="mt-3" />
+      ) : (
+      <>
+      <p className="text-copy text-muted mb-4">{w.about}</p>
 
       {/* Window toggle */}
       <div className="flex gap-2 mb-3">
         {WINDOWS.map((w) => (
           <button key={w} type="button" onClick={() => setActiveWindow(w)}
-            className={`text-xs px-3 py-1.5 rounded-lg border ${activeWindow === w ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+            className={`text-caption px-3 py-1.5 rounded-control border ${activeWindow === w ? 'bg-action text-action-ink border-action' : 'bg-surface text-body border-line'}`}>
             {w === 28 ? t.window28 : t.window90}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-6">
-          <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />{t.loading}
+        <div className="flex items-center gap-2 text-copy text-muted py-6">
+          <span className="inline-block w-4 h-4 border-2 border-action border-t-transparent rounded-pill animate-spin" />{t.loading}
         </div>
       ) : errored ? (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">{t.apiError}</div>
+        <div className="rounded-control border border-bad/20 bg-bad-soft px-3 py-2 text-copy text-bad">{t.apiError}</div>
       ) : state === 'not_connected' ? (
         renderStateCta(t.notConnected, ctaFor('not_connected')!)
       ) : state === 'no_property' ? (
@@ -221,7 +248,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
         <div className="space-y-3">
           {/* Partial-success retry banner (topic created, decision write failed) */}
           {ACTIONS_ENABLED && partialRetry && (
-            <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300 flex flex-wrap items-center gap-2">
+            <div className="rounded-control border border-warn/20 bg-warn-soft px-3 py-2 text-copy text-warn flex flex-wrap items-center gap-2">
               <AlertTriangle size={14} /><span>{t.partialSuccess}</span>
               <Button size="sm" variant="outline" className="ms-auto" onClick={handleRetryDecision} loading={retrying} disabled={retrying}>{t.retryDecision}</Button>
             </div>
@@ -232,7 +259,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
             <div className="flex flex-wrap gap-2">
               {(['open', 'decided', 'all'] as DecisionState[]).map((ds) => (
                 <button key={ds} type="button" onClick={() => setDecisionState(ds)}
-                  className={`text-xs px-2.5 py-1 rounded-full border ${decisionState === ds ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+                  className={`text-caption px-2.5 py-1 rounded-pill border ${decisionState === ds ? 'bg-action text-action-ink border-action' : 'bg-surface text-body border-line'}`}>
                   {ds === 'open' ? t.decisionOpen : ds === 'decided' ? t.decisionDecided : t.decisionAll}
                   {data?.decisionCounts && ds !== 'all' ? ` (${data.decisionCounts[ds] ?? 0})` : ''}
                 </button>
@@ -243,26 +270,26 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
           {/* Type filter chips */}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setTypeFilter(null)}
-              className={`text-xs px-2.5 py-1 rounded-full border ${typeFilter === null ? 'bg-slate-800 text-white border-slate-800 dark:bg-slate-100 dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+              className={`text-caption px-2.5 py-1 rounded-pill border ${typeFilter === null ? 'bg-action text-action-ink border-action' : 'bg-surface text-body border-line'}`}>
               {t.filterAll}
             </button>
             {allTypes.filter((ty) => (typeCounts[ty] ?? 0) > 0 || typeFilter === ty).map((ty) => (
               <button key={ty} type="button" onClick={() => setTypeFilter(ty)}
-                className={`text-xs px-2.5 py-1 rounded-full border ${typeFilter === ty ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+                className={`text-caption px-2.5 py-1 rounded-pill border ${typeFilter === ty ? 'bg-action text-action-ink border-action' : 'bg-surface text-body border-line'}`}>
                 {typeLabel(ty)}{typeCounts[ty] ? ` (${typeCounts[ty]})` : ''}
               </button>
             ))}
           </div>
 
           {opportunities.length === 0 ? (
-            <div className="text-sm text-slate-500 dark:text-slate-400 py-4">{t.noRows}</div>
+            <div className="text-copy text-muted py-4">{t.noRows}</div>
           ) : (
             <ul className="space-y-3">
               {opportunities.map((o) => {
                 const isBusy = busyId === o.id
                 const canCreateTopic = o.opportunityType === 'supporting_content_candidate'
                 return (
-                  <li key={o.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                  <li key={o.id} className="rounded-control border border-line p-3">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <Badge variant={scoreBadgeVariant(o.opportunityScore)}>{t.scoreLabel}: {o.opportunityScore}</Badge>
                       <Badge variant="info">{typeLabel(o.opportunityType)}</Badge>
@@ -273,16 +300,16 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
                       {o.decision && <Badge variant={o.decision.decision === 'created_topic' ? 'success' : 'neutral'}>{decidedLabel(o.decision.decision)}</Badge>}
                     </div>
 
-                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{o.primaryQuery}</div>
+                    <div className="text-copy font-semibold text-ink">{o.primaryQuery}</div>
                     {o.relatedQueries.length > 0 && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.colRelated}: {o.relatedQueries.join(' · ')}</div>
+                      <div className="text-caption text-muted mt-0.5">{t.colRelated}: {o.relatedQueries.join(' · ')}</div>
                     )}
                     <a href={o.page} target="_blank" rel="noopener noreferrer" title={safeDecodeUrl(o.page)} dir="ltr"
-                      className="block text-xs font-mono text-indigo-600 dark:text-indigo-400 hover:underline mt-1 truncate">
+                      className="block text-caption text-action hover:underline mt-1 truncate">
                       {safeDecodeUrl(o.page)}
                     </a>
 
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300 mt-2">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-body mt-2">
                       <span>{t.colClicks}: <span className="tabular-nums font-medium">{fmtInt(o.clicks)}</span></span>
                       <span>{t.colImpressions}: <span className="tabular-nums font-medium">{fmtInt(o.impressions)}</span></span>
                       <span>{t.colCtr}: <span className="tabular-nums font-medium">{fmtCtr(o.ctr)}</span></span>
@@ -290,31 +317,31 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
                     </div>
 
                     <div className="mt-2">
-                      <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.whyLabel}</div>
+                      <div className="text-caption font-medium text-muted">{t.whyLabel}</div>
                       <ul className="mt-1 flex flex-wrap gap-1.5">
                         {o.reasons.map((r, i) => (
-                          <li key={`${o.id}-${r.code}-${i}`} className="text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{reasonText(r)}</li>
+                          <li key={`${o.id}-${r.code}-${i}`} className="text-overline px-2 py-0.5 rounded-control bg-sunk text-body">{reasonText(r)}</li>
                         ))}
                       </ul>
                       {o.signals.includes('multi_page_signal') && (
-                        <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 inline-flex items-center gap-1"><AlertTriangle size={11} />{t.multiPageNote}</div>
+                        <div className="mt-1 text-overline text-warn inline-flex items-center gap-1"><AlertTriangle size={11} />{t.multiPageNote}</div>
                       )}
                     </div>
 
-                    <div className="mt-2 text-xs">
+                    <div className="mt-2 text-caption">
                       {o.existingContentMatch ? (
-                        <span className="text-emerald-700 dark:text-emerald-400">{t.matchLabel}: <span className="font-medium">{o.existingContentMatch.reference}</span></span>
+                        <span className="text-ok">{t.matchLabel}: <span className="font-medium">{o.existingContentMatch.reference}</span></span>
                       ) : (
-                        <span className="text-slate-400 dark:text-slate-500">{t.noMatch}</span>
+                        <span className="text-muted">{t.noMatch}</span>
                       )}
                     </div>
 
                     {/* E2B controlled actions (only when the actions flag is on, state is ok) */}
                     {ACTIONS_ENABLED && (
-                      <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+                      <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-2">
                         {o.decision ? (
                           o.decision.decision === 'created_topic' ? (
-                            <span className="text-xs text-emerald-700 dark:text-emerald-400">{t.createdTopicRef}{o.decision.createdTopicId ? `: ${o.decision.createdTopicId.slice(0, 8)}…` : ''}</span>
+                            <span className="text-caption text-ok">{t.createdTopicRef}{o.decision.createdTopicId ? `: ${o.decision.createdTopicId.slice(0, 8)}…` : ''}</span>
                           ) : (
                             <Button size="sm" variant="outline" onClick={() => handleUndo(o)} loading={isBusy} disabled={isBusy}>{isBusy ? t.working : t.actionUndo}</Button>
                           )
@@ -333,11 +360,11 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
             </ul>
           )}
 
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">{t.scoreExplained}</p>
+          <p className="text-overline text-muted">{t.scoreExplained}</p>
 
           {total > PAGE_SIZE && (
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-slate-500 dark:text-slate-400">{t.pageOf(page * PAGE_SIZE + 1, Math.min((page + 1) * PAGE_SIZE, total), total)}</span>
+              <span className="text-caption text-muted">{t.pageOf(page * PAGE_SIZE + 1, Math.min((page + 1) * PAGE_SIZE, total), total)}</span>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" disabled={page === 0 || loading} onClick={() => setPage((p) => Math.max(0, p - 1))}>{t.prevPage}</Button>
                 <Button size="sm" variant="outline" disabled={(page + 1) * PAGE_SIZE >= total || loading} onClick={() => setPage((p) => p + 1)}>{t.nextPage}</Button>
@@ -345,6 +372,8 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
             </div>
           )}
         </div>
+      )}
+      </>
       )}
 
       {/* Reused topic-creation modal (create mode, prefilled, fully editable). Only mounted
@@ -364,5 +393,6 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
         />
       )}
     </Card>
+    </section>
   )
 }

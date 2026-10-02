@@ -6,17 +6,32 @@
  * Connect a WordPress site to the project via Application Password:
  * URL + username + password → test → save (encrypted server-side).
  * The password is write-only: it is never returned or displayed again.
+ *
+ * `startWithForm`: the settings screen's "Choose platform" promises the form
+ * (site address, username, application password) once WordPress is confirmed,
+ * so it opens this panel with the form already out, and the three short steps
+ * that say where in wp-admin the application password is created. The settings
+ * screen passes it only while nothing is connected.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { ChevronDown } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
+import { wpErrorKey } from '@/lib/wordpress/error-copy'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { connectionAnswer } from '@/lib/connection-status/known'
+import { peekKnownRead, readKnown } from '@/lib/connection-status/useKnownRead'
+import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
 
 type SanitizedConnection = {
   id: string
@@ -26,13 +41,30 @@ type SanitizedConnection = {
   last_tested_at: string | null
 }
 
-export default function WordPressConnectionPanel({ projectId, onChanged, onConnected }: { projectId: string; onChanged?: () => void; onConnected?: () => void }) {
+export default function WordPressConnectionPanel({
+  projectId,
+  onChanged,
+  onConnected,
+  startWithForm = false,
+}: {
+  projectId: string
+  onChanged?: () => void
+  onConnected?: () => void
+  startWithForm?: boolean
+}) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
 
-  const [loading, setLoading] = useState(true)
-  const [connection, setConnection] = useState<SanitizedConnection | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  // Known or not (lib/connection-status): the section above usually read this very
+  // URL a moment ago, so the first render has the answer and draws it directly.
+  const url = projectConnectionUrls(projectId).wordpress
+  const [initial] = useState(() => connectionAnswer<SanitizedConnection>(peekKnownRead(url) ?? null))
+  const [loading, setLoading] = useState(initial.state === 'loading')
+  // The connection could not be read: said as that, never as "not connected".
+  const [loadFailed, setLoadFailed] = useState(initial.state === 'error')
+  const [connection, setConnection] = useState<SanitizedConnection | null>(initial.state === 'ready' ? initial.value.connection : null)
+  const [showForm, setShowForm] = useState(startWithForm)
+  const { confirm, dialog } = useConfirm()
   const [guideOpen, setGuideOpen] = useState(false)
 
   const [siteUrl, setSiteUrl] = useState('')
@@ -43,24 +75,29 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
   const [saving, setSaving] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  /** A route's sentence, as one of ours in the merchant's language; never shown as it came. */
+  const wpError = (raw: unknown): string => {
+    const key = wpErrorKey(raw)
+    return key === 'generic' ? t.genericError : t.wpErrors[key]
+  }
 
-  const loadConnection = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/wordpress/connection?projectId=${projectId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setConnection(data.connection ?? null)
-      }
-    } catch {
-      // Leave as not-connected; the panel still renders the connect form.
-    } finally {
-      setLoading(false)
+  const loadingRef = useRef(initial.state === 'loading')
+  const loadConnection = useCallback(async (fresh = true) => {
+    const known = connectionAnswer<SanitizedConnection>(await readKnown(url, { fresh }))
+    if (known.state === 'ready') {
+      setConnection(known.value.connection)
+      setLoadFailed(false)
+    } else {
+      // A re-read that failed keeps what is on screen; a first read that failed says so.
+      setLoadFailed((was) => was || loadingRef.current)
     }
-  }, [projectId])
+    loadingRef.current = false
+    setLoading(false)
+  }, [url])
 
   useEffect(() => {
-    loadConnection()
-  }, [loadConnection])
+    if (initial.state === 'loading') void loadConnection(false)
+  }, [loadConnection, initial.state])
 
   function openForm() {
     setSiteUrl(connection?.site_url ?? '')
@@ -95,7 +132,7 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
         const who = data.user?.name ? ` (${t.connectedAs}: ${data.user.name})` : ''
         setMessage({ text: `${t.testSuccess}${who}`, ok: true })
       } else {
-        setMessage({ text: data.error || t.genericError, ok: false })
+        setMessage({ text: wpError(data.error), ok: false })
       }
       loadConnection()
     } catch {
@@ -122,7 +159,7 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
       })
       const data = await res.json()
       if (!res.ok) {
-        const text = data.reason === 'platform_already_connected' ? t.platformAlreadyConnected : (data.error || t.genericError)
+        const text = data.reason === 'platform_already_connected' ? t.platformAlreadyConnected : wpError(data.error)
         setMessage({ text, ok: false })
         return
       }
@@ -137,7 +174,7 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
         // so a disconnect (onChanged only) never triggers navigation.
         onConnected?.()
       } else {
-        setMessage({ text: data.test?.error || t.statusFailed, ok: false })
+        setMessage({ text: data.test?.error ? wpError(data.test.error) : t.statusFailed, ok: false })
       }
     } catch {
       setMessage({ text: t.genericError, ok: false })
@@ -147,7 +184,13 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
   }
 
   async function handleDisconnect() {
-    if (!window.confirm(t.confirmDisconnectExclusive)) return
+    const ok = await confirm({
+      title: t.confirmDisconnectTitle,
+      body: t.confirmDisconnectBody,
+      confirmLabel: t.confirmDisconnectAction,
+      tone: 'danger',
+    })
+    if (!ok) return
     setDisconnecting(true)
     setMessage(null)
     try {
@@ -179,25 +222,25 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
   ) : null
 
   return (
-    <Card className="hover:translate-y-0">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+    <Card className="p-5 sm:p-6">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h3 className="text-section font-semibold text-ink">
           {t.wpConnectionTitle}
         </h3>
         {statusBadge}
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.wpConnectionHelp}</p>
+      <p className="mb-4 max-w-prose text-copy text-muted">{t.wpConnectionHelp}</p>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4">
-          <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <div aria-busy="true" data-connection-loading="wordpress"><Skeleton className="h-12 w-full rounded-inset" /></div>
+      ) : loadFailed && !showForm ? (
+        <ConnectionLoadFailed onRetry={() => { loadingRef.current = true; setLoading(true); void loadConnection() }} />
       ) : !connection && !showForm ? (
-        <div className="text-center py-6">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.notConnected}</p>
+        <div className="py-6 text-center">
+          <p className="mb-3 text-copy text-body">{t.notConnected}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button size="sm" onClick={openForm}>{t.connectButton}</Button>
-            <Button size="sm" variant="outline" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
+            <Button size="sm" onClick={openForm} data-wp-connect-button>{t.connectButton}</Button>
+            <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
           </div>
         </div>
       ) : (
@@ -206,39 +249,42 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
             // Compact connected state: URL + actions on one row; username /
             // last-tested tucked into a collapsed "details" so a set-once
             // connection doesn't dominate the page.
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div className="rounded-inset border border-line bg-sunk/60 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm text-slate-800 dark:text-slate-100 truncate max-w-full min-w-0" dir="ltr">
+                <span className="min-w-0 max-w-full truncate text-copy font-medium text-ink" dir="ltr" title={connection.site_url}>
                   {connection.site_url}
                 </span>
-                <div className="flex flex-wrap items-center gap-2 ms-auto">
-                  <Button size="sm" variant="outline" onClick={handleTest} loading={testing} disabled={testing}>
+                <div className="ms-auto flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={handleTest} loading={testing} disabled={testing}>
                     {testing ? t.testing : t.testConnection}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={openForm}>
+                  <Button size="sm" variant="ghost" onClick={openForm}>
                     {t.editConnection}
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     onClick={handleDisconnect}
                     loading={disconnecting}
                     disabled={disconnecting}
-                    className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                    className="text-bad hover:bg-bad-soft hover:text-bad"
                   >
                     {disconnecting ? t.disconnecting : t.disconnect}
                   </Button>
                 </div>
               </div>
               {(connection.wp_username || connection.last_tested_at) && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer select-none text-xs text-slate-500 dark:text-slate-400">{t.connectionDetails}</summary>
+                <details className="group mt-2">
+                  <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 text-caption font-medium text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+                    <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                    {t.connectionDetails}
+                  </summary>
                   <div className="mt-1.5 space-y-1">
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="text-caption text-muted">
                       {t.wpUsername}: <span className="font-medium">{connection.wp_username}</span>
                     </div>
                     {connection.last_tested_at && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-caption text-muted">
                         {t.lastTestedAt}: {formatDateTime(connection.last_tested_at)}
                       </div>
                     )}
@@ -249,7 +295,8 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
           )}
 
           {showForm && (
-            <div className="space-y-3">
+            <div className="space-y-4" data-wp-form>
+              {!connection && <WpPasswordSteps t={t} siteUrl={siteUrl} />}
               <Input
                 label={t.wpSiteUrl}
                 type="url"
@@ -274,10 +321,11 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   onClick={handleTest}
                   loading={testing}
                   disabled={testing || !siteUrl || !username || (!appPassword && !connection)}
+                  data-wp-action="test"
                 >
                   {testing ? t.testing : t.testConnection}
                 </Button>
@@ -286,6 +334,7 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
                   onClick={handleSave}
                   loading={saving}
                   disabled={saving || !siteUrl || !username || (!appPassword && !connection)}
+                  data-wp-action="save"
                 >
                   {saving ? t.saving : t.saveConnection}
                 </Button>
@@ -294,15 +343,9 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
           )}
 
           {message && (
-            <div
-              className={`text-sm rounded-lg px-3 py-2 border ${
-                message.ok
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
-                  : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
-              }`}
-            >
+            <Notice tone={message.ok ? 'ok' : 'bad'}>
               {message.text}
-            </div>
+            </Notice>
           )}
         </div>
       )}
@@ -310,18 +353,58 @@ export default function WordPressConnectionPanel({ projectId, onChanged, onConne
       {/* Help-only modal: how to create a WordPress Application Password and
           connect. Pure guidance — no connection logic runs here. */}
       <Modal open={guideOpen} onClose={() => setGuideOpen(false)} title={t.guideTitle} size="md">
-        <ol className="list-decimal space-y-2 pe-5 text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+        <ol className="list-decimal space-y-2 ps-5 text-copy text-body">
           {t.guideSteps.map((step, i) => (
             <li key={i}>{step}</li>
           ))}
         </ol>
-        <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        <Notice tone="warn" className="mt-4">
           {t.guideWarning}
-        </div>
+        </Notice>
         <div className="mt-4 flex justify-end">
           <Button size="sm" onClick={() => setGuideOpen(false)}>{t.guideClose}</Button>
         </div>
       </Modal>
+      {dialog}
     </Card>
+  )
+}
+
+/**
+ * The page on the merchant's own site where application passwords are made,
+ * when the address typed so far is a plain http(s) site address; null otherwise.
+ * It is a link the merchant opens themselves, in a new tab, to their own site:
+ * never a redirect, and never built from anything but what they typed here.
+ */
+export function wpProfileHref(siteUrl: string): string | null {
+  const raw = siteUrl.trim()
+  if (!raw) return null
+  let url: URL
+  try {
+    url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+  } catch {
+    return null
+  }
+  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password || !url.hostname.includes('.')) return null
+  const base = url.pathname.replace(/\/+$/, '')
+  return `${url.origin}${base}/wp-admin/profile.php#application-passwords-section`
+}
+
+function WpPasswordSteps({ t, siteUrl }: { t: { wpStepsTitle: string; wpSteps: readonly string[]; wpOpenProfile: string }; siteUrl: string }) {
+  const href = wpProfileHref(siteUrl)
+  return (
+    <div className="rounded-inset border border-line bg-sunk/60 px-4 py-3" data-wp-steps>
+      <p className="text-caption font-semibold text-ink">{t.wpStepsTitle}</p>
+      <ol className="mt-1.5 list-decimal space-y-1 ps-5 text-caption text-body">
+        {t.wpSteps.map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
+      {href && (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-caption font-medium text-action hover:underline">
+          {t.wpOpenProfile}
+        </a>
+      )}
+    </div>
   )
 }

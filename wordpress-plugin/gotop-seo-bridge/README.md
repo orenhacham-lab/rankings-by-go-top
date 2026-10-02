@@ -1,32 +1,60 @@
-# GO TOP SEO Bridge (companion WordPress plugin)
+# GO TOP SEO Bridge 2.1 (companion WordPress plugin)
 
-WordPress core's REST API silently drops **protected** SEO meta (Yoast `_yoast_wpseo_*`,
-Rank Math `rank_math_*`) from `POST /wp-json/wp/v2/posts/:id { meta }` unless the site
-registered those keys in REST. That is why publishing could return HTTP 200 while the Yoast
-meta description / focus keyword stayed empty (`written_not_verifiable`).
+Two jobs, both authenticated, both narrow:
 
-This tiny companion plugin exposes ONE authenticated endpoint the GO TOP app calls **only when
-core REST could not persist the SEO meta**:
+1. **1.x, unchanged:** `POST /wp-json/gotop/v1/seo-meta` writes allowlisted Yoast / Rank Math
+   keys when WordPress core REST silently drops protected SEO meta while publishing an article.
+   Auth: the WordPress application password of a user who can edit the post.
+2. **2.0, site-health fixes:** applies ONE fix the merchant approved in the GO TOP app, per
+   request, and can undo it.
+
+## 2.0 routes (namespace `gotop/v1`)
+
+| Route | Auth | What it does |
+|---|---|---|
+| `POST /pair` | signed-in administrator (`manage_options`, via application password) | stores the site key from a pairing code |
+| `POST /status` | signed (HMAC) | version, SEO plugin, the fix types (nine in 2.0.0, eleven since 2.1.0) |
+| `POST /inspect` | signed | one post/page: content hash, SEO fields (2.1.0: the content's own H1 words, page-builder flag) |
+| `POST /search` | signed | up to 5 posts/pages containing a phrase (internal-link fix) |
+| `POST /fix` | signed | applies one approved fix |
+| `POST /undo` | signed | restores the value stored before that fix |
+
+The same pairing can be done by hand: **Settings → GO TOP SEO**, paste the code, **Connect**.
+
+### Signing
+
+Headers `X-GoTop-Key`, `X-GoTop-Timestamp`, `X-GoTop-Nonce` (32 hex), `X-GoTop-Signature: v1=<hex>`,
+where the signature is HMAC-SHA256 with the site's secret over
 
 ```
-POST /wp-json/gotop/v1/seo-meta
-Authorization: <the same WordPress app-password used for publishing>
-Body: { "post_id": 123, "plugin": "yoast", "meta": { "_yoast_wpseo_metadesc": "…", … } }
+GOTOP-HMAC-V1\nPOST\n/gotop/v1/<route>\n<timestamp>\n<nonce>\n<key id>\n<sha256(body)>
 ```
 
-Guarantees:
+Checked with `hash_equals`; a timestamp more than 5 minutes off is refused; a nonce is stored
+(10 minutes) only after the signature verified, so a replay is refused and a forgery cannot burn
+a real nonce. The app side is `lib/site-fix/plugin-auth.ts`; the QA suite
+`lib/site-fix/__qa__/site-fix-plugin.qa.ts` runs this PHP against the app's signer.
 
-- **Auth:** `permission_callback` requires the user to be able to edit the target post
-  (`current_user_can('edit_post', post_id)`), i.e. `edit_posts`.
-- **Allowlist only:** it writes ONLY the exact Yoast / Rank Math SEO keys. Any other meta key
-  is ignored — it can never write arbitrary post meta.
-- **Verifiable:** it returns the read-back applied values so the app verifies exact normalized
-  values per field (only then does the app report `verified`).
-- **No secrets:** it exposes no credentials, options, or unrelated data.
+### What a fix can change (the whole list)
 
-## Install
+`seo_title`, `meta_description`, `canonical`, `focus_keyphrase` (Yoast / Rank Math keys, or the
+plugin's own `_gotop_*` meta printed in `<head>` when there is no SEO plugin), `schema_jsonld`
+(printed as escaped JSON-LD; no Product/Offer/Review types), `image_alt` (only images without an
+alt), `faq_block` (appended at the end of the content), `broken_link` (point a dead same-site
+link elsewhere, or unlink it keeping its words), `internal_link` (wrap words already in the text).
 
-Copy the `gotop-seo-bridge` folder into `wp-content/plugins/` on the connected site and
-activate it (or upload the zip via **Plugins → Add New → Upload**). The app **capability-detects**
-the `gotop/v1` REST namespace automatically; until it is installed, the app surfaces the typed
-state `seo_bridge_required` with this setup instruction — it never claims the SEO data was saved.
+Posts and pages only. Before every write the previous value is stored in post meta
+`_gotop_fix_<job id>`; undo refuses when the element changed since (an FAQ block is removed
+exactly). It never deletes content, touches prices, products, the theme, plugins, settings or
+users, and never publishes or unpublishes anything (only `ID` and `post_content` go to
+`wp_update_post`).
+
+## Build and install
+
+```
+node scripts/build-wordpress-plugin.mjs --out gotop-seo-bridge.zip
+```
+
+The app serves the same zip to signed-in users at `/api/site-health/plugin-zip` (built into
+`lib/site-fix/plugin-zip.generated.ts`; `--check` fails when it is stale). Install through
+**Plugins → Add New → Upload Plugin**, then pair.

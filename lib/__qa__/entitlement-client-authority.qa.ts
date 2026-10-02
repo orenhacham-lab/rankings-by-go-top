@@ -289,7 +289,9 @@ async function main() {
     let thrown: Error | null = null
     try { await createTrackingTargetAction(keywordFormData()) } catch (e) { thrown = e as Error }
     check('D9: the action reports the outage, not a "limit of 0 keywords" quota message',
-      !!thrown && !/מגבלת 0/.test(thrown.message) && /תקלה זמנית/.test(thrown.message), thrown?.message)
+      // (in the request's language since the language pass: English here, no request cookie; Hebrew for a Hebrew request)
+      !!thrown && !/מגבלת 0|limit of 0/i.test(thrown.message) && (thrown as { code?: string }).code === ENTITLEMENT_UNAVAILABLE_CODE
+      && /temporary|תקלה זמנית/i.test(thrown.message), thrown?.message)
     check('D10: …and still creates no partial row', t.tracking_targets.length === 0)
   }
 

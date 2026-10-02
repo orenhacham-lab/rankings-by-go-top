@@ -1,26 +1,36 @@
 import { cn } from '@/lib/utils'
 
+/**
+ * A badge states a fact about the thing beside it. It is a soft tint plus dark
+ * text — never a filled colour, because a filled colour in this app means an
+ * action you can take, and a badge is not clickable.
+ *
+ * `dot` adds a small leading point in the badge's own colour, for a state that
+ * is live (running, active) rather than a plain label.
+ */
 interface BadgeProps {
   children: React.ReactNode
   variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'
+  dot?: boolean
   className?: string
 }
 
-export default function Badge({ children, variant = 'default', className }: BadgeProps) {
+export default function Badge({ children, variant = 'default', dot = false, className }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center whitespace-nowrap px-3 py-0.5 rounded-full text-xs font-medium',
+        'inline-flex h-6 items-center gap-1.5 whitespace-nowrap px-2.5 rounded-pill text-caption font-semibold border',
         {
-          'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200': variant === 'default' || variant === 'neutral',
-          'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300': variant === 'success',
-          'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300': variant === 'warning',
-          'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300': variant === 'danger',
-          'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300': variant === 'info',
+          'bg-sunk text-muted border-line': variant === 'default' || variant === 'neutral',
+          'bg-ok-soft text-ok border-ok/20': variant === 'success',
+          'bg-warn-soft text-warn border-warn/20': variant === 'warning',
+          'bg-bad-soft text-bad border-bad/20': variant === 'danger',
+          'bg-info-soft text-info border-info/20': variant === 'info',
         },
         className
       )}
     >
+      {dot && <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />}
       {children}
     </span>
   )

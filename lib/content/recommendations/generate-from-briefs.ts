@@ -34,7 +34,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard, coveredByExistingContent, ownedByExistingEntity, normalizePhrase, titleMainPhrase, keywordOriginsOf, type KeywordOriginEntry } from './keyword-guard'
 import { flattenKeywordResearchCacheDetailed, contentTokens, type EntityNode, type KeywordResearchIngestion } from './evidence-cluster'
@@ -491,7 +492,7 @@ export async function prepareBriefRun(
   let siteScanEntities = 0
   let staleIndexExcluded = false
   try {
-    const cacheRow = await getCachedIndex(admin, input.projectId)
+    const cacheRow = await getContentIndex(input.projectId, input.userId, admin)
     // D11 guard — a scan blob whose site host does not match the project's CURRENT
     // target domain is a previous site's content (the index is preserved across
     // re-points and write failures). Its pages/links must not enter this project's

@@ -1,7 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Database, Search, CheckCircle2 } from 'lucide-react'
+import {
+  BookOpen, CircleCheck, Database, FlaskConical, KeyRound, Play, Plug, RefreshCw, ScrollText, Search, Settings2,
+} from 'lucide-react'
+import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import EmptyState from '@/components/ui/EmptyState'
+import Input from '@/components/ui/Input'
+import { NoticeBox } from '@/components/ui/Notice'
+import Segmented from '@/components/ui/Segmented'
+import Select from '@/components/ui/Select'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { cn } from '@/lib/utils'
+import { isStatusShape, logsErrorCopy, SCAN_ERROR, serviceCopy, testScanErrorCopy, type SetupTone } from './status-copy'
 
 /* ─── Types ─────────────────────────────────────────────── */
 
@@ -28,29 +41,37 @@ interface LogEntry {
 
 /* ─── Small helpers ──────────────────────────────────────── */
 
-function StatusDot({ ok }: { ok: boolean | null }) {
-  if (ok === null) return <span className="inline-block w-3 h-3 rounded-full bg-slate-300 animate-pulse" />
-  return (
-    <span
-      className={`inline-block w-3 h-3 rounded-full ${ok ? 'bg-green-500' : 'bg-red-500'}`}
-    />
-  )
+const DOT: Record<SetupTone, string> = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad' }
+const BADGE: Record<SetupTone, 'success' | 'warning' | 'danger'> = { ok: 'success', warn: 'warning', bad: 'danger' }
+
+function StatusDot({ tone }: { tone: SetupTone }) {
+  return <span aria-hidden className={cn('inline-block size-2 shrink-0 rounded-pill', DOT[tone])} />
 }
 
 function EnvRow({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-sm py-1">
-      <StatusDot ok={ok} />
-      <span className={ok ? 'text-slate-700' : 'text-red-600'}>{label}</span>
-      <span className="mr-auto text-xs text-slate-400">{ok ? 'מוגדר' : 'חסר'}</span>
+    <div className="flex items-center gap-3 py-2.5 text-copy">
+      <StatusDot tone={ok ? 'ok' : 'bad'} />
+      <span dir="ltr" className={cn('min-w-0 truncate', ok ? 'text-ink' : 'text-bad')}>{label}</span>
+      <span className={cn('ms-auto shrink-0 text-caption', ok ? 'text-muted' : 'font-semibold text-bad')}>{ok ? 'מוגדר' : 'חסר'}</span>
     </div>
   )
 }
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+/** The service icon's squircle carries the check's tone (ok stays the calm action blue). */
+const ICON_TONE: Record<SetupTone, string> = {
+  ok: 'bg-action-soft text-action',
+  warn: 'bg-warn-soft text-warn',
+  bad: 'bg-bad-soft text-bad',
+}
+
+function CardTitle({ icon: Icon, children }: { icon: typeof Database; children: React.ReactNode }) {
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>
-      {children}
+    <div className="mb-5 flex items-center gap-3">
+      <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+        <Icon className="size-5" />
+      </span>
+      <h2 className="text-section font-semibold text-ink">{children}</h2>
     </div>
   )
 }
@@ -60,17 +81,20 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 function StatusTab() {
   const [status, setStatus] = useState<StatusResult | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
 
   const fetchStatus = useCallback(async () => {
     setLoading(true)
-    setError(null)
+    setFailed(false)
     try {
       const res = await fetch('/api/setup/status')
-      const data = await res.json()
-      setStatus(data)
-    } catch (e) {
-      setError((e as Error).message)
+      const data: unknown = await res.json()
+      // An error reply (no admin session, a server error) has no services to draw.
+      if (isStatusShape(data)) setStatus(data)
+      else { setStatus(null); setFailed(true) }
+    } catch {
+      setStatus(null)
+      setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -80,61 +104,65 @@ function StatusTab() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-500 text-sm">בודק חיבורים…</p>
+      <div className="space-y-4" role="status" aria-label="בודק חיבורים">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          <Skeleton className="h-28 w-full rounded-card" />
+          <Skeleton className="h-28 w-full rounded-card" />
+        </div>
+        <Skeleton className="h-48 w-full rounded-card" />
       </div>
     )
   }
 
-  if (error) {
+  if (failed || !status) {
     return (
-      <div className="p-6 bg-red-50 rounded-xl border border-red-200 text-red-700 text-sm">
-        שגיאה בבדיקת הסטטוס: {error}
-      </div>
+      <NoticeBox tone="bad" language="he" action={{ label: 'ניסיון נוסף', onClick: fetchStatus }}>
+        לא הצלחנו לבדוק את החיבורים. כדאי לוודא שנכנסת כמנהל ולנסות שוב.
+      </NoticeBox>
     )
   }
-
-  if (!status) return null
 
   const connections = [
-    { key: 'supabase', data: status.supabase, icon: Database, title: 'Supabase' },
-    { key: 'serper', data: status.serper, icon: Search, title: 'Serper API' },
+    { key: 'supabase' as const, data: status.supabase, icon: Database, title: 'Supabase' },
+    { key: 'serper' as const, data: status.serper, icon: Search, title: 'Serper API' },
   ]
+  const allGreen = status.supabase.ok && status.serper.ok && Object.values(status.envVars).every(Boolean)
 
   return (
-    <div className="space-y-6">
-      {/* Connection cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {connections.map(({ key, data, icon: IconComponent, title }) => (
-          <Card key={key} className="p-5">
-            <div className="flex items-start gap-3">
-              <IconComponent size={24} strokeWidth={2} className="text-slate-600 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <StatusDot ok={data.ok} />
-                  <span className="font-semibold text-slate-800 text-sm">{title}</span>
-                  <span
-                    className={`mr-auto text-xs font-medium px-2 py-0.5 rounded-full ${
-                      data.ok
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {data.label}
-                  </span>
+    <div className="space-y-8">
+      {allGreen && (
+        <NoticeBox tone="ok" language="he">
+          כל החיבורים פעילים והמערכת מוכנה לשימוש.{' '}
+          <a href="/signup" className="font-semibold text-action underline-offset-2 hover:underline">כניסה למערכת</a>
+        </NoticeBox>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+        {connections.map(({ key, data, icon: Icon, title }) => {
+          const copy = serviceCopy(key, data)
+          return (
+            // The state is on the icon and the badge; no start rail bending round the card's corner (G3).
+            <Card key={key} className="p-5 sm:p-6">
+              <div className="flex items-start gap-3" data-setup-service={key} data-tone={copy.tone}>
+                <span aria-hidden className={cn('flex size-10 shrink-0 items-center justify-center rounded-inset', ICON_TONE[copy.tone])}>
+                  <Icon className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-section font-semibold text-ink">{title}</span>
+                    <Badge variant={BADGE[copy.tone]} dot className="ms-auto">{copy.label}</Badge>
+                  </div>
+                  <p data-setup-detail={key} className="mt-1 break-words text-caption text-muted">{copy.detail}</p>
                 </div>
-                <p className="text-xs text-slate-500 break-words">{data.detail}</p>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          )
+        })}
       </div>
 
-      {/* Env vars */}
-      <Card className="p-5">
-        <h3 className="font-semibold text-slate-800 text-sm mb-3">משתני סביבה</h3>
-        <div className="divide-y divide-slate-100">
+      <Card className="p-5 sm:p-6">
+        <CardTitle icon={KeyRound}>משתני סביבה</CardTitle>
+        <div className="divide-y divide-line">
           <EnvRow label="NEXT_PUBLIC_SUPABASE_URL" ok={status.envVars.supabaseUrl} />
           <EnvRow label="NEXT_PUBLIC_SUPABASE_ANON_KEY" ok={status.envVars.supabaseAnonKey} />
           <EnvRow label="SUPABASE_SERVICE_ROLE_KEY" ok={status.envVars.supabaseServiceKey} />
@@ -142,27 +170,10 @@ function StatusTab() {
         </div>
       </Card>
 
-      {/* All green */}
-      {status.supabase.ok && status.serper.ok &&
-        Object.values(status.envVars).every(Boolean) && (
-          <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4 text-green-800 text-sm">
-            <CheckCircle2 size={24} strokeWidth={2} className="text-green-600 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">כל החיבורים פעילים!</p>
-              <p className="text-green-700 text-xs mt-0.5">
-                המערכת מוכנה לשימוש.{' '}
-                <a href="/signup" className="underline font-medium">היכנס למערכת</a>
-              </p>
-            </div>
-          </div>
-        )}
-
-      <button
-        onClick={fetchStatus}
-        className="text-sm text-blue-600 hover:underline"
-      >
-        רענן בדיקה
-      </button>
+      <Button variant="secondary" onClick={fetchStatus}>
+        <RefreshCw aria-hidden className="size-4" />
+        בדיקה חוזרת
+      </Button>
     </div>
   )
 }
@@ -179,21 +190,21 @@ function Step({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex gap-4">
-      <div className="flex-shrink-0 w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
+    <li className="flex gap-4">
+      <span aria-hidden className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-pill bg-action-soft text-caption font-bold tabular-nums text-action">
         {num}
+      </span>
+      <div className="min-w-0">
+        <h3 className="mb-1 text-copy font-semibold text-ink">{title}</h3>
+        <div className="space-y-1 text-copy text-body">{children}</div>
       </div>
-      <div>
-        <h3 className="font-semibold text-slate-800 text-sm mb-1">{title}</h3>
-        <div className="text-sm text-slate-600 space-y-1">{children}</div>
-      </div>
-    </div>
+    </li>
   )
 }
 
 function Code({ children }: { children: string }) {
   return (
-    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs font-mono">
+    <code dir="ltr" className="rounded-control bg-sunk px-1.5 py-0.5 text-caption text-ink">
       {children}
     </code>
   )
@@ -202,89 +213,62 @@ function Code({ children }: { children: string }) {
 function InstructionsTab() {
   return (
     <div className="space-y-8">
-      {/* Supabase section */}
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xl">🗄️</span>
-          <h2 className="font-bold text-slate-800">הגדרת Supabase</h2>
-        </div>
-        <div className="space-y-5">
-          <Step num={1} title="צור פרויקט חדש ב-Supabase">
+      <Card className="p-5 sm:p-6">
+        <CardTitle icon={Database}>הגדרת Supabase</CardTitle>
+        <ol className="space-y-5">
+          <Step num={1} title="יצירת פרויקט חדש ב-Supabase">
             <p>
-              גש לאתר{' '}
-              <span className="font-medium text-slate-800">supabase.com</span> וצור חשבון חינמי
-              (או התחבר לחשבון קיים). לחץ על{' '}
-              <span className="font-medium">New Project</span>.
+              באתר <span className="font-semibold text-ink">supabase.com</span> יוצרים חשבון חינמי (או נכנסים לחשבון קיים) ולוחצים על{' '}
+              <span className="font-semibold text-ink">New Project</span>.
             </p>
           </Step>
 
-          <Step num={2} title="קבל את כתובת ה-URL ומפתחות ה-API">
-            <p>בפרויקט שלך לחץ על:</p>
+          <Step num={2} title="כתובת הפרויקט ומפתחות ה-API">
             <p>
-              <span className="font-medium">Project Settings → API</span>
+              בפרויקט נכנסים אל <span className="font-semibold text-ink">Project Settings</span>, ומשם אל <span className="font-semibold text-ink">API</span>. שם נמצאים:
             </p>
-            <p>שם תמצא:</p>
-            <ul className="list-disc list-inside space-y-1 mt-1">
-              <li>
-                <Code>Project URL</Code> — זה ה-<Code>NEXT_PUBLIC_SUPABASE_URL</Code>
-              </li>
-              <li>
-                <Code>anon public</Code> — זה ה-<Code>NEXT_PUBLIC_SUPABASE_ANON_KEY</Code>
-              </li>
-              <li>
-                <Code>service_role secret</Code> — זה ה-<Code>SUPABASE_SERVICE_ROLE_KEY</Code>
-              </li>
+            <ul className="mt-1 list-inside list-disc space-y-1">
+              <li><Code>Project URL</Code>, שהוא <Code>NEXT_PUBLIC_SUPABASE_URL</Code></li>
+              <li><Code>anon public</Code>, שהוא <Code>NEXT_PUBLIC_SUPABASE_ANON_KEY</Code></li>
+              <li><Code>service_role secret</Code>, שהוא <Code>SUPABASE_SERVICE_ROLE_KEY</Code></li>
             </ul>
           </Step>
 
-          <Step num={3} title="הרץ את סכמת בסיס הנתונים">
+          <Step num={3} title="הרצת סכמת בסיס הנתונים">
             <p>
-              לחץ על <span className="font-medium">SQL Editor</span> בתפריט הצד, הדבק את
-              תוכן הקובץ <Code>supabase/schema.sql</Code> מהפרויקט ולחץ{' '}
-              <span className="font-medium">Run</span>.
+              בתפריט הצד לוחצים על <span className="font-semibold text-ink">SQL Editor</span>, מדביקים את תוכן הקובץ <Code>supabase/schema.sql</Code> מהפרויקט ולוחצים{' '}
+              <span className="font-semibold text-ink">Run</span>.
             </p>
           </Step>
-        </div>
+        </ol>
       </Card>
 
-      {/* Serper section */}
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xl">🔍</span>
-          <h2 className="font-bold text-slate-800">הגדרת Serper API</h2>
-        </div>
-        <div className="space-y-5">
-          <Step num={4} title="צור חשבון ב-Serper">
+      <Card className="p-5 sm:p-6">
+        <CardTitle icon={Search}>הגדרת Serper API</CardTitle>
+        <ol className="space-y-5">
+          <Step num={4} title="יצירת חשבון ב-Serper">
             <p>
-              גש לאתר{' '}
-              <span className="font-medium text-slate-800">serper.dev</span>, צור חשבון חינמי.
-              ל-2,500 חיפושים ראשונים אין עלות.
+              באתר <span className="font-semibold text-ink">serper.dev</span> יוצרים חשבון חינמי. 2,500 החיפושים הראשונים ללא עלות.
             </p>
           </Step>
 
-          <Step num={5} title="קבל את מפתח ה-API">
+          <Step num={5} title="מפתח ה-API">
             <p>
-              לאחר ההרשמה לחץ על <span className="font-medium">API Key</span> בדאשבורד.
-              העתק את המפתח — זה ה-<Code>SERPER_API_KEY</Code>.
+              אחרי ההרשמה לוחצים על <span className="font-semibold text-ink">API Key</span> בלוח הבקרה ומעתיקים את המפתח. זה <Code>SERPER_API_KEY</Code>.
             </p>
           </Step>
-        </div>
+        </ol>
       </Card>
 
-      {/* Env file section */}
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xl">⚙️</span>
-          <h2 className="font-bold text-slate-800">הוספת משתני הסביבה</h2>
-        </div>
-        <div className="space-y-5">
-          <Step num={6} title="צור קובץ .env.local">
+      <Card className="p-5 sm:p-6">
+        <CardTitle icon={Settings2}>הוספת משתני הסביבה</CardTitle>
+        <ol className="space-y-5">
+          <Step num={6} title="קובץ .env.local">
             <p>
-              בתיקיית השורש של הפרויקט צור קובץ בשם <Code>.env.local</Code> עם התוכן
-              הבא (החלף את הערכים האמיתיים שלך):
+              בתיקיית השורש של הפרויקט יוצרים קובץ בשם <Code>.env.local</Code> עם התוכן הבא, עם הערכים האמיתיים:
             </p>
             <pre
-              className="mt-2 bg-slate-900 text-green-400 text-xs rounded-lg p-4 overflow-x-auto"
+              className="mt-2 overflow-x-auto rounded-inset bg-contrast p-4 text-caption text-contrast-ink"
               dir="ltr"
             >{`NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
@@ -292,17 +276,15 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 SERPER_API_KEY=abc123...`}</pre>
           </Step>
 
-          <Step num={7} title="הפעל מחדש את השרת">
+          <Step num={7} title="הפעלה מחדש של השרת">
             <p>
-              לאחר שמירת הקובץ, הפעל מחדש את שרת הפיתוח עם{' '}
-              <Code>npm run dev</Code> כדי שהמשתנים ייטענו.
+              אחרי שמירת הקובץ מפעילים מחדש את שרת הפיתוח עם <Code>npm run dev</Code>, כדי שהמשתנים ייטענו.
             </p>
-            <p className="mt-1 text-slate-500 text-xs">
-              בסביבת ייצור (Vercel, Railway וכד׳) יש להוסיף את המשתנים בלוח הבקרה
-              של הפלטפורמה ולא בקובץ.
+            <p className="mt-1 text-caption text-muted">
+              בסביבת ייצור (Vercel, Railway וכדומה) מוסיפים את המשתנים בלוח הבקרה של הפלטפורמה ולא בקובץ.
             </p>
           </Step>
-        </div>
+        </ol>
       </Card>
     </div>
   )
@@ -316,6 +298,15 @@ interface TestScanResult {
   raw: unknown
   timing: { startedAt: string; completedAt: string }
   error?: string
+}
+
+function ResultFigure({ label, children, tone }: { label: string; children: React.ReactNode; tone?: 'ok' | 'bad' }) {
+  return (
+    <div className="rounded-inset border border-line bg-sunk/60 p-3 text-center">
+      <div className={cn('truncate text-section font-bold tabular-nums', tone === 'ok' ? 'text-ok' : tone === 'bad' ? 'text-bad' : 'text-ink')}>{children}</div>
+      <div className="mt-1 text-caption text-muted">{label}</div>
+    </div>
+  )
 }
 
 function TestScanTab() {
@@ -348,193 +339,103 @@ function TestScanTab() {
   }
 
   const parsed = result?.parsed as { found?: boolean; position?: number | null; totalResults?: number; error?: string } | undefined
+  const requestError = testScanErrorCopy(result?.error)
 
   return (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h2 className="font-bold text-slate-800 mb-4">בדיקת סריקה חיה</h2>
-        <p className="text-sm text-slate-500 mb-5">
-          בצע סריקת ניסיון כדי לוודא שמפתח ה-API עובד ולראות תשובה אמיתית מ-Serper.
+    <div className="space-y-8">
+      <Card className="p-5 sm:p-6">
+        <CardTitle icon={FlaskConical}>בדיקת סריקה חיה</CardTitle>
+        <p className="-mt-2 mb-5 text-copy text-muted">
+          סריקת ניסיון מוודאת שמפתח ה-API עובד ומראה תשובה אמיתית מ-Serper.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Engine */}
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">מנוע חיפוש</label>
-            <div className="flex gap-3">
-              {[
-                { value: 'google_search', label: '🌐 גוגל אורגני' },
-                { value: 'google_maps', label: '📍 גוגל מפות' },
-              ].map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer text-sm transition-all ${
-                    engine === opt.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    value={opt.value}
-                    checked={engine === opt.value}
-                    onChange={(e) => setEngine(e.target.value as 'google_search' | 'google_maps')}
-                    className="sr-only"
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Keyword */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">מילת מפתח</label>
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span id="setup-engine-label" className="text-caption font-semibold text-ink">מנוע חיפוש</span>
+            <Segmented
+              ariaLabel="מנוע חיפוש"
+              value={engine}
+              onChange={(v) => setEngine(v)}
+              className="self-start"
+              options={[
+                { value: 'google_search', label: 'גוגל אורגני', icon: Search },
+                { value: 'google_maps', label: 'גוגל מפות', icon: Database },
+              ]}
             />
           </div>
 
-          {/* Domain / Business */}
+          <Input id="setup-keyword" label="מילת מפתח" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+
           {engine === 'google_search' ? (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">דומיין יעד</label>
-              <input
-                type="text"
-                value={targetDomain}
-                onChange={(e) => setTargetDomain(e.target.value)}
-                placeholder="example.co.il"
-                dir="ltr"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <Input id="setup-domain" label="דומיין יעד" value={targetDomain} onChange={(e) => setTargetDomain(e.target.value)} placeholder="example.co.il" dir="ltr" />
           ) : (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">שם עסק</label>
-              <input
-                type="text"
-                value={targetBusinessName}
-                onChange={(e) => setTargetBusinessName(e.target.value)}
-                placeholder="שם העסק בגוגל מפות"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <Input id="setup-business" label="שם עסק" value={targetBusinessName} onChange={(e) => setTargetBusinessName(e.target.value)} placeholder="שם העסק בגוגל מפות" />
           )}
 
-          {/* Country */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">מדינה</label>
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="IL">ישראל (IL)</option>
-              <option value="US">ארה&quot;ב (US)</option>
-              <option value="GB">בריטניה (GB)</option>
-            </select>
-          </div>
+          <Select
+            id="setup-country"
+            label="מדינה"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            options={[
+              { value: 'IL', label: 'ישראל (IL)' },
+              { value: 'US', label: 'ארה"ב (US)' },
+              { value: 'GB', label: 'בריטניה (GB)' },
+            ]}
+          />
 
-          {/* Language */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">שפה</label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="he">עברית (he)</option>
-              <option value="en">אנגלית (en)</option>
-            </select>
-          </div>
+          <Select
+            id="setup-language"
+            label="שפה"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            options={[
+              { value: 'he', label: 'עברית (he)' },
+              { value: 'en', label: 'אנגלית (en)' },
+            ]}
+          />
         </div>
 
-        <button
-          onClick={runTest}
-          disabled={loading}
-          className="mt-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center gap-2"
-        >
-          {loading ? (
-            <>
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              סורק…
-            </>
-          ) : (
-            <>🚀 הרץ בדיקה</>
-          )}
-        </button>
+        <Button onClick={runTest} loading={loading} className="mt-6">
+          {!loading && <Play aria-hidden className="size-4" />}
+          {loading ? 'סורק…' : 'הרצת הבדיקה'}
+        </Button>
       </Card>
 
-      {/* Result */}
       {result && (
-        <Card className="p-6">
-          {result.error ? (
-            <div className="text-red-600 text-sm">
-              <span className="font-semibold">שגיאה: </span>{result.error}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-800">תוצאה</h3>
+        requestError ? (
+          <NoticeBox tone="bad" language="he">{requestError}</NoticeBox>
+        ) : (
+          <Card className="space-y-5 p-5 sm:p-6">
+            <h3 className="text-section font-semibold text-ink">תוצאה</h3>
 
-              {/* Parsed summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-slate-800">
-                    {parsed?.found ? parsed.position ?? '—' : '—'}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">מיקום</div>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <div className={`text-2xl font-bold ${parsed?.found ? 'text-green-600' : 'text-red-500'}`}>
-                    {parsed?.found ? 'נמצא' : 'לא נמצא'}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">סטטוס</div>
-                </div>
-                {parsed?.totalResults != null && (
-                  <div className="bg-slate-50 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-slate-800">
-                      {parsed.totalResults.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">תוצאות כולל</div>
-                  </div>
-                )}
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <div className="text-sm font-bold text-slate-800 truncate">
-                    {result.timing.startedAt
-                      ? new Date(result.timing.completedAt).getTime() -
-                        new Date(result.timing.startedAt).getTime()
-                      : '—'}ms
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">זמן תגובה</div>
-                </div>
-              </div>
-
-              {parsed?.error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm">
-                  <span className="font-medium">שגיאת סריקה: </span>{parsed.error}
-                </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <ResultFigure label="מיקום">{parsed?.found ? parsed.position ?? '-' : '-'}</ResultFigure>
+              <ResultFigure label="סטטוס" tone={parsed?.found ? 'ok' : 'bad'}>{parsed?.found ? 'נמצא' : 'לא נמצא'}</ResultFigure>
+              {parsed?.totalResults != null && (
+                <ResultFigure label="תוצאות בסך הכל">{parsed.totalResults.toLocaleString()}</ResultFigure>
               )}
-
-              {/* Raw toggle */}
-              <div>
-                <button
-                  onClick={() => setShowRaw(!showRaw)}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  {showRaw ? 'הסתר תגובה גולמית' : 'הצג תגובה גולמית מ-Serper'}
-                </button>
-                {showRaw && (
-                  <pre className="mt-2 bg-slate-900 text-green-300 text-xs rounded-lg p-4 overflow-x-auto max-h-96" dir="ltr">
-                    {JSON.stringify(result.raw, null, 2)}
-                  </pre>
-                )}
-              </div>
+              <ResultFigure label="זמן תגובה">
+                {result.timing?.startedAt
+                  ? `${new Date(result.timing.completedAt).getTime() - new Date(result.timing.startedAt).getTime()}ms`
+                  : '-'}
+              </ResultFigure>
             </div>
-          )}
-        </Card>
+
+            {parsed?.error && <NoticeBox tone="warn" language="he">{SCAN_ERROR}</NoticeBox>}
+
+            <div>
+              <Button size="sm" variant="ghost" onClick={() => setShowRaw(!showRaw)} aria-expanded={showRaw} className="-ms-3">
+                {showRaw ? 'הסתרת התגובה הגולמית' : 'הצגת התגובה הגולמית מ-Serper'}
+              </Button>
+              {showRaw && (
+                <pre className="mt-2 max-h-96 overflow-x-auto rounded-inset bg-contrast p-4 text-caption text-contrast-ink" dir="ltr">
+                  {JSON.stringify(result.raw, null, 2)}
+                </pre>
+              )}
+            </div>
+          </Card>
+        )
       )}
     </div>
   )
@@ -564,10 +465,10 @@ function LogsTab() {
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
-  const levelStyle = (level: LogEntry['level']) => {
-    if (level === 'error') return 'bg-red-100 text-red-700'
-    if (level === 'warning') return 'bg-amber-100 text-amber-700'
-    return 'bg-blue-100 text-blue-700'
+  const levelVariant = (level: LogEntry['level']) => {
+    if (level === 'error') return 'danger' as const
+    if (level === 'warning') return 'warning' as const
+    return 'info' as const
   }
 
   const levelLabel = (level: LogEntry['level']) => {
@@ -576,61 +477,51 @@ function LogsTab() {
     return 'מידע'
   }
 
+  const errorCopy = logsErrorCopy(error)
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-bold text-slate-800">לוג שגיאות אחרונות</h2>
-        <button onClick={fetchLogs} className="text-xs text-blue-600 hover:underline">
-          רענן
-        </button>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-section font-semibold text-ink">לוג שגיאות אחרונות</h2>
+        <Button size="sm" variant="secondary" onClick={fetchLogs} loading={loading}>
+          {!loading && <RefreshCw aria-hidden className="size-4" />}
+          רענון
+        </Button>
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-16 gap-3">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-500 text-sm">טוען…</span>
+        <div className="space-y-3" role="status" aria-label="טוען">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
         </div>
       )}
 
-      {error && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-800 text-sm">
-          {error.includes('Supabase') || error.includes('מוגדר')
-            ? 'Supabase אינו מחובר עדיין — לאחר ההגדרה יופיעו כאן שגיאות מהסריקות.'
-            : error}
-        </div>
-      )}
+      {errorCopy && <NoticeBox tone="warn" language="he">{errorCopy}</NoticeBox>}
 
       {!loading && !error && logs.length === 0 && (
-        <Card className="p-10 text-center">
-          <span className="text-4xl block mb-3">✅</span>
-          <p className="text-slate-600 font-medium">אין שגיאות אחרונות</p>
-          <p className="text-slate-400 text-sm mt-1">הכל עובד כצפוי</p>
+        <Card padding={false}>
+          <EmptyState icon={<CircleCheck />} title="המערכת רצה בלי שגיאות" body="כל שגיאה מסריקה תופיע כאן, עם הפרויקט והשעה." />
         </Card>
       )}
 
       {!loading && logs.length > 0 && (
-        <Card>
-          <div className="divide-y divide-slate-100">
+        <Card padding={false}>
+          <ul className="divide-y divide-line">
             {logs.map((log) => (
-              <div key={log.id} className="px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${levelStyle(log.level)}`}
-                  >
-                    {levelLabel(log.level)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{log.message}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{log.detail}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {log.project} &bull;{' '}
-                      {new Date(log.timestamp).toLocaleString('he-IL')}
-                    </p>
-                  </div>
+              <li key={log.id} className="flex items-start gap-3 px-5 py-4 sm:px-6">
+                <Badge variant={levelVariant(log.level)} className="mt-0.5 shrink-0">{levelLabel(log.level)}</Badge>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-copy font-semibold text-ink">{log.message}</p>
+                  {log.detail && <p className="mt-0.5 break-words text-caption text-muted">{log.detail}</p>}
+                  <p className="mt-1 text-caption text-muted">
+                    <span>{log.project}</span>
+                    <span aria-hidden className="mx-1.5">·</span>
+                    <span className="tabular-nums">{new Date(log.timestamp).toLocaleString('he-IL')}</span>
+                  </p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </Card>
       )}
     </div>
@@ -640,10 +531,10 @@ function LogsTab() {
 /* ─── Main Page ──────────────────────────────────────────── */
 
 const TABS = [
-  { id: 'status', label: 'סטטוס חיבורים', icon: '🔌' },
-  { id: 'instructions', label: 'הוראות הגדרה', icon: '📖' },
-  { id: 'test', label: 'בדיקת סריקה', icon: '🧪' },
-  { id: 'logs', label: 'לוג שגיאות', icon: '📋' },
+  { id: 'status', label: 'סטטוס חיבורים', short: 'חיבורים', icon: Plug },
+  { id: 'instructions', label: 'הוראות הגדרה', short: 'הוראות', icon: BookOpen },
+  { id: 'test', label: 'בדיקת סריקה', short: 'בדיקה', icon: FlaskConical },
+  { id: 'logs', label: 'לוג שגיאות', short: 'לוג', icon: ScrollText },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -652,34 +543,31 @@ export default function SetupPage() {
   const [activeTab, setActiveTab] = useState<TabId>('status')
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 w-full">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">הגדרת המערכת</h1>
-        <p className="text-slate-500 text-sm mt-1">
-          בצע את השלבים הבאים כדי לחבר את Supabase ו-Serper ולהפעיל את המערכת.
+    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-8 sm:py-10">
+      <div>
+        <h1 className="text-title font-bold tracking-tight text-ink">הגדרת המערכת</h1>
+        <p className="mt-1.5 text-copy text-muted">
+          השלבים הבאים מחברים את Supabase ו-Serper ומפעילים את המערכת.
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6 flex-wrap">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center ${
-              activeTab === tab.id
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span>{tab.icon}</span>
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      <Segmented
+        ariaLabel="אזורי ההגדרה"
+        value={activeTab}
+        onChange={(v) => setActiveTab(v)}
+        fill
+        options={TABS.map((tab) => ({
+          value: tab.id,
+          icon: tab.icon,
+          label: (
+            <>
+              <span className="sm:hidden">{tab.short}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
+            </>
+          ),
+        }))}
+      />
 
-      {/* Tab content */}
       {activeTab === 'status' && <StatusTab />}
       {activeTab === 'instructions' && <InstructionsTab />}
       {activeTab === 'test' && <TestScanTab />}

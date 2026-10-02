@@ -60,6 +60,9 @@ import { calculateNextScanDate } from '@/lib/utils'
 import { getUserEntitlement } from '@/lib/subscription'
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeUsageReservation } from '@/lib/billing/usage-reservations'
+import {
+  loadCompetitorDomainsForScan, recordCompetitorPositions, finishCompetitorSavesAfterResponse,
+} from '@/lib/competitors/scan-positions'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -121,6 +124,8 @@ export async function processScheduledScanForProject(
   let reservationToken: string | null = null
   let dispatchedCount = 0
   let scanId: string | null = null
+  /** Competitor-position inserts started during this run (best effort, never awaited). */
+  const competitorSaves: Promise<unknown>[] = []
 
   /** Every project-row write in this function is guarded by `scan_claimed_at
    *  = claimToken` — if a newer worker has since re-claimed, this resolves
@@ -152,6 +157,14 @@ export async function processScheduledScanForProject(
     if (!claimed) {
       return { status: 'skipped', reason: 'already_claimed' }
     }
+
+    // Competitors ride along, never in the way (see app/api/scan/route.ts):
+    // the list loads while the steps below run and is never awaited, and the
+    // scanner locates them in the result pages it fetches anyway. Scoped to
+    // the project AND its owner, because this client bypasses RLS.
+    let competitorDomains: string[] = []
+    void loadCompetitorDomainsForScan(admin, { projectId: project.id, ownerId: project.user_id })
+      .then((domains) => { competitorDomains = domains })
 
     // Load active targets
     const { data: targets, error: targetsError } = await admin
@@ -296,6 +309,10 @@ export async function processScheduledScanForProject(
         .maybeSingle()
 
       const previousPosition = prevResult?.position ?? null
+      const withCompetitors = target.engine_type === 'google_search' && competitorDomains.length > 0
+        ? { competitorDomains }
+        : {}
+      const checkedAt = now.toISOString()
 
       // dispatchedCount increments IMMEDIATELY before the provider call — a
       // check is "dispatched" (and therefore chargeable, per the reservation
@@ -338,6 +355,7 @@ export async function processScheduledScanForProject(
         language: project.language,
         city: project.city,
         deviceType: project.device_type,
+        ...withCompetitors,
       })
 
       const changeValue =
@@ -357,13 +375,20 @@ export async function processScheduledScanForProject(
         result_url: scanOutput.resultUrl,
         result_title: scanOutput.resultTitle,
         result_address: scanOutput.resultAddress,
-        checked_at: now.toISOString(),
+        checked_at: checkedAt,
         error_message: scanOutput.error,
       })
       // 2nd review correction — this was previously unchecked, silently
       // swallowing a persistence failure (see the comment above this loop).
       if (resultInsertError) {
         throw new Error(`scan_results_insert_failed:${target.id}:${resultInsertError.message}`)
+      }
+      // Under the SAME checked_at as the row just written. Not awaited, never rejects.
+      if (scanOutput.competitorPositions) {
+        competitorSaves.push(recordCompetitorPositions(admin, {
+          ownerId: project.user_id, projectId: project.id, trackingTargetId: target.id,
+          checkedAt, positions: scanOutput.competitorPositions,
+        }))
       }
     }
 
@@ -426,5 +451,9 @@ export async function processScheduledScanForProject(
     }
     await guardedProjectUpdate({ scan_claimed_at: null, scan_retry_count: retryCount })
     return { status: 'will_retry', error: msg }
+  } finally {
+    // Competitor inserts still in flight finish after the response, whatever
+    // happened above. Synchronous, and it never throws.
+    finishCompetitorSavesAfterResponse(competitorSaves)
   }
 }

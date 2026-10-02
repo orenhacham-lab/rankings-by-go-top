@@ -4,7 +4,10 @@ import { useState } from 'react'
 import { Client } from '@/lib/supabase/types'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge } from '@/components/ui/StatusBadge'
-import Button from '@/components/ui/Button'
+import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
+import { PauseCircle, Pencil, PlayCircle, Search, Trash2 } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import ClientForm from './ClientForm'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
@@ -50,13 +53,15 @@ export default function ClientsTable({ clients, onClientsChange }: ClientsTableP
   return (
     <>
       {/* Search */}
-      <div className="mb-4">
+      <div className="relative mb-4 w-full max-w-sm">
+        <Search aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
         <input
-          type="text"
+          type="search"
           placeholder={dict.clients.searchPlaceholder}
+          aria-label={dict.clients.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          className={cn(FIELD_CLASSES, 'h-10 ps-9')}
         />
       </div>
 
@@ -64,64 +69,50 @@ export default function ClientsTable({ clients, onClientsChange }: ClientsTableP
         <TableHead>
           <tr>
             <Th>{dict.clients.table.clientName}</Th>
-            <Th>{dict.clients.table.contactName}</Th>
-            <Th>{dict.clients.table.email}</Th>
-            <Th>{dict.clients.table.phone}</Th>
+            <Th className="hidden md:table-cell">{dict.clients.table.contactName}</Th>
+            <Th className="hidden lg:table-cell">{dict.clients.table.email}</Th>
+            <Th className="hidden lg:table-cell">{dict.clients.table.phone}</Th>
             <Th>{dict.clients.table.status}</Th>
-            <Th>{dict.clients.table.createdAt}</Th>
-            <Th>{dict.clients.table.actions}</Th>
+            <Th className="hidden md:table-cell">{dict.clients.table.createdAt}</Th>
+            <Th><span className="sr-only">{dict.clients.table.actions}</span></Th>
           </tr>
         </TableHead>
         <TableBody>
           {filtered.length === 0 && (
             <EmptyRow colSpan={7} message={dict.clients.table.emptyState} />
           )}
-          {filtered.map((client) => (
+          {filtered.map((client) => {
+            // One menu per row, like the projects table: delete only opens the confirmation.
+            const menu: RowMenuItem[] = [
+              { key: 'edit', label: dict.clients.actions.edit, icon: <Pencil aria-hidden="true" className="size-4" />, onSelect: () => setEditingClient(client) },
+              {
+                key: 'toggle', label: client.is_active ? dict.clients.actions.deactivate : dict.clients.actions.activate,
+                disabled: togglingId === client.id,
+                icon: client.is_active ? <PauseCircle aria-hidden="true" className="size-4" /> : <PlayCircle aria-hidden="true" className="size-4" />,
+                onSelect: () => { void handleToggleActive(client) },
+              },
+              { key: 'delete', label: dict.clients.actions.delete, danger: true, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => setDeletingClient(client) },
+            ]
+            return (
             <TableRow key={client.id}>
-              <Td>
-                <Link
-                  href={`/clients/${client.id}`}
-                  className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                >
+              <Td className="min-w-[10rem]">
+                <Link href={`/clients/${client.id}`} className="font-semibold text-ink hover:text-action hover:underline">
                   {client.name}
                 </Link>
               </Td>
-              <Td>{client.contact_name || '—'}</Td>
-              <Td>{client.email || '—'}</Td>
-              <Td>{client.phone || '—'}</Td>
+              <Td className="hidden md:table-cell">{client.contact_name || '—'}</Td>
+              <Td className="hidden lg:table-cell"><span dir="ltr" className="block max-w-64 truncate text-caption text-muted">{client.email || '—'}</span></Td>
+              <Td className="hidden lg:table-cell"><span dir="ltr" className="tabular-nums">{client.phone || '—'}</span></Td>
               <Td>
                 <ActiveBadge active={client.is_active} />
               </Td>
-              <Td>{formatDate(client.created_at)}</Td>
-              <Td>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingClient(client)}
-                  >
-                    {dict.clients.actions.edit}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    loading={togglingId === client.id}
-                    onClick={() => handleToggleActive(client)}
-                  >
-                    {client.is_active ? dict.clients.actions.deactivate : dict.clients.actions.activate}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-600 dark:text-red-400"
-                    onClick={() => setDeletingClient(client)}
-                  >
-                    {dict.clients.actions.delete}
-                  </Button>
-                </div>
+              <Td className="hidden md:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(client.created_at)}</span></Td>
+              <Td className="w-12">
+                <RowMenu label={dict.clients.table.moreActions(client.name)} items={menu} />
               </Td>
             </TableRow>
-          ))}
+            )
+          })}
         </TableBody>
       </Table>
 

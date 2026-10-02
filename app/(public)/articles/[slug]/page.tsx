@@ -3,12 +3,17 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { CalendarDays, FileQuestion, ListTree } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import Button from '@/components/ui/Button'
+import BackLink from '@/components/ui/BackLink'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
+import { CONTAINER } from '@/components/public/marketing'
+import { ArticlesPromo, type ArticlesPromoCopy } from '@/components/public/ArticlesPromo'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
+import { authHref } from '@/lib/i18n/auth-href'
 
 // ============================================================
 // ARTICLE ACCESS CONTROL NOTE
@@ -75,11 +80,22 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
+      <div className="flex min-h-screen flex-col bg-canvas">
         <PublicNav />
-        <div className="flex items-center justify-center pt-32 pb-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען...
+        <div className={`${CONTAINER} max-w-4xl flex-1 pt-28 pb-20 lg:pt-32`}>
+          <div role="status" aria-busy="true" className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-10">
+            <span className="sr-only">טוען...</span>
+            <div aria-hidden="true" className="space-y-4">
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-4 w-1/3" />
+              <div className="space-y-3 pt-6">
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-3.5 w-5/6" />
+                <Skeleton className="h-3.5 w-2/3" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -87,25 +103,24 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   if (notFound || !article) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <div className="flex min-h-screen flex-col bg-canvas">
         <PublicNav />
-        <div className="flex-1">
-          <div className="max-w-3xl mx-auto pt-28 pb-12 px-4">
+        <main className="flex-1">
+          <div className={`${CONTAINER} max-w-3xl pt-28 pb-16 lg:pt-32`}>
             <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: 'מאמר לא נמצא', href: '#' }]} />
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-              <h1 className="text-2xl font-bold text-slate-900 mb-4">מאמר לא נמצא</h1>
-              <p className="text-slate-600 mb-6">המאמר שחיפשת אינו קיים או הוסר</p>
-              <div className="flex gap-4 justify-center flex-wrap">
-                <Link href="/articles">
-                  <Button>← חזור למאמרים</Button>
-                </Link>
-                <Link href="/">
-                  <Button>← חזור לעמוד הבית</Button>
-                </Link>
+            <div className="mt-8 flex flex-col items-center gap-3 rounded-card border border-line bg-surface px-6 py-12 text-center shadow-card">
+              <div className="mb-1 flex size-12 items-center justify-center rounded-inset bg-action-soft text-action ring-8 ring-sunk/70" aria-hidden="true">
+                <FileQuestion className="size-5" />
+              </div>
+              <h1 className="text-title font-bold tracking-tight text-ink">מאמר לא נמצא</h1>
+              <p className="text-copy text-muted">המאמר שחיפשת אינו קיים או הוסר</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <BackLink href="/articles">חזור למאמרים</BackLink>
+                <BackLink href="/">חזור לעמוד הבית</BackLink>
               </div>
             </div>
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     )
@@ -140,42 +155,34 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav />
-      <div className="flex-1">
-        {/* Article Hero with gradient background */}
-        <div className="relative pt-28 lg:pt-32 pb-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.1),_transparent_50%)]" />
-          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: article.title, href: '#' }]} />
-          </div>
-        </div>
+      <main className="flex-1">
+        <div className={`${CONTAINER} max-w-4xl pt-28 pb-16 lg:pt-32 lg:pb-20`}>
+          <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: article.title, href: '#' }]} />
 
-        <div className="max-w-4xl mx-auto pb-12 px-4 sm:px-6 lg:px-8">
-          <article className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden -mt-4">
+          <article className="mt-6 overflow-hidden rounded-card border border-line bg-surface shadow-card">
             {/* Article Header with Image */}
-            <div className="flex flex-col lg:flex-row gap-8 p-8 lg:p-10 items-start">
-              <div className="flex-1">
-                <h1 className="text-3xl lg:text-4xl xl:text-5xl font-extrabold text-slate-900 mb-6 leading-tight tracking-tight">
+            <div className="flex flex-col items-start gap-8 p-6 sm:p-10 lg:flex-row">
+              <div className="min-w-0 flex-1">
+                <h1 className="mb-6 text-title font-bold tracking-tight text-ink text-balance sm:text-display">
                   {article.title}
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-4 pb-6 border-b border-slate-200">
+                <div className="flex flex-wrap items-center gap-4 border-b border-line pb-6">
                   {article.author && (
                     <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                      <span className="flex size-9 items-center justify-center rounded-pill bg-action-soft text-caption font-bold text-action" aria-hidden="true">
                         {article.author.charAt(0)}
-                      </div>
-                      <span className="text-sm text-slate-700 font-medium">
+                      </span>
+                      <span className="text-copy font-medium text-ink">
                         {article.author}
                       </span>
                     </div>
                   )}
                   {article.published_at && (
-                    <span className="text-sm text-slate-500 flex items-center gap-1.5">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
+                    <span className="flex items-center gap-1.5 text-copy text-muted">
+                      <CalendarDays className="size-4" aria-hidden="true" />
                       {new Date(article.published_at).toLocaleDateString('he-IL', {
                         year: 'numeric',
                         month: 'long',
@@ -188,42 +195,40 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
               {/* Article Image */}
               {article.featured_image_url && (
-                <div className="lg:w-64 lg:h-64 relative flex-shrink-0">
+                <div className="relative shrink-0 lg:size-64">
                   <Image
                     src={article.featured_image_url}
                     alt={article.featured_image_alt || article.title}
                     width={256}
                     height={256}
-                    className="w-full h-full object-cover rounded-xl shadow-md"
+                    className="size-full rounded-inset border border-line object-cover"
                   />
                 </div>
               )}
             </div>
 
             {/* Article Content */}
-            <div className="px-8 lg:px-10 py-8">
+            <div className="px-6 pb-10 sm:px-10">
               <div
-                className="max-w-none text-slate-700 article-content [&_h2]:scroll-mt-4 [&_h3]:scroll-mt-4 [&_h2]:text-2xl [&_h2]:lg:text-3xl [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:lg:text-2xl [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-6 [&_h3]:mb-3 [&_p]:mb-4 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-2 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:space-y-2 [&_ol]:mb-4 [&_a]:text-blue-600 [&_a]:hover:underline [&_strong]:font-bold [&_strong]:text-slate-900"
+                className="article-content max-w-none text-section font-normal leading-8 text-body [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24 [&_h2]:mt-10 [&_h2]:mb-4 [&_h2]:text-title [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:text-ink [&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:text-section [&_h3]:font-semibold [&_h3]:text-ink [&_p]:mb-5 [&_ul]:mb-5 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:ps-6 [&_ol]:mb-5 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:ps-6 [&_a]:font-medium [&_a]:text-action [&_a]:underline-offset-4 [&_a:hover]:underline [&_strong]:font-semibold [&_strong]:text-ink [&_img]:rounded-inset [&_blockquote]:border-s-[3px] [&_blockquote]:border-line-strong [&_blockquote]:ps-4 [&_blockquote]:text-muted"
                 dangerouslySetInnerHTML={{ __html: contentWithIds }}
               />
             </div>
 
             {/* Table of Contents at the end */}
             {headings && headings.length > 0 && (
-              <div className="px-8 lg:px-10 py-8 border-t border-slate-200 bg-slate-50">
-                <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4 pb-3 border-b border-slate-200 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
+              <nav aria-labelledby="article-toc" className="border-t border-line bg-sunk px-6 py-8 sm:px-10">
+                <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+                  <h3 id="article-toc" className="mb-4 flex items-center gap-2 border-b border-line pb-3 text-section font-semibold text-ink">
+                    <ListTree className="size-5 text-action" aria-hidden="true" />
                     תוכן עניינים
                   </h3>
                   <ul className="space-y-2">
                     {headings.map((heading, index) => (
-                      <li key={index} style={{ paddingRight: (heading.level - 2) * 16 }}>
+                      <li key={index} style={{ paddingInlineStart: (heading.level - 2) * 16 }}>
                         <a
                           href={`#${heading.id}`}
-                          className="text-blue-600 hover:text-blue-700 hover:underline text-sm transition-colors"
+                          className="rounded-control text-copy text-action underline-offset-4 transition-colors duration-150 ease-snappy hover:text-action-hover hover:underline"
                         >
                           {heading.text}
                         </a>
@@ -231,113 +236,36 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                     ))}
                   </ul>
                 </div>
-              </div>
+              </nav>
             )}
           </article>
 
           {/* Software promotion section */}
-          <SoftwarePromoSection />
+          <div className="mt-12">
+            <ArticlesPromo copy={PROMO} />
+          </div>
         </div>
-      </div>
+      </main>
       <Footer />
     </div>
   )
 }
 
-function SoftwarePromoSection() {
-  return (
-    <div className="mt-12 space-y-8">
-      {/* Hero CTA Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 p-8 lg:p-12 shadow-2xl">
-        <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-
-        <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-          <div className="text-white">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur text-white text-xs font-semibold mb-4">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              Rankings by Go Top
-            </div>
-            <h3 className="text-3xl lg:text-4xl font-extrabold mb-4 leading-tight">
-              עקוב אחר הדירוגים שלך<br />בגוגל, מתי שתרצה
-            </h3>
-            <p className="text-blue-100 text-lg mb-6 leading-relaxed">
-              מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/signup"
-                className="px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
-              >
-                התחל ניסיון חינם
-              </Link>
-              <Link
-                href="/pricing"
-                className="px-6 py-3 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white font-semibold text-base hover:bg-white/20 transition-all"
-              >
-                צפה במחירים
-              </Link>
-            </div>
-          </div>
-
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { num: '1000+', label: 'מילות מפתח' },
-              { num: '2', label: 'מנועי דירוג (Google + Maps)' },
-              { num: '100%', label: 'בעברית' },
-              { num: '7 ימים', label: 'ניסיון חינם' },
-            ].map((stat) => (
-              <div key={stat.label} className="bg-white/10 backdrop-blur rounded-2xl p-4 lg:p-6 border border-white/20">
-                <div className="text-2xl lg:text-3xl font-extrabold text-white mb-1">{stat.num}</div>
-                <div className="text-sm text-blue-100">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Feature highlights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          {
-            title: 'גוגל אורגני',
-            desc: 'מעקב אחרי דירוגים בעמודי 1-2 בגוגל עם תוצאות מדויקות',
-            icon: (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            ),
-          },
-          {
-            title: 'גוגל מפות',
-            desc: 'מעקב לפי מיקום גיאוגרפי מדויק - עיר, מיקוד, נקודת ציון',
-            icon: (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            ),
-          },
-          {
-            title: 'דוחות מקצועיים',
-            desc: 'יצוא דוחות PDF ו-Excel עם מגמות, השוואות וניתוח מתקדם',
-            icon: (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            ),
-          },
-        ].map((feat) => (
-          <div key={feat.title} className="bg-white rounded-2xl border border-slate-200 p-6 hover:border-blue-300 hover:shadow-lg transition-all">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center mb-4 shadow-md">
-              {feat.icon}
-            </div>
-            <h4 className="text-lg font-bold text-slate-900 mb-2">{feat.title}</h4>
-            <p className="text-sm text-slate-600 leading-relaxed">{feat.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+const PROMO: ArticlesPromoCopy = {
+  badge: 'Go Top SEO',
+  title: ['עקוב אחר הדירוגים שלך', 'בגוגל, מתי שתרצה'],
+  body: 'מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.',
+  signup: { label: 'התחל ניסיון חינם', href: authHref('signup', 'he') },
+  pricing: { label: 'צפה במחירים', href: '/pricing' },
+  stats: [
+    { num: '1000+', label: 'מילות מפתח' },
+    { num: '2', label: 'מנועי דירוג (Google + Maps)' },
+    { num: '100%', label: 'בעברית' },
+    { num: '7 ימים', label: 'ניסיון חינם' },
+  ],
+  features: [
+    { title: 'גוגל אורגני', desc: 'מעקב אחרי דירוגים בעמודי 1-2 בגוגל עם תוצאות מדויקות' },
+    { title: 'גוגל מפות', desc: 'מעקב לפי מיקום גיאוגרפי מדויק - עיר, מיקוד, נקודת ציון' },
+    { title: 'דוחות מקצועיים', desc: 'יצוא דוחות PDF ו-Excel עם מגמות, השוואות וניתוח מתקדם' },
+  ],
 }

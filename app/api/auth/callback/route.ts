@@ -5,6 +5,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { sendSignupNotification } from '@/lib/notifications/signup-email'
+import { RESET_PASSWORD_PATH, recoveryFailureUrl } from '@/lib/auth/password-reset'
+import { SEED_CLAIM_COOKIE } from '@/lib/onboarding/claim-cookie'
+import { afterSignupPath } from '@/lib/onboarding/claim-start'
 
 /**
  * Supabase auth callback (email confirmation and Supabase-hosted OAuth, PKCE).
@@ -68,12 +71,27 @@ export async function GET(request: NextRequest) {
       // hop. The durable source is auth metadata (seeds the dashboard provider); this
       // just keeps the choice on the redirect URL so the param is never lost.
       const lang = searchParams.get('lang')
-      const dest = new URL(next, origin)
+      // A sign-up that carried a free-check claim opens the project made from
+      // that scan instead of an empty dashboard (lib/onboarding/claim-start.ts).
+      // The claim cookie arrives with the confirmation link's navigation, in any
+      // tab of this browser. Only the default landing is replaced, and only by
+      // one fixed internal path; any other `next` is kept as it was.
+      const landing = afterSignupPath({ next, claimCookie: cookieStore.get(SEED_CLAIM_COOKIE)?.value, env: process.env })
+      const dest = new URL(landing, origin)
       if (lang === 'en' || lang === 'he') dest.searchParams.set('lang', lang)
       return NextResponse.redirect(dest.toString())
     }
   }
 
-  // Return to login on error
-  return NextResponse.redirect(`${origin}/login?error=oauth`)
+  // Return to login on error — in the language the visitor signed up in, where
+  // the login page now says the link was invalid or expired instead of showing
+  // an unexplained empty form.
+  const lang = searchParams.get('lang')
+  // A password-recovery link that could not be exchanged (expired, used
+  // twice) goes back to the request form, which says so and offers a new one.
+  if (next === RESET_PASSWORD_PATH) return NextResponse.redirect(recoveryFailureUrl(origin, lang).toString())
+  const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)
+  failed.searchParams.set('error', 'oauth')
+  if (lang === 'he') failed.searchParams.set('lang', 'he')
+  return NextResponse.redirect(failed.toString())
 }

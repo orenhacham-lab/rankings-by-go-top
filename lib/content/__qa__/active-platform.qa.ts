@@ -60,15 +60,17 @@ async function main() {
     check('overview returns shopify + resolved platform + shopify article fields', /resolveActivePlatform\(/.test(overview) && /shopify,\s*platform,/.test(overview) && /shopify_article_id/.test(overview))
     check('overview also returns the shared active-alert decision', /alerts,\s*alertsUnavailable\s*}\)/.test(overview) && /loadActiveAlerts\(/.test(overview))
 
-    const hub = read('../../../components/content/ContentHub.tsx')
-    check('ContentHub routes row + batch by activePlatform to the Shopify route', /activePlatform: ActivePlatform = data\?\.platform\?\.platform/.test(hub) && /articles\/\$\{a\.id\}\/shopify/.test(hub) && /articles\/\$\{id\}\/shopify/.test(hub) && /if \(activePlatform === 'shopify'\) \{ await exportRowShopify/.test(hub))
+    const hub = read('../../../components/content/workspace/ArticlesScreen.tsx')
+    const workspace = read('../../../components/content/workspace/ContentWorkspaceProvider.tsx')
+    check('the platform is resolved ONCE, in the workspace', /activePlatform: ActivePlatform = data\?\.platform\?\.platform/.test(workspace))
+    check('the articles screen routes row + batch by activePlatform to the Shopify route', /articles\/\$\{a\.id\}\/shopify/.test(hub) && /articles\/\$\{id\}\/shopify/.test(hub) && /if \(activePlatform === 'shopify'\) \{ await exportRowShopify/.test(hub))
     // The corrective codes used to be an inline three-way ternary here. They now
     // go through ONE localizer (lib/i18n/dashboard/shopify-publish-error.ts),
     // which covers every code in every shape the server emits instead of three
     // of them — so the contract is that the localizer is used, and that the
     // shared dictionary really carries the corrective codes.
-    check('ContentHub Shopify row is idempotent + surfaces corrective scope/blog errors',
-      /shopifyPublishError\(/.test(hub) && /localizeShopifyPublishError/.test(hub) && /shopify_article_id/.test(hub))
+    check('the Shopify row is idempotent + surfaces corrective scope/blog errors',
+      /shopifyPublishError\(/.test(hub) && /localizeShopifyPublishError/.test(workspace) && /shopify_article_id/.test(hub))
     const genErrors = read('../../i18n/dashboard/en.ts')
     check('the shared dictionary carries the corrective Shopify publish codes',
       /missing_write_content_scope: '/.test(genErrors) && /no_shopify_blog: '/.test(genErrors)

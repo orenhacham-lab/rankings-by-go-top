@@ -6,6 +6,7 @@
  * precomputed run aggregates (no metric-row re-scan). This endpoint changes no state.
  */
 import { authContentProject } from '@/lib/content/api-auth'
+import { isAdminUser } from '@/lib/auth/admin-role'
 import { isGscReadOnlyEnabled, isGscOAuthConfigured } from '@/lib/gsc/config'
 import { loadUserConnection, loadProjectProperty, latestSucceededRun, sanitizeConnection, GscServiceError } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
@@ -54,18 +55,41 @@ export async function GET(request: Request) {
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
   try {
-    const connection = await loadUserConnection(auth.admin, auth.user.id)
-    const property = await loadProjectProperty(auth.admin, auth.project.id)
+    // SPEED: the reads below depend only on the (already ownership-checked)
+    // project and user, so they go out together instead of one round trip
+    // each. The windows are read alongside the property; they are used, and a
+    // failure of theirs counts, only when the project has a property, exactly
+    // as before.
+    const oauthConfigured = isGscOAuthConfigured()
+    const runsRead = Promise.all(GSC_WINDOWS.map((w) => latestSucceededRun(auth.admin, auth.project.id, w as GscWindowDays)))
+      .then((runs) => ({ runs }), (error: unknown) => ({ error }))
+    const [connectionRead, propertyRead, runsResult] = await Promise.allSettled([
+      loadUserConnection(auth.admin, auth.user.id),
+      loadProjectProperty(auth.admin, auth.project.id),
+      runsRead,
+    ])
+    // Failures surface in the order the reads used to run: connection, property, windows.
+    if (connectionRead.status === 'rejected') throw connectionRead.reason
+    if (propertyRead.status === 'rejected') throw propertyRead.reason
+    const connection = connectionRead.value
+    const property = propertyRead.value
 
     const windows: Record<string, ReturnType<typeof summaryCard>> = {}
     if (property) {
-      const runs = await Promise.all(GSC_WINDOWS.map((w) => latestSucceededRun(auth.admin, auth.project.id, w as GscWindowDays)))
+      const read = runsResult.status === 'fulfilled' ? runsResult.value : { error: runsResult.reason }
+      if ('error' in read) throw read.error
+      const runs = read.runs
       GSC_WINDOWS.forEach((w, i) => { windows[String(w)] = summaryCard(runs[i]) })
     }
+    // Why it is unavailable (server configuration) is for an administrator to read; a merchant
+    // sees only that it is unavailable. The role comes from profiles via the service-role client.
+    // (Only read when OAuth is not configured, so it costs nothing in production.)
+    const opsDetail = !oauthConfigured && await isAdminUser(auth.admin, auth.user.id)
 
     return Response.json({
       ok: true,
-      oauthConfigured: isGscOAuthConfigured(),
+      oauthConfigured,
+      opsDetail,
       connection: sanitizeConnection(connection),
       property: property ? { siteUrl: property.site_url, permissionLevel: property.permission_level, selectedAt: property.selected_at } : null,
       windows,

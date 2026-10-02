@@ -5,15 +5,19 @@ import { Project, Client } from '@/lib/supabase/types'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
+import RowMenu, { type RowMenuItem } from '@/components/ui/RowMenu'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
+import { PauseCircle, Pencil, PlayCircle, Search, Trash2 } from 'lucide-react'
 import ProjectForm from './ProjectForm'
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
-import { formatDate, getFrequencyLabel } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { toggleProjectActiveAction, deleteProjectAction } from '@/app/actions/projects'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 
 interface ProjectsTableProps {
   projects: (Project & { clients?: Client })[]
@@ -25,19 +29,25 @@ interface ProjectsTableProps {
 export default function ProjectsTable({ projects, clients, showClient = true, onProjectsChange }: ProjectsTableProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
+  // The top bar's switcher lists the active projects. Every change made here
+  // (a rename, deactivating, reactivating, deleting) reloads that list, or the
+  // switcher would keep offering what this table just changed.
+  const { reloadProjects } = useActiveProject()
 
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Phase 3 — weekly/monthly_first_day removed. A legacy value that somehow
-  // still reaches this component (pre-migration data) falls back to the
-  // generic label helper rather than a dedicated (now-removed) translation.
+  // UX review P2-2 ("does not handle weekly"): there is no weekly any more. Phase 3
+  // converted every weekly project to monthly and the column's CHECK allows only
+  // manual | monthly, so naming "weekly" here would describe a cadence that never
+  // runs. What was wrong is the fallback: an unknown value went to a Hebrew-only
+  // helper, so the English screen showed "ידני". Every value now reads in the
+  // screen's language.
   function localizedFrequency(freq: string): string {
-    if (freq === 'monthly') return dict.projects.frequency.monthly
-    if (freq === 'manual') return dict.projects.frequency.manual
-    return getFrequencyLabel(freq)
+    const f = dict.projects.frequency
+    return freq === 'monthly' ? f.monthly : f.manual
   }
 
   const filtered = projects.filter(
@@ -50,6 +60,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
     setTogglingId(project.id)
     try {
       await toggleProjectActiveAction(project.id, project.is_active)
+      reloadProjects()
     } finally {
       setTogglingId(null)
     }
@@ -57,90 +68,96 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
 
   return (
     <>
-      <div className="mb-4">
+      <div className="relative mb-4 w-full max-w-sm">
+        <Search aria-hidden className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
         <input
-          type="text"
+          type="search"
           placeholder={dict.projects.searchPlaceholder}
+          aria-label={dict.projects.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          className={cn(FIELD_CLASSES, 'h-10 ps-9')}
         />
       </div>
 
+      {/* PRIORITY COLUMNS: a phone shows the project (its domain under the name),
+          its status and the actions; client, cadence and last check return as the
+          screen widens. The domain has its own column from md up. */}
       <Table>
         <TableHead>
-          <tr>
+          <tr className="max-sm:[&>th]:px-2.5">
             <Th>{dict.projects.table.projectName}</Th>
-            {showClient && <Th>{dict.projects.table.client}</Th>}
-            <Th>{dict.projects.table.domain}</Th>
-            <Th>{dict.projects.table.frequency}</Th>
-            <Th>{dict.projects.table.lastScan}</Th>
+            {showClient && <Th className="hidden md:table-cell">{dict.projects.table.client}</Th>}
+            <Th className="hidden md:table-cell">{dict.projects.table.domain}</Th>
+            <Th className="hidden lg:table-cell">{dict.projects.table.frequency}</Th>
+            <Th className="hidden md:table-cell">{dict.projects.table.lastScan}</Th>
             <Th>{dict.projects.table.status}</Th>
-            <Th>{dict.projects.table.actions}</Th>
+            <Th><span className="sr-only">{dict.projects.table.actions}</span></Th>
           </tr>
         </TableHead>
         <TableBody>
           {filtered.length === 0 && (
             <EmptyRow colSpan={showClient ? 7 : 6} message={dict.projects.table.emptyState} />
           )}
-          {filtered.map((project) => (
-            <TableRow key={project.id}>
-              <Td>
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  {project.name}
-                </Link>
+          {filtered.map((project) => {
+            // The same three actions as before, behind "⋯" like every other table:
+            // delete only opens the confirmation dialog.
+            const menu: RowMenuItem[] = [
+              { key: 'edit', label: dict.projects.actions.edit, icon: <Pencil aria-hidden="true" className="size-4" />, onSelect: () => setEditingProject(project) },
+              {
+                key: 'toggle', label: project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate,
+                disabled: togglingId === project.id,
+                icon: project.is_active ? <PauseCircle aria-hidden="true" className="size-4" /> : <PlayCircle aria-hidden="true" className="size-4" />,
+                onSelect: () => { void handleToggleActive(project) },
+              },
+              { key: 'delete', label: dict.projects.actions.delete, danger: true, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => setDeletingProject(project) },
+            ]
+            return (
+            <TableRow key={project.id} className="max-sm:[&>td]:px-2.5">
+              <Td className="min-w-[10rem]">
+                {/* A project opens as the current project, on its dashboard. An
+                    inactive one has no workspace to open until it is reactivated. */}
+                {project.is_active ? (
+                  <Link
+                    href={`/dashboard?projectId=${encodeURIComponent(project.id)}`}
+                    className="font-semibold text-ink hover:text-action hover:underline"
+                  >
+                    {project.name}
+                  </Link>
+                ) : (
+                  <span className="font-semibold text-muted">{project.name}</span>
+                )}
+                <p dir="ltr" className="mt-0.5 max-w-[12rem] truncate text-start text-caption text-muted md:hidden">{project.target_domain}</p>
               </Td>
               {showClient && (
-                <Td>
+                <Td className="hidden md:table-cell">
                   {project.clients ? (
-                    <Link href={`/clients/${project.clients.id}`} className="text-slate-600 dark:text-slate-300 hover:underline text-sm">
+                    <Link href={`/clients/${project.clients.id}`} className="text-copy text-body hover:text-action hover:underline">
                       {project.clients.name}
                     </Link>
-                  ) : '—'}
+                  ) : <span className="text-muted">—</span>}
                 </Td>
               )}
-              <Td className="font-mono text-xs text-slate-600 dark:text-slate-300">{project.target_domain}</Td>
-              <Td>
+              <Td className="hidden md:table-cell"><span dir="ltr" title={project.target_domain} className="block max-w-64 truncate text-caption text-muted">{project.target_domain}</span></Td>
+              <Td className="hidden lg:table-cell">
                 <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
                   {localizedFrequency(project.scan_frequency)}
                 </Badge>
               </Td>
-              <Td>{project.last_scan_at ? formatDate(project.last_scan_at) : '—'}</Td>
+              <Td className="hidden md:table-cell">
+                <span className="whitespace-nowrap text-caption text-muted">
+                  {project.last_scan_at ? formatDate(project.last_scan_at, language) : dict.projects.table.neverScanned}
+                </span>
+              </Td>
               <Td>
                 <ActiveBadge active={project.is_active} />
               </Td>
-              <Td>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingProject(project)}
-                  >
-                    {dict.projects.actions.edit}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    loading={togglingId === project.id}
-                    onClick={() => handleToggleActive(project)}
-                  >
-                    {project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-600 dark:text-red-400"
-                    onClick={() => setDeletingProject(project)}
-                  >
-                    {dict.projects.actions.delete}
-                  </Button>
-                </div>
+              <Td className="w-12">
+                <RowMenu label={dict.projects.table.moreActions(project.name)} items={menu} />
               </Td>
             </TableRow>
-          ))}
+            )
+          })}
         </TableBody>
       </Table>
 
@@ -154,7 +171,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
           <ProjectForm
             project={editingProject}
             clients={clients}
-            onSuccess={() => setEditingProject(null)}
+            onSuccess={() => { setEditingProject(null); reloadProjects() }}
             onCancel={() => setEditingProject(null)}
           />
         </Modal>
@@ -167,7 +184,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
           labels={dict.projects.deleteDialog}
           onConfirm={() => deleteProjectAction(deletingProject.id)}
           onClose={() => setDeletingProject(null)}
-          onDeleted={async () => { if (onProjectsChange) await onProjectsChange() }}
+          onDeleted={async () => { reloadProjects(); if (onProjectsChange) await onProjectsChange() }}
         />
       )}
     </>

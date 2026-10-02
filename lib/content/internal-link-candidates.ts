@@ -50,6 +50,8 @@ export function readAnchorBank(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   const out: string[] = []
   for (const entry of value) {
+    // An automatic link (source 'auto') is one this article gives, not an anchor other articles should use for it.
+    if (entry && typeof entry === 'object' && (entry as { source?: unknown }).source === 'auto') continue
     if (entry && typeof entry === 'object' && typeof (entry as { anchor?: unknown }).anchor === 'string') {
       const a = ((entry as { anchor: string }).anchor).trim()
       if (a) out.push(a)

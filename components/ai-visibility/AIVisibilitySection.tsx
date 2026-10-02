@@ -18,141 +18,72 @@
  * the drawer for the just-completed scan.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Link, Bot, AlertTriangle, Award, Layers, Cpu, TrendingDown, Sparkles } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Archive, CalendarClock, Check, ChevronDown, Info, Loader2, MessageSquareText, Minus, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
+import NextLink from 'next/link'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import Notice from '@/components/ui/Notice'
+import RowMenu from '@/components/ui/RowMenu'
+import Select from '@/components/ui/Select'
+import { Skeleton } from '@/components/ui/Skeleton'
 import {
   ENGINE_META,
-  ExternalLinkIcon,
   SparkleIcon,
-  TrashIcon,
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
+import { resolveBusinessIdentity, type ScanBusiness } from '@/lib/ai-visibility/business-identity'
+import { rankByWorth, type WorthContext, type WorthPage } from '@/lib/ai-visibility/question-worth'
+import { buildSiteTopics, siteTitleQuestions } from '@/lib/ai-visibility/site-topics'
+import { questionArticleStatus, topicBriefForQuestion, normalizeQuestion, type ContextTopic } from '@/lib/ai-visibility/question-article'
+import { strategyHref, STRATEGY_ANCHORS } from '@/lib/content/strategy/view'
 import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
+import { SCORED_ENGINES, engineScores, latestAnswers, visibilityScore } from '@/lib/ai-visibility/score'
+import { monthlyEngines } from '@/lib/ai-visibility/monthly-check/config'
+import { engineSupportsCountry } from '@/lib/ai-visibility/providers/scrapellm'
+import { dropOffTopicSuggestions, type ProjectVocabulary } from '@/lib/ai-visibility/question-relevance'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { UserFacingError, apiErrorText, isUserFacingError } from '@/lib/i18n/user-facing-error'
+import { generatePromptSuggestions, buildFallbackSuggestions, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
-import { computeDisplayMatches, buildDomainList } from '@/lib/ai-visibility/display-classification'
-import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
-import { generateGeoExplanation } from '@/lib/ai-visibility/geo-explanations'
-import { generateGeoRecommendations } from '@/lib/ai-visibility/geo-recommendations'
-import type {
-  GeoOpportunityMapping,
-  ContentSignalKey,
-  SignalStats,
-  CitationStats,
-  EngineStats,
-  MissingOpportunity,
-} from '@/lib/ai-visibility/geo-opportunity-mapping'
-import type {
-  GeoCompetitorIntelligence,
-  CompetitorCategory,
-} from '@/lib/ai-visibility/geo-competitor-intelligence'
+import { buildDomainList } from '@/lib/ai-visibility/display-classification'
+import type { GeoOpportunityMapping } from '@/lib/ai-visibility/geo-opportunity-mapping'
+import type { GeoCompetitorIntelligence } from '@/lib/ai-visibility/geo-competitor-intelligence'
 import type { BusinessMentionIntelligence } from '@/lib/ai-visibility/geo-business-mentions'
-import { dedupClientSide, applyDiversityFilter, deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
+import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
+import type { CompetitorAnalysisData, EngineMetrics, GlobalMetrics, PromptInsight, PromptRow, ResultRow, TabType } from './sections/types'
+import { AIVisibilityScoreCard, EngineMentionCards, OverviewSummaryStrip } from './sections/ScoreCards'
+import { RecommendationsCard } from './sections/Recommendations'
+import { PromptInsightRow } from './sections/PromptInsightRow'
+import { ResultRowCard } from './sections/ResultRowCard'
+import { SmartQuestionCard } from './sections/SmartQuestionCard'
+import { ResultDetailDrawer } from './sections/ResultDetailDrawer'
+import { AIVisibilitySummarySection } from './sections/InsightsSummary'
+import { GeoOpportunityMappingSection } from './sections/GeoOpportunityMapping'
+import { GeoCompetitorIntelligenceSection } from './sections/GeoCompetitorIntelligence'
+import { NewAIQueryModal } from './sections/NewAIQueryModal'
+import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
 
 const MAX_SUGGESTIONS = 40
 
-const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
+/** The engines the tool checks: the shared score's list (lib/ai-visibility/score.ts). */
+const SUPPORTED_ENGINES = SCORED_ENGINES
 
-type ResultRow = {
-  id: string
-  runId: string
-  promptId: string | null
-  engine: string
-  promptText: string
-  // Raw DB values — never overwritten.
-  mentioned: boolean
-  targetCited: boolean
-  citationCount: number
-  status: string | null
-  scannedAt: string | null
-  citations: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }>
-  responseText: string | null
-  excludedFromScore: boolean
-  // Server-computed display values — present from /api/ai-visibility/runs;
-  // used everywhere the UI counts or labels mentions/citations.
-  displayMentioned: boolean
-  displayCited: boolean
-  displayBrandLabels: string[]
-  displayDomainLabel: string | null
-  // Strict 4-signal model — distinguishes an answer-text mention from a
-  // source/citation. citedAsSource is true ONLY when a project domain is in the
-  // sources list (never when the domain merely appears in the answer body).
-  mentionedInAnswer: boolean
-  citedAsSource: boolean
-  domainMentioned: boolean
-  brandMentioned: boolean
-  domainInAnswerLabel: string | null
-  domainInSourceLabel: string | null
-  // GEO Insights — server-computed, rule-based, read-only. Drawer-only UI.
-  geoInsights: GeoInsights | null
-}
+/** The error state's value for "something failed that is not the merchant's to read": shown as our own words. */
+const GENERIC_ERROR = '__generic__'
 
-const EMPTY_GEO_INSIGHTS: GeoInsights = {
-  queryIntents: [],
-  citationTypes: [],
-  contentSignals: {
-    hasList: false,
-    hasComparisonLanguage: false,
-    hasPricingLanguage: false,
-    hasReviewLanguage: false,
-    hasLocalLanguage: false,
-    hasRecommendationLanguage: false,
-  },
-}
+/** The tool's own tabs, for a page that asks it to open one (W6d). */
+export type AIVisibilityTab = TabType
 
-type PromptRow = {
-  id: string
-  prompt: string
-  country: string | null
-  language: string | null
-  target_domain: string | null
-  target_brand_name: string | null
-  created_at: string
-}
-
-type GlobalMetrics = {
-  totalScans: number
-  totalMentions: number
-  totalCitations: number
-  mentionRate: number
-  citationRate: number
-  enginesCovered: number
-  enginesWithMentions: number
-}
-
-type EngineMetrics = {
-  engine: string
-  scans: number
-  mentions: number
-  citations: number
-  rate: number
-}
-
-type TabType = 'results' | 'queries' | 'insights' | 'competitors'
-
-type CompetitorAnalysisData = {
-  project: { name: string | null; mentionsCount: number; totalResults: number; mentionRate: number } | null
-  competitors: Array<{ id: string; name: string; mentionsCount: number; mentionRate: number }>
-}
-
-type PromptInsight = {
-  totalEngines: number
-  businessMentionEngines: number
-  mentionRate: number
-  targetCitedCount: number
-  status: 'missing' | 'weak' | 'medium' | 'good'
-}
 
 export default function AIVisibilitySection({
   projectId,
@@ -164,6 +95,18 @@ export default function AIVisibilitySection({
   projectDomainAliases,
   projectCity,
   projectKeywords,
+  initialTab,
+  overviewMode = false,
+  onRunsLoaded,
+  onQuestionsCount,
+  competitorsSlot,
+  openQueriesWhenEmpty = false,
+  suggestionsRefreshKey = 0,
+  requestedTab,
+  onAllowanceOut,
+  onChecksRan,
+  autoQuestionIds,
+  resultsRefreshKey = 0,
 }: {
   projectId: string
   projectCountry: string | null
@@ -174,26 +117,75 @@ export default function AIVisibilitySection({
   projectDomainAliases?: string[] | null
   projectCity?: string | null
   projectKeywords?: string[]
+  /** The tab to open on, e.g. from a link that manages competitors. */
+  initialTab?: TabType
+  // ── W6d: the AI-visibility tab's overview around the tool. Every one of these
+  // is optional and off by default. The AI-visibility page passes them for every
+  // project, scanned or not (part B of the UX review): a caller that passes none
+  // gets the bare tool.
+  /** The page shows its own title, score and summary: leave out the tool's copies of them. */
+  overviewMode?: boolean
+  /** The runs this tool loaded (GET /api/ai-visibility/runs), or null when they could not be read. */
+  onRunsLoaded?: (runs: unknown[] | null) => void
+  /** How many questions the project tracks, once loaded (the page's next-step copy). */
+  onQuestionsCount?: (count: number) => void
+  /** Shown in the competitors tab in place of the editor (competitors are managed in settings). */
+  competitorsSlot?: React.ReactNode
+  /** On the first load, open the questions tab when there is no check yet. */
+  openQueriesWhenEmpty?: boolean
+  /** Bumped when new suggested questions were saved (the scan's b5): reload them from the cache. */
+  suggestionsRefreshKey?: number
+  /** Switch to a tab; `seq` makes the same tab requestable twice. */
+  requestedTab?: { tab: TabType; seq: number }
+  /** Whether the allowance is read and nothing is left: the page's hero then offers the billing page, not more checks. */
+  onAllowanceOut?: (out: boolean) => void
+  /** A check finished (or failed): the page re-reads what it shows about the allowance. */
+  onChecksRan?: () => void
+  /** The questions the automatic monthly check covers: each gets a badge in the list (wave 9). */
+  autoQuestionIds?: readonly string[]
+  /** Bumped when checks ran outside the tool (the monthly check's "run now"): reload results and the allowance. */
+  resultsRefreshKey?: number
 }) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const isHebrew = dashboardLanguage === 'he'
 
-  const [currentTab, setCurrentTab] = useState<TabType>('results')
+  const [currentTab, setCurrentTab] = useState<TabType>(initialTab ?? 'results')
+  // W6d. Held in refs: loadAllResults must keep depending on the project alone,
+  // or a caller's new callback identity would reload every result on each render.
+  const onRunsLoadedRef = useRef(onRunsLoaded)
+  onRunsLoadedRef.current = onRunsLoaded
+  const openQueriesWhenEmptyRef = useRef(openQueriesWhenEmpty && !initialTab)
+  useEffect(() => {
+    if (requestedTab) setCurrentTab(requestedTab.tab)
+  }, [requestedTab])
   const [allResults, setAllResults] = useState<ResultRow[]>([])
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
+  const onQuestionsCountRef = useRef(onQuestionsCount)
+  onQuestionsCountRef.current = onQuestionsCount
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [geoOpportunityMapping, setGeoOpportunityMapping] = useState<GeoOpportunityMapping | null>(null)
   const [geoCompetitorIntelligence, setGeoCompetitorIntelligence] = useState<GeoCompetitorIntelligence | null>(null)
   const [businessMentionIntelligence, setBusinessMentionIntelligence] = useState<BusinessMentionIntelligence | null>(null)
   const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    if (!loading) onQuestionsCountRef.current?.(allPrompts.length)
+  }, [loading, allPrompts.length])
   const [showAllResults, setShowAllResults] = useState(false)
   const [seenPrompts, setSeenPrompts] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  // The empty list's "pick a suggested question" goes to the recommended
+  // list on this page (the same questions, with why and the article action);
+  // the window is the fallback only when that list is not there.
+  const pickRecommended = useCallback(() => {
+    const list = typeof document !== 'undefined' ? document.getElementById('ai-recommended-questions') : null
+    if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else setShowSuggestions(true)
+  }, [])
   const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [deletePromptId, setDeletePromptId] = useState<string | null>(null)
@@ -209,8 +201,24 @@ export default function AIVisibilitySection({
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   // Always strip the insufficient-context marker before it can enter state, so
   // it never lingers as a "+" card after the user generates new questions.
+  // The project's own words, for dropping suggestions about another trade
+  // (lib/ai-visibility/question-relevance.ts): read through a ref so every
+  // commit uses the latest ones.
+  const vocabularyRef = useRef<ProjectVocabulary>({})
+  // WORTH GATE (question-worth.ts): every list of suggestions, whatever made it
+  // (templates, the cache, the model), keeps only the questions this business
+  // can win, best first, each with its reason. The last raw list is kept so the
+  // ranking can run again when the site's pages and topics arrive.
+  const worthRef = useRef<WorthContext | null>(null)
+  const rawSuggestionsRef = useRef<PromptSuggestion[] | null>(null)
+  // The questions the site's own page titles ask (site-topics.ts): added to every list, once.
+  const siteQuestionsRef = useRef<PromptSuggestion[]>([])
   const commitSuggestedQuestions = useCallback((list: PromptSuggestion[]) => {
-    setSuggestedQuestions(list.filter((s) => !isInsufficientContextSuggestion(s)))
+    rawSuggestionsRef.current = list
+    const listed = new Set(list.map((s) => normalizeQuestion(s.prompt)))
+    const withSite = [...list, ...siteQuestionsRef.current.filter((s) => !listed.has(normalizeQuestion(s.prompt)))]
+    const onTopic = dropOffTopicSuggestions(withSite.filter((s) => !isInsufficientContextSuggestion(s)), vocabularyRef.current)
+    setSuggestedQuestions(worthRef.current ? rankByWorth(onTopic, worthRef.current) : onTopic)
   }, [])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
   // Tracks normalized prompt text of every suggestion shown across all batches
@@ -247,9 +255,127 @@ export default function AIVisibilitySection({
     }
   }, [])
   useEffect(() => { void loadAllowance() }, [loadAllowance])
+  const onChecksRanRef = useRef(onChecksRan)
+  onChecksRanRef.current = onChecksRan
+  const onAllowanceOutRef = useRef(onAllowanceOut)
+  onAllowanceOutRef.current = onAllowanceOut
+  const allowanceOut = allowance != null && allowance.state === 'known' && allowance.remaining === 0
+  useEffect(() => { onAllowanceOutRef.current?.(allowanceOut) }, [allowanceOut])
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
+  // What the site scan says the business is, read with the saved profile.
+  const [scanBusiness, setScanBusiness] = useState<ScanBusiness | null>(null)
+  // The suggestions wait for that read, so they are built once, from the right
+  // business, and never flash questions for a type the business is not.
+  const [identityReady, setIdentityReady] = useState(false)
+  // THE BUSINESS TYPE comes from the owner's choice, then the site scan, then
+  // the name/domain, then a clear keyword majority (business-identity.ts). It
+  // used to come from every tracked keyword joined together, where one keyword
+  // ("אוכל רחוב יפן") turned a Japan travel site into a restaurant.
+  const identity = useMemo(
+    () => resolveBusinessIdentity({
+      manualProfile, scan: scanBusiness, businessName: projectBrandName, domain: projectDomain, keywords: projectKeywords,
+    }),
+    [manualProfile, scanBusiness, projectBrandName, projectDomain, projectKeywords],
+  )
+  const identityCategory = identity.category
+
+  // The site's pages and planned topics (question-context route): a question a
+  // page answers says "improve that page"; one written about shows its status.
+  const [questionContext, setQuestionContext] = useState<{ contentEnabled: boolean; pages: WorthPage[]; topics: ContextTopic[] } | null>(null)
+  const loadQuestionContext = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai-visibility/question-context?projectId=${encodeURIComponent(projectId)}`)
+      if (!res.ok) return
+      const body = await res.json()
+      setQuestionContext({
+        contentEnabled: body?.contentEnabled === true,
+        pages: Array.isArray(body?.pages) ? body.pages : [],
+        topics: Array.isArray(body?.topics) ? body.topics : [],
+      })
+    } catch {
+      // Scored without pages and topics; the article action stays hidden.
+    }
+  }, [projectId])
+  useEffect(() => { void loadQuestionContext() }, [loadQuestionContext])
+  // SITE CONTENT (w8-relevance): what the site's own pages are about. With it, the
+  // questions are judged by the site's content (a page that answers, a subject the
+  // site covers, or only the broad niche), and the site's own title questions join
+  // the list. Too few titled pages: null, and the rules stay as they were.
+  const siteTopics = useMemo(() => buildSiteTopics({
+    pages: questionContext?.pages ?? [],
+    niche: identity.label,
+    businessName: projectBrandName,
+    domain: projectDomain,
+    category: identity.category,
+    terms: projectKeywords ?? [],
+  }), [questionContext, identity.label, identity.category, projectBrandName, projectDomain, projectKeywords])
+  const worthContext = useMemo<WorthContext>(() => ({
+    businessName: projectBrandName,
+    identityLabel: identity.label,
+    category: identity.category,
+    keywords: projectKeywords ?? [],
+    scanTerms: scanBusiness?.terms ?? [],
+    pages: questionContext?.pages ?? [],
+    plannedTopics: (questionContext?.topics ?? []).map((t) => t.topic),
+    siteTopics,
+  }), [projectBrandName, identity.label, identity.category, projectKeywords, scanBusiness, questionContext, siteTopics])
+  siteQuestionsRef.current = useMemo(() => (siteTopics ? siteTitleQuestions(questionContext?.pages ?? []) : []).map((prompt, i): PromptSuggestion => {
+    const meta = deriveSuggestionMeta(/(כמה עול|מחיר|price|cost)/i.test(prompt) ? 'commercial' : /(לבחור|מומלץ|כדאי|best|choose)/i.test(prompt) ? 'recommendation' : 'informational')
+    return {
+      id: `site-${i}`, prompt, intent: meta.intent, intentLabel: meta.intent, category: identity.category,
+      language: projectLanguage ?? 'he', qualityScore: meta.qualityScore, confidenceTier: meta.confidenceTier,
+      reason: '', chips: [], valueReason: '',
+    }
+  }), [siteTopics, questionContext, identity.category, projectLanguage])
+  worthRef.current = identityReady ? worthContext : null
+  useEffect(() => {
+    if (identityReady && rawSuggestionsRef.current) commitSuggestedQuestions(rawSuggestionsRef.current)
+  }, [worthContext, identityReady, commitSuggestedQuestions])
+  // Questions an AI engine has cited the site for (the tracked copy of the question).
+  const citedQuestions = useMemo(
+    () => new Set(allResults.filter((r) => r.displayCited && r.promptText).map((r) => normalizeQuestion(r.promptText))),
+    [allResults],
+  )
+  const [writingArticleFor, setWritingArticleFor] = useState<string | null>(null)
+  const [articleErrorFor, setArticleErrorFor] = useState<string | null>(null)
+  // "Write an article" on a subject the site already covers: offer improving it first.
+  const [articleOverlapFor, setArticleOverlapFor] = useState<Record<string, OverlapPayload>>({})
+  const writeArticleFor = useCallback(async (q: PromptSuggestion, anyway = false) => {
+    setWritingArticleFor(q.id)
+    setArticleErrorFor(null)
+    try {
+      if (!anyway) {
+        const found = await fetchOverlap(projectId, q.prompt, q.prompt)
+        if (found) { setArticleOverlapFor((m) => ({ ...m, [q.id]: found })); return }
+      }
+      setArticleOverlapFor((m) => { if (!(q.id in m)) return m; const next = { ...m }; delete next[q.id]; return next })
+      const lang = normalizeLanguage(projectLanguage)
+      const res = await fetch('/api/content/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(topicBriefForQuestion({
+          projectId, question: q.prompt, intent: q.intent, language: lang, worth: q.worth,
+          note: createI18n(lang)('article_brief_note').replace('{q}', q.prompt),
+        })),
+      })
+      if (!res.ok) throw new Error('topic')
+      await loadQuestionContext()
+    } catch {
+      setArticleErrorFor(q.id)
+    } finally {
+      setWritingArticleFor(null)
+    }
+  }, [projectId, projectLanguage, loadQuestionContext])
+  vocabularyRef.current = {
+    keywords: projectKeywords ?? [],
+    offerings: manualProfile?.mode === 'manual' ? [manualProfile.primaryCategory, ...manualProfile.secondaryCategories] : [],
+    businessName: projectBrandName,
+    domain: projectDomain,
+  }
   const [showAllPrompts, setShowAllPrompts] = useState(false)
+  // Questions whose full engine row is open (the rest show only the engines that named the business).
+  const [enginesOpenFor, setEnginesOpenFor] = useState<ReadonlySet<string>>(() => new Set())
   const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(() => {
     if (typeof window === 'undefined') return false
     try {
@@ -311,6 +437,12 @@ export default function AIVisibilitySection({
 
       const runsData = await runsRes.json()
       const promptsData = await promptsRes.json()
+      onRunsLoadedRef.current?.(Array.isArray(runsData.runs) ? runsData.runs : [])
+      // Once, on the first load: nothing checked yet, so the questions are the place to start.
+      if (openQueriesWhenEmptyRef.current) {
+        openQueriesWhenEmptyRef.current = false
+        if (!Array.isArray(runsData.runs) || runsData.runs.length === 0) setCurrentTab('queries')
+      }
 
       // Project-level GEO Opportunity Mapping — server-computed, read-only.
       // Falls back to null when API has no aggregation (older deploy).
@@ -385,64 +517,33 @@ export default function AIVisibilitySection({
       setAllResults(resultsWithText)
       setAllPrompts(promptsArr)
 
-      // Score calculation must exclude archived results, regardless of display filter
-      const scoreResults = resultsWithText.filter((r) => r.excludedFromScore !== true)
-
-      const engines = new Set<string>()
+      // The shared score (lib/ai-visibility/score.ts): the latest answer per
+      // question x engine, archived answers and unchecked engines left out. The
+      // same number the overview, the dashboard and the competitor comparison show.
+      const scored = resultsWithText.map((r) => ({
+        id: r.id, promptId: r.promptId || null, engine: r.engine, at: r.scannedAt || null, status: r.status,
+        excluded: r.excludedFromScore === true, mentioned: r.displayMentioned === true, cited: r.displayCited === true,
+      }))
+      const total = visibilityScore(scored)
       const engineMap = new Map<string, EngineMetrics>()
-      let totalMentions = 0
-      let totalCitations = 0
-
-      SUPPORTED_ENGINES.forEach((engine) => {
-        engineMap.set(engine, { engine, scans: 0, mentions: 0, citations: 0, rate: 0 })
-      })
-
-      scoreResults.forEach((r) => {
-        if (r.status === 'success' && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) {
-          engines.add(r.engine)
-          // Summary counts must match the badges shown in the list — use the
-          // server-computed display values, not raw DB flags.
-          if (r.displayMentioned) totalMentions++
-          if (r.displayCited) totalCitations++
-
-          const existing = engineMap.get(r.engine) || {
-            engine: r.engine,
-            scans: 0,
-            mentions: 0,
-            citations: 0,
-            rate: 0,
-          }
-          existing.scans++
-          if (r.displayMentioned) existing.mentions++
-          existing.citations += r.citationCount
-          existing.rate = existing.scans > 0 ? Math.round((existing.mentions / existing.scans) * 100) : 0
-          engineMap.set(r.engine, existing)
-        }
-      })
-
-      const successfulScans = scoreResults.filter((r) => r.status === 'success').length
-
-      // Count engines that have at least one mention
-      let enginesWithMentions = 0
-      for (const [, metrics] of engineMap) {
-        if (metrics.mentions > 0) {
-          enginesWithMentions++
-        }
+      for (const [engine, m] of engineScores(scored)) {
+        engineMap.set(engine, { engine, scans: m.answers, mentions: m.mentions, citations: m.citations, rate: m.rate })
       }
 
       setGlobalMetrics({
-        totalScans: successfulScans,
-        totalMentions,
-        totalCitations,
-        mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
-        citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
+        totalScans: total.answers,
+        totalMentions: total.mentions,
+        totalCitations: total.citations,
+        mentionRate: total.score ?? 0,
+        citationRate: total.answers > 0 ? Math.round((total.citations / total.answers) * 100) : 0,
         enginesCovered: SUPPORTED_ENGINES.length,
-        enginesWithMentions,
+        enginesWithMentions: [...engineMap.values()].filter((m) => m.mentions > 0).length,
       })
 
       setEngineMetrics(engineMap)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load results')
+      onRunsLoadedRef.current?.(null)
+      setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
     } finally {
       setLoading(false)
     }
@@ -454,10 +555,16 @@ export default function AIVisibilitySection({
     fetch(`/api/projects/${projectId}/ai-profile`)
       .then((r) => (r.ok ? r.json() : { profile: null }))
       .then((d) => {
-        if (!cancelled) setManualProfile(d.profile ?? null)
+        if (cancelled) return
+        setManualProfile(d.profile ?? null)
+        setScanBusiness(d.scanBusiness ?? null)
+        setIdentityReady(true)
       })
       .catch(() => {
-        if (!cancelled) setManualProfile(null)
+        if (cancelled) return
+        setManualProfile(null)
+        setScanBusiness(null)
+        setIdentityReady(true)
       })
     return () => {
       cancelled = true
@@ -465,6 +572,7 @@ export default function AIVisibilitySection({
   }, [projectId])
 
   useEffect(() => {
+    if (!identityReady) return
     let cancelled = false
 
     const suggestions = generatePromptSuggestions({
@@ -475,6 +583,7 @@ export default function AIVisibilitySection({
       language: projectLanguage,
       keywords: projectKeywords,
       manualProfile,
+      category: identityCategory,
       shuffle: false,
       limit: 8,
     })
@@ -494,7 +603,7 @@ export default function AIVisibilitySection({
     // No notice here — this is a passive load, not a failed AI attempt. Cached
     // Gemini questions (if any) replace these silently in the background below.
     if (vNextFiltered.length === 0) {
-      const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+      const category = identityCategory
       const fallback = buildFallbackSuggestions(
         projectBrandName,
         null, // projectName not available
@@ -680,7 +789,7 @@ export default function AIVisibilitySection({
         // DISPLAY QUALITY GATE: cached/vNext rows may have been generated by the
         // pre-intent-v2 engine. Drop legacy/weak phrasings and top up with the
         // new engine so what users actually see reflects the current logic.
-        const gateCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+        const gateCategory = identityCategory
         const gated = applyDisplayQualityGate(merged, {
           businessName: projectBrandName,
           domain: projectDomain,
@@ -739,11 +848,16 @@ export default function AIVisibilitySection({
     // must not re-run because a parent re-rendered. The parent now memoizes it
     // too; this makes the component immune to the next caller that forgets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywordsKey, manualProfile, projectId])
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, suggestionsRefreshKey, projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId])
 
   useEffect(() => {
     loadAllResults()
   }, [loadAllResults])
+  useEffect(() => {
+    if (resultsRefreshKey === 0) return
+    void loadAllResults()
+    void loadAllowance()
+  }, [resultsRefreshKey, loadAllResults, loadAllowance])
 
   // Fetch competitor analysis (read-only) so we can build a competitor-leading
   // recommendation when a competitor has more mentions than the project.
@@ -785,6 +899,18 @@ export default function AIVisibilitySection({
       cancelled = true
     }
   }, [projectId, allResults.length, competitorsRefreshKey])
+
+  // What each question's latest answer on each engine said: true = the
+  // business was mentioned, false = checked and not mentioned; absent = never
+  // checked. The chip's mark says this, not merely "checked".
+  const mentionedByPair = useMemo(() => {
+    const m = new Map<string, boolean>()
+    const latest = latestAnswers(allResults.filter((r) => !!r.promptId).map((r) => ({
+      ...r, at: r.scannedAt, excluded: false, mentioned: r.displayMentioned === true, cited: r.displayCited === true,
+    })))
+    for (const a of latest) m.set(`${a.promptId}:${a.engine}`, a.mentioned)
+    return m
+  }, [allResults])
 
   const scannedSet = useMemo(() => {
     const s = new Set<string>()
@@ -929,7 +1055,11 @@ export default function AIVisibilitySection({
         if (!res.ok) {
           clearInterval(progressInterval)
           const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || `HTTP ${res.status}`)
+          // Only a refusal written for the merchant (it carries errorEn: quota,
+          // already running, try again) is shown as it is; anything else is ours.
+          throw typeof body.errorEn === 'string' && body.errorEn
+            ? new UserFacingError(apiErrorText(body, isHebrew ? 'he' : 'en', body.errorEn))
+            : new Error(body.error || `HTTP ${res.status}`)
         }
         const body = await res.json()
         clearInterval(progressInterval)
@@ -948,12 +1078,13 @@ export default function AIVisibilitySection({
         }, 250)
       } catch (e) {
         clearInterval(progressInterval)
-        setError(e instanceof Error ? e.message : 'Scan failed')
+        setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
         setScanStatus(null)
       } finally {
         // The allowance moved (or did not) — re-read it either way, so what the
         // merchant sees is the ledger's answer and not an optimistic guess.
         void loadAllowance()
+        onChecksRanRef.current?.()
         setScanningKey(null)
         // Reset progress after fade
         setTimeout(() => {
@@ -963,7 +1094,7 @@ export default function AIVisibilitySection({
         }, 500)
       }
     },
-    [projectId, loadAllResults, allResults, openResultDrawer, t, loadAllowance]
+    [projectId, loadAllResults, allResults, openResultDrawer, t, loadAllowance, isHebrew]
   )
 
   // When allResults updates after a scan, if there's a highlighted id we haven't
@@ -976,6 +1107,55 @@ export default function AIVisibilitySection({
       setHighlightResultId(null)
     }
   }, [allResults, highlightResultId, drawerOpen, openResultDrawer])
+
+  // RECHECK A QUESTION on the monthly check's engines (ChatGPT, Gemini, Google AI
+  // Mode; Perplexity where the country needs it): one button, one check per
+  // engine, each through the same dispatch route (and allowance) as a single one.
+  const recheckEngines = useMemo(() => monthlyEngines(projectCountry), [projectCountry])
+  const [recheck, setRecheck] = useState<{ promptId: string; done: number; total: number } | null>(null)
+  const recheckQuestion = useCallback(async (promptId: string) => {
+    const engines = recheckEngines
+    setRecheck({ promptId, done: 0, total: engines.length })
+    setError(null)
+    setScanStatus(t('scan_in_progress'))
+    let ok = 0
+    let refusal: string | null = null
+    await Promise.all(engines.map(async (engine) => {
+      try {
+        const res = await fetch('/api/ai-visibility/runs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, promptId, engine }),
+        })
+        if (res.ok) ok++
+        else {
+          const body = await res.json().catch(() => ({}))
+          // Only a refusal written for the merchant is shown as it is.
+          if (typeof body.errorEn === 'string' && body.errorEn) refusal = apiErrorText(body, isHebrew ? 'he' : 'en', body.errorEn)
+        }
+      } catch {
+        // counted below as not finished
+      } finally {
+        setRecheck((prev) => (prev && prev.promptId === promptId ? { ...prev, done: prev.done + 1 } : prev))
+      }
+    }))
+    await loadAllResults()
+    void loadAllowance()
+    onChecksRanRef.current?.()
+    setRecheck(null)
+    if (ok === engines.length) {
+      setScanStatus(t('scan_done'))
+      setCurrentTab('results')
+      setTimeout(() => setScanStatus(null), 3000)
+    } else {
+      setScanStatus(null)
+      setError(refusal ?? (ok > 0 ? t('recheck_partial_failed') : GENERIC_ERROR))
+    }
+  }, [recheckEngines, projectId, loadAllResults, loadAllowance, t, isHebrew])
+  /** One check at a time from this tab: a single engine, or one question's recheck. */
+  const busy = scanningKey !== null || recheck !== null
+  /** Checks left in the period, when the allowance is read (null: unmetered or not known). */
+  const knownLeft = allowance != null && allowance.state === 'known' ? allowance.remaining : null
 
   const deletePrompt = useCallback(async (promptId: string) => {
     setDeleting(true)
@@ -993,7 +1173,7 @@ export default function AIVisibilitySection({
       await loadAllResults()
     } catch (e) {
       setAllPrompts(prev)
-      setError(e instanceof Error ? e.message : 'Failed to delete question')
+      setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
     } finally {
       setDeleting(false)
       setDeletePromptId(null)
@@ -1007,7 +1187,7 @@ export default function AIVisibilitySection({
     // local fallback is required (so the user is never left with no questions).
     let geminiProducedQuestions = false
     const normalizedLang = normalizeLanguage(projectLanguage)
-    const detectedCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+    const detectedCategory = identityCategory
     if (trigger === 'top') console.log('[ai-question-suggestions] top button clicked', { projectId })
     else console.log('[ai-question-suggestions] inner button clicked', { projectId })
     console.log('[ai-question-suggestions] generate clicked', {
@@ -1085,6 +1265,7 @@ export default function AIVisibilitySection({
         language: projectLanguage,
         keywords: projectKeywords,
         manualProfile,
+        category: identityCategory,
         shuffle: true,
         diversify: true,
         limit: 40,
@@ -1382,7 +1563,7 @@ export default function AIVisibilitySection({
         // capped already contains the right PromptSuggestion objects with intent/labels from API
         // DISPLAY QUALITY GATE (force refresh): user explicitly asked for more
         // questions, so drop legacy/weak phrasings and top up with intent-v2.
-        const refreshGateCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+        const refreshGateCategory = identityCategory
         const refreshGate = applyDisplayQualityGate(capped, {
           businessName: projectBrandName,
           domain: projectDomain,
@@ -1567,10 +1748,10 @@ export default function AIVisibilitySection({
           console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
           console.log('[ai-question-suggestions] state updated')
         } else {
-          setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+          setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
         }
       } else {
-        setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+        setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
       }
     } finally {
       setRefreshingSuggestions(false)
@@ -1583,6 +1764,7 @@ export default function AIVisibilitySection({
     projectLanguage,
     projectKeywords,
     manualProfile,
+    identityCategory,
     suggestedQuestions,
     allPrompts,
     excludedSuggestionKeys,
@@ -1645,7 +1827,7 @@ export default function AIVisibilitySection({
         if (!res.ok) {
           const errorBody = await res.json().catch(() => ({}))
           setExclusionToast({
-            message: isHebrew ? 'שגיאה בעדכון סטטוס הארכיון' : 'Failed to update archive status',
+            message: t('archive_update_failed'),
             type: 'error',
           })
           setTimeout(() => setExclusionToast(null), 3000)
@@ -1658,39 +1840,35 @@ export default function AIVisibilitySection({
         )
 
         // Show success message
-        const message = newExcludedState
-          ? (isHebrew ? 'הסריקה הועברה לארכיון ולא תשפיע על ציון הנראות.' : 'Result archived and excluded from score.')
-          : (isHebrew ? 'הסריקה שוחזרה וחזרה לחישוב ציון הנראות.' : 'Result restored and included in score.')
+        const message = newExcludedState ? t('archived_toast') : t('restored_toast')
 
         setExclusionToast({ message, type: 'success' })
         setTimeout(() => setExclusionToast(null), 3000)
 
-        // Optionally show archive view after archiving (but don't force it)
-        if (newExcludedState && !showArchive) {
-          // Just show toast, let user choose to view archive if they want
-        }
       } catch (err) {
         console.error('Error updating archive status:', err)
         setExclusionToast({
-          message: isHebrew ? 'שגיאה בעדכון סטטוס הארכיון' : 'Failed to update archive status',
+          message: t('archive_update_failed'),
           type: 'error',
         })
         setTimeout(() => setExclusionToast(null), 3000)
       }
     },
-    [isHebrew]
+    [t]
   )
 
   if (loading) {
     return (
-      <section id="ai-visibility" className="space-y-6 mb-10">
-        <div className="space-y-4">
+      <section id="ai-visibility" className="space-y-6">
+        <div role="status" aria-busy="true" className="space-y-4" data-skeleton="">
+          <span className="sr-only">{t('loading')}</span>
+          <Skeleton className="h-11 w-full max-w-md" />
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 animate-pulse">
-              <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div key={i} className="rounded-card border border-line bg-surface p-5 shadow-card">
+              <Skeleton className="mb-3 h-4 w-2/3" />
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 {[0, 1, 2, 3].map((j) => (
-                  <div key={j} className="h-12 bg-slate-100 dark:bg-slate-800 rounded" />
+                  <Skeleton key={j} className="h-10" />
                 ))}
               </div>
             </div>
@@ -1701,55 +1879,65 @@ export default function AIVisibilitySection({
   }
 
   return (
-    <section id="ai-visibility" className="space-y-6 mb-10" dir={isHebrew ? 'rtl' : 'ltr'}>
-      {/* HEADER */}
+    <section id="ai-visibility" className="space-y-6" dir={isHebrew ? 'rtl' : 'ltr'}>
+      {/* HEADER — the page carries its own in overview mode (W6d) */}
+      {!overviewMode && (
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-500/30">
-            <SparkleIcon size={20} className="text-white" />
-          </div>
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+            <SparkleIcon size={20} />
+          </span>
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{t('ai_visibility')}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0">{t('monitor_engines')}</p>
+            <h2 className="text-section font-semibold text-ink">{t('ai_visibility')}</h2>
+            <p className="text-caption text-muted">{t('monitor_engines')}</p>
           </div>
         </div>
       </div>
+      )}
 
+      {/* Only our own words reach the merchant: a raw server or provider error
+          is stored as GENERIC_ERROR and read out as "something went wrong". */}
       {error && (
-        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0">✕</span>
-          <span>{error}</span>
-        </div>
+        <Notice tone="bad" onDismiss={() => setError(null)}>
+          {error === GENERIC_ERROR ? t('something_went_wrong') : error}
+        </Notice>
       )}
 
-      {scanStatus && (
-        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-700 flex items-start gap-2">
-          <span className="shrink-0 animate-pulse">…</span>
-          <span>{scanStatus}</span>
-        </div>
-      )}
+      {scanStatus && <Notice tone="wait">{scanStatus}</Notice>}
 
       {exclusionToast && (
-        <div className={`p-3 rounded-xl border text-sm flex items-start gap-2 ${
-          exclusionToast.type === 'success'
-            ? 'bg-green-50 border-green-200 text-green-700'
-            : 'bg-red-50 border-red-200 text-red-700'
-        }`}>
-          <span className="shrink-0">{exclusionToast.type === 'success' ? '✓' : '✕'}</span>
-          <span>{exclusionToast.message}</span>
-        </div>
+        <Notice tone={exclusionToast.type === 'success' ? 'ok' : 'bad'}>{exclusionToast.message}</Notice>
       )}
 
       {/* TAB BAR */}
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+      <div
+        role="tablist"
+        aria-label={t('ai_visibility')}
+        className="-mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0"
+        onKeyDown={(e) => {
+          // Arrow keys move between the tabs (and select), as a tab list should.
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+          const order = ['results', 'queries', 'insights', 'competitors'] as const
+          const forward = (e.key === 'ArrowLeft') === isHebrew
+          const next = order[(order.indexOf(currentTab as (typeof order)[number]) + (forward ? 1 : order.length - 1)) % order.length]
+          e.preventDefault()
+          setCurrentTab(next)
+          e.currentTarget.querySelector<HTMLElement>(`[data-ai-tab="${next}"]`)?.focus()
+        }}
+      >
         {(['results', 'queries', 'insights', 'competitors'] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
+            role="tab"
+            data-ai-tab={tab}
+            aria-selected={currentTab === tab}
+            tabIndex={currentTab === tab ? 0 : -1}
             onClick={() => setCurrentTab(tab)}
-            className={`px-4 py-3 text-base font-semibold border-b-2 transition whitespace-nowrap ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-copy font-semibold transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${
               currentTab === tab
-                ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'border-action text-ink'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             {tab === 'results' && t('tab_results')}
@@ -1763,83 +1951,83 @@ export default function AIVisibilitySection({
       {/* TAB 1: RESULTS (includes overview) */}
       {currentTab === 'results' && (
         <>
-          {globalMetrics && (
+          {/* In overview mode the page's opening card shows the score and the totals (W6d). */}
+          {globalMetrics && !overviewMode && (
             <AIVisibilityScoreCard score={globalMetrics.mentionRate} t={t} isRTL={isHebrew} />
           )}
-          {globalMetrics && (
+          {globalMetrics && !overviewMode && (
             <OverviewSummaryStrip metrics={globalMetrics} totalResults={scoreResults.length} t={t} />
           )}
           <EngineMentionCards metrics={engineMetrics} t={t} />
 
           {/* FILTER BAR */}
-          <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
-            <Input
-              placeholder={t('search')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 min-w-[200px]"
-            />
-            <select
-              value={filterEngine || ''}
-              onChange={(e) => setFilterEngine(e.target.value || null)}
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
-            >
-              <option value="">{t('all_engines')}</option>
-              {SUPPORTED_ENGINES.map((e) => (
-                <option key={e} value={e}>
-                  {ENGINE_META[e as keyof typeof ENGINE_META]?.name || e}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
-              onChange={(e) =>
-                setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
-              }
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
-            >
-              <option value="">{t('all_mention')}</option>
-              <option value="yes">{t('mentioned')}</option>
-              <option value="no">{t('not_mentioned')}</option>
-            </select>
-            <select
-              value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
-              onChange={(e) =>
-                setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
-              }
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
-            >
-              <option value="">{t('all_citations')}</option>
-              <option value="yes">{t('target_cited')}</option>
-              <option value="no">{t('not_cited')}</option>
-            </select>
-            {archivedResults.length > 0 && (
-              <button
-                onClick={() => setShowArchive(!showArchive)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  showArchive
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
-                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                {isHebrew ? `הצג ארכיון (${archivedResults.length})` : `Show archive (${archivedResults.length})`}
-              </button>
-            )}
-          </div>
-
-          {archivedResults.length > 0 && (
-            <div className="text-xs text-slate-500 dark:text-slate-400 italic">
-              {isHebrew ? 'תוצאות בארכיון אינן נכללות בחישוב הציון.' : 'Archived results are not included in score calculations.'}
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] lg:items-center">
+              <div className="relative sm:col-span-2 lg:col-span-1">
+                <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                <Input
+                  type="search"
+                  aria-label={t('search')}
+                  placeholder={t('search')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ps-9"
+                />
+              </div>
+              <Select
+                aria-label={t('filter_engine')}
+                value={filterEngine || ''}
+                onChange={(e) => setFilterEngine(e.target.value || null)}
+                options={[
+                  { value: '', label: t('all_engines') },
+                  ...SUPPORTED_ENGINES.map((e) => ({ value: e, label: ENGINE_META[e as keyof typeof ENGINE_META]?.name || e })),
+                ]}
+              />
+              <Select
+                aria-label={t('filter_mention')}
+                value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
+                onChange={(e) =>
+                  setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
+                }
+                options={[
+                  { value: '', label: t('all_mention') },
+                  { value: 'yes', label: t('mentioned') },
+                  { value: 'no', label: t('not_mentioned') },
+                ]}
+              />
+              <Select
+                aria-label={t('filter_citation')}
+                value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
+                onChange={(e) =>
+                  setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
+                }
+                options={[
+                  { value: '', label: t('all_citations') },
+                  { value: 'yes', label: t('target_cited') },
+                  { value: 'no', label: t('not_cited') },
+                ]}
+              />
+              {archivedResults.length > 0 && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowArchive(!showArchive)}
+                  aria-pressed={showArchive}
+                  className={showArchive ? 'border-action bg-action-soft text-action hover:border-action hover:bg-action-soft' : undefined}
+                >
+                  <Archive aria-hidden="true" className="size-4" />
+                  {t('show_archive').replace('{count}', String(archivedResults.length))}
+                </Button>
+              )}
             </div>
-          )}
-
-          <div className="text-sm text-slate-600 dark:text-slate-300">
-            {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
+            <p className="text-caption text-muted">
+              {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
+              {archivedResults.length > 0 && <> · {t('archive_note')}</>}
+            </p>
           </div>
 
           {filteredResults.length > 0 ? (
             <>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {filteredResults.slice(0, showAllResults ? undefined : 3).map((r) => (
                   <ResultRowCard
                     key={r.id}
@@ -1857,9 +2045,9 @@ export default function AIVisibilitySection({
                 ))}
               </div>
               {filteredResults.length > 3 && (
-                <div className="text-center mt-4">
+                <div className="flex justify-center">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setShowAllResults(!showAllResults)}
                   >
@@ -1869,9 +2057,17 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_scans')}</p>
-            </div>
+            <EmptyState
+              icon={<MessageSquareText />}
+              title={t('no_scans')}
+              body={t('no_scans_help')}
+              action={
+                <Button size="sm" variant="secondary" onClick={() => setCurrentTab('queries')}>
+                  {t('tab_queries')}
+                </Button>
+              }
+              className="rounded-card border border-line bg-surface"
+            />
           )}
 
         </>
@@ -1922,14 +2118,18 @@ export default function AIVisibilitySection({
         <>
           <AIBusinessProfilePanel
             projectId={projectId}
-            businessName={projectBrandName}
-            domain={projectDomain}
-            keywords={projectKeywords || []}
+            identity={identity}
+            scanDescription={scanBusiness?.description ?? null}
+            ready={identityReady}
             initialProfile={manualProfile}
+            onRegenerate={() => { void refreshSuggestions('top') }}
             onChange={(profile) => {
               setManualProfile(profile)
               // Immediately refresh inline recommended questions with the
               // new profile — no page reload needed.
+              const next = resolveBusinessIdentity({
+                manualProfile: profile, scan: scanBusiness, businessName: projectBrandName, domain: projectDomain, keywords: projectKeywords,
+              })
               const refreshed = generatePromptSuggestions({
                 businessName: projectBrandName,
                 domain: projectDomain,
@@ -1938,29 +2138,52 @@ export default function AIVisibilitySection({
                 language: projectLanguage,
                 keywords: projectKeywords,
                 manualProfile: profile,
+                category: next.category,
                 shuffle: false,
                 limit: 20,
               })
               commitSuggestedQuestions(refreshed)
             }}
           />
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                {t('ai_queries')}
-              </h3>
-              <Badge variant="neutral" className="!text-xs">{allPrompts.length}</Badge>
+              <h3 className="text-section font-semibold text-ink">{t('ai_queries')}</h3>
+              <Badge variant="neutral">{allPrompts.length}</Badge>
             </div>
-            <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }} className="w-full sm:w-auto">
-                {t('recommend_questions')}
-              </Button>
-              <Button size="sm" onClick={() => setShowNewPrompt(true)} className="w-full sm:w-auto">
+            {/* Tab walk: with no tracked question the empty state and the
+                recommended list below already offer the same choice, so a third
+                button that opens the same questions in a window only confused. */}
+            <div className={allPrompts.length > 0 ? 'grid grid-cols-2 gap-2 sm:flex' : 'grid grid-cols-1 gap-2 sm:flex'}>
+              {allPrompts.length > 0 && (
+                <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  {t('recommend_questions')}
+                </Button>
+              )}
+              <Button onClick={() => setShowNewPrompt(true)}>
+                <Plus aria-hidden="true" className="size-4" />
                 {t('new_query')}
               </Button>
             </div>
           </div>
 
+          {/* How it works: the long explanations fold away; the one line that
+              says what to do (and the allowance) stays in view. */}
+          {allPrompts.length > 0 && (
+          <details className="group rounded-inset border border-line bg-surface">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-inset px-4 py-3 text-copy font-semibold text-ink transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-2">
+                <Info aria-hidden="true" className="size-4 text-muted" />
+                {t('how_it_works')}
+              </span>
+              <ChevronDown aria-hidden="true" className="size-4 text-muted transition-transform duration-150 ease-snappy group-open:rotate-180" />
+            </summary>
+            <div className="space-y-2 border-t border-line px-4 py-3">
+              <p data-ai-questions-explainer="" className="max-w-[80ch] text-copy text-body">{t('queries_explainer')}</p>
+              <p className="text-caption text-muted" data-ai-chip-legend="">{t('chip_legend')}</p>
+            </div>
+          </details>
+          )}
           {allPrompts.length > 0 ? (
             <>
               {/* THE CONTROL EXISTS — say so. The engine chips below dispatch a
@@ -1968,41 +2191,80 @@ export default function AIVisibilitySection({
                   which is why a reviewer could not find any way to start one.
                   The allowance beside it comes from the usage ledger, so it can
                   never disagree with what the dispatcher enforces. */}
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
-                <span className="text-slate-500 dark:text-slate-400">{t('run_a_check_hint')}</span>
-                <span className="text-slate-500 dark:text-slate-400 tabular-nums" data-testid="ai-allowance">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-caption">
+                <span className="max-w-[80ch] text-body">{t('run_a_check_hint')}</span>
+                <span className="text-muted tabular-nums" data-testid="ai-allowance">
                   {allowance == null ? null
                     : allowance.state === 'unmetered' ? t('ai_allowance_unmetered')
                     : allowance.state === 'unknown' ? t('ai_allowance_unknown')
+                    : allowance.limit === 0 ? `${t('ai_allowance')}: ${t('ai_allowance_not_included')}`
                     : `${t('ai_allowance')}: ${allowance.used}/${allowance.limit}`}
                 </span>
               </div>
+              {/* Nothing left to check with: say which case it is (a plan without
+                  AI checks is not "used them all") and where to get more. The
+                  link only opens the billing page; nothing here changes a plan. */}
               {allowance != null && allowance.state === 'known' && allowance.remaining === 0 && (
-                <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{t('ai_allowance_exhausted')}</p>
+                <Notice tone="warn">
+                  <span data-ai-allowance-out="">
+                    {allowance.limit === 0 ? t('ai_allowance_none_body') : t('ai_allowance_exhausted')}{' '}
+                    <NextLink href="/billing" className="font-semibold text-action underline underline-offset-2 hover:text-action-hover">
+                      {t('ai_allowance_upgrade')}
+                    </NextLink>
+                  </span>
+                </Notice>
               )}
-              <div className="space-y-2">
+              <ul className="space-y-3">
                 {allPrompts.slice(0, showAllPrompts ? undefined : 3).map((p) => (
-                  <div
+                  <li
                     key={p.id}
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:shadow-sm transition"
+                    data-ai-question=""
+                    className="space-y-3 rounded-inset border border-line bg-surface p-4"
                   >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 line-clamp-2">{p.prompt}</p>
-                      <button
-                        onClick={() => setDeletePromptId(p.id)}
-                        className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                        title={t('delete')}
-                        aria-label={t('delete')}
-                      >
-                        <TrashIcon size={16} />
-                      </button>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-copy font-medium text-ink">{p.prompt}</p>
+                        {autoQuestionIds?.includes(p.id) && (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-action-soft px-2 py-0.5 text-caption font-semibold text-action" data-ai-auto-question={p.id}>
+                            <CalendarClock aria-hidden size={13} />
+                            {t('question_auto_monthly')}
+                          </span>
+                        )}
+                      </div>
+                      {/* Single engines, all six the plan promises, one check each: the
+                          main surface no longer asks the customer to pick an engine. */}
+                      <RowMenu
+                        label={t('question_more_actions')}
+                        className="-me-1.5 -mt-1 shrink-0"
+                        items={[
+                          ...SUPPORTED_ENGINES.filter((e) => engineSupportsCountry(e, projectCountry)).map((engine) => ({
+                            key: `check-${engine}`,
+                            label: t('check_on_engine_menu').replace('{engine}', ENGINE_META[engine as keyof typeof ENGINE_META]?.name || engine),
+                            icon: <RefreshCw aria-hidden="true" className="size-4" />,
+                            disabled: busy || (knownLeft !== null && knownLeft < 1),
+                            onSelect: () => { if (!busy) void scanEngine(p.id, engine) },
+                          })),
+                          { key: 'delete', label: t('delete'), danger: true, icon: <Trash2 aria-hidden="true" className="size-4" />, onSelect: () => setDeletePromptId(p.id) },
+                        ]}
+                      />
                     </div>
                     <PromptInsightRow insight={promptInsights.get(p.id) ?? null} t={t} isRTL={isHebrew} />
-                    <div className="flex flex-wrap gap-1.5">
-                      {SUPPORTED_ENGINES.map((engine) => {
+                    {(() => {
+                    // One quiet row per question: the engines that mentioned the business
+                    // (and one that is running now), the rest behind "+N". A question never
+                    // checked anywhere shows every engine, since each chip is how a check starts.
+                    const checkedAny = SUPPORTED_ENGINES.some((e) => scannedSet.has(`${p.id}:${e}`))
+                    const allOpen = !checkedAny || enginesOpenFor.has(p.id)
+                    const shownEngines = allOpen ? SUPPORTED_ENGINES
+                      : SUPPORTED_ENGINES.filter((e) => mentionedByPair.get(`${p.id}:${e}`) === true || scanningKey === `${p.id}:${e}`)
+                    const hiddenEngines = SUPPORTED_ENGINES.length - shownEngines.length
+                    return (
+                    <div className="flex flex-wrap gap-1.5" data-ai-engine-row={allOpen ? 'all' : 'mentioned'}>
+                      {shownEngines.map((engine) => {
                         const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
                         const key = `${p.id}:${engine}`
                         const scanned = scannedSet.has(key)
+                        const mentionedHere = mentionedByPair.get(key)
                         const scanning = scanningKey === key
                         const scannedAt = scannedDateMap.get(key)
                         const formatDate = (dateStr: string) => {
@@ -2019,70 +2281,115 @@ export default function AIVisibilitySection({
                         const tooltip = scanning
                           ? t('scanning')
                           : scanned
-                          ? t('rescan')
-                          : t('scan_this_engine')
+                          ? `${mentionedHere === true ? t('chip_mentioned') : t('chip_not_mentioned')}${scannedAt ? ` · ${t('scanned_at')}: ${formatDate(scannedAt)}` : ''}`
+                          : t('chip_not_checked')
                         // The ACCESSIBLE NAME says what the click does and to
                         // which engine. "ChatGPT ✓" named a status; "Run an AI
                         // check on ChatGPT" names an action, which is what a
                         // reviewer — and a screen reader — is looking for.
-                        const actionLabel = scanning
+                        // …and then what the last check found there.
+                        const outcomeLabel = mentionedHere === true ? t('chip_mentioned')
+                          : mentionedHere === false ? t('chip_not_mentioned') : t('chip_not_checked')
+                        // A STATUS, NOT A CONTROL (UX review B): what the latest check
+                        // on this engine found. Checks start from the recheck button
+                        // below or from the ⋯ menu.
+                        const statusLabel = scanning
                           ? t('scanning')
-                          : `${scanned ? t('rerun_check_on') : t('run_check_on')}${meta?.name || engine}`
+                          : t('engine_status_label').replace('{engine}', meta?.name || engine).replace('{status}', outcomeLabel)
                         return (
-                          <div
-                            key={engine}
-                            className="inline-flex flex-col items-center min-w-0"
-                          >
-                            <div className="relative group">
-                              <button
-                                onClick={() => !scanning && scanEngine(p.id, engine)}
-                                disabled={scanning}
-                                title={actionLabel}
-                                aria-label={actionLabel}
-                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
+                          <div key={engine} className="group relative min-w-0">
+                              <span
+                                role="img"
+                                title={statusLabel}
+                                aria-label={statusLabel}
+                                className={`relative inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-control border px-2.5 text-caption font-medium focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${
                                   scanning
-                                    ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
-                                    : scanned
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 cursor-pointer'
-                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
+                                    ? 'border-line bg-sunk text-body'
+                                    : mentionedHere === true
+                                    ? 'border-ok/40 bg-ok-soft text-ink'
+                                    : mentionedHere === false
+                                    ? 'border-line bg-sunk text-body'
+                                    : 'border-dashed border-line bg-surface text-muted'
                                 }`}
+                                data-chip-outcome={mentionedHere === true ? 'mentioned' : mentionedHere === false ? 'not_mentioned' : 'not_checked'}
                               >
                                 {scanning && (
-                                  <div
-                                    className="absolute inset-0 bg-indigo-200 dark:bg-indigo-700/40 transition-all"
+                                  <span
+                                    aria-hidden="true"
+                                    className="absolute inset-y-0 start-0 bg-action/20 transition-[width] duration-150 ease-snappy"
                                     style={{ width: `${scanProgress}%` }}
                                   />
                                 )}
                                 <span className="relative z-10">
-                                  {meta && <meta.Icon size={14} className={meta.accent} />}
+                                  {meta && <meta.Icon size={14} />}
                                 </span>
                                 <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
-                                {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
-                              </button>
+                                {!scanning && mentionedHere === true && <Check aria-hidden size={13} strokeWidth={3} className="relative z-10 text-ok" />}
+                                {!scanning && mentionedHere === false && <Minus aria-hidden size={13} strokeWidth={3} className="relative z-10 text-muted" />}
+                              </span>
                               {/* Custom CSS tooltip — appears instantly on hover/focus, not delayed like native title */}
                               <span
                                 role="tooltip"
-                                className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-900 dark:bg-slate-700 text-white text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md"
+                                className="pointer-events-none absolute bottom-full start-0 z-50 mb-1.5 hidden w-max max-w-[min(16rem,70vw)] rounded-control bg-contrast px-2 py-1 text-caption font-medium text-contrast-ink shadow-pop group-focus-within:block group-hover:block"
                               >
                                 {tooltip}
                               </span>
-                            </div>
-                            {scanned && scannedAt && (
-                              <div className="text-[10px] leading-tight text-slate-500 dark:text-slate-400 mt-0.5 text-center whitespace-nowrap">
-                                {t('scanned_at')}: {formatDate(scannedAt)}
-                              </div>
-                            )}
                           </div>
                         )
                       })}
+                      {hiddenEngines > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setEnginesOpenFor((prev) => new Set(prev).add(p.id))}
+                          aria-label={t('engines_show_rest').replace('{n}', String(hiddenEngines))}
+                          title={t('engines_show_rest').replace('{n}', String(hiddenEngines))}
+                          data-ai-engines-more={hiddenEngines}
+                          className="inline-flex h-8 items-center rounded-control border border-line bg-surface px-2.5 text-caption font-semibold tabular-nums text-body transition-colors duration-150 ease-snappy hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                        >
+                          <span dir="ltr">+{hiddenEngines}</span>
+                        </button>
+                      )}
                     </div>
-                  </div>
+                    )
+                    })()}
+                    {(() => {
+                      // ONE BUTTON PER QUESTION: the monthly engines, one check each.
+                      const n = recheckEngines.length
+                      const checkedBefore = recheckEngines.some((e) => scannedSet.has(`${p.id}:${e}`))
+                      const notEnough = knownLeft !== null && knownLeft < n
+                      const running = recheck?.promptId === p.id
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-ai-recheck-row="">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy || notEnough}
+                            onClick={() => { if (!busy && !notEnough) void recheckQuestion(p.id) }}
+                            data-ai-recheck={p.id}
+                            aria-describedby={notEnough ? `ai-recheck-note-${p.id}` : undefined}
+                          >
+                            {running
+                              ? <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+                              : <RefreshCw aria-hidden="true" className="size-4" />}
+                            {running
+                              ? t('recheck_running').replace('{done}', String(recheck?.done ?? 0)).replace('{n}', String(n))
+                              : t(checkedBefore ? 'recheck_question_all' : 'check_question_all').replace('{n}', String(n))}
+                          </Button>
+                          {notEnough && (
+                            <span id={`ai-recheck-note-${p.id}`} className="text-caption text-muted" data-ai-recheck-not-enough="">
+                              {t('recheck_not_enough')}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </li>
                 ))}
-              </div>
+              </ul>
               {allPrompts.length > 3 && (
-                <div className="text-center mt-4">
+                <div className="flex justify-center">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setShowAllPrompts(!showAllPrompts)}
                   >
@@ -2092,8 +2399,22 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_queries')}</p>
+            <div data-ai-questions-empty="" className="rounded-card border border-line bg-surface">
+              <EmptyState
+                icon={<MessageSquareText />}
+                title={t('no_queries_title')}
+                body={t('no_queries_body')}
+                action={<Button onClick={pickRecommended}>{t('no_queries_pick')}</Button>}
+                secondary={
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPrompt(true)}
+                    className="rounded-control font-semibold text-action underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                  >
+                    {t('no_queries_write')}
+                  </button>
+                }
+              />
             </div>
           )}
 
@@ -2164,36 +2485,18 @@ export default function AIVisibilitySection({
             // in the background (useEffect at line 437) will populate them.
             // If truly empty, show empty state with button to manually generate.
             return (
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
+              <section id="ai-recommended-questions" aria-labelledby="ai-smart-questions-title" className="scroll-mt-4 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1 flex items-center gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <h3 id="ai-smart-questions-title" className="flex items-center gap-1.5 text-section font-semibold text-ink">
                       {t('smart_questions_title')}
-                      <span className="relative group inline-flex items-center">
-                        <span
-                          className="cursor-help text-indigo-400 dark:text-indigo-500 flex-shrink-0"
-                          tabIndex={0}
-                          aria-label="מה המשמעות של גבוה/טוב?"
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 16v-4M12 8h.01"/>
-                          </svg>
-                        </span>
-                        <span
-                          role="tooltip"
-                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1.5 rounded bg-slate-900 dark:bg-slate-700 text-white text-[10px] font-medium normal-case tracking-normal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md w-max max-w-[200px] text-center"
-                        >
-                          התגית מציינת עדיפות למעקב, לא ציון הסריקה.
-                        </span>
-                      </span>
                     </h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                    <p className="mt-0.5 text-caption text-muted">
                       {t('smart_questions_subtitle')}
                     </p>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => refreshSuggestions('inner')}
                     loading={refreshingSuggestions}
@@ -2202,48 +2505,40 @@ export default function AIVisibilitySection({
                     title={t('generate_more_suggestions')}
                     aria-label={t('generate_more_suggestions')}
                   >
+                    {!refreshingSuggestions && <RefreshCw aria-hidden="true" className="size-4" />}
                     <span className="hidden sm:inline">{t('generate_more_suggestions')}</span>
-                    <span className="sm:hidden">
-                      {isHebrew ? 'עוד שאלות' : 'More questions'}
-                    </span>
+                    <span className="sm:hidden">{t('more_questions_short')}</span>
                   </Button>
                 </div>
 
                 {/* EMPTY STATE: Show when no suggestions available and not refreshing */}
-                {availableSuggestions.length === 0 && !refreshingSuggestions && (
-                  <div className="rounded-lg border border-dashed border-indigo-200 dark:border-indigo-800 bg-indigo-50/30 dark:bg-indigo-900/10 p-6 text-center">
-                    <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">
-                      {isHebrew
-                        ? 'עדיין אין שאלות מומלצות לפרויקט הזה'
-                        : 'No recommended questions yet for this project'}
-                    </p>
-                    <Button
-                      size="sm"
-                      onClick={() => refreshSuggestions('inner')}
-                      disabled={refreshingSuggestions}
-                    >
-                      {isHebrew ? 'צור שאלות מומלצות' : 'Generate recommended questions'}
-                    </Button>
-                  </div>
+                {availableSuggestions.length === 0 && !refreshingSuggestions && identity.source === 'unknown' && (
+                  <EmptyState icon={<Sparkles />} title={t('worth_ask_business')} className="py-8" />
+                )}
+                {availableSuggestions.length === 0 && !refreshingSuggestions && identity.source !== 'unknown' && (
+                  <EmptyState
+                    icon={<Sparkles />}
+                    title={t('no_recommended_yet')}
+                    action={
+                      <Button size="sm" onClick={() => refreshSuggestions('inner')} disabled={refreshingSuggestions}>
+                        {t('generate_recommended')}
+                      </Button>
+                    }
+                    className="py-8"
+                  />
                 )}
 
                 {/* LOADING INDICATOR: Show while generating */}
                 {refreshingSuggestions && availableSuggestions.length === 0 && (
-                  <div className="flex flex-col items-center gap-3 py-6">
-                    <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      {isHebrew ? 'יוצר שאלות מומלצות...' : 'Generating recommended questions...'}
-                    </span>
+                  <div role="status" className="flex flex-col items-center gap-3 py-8">
+                    <Loader2 aria-hidden="true" className="size-5 animate-spin text-action" />
+                    <span className="text-copy text-body">{t('generating_recommended')}</span>
                   </div>
                 )}
 
                 {/* FALLBACK NOTICE: shown when AI was unavailable and we seeded basics */}
                 {usedFallbackQuestions && availableSuggestions.length > 0 && !refreshingSuggestions && (
-                  <div className="mb-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                    {isHebrew
-                      ? 'לא הצלחנו ליצור שאלות דרך AI כרגע, הצגנו שאלות בסיסיות להתחלה.'
-                      : "We couldn't generate AI questions right now, so we've shown basic starter questions."}
-                  </div>
+                  <Notice tone="warn" className="mb-4">{t('fallback_questions_notice')}</Notice>
                 )}
 
                 {/* SUGGESTIONS GRID: Show when there are available suggestions */}
@@ -2251,18 +2546,33 @@ export default function AIVisibilitySection({
                   <>
                     {/* Inline loading indicator — shown above the grid when adding more */}
                     {refreshingSuggestions && (
-                      <div className="flex items-center gap-2 mb-3 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      <div role="status" className="mb-3 flex items-center gap-2 text-caption text-muted">
+                        <Loader2 aria-hidden="true" className="size-4 animate-spin text-action" />
                         <span>{t('generating_more')}</span>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       {visibleSliced.map((q) => (
                         <SmartQuestionCard
                           key={q.id}
                           question={q}
                           isAlreadyTracked={false}
                           allPrompts={allPrompts}
+                          article={questionContext?.contentEnabled ? (() => {
+                            const { status, topic } = questionArticleStatus(q.prompt, questionContext.topics, citedQuestions)
+                            return {
+                              status,
+                              busy: writingArticleFor === q.id,
+                              failed: articleErrorFor === q.id,
+                              onWrite: () => { void writeArticleFor(q) },
+                              topicHref: strategyHref('list', STRATEGY_ANCHORS.topics),
+                              articleHref: topic?.article ? `/content/articles/${encodeURIComponent(topic.article.id)}` : null,
+                              existingHref: '/content/existing',
+                              overlap: articleOverlapFor[q.id]
+                                ? { found: articleOverlapFor[q.id], language: dashboardLanguage, onWriteAnyway: () => { void writeArticleFor(q, true) } }
+                                : null,
+                            }
+                          })() : null}
                           onAdd={async () => {
                             try {
                               const res = await fetch('/api/ai-visibility/prompts', {
@@ -2280,7 +2590,7 @@ export default function AIVisibilitySection({
                               if (!res.ok) throw new Error('Failed to add')
                               loadAllResults()
                             } catch (e) {
-                              setError(e instanceof Error ? e.message : 'Failed to add question')
+                              setError(isUserFacingError(e) ? e.message : GENERIC_ERROR)
                             }
                           }}
                           t={t}
@@ -2288,9 +2598,9 @@ export default function AIVisibilitySection({
                       ))}
                     </div>
                     {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && (
-                      <div className="text-center mt-4">
+                      <div className="mt-4 flex justify-center">
                         <Button
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           onClick={() => {
                             const newExpandedState = !showAllSmartQuestions
@@ -2313,13 +2623,13 @@ export default function AIVisibilitySection({
                       </div>
                     )}
                     {noNewSuggestionsFound && (
-                      <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
+                      <p className="mt-4 text-center text-caption text-muted">
                         {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
-                      </div>
+                      </p>
                     )}
                   </>
                 )}
-              </div>
+              </section>
             )
           })()}
         </>
@@ -2328,11 +2638,14 @@ export default function AIVisibilitySection({
       {/* TAB 3: COMPETITORS */}
       {currentTab === 'competitors' && (
         <>
+          {/* Competitors are added and removed in settings once the page passes a slot (W6d). */}
+          {competitorsSlot ?? (
           <CompetitorsPanel
             projectId={projectId}
-            defaultCollapsed={true}
+            defaultCollapsed={initialTab !== 'competitors'}
             onCompetitorsChanged={() => setCompetitorsRefreshKey((k) => k + 1)}
           />
+          )}
           <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
         </>
       )}
@@ -2363,20 +2676,19 @@ export default function AIVisibilitySection({
           size="md"
         >
           <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-            <p className="text-sm text-slate-700 dark:text-slate-200">{t('delete_question_body')}</p>
-            <div className="flex gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
+            <p className="text-copy text-body">{t('delete_question_body')}</p>
+            <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setDeletePromptId(null)}
                 disabled={deleting}
-                className="flex-1"
               >
                 {t('cancel')}
               </Button>
               <Button
+                variant="danger"
                 onClick={() => deletePrompt(deletePromptId)}
                 loading={deleting}
-                className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white"
               >
                 {t('delete_permanently')}
               </Button>
@@ -2397,6 +2709,8 @@ export default function AIVisibilitySection({
         language={projectLanguage}
         keywords={projectKeywords}
         manualProfile={manualProfile}
+        category={identityCategory}
+        worthContext={identityReady ? worthContext : null}
         onAdded={loadAllResults}
       />
 
@@ -2414,2536 +2728,4 @@ export default function AIVisibilitySection({
       />
     </section>
   )
-}
-
-/* --- COMPONENTS --- */
-
-type T = (key: any) => string
-
-function AIVisibilityScoreCard({
-  score,
-  t,
-  isRTL,
-}: {
-  score: number
-  t: T
-  isRTL: boolean
-}) {
-  const safeScore = Math.max(0, Math.min(100, Math.round(score || 0)))
-  const level = safeScore <= 30 ? 'low' : safeScore <= 70 ? 'medium' : 'high'
-  const badgeText = level === 'low' ? t('score_low') : level === 'medium' ? t('score_medium') : t('score_high')
-  const badgeClass =
-    level === 'low'
-      ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800'
-      : level === 'medium'
-      ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
-      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800'
-  const scoreColor =
-    level === 'low'
-      ? 'text-orange-600 dark:text-orange-400'
-      : level === 'medium'
-      ? 'text-yellow-600 dark:text-yellow-400'
-      : 'text-emerald-600 dark:text-emerald-400'
-  const barColor =
-    level === 'low'
-      ? 'bg-orange-400 dark:bg-orange-500'
-      : level === 'medium'
-      ? 'bg-yellow-400 dark:bg-yellow-500'
-      : 'bg-emerald-400 dark:bg-emerald-500'
-
-  return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-white to-indigo-50/40 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-5">
-      <div className={`flex items-center justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-        <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
-          <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              {t('ai_visibility_score')}
-            </h3>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeClass}`}
-              title={t('score_help')}
-            >
-              {badgeText}
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug" title={t('score_help')}>
-            {t('score_subtext')}
-          </p>
-        </div>
-        <div className="shrink-0" dir="ltr">
-          <span className={`text-3xl sm:text-4xl font-bold tabular-nums ${scoreColor}`}>{safeScore}</span>
-          <span className="text-sm sm:text-base font-semibold text-slate-400 dark:text-slate-500 ml-0.5">/100</span>
-        </div>
-      </div>
-      {/* Progress bar */}
-      <div className="mt-3 w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" dir="ltr">
-        <div
-          className={`h-full ${barColor} transition-all`}
-          style={{ width: `${safeScore}%` }}
-        />
-      </div>
-    </div>
-  )
-}
-
-function OverviewSummaryStrip({
-  metrics,
-  totalResults,
-  t,
-}: {
-  metrics: GlobalMetrics
-  totalResults: number
-  t: T
-}) {
-  return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6">
-      <div className="grid grid-cols-3 gap-3 sm:gap-6">
-        <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
-            {t('total_mentions')}
-          </div>
-          <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalMentions}</div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">
-            {t('out_of_results').replace('{count}', String(totalResults))}
-          </div>
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate" title={t('engines_coverage_help')}>
-            {t('engine_coverage')}
-          </div>
-          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">
-            {metrics.enginesWithMentions}/{metrics.enginesCovered}
-          </div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">
-            {t('ai_engines')}
-          </div>
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
-            {t('target_cited')}
-          </div>
-          <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('citations')}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface Recommendation {
-  id: string
-  type: 'competitor_leading'
-  severity: 'high' | 'medium' | 'low'
-  titleKey: string
-  bodyKey: string
-  body?: string
-  priority: number
-}
-
-function RecommendationsCard({
-  competitorAnalysis,
-  t,
-  isRTL,
-}: {
-  competitorAnalysis: CompetitorAnalysisData | null
-  t: T
-  isRTL: boolean
-}) {
-  const recommendations: Recommendation[] = []
-
-  // Competitor leading — a competitor has more mentions than the project.
-  // This is the ONLY recommendation type retained here. weak_engines and
-  // weak_questions are already covered by GEO Opportunity Mapping with
-  // richer context, so they were removed to eliminate duplication.
-  if (competitorAnalysis && competitorAnalysis.project && competitorAnalysis.competitors.length > 0) {
-    const projectMentions = competitorAnalysis.project.mentionsCount
-    let leadingCompetitor: { name: string; gap: number } | null = null
-    for (const comp of competitorAnalysis.competitors) {
-      const gap = comp.mentionsCount - projectMentions
-      if (gap > 0 && comp.name && (!leadingCompetitor || gap > leadingCompetitor.gap)) {
-        leadingCompetitor = { name: comp.name, gap }
-      }
-    }
-    if (leadingCompetitor) {
-      const bodyText = t('rec_competitor_leading_body')
-        .replace('{competitorName}', leadingCompetitor.name)
-        .replace('{gap}', String(leadingCompetitor.gap))
-      recommendations.push({
-        id: 'competitor_leading',
-        type: 'competitor_leading',
-        severity: 'high',
-        titleKey: 'rec_competitor_leading_title',
-        body: bodyText,
-        bodyKey: 'rec_competitor_leading_body',
-        priority: 1,
-      })
-    }
-  }
-
-  // Hide section entirely when there is no competitor_leading alert.
-  // No fallback, no "all good" message — the section simply disappears.
-  if (recommendations.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 mt-6">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-        {t('recommendations_title')}
-      </h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('recommendations_desc')}</p>
-      <div className="space-y-2">
-        {recommendations.map((rec) => (
-          <RecommendationItem key={rec.id} rec={rec} t={t} isRTL={isRTL} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function RecommendationItem({
-  rec,
-  t,
-  isRTL,
-}: {
-  rec: Recommendation
-  t: T
-  isRTL: boolean
-}) {
-  const borderClass = {
-    high: 'border-rose-200 dark:border-rose-800',
-    medium: 'border-amber-200 dark:border-amber-800',
-    low: 'border-slate-200 dark:border-slate-700',
-  }[rec.severity]
-
-  const badgeClass = {
-    high: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-    medium: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-  }[rec.severity]
-
-  const severityLabel =
-    rec.severity === 'high'
-      ? t('rec_severity_high')
-      : rec.severity === 'medium'
-      ? t('rec_severity_medium')
-      : t('rec_severity_low')
-
-  const bodyText = rec.body || t(rec.bodyKey as any)
-
-  return (
-    <div className={`rounded-md border bg-white dark:bg-slate-900 px-3 py-2.5 sm:px-4 sm:py-3 ${borderClass}`}>
-      <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse justify-end' : ''}`}>
-        <h4 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
-          {t(rec.titleKey as any)}
-        </h4>
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${badgeClass}`}>
-          {severityLabel}
-        </span>
-      </div>
-      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-2 sm:mt-2.5 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
-        {bodyText}
-      </p>
-    </div>
-  )
-}
-
-function PromptInsightRow({
-  insight,
-  t,
-  isRTL,
-}: {
-  insight: PromptInsight | null
-  t: T
-  isRTL: boolean
-}) {
-  if (!insight) {
-    return (
-      <div className={`text-xs text-slate-500 dark:text-slate-400 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-        {t('prompt_not_scanned_yet')}
-      </div>
-    )
-  }
-
-  const statusKey = (`prompt_status_${insight.status}`) as
-    | 'prompt_status_missing'
-    | 'prompt_status_weak'
-    | 'prompt_status_medium'
-    | 'prompt_status_good'
-
-  const mentionsText = t('prompt_engines_of')
-    .replace('{mentioned}', String(insight.businessMentionEngines))
-    .replace('{total}', String(insight.totalEngines))
-
-  const citedText = insight.targetCitedCount > 0 ? t('prompt_yes') : t('prompt_no')
-  const statusText = t(statusKey)
-
-  return (
-    <div
-      className={`mb-2 text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 ${
-        isRTL ? 'text-right' : 'text-left'
-      }`}
-    >
-      <span className="font-semibold text-slate-700 dark:text-slate-200">{t('prompt_mentions')}:</span>
-      <span> {mentionsText} </span>
-      <span className="text-slate-400 dark:text-slate-500">|</span>
-      <span> {t('prompt_site_cited')}:</span>
-      <span className="font-semibold text-slate-700 dark:text-slate-200"> {citedText} </span>
-      <span className="text-slate-400 dark:text-slate-500">|</span>
-      <span> {t('prompt_status')}:</span>
-      <span className="font-semibold text-slate-700 dark:text-slate-200"> {statusText}</span>
-    </div>
-  )
-}
-
-function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics>; t: T }) {
-  const engineList = SUPPORTED_ENGINES.map(
-    (engine) => metrics.get(engine) || { engine, scans: 0, mentions: 0, citations: 0, rate: 0 }
-  ).sort((a, b) => b.mentions - a.mentions)
-
-  return (
-    <div>
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-4">
-        {t('mentions_by_engine')}
-      </h3>
-      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
-        {engineList.map((em) => {
-          const meta = ENGINE_META[em.engine as keyof typeof ENGINE_META]
-          const percent = em.scans > 0 ? Math.round((em.mentions / em.scans) * 100) : 0
-          return (
-            <div
-              key={em.engine}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 sm:p-4 hover:shadow-md transition flex flex-col items-center text-center"
-            >
-              {meta && <meta.Icon size={32} className={`${meta.accent} mb-2 sm:mb-1`} />}
-              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-1 sm:mt-2 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
-              <div className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 sm:mt-2">{em.mentions}</div>
-              <div className="hidden sm:block text-xs text-slate-600 dark:text-slate-300 mt-2">
-                {t('out_of_results').replace('{count}', String(em.scans))}
-              </div>
-              {em.scans > 0 && <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1">({percent}%)</div>}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Highlight matched brand variants and domain inside text.
- * Returns React nodes with matched portions wrapped in a styled span.
- * Case-insensitive. Hebrew/RTL safe — only renders the text, doesn't modify raw.
- */
-function highlightMatches(
-  text: string,
-  brandVariants: string[],
-  targetDomain: string | null
-): React.ReactNode {
-  if (!text) return text
-
-  // Build a unique, sorted-by-length-desc list of search terms
-  const terms = new Set<string>()
-  for (const v of brandVariants) {
-    if (v && v.trim().length >= 2) terms.add(v.trim())
-  }
-  if (targetDomain && targetDomain.trim().length >= 2) {
-    const cleaned = targetDomain.trim().toLowerCase()
-    terms.add(cleaned)
-    terms.add(`www.${cleaned}`)
-    terms.add(`https://${cleaned}`)
-    terms.add(`http://${cleaned}`)
-    terms.add(`https://www.${cleaned}`)
-    terms.add(`http://www.${cleaned}`)
-  }
-  if (terms.size === 0) return text
-
-  const sortedTerms = Array.from(terms).sort((a, b) => b.length - a.length)
-  const escaped = sortedTerms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi')
-
-  const parts = text.split(pattern)
-  const lowerTerms = new Set(sortedTerms.map((s) => s.toLowerCase()))
-
-  return parts.map((part, i) => {
-    if (!part) return null
-    if (lowerTerms.has(part.toLowerCase())) {
-      return (
-        <span
-          key={i}
-          className="font-bold text-emerald-700 bg-emerald-50 px-1 rounded"
-        >
-          {part}
-        </span>
-      )
-    }
-    return <React.Fragment key={i}>{part}</React.Fragment>
-  })
-}
-
-/**
- * Find which brand variant (or domain) actually appears in the response text,
- * for display as a chip on the result row. Falls back to first variant if
- * the response text isn't loaded yet but the row is marked mentioned.
- */
-/**
- * Strip protocol, query params, hash, and trailing slashes for clean display.
- * Detection variants are not modified — this is presentation only.
- */
-function cleanDisplayDomain(s: string | null): string | null {
-  if (!s) return s
-  return s
-    .replace(/^https?:\/\//i, '')
-    .replace(/[?#].*$/, '')
-    .replace(/\/+$/, '')
-    .trim()
-}
-
-/**
- * Check if a citation's domain matches the target domain (ignoring www prefix).
- * Used for citation-list rendering and for setting reCited from sources.
- */
-function isTargetCitation(citationDomain: string | null | undefined, targetDomain: string | null): boolean {
-  if (!citationDomain || !targetDomain) return false
-  const c = citationDomain.toLowerCase().replace(/^www\./, '')
-  const t = targetDomain.toLowerCase().replace(/^www\./, '')
-  return c === t
-}
-
-/**
- * Re-evaluate a result's signals for display. Delegates to the shared
- * computeDisplayMatches so the client, server and scripts stay in lock-step.
- *
- * Strict separation:
- *   - A project domain in the ANSWER body → mention (reMentioned), never reCited.
- *   - reCited is true ONLY when a project domain is in the SOURCES list.
- *
- * `domainList` carries the project domain + any domain aliases.
- */
-function findMatchedLabels(
-  responseText: string | null,
-  brandVariants: string[],
-  targetDomain: string | null,
-  mentioned: boolean,
-  cited: boolean,
-  citations?: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }> | null,
-  domainList?: string[]
-): {
-  brandLabels: string[]
-  domainLabel: string | null
-  reMentioned: boolean
-  reCited: boolean
-  reBrandMentioned: boolean
-  reDomainMentioned: boolean
-  domainInAnswerLabel: string | null
-  domainInSourceLabel: string | null
-} {
-  const d = computeDisplayMatches({
-    responseText,
-    brandVariants,
-    targetDomain,
-    domainList: domainList ?? buildDomainList(targetDomain),
-    mentioned,
-    cited,
-    citations: citations ?? null,
-  })
-
-  return {
-    brandLabels: d.displayBrandLabels,
-    domainLabel: d.displayDomainLabel,
-    reMentioned: d.mentionedInAnswer,
-    reCited: d.citedAsSource,
-    reBrandMentioned: d.brandMentioned,
-    reDomainMentioned: d.domainMentioned,
-    domainInAnswerLabel: d.domainInAnswerLabel,
-    domainInSourceLabel: d.domainInSourceLabel,
-  }
-}
-
-function ResultRowCard({
-  result,
-  highlighted,
-  brandVariants,
-  targetDomain,
-  domainList,
-  isHebrew,
-  onRowClick,
-  onArchiveToggle,
-  onRetry,
-  t,
-}: {
-  result: ResultRow
-  highlighted: boolean
-  brandVariants: string[]
-  targetDomain: string | null
-  domainList?: string[]
-  isHebrew: boolean
-  onRowClick: (r: ResultRow) => void
-  onArchiveToggle: (resultId: string, newExcludedState: boolean) => void
-  onRetry: () => void
-  t: T
-}) {
-  const [isTogglingArchive, setIsTogglingArchive] = React.useState(false)
-  const [isRetrying, setIsRetrying] = React.useState(false)
-
-  const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
-  // Prefer the server-computed display fields so the list is correct on first
-  // render. If the drawer has loaded responseText, re-evaluate live to pick up
-  // any additional labels (and for in-text highlighting parity).
-  const live = findMatchedLabels(
-    result.responseText,
-    brandVariants,
-    targetDomain,
-    result.mentioned,
-    result.targetCited,
-    result.citations,
-    domainList
-  )
-  const brandLabels = result.responseText ? live.brandLabels : result.displayBrandLabels
-  const reMentioned = result.responseText ? live.reMentioned : result.displayMentioned
-  const reCited = result.responseText ? live.reCited : result.displayCited
-  const reDomainInSource = result.responseText ? live.domainInSourceLabel : result.domainInSourceLabel
-
-  const scannedAtStr = result.scannedAt ? formatShortDateTime(result.scannedAt, isHebrew) : null
-
-  const handleArchiveClick = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsTogglingArchive(true)
-    await onArchiveToggle(result.id, !result.excludedFromScore)
-    setIsTogglingArchive(false)
-  }
-
-  const handleRetry = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsRetrying(true)
-    await onRetry()
-    setIsRetrying(false)
-  }
-
-  // Show error state when scan failed/timed out
-  if (result.status === 'error') {
-    return (
-      <div
-        className={`rounded-lg border bg-red-50 dark:bg-red-950/30 p-4 hover:shadow-md transition ${
-          highlighted ? 'border-red-300 ring-2 ring-red-200 dark:ring-red-700' : 'border-red-200 dark:border-red-800'
-        }`}
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium line-clamp-2 text-red-900 dark:text-red-100">
-              {result.promptText}
-            </p>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {meta && <meta.Icon size={16} className={meta.accent} />}
-              <span className="text-xs font-medium text-red-700 dark:text-red-300">
-                {meta?.name || result.engine}
-              </span>
-              <Badge variant="danger" className="!text-xs">
-                {isHebrew ? 'סריקה נכשלה' : 'Scan failed'}
-              </Badge>
-            </div>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-              {isHebrew ? 'הסריקה נכשלה זמנית. אפשר לנסות שוב.' : 'Scan failed temporarily. You can retry.'}
-            </p>
-          </div>
-          <button
-            onClick={handleRetry}
-            disabled={isRetrying}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition whitespace-nowrap ${
-              isRetrying
-                ? 'bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-200 opacity-50 cursor-wait'
-                : 'bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-200 hover:bg-red-300 dark:hover:bg-red-700'
-            }`}
-          >
-            {isHebrew ? 'נסה שוב' : 'Retry'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      onClick={() => onRowClick(result)}
-      className={`rounded-lg border bg-white dark:bg-slate-900 p-4 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition cursor-pointer ${
-        highlighted ? 'border-indigo-300 ring-2 ring-indigo-200 dark:ring-indigo-700' : 'border-slate-200 dark:border-slate-700'
-      } ${result.excludedFromScore ? 'opacity-60' : ''}`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          {/* Row 1: query text */}
-          <p className={`text-sm font-medium line-clamp-2 ${result.excludedFromScore ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-slate-100'}`}>
-            {result.promptText}
-          </p>
-
-          {/* Row 2: engine + status badges + scan time + archive label */}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {meta && <meta.Icon size={16} className={meta.accent} />}
-            <span className={`text-xs font-medium ${result.excludedFromScore ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
-              {meta?.name || result.engine}
-            </span>
-
-            {result.excludedFromScore && (
-              <Badge variant="neutral" className="!text-xs !bg-slate-100 dark:!bg-slate-800">
-                {isHebrew ? 'לא נכלל בציון' : 'Not in score'}
-              </Badge>
-            )}
-
-            {!result.excludedFromScore && (
-              <>
-                {/* Strict separation: a mention in the answer is NOT a source
-                    citation. Only reCited (domain in the sources list) shows
-                    "appeared as source". */}
-                {reMentioned && reCited ? (
-                  <Badge variant="success" className="!text-xs">{t('mentioned_and_source')}</Badge>
-                ) : (
-                  <>
-                    {reMentioned ? (
-                      <Badge variant="success" className="!text-xs">{t('mentioned_in_answer')}</Badge>
-                    ) : (
-                      <Badge variant="neutral" className="!text-xs">{t('not_mentioned_in_answer')}</Badge>
-                    )}
-                    {reCited ? (
-                      <Badge variant="info" className="!text-xs">{t('appeared_as_source')}</Badge>
-                    ) : (
-                      <Badge variant="neutral" className="!text-xs">{t('not_appeared_as_source')}</Badge>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            {scannedAtStr && (
-              <span className={`text-[11px] ${result.excludedFromScore ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                · {t('scanned_at')} {scannedAtStr}
-              </span>
-            )}
-          </div>
-
-          {/* Row 3: matched variants — only when something was matched and not archived.
-              "Mentioned" chips = brand aliases + any domain seen in the answer body.
-              "Appeared as source" chip = the project domain found in the sources list. */}
-          {!result.excludedFromScore && (brandLabels.length > 0 || reDomainInSource) && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-              {brandLabels.length > 0 && (
-                <div className="inline-flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">{t('what_was_mentioned')}:</span>
-                  {brandLabels.map((label) => (
-                    <span
-                      key={label}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {reDomainInSource && (
-                <div className="inline-flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_appeared_as_source')}:</span>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                    {reDomainInSource}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {!result.excludedFromScore && result.citationCount > 0 && (
-            <Badge variant="info" className="!text-xs">
-              {result.citationCount} {t('citations')}
-            </Badge>
-          )}
-          <button
-            onClick={handleArchiveClick}
-            disabled={isTogglingArchive}
-            title={result.excludedFromScore ? (isHebrew ? 'שחזר לציון הנראות' : 'Restore to scoring') : (isHebrew ? 'העבר לארכיון' : 'Archive')}
-            className={`px-2 py-1 rounded text-xs font-medium transition ${
-              result.excludedFromScore
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-            } ${isTogglingArchive ? 'opacity-50 cursor-wait' : ''}`}
-          >
-            {result.excludedFromScore ? (isHebrew ? 'שחזר' : 'Restore') : (isHebrew ? 'ארכיון' : 'Archive')}
-          </button>
-          <ExternalLinkIcon size={16} className={`${result.excludedFromScore ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500'}`} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SmartQuestionCard({
-  question,
-  onAdd,
-  t,
-  allPrompts,
-  isAlreadyTracked,
-}: {
-  question: PromptSuggestion
-  onAdd: () => void
-  t: T
-  allPrompts?: PromptRow[]
-  isAlreadyTracked?: boolean
-}) {
-  const intentTone: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
-    brand: 'info',
-    comparison: 'warning',
-    local: 'success',
-    transactional: 'warning',
-    recommendation: 'info',
-    informational: 'neutral',
-    commercial: 'warning',
-    alternatives: 'neutral',
-    pre_purchase: 'info',
-    gift: 'success',
-  }
-
-  // Intent label follows dashboard UI language, not the project's scan language.
-  const label =
-    (
-      {
-        brand: t('intent_brand'),
-        comparison: t('intent_comparison'),
-        commercial: t('intent_commercial'),
-        local: t('intent_local'),
-        transactional: t('intent_transactional'),
-        recommendation: t('intent_recommendation'),
-        informational: t('intent_informational'),
-        alternatives: t('intent_alternatives'),
-        pre_purchase: t('intent_pre_purchase'),
-        gift: t('intent_gift'),
-      } as Record<string, string>
-    )[question.intent] ||
-    question.intent
-
-  // Confidence tier display (replaces numeric score)
-  const confidenceTierLabel = (tier: string): string => {
-    switch (tier) {
-      case 'high': return t('confidence_high')
-      case 'good': return t('confidence_good')
-      case 'medium': return t('confidence_medium')
-      case 'opportunity': return t('confidence_opportunity')
-      case 'experimental': return t('confidence_experimental')
-      default: return tier
-    }
-  }
-
-  const confidenceTierColor = (tier: string): 'success' | 'info' | 'warning' | 'neutral' | 'danger' => {
-    switch (tier) {
-      case 'high': return 'success'
-      case 'good': return 'info'
-      case 'medium': return 'warning'
-      case 'opportunity': return 'warning'
-      case 'experimental': return 'neutral'
-      default: return 'neutral'
-    }
-  }
-
-  const chipLabel = (chip: string): string => {
-    return t(chip as any) || chip
-  }
-
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:shadow-sm transition">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-900 dark:text-slate-100 font-medium line-clamp-2 mb-1.5">{question.prompt}</p>
-        <div className="flex items-center gap-1.5 mb-1">
-          <Badge variant={intentTone[question.intent] || 'neutral'} className="!text-[9px]">
-            {label}
-          </Badge>
-          {'confidenceTier' in question && (
-            <Badge variant={confidenceTierColor(question.confidenceTier)} className="!text-[9px]">
-              {confidenceTierLabel(question.confidenceTier)}
-            </Badge>
-          )}
-        </div>
-        {'valueReason' in question && question.valueReason && (
-          <p className="text-[12px] font-medium text-indigo-700 dark:text-indigo-300 mb-1.5">
-            {question.valueReason}
-          </p>
-        )}
-        {'chips' in question && question.chips && question.chips.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            {question.chips.map((chip) => (
-              <span
-                key={chip}
-                className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-              >
-                {chipLabel(chip)}
-              </span>
-            ))}
-          </div>
-        )}
-        {question.reason && (
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1">
-            {question.reason}
-          </p>
-        )}
-      </div>
-      {isAlreadyTracked ? (
-        <div className="shrink-0 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-[9px] font-medium text-emerald-700 dark:text-emerald-300 whitespace-nowrap flex items-center">
-          {t('already_tracked')}
-        </div>
-      ) : (
-        <button
-          onClick={onAdd}
-          className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
-          aria-label={t('add_question_label')}
-          title={t('add_question_label')}
-        >
-          +
-        </button>
-      )}
-    </div>
-  )
-}
-
-function ResultDetailDrawer({
-  open,
-  result,
-  brandVariants,
-  targetDomain,
-  domainList,
-  isHebrew,
-  onClose,
-  t,
-}: {
-  open: boolean
-  result: ResultRow
-  brandVariants: string[]
-  targetDomain: string | null
-  domainList?: string[]
-  isHebrew: boolean
-  onClose: () => void
-  t: T
-}) {
-  if (!open) return null
-
-  const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
-  // Same pattern as the list card: use server-computed values until the
-  // drawer's responseText load lets us re-evaluate live.
-  const live = findMatchedLabels(
-    result.responseText,
-    brandVariants,
-    targetDomain,
-    result.mentioned,
-    result.targetCited,
-    result.citations,
-    domainList
-  )
-  const brandLabels = result.responseText ? live.brandLabels : result.displayBrandLabels
-  const reMentioned = result.responseText ? live.reMentioned : result.displayMentioned
-  const reCited = result.responseText ? live.reCited : result.displayCited
-  const reDomainInSource = result.responseText ? live.domainInSourceLabel : result.domainInSourceLabel
-
-  function cleanResponseText(text: string): string {
-    if (!text) return ''
-    return text
-      .replace(/\*\*([^*]+)\*\*/g, '$1')
-      .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/__([^_]+)__/g, '$1')
-      .replace(/_([^_]+)_/g, '$1')
-      .replace(/^#+\s+/gm, '')
-      .replace(/\[\[\d+\]\]/g, '')
-      .replace(/\[\d+\]/g, '')
-      .replace(/\(\[[^\]]+\]\[[^\]]+\]\)/g, '')
-      .replace(/\(\[[^\]]+\]\)/g, '')
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-      .replace(/^[\s]*[-*+]\s+/gm, '• ')
-      .trim()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-end" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-slate-900 w-full max-w-2xl h-full overflow-y-auto shadow-xl animate-in slide-in-from-right"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">{result.promptText}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{engineMeta?.name || result.engine}</p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-2xl leading-none">
-            ×
-          </button>
-        </div>
-
-        <div className="space-y-6 p-6">
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('scan_activity')}</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs text-slate-600 dark:text-slate-300">{t('mentioned_in_answer')}</div>
-                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                  {reMentioned ? '✓' : '—'}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-blue-600 dark:text-blue-400">{t('appeared_as_source')}</div>
-                <div className={`text-lg font-bold ${reCited ? 'text-blue-700 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                  {reCited ? '✓' : '—'}
-                </div>
-              </div>
-            </div>
-            {(brandLabels.length > 0 || reDomainInSource) && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3">
-                {brandLabels.length > 0 && (
-                  <div className="inline-flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">{t('what_was_mentioned')}:</span>
-                    {brandLabels.map((label) => (
-                      <span
-                        key={label}
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {reDomainInSource && (
-                  <div className="inline-flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_appeared_as_source')}:</span>
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      {reDomainInSource}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <GeoExplanationSection
-            geoInsights={result.geoInsights}
-            displayMentioned={result.displayMentioned}
-            displayCited={result.displayCited}
-            displayBrandLabels={result.displayBrandLabels}
-            displayDomainLabel={result.displayDomainLabel}
-            isHebrew={isHebrew}
-            t={t}
-          />
-
-          <GeoRecommendationsSection
-            geoInsights={result.geoInsights}
-            displayMentioned={result.displayMentioned}
-            displayCited={result.displayCited}
-            isHebrew={isHebrew}
-            t={t}
-          />
-
-          <GeoInsightsCollapsible insights={result.geoInsights} t={t} />
-
-          {result.citations.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {t('sources')} ({result.citations.length})
-              </h3>
-              <div className="space-y-2">
-                {result.citations.map((c, i) => {
-                  // Fall back to client-side www-tolerant match when backend
-                  // is_target_domain wasn't set on legacy rows.
-                  const isTarget = c.is_target_domain || isTargetCitation(c.domain, targetDomain)
-                  const displayDomain = cleanDisplayDomain(c.domain) || c.domain
-                  return (
-                    <a
-                      key={i}
-                      href={c.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition"
-                    >
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className={`font-medium ${isTarget ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                          {displayDomain}
-                        </span>
-                        {isTarget && (
-                          <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>
-                        )}
-                      </div>
-                    </a>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {result.responseText && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('ai_answer')}</h3>
-              <div className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
-                {cleanResponseText(result.responseText)
-                  .split('\n')
-                  .map((line, i) => (
-                    <p key={i} className="leading-relaxed">
-                      {line ? highlightMatches(line, brandVariants, targetDomain) : <br />}
-                    </p>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="sticky bottom-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
-          <Button variant="outline" onClick={onClose} className="w-full">
-            {t('close')}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * AI Visibility Summary — top of Insights tab.
- *
- * A compact 3-4 bullet snapshot:
- *   1. Overall visibility status (high / medium / low / insufficient)
- *   2. Strongest engines (success rate >= 60%)
- *   3. Weakest engines (success rate <= 25%) — only if clearly weak
- *   4. Single recommended action (deterministic, derived from
- *      GeoOpportunityMapping signals)
- *
- * Deterministic. No AI calls. No DB / API changes.
- */
-function AIVisibilitySummarySection({
-  metrics,
-  engineMetrics,
-  mapping,
-  isHebrew,
-  t,
-}: {
-  metrics: GlobalMetrics
-  engineMetrics: Map<string, EngineMetrics>
-  mapping: GeoOpportunityMapping | null
-  isHebrew: boolean
-  t: T
-}) {
-  const engineDisplayName = (engine: string): string =>
-    ENGINE_META[engine as keyof typeof ENGINE_META]?.name || engine
-
-  // Hebrew & English list joiners — "X, Y ו־Z" / "X, Y and Z".
-  const joinNames = (names: string[]): string => {
-    if (names.length === 0) return ''
-    if (names.length === 1) return names[0]
-    const and = isHebrew ? 'ו־' : 'and '
-    if (names.length === 2) {
-      return isHebrew ? `${names[0]} ${and}${names[1]}` : `${names[0]} ${and}${names[1]}`
-    }
-    const head = names.slice(0, -1).join(', ')
-    const last = names[names.length - 1]
-    return isHebrew ? `${head} ${and}${last}` : `${head} ${and}${last}`
-  }
-
-  // Map a content signal to its short action sentence.
-  const actionForSignal = (signal: ContentSignalKey): string => {
-    switch (signal) {
-      case 'reviews': return t('ai_summary_action_reviews')
-      case 'comparison': return t('ai_summary_action_comparison')
-      case 'pricing': return t('ai_summary_action_pricing')
-      case 'list': return t('ai_summary_action_list')
-      case 'local': return t('ai_summary_action_local')
-      case 'recommendation': return t('ai_summary_action_recommendation')
-    }
-  }
-
-  // Pick a single recommended action. Prioritize missing signals
-  // (failureRate >= 50%) over merely weak signals. Falls back to a
-  // generic suggestion when no clear opportunity is detectable.
-  const pickAction = (): string => {
-    if (mapping) {
-      const missing = mapping.missingOpportunities
-        .filter((m) => m.category === 'content' && m.failureRate >= 50)
-        .sort((a, b) => b.failureRate - a.failureRate)
-      if (missing.length > 0) {
-        return actionForSignal(missing[0].signal as ContentSignalKey)
-      }
-      const weak = [...mapping.contentSignals]
-        .filter((s) => s.visibilityRate < 60)
-        .sort((a, b) => a.visibilityRate - b.visibilityRate)
-      if (weak.length > 0) {
-        return actionForSignal(weak[0].signal)
-      }
-    }
-    return t('ai_summary_action_fallback')
-  }
-
-  type Bullet = { text: string; isFirst?: boolean; isAction?: boolean }
-  const bullets: Bullet[] = []
-
-  // Insufficient data short-circuit — show only status + fallback action.
-  if (metrics.totalScans < 3) {
-    bullets.push({ text: t('ai_summary_status_insufficient'), isFirst: true })
-    bullets.push({
-      text: t('ai_summary_action_label') + t('ai_summary_action_fallback'),
-      isAction: true,
-    })
-  } else {
-    // 1. Overall status bullet
-    const score = metrics.mentionRate || 0
-    let statusText: string
-    if (score >= 70) statusText = t('ai_summary_status_high')
-    else if (score >= 40) statusText = t('ai_summary_status_medium')
-    else statusText = t('ai_summary_status_low')
-    bullets.push({ text: statusText, isFirst: true })
-
-    // 2. Strong engines (rate >= 60% AND at least 2 scans on that engine)
-    // Phrasing depends on overall visibility to avoid contradiction:
-    // If overall score < 40%, use moderate phrasing; otherwise, "strong visibility" is appropriate.
-    const strong = Array.from(engineMetrics.values())
-      .filter((em) => em.scans >= 2 && em.rate >= 60)
-      .sort((a, b) => b.rate - a.rate)
-      .slice(0, 3)
-      .map((em) => engineDisplayName(em.engine))
-    if (strong.length > 0) {
-      const score = metrics.mentionRate || 0
-      let text: string
-      if (isHebrew) {
-        text = score < 40
-          ? `העסק הופיע בעיקר ב־${joinNames(strong)}.`
-          : `הנראות חזקה בעיקר ב־${joinNames(strong)}.`
-      } else {
-        text = score < 40
-          ? `The business did appear mainly on ${joinNames(strong)}.`
-          : `Visibility is strong mainly on ${joinNames(strong)}.`
-      }
-      bullets.push({ text })
-    }
-
-    // 3. Weak engines (rate <= 25% AND at least 2 scans on that engine)
-    const weakEngines = Array.from(engineMetrics.values())
-      .filter((em) => em.scans >= 2 && em.rate <= 25)
-      .sort((a, b) => a.rate - b.rate)
-      .slice(0, 2)
-      .map((em) => engineDisplayName(em.engine))
-    if (weakEngines.length > 0) {
-      const text = isHebrew
-        ? `החולשה המרכזית היא ב־${joinNames(weakEngines)}.`
-        : `The main weakness is on ${joinNames(weakEngines)}.`
-      bullets.push({ text })
-    }
-
-    // 4. Recommended action — marked as action for visual emphasis
-    bullets.push({ text: t('ai_summary_action_label') + pickAction(), isAction: true })
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-3 shadow-sm">
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {t('ai_summary_title')}
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {t('ai_summary_subtitle')}
-          </p>
-        </div>
-      </div>
-      <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
-        {bullets.map((b, i) => (
-          <div key={i}>
-            {b.isAction && i > 0 && (
-              <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
-            )}
-            <div className={`flex gap-1.5 ${b.isAction ? 'pt-1.5' : ''}`}>
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
-              <span
-                className={
-                  b.isFirst
-                    ? 'font-medium text-slate-800 dark:text-slate-200'
-                    : b.isAction
-                    ? 'font-semibold text-indigo-700 dark:text-indigo-300'
-                    : 'text-slate-700 dark:text-slate-300'
-                }
-              >
-                {b.text}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/**
- * GEO Opportunity Mapping — actionable recommendations panel.
- *
- * Answers: "What should I improve on my website so AI engines show me more?"
- *
- * Dynamic card count: each card renders ONLY if it has a real opportunity.
- * If no card has data, a single fallback message is shown.
- *
- * Possible cards (deterministic, data-driven, no inventions):
- *   1. תוכן שכדאי לחזק — weak content signals to strengthen
- *   2. שאלות שבהן העסק חלש — specific prompts where business is missing/weak
- *   3. מנועים שכדאי לחזק — engines with significantly low visibility
- *   4. מה חסר כשהעסק לא מופיע — content patterns missing from failed results
- */
-function GeoOpportunityMappingSection({
-  mapping,
-  results,
-  isHebrew,
-  t,
-}: {
-  mapping: GeoOpportunityMapping | null
-  results: ResultRow[]
-  isHebrew: boolean
-  t: T
-}) {
-  if (!mapping || mapping.totalResults === 0) {
-    return null
-  }
-
-  const engineDisplayName = (engine: string): string => {
-    const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
-    return meta?.name || engine
-  }
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 1 templates: actionable instruction per weak content signal.
-  // Each phrase is the full sentence (no trailing fragment), so they
-  // read naturally on their own.
-  // ─────────────────────────────────────────────────────────────────────
-  const weakSignalRecommendation = (
-    signal: ContentSignalKey,
-    lang: 'he' | 'en',
-  ): string => {
-    if (lang === 'he') {
-      switch (signal) {
-        case 'pricing':
-          return 'להוסיף באתר מידע ברור על מחירים, טווחי מחיר ומה כלול בשירות.'
-        case 'reviews':
-          return 'להציג ביקורות, דירוגים ועדויות לקוחות באזורים בולטים באתר.'
-        case 'comparison':
-          return 'להוסיף עמודי השוואה שיעזרו ללקוח לבחור בין מוצרים, שירותים או אפשרויות.'
-        case 'list':
-          return 'להוסיף שאלות נפוצות, רשימות ותשובות קצרות לשאלות שחוזרות אצל לקוחות.'
-        case 'recommendation':
-          return 'להוסיף תוכן המלצה שמסביר ללקוח כיצד לבחור את הפתרון המתאים לו.'
-        case 'local':
-          return 'להבליט אזורי שירות, כתובת, זמינות ומידע מקומי רלוונטי.'
-      }
-    }
-    switch (signal) {
-      case 'pricing':
-        return 'Add clear pricing information, price ranges, and what is included.'
-      case 'reviews':
-        return 'Display reviews, ratings, and customer testimonials in prominent areas of the site.'
-      case 'comparison':
-        return 'Add comparison pages that help customers choose between products, services, or options.'
-      case 'list':
-        return 'Add FAQs, lists, and concise answers to recurring customer questions.'
-      case 'recommendation':
-        return 'Add recommendation content explaining how to choose the right solution.'
-      case 'local':
-        return 'Highlight service areas, address, availability, and relevant local information.'
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 4 templates: structured as "X appeared less when business
-  // didn't appear. Worth doing Y."
-  // ─────────────────────────────────────────────────────────────────────
-  const missingSignalRecommendation = (
-    signal: ContentSignalKey,
-    lang: 'he' | 'en',
-  ): string => {
-    if (lang === 'he') {
-      switch (signal) {
-        case 'pricing':
-          return 'בשאלות שבהן העסק לא הופיע, היה פחות מידע מסחרי. כדאי להציג טווחי מחיר, מה כלול בשירות ותנאי רכישה.'
-        case 'reviews':
-          return 'בשאלות שבהן העסק לא הופיע, חסרו הוכחות אמון. כדאי להבליט ביקורות, דירוגים ועדויות לקוחות.'
-        case 'comparison':
-          return 'בשאלות שבהן העסק לא הופיע, חסרו השוואות ברורות. כדאי להוסיף עמודים שיעזרו ללקוח לבחור בין אפשרויות.'
-        case 'list':
-          return 'בשאלות שבהן העסק לא הופיע, חסרו תשובות מסודרות. כדאי להוסיף שאלות נפוצות ותשובות קצרות לשאלות מרכזיות.'
-        case 'recommendation':
-          return 'בשאלות שבהן העסק לא הופיע, חסר תוכן המלצה. כדאי להוסיף תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.'
-        case 'local':
-          return 'בשאלות שבהן העסק לא הופיע, חסר מידע מקומי. כדאי להבליט אזורי שירות, כתובת וזמינות.'
-      }
-    }
-    switch (signal) {
-      case 'pricing':
-        return 'Pricing information appeared less when the business did not appear. Worth displaying price ranges, what is included, and purchase terms.'
-      case 'reviews':
-        return 'Reviews and ratings appeared less when the business did not appear. Worth highlighting customer testimonials and trust signals.'
-      case 'comparison':
-        return 'Comparison content appeared less when the business did not appear. Worth adding pages that compare services, products, or options.'
-      case 'list':
-        return 'FAQ and structured content appeared less when the business did not appear. Worth adding clear answers to key recurring questions.'
-      case 'recommendation':
-        return 'Recommendation content appeared less when the business did not appear. Worth adding guidance that helps customers choose.'
-      case 'local':
-        return 'Local information appeared less when the business did not appear. Worth highlighting service areas, address, and availability.'
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 1: Content to strengthen — weak content signals only.
-  // A signal is "weak" if its visibilityRate is below 60% (genuinely
-  // underperforming in the project's successful answers).
-  // ─────────────────────────────────────────────────────────────────────
-  const contentStrengthCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-    const weak = mapping.contentSignals
-      .filter((s) => s.visibilityRate < 60)
-      .sort((a, b) => a.visibilityRate - b.visibilityRate)
-      .slice(0, 3)
-
-    if (weak.length === 0) return []
-
-    weak.forEach((signal, idx) => {
-      lines.push({
-        text: weakSignalRecommendation(signal.signal, isHebrew ? 'he' : 'en'),
-        isFirst: idx === 0,
-      })
-    })
-    return lines
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 2: Specific prompts where business is missing or nearly missing.
-  // For each prompt, count how many engines featured the business vs.
-  // total engines scanned. Only show prompts where the business is in
-  // 0 engines OR at most 1 out of 3+ engines.
-  // ─────────────────────────────────────────────────────────────────────
-  const weakPromptsCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-
-    // Group results by prompt text (fallback to promptId if no text).
-    const byPrompt = new Map<string, { promptText: string; total: number; success: number }>()
-    for (const r of results) {
-      const key = r.promptText?.trim() || r.promptId || ''
-      if (!key) continue
-      const isSuccess = r.displayMentioned || r.displayCited
-      const entry = byPrompt.get(key) || { promptText: r.promptText || '', total: 0, success: 0 }
-      entry.total += 1
-      if (isSuccess) entry.success += 1
-      byPrompt.set(key, entry)
-    }
-
-    // Only count prompts with enough engine coverage (at least 2 scans),
-    // so single-engine prompts don't pollute the list.
-    const weakPrompts = Array.from(byPrompt.values())
-      .filter((p) => p.total >= 2 && p.promptText)
-      .map((p) => ({
-        ...p,
-        rate: Math.round((p.success / p.total) * 100),
-      }))
-      .filter((p) => p.rate <= 25) // missing or near-missing
-      .sort((a, b) => a.rate - b.rate)
-      .slice(0, 3)
-
-    if (weakPrompts.length === 0) return []
-
-    weakPrompts.forEach((p, idx) => {
-      // Truncate long prompts so the card stays scannable.
-      const promptDisplay = p.promptText.length > 90
-        ? p.promptText.slice(0, 90).trim() + '…'
-        : p.promptText
-      const actionText = isHebrew
-        ? 'צרו עמוד תוכן או FAQ שעונה לשאלה הזו.'
-        : 'Consider creating a content page or FAQ section that directly answers this question.'
-      const text = isHebrew
-        ? `בשאלה "${promptDisplay}" העסק לא הופיע. מומלץ ליצור עמוד תוכן או FAQ שעונה לה ישירות.`
-        : `The business did not appear for: "${promptDisplay}"\n${actionText}`
-      lines.push({ text, isFirst: idx === 0 })
-    })
-    return lines
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 3: Engines worth strengthening — engines where visibility is
-  // significantly low (rate < 50% AND clearly below the overall average).
-  // ─────────────────────────────────────────────────────────────────────
-  const weakEnginesCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-
-    const avgRate = mapping.totalResults > 0
-      ? Math.round((mapping.totalSuccess / mapping.totalResults) * 100)
-      : 0
-
-    const underperforming = mapping.enginePatterns
-      .map((e) => ({
-        engine: e.engine,
-        rate: e.totalScans > 0 ? Math.round((e.totalSuccess / e.totalScans) * 100) : 0,
-      }))
-      // Threshold: must be both <50% AND at least 10 points below average.
-      .filter((e) => e.rate < 50 && e.rate <= avgRate - 10)
-      .sort((a, b) => a.rate - b.rate)
-      .slice(0, 3)
-
-    if (underperforming.length === 0) return []
-
-    underperforming.forEach((e, idx) => {
-      const name = engineDisplayName(e.engine)
-      const text = isHebrew
-        ? `${name}: העסק מופיע רק ב-${e.rate}% מהשאלות. חזקו את התוכן שמתאים למנוע הזה.`
-        : `On ${name}, the business appears in only ${e.rate}% of questions. Worth investing in strengthening relevant content for this engine.`
-      lines.push({ text, isFirst: idx === 0 })
-    })
-    return lines
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 4: What's missing when the business doesn't appear.
-  // Uses mapping.missingOpportunities. Dedupes by signal — each content
-  // signal yields a unique sentence, so no repetition.
-  // ─────────────────────────────────────────────────────────────────────
-  const missingGapsCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-    const seen = new Set<string>()
-
-    const impactful = mapping.missingOpportunities
-      .filter((m) => m.category === 'content' && m.failureRate >= 50)
-
-    for (const miss of impactful) {
-      const key = String(miss.signal)
-      if (seen.has(key)) continue
-      seen.add(key)
-      lines.push({
-        text: missingSignalRecommendation(miss.signal as ContentSignalKey, isHebrew ? 'he' : 'en'),
-        isFirst: lines.length === 0,
-      })
-      if (lines.length >= 3) break
-    }
-    return lines
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Build the visible card list. Only cards with real opportunities
-  // are rendered; otherwise the section shows a single fallback.
-  // ─────────────────────────────────────────────────────────────────────
-  type CardSpec = {
-    title: string
-    tone: 'emerald' | 'blue' | 'indigo' | 'amber'
-    icon: React.ReactNode
-    sentences: Array<{ text: string; isFirst?: boolean }>
-  }
-  const cards: CardSpec[] = []
-  if (contentStrengthCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'תוכן שכדאי לחזק' : 'Content to strengthen',
-      tone: 'emerald',
-      icon: <BarChart3 className="w-5 h-5" />,
-      sentences: contentStrengthCard,
-    })
-  }
-  if (weakPromptsCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'שאלות שבהן העסק לא הופיע' : 'Questions where the business is weak',
-      tone: 'blue',
-      icon: <TrendingDown className="w-5 h-5" />,
-      sentences: weakPromptsCard,
-    })
-  }
-  if (weakEnginesCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'מנועים שכדאי לחזק' : 'Engines worth strengthening',
-      tone: 'indigo',
-      icon: <Cpu className="w-5 h-5" />,
-      sentences: weakEnginesCard,
-    })
-  }
-  if (missingGapsCard.length > 0) {
-    cards.push({
-      title: isHebrew ? 'מה חסר כשהעסק לא מופיע' : 'What is missing when the business does not appear',
-      tone: 'amber',
-      icon: <Award className="w-5 h-5" />,
-      sentences: missingGapsCard,
-    })
-  }
-
-  const fallbackText = isHebrew
-    ? 'כרגע לא זוהתה חולשה ברורה. כדי לקבל המלצות מדויקות יותר, מומלץ להריץ עוד שאלות ומנועים.'
-    : 'No clear weakness detected at the moment. To get more accurate recommendations, it is recommended to run more questions and engines.'
-
-  return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {t('geo_opp_title')}
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {t('geo_opp_subtitle')}
-          </p>
-        </div>
-        <span className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-          {mapping.totalSuccess}/{mapping.totalResults}
-        </span>
-      </div>
-
-      {mapping.totalResults < 20 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex gap-3">
-          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-900 dark:text-amber-200">
-            {t('geo_opp_small_sample_warning')}
-          </p>
-        </div>
-      )}
-
-      {cards.length === 0 ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{fallbackText}</p>
-      ) : (
-        <div className={`grid grid-cols-1 ${cards.length > 1 ? 'md:grid-cols-2' : ''} gap-3`}>
-          {cards.map((card, i) => (
-            <OpportunityCard
-              key={i}
-              title={card.title}
-              tone={card.tone}
-              icon={card.icon}
-              sentences={card.sentences}
-              emptyText=""
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function OpportunityCard({
-  title,
-  tone,
-  icon,
-  sentences,
-  emptyText,
-}: {
-  title: string
-  tone: 'emerald' | 'blue' | 'indigo' | 'amber'
-  icon: React.ReactNode
-  sentences: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }>
-  emptyText: string
-}) {
-  const accent =
-    tone === 'emerald'
-      ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-900/10'
-      : tone === 'blue'
-      ? 'border-blue-200 dark:border-blue-800/60 bg-blue-50/40 dark:bg-blue-900/10'
-      : tone === 'indigo'
-      ? 'border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-900/10'
-      : 'border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-900/10'
-
-  const iconTone =
-    tone === 'emerald'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : tone === 'blue'
-      ? 'text-blue-600 dark:text-blue-400'
-      : tone === 'indigo'
-      ? 'text-indigo-600 dark:text-indigo-400'
-      : 'text-amber-600 dark:text-amber-400'
-
-  return (
-    <div className={`rounded-xl border ${accent} p-4 space-y-2`}>
-      <div className="flex items-center gap-2">
-        <div className={`${iconTone}`} aria-hidden="true">{icon}</div>
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
-      </div>
-      {sentences.length > 0 ? (
-        <ul className="space-y-1.5 text-xs leading-relaxed">
-          {sentences.map((item, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
-              <span className={item.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : 'text-slate-700 dark:text-slate-300'}>
-                {item.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
-      )}
-    </div>
-  )
-}
-
-function capitalize(s: string): string {
-  if (!s) return s
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
-/**
- * GEO Competitor Intelligence — Phase 2C
- *
- * AI search market intelligence section. Surfaces which sources AI engines
- * trust, what content patterns repeatedly win visibility, how different
- * engines differ, and what tends to replace the project when it loses
- * visibility.
- *
- * Framing: executive intelligence (not analytics dump). Insights first,
- * supporting domain pills are visual texture only. Max 1 percentage per
- * card. Authority scores never exposed in UI.
- */
-function GeoCompetitorIntelligenceSection({
-  intelligence,
-  businessMentions,
-  results,
-  isHebrew,
-  t,
-}: {
-  intelligence: GeoCompetitorIntelligence | null
-  businessMentions: BusinessMentionIntelligence | null
-  results: ResultRow[]
-  isHebrew: boolean
-  t: T
-}) {
-  if (!intelligence) return null
-
-  const hasAnyData =
-    intelligence.trustedDomains.length > 0 ||
-    intelligence.enginePreferences.length > 0 ||
-    intelligence.visibilityLossPatterns.dominantDomains.length > 0 ||
-    (businessMentions?.mentionedBusinesses.length ?? 0) > 0
-
-  if (!hasAnyData) return null
-
-  // Never expose 'unknown' to users. Returns null to signal "skip this".
-  const categoryLabel = (cat: CompetitorCategory): string | null => {
-    switch (cat) {
-      case 'review': return t('geo_comp_cat_review')
-      case 'marketplace': return t('geo_comp_cat_marketplace')
-      case 'forum': return t('geo_comp_cat_forum')
-      case 'brand': return t('geo_comp_cat_brand')
-      case 'editorial': return t('geo_comp_cat_editorial')
-      case 'directory': return t('geo_comp_cat_directory')
-      default: return null // 'unknown' or any other → hide entirely
-    }
-  }
-
-  const engineDisplayName = (engine: string): string => {
-    const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
-    return meta?.name || engine
-  }
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 1: Recurring websites — focus on specific domains by name.
-  // Answers "Who keeps showing up?". No category language (that's Card 3).
-  // ─────────────────────────────────────────────────────────────────────
-  const trustedSourcesCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-    const domains = intelligence.trustedDomains
-    const topDomain = domains[0]
-    const secondDomain = domains[1]
-
-    if (topDomain) {
-      // Lead: name the most dominant domain directly
-      if (topDomain.uniqueEngineCount >= 3) {
-        lines.push({
-          text: isHebrew
-            ? `${topDomain.domain} הופיע ב-${topDomain.uniqueEngineCount} מנועים שונים.`
-            : `${topDomain.domain} recurred across ${topDomain.uniqueEngineCount} different AI engines.`,
-          isFirst: true,
-        })
-      } else {
-        lines.push({
-          text: isHebrew
-            ? `${topDomain.domain} הופיע בעקביות בתוצאות AI.`
-            : `${topDomain.domain} stood out with consistent presence across AI answers.`,
-          isFirst: true,
-        })
-      }
-    }
-
-    if (secondDomain) {
-      lines.push({
-        text: isHebrew
-          ? `${secondDomain.domain} הופיע גם הוא במספר תוצאות שונות.`
-          : `${secondDomain.domain} also appeared in multiple results.`,
-        isFirst: false,
-      })
-    }
-
-    // Closing context line — only if we have 3+ recurring sites
-    if (domains.length >= 3) {
-      lines.push({
-        text: isHebrew
-          ? `סך הכל ${domains.length} אתרים חזרו על עצמם בסריקות.`
-          : `In total, ${domains.length} websites recurred across scans.`,
-        isFirst: false,
-      })
-    }
-
-    const pills = domains.slice(0, 3).map((d) => d.domain)
-    return { lines, pills }
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 2: Content patterns — REAL signals about what content appears.
-  // Uses only contentSignals (hasList, hasReviewLanguage, etc) from actual
-  // geoInsights. Does NOT use citationTypes / URL taxonomy.
-  // Answers: "What KIND OF INFORMATION helped the business appear?"
-  // Not: "What kind of URL got cited?"
-  // DYNAMIC: Shows only insights for signals that are actually strong in this project.
-  // ─────────────────────────────────────────────────────────────────────
-  const contentStructureCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-
-    // Aggregate content signals from all results with geoInsights
-    interface ContentSignalCount {
-      hasReviewLanguage: number
-      hasPricingLanguage: number
-      hasComparisonLanguage: number
-      hasRecommendationLanguage: number
-      hasList: number
-      hasLocalLanguage: number
-    }
-
-    const signals: ContentSignalCount = {
-      hasReviewLanguage: 0,
-      hasPricingLanguage: 0,
-      hasComparisonLanguage: 0,
-      hasRecommendationLanguage: 0,
-      hasList: 0,
-      hasLocalLanguage: 0,
-    }
-
-    let totalResultsWithSignals = 0
-    for (const result of results) {
-      if (!result.geoInsights?.contentSignals) continue
-      totalResultsWithSignals++
-      const cs = result.geoInsights.contentSignals
-      if (cs.hasReviewLanguage) signals.hasReviewLanguage++
-      if (cs.hasPricingLanguage) signals.hasPricingLanguage++
-      if (cs.hasComparisonLanguage) signals.hasComparisonLanguage++
-      if (cs.hasRecommendationLanguage) signals.hasRecommendationLanguage++
-      if (cs.hasList) signals.hasList++
-      if (cs.hasLocalLanguage) signals.hasLocalLanguage++
-    }
-
-    // Not enough data — fallback
-    if (totalResultsWithSignals === 0) {
-      lines.push({
-        text: isHebrew
-          ? 'עדיין אין מספיק נתונים כדי לזהות איזה סוג תוכן עוזר לחשיפה בפרויקט הזה.'
-          : 'There is not enough data yet to identify which content types improve visibility for this project.',
-        isFirst: true,
-      })
-      return { lines, pills: [] }
-    }
-
-    // Rank signals by frequency
-    const rankedSignals = Object.entries(signals)
-      .map(([key, count]) => ({
-        key,
-        count,
-        percentage: (count / totalResultsWithSignals) * 100,
-      }))
-      .filter((s) => s.count > 0) // Only include signals that appeared at least once
-      .sort((a, b) => b.count - a.count)
-
-    // If no signals appeared at all, fallback
-    if (rankedSignals.length === 0) {
-      lines.push({
-        text: isHebrew
-          ? 'עדיין אין מספיק נתונים כדי לזהות איזה סוג תוכן עוזר לחשיפה בפרויקט הזה.'
-          : 'There is not enough data yet to identify which content types improve visibility for this project.',
-        isFirst: true,
-      })
-      return { lines, pills: [] }
-    }
-
-    // Define signal groups — signals that share similar meaning get one message.
-    // A group is shown only if at least one signal in it is STRONG.
-    interface SignalGroup {
-      signalKeys: string[]
-      heMessage: string
-      enMessage: string
-    }
-
-    const signalGroups: SignalGroup[] = [
-      {
-        signalKeys: ['hasList', 'hasComparisonLanguage'],
-        heMessage: 'רשימות, השוואות ו-FAQ הופיעו יותר בתוצאות מוצלחות.',
-        enMessage:
-          'List-formatted, comparison, or FAQ content appeared more than generic content.',
-      },
-      {
-        signalKeys: ['hasPricingLanguage'],
-        heMessage:
-          'בשאלות בנושאי קנייה או בחירת ספק, הופיעו יותר תשובות עם מחיר, יתרונות ופרטי רכישה.',
-        enMessage:
-          'In purchase or vendor-selection queries, answers with pricing, benefits, and purchase details appeared more often.',
-      },
-      {
-        signalKeys: ['hasReviewLanguage', 'hasRecommendationLanguage'],
-        heMessage: 'ביקורות, דירוגים והמלצות חזרו בתשובות שבהן העסק קיבל חשיפה.',
-        enMessage:
-          'Reviews, ratings, and recommendations recurred in answers where the business appeared.',
-      },
-      {
-        signalKeys: ['hasLocalLanguage'],
-        heMessage:
-          'בשאלות מקומיות, הופיעו יותר תשובות שכללו אזורי שירות, מיקום או זמינות.',
-        enMessage:
-          'In local queries, answers that included service areas, location, or availability appeared more often.',
-      },
-    ]
-
-    // Determine which groups to show: a group is "strong" if at least one signal
-    // in it is strong. A signal is strong if: count >= 3, OR in top 3, OR percentage >= 25%.
-    const groupsToShow: SignalGroup[] = []
-
-    for (const group of signalGroups) {
-      const hasStrongSignal = group.signalKeys.some((signalKey) => {
-        const rankedPos = rankedSignals.findIndex((s) => s.key === signalKey)
-        if (rankedPos === -1) return false // Signal didn't appear
-
-        const signal = rankedSignals[rankedPos]
-        // Strong if: count >= 3, OR in top 3, OR percentage >= 25%
-        const isStrong =
-          signal.count >= 3 || rankedPos < 3 || signal.percentage >= 25
-
-        return isStrong
-      })
-
-      if (hasStrongSignal) {
-        groupsToShow.push(group)
-      }
-    }
-
-    // Display insights for strong groups (max 3)
-    const maxInsights = 3
-    for (let i = 0; i < groupsToShow.length && i < maxInsights; i++) {
-      const group = groupsToShow[i]
-      lines.push({
-        text: isHebrew ? group.heMessage : group.enMessage,
-        isFirst: i === 0,
-      })
-    }
-
-    // If no groups are strong enough to show, fallback
-    if (lines.length === 0) {
-      lines.push({
-        text: isHebrew
-          ? 'עדיין אין מספיק נתונים כדי לזהות איזה סוג תוכן עוזר לחשיפה בפרויקט הזה.'
-          : 'There is not enough data yet to identify which content types improve visibility for this project.',
-        isFirst: true,
-      })
-    }
-
-    return { lines, pills: [] }
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 3: Per-engine source preferences — pure category language, no
-  // domain names (avoids overlap with Card 1). Skip engines where no
-  // clear category emerges (no generic fallback).
-  // ─────────────────────────────────────────────────────────────────────
-  const enginePatternsCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-
-    const templates = isHebrew
-      ? {
-          one: (name: string, c1: string) => `${name} הציג בעיקר ${c1}.`,
-          two: (name: string, c1: string, c2: string) => `${name} הציג בעיקר ${c1} ו${c2}.`,
-        }
-      : {
-          one: (name: string, c1: string) => `${capitalize(name)} mostly surfaced ${c1}.`,
-          two: (name: string, c1: string, c2: string) => `${capitalize(name)} mostly surfaced ${c1} and ${c2}.`,
-        }
-
-    let firstLineSet = false
-    for (const ep of intelligence.enginePreferences.slice(0, 4)) {
-      const name = engineDisplayName(ep.engine)
-      if (ep.topCompetitors.length === 0) continue
-
-      // Aggregate categories across this engine's top competitors. Use
-      // trustedDomains as the lookup source. Skip 'unknown' categories
-      // (categoryLabel returns null) so we never surface debug values.
-      const catCount = new Map<CompetitorCategory, number>()
-      for (const tc of ep.topCompetitors) {
-        const td = intelligence.trustedDomains.find((d) => d.domain === tc.domain)
-        if (!td) continue
-        if (categoryLabel(td.category) === null) continue // hide 'unknown'
-        catCount.set(td.category, (catCount.get(td.category) || 0) + 1)
-      }
-
-      const sortedCats = Array.from(catCount.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([c]) => c)
-
-      // No identifiable category → skip this engine line entirely.
-      // Avoid generic "recurring sources" fallback.
-      if (sortedCats.length === 0) continue
-
-      const cat1 = categoryLabel(sortedCats[0])
-      const cat2 = sortedCats.length >= 2 ? categoryLabel(sortedCats[1]) : null
-      if (!cat1) continue // double-safety
-
-      const text = cat2
-        ? templates.two(name, cat1, cat2)
-        : templates.one(name, cat1)
-
-      lines.push({ text, isFirst: !firstLineSet })
-      firstLineSet = true
-    }
-
-    return { lines, pills: [] }
-  })()
-
-  // ─────────────────────────────────────────────────────────────────────
-  // Card 4: Business mentions only — competitors detected in response text.
-  // NO citation domains here. If no business mentions, show a clear fallback
-  // (never fall back to domain pills, which would mix sources with
-  // competitors).
-  // ─────────────────────────────────────────────────────────────────────
-  const visibilityLossCard = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-    const mentioned = businessMentions?.mentionedBusinesses ?? []
-
-    if (mentioned.length === 0) {
-      return { lines, pills: [] }
-    }
-
-    // Lead: name the most-mentioned competitor by name.
-    const top = mentioned[0]
-    if (top.engines.length >= 2) {
-      lines.push({
-        text: isHebrew
-          ? `${top.name} הוזכר ב-${top.mentionCount} תשובות, על פני ${top.engines.length} מנועי AI.`
-          : `${top.name} was mentioned in ${top.mentionCount} answers across ${top.engines.length} AI engines.`,
-        isFirst: true,
-      })
-    } else {
-      lines.push({
-        text: isHebrew
-          ? `${top.name} הוזכר ב-${top.mentionCount} תשובות בתוכן של מנועי AI.`
-          : `${top.name} was mentioned in ${top.mentionCount} AI answers.`,
-        isFirst: true,
-      })
-    }
-
-    // Secondary: second competitor by name.
-    if (mentioned[1]) {
-      const second = mentioned[1]
-      lines.push({
-        text: isHebrew
-          ? `${second.name} גם הוא הוזכר במספר תשובות שונות.`
-          : `${second.name} was also mentioned in multiple answers.`,
-        isFirst: false,
-      })
-    }
-
-    // Tertiary: total competitors detected
-    if (mentioned.length >= 3) {
-      lines.push({
-        text: isHebrew
-          ? `סך הכל ${mentioned.length} מתחרים מהרשימה הוזכרו בתשובות.`
-          : `In total, ${mentioned.length} listed competitors were mentioned in answers.`,
-        isFirst: false,
-      })
-    }
-
-    const pills = mentioned.slice(0, 3).map((b) => b.name)
-    return { lines, pills }
-  })()
-
-  return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {t('geo_comp_title')}
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {t('geo_comp_subtitle')}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <IntelligenceCard
-          title={t('geo_comp_card_sources')}
-          tone="violet"
-          icon={<Award className="w-5 h-5" />}
-          lines={trustedSourcesCard.lines}
-          pills={trustedSourcesCard.pills}
-          pillsLabel={t('geo_comp_pills_label')}
-          emptyText={t('geo_comp_no_data_sources')}
-        />
-        <IntelligenceCard
-          title={t('geo_comp_card_content')}
-          tone="teal"
-          icon={<Layers className="w-5 h-5" />}
-          lines={contentStructureCard.lines}
-          pills={contentStructureCard.pills}
-          emptyText={t('geo_comp_no_data_content')}
-        />
-        <IntelligenceCard
-          title={t('geo_comp_card_engines')}
-          tone="slate"
-          icon={<Cpu className="w-5 h-5" />}
-          lines={enginePatternsCard.lines}
-          pills={enginePatternsCard.pills}
-          emptyText={t('geo_comp_no_data_engines')}
-        />
-        <IntelligenceCard
-          title={t('geo_comp_card_loss')}
-          tone="rose"
-          icon={<TrendingDown className="w-5 h-5" />}
-          lines={visibilityLossCard.lines}
-          pills={visibilityLossCard.pills}
-          pillsLabel={t('geo_comp_pills_label_competitors')}
-          emptyText={t('geo_comp_no_data_loss')}
-        />
-      </div>
-    </div>
-  )
-}
-
-/**
- * IntelligenceCard — premium card for Competitor Intelligence section.
- * Same visual language as OpportunityCard, plus subtle domain pills as
- * concrete grounding (max 3, never ranked, secondary to the insight).
- */
-function IntelligenceCard({
-  title,
-  tone,
-  icon,
-  lines,
-  pills,
-  pillsLabel,
-  emptyText,
-}: {
-  title: string
-  tone: 'violet' | 'teal' | 'slate' | 'rose'
-  icon: React.ReactNode
-  lines: Array<{ text: string; isFirst?: boolean }>
-  pills: string[]
-  pillsLabel?: string
-  emptyText: string
-}) {
-  const accent =
-    tone === 'violet'
-      ? 'border-violet-200 dark:border-violet-800/60 bg-violet-50/40 dark:bg-violet-900/10'
-      : tone === 'teal'
-      ? 'border-teal-200 dark:border-teal-800/60 bg-teal-50/40 dark:bg-teal-900/10'
-      : tone === 'rose'
-      ? 'border-rose-200 dark:border-rose-800/60 bg-rose-50/40 dark:bg-rose-900/10'
-      : 'border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/10'
-
-  const iconTone =
-    tone === 'violet'
-      ? 'text-violet-600 dark:text-violet-400'
-      : tone === 'teal'
-      ? 'text-teal-600 dark:text-teal-400'
-      : tone === 'rose'
-      ? 'text-rose-600 dark:text-rose-400'
-      : 'text-slate-600 dark:text-slate-400'
-
-  return (
-    <div className={`rounded-xl border ${accent} p-4 space-y-3`}>
-      <div className="flex items-center gap-2">
-        <div className={iconTone} aria-hidden="true">{icon}</div>
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
-      </div>
-      {lines.length > 0 ? (
-        <ul className="space-y-1.5 text-xs leading-relaxed">
-          {lines.map((line, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
-              <span
-                className={
-                  line.isFirst
-                    ? 'font-medium text-slate-800 dark:text-slate-200'
-                    : 'text-slate-700 dark:text-slate-300'
-                }
-              >
-                {line.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
-      )}
-      {pills.length > 0 && (
-        <div className="pt-1 space-y-1.5">
-          {pillsLabel && (
-            <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              {pillsLabel}
-            </div>
-          )}
-          <div className="flex flex-wrap gap-1.5">
-            {pills.map((domain) => (
-              <span
-                key={domain}
-                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-              >
-                {domain}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * GEO Explanation — Phase 1B human-readable explanation.
- *
- * Converts raw GEO Insights into 2–4 clear bullets explaining why
- * this result appeared (or didn't) in the AI engine response.
- */
-function GeoExplanationSection({
-  geoInsights,
-  displayMentioned,
-  displayCited,
-  displayBrandLabels,
-  displayDomainLabel,
-  isHebrew,
-  t,
-}: {
-  geoInsights: GeoInsights | null
-  displayMentioned: boolean
-  displayCited: boolean
-  displayBrandLabels: string[]
-  displayDomainLabel: string | null
-  isHebrew: boolean
-  t: T
-}) {
-  const explanation = generateGeoExplanation({
-    geoInsights,
-    displayMentioned,
-    displayCited,
-    displayBrandLabels,
-    displayDomainLabel,
-    isHebrew,
-  })
-
-  if (!explanation.hasSignals || explanation.bullets.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 p-4 space-y-2">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-        {t('geo_explanation_title')}
-      </h3>
-      <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-        {explanation.bullets.map((bullet, i) => (
-          <li key={i} className="flex gap-2">
-            <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
-            <span>{bullet}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-/**
- * GEO Recommendations — Phase 1C "What can be improved?" section.
- *
- * Rule-based, actionable, business-facing suggestions grounded in gaps
- * detected in geoInsights. Shows fallback message when no gaps are
- * detected (positive reinforcement if the business appeared + cited, or
- * generic "no clear gaps" otherwise).
- */
-function GeoRecommendationsSection({
-  geoInsights,
-  displayMentioned,
-  displayCited,
-  isHebrew,
-  t,
-}: {
-  geoInsights: GeoInsights | null
-  displayMentioned: boolean
-  displayCited: boolean
-  isHebrew: boolean
-  t: T
-}) {
-  const recs = generateGeoRecommendations({
-    geoInsights,
-    displayMentioned,
-    displayCited,
-    isHebrew,
-  })
-
-  // Fallback message when no recommendations are generated
-  let fallbackText: string | null = null
-  if (recs.length === 0) {
-    if (displayMentioned && displayCited) {
-      // Positive reinforcement: business is appearing well
-      fallbackText = isHebrew
-        ? 'שמרו על תוכן ברור עם מחירים, ביקורות והמלצות כדי לחזק את הופעתכם בתוצאות דומות.'
-        : 'Keep your content clear with pricing, reviews, and recommendations to strengthen your visibility in similar queries.'
-    } else {
-      // Generic: no clear improvements detected
-      fallbackText = isHebrew
-        ? 'לא זוהו פעולות שיפור ברורות בתוצאה הזו.'
-        : 'No clear improvements were detected in this result.'
-    }
-  }
-
-  // If no recommendations and no fallback, don't render
-  if (recs.length === 0 && !fallbackText) return null
-
-  return (
-    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-2">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-        {t('geo_recommendations_title')}
-      </h3>
-      {recs.length > 0 ? (
-        <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          {recs.map((r) => (
-            <li key={r.key} className="flex gap-2">
-              <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">→</span>
-              <span>{r.text}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          {fallbackText}
-        </p>
-      )}
-    </div>
-  )
-}
-
-/**
- * GEO Insights — Phase 1C collapsible technical details panel.
- *
- * Renders the raw signals as compact chips inside a collapsible <details>
- * element. The summary line shows the section name; users opt in to see
- * the technical breakdown rather than having it pushed to the foreground.
- *
- * Renders nothing when no signals are present.
- */
-function GeoInsightsCollapsible({
-  insights,
-  t,
-}: {
-  insights: GeoInsights | null
-  t: T
-}) {
-  const data = insights ?? EMPTY_GEO_INSIGHTS
-
-  const activeSignals: Array<{ key: string; label: string }> = []
-  if (data.contentSignals.hasList) activeSignals.push({ key: 'list', label: t('geo_signal_list') })
-  if (data.contentSignals.hasComparisonLanguage)
-    activeSignals.push({ key: 'comparison', label: t('geo_signal_comparison') })
-  if (data.contentSignals.hasPricingLanguage)
-    activeSignals.push({ key: 'pricing', label: t('geo_signal_pricing') })
-  if (data.contentSignals.hasReviewLanguage)
-    activeSignals.push({ key: 'review', label: t('geo_signal_review') })
-  if (data.contentSignals.hasLocalLanguage)
-    activeSignals.push({ key: 'local', label: t('geo_signal_local') })
-  if (data.contentSignals.hasRecommendationLanguage)
-    activeSignals.push({ key: 'recommendation', label: t('geo_signal_recommendation') })
-
-  const hasAny =
-    data.queryIntents.length > 0 ||
-    data.citationTypes.length > 0 ||
-    activeSignals.length > 0
-  if (!hasAny) return null
-
-  const intentLabel = (i: QueryIntent): string => {
-    switch (i) {
-      case 'transactional': return t('geo_intent_transactional')
-      case 'informational': return t('geo_intent_informational')
-      case 'comparison': return t('geo_intent_comparison')
-      case 'review': return t('geo_intent_review')
-      case 'local': return t('geo_intent_local')
-      case 'navigational': return t('geo_intent_navigational')
-    }
-  }
-
-  const citationLabel = (c: CitationType): string => {
-    switch (c) {
-      case 'homepage': return t('geo_citation_homepage')
-      case 'category': return t('geo_citation_category')
-      case 'product': return t('geo_citation_product')
-      case 'comparison': return t('geo_citation_comparison')
-      case 'review': return t('geo_citation_review')
-      case 'blog': return t('geo_citation_blog')
-      case 'marketplace': return t('geo_citation_marketplace')
-      case 'forum': return t('geo_citation_forum')
-      case 'directory': return t('geo_citation_directory')
-      case 'brand_site': return t('geo_citation_brand_site')
-      case 'unknown': return t('geo_citation_unknown')
-    }
-  }
-
-  return (
-    <details className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 group">
-      <summary className="cursor-pointer list-none p-3 flex items-center justify-between gap-2 select-none hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg">
-        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-          {t('geo_insights_title')} <span className="text-slate-400 dark:text-slate-500">· {t('geo_technical_details')}</span>
-        </span>
-        <span className="text-slate-400 dark:text-slate-500 text-xs group-open:rotate-180 transition-transform">▾</span>
-      </summary>
-      <div className="p-4 pt-0 space-y-3 border-t border-slate-200 dark:border-slate-700 mt-0">
-        {data.queryIntents.length > 0 && (
-          <div className="pt-3">
-            <GeoChipRow
-              label={t('geo_query_intent')}
-              chips={data.queryIntents.map((i) => intentLabel(i))}
-              tone="indigo"
-            />
-          </div>
-        )}
-
-        {data.citationTypes.filter((c) => c !== 'unknown').length > 0 && (
-          <GeoChipRow
-            label={t('geo_citation_types')}
-            chips={data.citationTypes.filter((c) => c !== 'unknown').map((c) => citationLabel(c))}
-            tone="slate"
-          />
-        )}
-
-        {activeSignals.length > 0 && (
-          <GeoChipRow
-            label={t('geo_content_signals')}
-            chips={activeSignals.map((s) => s.label)}
-            tone="emerald"
-          />
-        )}
-      </div>
-    </details>
-  )
-}
-
-function GeoChipRow({
-  label,
-  chips,
-  tone,
-}: {
-  label: string
-  chips: string[]
-  tone: 'indigo' | 'slate' | 'emerald'
-}) {
-  const toneClasses =
-    tone === 'indigo'
-      ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-      : tone === 'emerald'
-      ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600'
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-        {label}:
-      </span>
-      {chips.map((c, i) => (
-        <span
-          key={`${c}-${i}`}
-          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${toneClasses}`}
-        >
-          {c}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-/**
- * Manual "+ שאלת AI חדשה" modal. Supports both single and multi-question entry:
- * each non-empty line is sent as a separate query. Duplicates (within the input
- * or against existing prompts) are skipped client-side; the API also dedups.
- */
-function NewAIQueryModal({
-  open,
-  onClose,
-  projectId,
-  domain,
-  businessName,
-  country,
-  language,
-  existingPrompts,
-  onAdded,
-  t,
-}: {
-  open: boolean
-  onClose: () => void
-  projectId: string
-  domain: string | null
-  businessName: string | null
-  country: string | null
-  language: string | null
-  existingPrompts: PromptRow[]
-  onAdded: () => void
-  t: T
-}) {
-  const { language: dashboardLanguage } = useDashboardLanguage()
-  const [prompt, setPrompt] = useState('')
-  const [targetDomain, setTargetDomain] = useState(domain || '')
-  const [targetBrand, setTargetBrand] = useState(businessName || '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const existingSet = useMemo(
-    () => new Set(existingPrompts.map((p) => (p.prompt || '').trim().toLowerCase())),
-    [existingPrompts]
-  )
-
-  // Parse the textarea into deduplicated, trimmed lines.
-  const parsedQueries = useMemo(() => {
-    const seen = new Set<string>()
-    const out: string[] = []
-    for (const raw of prompt.split('\n')) {
-      const line = raw.trim()
-      if (!line) continue
-      const key = line.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      out.push(line)
-    }
-    return out
-  }, [prompt])
-
-  const newQueries = useMemo(
-    () => parsedQueries.filter((q) => !existingSet.has(q.toLowerCase())),
-    [parsedQueries, existingSet]
-  )
-  const skippedDuplicates = parsedQueries.length - newQueries.length
-
-  const handleSubmit = async () => {
-    if (parsedQueries.length === 0) {
-      setError(t('multi_query_help'))
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    let failures = 0
-    try {
-      for (const q of parsedQueries) {
-        try {
-          const res = await fetch('/api/ai-visibility/prompts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              projectId,
-              prompt: q,
-              country,
-              language,
-              targetDomain: targetDomain || null,
-              targetBrandName: targetBrand || null,
-            }),
-          })
-          if (!res.ok) failures++
-        } catch {
-          failures++
-        }
-      }
-      setPrompt('')
-      setTargetDomain(domain || '')
-      setTargetBrand(businessName || '')
-      onAdded()
-      onClose()
-      if (failures > 0) {
-        setError(`${failures} ${t('error')}`)
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!open) return null
-
-  const isHebrew = dashboardLanguage === 'he'
-
-  const countText =
-    parsedQueries.length === 0
-      ? ''
-      : parsedQueries.length === 1
-      ? t('will_create_one_query')
-      : t('will_create_n_queries').replace('{count}', String(newQueries.length))
-
-  return (
-    <Modal open={open} onClose={onClose} title={t('new_ai_query_title')} size="md">
-      <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('query_label')}</label>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder={t('multi_query_placeholder')}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
-            rows={6}
-            disabled={saving}
-          />
-          <p className="text-xs text-slate-500 mt-1">{t('multi_query_help')}</p>
-          {countText && (
-            <p className="text-xs text-indigo-600 mt-1 font-medium">
-              {countText}
-              {skippedDuplicates > 0 && (
-                <span className="text-slate-500 font-normal">
-                  {' '}
-                  ({skippedDuplicates} {t('query_already_exists')})
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('target_domain_label')}</label>
-          <Input
-            type="text"
-            value={targetDomain}
-            onChange={(e) => setTargetDomain(e.target.value)}
-            placeholder={domain || t('target_domain_label')}
-            disabled={saving}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('target_brand_label')}</label>
-          <Input
-            type="text"
-            value={targetBrand}
-            onChange={(e) => setTargetBrand(e.target.value)}
-            placeholder={businessName || t('target_brand_label')}
-            disabled={saving}
-          />
-        </div>
-
-        <div className="flex gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
-          <Button variant="outline" onClick={onClose} disabled={saving} className="flex-1">
-            {t('cancel')}
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            loading={saving}
-            disabled={parsedQueries.length === 0 || saving}
-            className="flex-1"
-          >
-            {t('create_query')}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-/* --- Helpers --- */
-
-function formatShortDateTime(iso: string, isHebrew: boolean): string {
-  try {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return ''
-    return d.toLocaleString(isHebrew ? 'he-IL' : 'en-US', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return ''
-  }
 }

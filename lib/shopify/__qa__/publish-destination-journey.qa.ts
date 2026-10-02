@@ -398,11 +398,18 @@ async function main() {
     const card = strip(read('components/content/ContentHubPlatformCard.tsx'))
     const panel = strip(read('components/content/ShopifyConnectionPanel.tsx'))
     const dest = strip(read('components/content/ShopifyDestinationSection.tsx'))
-    const hub = strip(read('components/content/ContentHub.tsx'))
+    const hub = strip(read('components/content/workspace/ArticlesScreen.tsx'))
 
-    check('8a: SOURCE — the hub renders ContentHubPlatformCard', hub.includes('<ContentHubPlatformCard'))
-    check('8b: SOURCE — and renders ShopifyConnectionPanel ONLY when nothing is connected (why the card must carry the destination)',
-      /activePlatform === 'none' &&[\s\S]{0,200}<ShopifyConnectionPanel/.test(hub))
+    check('8a: SOURCE — the articles screen renders ContentHubPlatformCard', hub.includes('<ContentHubPlatformCard'))
+    // The content screens carry NO connect form at all any more — connection management
+    // belongs to the project. That makes the destination on this card the ONLY place a
+    // connected merchant can see or fix where their articles publish, so 8c/8d below are
+    // the load-bearing checks. The project's settings own the connect form itself (the
+    // project page that used to hold it is a redirect to the project's tabs now).
+    const settingsPage = strip(read('app/(dashboard)/settings/page.tsx'))
+    check("8b: SOURCE — no connect form on the content screens; the project's settings own it",
+      !/<ShopifyConnectionPanel/.test(hub) && !/<WordPressConnectionPanel/.test(hub)
+      && /<ContentSection projectId=\{project\.id\}/.test(settingsPage))
     check('8c: SOURCE — the visible card renders the destination section', card.includes('<ShopifyDestinationSection'))
     check('8d: SOURCE — it passes the real connection fields, not constants',
       /canPublish=\{shopify\.can_publish\}/.test(card) && /defaultBlogId=\{shopify\.default_blog_id\}/.test(card))

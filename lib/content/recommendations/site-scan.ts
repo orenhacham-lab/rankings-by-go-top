@@ -13,7 +13,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
@@ -418,7 +419,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   // entities mapped to the same ScannedTarget model. Shopify-only projects have
   // no WP cache row but a full Shopify corpus; WordPress-only projects get [] for
   // Shopify → identical to before. No ranking/dedup/provenance change.
-  const cacheRow = await getCachedIndex(admin, input.projectId)
+  const cacheRow = await getContentIndex(input.projectId, null, admin)
   const wpTargets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
   const shopifyTargets = await loadShopifyScannedTargets(admin, input.projectId)
   const targets = [...wpTargets, ...shopifyTargets]

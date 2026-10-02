@@ -1,10 +1,10 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'About Rankings by Go Top',
-  description: 'Discover the story of Rankings by Go Top - a Google rank tracking and AI visibility platform built on 11+ years of digital experience. Professional, transparent, results-focused.',
+  title: 'About Go Top SEO',
+  description: 'Discover the story of Go Top SEO - a Google rank tracking and AI visibility platform built on 11+ years of digital experience. Professional, transparent, results-focused.',
   openGraph: {
-    title: 'About Rankings by Go Top',
+    title: 'About Go Top SEO',
     description: 'Google rank tracking and AI visibility platform built with 11+ years of digital expertise',
     url: 'https://www.gotopseo.com/en/about',
     type: 'website',

@@ -16,6 +16,7 @@ import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import type { AlertChannel } from '@/lib/content/automation/alert-read-model'
 import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
+import { publishSitePoolItem } from '@/lib/site-platforms/publish'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 import type { WpCreateError } from '@/lib/content/wordpress-publish'
 
@@ -131,6 +132,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     }
     if (active.platform === 'shopify') {
       return await publishShopifyPoolItem(admin, item)
+    }
+    if (active.platform === 'wix' || active.platform === 'webhook') {
+      return await publishSitePoolItem(admin, item)
     }
 
     const { data: artData } = await admin.from('generated_articles').select(ARTICLE_SELECT).eq('id', item.article_id).maybeSingle()

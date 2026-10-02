@@ -14,9 +14,13 @@
  * only the admin (service-role) client, so it is fully headless-safe.
  */
 
+import { trackArticleQuestion } from '@/lib/ai-visibility/article-question'
+import { runLinkNetworkStep } from '@/lib/link-network/step'
+import { runAutoInternalLinksStep } from '@/lib/content/auto-internal-links/step'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
+import { runArticleImageStep } from '@/lib/content/article-style/generation'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
@@ -363,6 +367,17 @@ export async function generateArticleForTopic(
     await admin.from('article_topics').update({ status: 'used', updated_at: new Date().toISOString() }).eq('id', topicId)
   } catch { /* non-fatal */ }
 
+  // One tracked AI-visibility question for the article, from its primary keyword
+  // (lib/ai-visibility/article-question.ts). Adds a row only: no check runs and
+  // nothing is spent. Best-effort; never fails generation.
+  const aiQuestion = await trackArticleQuestion(admin, {
+    projectId,
+    userId,
+    title: article.title ?? null,
+    topic: { primary_keyword: (t.primary_keyword as string) ?? null, language: (t.language as string) ?? null },
+  })
+  if (aiQuestion.outcome === 'failed') console.warn('[content-article-generation] ai question skipped', { articleId: inserted.id })
+
   console.log('[content-article-generation] created', { articleId: inserted.id, projectId, score: gen.audit.score, warnings: gen.audit.warnings.length })
 
   // Phase 2J — auto-insert approved internal links into the fresh DRAFT, once,
@@ -388,17 +403,24 @@ export async function generateArticleForTopic(
     })
   }
 
-  // Auto-generate a brand-neutral featured image (default ON). Best-effort.
-  let imageGenerated = false
-  if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
-    try {
-      const img = await deps.createFeaturedImage(admin, inserted.id)
-      imageGenerated = !('error' in img)
-      if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
-    } catch (e) {
-      console.warn('[content-article-generation] auto image threw', { message: e instanceof Error ? e.message : String(e) })
-    }
-  }
+  // Automatic internal links (lib/content/auto-internal-links): 2 to 5 links to
+  // the site's own live pages, chosen by topic from the latest site mapping and
+  // placed on words already in the text. Every generation path, no approval
+  // step (the article view lists them, each removable). After the approved plan
+  // links above, so a page already linked is not linked twice. Best-effort.
+  await runAutoInternalLinksStep(admin, { projectId, userId, articleId: inserted.id })
+
+  // Link network (lib/link-network): at most one link to a complementary member,
+  // only for a project that joined. One delimited, best-effort step; never throws.
+  await runLinkNetworkStep(admin, { projectId, userId, articleId: inserted.id })
+
+  // The article's images, by the project's article-design settings
+  // (lib/content/article-style/generation.ts): the brand-neutral featured image
+  // as before (default ON, best-effort), in the project's image style, plus the
+  // inline images the project asked for. No settings = the featured image only.
+  const { imageGenerated } = await runArticleImageStep(admin, { articleId: inserted.id, projectId, ownerId: userId }, {
+    createFeaturedImage: () => deps.createFeaturedImage(admin, inserted.id),
+  })
 
   return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated, autoInternalLinks }
 }

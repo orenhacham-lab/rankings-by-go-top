@@ -1,122 +1,66 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Project, Client } from '@/lib/supabase/types'
+/**
+ * AI visibility: how AI assistants answer about the current project.
+ *
+ * This tab used to be an overview of every project, each card linking into that
+ * project's page, where the tool itself sat between the keyword table and the
+ * content section. The tool is the tab now, for the project the top bar names.
+ * The overview went with it, because the switcher is the one place projects are
+ * listed.
+ *
+ * Gated by the same build-time flag the project page used for this section; the
+ * routes it calls re-check the authoritative server flag on their own.
+ *
+ * W6d: A PROJECT WITH A SEEDING SCAN gets the tab of plan section 5 around the
+ * same tool: a status bar (row 1), the dark opening card (row 2), the tool with
+ * the scan's questions and competitors (row 3), recent activity (row 4) and the
+ * scan's AI-readiness checks (row 5). Everything the rows show is read from what
+ * the tool already loads and from GET /api/projects/[id]/seed; opening the tab
+ * calls no model and spends nothing, and a check still starts only from the
+ * tool's own engine buttons, through the dispatch route and its allowance.
+ *
+ * EVERY PROJECT GETS THIS TAB (part B of the UX review). A project WITHOUT a scan
+ * (older than it, or the scan's flag off) used to get the tool exactly as it was
+ * before W6d, in its older look. It now gets the same rows: the status bar, the
+ * opening card and recent activity are computed from its own checks
+ * (ai_scan_results, through the tool's runs), its questions are its own, and
+ * competitors are shown read-only with the link to settings. Only what the scan
+ * alone can know (the four readiness checks, the questions it suggests from the
+ * business) is a placeholder that offers the mapping, and only when the mapping
+ * can be offered at all.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
-import { Card } from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
-import Link from 'next/link'
+import WorkspaceGate from '@/components/layout/WorkspaceGate'
+import AIVisibilitySection, { type AIVisibilityTab } from '@/components/ai-visibility/AIVisibilitySection'
+import CompetitorsReadOnly from '@/components/ai-visibility/CompetitorsReadOnly'
+import ReadinessCard from '@/components/ai-visibility/ReadinessCard'
+import { OverviewOpeningCard, OverviewStatusBar, RecentActivity, type MonthlyView, type OverviewData } from '@/components/ai-visibility/OverviewRows'
+import { useSeedPageState } from '@/components/ai-visibility/useSeedPageState'
+import {
+  buildOverview, competitorsSettingsHref, readinessView, readRuns, settingsHref, type OverviewRun,
+} from '@/components/ai-visibility/overview-model'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { createI18n } from '@/lib/ai-visibility/i18n'
-
-type Summary = {
-  projectId: string
-  totalQueries: number
-  totalScans: number
-  totalMentions: number
-  totalCitations: number
-  visibilityScore: number
-  lastScanAt: string | null
-}
-
-type ProjectRow = Project & { clients?: Client | null }
+import MappingPlaceholder from '@/components/mapping/MappingPlaceholder'
+import { useMapping } from '@/components/mapping/useMapping'
+import { createClient } from '@/lib/supabase/client'
+import { withDeadline } from '@/lib/active-project/useProjectRow'
+import type { Project } from '@/lib/supabase/types'
+import { Reveal } from '@/components/ui/motion'
 
 export default function AIVisibilityPage() {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => createI18n(language), [language])
 
-  const [projects, setProjects] = useState<ProjectRow[]>([])
-  const [summaries, setSummaries] = useState<Map<string, Summary>>(new Map())
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setLoading(false)
-          return
-        }
-
-        const projectsPromise = supabase
-          .from('projects')
-          .select('*, clients(*)')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .order('name')
-
-        const summaryPromise = fetch('/api/ai-visibility/summary')
-
-        const [projectsRes, summaryRes] = await Promise.all([projectsPromise, summaryPromise])
-        const projectsData = (projectsRes.data ?? []) as ProjectRow[]
-        setProjects(projectsData)
-
-        if (summaryRes.ok) {
-          const json = await summaryRes.json()
-          const map = new Map<string, Summary>()
-          for (const s of json.summaries ?? []) {
-            map.set(s.projectId, s)
-          }
-          setSummaries(map)
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : t('failed_to_load'))
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [t])
-
-  const formatDate = (iso: string | null): string => {
-    if (!iso) return '—'
-    try {
-      return new Date(iso).toLocaleDateString(language === 'en' ? 'en-US' : 'he-IL', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
-    } catch {
-      return '—'
-    }
-  }
-
-  const overallStats = useMemo(() => {
-    let totalQueries = 0
-    let totalScans = 0
-    let totalMentions = 0
-    let totalCitations = 0
-    let avgScore = 0
-    let scoreCount = 0
-    for (const summary of summaries.values()) {
-      totalQueries += summary.totalQueries
-      totalScans += summary.totalScans
-      totalMentions += summary.totalMentions
-      totalCitations += summary.totalCitations
-      if (summary.totalScans > 0) {
-        avgScore += summary.visibilityScore
-        scoreCount++
-      }
-    }
-    return {
-      totalProjects: projects.length,
-      totalQueries,
-      totalScans,
-      totalMentions,
-      totalCitations,
-      avgScore: scoreCount > 0 ? Math.round(avgScore / scoreCount) : 0,
-    }
-  }, [summaries, projects.length])
-
-  if (loading) {
+  if (process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true') {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-400">
-        <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        {t('loading')}
+      <div>
+        <Header title={t('ai_visibility')} />
+        <p className="py-20 text-center text-copy text-muted">{t('not_available')}</p>
       </div>
     )
   }
@@ -124,118 +68,190 @@ export default function AIVisibilityPage() {
   return (
     <div>
       <Header title={t('ai_visibility')} subtitle={t('page_subtitle')} />
+      <WorkspaceGate>
+        {(project) => <ProjectAIVisibility key={project.id} project={project} />}
+      </WorkspaceGate>
+    </div>
+  )
+}
 
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
-          {error}
+function ProjectAIVisibility({ project }: { project: Project }) {
+  const { language } = useDashboardLanguage()
+  const mappingCopy = getDashboardDictionary(language).mapping
+  const [keywords, setKeywords] = useState<string[]>([])
+  // "Manage competitors" links (the keywords tab, the dashboard) open this tab
+  // on the competitors. Only that value is honoured; anything else is ignored.
+  const initialTab = useSearchParams().get('tab') === 'competitors' ? 'competitors' as const : undefined
+
+  // The tracked keywords seed the suggested AI questions. A failed read leaves the
+  // list empty, which the section handles as "no keywords yet"; it never blocks
+  // the tool.
+  useEffect(() => {
+    let cancelled = false
+    void withDeadline(createClient().from('tracking_targets').select('keyword').eq('project_id', project.id))
+      .then((res) => { if (!cancelled) setKeywords((res?.data ?? []).map((r) => r.keyword)) })
+    return () => { cancelled = true }
+  }, [project.id])
+
+  // A NEW ARRAY EVERY RENDER IS A NEW DEPENDENCY. This list is in the dependency
+  // array of an effect that calls the Gemini-backed enriched-suggestions route;
+  // passing a fresh array each render once called that endpoint three times for
+  // one page load.
+  const projectKeywords = useMemo(() => keywords.filter(Boolean), [keywords])
+
+  // The seeding scan no longer decides the layout: every project gets the overview
+  // rows around the tool. The scan only adds what it alone knows.
+  const [seedRefresh, setSeedRefresh] = useState(0)
+  const { state: seed, questionsArrived } = useSeedPageState(project.id, seedRefresh)
+  const mapping = useMapping(project.id, language, useCallback(() => setSeedRefresh((n) => n + 1), []))
+  const [runs, setRuns] = useState<OverviewRun[] | 'error' | null>(null)
+  // How many questions the project tracks, from the tool's own list: the opening
+  // card's next step is "check one" with questions, "pick one" without.
+  const [questionsCount, setQuestionsCount] = useState<number | null>(null)
+  const onRunsLoaded = useCallback((raw: unknown[] | null) => setRuns(raw === null ? 'error' : readRuns(raw)), [])
+  const overview = useMemo<OverviewData>(() => (runs === null ? null : runs === 'error' ? 'error' : buildOverview(runs)), [runs])
+  // The hero's next step reads the same allowance the tool shows (reported by the tool).
+  const [allowanceOut, setAllowanceOut] = useState(false)
+  const [tabRequest, setTabRequest] = useState<{ tab: AIVisibilityTab; seq: number } | undefined>(undefined)
+  const toolRef = useRef<HTMLDivElement>(null)
+
+  // THE AUTOMATIC MONTHLY CHECK (lib/ai-visibility/monthly-check): what the hero
+  // says about it, re-read after every check. A failed read shows nothing extra.
+  const [monthly, setMonthly] = useState<MonthlyView>(null)
+  const [monthlyRunning, setMonthlyRunning] = useState(false)
+  const [monthlyError, setMonthlyError] = useState<string | null>(null)
+  const [resultsRefreshKey, setResultsRefreshKey] = useState(0)
+  const loadMonthly = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai-visibility/monthly?projectId=${encodeURIComponent(project.id)}`)
+      setMonthly(res.ok ? await res.json() : null)
+    } catch {
+      setMonthly(null)
+    }
+  }, [project.id])
+  useEffect(() => { void loadMonthly() }, [loadMonthly])
+  const overviewCopy = getDashboardDictionary(language).aiVisibilityOverview
+  const runMonthlyNow = useCallback(async () => {
+    setMonthlyRunning(true)
+    setMonthlyError(null)
+    try {
+      const res = await fetch('/api/ai-visibility/monthly', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id }),
+      })
+      if (!res.ok) setMonthlyError(overviewCopy.autoRunFailed)
+    } catch {
+      setMonthlyError(overviewCopy.autoRunFailed)
+    } finally {
+      setMonthlyRunning(false)
+      setResultsRefreshKey((n) => n + 1)
+      void loadMonthly()
+    }
+  }, [project.id, loadMonthly, overviewCopy])
+  const toggleMonthly = useCallback(async (enabled: boolean) => {
+    setMonthlyError(null)
+    try {
+      const res = await fetch('/api/ai-visibility/monthly', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, enabled }),
+      })
+      if (!res.ok) setMonthlyError(overviewCopy.autoSettingSaveFailed)
+    } catch {
+      setMonthlyError(overviewCopy.autoSettingSaveFailed)
+    } finally {
+      void loadMonthly()
+    }
+  }, [project.id, loadMonthly, overviewCopy])
+  const chooseQuestions = useCallback(() => {
+    setTabRequest((prev) => ({ tab: 'queries', seq: (prev?.seq ?? 0) + 1 }))
+    toolRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  const toolProps = {
+    projectId: project.id,
+    projectCountry: project.country,
+    projectLanguage: project.language,
+    projectDomain: project.target_domain,
+    projectBrandName: project.business_name,
+    projectBrandAliases: project.brand_aliases,
+    projectDomainAliases: project.domain_aliases,
+    projectCity: project.city,
+    initialTab,
+  }
+
+  // One short database read (bounded by SEED_READ_DEADLINE_MS) before the tool
+  // mounts, so the tool never mounts twice and nothing jumps when the rows appear.
+  if (seed.kind === 'loading') {
+    return <div aria-busy="true" className="min-h-[60vh]" data-ai-page="loading" />
+  }
+
+  // The overview's additions to the tool, for every project.
+  const overviewProps = {
+    overviewMode: true,
+    onRunsLoaded,
+    onQuestionsCount: setQuestionsCount,
+    openQueriesWhenEmpty: true,
+    suggestionsRefreshKey: questionsArrived,
+    requestedTab: tabRequest,
+    onAllowanceOut: setAllowanceOut,
+    onChecksRan: loadMonthly,
+    autoQuestionIds: monthly && 'questions' in monthly ? (monthly.questions ?? []).map((q) => q.id) : undefined,
+    resultsRefreshKey,
+    competitorsSlot: (
+      <CompetitorsReadOnly
+        projectId={project.id}
+        scanDomains={seed.kind === 'none' ? [] : seed.scanCompetitors}
+        manageHref={competitorsSettingsHref(project.id)}
+      />
+    ),
+  }
+  // The one place the tool is rendered. projectKeywords goes by name: it is the
+  // memoized array (reviewer-hardening B11), never a new one per render.
+  const tool = <AIVisibilitySection {...toolProps} projectKeywords={projectKeywords} {...overviewProps} />
+
+  const questionsPending = seed.kind === 'questions_pending'
+  const readiness = readinessView(seed)
+  // No scan yet: the readiness checks and the scan's questions are the mapping's to find.
+  const mappingCard = seed.kind === 'none' && mapping.mapping.available === true && (
+    <section
+      id="ai-readiness"
+      aria-label={mappingCopy.aiTitle}
+      data-ai-readiness="mapping"
+      className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
+    >
+      <MappingPlaceholder control={mapping} title={mappingCopy.aiTitle} body={mappingCopy.aiBody} locale={language} withNotice />
+    </section>
+  )
+  return (
+    // The rows enter the way every other app screen's do (components/ui/motion:
+    // once, 8px, staggered, nothing at all under reduced motion).
+    <div className="space-y-8" data-ai-page={seed.kind}>
+      <Reveal index={0} data-ai-entrance="status">
+        <OverviewStatusBar overview={overview} questionsPending={questionsPending} monthly={monthly} />
+      </Reveal>
+      <Reveal index={1} data-ai-entrance="opening">
+        <OverviewOpeningCard
+          overview={overview}
+          questionsPending={questionsPending}
+          questionsSuggested={seed.kind === 'none' ? null : seed.questionsSuggested}
+          questionsCount={questionsCount}
+          allowanceOut={allowanceOut}
+          onChooseQuestions={chooseQuestions}
+          monthly={monthly}
+          monthlyRunning={monthlyRunning}
+          monthlyError={monthlyError}
+          onRunMonthlyNow={runMonthlyNow}
+          onToggleMonthly={toggleMonthly}
+        />
+      </Reveal>
+      <Reveal index={2} data-ai-entrance="tool">
+        <div ref={toolRef} className="scroll-mt-4">
+          {tool}
         </div>
-      )}
-
-      {projects.length === 0 ? (
-        <div className="text-center py-20 text-slate-500">
-          <p className="mb-4">{t('no_projects_available')}</p>
-          <Link href="/projects/new">
-            <Button>{t('add_project')}</Button>
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-            <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">{t('total_projects')}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalProjects}</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">{t('total_queries')}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalQueries}</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">{t('total_scans')}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalScans}</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">{t('total_mentions')}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalMentions}</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">{t('total_citations')}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalCitations}</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">{t('avg_visibility')}</div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.avgScore}%</div>
-            </Card>
-          </div>
-
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{t('projects_heading')}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => {
-            const summary = summaries.get(project.id)
-            const score = summary?.visibilityScore ?? 0
-            const scoreTone: 'success' | 'warning' | 'danger' | 'neutral' =
-              !summary || summary.totalScans === 0
-                ? 'neutral'
-                : score >= 60
-                ? 'success'
-                : score >= 30
-                ? 'warning'
-                : 'danger'
-
-            return (
-              <Card key={project.id} className="p-4 hover:shadow-md transition flex flex-col">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">{project.name}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">{project.target_domain}</p>
-                    {project.clients?.name && (
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{project.clients.name}</p>
-                    )}
-                  </div>
-                  <Badge variant={scoreTone}>
-                    {summary && summary.totalScans > 0 ? `${score}%` : t('no_data')}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('queries')}</div>
-                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalQueries ?? 0}</div>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('scans')}</div>
-                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalScans ?? 0}</div>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('mentions')}</div>
-                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalMentions ?? 0}</div>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('citations')}</div>
-                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalCitations ?? 0}</div>
-                  </div>
-                </div>
-
-                <div
-                  className="text-[11px] text-slate-500 dark:text-slate-400 mb-3"
-                  dir={language === 'en' ? 'ltr' : 'rtl'}
-                >
-                  {t('last_scan')}: {formatDate(summary?.lastScanAt ?? null)}
-                </div>
-
-                <Link
-                  href={`/projects/${project.id}?section=ai-visibility`}
-                  className="mt-auto block"
-                >
-                  <Button variant="secondary" size="sm" className="w-full">
-                    {t('open_ai_visibility')}
-                  </Button>
-                </Link>
-              </Card>
-            )
-          })}
-        </div>
-        </>
-      )}
+      </Reveal>
+      <Reveal index={3} data-ai-entrance="activity" className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
+        <RecentActivity overview={overview} />
+        {readiness && seed.kind !== 'none' && <ReadinessCard view={readiness} scannedAt={seed.scannedAt} settingsHref={settingsHref(project.id)} />}
+        {mappingCard}
+      </Reveal>
     </div>
   )
 }

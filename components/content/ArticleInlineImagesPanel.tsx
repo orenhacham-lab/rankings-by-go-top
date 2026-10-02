@@ -3,7 +3,7 @@
 /**
  * Phase 4D — inline article images editor panel.
  *
- * Manages the article's inline images (max 3) via /api/content/articles/:id/
+ * Manages the article's inline images (max 4) via /api/content/articles/:id/
  * inline-images. Each image is attached to an eligible H2 section and composed
  * into the body at publish/preview time — this panel never edits content_html.
  * Per-image controls: generate/regenerate, edit prompt/alt/caption, move to
@@ -16,6 +16,10 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import Select from '@/components/ui/Select'
+import Notice from '@/components/ui/Notice'
+import Textarea from '@/components/ui/Textarea'
 
 type EligibleSection = { sectionId: string; title: string }
 type InlineImage = {
@@ -47,8 +51,6 @@ type Dict = {
   errors: Record<string, string>
 }
 
-const inputCls =
-  'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 export default function ArticleInlineImagesPanel({
   articleId,
@@ -65,6 +67,7 @@ export default function ArticleInlineImagesPanel({
   onImagesChange?: (images: InlineImage[]) => void
 }) {
   const t = dict
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [migrationRequired, setMigrationRequired] = useState(false)
   const [images, setImages] = useState<InlineImage[]>([])
@@ -224,7 +227,7 @@ export default function ArticleInlineImagesPanel({
   }
 
   async function remove(id: string) {
-    if (!window.confirm(t.removeConfirm)) return
+    if (!(await confirm({ title: t.removeConfirm, confirmLabel: t.remove, tone: 'danger' }))) return
     setBusy(id)
     try {
       const res = await fetch(`/api/content/articles/${articleId}/inline-images/${id}`, { method: 'DELETE' })
@@ -236,15 +239,15 @@ export default function ArticleInlineImagesPanel({
 
   if (loading) {
     return (
-      <Card className="hover:translate-y-0">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.title}</h3>
-        <p className="text-xs text-slate-400 dark:text-slate-500">…</p>
+      <Card>
+        <h3 className="text-section font-semibold text-ink mb-1">{t.title}</h3>
+        <p className="text-caption text-muted">…</p>
       </Card>
     )
   }
 
   return (
-    <Card className="hover:translate-y-0" >
+    <Card  >
       {/* Single hidden input reused by every row's Replace action. */}
       <input
         ref={fileInputRef}
@@ -254,18 +257,18 @@ export default function ArticleInlineImagesPanel({
         onChange={onReplaceFileSelected}
       />
       <div className="flex items-center justify-between gap-2 mb-1">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant="neutral">{images.length}/{max}</Badge>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.hint}</p>
+      <p className="mb-4 max-w-prose text-caption text-muted">{t.hint}</p>
 
       {migrationRequired ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">{t.migrationRequired}</p>
+        <Notice tone="warn">{t.migrationRequired}</Notice>
       ) : (
         <>
           <div className="space-y-4">
             {images.length === 0 && (
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t.empty}</p>
+              <p className="text-caption text-muted">{t.empty}</p>
             )}
             {[...images].sort((a, b) => a.position - b.position).map((img) => {
               const d = drafts[img.id] || { prompt: '', alt: '', caption: '' }
@@ -275,52 +278,48 @@ export default function ArticleInlineImagesPanel({
               // Sections this image may move to: open ones + its own current section.
               const moveTargets = sections.filter((s) => s.sectionId === img.section_id || !usedSections.has(s.sectionId))
               return (
-                <div key={img.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+                <div key={img.id} className="rounded-control border border-line p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <Badge variant={st.variant}>{st.text}</Badge>
-                    <span className="text-[11px] text-slate-400 dark:text-slate-500">{t.section}: {sectionTitle(img.section_id)}</span>
+                    <span className="text-caption text-muted">{t.section}: {sectionTitle(img.section_id)}</span>
                   </div>
 
                   {url && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={url} alt={img.alt_text || ''} className="w-full max-h-56 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+                    <img src={url} alt={img.alt_text || ''} className="w-full max-h-56 object-cover rounded-control border border-line" />
                   )}
                   {img.status === 'failed' && img.last_error && (
-                    <p className="text-[11px] text-red-600 dark:text-red-400 break-words">{errText(img.last_error)}</p>
+                    <p className="text-caption text-bad break-words">{errText(img.last_error)}</p>
                   )}
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.section}</label>
-                    <select
-                      className={inputCls}
-                      value={img.section_id}
-                      disabled={isBusy}
-                      onChange={(ev) => { if (ev.target.value !== img.section_id) move(img.id, ev.target.value) }}
-                    >
-                      {moveTargets.map((s) => <option key={s.sectionId} value={s.sectionId}>{s.title}</option>)}
-                    </select>
-                  </div>
+                  <Select
+                    id={`inline-img-section-${img.id}`}
+                    label={t.section}
+                    value={img.section_id}
+                    disabled={isBusy}
+                    onChange={(ev) => { if (ev.target.value !== img.section_id) move(img.id, ev.target.value) }}
+                    options={moveTargets.map((s) => ({ value: s.sectionId, label: s.title }))}
+                  />
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.promptLabel}</label>
-                    <textarea
-                      rows={2} className={inputCls} placeholder={t.promptPlaceholder} value={d.prompt} disabled={isBusy}
-                      onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, prompt: ev.target.value } }))}
-                    />
-                  </div>
+                  <Textarea
+                    id={`inline-img-prompt-${img.id}`}
+                    label={t.promptLabel}
+                    rows={2} placeholder={t.promptPlaceholder} value={d.prompt} disabled={isBusy}
+                    onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, prompt: ev.target.value } }))}
+                  />
                   <Input label={t.altLabel} value={d.alt} placeholder={t.altPlaceholder} disabled={isBusy}
                     onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, alt: ev.target.value } }))} />
                   <Input label={t.captionLabel} value={d.caption} placeholder={t.captionPlaceholder} disabled={isBusy}
                     onChange={(ev) => setDrafts((p) => ({ ...p, [img.id]: { ...d, caption: ev.target.value } }))} />
 
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button size="sm" onClick={() => generate(img.id)} loading={isBusy} disabled={isBusy}>
+                    <Button size="sm" variant="secondary" onClick={() => generate(img.id)} loading={isBusy} disabled={isBusy}>
                       {isBusy ? t.generating : (url ? t.regenerate : t.generate)}
                     </Button>
                     {/* Replace = upload a chosen file; separate from AI Regenerate. */}
-                    <Button size="sm" variant="outline" onClick={() => pickReplacement(img.id)} disabled={isBusy}>{t.replace}</Button>
-                    <Button size="sm" variant="outline" onClick={() => saveDetails(img.id)} disabled={isBusy}>{t.save}</Button>
-                    <Button size="sm" variant="ghost" onClick={() => remove(img.id)} disabled={isBusy} className="text-red-600 dark:text-red-400">{t.remove}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => pickReplacement(img.id)} disabled={isBusy}>{t.replace}</Button>
+                    <Button size="sm" variant="secondary" onClick={() => saveDetails(img.id)} disabled={isBusy}>{t.save}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => remove(img.id)} disabled={isBusy} className="text-bad">{t.remove}</Button>
                   </div>
                 </div>
               )
@@ -328,21 +327,25 @@ export default function ArticleInlineImagesPanel({
           </div>
 
           {/* Add a new inline image to an open eligible section. */}
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="mt-4 pt-3 border-t border-line">
             {atMax ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.max}</p>
+              <p className="text-caption text-muted">{t.max}</p>
             ) : openSections.length === 0 ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.noEligible}</p>
+              <p className="text-caption text-muted">{t.noEligible}</p>
             ) : (
               <div className="flex flex-wrap items-end gap-2">
-                <div className="flex flex-col gap-1 flex-1 min-w-[12rem]">
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.section}</label>
-                  <select className={inputCls} value={addSection} disabled={busy === 'add'} onChange={(ev) => setAddSection(ev.target.value)} dir={dir}>
-                    <option value="">{t.selectSection}</option>
-                    {openSections.map((s) => <option key={s.sectionId} value={s.sectionId}>{s.title}</option>)}
-                  </select>
+                <div className="min-w-48 flex-1">
+                  <Select
+                    id="inline-img-add-section"
+                    label={t.section}
+                    value={addSection}
+                    disabled={busy === 'add'}
+                    onChange={(ev) => setAddSection(ev.target.value)}
+                    dir={dir}
+                    options={[{ value: '', label: t.selectSection }, ...openSections.map((s) => ({ value: s.sectionId, label: s.title }))]}
+                  />
                 </div>
-                <Button size="sm" onClick={addImage} loading={busy === 'add'} disabled={busy === 'add' || !addSection}>
+                <Button size="sm" variant="secondary" onClick={addImage} loading={busy === 'add'} disabled={busy === 'add' || !addSection}>
                   {busy === 'add' ? t.adding : t.add}
                 </Button>
               </div>
@@ -350,6 +353,7 @@ export default function ArticleInlineImagesPanel({
           </div>
         </>
       )}
+      {confirmDialog}
     </Card>
   )
 }

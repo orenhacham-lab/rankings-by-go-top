@@ -32,7 +32,7 @@ export function buildSignupNotificationHtml(user: Pick<User, 'email' | 'user_met
   const field = (v: unknown) => (typeof v === 'string' && v.trim() ? escapeEmailHtml(v.trim().slice(0, 200)) : 'לא הוזן')
   return `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2563eb;">🎉 חשבון חדש נפתח ב-Rankings by Go Top!</h2>
+          <h2 style="color: #2563eb;">🎉 חשבון חדש נפתח ב-Go Top SEO!</h2>
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-right: 4px solid #2563eb;">
             <p><strong>שם מלא:</strong> ${field(meta.full_name ?? meta.name)}</p>
             <p><strong>דוא״ל:</strong> ${field(user.email)}</p>
@@ -41,7 +41,7 @@ export function buildSignupNotificationHtml(user: Pick<User, 'email' | 'user_met
             <p><strong>זמן הרשמה:</strong> ${escapeEmailHtml(when.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }))}</p>
           </div>
           <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
-          <p style="color: #64748b; font-size: 12px;">הודעה אוטומטית מ-Rankings by Go Top</p>
+          <p style="color: #64748b; font-size: 12px;">הודעה אוטומטית מ-Go Top SEO</p>
         </div>
       `
 }
@@ -56,13 +56,13 @@ export async function sendSignupNotification(user: User): Promise<SignupNotifica
 
   const { Resend } = await import('resend')
   const resend = new Resend(process.env.RESEND_API_KEY)
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Rankings by Go Top <onboarding@resend.dev>'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Go Top SEO <onboarding@resend.dev>'
   const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'orenhacham@gmail.com'
 
   const result = await resend.emails.send({
     from: fromEmail,
     to: adminEmail,
-    subject: 'חשבון חדש נפתח - Rankings by Go Top',
+    subject: 'חשבון חדש נפתח - Go Top SEO',
     html: buildSignupNotificationHtml(user, new Date()),
   })
   if (result.error) {

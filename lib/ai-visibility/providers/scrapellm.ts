@@ -46,6 +46,20 @@ const UNSUPPORTED_COUNTRIES_BY_ENGINE: Record<string, Set<string>> = {
 
 const SUPPORTED_ENGINES = new Set(Object.keys(ENGINE_TO_SCRAPER))
 
+/**
+ * Whether ScrapeLLM answers `engine` for `country` (the same table run() checks
+ * before it calls anything). Read by the automatic monthly check
+ * (lib/ai-visibility/monthly-check) to put Perplexity in place of an engine the
+ * project's country does not support, so it never dispatches a check that can
+ * only fail.
+ */
+export function engineSupportsCountry(engine: string, country: string | null | undefined): boolean {
+  const scraper = ENGINE_TO_SCRAPER[engine.toLowerCase()]
+  if (!scraper) return false
+  const blocked = UNSUPPORTED_COUNTRIES_BY_ENGINE[scraper]
+  return !(country && blocked && blocked.has(country.toUpperCase()))
+}
+
 export interface ScrapeLLMRawResponse {
   scraper?: string
   status?: string

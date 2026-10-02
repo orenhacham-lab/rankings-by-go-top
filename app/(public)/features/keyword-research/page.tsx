@@ -1,12 +1,12 @@
 import { Metadata } from 'next'
-import Link from 'next/link'
-import { PublicNav } from '@/components/PublicNav'
-import { Footer } from '@/components/Footer'
-import { Search, TrendingUp, Target, PieChart, Zap, Check } from 'lucide-react'
+import { Coins, Info, Lightbulb, Plus, Sparkles, Target, TrendingUp, Search } from 'lucide-react'
+import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { KeywordIdeasVisual } from '@/components/public/feature-visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
-  title: 'מחקר ביטויים | Rankings by Go Top',
+  title: 'מחקר ביטויים | Go Top SEO',
   description: 'גלו רעיונות לביטויים מנתוני Google Ads. בדקו נפח חיפוש, תחרות והערכות CPC. הוסיפו ביטויים ישירות למעקב וליצירת שאלות AI.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/keyword-research',
@@ -18,167 +18,86 @@ export const metadata: Metadata = {
 }
 
 export default function KeywordResearchFeaturePage() {
-  return (
-    <div className="flex flex-col min-h-screen bg-white rtl">
-      <PublicNav locale="he" />
+  return <FeaturePage locale="he" content={CONTENT} />
+}
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="relative pt-40 pb-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-amber-50 via-white to-orange-50 overflow-hidden">
-          <div className="max-w-5xl mx-auto">
-            {/* Badge */}
-            <div className="flex justify-center mb-8">
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 text-amber-800 text-sm font-medium border border-amber-200">
-                <Search className="w-4 h-4" />
-                מחקר ביטויים
-              </span>
-            </div>
+const C = FEATURE_COMMON.he
 
-            {/* Main Heading */}
-            <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 text-center mb-6 leading-tight">
-              גלו ביטויים עם נתוני Google Ads
-            </h1>
-
-            {/* Subheading */}
-            <p className="text-xl text-slate-600 text-center mb-12 max-w-2xl mx-auto">
-              חפשו רעיונות לביטויים, בדקו נפח חיפוש ותחרות, והוסיפו אותם ישירות למעקב דירוגים או לשאלות נראות AI.
-            </p>
-
-            {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-              <Link
-                href="/signup"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-amber-700 hover:to-orange-700 transition-all text-center"
-              >
-                להתנסות בחינם
-              </Link>
-              <Link
-                href="/pricing"
-                className="px-8 py-4 rounded-lg border-2 border-slate-300 text-slate-700 text-lg font-semibold hover:bg-slate-50 transition-all text-center"
-              >
-                צפייה בתמחור
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-12 text-center">מה אפשר לעשות במערכת</h2>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[
-                {
-                  icon: Search,
-                  title: 'רעיונות לביטויים',
-                  description: 'קבלו רעיונות לביטויים רלוונטיים בהתבסס על ביטוי זרע או כתובת אתר, באמצעות נתונים מ-Google Ads API.',
-                },
-                {
-                  icon: TrendingUp,
-                  title: 'נפח חיפוש',
-                  description: 'צפו בנפח חיפוש חודשי משוער לכל ביטוי כדי להבין את גודל הביקוש.',
-                },
-                {
-                  icon: Target,
-                  title: 'נתוני תחרות',
-                  description: 'בדקו את רמת התחרות (נמוכה, בינונית או גבוהה) ואת מדד התחרותיות לכל ביטוי.',
-                },
-                {
-                  icon: PieChart,
-                  title: 'הערכות CPC',
-                  description: 'ראו הערכות של הצעת מחיר מינימלית ומקסימלית בראש העמוד, להבנת עלות הקליק.',
-                },
-                {
-                  icon: Zap,
-                  title: 'הוספה מהירה לפרויקטים',
-                  description: 'הוסיפו ביטויים נבחרים ישירות לפרויקטים שלכם למעקב דירוגים מיידי.',
-                },
-                {
-                  icon: Check,
-                  title: 'יצירת שאלות AI',
-                  description: 'הפכו ביטויים לשאלות בשפה טבעית למעקב נראות במנועי AI.',
-                },
-              ].map((feature, i) => {
-                const Icon = feature.icon
-                return (
-                  <div key={i} className="p-6 rounded-lg border border-slate-200 hover:border-amber-300 hover:shadow-lg transition-all">
-                    <Icon className="w-8 h-8 text-amber-600 mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h3>
-                    <p className="text-slate-600 leading-relaxed">{feature.description}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* How It Works */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-12 text-center">איך זה עובד</h2>
-
-            <div className="grid sm:grid-cols-3 gap-8">
-              {[
-                {
-                  number: '1',
-                  title: 'חפשו ביטויים',
-                  description: 'הזינו ביטוי זרע או כתובת אתר, ובחרו מדינה ושפה.',
-                },
-                {
-                  number: '2',
-                  title: 'בדקו תוצאות',
-                  description: 'עיינו ברעיונות שמוצגים יחד עם נפח חיפוש, רמת תחרות והערכות CPC.',
-                },
-                {
-                  number: '3',
-                  title: 'פעלו לפי הנתונים',
-                  description: 'הוסיפו ביטויים לפרויקט קיים או הפכו אותם לשאלות AI בלחיצה אחת.',
-                },
-              ].map((step) => (
-                <div key={step.number} className="text-center">
-                  <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-amber-600 text-white font-bold text-lg">
-                    {step.number}
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">{step.title}</h3>
-                  <p className="text-slate-600 leading-relaxed">{step.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Data Note */}
-        <section className="py-16 px-4 sm:px-6 lg:px-8 bg-amber-50 border-t border-amber-200">
-          <div className="max-w-3xl mx-auto">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">על מקורות הנתונים</h3>
-            <p className="text-slate-600 mb-3 leading-relaxed">
-              נתוני מחקר הביטויים מתקבלים מ-Google Ads API. נפחי חיפוש, רמות תחרות והערכות CPC הם משוערים ומבוססים על נתונים מצטברים של Google. ביצועים בפועל עשויים להשתנות בהתאם לקמפיין, לתחום ולשאר נסיבות.
-            </p>
-            <p className="text-slate-600 leading-relaxed">
-              השתמשו בנתונים הללו כנקודת פתיחה לאסטרטגיית ה-SEO והתוכן שלכם, ואמתו אותם תמיד מול נתוני המעקב והניתוח שלכם בפועל.
-            </p>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-slate-900 mb-6">מוכנים להאיץ את מחקר הביטויים?</h2>
-            <p className="text-xl text-slate-600 mb-8">
-              התחילו ניסיון חינם ל-7 ימים, ללא צורך בכרטיס אשראי.
-            </p>
-            <Link
-              href="/signup"
-              className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-amber-700 hover:to-orange-700 transition-all"
-            >
-              להתנסות בחינם
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      <Footer />
-    </div>
-  )
+const CONTENT: FeaturePageContent = {
+  hero: {
+    eyebrow: 'מחקר ביטויים',
+    eyebrowIcon: Search,
+    title: 'תכתבו על מה שהלקוחות',
+    accent: 'באמת מחפשים',
+    subtitle: 'רעיונות לביטויים מנתוני Google Ads, עם נפח חיפוש חודשי, רמת תחרות והערכת עלות לקליק. את הטובים מוסיפים למעקב או הופכים לשאלות AI בלחיצה.',
+    trust: C.trust,
+    primary: C.check,
+    secondary: C.trial,
+    visual: (
+      <KeywordIdeasVisual
+        seed="התקנת מזגנים"
+        headers={['ביטוי', 'חיפושים בחודש', 'תחרות']}
+        rows={[
+          { keyword: 'התקנת מזגן עילי', volume: '1,900', competition: 'בינונית', level: 'medium', added: true },
+          { keyword: 'מחיר התקנת מזגן', volume: '1,300', competition: 'נמוכה', level: 'low' },
+          { keyword: 'התקנת מיני מרכזי', volume: '590', competition: 'גבוהה', level: 'high' },
+          { keyword: 'טכנאי מזגנים בחיפה', volume: '320', competition: 'נמוכה', level: 'low', added: true },
+        ]}
+      />
+    ),
+  },
+  sections: [
+    {
+      kind: 'cards',
+      tone: 'contrast',
+      eyebrow: 'למה להתחיל כאן',
+      title: 'מאמר מצוין על ביטוי שאף אחד לא מחפש, לא מביא אף אחד',
+      intro: 'המחקר מראה מה מחפשים, כמה מחפשים, וכמה קשה להתחרות, עוד לפני שנכתבת מילה.',
+      items: [
+        { icon: TrendingUp, title: 'ביקוש אמיתי', body: 'נפח חיפוש חודשי משוער לכל ביטוי, מנתוני Google.' },
+        { icon: Target, title: 'איפה אפשר לנצח', body: 'רמת תחרות לכל ביטוי, כדי לבחור ביטויים שאפשר באמת להגיע בהם למעלה.' },
+        { icon: Coins, title: 'כמה שווה קליק', body: 'הערכת המחיר שמפרסמים משלמים על קליק, סימן טוב לכמה הביטוי שווה לעסקים.' },
+      ],
+    },
+    {
+      kind: 'steps',
+      eyebrow: 'איך זה עובד',
+      title: 'מרעיון לרשימת עבודה',
+      items: [
+        { title: 'מתחילים מביטוי או מאתר', body: 'מקלידים ביטוי או כתובת אתר, ובוחרים מדינה ושפה.' },
+        { title: 'מקבלים רעיונות עם נתונים', body: 'רשימת ביטויים קשורים, עם נפח חיפוש, תחרות והערכת עלות לקליק.' },
+        { title: 'מעבירים לעבודה', body: 'מוסיפים ביטויים למעקב המיקומים, או הופכים אותם לשאלות למעקב ה-AI.' },
+      ],
+    },
+    {
+      kind: 'cards',
+      eyebrow: 'מה אפשר לעשות',
+      title: 'כל מה שצריך כדי לבחור ביטויים נכון',
+      items: [
+        { icon: Lightbulb, title: 'רעיונות מביטוי או מאתר', body: 'ביטויים קשורים מתוך ביטוי אחד, או מתוך כתובת של אתר.' },
+        { icon: TrendingUp, title: 'נפח חיפוש', body: 'כמה מחפשים כל ביטוי בחודש, בהערכה של Google.' },
+        { icon: Target, title: 'רמת תחרות', body: 'נמוכה, בינונית או גבוהה, לכל ביטוי.' },
+        { icon: Coins, title: 'הערכת עלות לקליק', body: 'טווח ההצעות בפרסום ממומן לראש העמוד.' },
+        { icon: Plus, title: 'הוספה למעקב בלחיצה', body: 'ביטוי שנבחר נכנס ישר למעקב המיקומים בפרויקט.' },
+        { icon: Sparkles, title: 'שאלות למעקב AI', body: 'הופכים ביטוי לשאלה בשפה טבעית, כדי לבדוק אם מנועי AI ממליצים עליכם.' },
+      ],
+    },
+    {
+      kind: 'callout',
+      icon: Info,
+      title: 'על הנתונים',
+      body: (
+        <>
+          <p>הנתונים מגיעים מ-Google Ads API. נפח חיפוש, תחרות ועלות לקליק הם הערכות של Google, ומשתנים לפי תחום, עונה ומיקום.</p>
+          <p>הם נקודת פתיחה טובה לבחירת נושאים. את התוצאה בפועל מודדים במעקב המיקומים.</p>
+        </>
+      ),
+    },
+  ],
+  cta: {
+    title: 'תמצאו את הביטויים ששווה לכתוב עליהם',
+    body: C.closeBody,
+    primary: C.check,
+    secondary: C.trial,
+  },
 }

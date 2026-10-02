@@ -92,27 +92,34 @@ async function main() {
   // ── A) the sidebar — the chrome the screencast shows first ─────────────────
   console.log('A) Sidebar, first render, no effects')
   {
+    // The content screens are sidebar entries of their own, gated by the build-time
+    // content flag and labelled from `contentHub.screens` (the same block their own
+    // headings read). Set the flag BEFORE the module loads, so the entries are part of
+    // this render and their labels are covered by the same first-render contract.
+    process.env.NEXT_PUBLIC_ENABLE_CONTENT = 'true'
     const Sidebar = load('components/layout/Sidebar.tsx')
     const en = getDashboardDictionary('en').sidebar
     const he = getDashboardDictionary('he').sidebar
+    const enScreens = getDashboardDictionary('en').contentHub.screens
+    const heScreens = getDashboardDictionary('he').contentHub.screens
 
     const enHtml = firstRender('en', createElement(Sidebar as never, { isAdmin: false }))
     check('A1: initialLocale="en" → English nav labels are present on the FIRST render',
-      enHtml.includes(en.dashboard) && enHtml.includes(en.projects) && enHtml.includes(en.content) && enHtml.includes(en.billing),
+      enHtml.includes(en.dashboard) && enHtml.includes(en.projectSettings) && enHtml.includes(enScreens.articles) && enHtml.includes(en.billing),
       enHtml.slice(0, 300))
     const enBody = withoutSwitcherLabels(enHtml)
     check('A2: …and NOT ONE Hebrew character is rendered outside the language switch',
       !HEBREW.test(enBody),
       (enBody.match(/[֐-׿][^<]*/g) ?? []).slice(0, 6).join(' | '))
     check('A3: …specifically, the Hebrew labels are absent',
-      !enHtml.includes(he.dashboard) && !enHtml.includes(he.projects) && !enHtml.includes(he.content))
+      !enHtml.includes(he.dashboard) && !enHtml.includes(he.projectSettings) && !enHtml.includes(heScreens.articles))
 
     const heHtml = firstRender('he', createElement(Sidebar as never, { isAdmin: false }))
     check('A4: initialLocale="he" → Hebrew nav labels are present on the FIRST render',
-      heHtml.includes(he.dashboard) && heHtml.includes(he.projects) && heHtml.includes(he.content),
-      JSON.stringify({ dashboard: heHtml.includes(he.dashboard), projects: heHtml.includes(he.projects), content: heHtml.includes(he.content) }))
+      heHtml.includes(he.dashboard) && heHtml.includes(he.projectSettings) && heHtml.includes(heScreens.articles),
+      JSON.stringify({ dashboard: heHtml.includes(he.dashboard), projectSettings: heHtml.includes(he.projectSettings), articles: heHtml.includes(heScreens.articles) }))
     check('A5: …and the English labels are absent',
-      !heHtml.includes(`>${en.dashboard}<`) && !heHtml.includes(`>${en.projects}<`))
+      !heHtml.includes(`>${en.dashboard}<`) && !heHtml.includes(`>${en.projectSettings}<`))
     check('A6: the two renders genuinely differ', enHtml !== heHtml)
 
     // The admin section too — it renders a second nav group from the same dict.
@@ -129,8 +136,15 @@ async function main() {
     const html = firstRender('en', createElement(Switcher as never))
     check('B1: it renders on the FIRST render (it used to return null until hydration)',
       html.includes('EN') && html.includes('עברית'), html)
+    // The active option is marked twice: for assistive tech (aria-pressed) and on screen
+    // (its own classes). The check used to pin one colour class; it now reads both marks,
+    // so a restyle keeps it and a switch that marks the wrong language still fails it.
+    const buttonOf = (h: string, lang: string) => h.match(new RegExp(`<button[^>]*\\blang="${lang}"[^>]*>`))?.[0] ?? ''
+    const classOf = (tag: string) => /\bclass="([^"]*)"/.exec(tag)?.[1] ?? ''
+    const [enTag, heTag] = [buttonOf(html, 'en'), buttonOf(html, 'he')]
     check('B2: …and it marks the ACTIVE language from the server-resolved value',
-      /bg-indigo-600[^"]*"[^>]*>\s*EN/.test(html) || html.indexOf('bg-indigo-600') > html.indexOf('עברית'), html)
+      /\baria-pressed="true"/.test(enTag) && /\baria-pressed="false"/.test(heTag)
+      && classOf(enTag) !== '' && classOf(enTag) !== classOf(heTag), html)
     const heHtml = firstRender('he', createElement(Switcher as never))
     check('B3: …and the Hebrew button is the active one under initialLocale="he"',
       heHtml !== html)
@@ -139,7 +153,10 @@ async function main() {
   // ── C) representative pages across the product ─────────────────────────────
   console.log('\nC) representative dashboard surfaces, first render')
   {
-    const cases: { label: string; path: string; named?: string; props?: Record<string, unknown>; probe: (d: ReturnType<typeof getDashboardDictionary>) => string[] }[] = [
+    // `wrap` renders the component inside a provider it needs. The content workspace is
+    // the case: its screens read one shared context, so the surface a reviewer opens is
+    // provider + shell, not a screen on its own.
+    const cases: { label: string; path: string; named?: string; props?: Record<string, unknown>; wrap?: { path: string; named: string }; probe: (d: ReturnType<typeof getDashboardDictionary>) => string[] }[] = [
       { label: 'StatusBadge/ActiveBadge', path: 'components/ui/StatusBadge.tsx', named: 'ActiveBadge', props: { active: true },
         probe: (d) => [String((d.common as never as Record<string, string>).active)] },
       { label: 'StatusBadge/ScanStatusBadge', path: 'components/ui/StatusBadge.tsx', named: 'ScanStatusBadge', props: { status: 'completed' },
@@ -151,17 +168,32 @@ async function main() {
       { label: 'ProjectForm', path: 'components/projects/ProjectForm.tsx', props: { clients: [] },
         probe: (d) => [String((d.projects as never as { table: Record<string, string> }).table.projectName)] },
       // The two surfaces the reviewer actually opens.
+      // Rendered with no active project (no provider here), so the page is its own
+      // heading plus the workspace gate's "create your first project" state.
       { label: 'DashboardPage', path: 'app/(dashboard)/dashboard/page.tsx', props: {},
-        probe: (d) => [String((d.home as never as Record<string, string>).loading)] },
-      { label: 'ContentHub', path: 'components/content/ContentHub.tsx', props: {},
+        probe: (d) => [
+          String((d.home as never as Record<string, string>).title),
+          String((d.home as never as Record<string, string>).subtitle),
+          String((d.workspace as never as Record<string, string>).noProjectTitle),
+        ] },
+      { label: 'ContentWorkspace', path: 'components/content/workspace/ContentWorkspaceShell.tsx', props: {},
+        wrap: { path: 'components/content/workspace/ContentWorkspaceProvider.tsx', named: 'ContentWorkspaceProvider' },
         probe: () => [] },
     ]
     for (const c of cases) {
       let Comp: unknown
       try { Comp = load(c.path, c.named) } catch { check(`C-${c.label}: module loads`, false, 'import failed'); continue }
       if (typeof Comp !== 'function') { check(`C-${c.label}: component resolved`, false, typeof Comp); continue }
+      let Wrap: unknown = null
+      if (c.wrap) {
+        try { Wrap = load(c.wrap.path, c.wrap.named) } catch { check(`C-${c.label}: wrapper loads`, false, 'import failed'); continue }
+        if (typeof Wrap !== 'function') { check(`C-${c.label}: wrapper resolved`, false, typeof Wrap); continue }
+      }
+      const element = () => (Wrap
+        ? createElement(Wrap as never, null, createElement(Comp as never, c.props as never))
+        : createElement(Comp as never, c.props as never))
       let enHtml = ''
-      try { enHtml = firstRender('en', createElement(Comp as never, c.props as never)) } catch (e) {
+      try { enHtml = firstRender('en', element()) } catch (e) {
         check(`C-${c.label}: renders`, false, (e as Error).message.slice(0, 120)); continue
       }
       const enWords = c.probe(getDashboardDictionary('en')).filter(Boolean)
@@ -169,7 +201,7 @@ async function main() {
       check(`C-${c.label}: English on the first render`,
         enWords.every((w) => enHtml.includes(w)) && !HEBREW.test(enBody),
         `${JSON.stringify(enWords)} :: ${(enBody.match(/[֐-׿][^<]*/g) ?? []).slice(0, 4).join(' | ') || enBody.slice(0, 160)}`)
-      const heHtml = firstRender('he', createElement(Comp as never, c.props as never))
+      const heHtml = firstRender('he', element())
       check(`C-${c.label}: Hebrew on the first render under he`,
         HEBREW.test(heHtml) && heHtml !== enHtml, heHtml.slice(0, 160))
     }

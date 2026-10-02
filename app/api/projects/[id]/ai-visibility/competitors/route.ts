@@ -18,7 +18,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
 
-const MAX_ACTIVE_COMPETITORS = 3
+const MAX_ACTIVE_COMPETITORS = 5
 
 const ERR = {
   unauthorized: 'יש להתחבר מחדש לפני שמירת המתחרים.',

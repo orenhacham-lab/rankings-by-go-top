@@ -4,8 +4,10 @@ import { useState } from 'react'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
+import Notice from '@/components/ui/Notice'
 import { Client } from '@/lib/supabase/types'
-import { updateClientAction } from '@/app/actions/clients'
+import { saveClientAction } from '@/app/actions/clients'
+import { apiErrorText } from '@/lib/i18n/user-facing-error'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -33,7 +35,12 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
     try {
       if (client) {
         // Update existing client - use server action
-        await updateClientAction(client.id, formData)
+        // The save returns its refusal in this screen's language.
+        const saved = await saveClientAction(client.id, formData)
+        if (!saved.ok) {
+          setError(saved.error || dict.common.saveError)
+          return
+        }
       } else {
         // Create new client - use API route
         const response = await fetch('/api/clients/create', {
@@ -42,16 +49,16 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || f.errorCreate)
+          const errorData = await response.json().catch(() => null)
+          setError(apiErrorText(errorData, language, f.errorCreate))
+          return
         }
 
         await response.json()
       }
       onSuccess()
-    } catch (err) {
-      const errorMessage = (err as Error).message || dict.common.saveError
-      setError(errorMessage)
+    } catch {
+      setError(dict.common.saveError)
     } finally {
       setLoading(false)
     }
@@ -59,11 +66,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="bad">{error}</Notice>}
 
       <Input
         label={f.nameLabel}

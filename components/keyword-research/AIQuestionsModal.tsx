@@ -1,7 +1,25 @@
 'use client'
 
+/**
+ * The AI questions generated for one keyword: review, edit and choose which ones
+ * go to the project's AI visibility tracking.
+ *
+ * The shared modal and primitives: the project named as a plain read-only line (it
+ * is the one the top bar names), a select-all checkbox that also reads "some",
+ * a count in words ("3 of 4 selected", never "selected 4 / 0"), one checkbox and
+ * one single-line field per question that grows only as the text wraps, and one
+ * primary action. Every word comes from the dictionary.
+ */
 import { useState } from 'react'
-import { X, Loader2, CheckCircle } from 'lucide-react'
+import Modal from '@/components/ui/Modal'
+import Button from '@/components/ui/Button'
+import Checkbox from '@/components/ui/Checkbox'
+import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
+import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { formatCount } from '@/components/gsc/format'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 
 interface AIQuestionsModalProps {
@@ -9,27 +27,12 @@ interface AIQuestionsModalProps {
   onClose: () => void
   questions: GeneratedQuestion[]
   selectedProject: string
-  projects: Array<{ id: string; name: string }>
+  projects: Array<{ id: string; name?: string | null }>
   language: 'he' | 'en'
   isRTL: boolean
   onAddQuestions: (questions: GeneratedQuestion[]) => Promise<void>
   loading?: boolean
   successMessage?: string
-}
-
-const typeLabels = {
-  he: {
-    recommendation: 'המלצה',
-    price: 'מחיר',
-    comparison: 'השוואה',
-    info: 'מידע',
-  },
-  en: {
-    recommendation: 'Recommendation',
-    price: 'Price',
-    comparison: 'Comparison',
-    info: 'Information',
-  },
 }
 
 export default function AIQuestionsModal({
@@ -46,199 +49,108 @@ export default function AIQuestionsModal({
 }: AIQuestionsModalProps) {
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set())
   const [editedQuestions, setEditedQuestions] = useState<Map<string, string>>(new Map())
-
-  const t = {
-    he: {
-      title: 'שאלות AI שנוצרו',
-      subtitle: 'בדקו, ערכו, ובחרו אילו שאלות להוסיף',
-      selectAll: 'בחירת הכל',
-      deselectAll: 'ביטול בחירה',
-      addButton: 'הוספת שאלות לפרויקט',
-      selectProject: 'בחירת פרויקט',
-      projectPlaceholder: 'בחרו פרויקט...',
-      cancel: 'ביטול',
-      sourceKeyword: 'ביטוי מקור',
-      error: 'יש לבחור פרויקט תחילה',
-      success: 'השאלות נוספו בהצלחה',
-      added: (count: number) => `נוספו ${count} שאלות`,
-      skipped: (count: number) => `${count} שאלות כבר היו קיימות`,
-    },
-    en: {
-      title: 'Generated AI Questions',
-      subtitle: 'Review, edit, and select which questions to add',
-      selectAll: 'Select all',
-      deselectAll: 'Deselect all',
-      addButton: 'Add questions to project',
-      selectProject: 'Select project',
-      projectPlaceholder: 'Select a project...',
-      cancel: 'Cancel',
-      sourceKeyword: 'Source keyword',
-      error: 'Please select a project first',
-      success: 'Questions added successfully!',
-      added: (count: number) => `${count} questions added`,
-      skipped: (count: number) => `${count} questions already existed`,
-    },
-  }
-
-  const labels = t[language]
-  const typeLabelsForLang = typeLabels[language]
+  const t = getDashboardDictionary(language).keywordResearch.aiQuestions
+  const n = (v: number) => formatCount(v, language)
 
   const toggleQuestion = (id: string) => {
-    const newSelected = new Set(selectedQuestions)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedQuestions(newSelected)
+    const next = new Set(selectedQuestions)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedQuestions(next)
   }
 
-  const updateQuestion = (id: string, newText: string) => {
-    const newEdited = new Map(editedQuestions)
-    newEdited.set(id, newText)
-    setEditedQuestions(newEdited)
+  const updateQuestion = (id: string, text: string) => {
+    const next = new Map(editedQuestions)
+    next.set(id, text)
+    setEditedQuestions(next)
   }
 
-  const selectAll = () => {
-    setSelectedQuestions(new Set(questions.map((_, i) => String(i))))
-  }
+  const allSelected = questions.length > 0 && selectedQuestions.size === questions.length
+  const someSelected = selectedQuestions.size > 0 && !allSelected
+  const setAll = (on: boolean) => setSelectedQuestions(on ? new Set(questions.map((_, i) => String(i))) : new Set())
 
-  const deselectAll = () => {
-    setSelectedQuestions(new Set())
-  }
-
-  const getDisplayQuestion = (index: number, original: GeneratedQuestion) => {
-    return editedQuestions.has(String(index)) ? editedQuestions.get(String(index))! : original.question
-  }
+  const getDisplayQuestion = (index: number, original: GeneratedQuestion) =>
+    editedQuestions.has(String(index)) ? editedQuestions.get(String(index))! : original.question
 
   const handleAdd = async () => {
-    if (!selectedProject) {
-      alert(labels.error)
-      return
-    }
-
+    if (!selectedProject || selectedQuestions.size === 0) return
     const toAdd = questions.filter((_, i) => selectedQuestions.has(String(i)))
     await onAddQuestions(toAdd)
   }
 
   if (!open) return null
+  const projectName = projects.find((p) => p.id === selectedProject)?.name || ''
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className={`bg-white dark:bg-slate-900 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isRTL ? 'rtl' : 'ltr'}`}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-900">
-          <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{labels.title}</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">{labels.subtitle}</p>
-          </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-            <X size={24} />
-          </button>
+    <Modal open={open} onClose={onClose} title={t.title} size="lg">
+      <div data-ai-questions-modal="" className={cn('space-y-4', isRTL ? 'rtl' : 'ltr')}>
+        <p className="max-w-prose text-copy text-muted">{t.subtitle}</p>
+
+        <div className="flex flex-col gap-1.5">
+          <span className={FIELD_LABEL_CLASSES}>{t.project}</span>
+          <p className="truncate rounded-control border border-line bg-sunk px-3 py-2 text-copy text-ink">{projectName}</p>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* Project Selection */}
-          <div>
-            <label className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-              {labels.selectProject} *
-            </label>
-            <select
-              value={selectedProject}
-              disabled
-              className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-            >
-              <option value={selectedProject}>{projects.find((p) => p.id === selectedProject)?.name || labels.projectPlaceholder}</option>
-            </select>
-          </div>
+        {successMessage && <Notice tone="ok">{successMessage}</Notice>}
 
-          {/* Success Message */}
-          {successMessage && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400">
-              <CheckCircle size={18} />
-              <span className="text-sm">{successMessage}</span>
-            </div>
-          )}
+        <div className="flex items-center justify-between gap-3 border-b border-line pb-3">
+          <Checkbox
+            checked={allSelected}
+            indeterminate={someSelected}
+            onChange={() => setAll(!allSelected)}
+            label={t.selectAll}
+            disabled={loading || questions.length === 0}
+          />
+          <span className="shrink-0 text-caption text-muted tabular-nums" aria-live="polite">
+            {t.selectedCount(n(selectedQuestions.size), n(questions.length))}
+          </span>
+        </div>
 
-          {/* Toolbar */}
-          <div className={`flex gap-2 justify-between items-center mb-4`}>
-            <div className={`text-sm text-slate-600 dark:text-slate-400`}>
-              {selectedQuestions.size} / {questions.length} selected
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={selectAll}
-                className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                {labels.selectAll}
-              </button>
-              <button
-                onClick={deselectAll}
-                className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                {labels.deselectAll}
-              </button>
-            </div>
-          </div>
-
-          {/* Questions List */}
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {questions.map((question, idx) => (
-              <div
+        <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
+          {questions.map((question, idx) => {
+            const id = String(idx)
+            const on = selectedQuestions.has(id)
+            return (
+              <li
                 key={idx}
-                className={`p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 space-y-2 ${
-                  selectedQuestions.has(String(idx)) ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700' : ''
-                }`}
+                data-ai-question={idx}
+                className={cn(
+                  'flex items-start gap-3 rounded-inset border p-3 transition-colors duration-150 ease-snappy',
+                  on ? 'border-action/30 bg-action-soft' : 'border-line bg-surface',
+                )}
               >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedQuestions.has(String(idx))}
-                    onChange={() => toggleQuestion(String(idx))}
-                    className="mt-1 rounded"
+                <span className="flex h-9 items-center">
+                  <Checkbox checked={on} onChange={() => toggleQuestion(id)} aria-label={t.selectQuestion(idx + 1)} disabled={loading} />
+                </span>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <textarea
+                    value={getDisplayQuestion(idx, question)}
+                    onChange={(e) => updateQuestion(id, e.target.value)}
+                    aria-label={t.question(idx + 1)}
+                    rows={1}
+                    disabled={loading}
+                    className={cn(FIELD_CLASSES, 'block min-h-9 resize-none py-1.5 leading-6 [field-sizing:content]')}
                   />
-                  <div className="flex-1">
-                    <textarea
-                      value={getDisplayQuestion(idx, question)}
-                      onChange={(e) => updateQuestion(String(idx), e.target.value)}
-                      className="w-full px-3 py-2 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={2}
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="neutral">{t.types[question.type] ?? question.type}</Badge>
+                    <span className="min-w-0 truncate text-caption text-muted">{t.sourceKeyword(question.sourceKeyword)}</span>
                   </div>
                 </div>
-                <div className={`flex gap-2 text-xs ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <span className="px-2 py-1 rounded bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                    {typeLabelsForLang[question.type]}
-                  </span>
-                  <span className="px-2 py-1 rounded bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-400">
-                    {labels.sourceKeyword}: {question.sourceKeyword}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              </li>
+            )
+          })}
+        </ul>
 
-        {/* Footer */}
-        <div className={`flex gap-3 p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
-          >
-            {labels.cancel}
-          </button>
-          <button
-            onClick={handleAdd}
-            disabled={!selectedProject || loading || selectedQuestions.size === 0}
-            className="flex-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 size={16} className="animate-spin" />}
-            {labels.addButton}
-          </button>
+        <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-end">
+          {selectedQuestions.size === 0 && !successMessage && (
+            <p className="text-caption text-muted sm:me-auto">{t.pickOne}</p>
+          )}
+          <Button variant="secondary" onClick={onClose} disabled={loading}>{t.cancel}</Button>
+          <Button onClick={handleAdd} loading={loading} disabled={!selectedProject || selectedQuestions.size === 0}>
+            {selectedQuestions.size > 0 ? t.addCount(n(selectedQuestions.size)) : t.add}
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
