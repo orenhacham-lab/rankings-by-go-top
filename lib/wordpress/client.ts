@@ -922,7 +922,11 @@ export async function getPages(creds: WordPressCredentials, opts: WordPressListO
   return (Array.isArray(rows) ? rows : []).map(mapContentItem)
 }
 
-export type WpContentEndpoint = '/posts' | '/pages'
+/**
+ * A REST collection of editable items: posts, pages, or a public custom post type such as
+ * WooCommerce's products (`/product`), whose rest_base the site itself reports (`/types`).
+ */
+export type WpContentEndpoint = '/posts' | '/pages' | `/${string}`
 
 /**
  * Read-only: fetch the rendered content HTML of ONE item by id. Kept as a
@@ -957,27 +961,88 @@ const pathOf = (raw: string): string | null => {
   }
 }
 
+/** Post types that are never a public page of their own. */
+const NOT_A_PAGE_TYPE = new Set(['post', 'page', 'attachment', 'nav_menu_item'])
+/** At most this many custom types are looked through for one address. */
+export const FIND_MAX_CUSTOM_TYPES = 4
+
+type WpGetter = <T>(path: string) => Promise<T>
+
 /**
- * Read-only: the post or page whose public address is `url`, or null. Looks the
- * slug up in pages, then posts (published only), and accepts a match only when the
- * item's own link has the same path, so a slug shared by two types never picks the
- * wrong one. The home page has no slug and is never matched.
+ * Read-only: the item whose public address is `url`, or null. Looks the slug up in pages, then
+ * posts, then the site's public custom types (WooCommerce products and the like, as `/types`
+ * lists them, the one whose base starts the address first), published only, and accepts a match
+ * only when the item's own link has the same path, so a slug shared by two types never picks the
+ * wrong one. The home page is the static front page WordPress is set to show, when it shows one.
+ *
+ * Wave 10: only pages and posts were looked at, and the home page never, so "fix it for me" on a
+ * store's product or on the home page said "we could not find this page in WordPress".
  */
-export async function findItemByUrl(creds: WordPressCredentials, url: string): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+export async function findItemByUrlWith(get: WpGetter, url: string): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
   const path = pathOf(url)
-  if (!path || path === '/') return null
-  const slug = path.split('/').filter(Boolean).pop() ?? ''
+  if (!path) return null
+  if (path === '/') return frontPage(get)
+  const segments = path.split('/').filter(Boolean)
+  const slug = segments[segments.length - 1] ?? ''
   if (!slug) return null
-  for (const endpoint of ['/pages', '/posts'] as const) {
-    const rows = await wpGet<unknown[]>(creds, `${endpoint}?slug=${encodeURIComponent(slug)}&status=publish&per_page=5&_fields=id,link`)
+  const match = async (endpoint: WpContentEndpoint): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> => {
+    const rows = await get<unknown[]>(`${endpoint}?slug=${encodeURIComponent(slug)}&status=publish&per_page=5&_fields=id,link`)
     for (const r of Array.isArray(rows) ? rows : []) {
       const row = r as { id?: unknown; link?: unknown }
       const id = Number(row.id)
       const link = String(row.link ?? '')
       if (id > 0 && pathOf(link) === path) return { endpoint, id, link }
     }
+    return null
+  }
+  for (const endpoint of ['/pages', '/posts'] as const) {
+    const hit = await match(endpoint)
+    if (hit) return hit
+  }
+  for (const endpoint of await customTypeEndpoints(get, segments.length > 1 ? segments[0] : null)) {
+    // A type the site lists but does not serve to this user is not an answer: the next one is tried.
+    const hit = await match(endpoint).catch(() => null)
+    if (hit) return hit
   }
   return null
+}
+
+/** The public custom types' collections, the one whose base or name starts the address first. */
+async function customTypeEndpoints(get: WpGetter, firstSegment: string | null): Promise<WpContentEndpoint[]> {
+  let types: Record<string, { slug?: unknown; rest_base?: unknown }> = {}
+  try {
+    const t = await get<Record<string, { slug?: unknown; rest_base?: unknown }>>('/types?_fields=slug,rest_base')
+    if (t && typeof t === 'object' && !Array.isArray(t)) types = t
+  } catch { /* the type list is not readable: WooCommerce's products are still tried */ }
+  const bases: { base: string; slug: string }[] = []
+  for (const [key, v] of Object.entries(types)) {
+    const slug = String(v?.slug ?? key)
+    const base = String(v?.rest_base ?? '')
+    if (NOT_A_PAGE_TYPE.has(slug) || slug.startsWith('wp_') || !/^[a-z0-9_-]{1,40}$/i.test(base)) continue
+    if (!bases.some((b) => b.base === base)) bases.push({ base, slug })
+  }
+  if (bases.length === 0) bases.push({ base: 'product', slug: 'product' })
+  const first = (firstSegment ?? '').toLowerCase()
+  bases.sort((a, b) => Number(b.base === first || b.slug === first) - Number(a.base === first || a.slug === first))
+  return bases.slice(0, FIND_MAX_CUSTOM_TYPES).map((b) => `/${b.base}` as WpContentEndpoint)
+}
+
+/** The page WordPress shows as its home page ("a static page" in Settings → Reading), or null. */
+async function frontPage(get: WpGetter): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+  try {
+    const s = await get<{ show_on_front?: unknown; page_on_front?: unknown }>('/settings?_fields=show_on_front,page_on_front')
+    const id = Number(s?.page_on_front)
+    if (s?.show_on_front !== 'page' || !(id > 0)) return null
+    const row = await get<{ id?: unknown; link?: unknown }>(`/pages/${id}?_fields=id,link`)
+    return Number(row?.id) === id ? { endpoint: '/pages', id, link: String(row?.link ?? '') } : null
+  } catch {
+    // Reading the settings needs an administrator's password: without it the home page stays "not found".
+    return null
+  }
+}
+
+export async function findItemByUrl(creds: WordPressCredentials, url: string): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+  return findItemByUrlWith(<T>(path: string) => wpGet<T>(creds, path), url)
 }
 
 /** Read-only: one item's raw title and content, as the editor holds them. */

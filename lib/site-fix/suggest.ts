@@ -108,18 +108,25 @@ export function titleFits(candidate: string, input: Pick<TitleInput, 'kind' | 's
 
 /**
  * The last resort for a too-short or missing title, from the page's own words only: its main
- * keyword (or heading) with the first sentence of its description or of its text, cut at a word.
+ * keyword (or heading) with an opening sentence of its description, else of its text, cut at a
+ * word. Wave 10: only the description's first sentence was tried, so a page whose description
+ * opens with a short sentence ("טוקיו – בירת יפן.") had no fallback at all, while its text had.
  */
 export function titlesFromPage(input: TitleInput): string[] {
   if (input.kind !== 'title_short' && input.kind !== 'title_missing') return []
   const lead = norm(input.keyword) || norm(input.h1)
-  const source = norm(input.description) || norm(input.text)
-  if (!lead || !source) return []
-  const first = (source.split(/(?<=[.!?])\s/u)[0] ?? '').replace(/[.!?]+$/u, '').trim()
-  if (!first) return []
+  if (!lead) return []
   const r = titleRangeFor(input.kind)
-  const body = first.toLocaleLowerCase().includes(lead.toLocaleLowerCase()) ? first : `${lead} – ${first}`
-  return [trimDangling(cutAtWord(body, r.max)), ...titleFits(trimDangling(cutAtWord(body, r.max - 12)), input)]
+  const out: string[] = []
+  for (const source of [norm(input.description), norm(input.text)]) {
+    if (!source) continue
+    const sentences = source.split(/(?<=[.!?])\s/u).slice(0, 2).map((x) => x.replace(/[.!?]+$/u, '').trim()).filter(Boolean)
+    for (const first of sentences) {
+      const body = first.toLocaleLowerCase().includes(lead.toLocaleLowerCase()) ? first : `${lead} – ${first}`
+      out.push(trimDangling(cutAtWord(body, r.max)), ...titleFits(trimDangling(cutAtWord(body, r.max - 12)), input))
+    }
+  }
+  return out
 }
 
 /** The first title that passes titleProblem: the page's own words, then the model (near misses fitted), then the page's text. */
