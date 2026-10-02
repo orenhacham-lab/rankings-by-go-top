@@ -26,7 +26,8 @@
  * Every guard has a mutation control (the code broken on purpose, the guard failing).
  * Source guards strip comments first.
  */
-import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
@@ -51,13 +52,22 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 const TZ = 'Asia/Jerusalem'
 const admin = (f: FakeAdmin) => f as unknown as ServiceRoleClient
 
-/** The module with one line broken on purpose, imported from a sibling temp file (so its imports resolve). */
+/**
+ * The module with one line broken on purpose, imported from a temp file OUTSIDE the
+ * tree (so no suite that scans the tree, running in parallel, ever sees it): its
+ * imports are rewritten to absolute paths so they still resolve.
+ */
 async function mutated<T>(rel: string, from: string, to: string): Promise<T> {
   const src = read(rel)
   if (!src.includes(from)) throw new Error(`mutation anchor missing in ${rel}: ${from}`)
-  const file = join(dirname(join(ROOT, rel)), `.mut-${process.pid}-${Math.random().toString(36).slice(2)}.ts`)
-  writeFileSync(file, src.replace(from, to))
-  try { return (await import(file)) as T } finally { unlinkSync(file) }
+  const dir = dirname(join(ROOT, rel))
+  const body = src.replace(from, to)
+    .replace(/from '@\/([^']+)'/g, (_m, p: string) => `from '${join(ROOT, p)}'`)
+    .replace(/from '\.\/([^']+)'/g, (_m, p: string) => `from '${join(dir, p)}'`)
+  const tmp = mkdtempSync(join(tmpdir(), 'w13-mut-'))
+  const file = join(tmp, 'mutated.ts')
+  writeFileSync(file, body)
+  try { return (await import(file)) as T } finally { rmSync(tmp, { recursive: true, force: true }) }
 }
 async function quiet<T>(fn: () => Promise<T>): Promise<T> {
   const l = console.log, e = console.error, w = console.warn
