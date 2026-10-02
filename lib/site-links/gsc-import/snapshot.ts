@@ -20,8 +20,10 @@
  */
 import { safeExternalUrl } from '@/lib/site-links/model'
 
-/** A request body above this is refused (Vercel's own limit on a function body is 4.5 MB). */
+/** Each file, and all the files of one import together, above this are refused (Vercel's own limit on a function body is 4.5 MB). */
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+/** CSV files in one import (Search Console's Links export is a few CSVs). */
+export const MAX_IMPORT_FILES = 5
 /** Rows read from one sheet. A bigger sheet is cut here, never rejected. */
 export const MAX_ROWS_PER_SHEET = 50_000
 /** Rows stored per list (the biggest, by count). */
@@ -46,7 +48,7 @@ export interface GscImportSnapshot {
 
 /** Stable codes the screen turns into words; never a parser's or a database's own text. */
 export type ImportErrorCode =
-  | 'unauthorized' | 'not_found' | 'no_file' | 'too_big' | 'wrong_file' | 'empty' | 'unavailable' | 'internal'
+  | 'unauthorized' | 'not_found' | 'no_file' | 'too_big' | 'too_many_files' | 'wrong_file' | 'empty' | 'unavailable' | 'internal'
 
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g
 

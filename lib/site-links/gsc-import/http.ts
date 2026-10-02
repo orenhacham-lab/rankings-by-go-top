@@ -3,7 +3,7 @@
  * owner imported for one project.
  *
  *   GET   → { ok, available, snapshot | null }   what was imported last
- *   POST  → multipart "file" (zip / csv / xlsx)  parse, replace the snapshot
+ *   POST  → multipart "file" × 1..MAX_IMPORT_FILES (.csv only)  parse, replace the snapshot
  *
  * proxy.ts does not cover /api/*, so each method authenticates the caller and
  * proves ownership itself. The table is read and written with the service role,
@@ -12,8 +12,10 @@
  * later query on the table is filtered by that project AND that owner. The user
  * id written is the project row's owner, never anything from the request.
  *
- * The upload is capped (MAX_UPLOAD_BYTES) before and after it is read, parsed
- * strictly (parse.ts) and stored as capped lists. A re-import REPLACES the
+ * The upload is capped before and after it is read: at most MAX_IMPORT_FILES
+ * files, each one AND all of them together at most MAX_UPLOAD_BYTES. It is parsed
+ * strictly (parse.ts: CSV text only; one bad file rejects the whole import) and
+ * stored as capped lists. A re-import REPLACES the
  * project's snapshot (one row per project). Answers carry stable codes only,
  * never a parser's or a database's text. A database without the table yet (an
  * older migration state) answers `available: false` on GET and `unavailable` on
@@ -21,8 +23,8 @@
  *
  * Guarded (with mutation controls) by lib/site-links/gsc-import/__qa__/gsc-import.qa.ts.
  */
-import { parseLinksExport } from './parse'
-import { MAX_UPLOAD_BYTES, cleanCell, readSnapshot, type GscImportSnapshot, type ImportErrorCode } from './snapshot'
+import { parseLinksExportFiles, type UploadedFile } from './parse'
+import { MAX_IMPORT_FILES, MAX_UPLOAD_BYTES, cleanCell, readSnapshot, type GscImportSnapshot, type ImportErrorCode } from './snapshot'
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- the handler takes the service-role client or the QA fake */
 export type GscImportDb = { from: (table: string) => any }
@@ -39,7 +41,8 @@ export type GscImportAnswer =
 
 export const GSC_IMPORT_TABLE = 'site_links_gsc_imports'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const NO_STORE = { 'cache-control': 'no-store' }
+// Never cached, and never indexed or followed by a crawler (every answer, the refusals too).
+const NO_STORE = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' }
 const refuse = (status: number, code: ImportErrorCode) => Response.json({ ok: false, code } satisfies GscImportAnswer, { status, headers: NO_STORE })
 
 function missingTable(error: unknown): boolean {
@@ -88,22 +91,36 @@ export async function handleGscImportPost(projectId: string, request: Request, d
   const declared = Number(request.headers.get('content-length'))
   if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES + 64 * 1024) return refuse(413, 'too_big')
 
-  let file: unknown
+  let entries: unknown[]
   try {
-    file = (await request.formData()).get('file')
+    entries = (await request.formData()).getAll('file')
   } catch {
     return refuse(400, 'no_file')
   }
-  if (!file || typeof file !== 'object' || typeof (file as File).arrayBuffer !== 'function' || typeof (file as File).size !== 'number') return refuse(400, 'no_file')
-  const upload = file as File
-  if (upload.size === 0) return refuse(422, 'empty')
-  if (upload.size > MAX_UPLOAD_BYTES) return refuse(413, 'too_big')
-  const bytes = new Uint8Array(await upload.arrayBuffer())
-  if (bytes.length > MAX_UPLOAD_BYTES) return refuse(413, 'too_big')
+  const isFile = (f: unknown): f is File => !!f && typeof f === 'object' && typeof (f as File).arrayBuffer === 'function' && typeof (f as File).size === 'number'
+  if (entries.length === 0 || !entries.every(isFile)) return refuse(400, 'no_file')
+  const uploads = entries as File[]
+  if (uploads.length > MAX_IMPORT_FILES) return refuse(422, 'too_many_files')
+  // Each file and the total, by the declared sizes first, then by the bytes actually read.
+  let declaredTotal = 0
+  for (const u of uploads) {
+    if (u.size > MAX_UPLOAD_BYTES) return refuse(413, 'too_big')
+    declaredTotal += u.size
+  }
+  if (declaredTotal > MAX_UPLOAD_BYTES) return refuse(413, 'too_big')
+  if (declaredTotal === 0) return refuse(422, 'empty')
+  const files: UploadedFile[] = []
+  let total = 0
+  for (const u of uploads) {
+    const bytes = new Uint8Array(await u.arrayBuffer())
+    total += bytes.length
+    if (bytes.length > MAX_UPLOAD_BYTES || total > MAX_UPLOAD_BYTES) return refuse(413, 'too_big')
+    files.push({ name: cleanCell(u.name, 200), bytes })
+  }
 
-  const fileName = cleanCell(upload.name, 200)
-  const parsed = await parseLinksExport(fileName, bytes)
-  if (!parsed.ok) return refuse(parsed.code === 'too_big' ? 413 : 422, parsed.code)
+  const fileName = cleanCell(files.map((f) => f.name).filter(Boolean).join(', '), 200)
+  const parsed = await parseLinksExportFiles(files)
+  if (!parsed.ok) return refuse(422, parsed.code)
 
   const importedAt = (deps.now?.() ?? new Date()).toISOString()
   const row = {

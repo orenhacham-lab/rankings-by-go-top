@@ -1,27 +1,31 @@
 /**
- * Reads the file Search Console's Links report exports.
+ * Reads the CSV files Search Console's Links report exports.
  *
- * Accepted: the CSV export (a .zip of several CSV files), a single .csv, and
- * Excel (.xlsx, read with the `xlsx` package the app already has). Each sheet
- * (a zip entry, a CSV file, an Excel sheet) is recognised by its HEADER ROW, in
- * the English and the Hebrew Search Console UI, never by its position:
+ * Accepted: plain-text .csv files ONLY, several in one import (http.ts caps them)
+ * (Search Console's "Download CSV" can arrive as a compressed folder of several
+ * CSVs; the owner opens it on the computer and selects the CSVs inside). There is
+ * no zip reader and no Excel reader here on purpose: a spreadsheet parser fed an
+ * untrusted file is an attack surface (the npm `xlsx` package has open parsing
+ * CVEs), and a zip reader is a decompression-bomb surface. Each file is
+ * recognised by its HEADER ROW, in the English and the Hebrew Search Console UI,
+ * never by its name or position:
  *
  *   linking sites   Site | Linking pages | Target pages
  *   target pages    Target page | Incoming links | Linking sites
  *   latest links    Linking page | Last crawled
  *
- * Anything else (anchor text, internal links, a sheet nobody asked about) is
- * ignored. A file with none of the three is "wrong_file"; with them but no rows,
+ * Anything else (anchor text, internal links, a file nobody asked about) is
+ * ignored. Files with none of the three are "wrong_file"; with them but no rows,
  * "empty".
  *
- * STRICT. Nothing is evaluated: a CSV is split by a small state machine, a zip
- * is read with node:zlib (inflateRaw, output-capped against a zip bomb) from its
- * central directory, an Excel sheet is read as values only (no formulas, no
- * styles, no HTML). Rows per sheet and rows kept are capped (snapshot.ts), every
- * cell goes through cleanCell, and the parser throws nothing the caller shows: it
- * returns a code. Server only (node:zlib, Buffer). Guarded by __qa__/gsc-import.qa.ts.
+ * STRICT. Every file must be named *.csv, must not start with a known binary
+ * signature (zip "PK", PDF, Windows/Linux executables, old .xls, images), must
+ * contain no NUL byte and must decode as text (UTF-8, or UTF-16LE with its BOM);
+ * ONE rejected file rejects the whole import. Nothing is evaluated: a CSV is split
+ * by a small state machine, rows per file and rows kept are capped (snapshot.ts),
+ * every cell goes through cleanCell, and the parser throws nothing the caller
+ * shows: it returns a code. Guarded by __qa__/gsc-import.qa.ts.
  */
-import { inflateRawSync } from 'node:zlib'
 import {
   MAX_ROWS_PER_SHEET, MAX_STORED_ROWS, cleanCell, parseCount,
   type GscImportSnapshot, type LatestLink, type LinkingSite, type TargetPage,
@@ -29,11 +33,8 @@ import {
 
 export type ParseResult =
   | { ok: true; data: Pick<GscImportSnapshot, 'linkingSites' | 'targetPages' | 'latestLinks' | 'totals'> }
-  | { ok: false; code: 'wrong_file' | 'empty' | 'too_big' }
+  | { ok: false; code: 'wrong_file' | 'empty' }
 
-const MAX_ZIP_ENTRIES = 40
-const MAX_ENTRY_BYTES = 25 * 1024 * 1024
-const MAX_ZIP_TOTAL_BYTES = 40 * 1024 * 1024
 const MAX_CELL_CHARS = 4096
 const HEADER_SEARCH_ROWS = 8
 
@@ -55,7 +56,7 @@ const H = {
   linkingPage: set('linking page', 'linking url', 'source page', 'source url', 'דף מקשר', 'עמוד מקשר', 'כתובת מקשרת', 'דף מקור', 'עמוד מקור'),
   lastCrawled: set('last crawled', 'last crawl', 'last crawl date', 'last crawled date', 'last seen', 'נסרק לאחרונה', 'סריקה אחרונה', 'תאריך סריקה אחרונה', 'נסרק לאחרונה בתאריך', 'התאריך של הסריקה האחרונה'),
 }
-/** A file or sheet about the site's OWN pages links to each other: not what this screen shows. */
+/** A file about the site's OWN pages links to each other: not what this screen shows. */
 const INTERNAL_NAME = /intern|פנימ/i
 
 type Kind = 'sites' | 'targets' | 'latest'
@@ -175,10 +176,42 @@ function finish(lists: Lists): ParseResult {
 
 // ── CSV ────────────────────────────────────────────────────────────────────
 
-function decodeText(bytes: Uint8Array): string {
-  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes.subarray(2))
-  const text = new TextDecoder('utf-8').decode(bytes)
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+/**
+ * Signatures of binary files that are never a CSV export: any zip ("PK", which
+ * also covers .xlsx/.docx), PDF, a Windows executable (MZ), a Linux executable
+ * (ELF), an old Office file (.xls/.doc, OLE D0 CF 11 E0), GIF, PNG, JPEG.
+ */
+const BINARY_MAGIC: readonly (readonly number[])[] = [
+  [0x50, 0x4b],
+  [0x25, 0x50, 0x44, 0x46],
+  [0x4d, 0x5a],
+  [0x7f, 0x45, 0x4c, 0x46],
+  [0xd0, 0xcf, 0x11, 0xe0],
+  [0x47, 0x49, 0x46, 0x38],
+  [0x89, 0x50, 0x4e, 0x47],
+  [0xff, 0xd8, 0xff],
+]
+const startsWithMagic = (b: Uint8Array) => BINARY_MAGIC.some((m) => b.length >= m.length && m.every((x, i) => b[i] === x))
+
+/**
+ * The text of one uploaded file, or null when it is not a plain-text file:
+ * a binary signature, a NUL byte, or bytes that are not valid UTF-8 (or
+ * UTF-16LE after its BOM).
+ */
+export function csvText(bytes: Uint8Array): string | null {
+  if (startsWithMagic(bytes)) return null
+  try {
+    if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+      const t = new TextDecoder('utf-16le', { fatal: true }).decode(bytes.subarray(2))
+      return t.includes('\u0000') ? null : t
+    }
+    // NUL never occurs in a text export.
+    if (bytes.includes(0)) return null
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+  } catch {
+    return null
+  }
 }
 
 function detectDelimiter(text: string): string {
@@ -214,108 +247,27 @@ export function parseCsv(text: string): string[][] {
   return rows
 }
 
-// ── ZIP ────────────────────────────────────────────────────────────────────
-
-const u16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8)
-const u32 = (b: Uint8Array, o: number) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0
-
-export const isZip = (b: Uint8Array) => b.length > 22 && b[0] === 0x50 && b[1] === 0x4b && (b[2] === 0x03 || b[2] === 0x05)
-
-/**
- * The files of a .zip, read from its central directory. Entries that are
- * encrypted, use zip64, have an unsafe name or inflate past the cap are skipped;
- * more than MAX_ZIP_ENTRIES entries, or a total past MAX_ZIP_TOTAL_BYTES, is
- * "too_big". Returns null when the bytes are not a readable zip.
- */
-export function readZip(b: Uint8Array): { files: { name: string; data: Uint8Array }[] } | { error: 'too_big' } | null {
-  let eocd = -1
-  for (let i = b.length - 22; i >= Math.max(0, b.length - 22 - 65535); i--) {
-    if (u32(b, i) === 0x06054b50) { eocd = i; break }
-  }
-  if (eocd < 0) return null
-  const count = u16(b, eocd + 10)
-  let p = u32(b, eocd + 16)
-  if (count === 0xffff || p === 0xffffffff) return null
-  if (count > MAX_ZIP_ENTRIES) return { error: 'too_big' }
-  const files: { name: string; data: Uint8Array }[] = []
-  let total = 0
-  for (let n = 0; n < count; n++) {
-    if (p + 46 > b.length || u32(b, p) !== 0x02014b50) return null
-    const flags = u16(b, p + 8), method = u16(b, p + 10)
-    const csize = u32(b, p + 20), usize = u32(b, p + 24)
-    const nameLen = u16(b, p + 28), extraLen = u16(b, p + 30), commentLen = u16(b, p + 32)
-    const local = u32(b, p + 42)
-    const name = new TextDecoder('utf-8').decode(b.subarray(p + 46, p + 46 + nameLen))
-    p += 46 + nameLen + extraLen + commentLen
-    if (name.endsWith('/') || (flags & 1) || csize === 0xffffffff || usize === 0xffffffff) continue
-    if (/(^|[\\/])\.\.([\\/]|$)/.test(name) || name.startsWith('__MACOSX/') || /(^|\/)\._/.test(name)) continue
-    if (usize > MAX_ENTRY_BYTES) return { error: 'too_big' }
-    if (local + 30 > b.length || u32(b, local) !== 0x04034b50) return null
-    const start = local + 30 + u16(b, local + 26) + u16(b, local + 28)
-    if (start + csize > b.length) return null
-    const raw = b.subarray(start, start + csize)
-    let data: Uint8Array
-    if (method === 0) data = raw
-    else if (method === 8) {
-      try { data = inflateRawSync(raw, { maxOutputLength: MAX_ENTRY_BYTES }) } catch { return { error: 'too_big' } }
-    } else continue
-    total += data.length
-    if (total > MAX_ZIP_TOTAL_BYTES) return { error: 'too_big' }
-    files.push({ name, data })
-  }
-  return { files }
-}
-
-// ── Excel ──────────────────────────────────────────────────────────────────
-
-async function excelSheets(bytes: Uint8Array): Promise<{ name: string; rows: unknown[][] }[] | null> {
-  try {
-    const mod = await import('xlsx')
-    const XLSX = ((mod as unknown as { default?: typeof mod }).default ?? mod) as typeof mod
-    // Values only: no formulas, no styles, no HTML, no external files; rows capped.
-    const wb = XLSX.read(Buffer.from(bytes), { type: 'buffer', cellFormula: false, cellHTML: false, cellStyles: false, cellNF: false, bookVBA: false, sheetRows: MAX_ROWS_PER_SHEET + HEADER_SEARCH_ROWS + 1 })
-    return wb.SheetNames.slice(0, MAX_ZIP_ENTRIES).map((name) => ({
-      name,
-      rows: (XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '', blankrows: false }) as unknown[][]),
-    }))
-  } catch {
-    return null
-  }
-}
-
 // ── entry point ────────────────────────────────────────────────────────────
 
-const ext = (name: string) => (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').toLowerCase()
+export interface UploadedFile { name: string; bytes: Uint8Array }
 
 /**
- * Reads an uploaded file. `fileName` only picks the format when the bytes do not
- * say (zip and xlsx announce themselves); the content decides everything else.
+ * Reads the uploaded CSV files of one import. Every file is checked before any is
+ * read: a name that is not *.csv, a binary file, or one that is not text rejects
+ * the WHOLE import as "wrong_file" (nothing is stored). The lists are then filled
+ * from the files' header rows; the first file of each kind wins.
  */
-export async function parseLinksExport(fileName: string, bytes: Uint8Array): Promise<ParseResult> {
-  if (bytes.length === 0) return { ok: false, code: 'empty' }
-  const lists = emptyLists()
-  if (isZip(bytes)) {
-    const zip = readZip(bytes)
-    if (!zip) return { ok: false, code: 'wrong_file' }
-    if ('error' in zip) return { ok: false, code: 'too_big' }
-    // An .xlsx is a zip too: its parts are XML, so it has no .csv entries; hand it to the Excel reader.
-    const isExcel = zip.files.some((f) => f.name === '[Content_Types].xml' || f.name.startsWith('xl/'))
-    if (isExcel) {
-      const sheets = await excelSheets(bytes)
-      if (!sheets) return { ok: false, code: 'wrong_file' }
-      for (const s of sheets) if (!INTERNAL_NAME.test(s.name)) addTable(s.rows, lists)
-      return finish(lists)
-    }
-    for (const f of zip.files) {
-      if (ext(f.name) !== 'csv' || INTERNAL_NAME.test(f.name)) continue
-      addTable(parseCsv(decodeText(f.data)), lists)
-    }
-    return finish(lists)
+export async function parseLinksExportFiles(files: readonly UploadedFile[]): Promise<ParseResult> {
+  if (files.length === 0) return { ok: false, code: 'empty' }
+  if (files.every((f) => f.bytes.length === 0)) return { ok: false, code: 'empty' }
+  const texts: { name: string; text: string }[] = []
+  for (const f of files) {
+    if (!/\.csv$/i.test(f.name.trim())) return { ok: false, code: 'wrong_file' }
+    const text = csvText(f.bytes)
+    if (text === null) return { ok: false, code: 'wrong_file' }
+    texts.push({ name: f.name, text })
   }
-  if (ext(fileName) === 'xlsx' || ext(fileName) === 'xls') return { ok: false, code: 'wrong_file' }
-  if (ext(fileName) !== 'csv' && ext(fileName) !== 'txt') return { ok: false, code: 'wrong_file' }
-  // A binary file renamed .csv: NUL bytes never occur in a text export.
-  if (bytes.subarray(0, 4096).includes(0) && !(bytes[0] === 0xff && bytes[1] === 0xfe)) return { ok: false, code: 'wrong_file' }
-  if (!INTERNAL_NAME.test(fileName)) addTable(parseCsv(decodeText(bytes)), lists)
+  const lists = emptyLists()
+  for (const t of texts) if (!INTERNAL_NAME.test(t.name)) addTable(parseCsv(t.text), lists)
   return finish(lists)
 }

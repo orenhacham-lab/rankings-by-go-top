@@ -3,7 +3,9 @@
 /**
  * The optional import of Search Console's Links export, under "Links Google
  * already found". The Search Console API has no links report, so the owner can
- * export the report from Search Console and upload the file here.
+ * export the report from Search Console and upload its CSV files here (CSV
+ * only, up to MAX_IMPORT_FILES at once, one request; no zip, no Excel: the
+ * server rejects anything that is not plain-text CSV).
  *
  * What it shows is a SNAPSHOT of that file and says so: the import date, and
  * "the list does not update by itself, import a new file to update it". A new
@@ -30,7 +32,7 @@ import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
-  MAX_UPLOAD_BYTES, cleanCell, importedHref, readSnapshot, visibleRows,
+  MAX_IMPORT_FILES, MAX_UPLOAD_BYTES, cleanCell, importedHref, readSnapshot, visibleRows,
   type GscImportSnapshot, type ImportErrorCode,
 } from '@/lib/site-links/gsc-import/snapshot'
 
@@ -66,13 +68,14 @@ export default function GscLinksImport({ projectId, copy }: { projectId: string;
     return () => { cancelled = true }
   }, [projectId])
 
-  const upload = useCallback(async (file: File) => {
+  const upload = useCallback(async (files: File[]) => {
     setNotice(null)
-    if (file.size > MAX_UPLOAD_BYTES) { setNotice({ tone: 'bad', text: t.errors.too_big }); return }
+    if (files.length > MAX_IMPORT_FILES) { setNotice({ tone: 'bad', text: t.errors.too_many_files }); return }
+    if (files.reduce((n, f) => n + f.size, 0) > MAX_UPLOAD_BYTES) { setNotice({ tone: 'bad', text: t.errors.too_big }); return }
     setBusy(true)
     try {
       const form = new FormData()
-      form.set('file', file)
+      for (const f of files) form.append('file', f)
       const res = await fetch(gscImportUrl(projectId), { method: 'POST', body: form })
       const body = await res.json().catch(() => null) as { ok?: unknown; code?: unknown } | null
       const answer = res.ok ? readAnswer(body) : null
@@ -98,7 +101,7 @@ export default function GscLinksImport({ projectId, copy }: { projectId: string;
   return (
     <ImportView
       copy={copy} locale={language === 'he' ? 'he-IL' : 'en-US'} available={load.available} snapshot={load.snapshot}
-      busy={busy} notice={notice} onDismiss={() => setNotice(null)} onPick={(f) => void upload(f)}
+      busy={busy} notice={notice} onDismiss={() => setNotice(null)} onPick={(files) => void upload(files)}
     />
   )
 }
@@ -113,7 +116,7 @@ export function ImportView({ copy, locale, available, snapshot, busy = false, no
   busy?: boolean
   notice?: Banner
   onDismiss?: () => void
-  onPick?: (file: File) => void
+  onPick?: (files: File[]) => void
 }) {
   const t = copy.gscLinks.import
   const input = useRef<HTMLInputElement>(null)
@@ -122,13 +125,14 @@ export function ImportView({ copy, locale, available, snapshot, busy = false, no
       <input
         ref={input}
         type="file"
-        accept=".zip,.csv,.xlsx"
+        accept=".csv,text/csv"
+        multiple
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"
         disabled={!available}
         data-gsc-import="file"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick?.(f); e.target.value = '' }}
+        onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length > 0) onPick?.(files); e.target.value = '' }}
       />
       <Button type="button" variant={variant} loading={busy} disabled={!available} onClick={() => input.current?.click()} data-gsc-import="choose">
         {!busy && <Upload size={16} aria-hidden="true" />}
