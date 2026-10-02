@@ -2,12 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
+import { getUserEntitlement } from '@/lib/subscription'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
-import { billingMarketFromLocale } from '@/lib/paypal/checkout-plans'
+import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { planPriceIn } from '@/lib/billing/market'
+import { PLAN_CATALOG } from '@/lib/plans/catalog'
 import BillingView from './BillingView'
 import AdminBillingView from './AdminBillingView'
 
@@ -82,13 +84,12 @@ export default async function BillingPage() {
   const shopifyMigrationStatus =
     (migrationResult.ok && migrationResult.migration?.status as 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | undefined) || null
 
-  // Phase 3 — the billing CURRENCY is resolved from the durable, persisted
-  // signup locale (user_metadata.locale), NEVER from the mutable dashboard
-  // display-language toggle (useDashboardLanguage) and NEVER from browser
-  // locale. A legacy account with no stored locale resolves to `null` here —
-  // BillingView shows an explicit market-selection prompt instead of
-  // guessing or defaulting silently (see app/api/billing-market/select).
-  const market = billingMarketFromLocale((user.user_metadata as { locale?: string } | null)?.locale ?? null)
+  // w17 — the billing CURRENCY comes from the ONE server-side resolver
+  // (lib/billing/server-market.ts): the market stored at the first PayPal
+  // checkout, else (accounts that already paid before w17) the pre-w17
+  // locale market, else the visitor's country (IL -> ILS, else USD). Never
+  // the dashboard language toggle, never a client choice, no switcher.
+  const { market, locked: marketLocked } = await resolveBillingMarket(supabase, user)
 
   return (
     <BillingView
@@ -103,19 +104,13 @@ export default async function BillingPage() {
       billingStateUnavailable={governanceUnavailable}
       shopifyMigrationStatus={shopifyMigrationStatus}
       market={market}
-      planPricesILS={{
-        trial: PLAN_LIMITS.trial.price,
-        regular: PLAN_LIMITS.regular.price,
-        advanced: PLAN_LIMITS.advanced.price,
-        premium: PLAN_LIMITS.premium.price,
-        large_agency: PLAN_LIMITS.large_agency.price,
-      }}
-      planPricesUSD={{
-        trial: PLAN_LIMITS.trial.priceUSD,
-        regular: PLAN_LIMITS.regular.priceUSD,
-        advanced: PLAN_LIMITS.advanced.priceUSD,
-        premium: PLAN_LIMITS.premium.priceUSD,
-        large_agency: PLAN_LIMITS.large_agency.priceUSD,
+      marketLocked={marketLocked}
+      planPrices={{
+        trial: 0,
+        regular: planPriceIn(PLAN_CATALOG.regular, market),
+        advanced: planPriceIn(PLAN_CATALOG.advanced, market),
+        premium: planPriceIn(PLAN_CATALOG.premium, market),
+        large_agency: planPriceIn(PLAN_CATALOG.large_agency, market),
       }}
     />
   )

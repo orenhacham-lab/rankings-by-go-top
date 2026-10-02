@@ -5,7 +5,7 @@ import Header from '@/components/layout/Header'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
-import type { BillingMarket } from '@/lib/paypal/checkout-plans'
+import { BILLING_MARKETS, type BillingMarket } from '@/lib/billing/market'
 import { Check, ShoppingBag, Star, TriangleAlert } from 'lucide-react'
 import { PLAN_AUDIENCE_DESCRIPTION, PLAN_AUDIENCE_LABEL } from '@/lib/plans/features'
 import { Card } from '@/components/ui/Card'
@@ -42,15 +42,14 @@ interface BillingViewProps {
    *  mutations, and say so, rather than guessing a billing provider. */
   billingStateUnavailable?: boolean
   shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null
-  /** Phase 3 — resolved server-side from the durable user_metadata.locale,
-   *  NEVER from the dashboard display-language toggle. `null` means a
-   *  legacy account with no stored locale: the plans are shown in a display
-   *  currency the viewer can switch, with no PayPal button, and a plan's
-   *  "continue" button makes the same explicit, persisted choice the old
-   *  prompt made. */
-  market: BillingMarket | null
-  planPricesILS: Record<PlanKey, number>
-  planPricesUSD: Record<PlanKey, number>
+  /** w17 — decided on the server (lib/billing/server-market.ts): the stored
+   *  market, else the pre-w17 market of an account that already paid, else
+   *  the visitor's country. Never chosen here: there is no switcher. */
+  market: BillingMarket
+  /** True once the currency is fixed for this account (first payment made). */
+  marketLocked: boolean
+  /** The plans' prices in `market`, from the plan catalog. */
+  planPrices: Record<PlanKey, number>
 }
 
 export default function BillingView({
@@ -65,23 +64,16 @@ export default function BillingView({
   billingStateUnavailable = false,
   shopifyMigrationStatus,
   market,
-  planPricesILS,
-  planPricesUSD,
+  marketLocked,
+  planPrices,
 }: BillingViewProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const t = dict.billing
   const dateLocale = language === 'en' ? 'en-US' : 'he-IL'
 
-  // DISPLAY ONLY. With no stored billing market the prices are shown in the
-  // currency of the dashboard's language (Hebrew → ILS, English → USD) until the
-  // viewer switches it. Nothing is saved by showing or switching: the market is
-  // persisted only by selectMarket below, the same request the old prompt sent.
-  // With a stored market, this is always that market.
-  const [pickedMarket, setPickedMarket] = useState<BillingMarket | null>(null)
-  const shownMarket: BillingMarket = market ?? pickedMarket ?? (language === 'en' ? 'USD' : 'ILS')
-  const planPrices = shownMarket === 'USD' ? planPricesUSD : planPricesILS
-  const currencySymbol = shownMarket === 'USD' ? '$' : '₪'
+  // w17 — the currency is the server's; this view only shows it.
+  const currencySymbol = BILLING_MARKETS[market].symbol
   // DISPLAY ONLY (w7 P2-13): the same grouping the public pricing page shows (₪1,999, not ₪1999).
   const numberLocale = language === 'en' ? 'en-US' : 'he-IL'
 
@@ -89,37 +81,6 @@ export default function BillingView({
   // Shown in the page in our words; the route's own error text never reaches the merchant.
   const [cancelResult, setCancelResult] = useState<'ok' | 'failed' | null>(null)
   const { confirm, dialog: confirmDialog } = useConfirm()
-  const [savingMarket, setSavingMarket] = useState<BillingMarket | null>(null)
-  const [marketSaveFailed, setMarketSaveFailed] = useState(false)
-
-  const selectMarket = async (chosen: BillingMarket) => {
-    setSavingMarket(chosen)
-    setMarketSaveFailed(false)
-    try {
-      const res = await fetch('/api/billing-market/select', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ market: chosen }),
-      })
-      if (res.ok) window.location.reload()
-      else { setSavingMarket(null); setMarketSaveFailed(true) }
-    } catch {
-      setSavingMarket(null)
-      setMarketSaveFailed(true)
-    }
-  }
-
-  // One primary per screen: the recommended plan's button; the other plans' are secondary.
-  const planAction = (plan: Exclude<PlanKey, 'trial'>, recommended = false) =>
-    market === null ? (
-      <Button
-        variant={recommended ? 'primary' : 'secondary'}
-        className="w-full"
-        data-continue-to-payment={plan}
-        onClick={() => selectMarket(shownMarket)}
-        disabled={savingMarket !== null}
-      >
-        {savingMarket !== null ? t.marketPrompt.saving : t.marketPrompt.continueToPayment}
-      </Button>
-    ) : null
 
   const handleCancel = async () => {
     // The in-app confirmation (ui/ConfirmDialog) in place of the browser's box:
@@ -262,50 +223,10 @@ export default function BillingView({
             </Card>
           )}
 
-          {market === null ? (
-            // Phase 3 — a legacy account with no stored billing market. The
-            // plans are visible straight away, priced in the display currency
-            // above; no PayPal button renders until the viewer continues from a
-            // plan, which persists that currency through the same route the old
-            // prompt used (one explicit choice, never a silent default).
-            <div className="mb-5 flex flex-col gap-2" data-billing-market-choice={shownMarket}>
-              <div className="flex flex-wrap items-center gap-3">
-                <span id="billing-currency-label" className="text-copy font-semibold text-ink">{t.marketPrompt.title}</span>
-                <div role="group" aria-labelledby="billing-currency-label" className="inline-flex items-center gap-0.5 rounded-pill bg-sunk p-1">
-                  {(['ILS', 'USD'] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={shownMarket === m}
-                      data-currency-option={m}
-                      onClick={() => setPickedMarket(m)}
-                      disabled={savingMarket !== null}
-                      className={cn(
-                        'h-8 rounded-pill px-3 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy',
-                        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50',
-                        shownMarket === m ? 'bg-surface text-ink shadow-control' : 'text-muted hover:text-ink',
-                      )}
-                    >
-                      {m === 'USD' ? t.marketPrompt.usdOption : t.marketPrompt.ilsOption}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-caption text-muted">
-                {t.marketPrompt.shownIn(shownMarket === 'USD' ? t.marketPrompt.usdName : t.marketPrompt.ilsName)}
-              </p>
-              {marketSaveFailed && (
-                <p role="alert" className="text-caption font-medium text-bad">{t.marketPrompt.saveFailed}</p>
-              )}
-            </div>
-          ) : (
-            <p className="mb-4 flex flex-wrap items-center gap-2 text-copy font-semibold text-ink" data-billing-market={market}>
-              {t.marketPrompt.currentMarketPrefix}
-              <span className="rounded-pill border border-line bg-surface px-2.5 py-0.5 text-caption font-semibold text-ink">
-                {market === 'USD' ? t.marketPrompt.usdLabel : t.marketPrompt.ilsLabel}
-              </span>
-            </p>
-          )}
+          {/* w17 — one quiet line: which currency applies, and why. No switcher. */}
+          <p className="mb-4 text-caption text-muted" data-billing-market={market} data-billing-market-locked={marketLocked ? 'true' : 'false'}>
+            {marketLocked ? t.marketPrompt.locked(t.marketPrompt.currencyName[market]) : t.marketPrompt.byLocation(t.marketPrompt.currencyName[market])}
+          </p>
 
           {/* The trial is a line above the paid plans rather than a fifth card in
               their grid, so the four plans you can buy sit side by side and the
@@ -332,7 +253,6 @@ export default function BillingView({
               audience={PLAN_AUDIENCE_LABEL.regular[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.regular[language]}
               numberLocale={numberLocale}
-              action={planAction('regular')}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
             />
@@ -348,7 +268,6 @@ export default function BillingView({
               audience={PLAN_AUDIENCE_LABEL.advanced[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.advanced[language]}
               numberLocale={numberLocale}
-              action={planAction('advanced', true)}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
             />
@@ -364,7 +283,6 @@ export default function BillingView({
               audience={PLAN_AUDIENCE_LABEL.premium[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.premium[language]}
               numberLocale={numberLocale}
-              action={planAction('premium')}
               recommendedLabel={t.recommended}
               currentLabel={t.currentPlan}
             />
@@ -381,14 +299,13 @@ export default function BillingView({
                 audience={PLAN_AUDIENCE_LABEL.large_agency[language]}
                 description={PLAN_AUDIENCE_DESCRIPTION.large_agency[language]}
                 numberLocale={numberLocale}
-                action={planAction('large_agency')}
                 recommendedLabel={t.recommended}
                 currentLabel={t.currentPlan}
               />
             )}
           </div>
 
-          {market !== null && <BillingClient market={market} />}
+          <BillingClient market={market} />
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

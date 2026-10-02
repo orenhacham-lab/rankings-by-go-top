@@ -347,7 +347,10 @@ function main() {
       !/NEXT_PUBLIC_PAYPAL_PLAN_ID/.test(read('lib/plans/features.ts'))
       && !/shopifyHandle/.test(read('lib/plans/features.ts')))
     check('D6: the pricing pages still show the unchanged prices from the catalog',
-      PAGES.every((rel) => /formatILS\(plan\.priceILS\)|formatUSD\(plan\.priceUSD\)/.test(read(rel))))
+      // w17: priced in the visitor's market, still straight from the catalog (planPriceIn reads priceILS/priceUSD).
+      PAGES.every((rel) => /formatPlanPrice\(planPriceIn\(plan, market\), market, '(he-IL|en-US)'\)/.test(read(rel)))
+      && /ILS: \{ symbol: '₪', priceField: 'priceILS' \}/.test(read('lib/billing/market.ts'))
+      && /USD: \{ symbol: '\$', priceField: 'priceUSD' \}/.test(read('lib/billing/market.ts')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

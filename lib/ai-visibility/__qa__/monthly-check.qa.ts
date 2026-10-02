@@ -519,6 +519,10 @@ async function main() {
     check('H3b: MUT a sentence added to the billing note fails H3', note(heD.replace("keywordCheckNote: '", "keywordCheckNote: 'X ")) !== note(base('lib/i18n/dashboard/he.ts')))
     let untouched = ''
     try { untouched = execSync('git diff --name-only 8b468a8 -- lib/plans lib/shopify lib/billing lib/subscription.ts lib/quota.ts supabase/migrations/20260829000000_add_usage_reservations_and_billing_periods.sql', { cwd: ROOT }).toString().trim() } catch { untouched = 'git unavailable' }
+    // w17 (owner decision 2026-10-02, currency by country) deliberately changed the billing MARKET files only;
+    // every other plan/price/quota/billing/entitlement/Shopify file must still be untouched.
+    const W17 = /^(lib\/billing\/(market\.ts|server-market\.ts|billing-market-selection\.ts|__qa__\/(w17-billing-market|billing-market-selection|billing-market-select-route)\.qa\.ts)|lib\/plans\/__qa__\/pricing-copy-and-layout\.qa\.ts)$/
+    untouched = untouched.split('\n').filter((f) => f && !W17.test(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
   }
 
