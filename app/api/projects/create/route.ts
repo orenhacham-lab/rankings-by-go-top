@@ -7,6 +7,11 @@ import { buildQuotaError, buildEntitlementUnavailableError, isEntitlementUnknown
 import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
 import { markScanOwnedFields, type SeedProjectField } from '@/lib/seed-scan/settings'
 import { bilingualError } from '@/lib/i18n/action-messages'
+import { isAdminUser } from '@/lib/auth/admin-role'
+import { runAfterResponse } from '@/lib/notifications/after-response'
+import { notifyProjectAdded } from '@/lib/notifications/operator-alerts'
+import { claimCookieFromHeader } from '@/lib/onboarding/claim-cookie'
+import { peekSeedClaim } from '@/lib/onboarding/claim-peek'
 
 // API Route for creating new projects
 // Replaces Server Action approach to avoid production crashes
@@ -177,6 +182,21 @@ export async function POST(request: NextRequest) {
         console.warn('[API] Placeholder fields not marked for the scan:', { projectId: createdId })
       }
     }
+
+    // Tell the operator an existing user added a site (not an administrator,
+    // and not the project made from the sign-up's own free-check claim, which
+    // the signup email already covers). After the response; never fails it.
+    const claimCookie = claimCookieFromHeader(request.headers.get('cookie')).token
+    runAfterResponse(async () => {
+      const admin = createAdminClient()
+      const isAdmin = entitlement.isAdmin || (await isAdminUser(admin, user.id))
+      let claimDomain: string | null = null
+      if (claimCookie && !isAdmin) {
+        const peek = await peekSeedClaim(admin, claimCookie, new Date())
+        if (peek.state === 'usable') claimDomain = peek.domain
+      }
+      await notifyProjectAdded({ user, isAdmin, domain: data.target_domain, claimDomain, entitlement })
+    })
 
     // Revalidate the projects page
     revalidatePath('/projects')

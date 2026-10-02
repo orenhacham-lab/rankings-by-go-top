@@ -14,6 +14,8 @@ import { clientIpFrom, hashClient, recordRun } from '@/lib/free-check/store'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { handleResearchPost, type ResearchDeps } from '@/lib/presignup/http'
 import { runAnonymousStageA } from '@/lib/presignup/run'
+import { runAfterResponse } from '@/lib/notifications/after-response'
+import { notifyFreeCheckCompleted } from '@/lib/notifications/operator-alerts'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
@@ -29,6 +31,8 @@ function liveDeps(): ResearchDeps {
     run: ({ url, locale, onStep }) => runAnonymousStageA({ url, locale, onStep }),
     record: (admin, row) => recordRun(row, admin),
     issueClaim: (admin, checkId) => issueClaimToken(checkId, admin),
+    afterRecorded: ({ checkId, domain, locale, result }) =>
+      runAfterResponse(() => notifyFreeCheckCompleted({ admin: createAdminClient(), checkId, domain, locale, result })),
     now: () => new Date(),
     env: process.env,
   }

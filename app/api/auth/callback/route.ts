@@ -5,7 +5,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
-import { sendSignupNotification } from '@/lib/notifications/signup-email'
+import { isFreshSignup, sendSignupNotification } from '@/lib/notifications/signup-email'
+import { resolveSignupSite } from '@/lib/notifications/signup-site'
 import { RESET_PASSWORD_PATH, recoveryFailureUrl } from '@/lib/auth/password-reset'
 import { SEED_CLAIM_COOKIE } from '@/lib/onboarding/claim-cookie'
 import { afterSignupPath } from '@/lib/onboarding/claim-start'
@@ -77,22 +78,27 @@ async function signedIn(
   user: User | null,
   { cookieStore, next, lang, origin }: { cookieStore: CookieStore; next: string; lang: string | null; origin: string },
 ): Promise<NextResponse> {
-  // Notify the operator of a new signup. The helper only reports accounts
-  // created in the last 30 minutes, from the verified user record.
-  if (user) {
-    try {
-      await sendSignupNotification(user)
-    } catch (emailError) {
-      console.error('[Signup] Failed to send notification email:', emailError instanceof Error ? emailError.name : 'unknown')
-      // Don't fail the signup if email fails
-    }
-  }
-
   // Area C — auto-create the default client from signup metadata now that the
   // session exists. Server-authoritative + best-effort; `supabase` carries the
   // just-established session (runs under RLS). Runs BEFORE the redirect below
   // so the client exists by the time the dashboard loads.
   try { await ensureDefaultClient(supabase, createAdminClient()) } catch { /* non-blocking */ }
+
+  // Notify the operator of a new signup, AFTER the client step and with the
+  // site the account is about (the free check's claim, else the signup
+  // metadata, else the first project). The helper only reports accounts
+  // created in the last 30 minutes, from the verified user record. Every
+  // sign-in door (email confirmation, Supabase OAuth, the site's own Google
+  // client) ends here. Never fails the sign-in.
+  if (user && isFreshSignup(user)) {
+    try {
+      const site = await resolveSignupSite({ user, claimCookie: cookieStore.get(SEED_CLAIM_COOKIE)?.value, admin: createAdminClient() })
+      await sendSignupNotification(user, site)
+    } catch (emailError) {
+      console.error('[Signup] Failed to send notification email:', emailError instanceof Error ? emailError.name : 'unknown')
+      // Don't fail the signup if email fails
+    }
+  }
 
   // Area G — preserve the signup-origin language through the hop. The durable
   // source is auth metadata (seeds the dashboard provider); this just keeps

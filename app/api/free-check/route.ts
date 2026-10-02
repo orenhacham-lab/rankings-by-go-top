@@ -26,6 +26,9 @@ import { checkGate, clientIpFrom, hashClient, recordRun } from '@/lib/free-check
 import { domainKey, normalizeCheckUrl } from '@/lib/free-check/url-guard'
 import type { FreeCheckErrorCode, FreeCheckResponse } from '@/lib/free-check/types'
 import { LOCALES, type Locale } from '@/lib/i18n/locales'
+import { runAfterResponse } from '@/lib/notifications/after-response'
+import { notifyFreeCheckCompleted } from '@/lib/notifications/operator-alerts'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -91,6 +94,12 @@ export async function POST(request: Request) {
   // every completed run — but it must never turn a good result into an error.
   const checkId = await recordRun({ domain, locale, url: outcome.result.url, result: outcome.result, seed: outcome.seed, clientHash })
   const claimToken = checkId ? await issueClaimToken(checkId) : null
+
+  // Tell the operator which site was scanned (once per domain per 24h), after
+  // the response has gone: it can never slow or fail the scan.
+  if (checkId) {
+    runAfterResponse(() => notifyFreeCheckCompleted({ admin: createAdminClient(), checkId, domain, locale, result: outcome.result }))
+  }
 
   return NextResponse.json(
     { ok: true, result: outcome.result, ...(claimToken ? { claimToken } : {}) } satisfies FreeCheckResponse,
