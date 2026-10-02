@@ -790,7 +790,7 @@ export const dashboardEn = {
     },
     autoSchedule: {
       title: 'Automatic publishing schedule',
-      intro: 'Pick approved topics, set a publishing frequency, and the system publishes articles automatically from the queue.',
+      intro: 'Pick approved topics, and the system publishes articles automatically from the queue on your publishing rhythm.',
       settingsTitle: 'Schedule settings',
       moveUp: 'Move up the queue',
       moveDown: 'Move down the queue',
