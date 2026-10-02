@@ -53,6 +53,10 @@ import {
   type StrategyView,
 } from '@/lib/content/strategy/view'
 import { ideaTargetFromCard } from '@/lib/content/strategy/ideas'
+import {
+  STRATEGY_SCHEDULE_ENDPOINTS, approvedNotQueued, firstArticleView, hasPublishingSite, readPublishFirstAnswer, readScheduleAnswer,
+} from '@/lib/content/strategy/first-article'
+import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { useStrategyData } from './useStrategyData'
 import { useRankingIdeas } from './useRankingIdeas'
 import { useIdeaActions } from './useIdeaActions'
@@ -213,7 +217,12 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
   const ranking = useRankingIdeas(projectId)
   const { reload: reloadStrategy } = strategy
   const onChanged = useCallback(() => { reloadStrategy(); void loadTopics() }, [reloadStrategy, loadTopics])
-  const actions = useIdeaActions({ projectId, automation: automationEnabled, dict, toast, onChanged })
+  // The first approval writes the first article: until a read shows it, the card says so.
+  const [starting, setStarting] = useState<{ projectId: string; at: number } | null>(null)
+  const onScheduled = useCallback((r: { writingFirst: boolean }) => {
+    if (r.writingFirst) setStarting({ projectId, at: Date.now() })
+  }, [projectId])
+  const actions = useIdeaActions({ projectId, automation: automationEnabled, dict, toast, onChanged, onScheduled })
   const { view: withActions, prune, deferred } = actions
   // A fresh read retires what it already shows.
   useEffect(() => { if (strategy.data) prune(strategy.data) }, [strategy.data, prune])
@@ -222,6 +231,70 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
     [strategy.data, strategy.queue, strategy.seed, ranking, withActions, deferred],
   )
   const act: BoardIdeaActions = { actions, automation: automationEnabled }
+
+  // ── Approved = scheduled ──────────────────────────────────────────────────
+  // An approved topic the queue does not hold (approved before approving meant
+  // queueing) is sent to the queue once when the screen opens, so the board and the
+  // queue never disagree. The server queues every such topic; the board reads again.
+  const [swept, setSwept] = useState<string | null>(null)
+  const unqueued = useMemo(
+    () => (automationEnabled && strategy.data && strategy.queue
+      ? approvedNotQueued({ topics: strategy.data.topics, articles: strategy.data.articles, queue: strategy.queue })
+      : []),
+    [automationEnabled, strategy.data, strategy.queue],
+  )
+  useEffect(() => {
+    if (!projectId || unqueued.length === 0 || swept === projectId) return
+    setSwept(projectId)
+    void (async () => {
+      try {
+        const res = await fetch(STRATEGY_SCHEDULE_ENDPOINTS.schedule, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
+        })
+        const r = readScheduleAnswer(res.ok, await res.json().catch(() => null))
+        if (r) { onScheduled(r); reloadStrategy() }
+      } catch { /* the next visit tries again */ }
+    })()
+  }, [projectId, unqueued, swept, onScheduled, reloadStrategy])
+
+  // The first article: being written (read again until it is ready), ready, or stopped.
+  const startingNow = !!starting && starting.projectId === projectId && Date.now() - starting.at < 6 * 60_000
+  const first = useMemo(
+    () => firstArticleView({ articles: strategy.data?.articles ?? [], queue: strategy.queue, starting: startingNow }),
+    [strategy.data, strategy.queue, startingNow],
+  )
+  useEffect(() => {
+    if (first.kind !== 'writing') return
+    const id = window.setInterval(reloadStrategy, 8_000)
+    return () => window.clearInterval(id)
+  }, [first.kind, reloadStrategy])
+  // Once it is written, the workspace's article list follows.
+  const firstKind = first.kind
+  useEffect(() => {
+    if (firstKind === 'ready') { setStarting(null); void load() }
+  }, [firstKind, load])
+
+  const platform = data?.platform
+  const hasSite = data ? hasPublishingSite(platform?.platform, { shopifyNeedsScope: platform?.shopifyNeedsScope }) : null
+  const [publishing, setPublishing] = useState(false)
+  const publishFirst = useCallback(async () => {
+    if (first.kind !== 'ready' || publishing) return
+    setPublishing(true)
+    try {
+      const res = await fetch(STRATEGY_SCHEDULE_ENDPOINTS.publishFirst, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, itemId: first.itemId }),
+      })
+      const outcome = readPublishFirstAnswer(res.ok, await res.json().catch(() => null))
+      if (outcome === 'published') toast.success(s.first.published)
+      else toast.error(outcome === 'no_site' ? s.first.noSite : s.first.publishError)
+    } catch {
+      toast.error(s.first.publishError)
+    } finally {
+      setPublishing(false)
+      reloadStrategy()
+      void load()
+    }
+  }, [first, publishing, projectId, toast, s, reloadStrategy, load])
   const nextIdea = useMemo(() => {
     const card = board?.next?.cardKey ? board.cards.find((c) => c.key === board.next!.cardKey) : undefined
     return card ? ideaTargetFromCard(card) : null
@@ -276,6 +349,13 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           onCreateTopic={createTopic}
           onGenerated={() => { void load(); void loadTopics() }}
           onError={(text) => toast.error(text)}
+          automation={automationEnabled}
+          first={first}
+          queuePaused={strategy.queueActive === false}
+          hasSite={hasSite}
+          connectHref={platformSetupHref(projectId)}
+          publishing={publishing}
+          onPublishFirst={() => void publishFirst()}
         />
       ) : strategy.status === 'error' ? (
         <Card className="flex flex-wrap items-center justify-between gap-3">

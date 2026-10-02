@@ -23,7 +23,7 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
     automationRefresh, setAutomationRefresh, ideasSuccessSignal, linkPlanSavedHint, ctaScrollSignal,
     setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, setPlanStatus,
     handleScheduled, handleTopicsQueued, handleReviewLinks,
-    setEditingTopic, setBriefOpen,
+    setEditingTopic, setBriefOpen, data,
   } = useContentWorkspace()
 
   return (
@@ -81,6 +81,7 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
         <div ref={scheduleSectionRef} className="scroll-mt-4">
           <AutomationSchedule
             projectId={projectId}
+            articles={data?.articles}
             language={language}
             refreshKey={automationRefresh}
             onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}

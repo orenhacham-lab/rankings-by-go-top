@@ -74,9 +74,11 @@ function main() {
     }
     check('C3: it runs only from the button\'s click handler, never on its own', behindClick(card))
     check('C3-MUT: a card that writes on mount fails C3', !behindClick(card.replace("import { useState } from 'react'", "import { useEffect, useState } from 'react'") + '\nuseEffect(() => { void writeFirst() }, [])'))
-    const firstOnly = (s: string) => /\{!hasArticles && \(/.test(s) && /onClick=\{writeFirst\}/.test(s.slice(s.indexOf('{!hasArticles && (')))
-    check('C4: "write the first article" is offered only before the project has an article (decision 6)', firstOnly(card))
-    check('C4-MUT: offering it always fails C4', !firstOnly(card.replace('{!hasArticles && (', '{(')))
+    // w13: with automation the first approval writes the first article (approve-schedules.qa.ts),
+    // so the manual "write the first article" remains only without automation.
+    const firstOnly = (s: string) => /\{!hasArticles && !automation && \(/.test(s) && /onClick=\{writeFirst\}/.test(s.slice(s.indexOf('{!hasArticles && !automation && (')))
+    check('C4: "write the first article" is offered only before the project has an article, and only without automation', firstOnly(card))
+    check('C4-MUT: offering it always fails C4', !firstOnly(card.replace('{!hasArticles && !automation && (', '{(')))
     const ideaThroughBrief = (s: string) => /if \(!next\.topicId\) \{\s*onOpenBrief\(/.test(s)
     check('C5: an idea that is not a topic yet goes through the existing brief, so nothing is spent unconfirmed', ideaThroughBrief(card))
     check('C5-MUT: generating straight from an idea fails C5', !ideaThroughBrief(card.replace('onOpenBrief({ topic: next.title', 'void ({ topic: next.title')))
