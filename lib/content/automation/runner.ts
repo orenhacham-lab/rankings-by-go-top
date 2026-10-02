@@ -13,7 +13,8 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
-import { advanceNextPublishAt, nextPublishAtWeekdays, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { advanceNextPublishAt, nextPublishAtWeekdays, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { readUsageAllowance } from '@/lib/billing/usage-allowance'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -96,6 +97,23 @@ async function recoverStaleLocks(admin: Admin, projectId: string | undefined, cu
         .eq('id', it.id).eq('status', 'generating').lt('locked_at', cutoffIso)
     }
     summary.staleRecovered++
+  }
+}
+
+/**
+ * The account's article allowance for the cycle, read from the ledger that
+ * enforces it. Null whenever it is not a known, periodic limit (admin, trial
+ * lifetime, unreadable) or the read fails: the caller then keeps the cadence.
+ */
+async function articleAllowanceForProject(admin: Admin, projectId: string): Promise<{ periodEnd: string; remaining: number } | null> {
+  try {
+    const { data } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
+    const userId = (data as { user_id?: string | null } | null)?.user_id
+    if (!userId) return null
+    const a = await readUsageAllowance(admin as never, { userId, usageType: 'article', limitFor: (l) => l.maxArticlesPerPeriodAccountWide })
+    return a.state === 'known' && a.periodEnd ? { periodEnd: a.periodEnd, remaining: a.remaining } : null
+  } catch {
+    return null
   }
 }
 
@@ -252,9 +270,22 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
             summary.published++
             // (F) Advance next slot only on a successful publish.
             const days = Array.isArray(pool.publish_days) ? pool.publish_days : []
-            const nextIso = days.length
+            const cadenceNextIso = days.length
               ? nextPublishAtWeekdays(publishTime, tz, days, nowMs)
               : advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
+            // The plan's articles are spread over what is left of the billing
+            // cycle (read only; nothing about the allowance changes). Unknown,
+            // unmetered or a trial without a period: the cadence's slot, as before.
+            const allowance = await articleAllowanceForProject(admin, pool.project_id)
+            const nextIso = allowance
+              ? spreadNextPublishAt({
+                cadenceNextIso, nowMs, periodEndIso: allowance.periodEnd, remaining: allowance.remaining,
+                ready: await countItems(admin, pool.id, 'generated'),
+                slotAfter: (fromMs) => days.length
+                  ? nextPublishAtWeekdays(publishTime, tz, days, fromMs)
+                  : advanceNextPublishAt(cadenceNextIso, tz, publishTime, intervalDays, fromMs),
+              })
+              : cadenceNextIso
             await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
             diag.nextPublishAtAfter = nextIso
             summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
