@@ -25,6 +25,7 @@ import { PLAN_CATALOG } from '@/lib/plans/catalog'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { readPublishRhythm } from '@/lib/content/automation/plan-rhythm'
 import { runAutomation } from '@/lib/content/automation/runner'
+import { topUpTarget } from '@/lib/content/automation/topic-topup'
 import type { createAdminClient } from '@/lib/supabase/admin'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -168,6 +169,11 @@ async function runner() {
   const s4 = await quiet(() => runAutomation(tue as unknown as Admin, { nowMs: Date.parse('2026-10-06T06:05:00Z') + H }))
   check('G5: on the plan\'s Tuesday the runner publishes', s4.diagnostics[0]?.publishAttempted === true, s4.diagnostics[0])
 }
+
+// I) the topic top-up feeds the queue at the plan's rhythm, not the owner's old choice
+const wk = { id: 'p', cadence: 'weekly', interval_days: 7, publish_days: [0] }
+check('I1: Advanced with an old weekly pool: topics for the plan rhythm (12), not 5', topUpTarget({ monthlyArticles: 12, ownerProjects: 1, pool: wk, planRhythm: { activeQueues: 1 } }) === 12 && topUpTarget({ monthlyArticles: 12, ownerProjects: 1, pool: wk }) === 5)
+check('I2: Basic stays 4; shared queues get their share', topUpTarget({ monthlyArticles: 4, ownerProjects: 1, pool: wk, planRhythm: { activeQueues: 1 } }) === 4 && topUpTarget({ monthlyArticles: 50, ownerProjects: 2, pool: wk, planRhythm: { activeQueues: 2 } }) === 12)
 
 // H) source: one slot function everywhere, the screen copy in he + en
 const root = join(__dirname, '..', '..', '..', '..')
