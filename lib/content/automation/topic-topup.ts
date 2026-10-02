@@ -55,7 +55,8 @@ import { randomUUID } from 'crypto'
 import type { createAdminClient, ServiceRoleClient } from '@/lib/supabase/admin'
 import { getUserEntitlement } from '@/lib/subscription'
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
-import { resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
+import { articlesPerWeekFor, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
+import { isPlanCode } from '@/lib/plans/catalog'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { insertPendingIdeas } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
@@ -107,11 +108,18 @@ export function poolMonthlyRate(pool: PoolLite): number {
  * are account-wide: a project with a pool needs what the pool publishes (the plan caps
  * it anyway); a project without one gets its share of the plan.
  */
-export function topUpTarget(input: { monthlyArticles: number; ownerProjects: number; pool: PoolLite | null }): number {
+export function topUpTarget(input: {
+  monthlyArticles: number; ownerProjects: number; pool: PoolLite | null
+  /** A paid plan sets the pool's rhythm (monthly ÷ 4 a week, shared by the owner's active queues). */
+  planRhythm?: { activeQueues: number } | null
+}): number {
   const monthly = Math.max(0, Math.floor(input.monthlyArticles))
   if (monthly === 0) return 0
+  const poolRate = input.pool && input.planRhythm
+    ? Math.ceil((articlesPerWeekFor(monthly, input.planRhythm.activeQueues) * 30) / 7)
+    : input.pool ? poolMonthlyRate(input.pool) : 0
   const raw = input.pool
-    ? Math.min(poolMonthlyRate(input.pool), monthly)
+    ? Math.min(poolRate, monthly)
     : Math.ceil(monthly / Math.max(1, input.ownerProjects))
   return Math.max(1, Math.min(PER_PROJECT_TARGET_CAP, raw))
 }
@@ -129,7 +137,7 @@ export interface GeneratedIdeas { suggestions: TopicSuggestion[]; modelUsed: str
 export interface TopUpDeps {
   now: () => number
   /** The existing entitlement, read only. Entitled = an admin or an active paid plan. */
-  entitlement: (userId: string) => Promise<{ entitled: boolean; monthlyArticles: number }>
+  entitlement: (userId: string) => Promise<{ entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>
   /** The existing AI-generation gate, asked before any model call. */
   modelAllowed: (userId: string) => Promise<boolean>
   loadIndex: (scope: { projectId: string; userId: string }) => Promise<OverlapIndex>
@@ -158,7 +166,10 @@ function defaultDeps(admin: Admin): TopUpDeps {
     now: () => Date.now(),
     entitlement: async (userId) => {
       const e = await getUserEntitlement(userId, admin as ServiceRoleClient)
-      return { entitled: e.isAdmin || e.hasActiveSubscription, monthlyArticles: e.limits.maxArticlesPerPeriodAccountWide }
+      return {
+        entitled: e.isAdmin || e.hasActiveSubscription, monthlyArticles: e.limits.maxArticlesPerPeriodAccountWide,
+        planRhythm: !e.isAdmin && isPlanCode(e.plan) && e.limits.maxArticlesPerPeriodAccountWide > 0,
+      }
     },
     modelAllowed: async (userId) => (await assertContentGenerationAllowedForUser(admin, userId)).allowed,
     loadIndex: (scope) => loadOverlapIndex(admin, scope, { gsc: isGscReadOnlyEnabled() }),
@@ -319,7 +330,9 @@ export async function runTopicTopUp(
 
   const ownerProjects = new Map<string, number>()
   for (const p of projects) ownerProjects.set(p.user_id, (ownerProjects.get(p.user_id) ?? 0) + 1)
-  const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number }>()
+  const activeQueues = new Map<string, number>()
+  for (const p of (poolRows ?? []) as PoolRow[]) activeQueues.set(p.user_id, (activeQueues.get(p.user_id) ?? 0) + 1)
+  const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>()
   const stillShort: { project: ProjectRow; pool: PoolRow | null; target: number; index: OverlapIndex }[] = []
 
   // Projects with an active pool first: an empty queue stops publishing.
@@ -337,7 +350,10 @@ export async function runTopicTopUp(
       if (!ent.entitled) { summary.notEntitled++; continue }
       const pool = poolByProject.get(project.id) ?? null
       if (pool && pool.user_id !== project.user_id) continue // a pool must be its project owner's
-      const target = topUpTarget({ monthlyArticles: ent.monthlyArticles, ownerProjects: ownerProjects.get(project.user_id) ?? 1, pool })
+      const target = topUpTarget({
+        monthlyArticles: ent.monthlyArticles, ownerProjects: ownerProjects.get(project.user_id) ?? 1, pool,
+        planRhythm: ent.planRhythm ? { activeQueues: activeQueues.get(project.user_id) ?? 1 } : null,
+      })
       if (target === 0 || (await countSupply(admin, scope, pool)) >= target) { summary.enough++; continue }
       const index = await deps.loadIndex(scope)
       const missing = await refillFromIdeas(admin, deps, scope, project, pool, target, index, summary, { deadlineAt: options.deadlineAt - MIN_MS_FOR_PROJECT })
