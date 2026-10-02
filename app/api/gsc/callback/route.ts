@@ -6,16 +6,19 @@
  *
  * Never logs codes/tokens. Never returns tokens to the browser.
  */
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse, after, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { consumeOAuthState } from '@/lib/gsc/state-store'
 import { exchangeCodeForTokens, GscOAuthError, GSC_RETURN_COOKIE } from '@/lib/gsc/oauth'
 import { storeConnectionFromTokens, GscServiceError } from '@/lib/gsc/service'
+import { startBackgroundGscSync } from '@/lib/gsc/background-sync'
 import { SETTINGS_GSC_ANCHOR } from '@/lib/content/content-hub-setup'
 
 export const runtime = 'nodejs'
+// The first sync runs in after(), which lives inside this function's duration.
+export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   const origin = new URL(request.url).origin
@@ -74,6 +77,15 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     const codeStr = e instanceof GscServiceError && e.code === 'no_refresh_token' ? 'no_refresh_token' : 'connection_store_failed'
     return back(projectId, { gsc_error: codeStr })
+  }
+
+  // Connected: link the matching property and run the first sync on the server, after the
+  // redirect has been sent (not awaited, so the redirect is not delayed, and it keeps going
+  // if the user leaves the page). The user's project is re-checked inside; a second trigger
+  // (a pick, the button, a reconnect) never runs a second sync at the same time.
+  if (projectId) {
+    const userId = user.id
+    after(() => startBackgroundGscSync({ admin: createAdminClient(), userId, projectId, autoAssign: true }))
   }
 
   return back(projectId, { gsc: 'connected' })

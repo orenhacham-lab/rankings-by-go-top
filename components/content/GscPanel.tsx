@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Search as SearchIcon, X } from 'lucide-react'
+import { Loader2, Search as SearchIcon, X } from 'lucide-react'
 import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Card } from '@/components/ui/Card'
@@ -39,7 +39,7 @@ interface SanitizedConnection { id: string; status: ConnStatus; grantedScope: st
 interface AssignedProperty { siteUrl: string; permissionLevel: string | null; selectedAt: string }
 // The read-only metrics view (windows summary + table) lives in GscMetricsTable now.
 // `windows` is still read here for Area A's last-sync / next-eligible derivation.
-interface StatusResponse { ok: boolean; oauthConfigured: boolean; /** Server says the viewer is an administrator and may read why. */ opsDetail?: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null> }
+interface StatusResponse { ok: boolean; oauthConfigured: boolean; /** Server says the viewer is an administrator and may read why. */ opsDetail?: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null>; /** A sync running now / the latest one's failure (code only). */ sync?: { running: boolean; lastFailure: { code: string; at: string | null } | null } | null }
 
 interface PropertyView { siteUrl: string; permissionLevel: string; kind: 'domain' | 'url_prefix'; covers: boolean; assignable: boolean }
 
@@ -87,6 +87,12 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   const [properties, setProperties] = useState<PropertyView[] | null>(null)
   const [loadingProps, setLoadingProps] = useState(false)
   const [assigning, setAssigning] = useState<string | null>(null)
+  // The sync starts by itself on the server once a property is linked (after connecting, or
+  // after choosing one). While we are waiting for it to show up, the screen polls the status.
+  const [awaitingAuto, setAwaitingAuto] = useState(false)
+  const waitStart = useRef(0)
+  const wasRunning = useRef(false)
+  const beginAwaiting = useCallback(() => { waitStart.current = Date.now(); setAwaitingAuto(true) }, [])
   // Bumped after a sync / property change to force GscMetricsTable to re-fetch.
   const [dataRefresh, setDataRefresh] = useState(0)
 
@@ -116,7 +122,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     const sp = new URLSearchParams(window.location.search)
     const ok = sp.get('gsc')
     const err = sp.get('gsc_error')
-    if (ok === 'connected') setMessage({ text: t.statusConnected, ok: true })
+    if (ok === 'connected') { setMessage({ text: t.statusConnected, ok: true }); beginAwaiting() }
     else if (err) setMessage({ text: errText(err), ok: false })
     if (ok || err) {
       sp.delete('gsc'); sp.delete('gsc_error')
@@ -144,6 +150,42 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     () => (lastSyncedAt ? new Date(Date.parse(lastSyncedAt) + AUTO_SYNC_MIN_INTERVAL_DAYS * 24 * 60 * 60 * 1000).toISOString() : null),
     [lastSyncedAt],
   )
+
+  const sync = status?.sync ?? null
+  const syncFailure = sync?.lastFailure && (!lastSyncedAt || (sync.lastFailure.at && Date.parse(sync.lastFailure.at) > Date.parse(lastSyncedAt))) ? sync.lastFailure : null
+  // Shown while the server runs a sync, or while the one that starts by itself has not
+  // produced anything yet (it begins a moment after the property is linked).
+  const syncRunning = !!sync?.running || (awaitingAuto && !!property && !lastSyncedAt && !syncFailure)
+  const autoLinking = awaitingAuto && !!status && !property
+
+  // Poll the status while a sync is running or expected, until it shows data or fails.
+  useEffect(() => {
+    if (!sync?.running && !awaitingAuto) return
+    const id = window.setInterval(() => {
+      if (!sync?.running && Date.now() - waitStart.current > 120_000) { setAwaitingAuto(false); return }
+      void loadStatus(true)
+    }, 3000)
+    return () => window.clearInterval(id)
+  }, [sync?.running, awaitingAuto, loadStatus])
+
+  // A sync that was running has finished: show its data (or its failure, below).
+  useEffect(() => {
+    if (sync?.running) { wasRunning.current = true; return }
+    if (wasRunning.current && sync) {
+      wasRunning.current = false
+      setAwaitingAuto(false)
+      setDataRefresh((k) => k + 1)
+      if (!sync.lastFailure) setMessage({ text: t.autoSyncDone, ok: true })
+    }
+  }, [sync, t])
+
+  // Stop waiting once there is something to show (data or a failure), or when no property
+  // could be linked on its own (the user then chooses one, which starts the sync).
+  useEffect(() => {
+    if (!awaitingAuto || !status || sync?.running) return
+    if (property && (lastSyncedAt || syncFailure)) { setAwaitingAuto(false); setDataRefresh((k) => k + 1); return }
+    if (!property && Date.now() - waitStart.current > 20_000) setAwaitingAuto(false)
+  }, [awaitingAuto, status, property, sync, lastSyncedAt, syncFailure])
 
   async function handleConnect() {
     setConnecting(true); setMessage(null)
@@ -175,7 +217,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     try {
       const res = await fetch('/api/gsc/property', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, siteUrl: view.siteUrl }) })
       const data = await res.json()
-      if (data.ok) { setPickerOpen(false); await loadStatus(); setDataRefresh((k) => k + 1) }
+      if (data.ok) { setPickerOpen(false); beginAwaiting(); await loadStatus(); setDataRefresh((k) => k + 1) }
       else setMessage({ text: errText(data.error), ok: false })
     } catch { setMessage({ text: t.genericError, ok: false }) } finally { setAssigning(null) }
   }
@@ -334,6 +376,11 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                 </ul>
               )}
             </div>
+          ) : !property && autoLinking ? (
+            <div role="status" aria-live="polite" data-gsc-autosync="linking" className="flex items-center justify-center gap-2 rounded-inset border border-line p-4 text-copy text-body">
+              <Loader2 className="size-4 text-action motion-safe:animate-spin" aria-hidden="true" />
+              {t.autoLinking}
+            </div>
           ) : !property ? (
             <div className="rounded-inset border border-line p-4 text-center">
               <p className="mb-3 text-copy text-body">{t.noPropertyAssigned}</p>
@@ -345,7 +392,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                 <span className="text-caption text-muted">{t.assignedProperty}:</span>
                 <span className="min-w-0 max-w-full truncate text-copy font-medium text-ink" dir="ltr" title={property.siteUrl}>{property.siteUrl}</span>
                 <div className="ms-auto flex flex-wrap items-center gap-2">
-                  <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
+                  <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || syncRunning || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
                   <Button size="sm" variant="ghost" onClick={openPicker}>{t.changeProperty}</Button>
                   <Button size="sm" variant="ghost" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-bad hover:bg-bad-soft hover:text-bad">
                     {unassigning ? t.unassigning : t.unassignProperty}
@@ -364,6 +411,12 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                 )}
               </div>
               {nextEligibleSyncAt && <p className="mt-1 text-caption text-muted">{t.nextAutoSyncHint}</p>}
+              {syncRunning && (
+                <div role="status" aria-live="polite" data-gsc-autosync="running" className="mt-3 flex items-center gap-2 rounded-control bg-action-soft px-3 py-2 text-copy font-medium text-action">
+                  <Loader2 className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+                  {t.autoSyncRunning}
+                </div>
+              )}
             </div>
           )}
 
@@ -373,10 +426,17 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
             </Notice>
           )}
 
-          {/* Diagnostics — the read-only SC data view (shared GscMetricsTable). */}
-          {property && !pickerOpen && (
-            <GscMetricsTable projectId={projectId} refreshKey={dataRefresh} />
+          {syncFailure && !syncRunning && (
+            <Notice tone="bad"><span data-gsc-autosync="failed">{(t.errors as Record<string, string>)[syncFailure.code] ?? t.autoSyncFailed}</span></Notice>
           )}
+
+          {/* Diagnostics — the read-only SC data view (shared GscMetricsTable). While the
+              first sync is still running there is nothing to read yet: a skeleton, then the data. */}
+          {property && !pickerOpen && (syncRunning && !lastSyncedAt ? (
+            <div aria-busy="true" data-gsc-autosync="skeleton" className="space-y-2"><Skeleton className="h-20 w-full rounded-inset" /><Skeleton className="h-40 w-full rounded-inset" /></div>
+          ) : (
+            <GscMetricsTable projectId={projectId} refreshKey={dataRefresh} />
+          ))}
         </div>
       )}
       {confirmDialog}
