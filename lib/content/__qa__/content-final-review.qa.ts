@@ -72,9 +72,9 @@ guard('destructive confirms are danger-toned (article delete, image remove, idea
 
 console.log('\nR1) one primary per region')
 {
-  guard('StrategyBoard / list: "approve" on each card is a small secondary', src('components/content-strategy/StrategyBoard.tsx'),
-    (s) => /<Button size="sm" variant="secondary" onClick=\{\(\) => void act\.actions\.approve\(target\)\}/.test(s),
-    (s) => s.replace('<Button size="sm" variant="secondary" onClick={() => void act.actions.approve(target)}', '<Button size="sm" onClick={() => void act.actions.approve(target)}'))
+  guard('StrategyBoard / list: "approve" on each card is the small dark-blue primary (wave 10)', src('components/content-strategy/StrategyBoard.tsx'),
+    (s) => /<Button size="sm" variant="primary" onClick=\{\(\) => void act\.actions\.approve\(target\)\}/.test(s),
+    (s) => s.replace('<Button size="sm" variant="primary" onClick={() => void act.actions.approve(target)}', '<Button size="sm" onClick={() => void act.actions.approve(target)}'))
   guard('ArticleTopBar steps back to secondary while the article is being edited', src('components/content/ArticleTopBar.tsx'),
     (s) => /quiet\?: boolean/.test(s) && /const ctaVariant = quiet \? 'secondary'/.test(s) && (s.match(/variant=\{ctaVariant\}|linkButton\(ctaVariant\)/g) ?? []).length >= 5,
     (s) => s.replace(/variant=\{ctaVariant\}/g, ''))

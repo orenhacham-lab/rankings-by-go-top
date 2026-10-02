@@ -163,7 +163,7 @@ async function main() {
     const all = rows.allWaitingRows('p1', w, 4)
     check('D1: the bell lists every waiting row (the card stops at three)', all.map((r) => r.kind).join() === 'connection,articles,topics,fixes' && rows.waitingRows('p1', w, 4).length === 3)
     check('D2: the badge counts each thing to do; a lost connection is one', rows.bellCount(all) === 1 + 3 + 12 + 4 && rows.bellCount([]) === 0)
-    const mutCount = await withMutant<any, number>('lib/nudges/rows.ts', [["(r.kind === 'connection' ? 1 : Math.max(0, r.n))", '1']], (m) => m.bellCount(m.allWaitingRows('p1', w, 4)))
+    const mutCount = await withMutant<any, number>('lib/nudges/rows.ts', [["(r.kind === 'connection' || r.kind === 'site' || r.kind === 'gsc' ? 1 : Math.max(0, r.n))", '1']], (m) => m.bellCount(m.allWaitingRows('p1', w, 4)))
     check('D2-MUT: a badge that counts rows instead of things → caught', mutCount !== 20)
     const bar = strip(read('components/layout/TopBarActions.tsx'))
     const barOk = (s: string) => /useWaiting\(activeProjectId, pathname\)/.test(s) && /allWaitingRows\(activeProjectId, waiting, safeFixes\)/.test(s)

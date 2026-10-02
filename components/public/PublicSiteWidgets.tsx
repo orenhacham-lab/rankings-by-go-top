@@ -71,7 +71,7 @@ export function shouldRenderPublicWidgets(isAuthenticated: boolean, pathname: st
 
 export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname()
-  const [cookieOpen, setCookieOpen] = useState(false)
+  const [, setCookieOpen] = useState(false)
 
   if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
     return null

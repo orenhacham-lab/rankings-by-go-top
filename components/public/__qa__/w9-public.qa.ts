@@ -130,7 +130,7 @@ function main() {
     const logicOk = (s: string) => /localStorage\.getItem\('cookie-consent-accepted'\)/.test(s) && /localStorage\.setItem\('cookie-consent-accepted', 'true'\)/.test(s) && /catch \{ \/\* storage blocked: ask again \*\/ \}/.test(s)
     check('E1: the same key, read and written exactly as before (and asked again when storage is blocked)', logicOk(read('components/CookieConsent.tsx')))
     check('MUT: another storage key fails E1', !logicOk(read('components/CookieConsent.tsx').replace("localStorage.setItem('cookie-consent-accepted'", "localStorage.setItem('cookies'")))
-    check('E2: the popup is at the left in both languages (physical left-*, no start/end)', /left-6/.test(c) && /left-3\.5/.test(c) && !/\b(?:start|end)-\d/.test(c))
+    check('E2: the popup is at the left in both languages (physical left-*, no start/end)', /left-24/.test(c) && /left-3\.5/.test(c) && !/\b(?:start|end)-\d/.test(c))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
