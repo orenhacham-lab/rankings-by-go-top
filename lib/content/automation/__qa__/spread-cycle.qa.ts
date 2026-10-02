@@ -81,10 +81,13 @@ check('C3: a slot already past the cycle end is kept', spreadNextPublishAt({ cad
 const root = join(__dirname, '..', '..', '..', '..')
 const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
 const runner = strip(readFileSync(join(root, 'lib/content/automation/runner.ts'), 'utf8'))
-check('D1: the runner spreads the slot after a publish, falling back to the cadence', /const allowance = await articleAllowanceForProject\(admin, pool\.project_id\)/.test(runner) && /const nextIso = allowance\s*\?\s*spreadNextPublishAt\(\{[\s\S]*?\}\)\s*:\s*cadenceNextIso/.test(runner))
-check('D2: it reads the article allowance against the plan\'s own limit', /usageType: 'article', limitFor: \(l\) => l\.maxArticlesPerPeriodAccountWide/.test(runner) && /a\.state === 'known' && a\.periodEnd/.test(runner))
-check('D3: the runner writes no billing table', !/from\('(usage_reservations|subscriptions|billing_periods|plans|profiles)'\)\s*\.(insert|update|upsert|delete)/.test(runner))
-check('D4: a failed allowance read keeps the cadence', /catch\s*\{\s*return null\s*\}/.test(runner.slice(runner.indexOf('async function articleAllowanceForProject'))))
+// Wave 11: the allowance read moved to plan-rhythm.ts (shared by the runner, the
+// pool routes and the screen); the runner still spreads every next slot.
+const rhythmSrc = strip(readFileSync(join(root, 'lib/content/automation/plan-rhythm.ts'), 'utf8'))
+check('D1: the runner spreads the slot after a publish, falling back to the cadence', /const rhythm = await readPublishRhythmForProject\(admin, pool\.project_id\)/.test(runner) && /return rhythm\.allowance\s*\?\s*spreadNextPublishAt\(\{[\s\S]*?\}\)\s*:\s*cadenceNextIso/.test(runner) && /if \(res\.status === 'published'\) \{[\s\S]*?const nextIso = await nextSlotAfter\(nowMs\)/.test(runner))
+check('D2: it reads the article allowance against the plan\'s own limit', /usageType: 'article', limitFor: \(l\) => l\.maxArticlesPerPeriodAccountWide/.test(rhythmSrc) && /a\.state !== 'known'/.test(rhythmSrc) && /a\.periodEnd \?/.test(rhythmSrc))
+check('D3: the runner writes no billing table', !/from\('(usage_reservations|subscriptions|billing_periods|plans|profiles)'\)\s*\.(insert|update|upsert|delete)/.test(runner + rhythmSrc))
+check('D4: a failed allowance read keeps the cadence', /catch\s*\{\s*return NO_RHYTHM\s*\}/.test(rhythmSrc.slice(rhythmSrc.indexOf('export async function readPublishRhythm('))))
 
 console.log('twice a week:', twiceOld.join(' '), '=>', twice.join(' '), '| weekly, five Sundays:', weeklyNov.join(' '))
 console.log(`${passed} passed, ${failed} failed`)

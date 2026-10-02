@@ -13,8 +13,8 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
-import { advanceNextPublishAt, nextPublishAtWeekdays, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
-import { readUsageAllowance } from '@/lib/billing/usage-allowance'
+import { localWeekday, isNoPublishWeekday, makeSlotAfter, slotFitsRhythm, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { readPublishRhythmForProject } from '@/lib/content/automation/plan-rhythm'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -100,23 +100,6 @@ async function recoverStaleLocks(admin: Admin, projectId: string | undefined, cu
   }
 }
 
-/**
- * The account's article allowance for the cycle, read from the ledger that
- * enforces it. Null whenever it is not a known, periodic limit (admin, trial
- * lifetime, unreadable) or the read fails: the caller then keeps the cadence.
- */
-async function articleAllowanceForProject(admin: Admin, projectId: string): Promise<{ periodEnd: string; remaining: number } | null> {
-  try {
-    const { data } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
-    const userId = (data as { user_id?: string | null } | null)?.user_id
-    if (!userId) return null
-    const a = await readUsageAllowance(admin as never, { userId, usageType: 'article', limitFor: (l) => l.maxArticlesPerPeriodAccountWide })
-    return a.state === 'known' && a.periodEnd ? { periodEnd: a.periodEnd, remaining: a.remaining } : null
-  } catch {
-    return null
-  }
-}
-
 async function countItems(admin: Admin, poolId: string, status: string): Promise<number> {
   const { count } = await admin.from('article_pool_items').select('id', { count: 'exact', head: true }).eq('pool_id', poolId).eq('status', status)
   return count ?? 0
@@ -174,11 +157,11 @@ async function pickForPublish(admin: Admin, poolId: string): Promise<PickedItem 
   return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
 }
 
-export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean } = {}): Promise<AutomationSummary> {
+export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean; nowMs?: number } = {}): Promise<AutomationSummary> {
   const started = Date.now()
   const dryRun = opts.dryRun === true
   const summary: AutomationSummary = { poolsChecked: 0, staleRecovered: 0, generated: 0, published: 0, skipped: 0, failures: 0, durationMs: 0, dryRun, details: [], diagnostics: [] }
-  const nowMs = Date.now()
+  const nowMs = opts.nowMs ?? Date.now()
   const cutoffIso = new Date(nowMs - STALE_LOCK_MS).toISOString()
 
   if (!dryRun) await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
@@ -263,36 +246,48 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
       if (due) {
         const gen = await pickForPublish(admin, pool.id)
         if (gen) {
-          diag.publishAttempted = true
-          const res = await publishPoolItem(admin, gen.id)
-          diag.publishResult = res.status + (res.reason ? ` (${res.reason})` : '')
-          if (res.status === 'published') {
-            summary.published++
-            // (F) Advance next slot only on a successful publish.
-            const days = Array.isArray(pool.publish_days) ? pool.publish_days : []
-            const cadenceNextIso = days.length
-              ? nextPublishAtWeekdays(publishTime, tz, days, nowMs)
-              : advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
-            // The plan's articles are spread over what is left of the billing
-            // cycle (read only; nothing about the allowance changes). Unknown,
-            // unmetered or a trial without a period: the cadence's slot, as before.
-            const allowance = await articleAllowanceForProject(admin, pool.project_id)
-            const nextIso = allowance
+          // The plan decides the rhythm (read only); an admin, a trial or an
+          // unreadable allowance keeps the owner's schedule. The next slot is
+          // spread over what is left of the billing cycle when that is known.
+          const rhythm = await readPublishRhythmForProject(admin, pool.project_id)
+          const perDay = rhythm.plan?.perDay ?? null
+          const slotAfter = makeSlotAfter({ publishTime, timeZone: tz, perDay, publishDays: pool.publish_days, intervalDays, anchorIso: pool.next_publish_at })
+          const nextSlotAfter = async (fromMs: number) => {
+            const cadenceNextIso = slotAfter(fromMs)
+            return rhythm.allowance
               ? spreadNextPublishAt({
-                cadenceNextIso, nowMs, periodEndIso: allowance.periodEnd, remaining: allowance.remaining,
-                ready: await countItems(admin, pool.id, 'generated'),
-                slotAfter: (fromMs) => days.length
-                  ? nextPublishAtWeekdays(publishTime, tz, days, fromMs)
-                  : advanceNextPublishAt(cadenceNextIso, tz, publishTime, intervalDays, fromMs),
+                cadenceNextIso, nowMs: fromMs, periodEndIso: rhythm.allowance.periodEnd, remaining: rhythm.allowance.remaining,
+                ready: await countItems(admin, pool.id, 'generated'), slotAfter,
               })
               : cadenceNextIso
+          }
+          // Never on Friday or Saturday (a late Thursday slot included), and a
+          // slot stored before the plan decided the rhythm is moved, not used.
+          const hold = isNoPublishWeekday(localWeekday(nowMs, tz)) ? 'held_no_publish_day'
+            : !slotFitsRhythm(pool.next_publish_at, tz, perDay) ? 'held_realigned_to_plan_rhythm' : null
+          if (hold) {
+            const nextIso = await nextSlotAfter(nowMs)
             await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
             diag.nextPublishAtAfter = nextIso
-            summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
+            diag.note = hold
+            summary.skipped++
+            summary.details.push(`pool ${pool.id}: ${hold} → next ${nextIso}`)
           } else {
-            // (E/H) Do NOT advance; leave failed/quality_check_failed for manual retry.
-            summary.failures++; diag.error = res.reason ?? res.status
-            summary.details.push(`pool ${pool.id}: publish ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
+            diag.publishAttempted = true
+            const res = await publishPoolItem(admin, gen.id)
+            diag.publishResult = res.status + (res.reason ? ` (${res.reason})` : '')
+            if (res.status === 'published') {
+              summary.published++
+              // (F) Advance next slot only on a successful publish.
+              const nextIso = await nextSlotAfter(nowMs)
+              await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
+              diag.nextPublishAtAfter = nextIso
+              summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
+            } else {
+              // (E/H) Do NOT advance; leave failed/quality_check_failed for manual retry.
+              summary.failures++; diag.error = res.reason ?? res.status
+              summary.details.push(`pool ${pool.id}: publish ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
+            }
           }
         } else {
           // Due but nothing generated (e.g. no queued items or generation failed).
