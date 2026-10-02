@@ -161,6 +161,8 @@ const MIN_SECOND_SEARCH_MS = 1_500
  */
 export const REFUSAL_STATUSES: readonly number[] = [401, 403, 406, 429, 503]
 export const MAX_COMPETITORS = 5
+/** How far down the ranking a4 offers domains to the project; the five-active cap still decides. */
+export const MAX_COMPETITOR_CANDIDATES = 12
 const MAX_RESULT_DOMAINS = 10
 
 // ── Dependencies ────────────────────────────────────────────────────────────
@@ -932,10 +934,19 @@ export function searchMarket(project: Pick<SeedProject, 'country' | 'language'>)
  *     itself or an obvious non-competitor (social, video, encyclopedias, the
  *     search engine);
  *   - suggestions first, then discoveries, each by how many searches showed
- *     them; at most MAX_COMPETITORS.
+ *     them;
+ *   - when that still leaves room, the best-placed domains of each search
+ *     fill it, one rank at a time across the searches (the top result of
+ *     every search, then the second…), under the same exclusions. The three
+ *     seed keywords are often different product lines, so few domains rank
+ *     for two of them: requiring two left real competitors (a store ranking
+ *     first for one line) out, and a scan mapped one competitor of five.
+ *     Every one of these still ranks for the business's own keyword: that
+ *     is the validation. No extra search is sent.
+ * At most `limit` (MAX_COMPETITORS by default).
  * A suggestion no search showed is dropped: it was never validated.
  */
-export function rankCompetitors(input: { candidates: string[]; results: string[][]; siteKey: string }): SeedCompetitor[] {
+export function rankCompetitors(input: { candidates: string[]; results: string[][]; siteKey: string; limit?: number }): SeedCompetitor[] {
   const isSelf = (d: string) => isDomainMatch(d, input.siteKey) || isDomainMatch(input.siteKey, d)
   const seenIn = (domain: string) => input.results.filter((list) => list.some((d) => isDomainMatch(d, domain))).length
 
@@ -963,7 +974,20 @@ export function rankCompetitors(input: { candidates: string[]; results: string[]
     .sort(([, a], [, b]) => b.lists - a.lists || a.bestRank - b.bestRank)
     .map(([domain, t]) => ({ domain, validated: true, seenIn: t.lists, source: 'search' as const }))
 
-  return [...suggested, ...discovered].slice(0, MAX_COMPETITORS)
+  const limit = input.limit ?? MAX_COMPETITORS
+  const picked = [...suggested, ...discovered]
+  const taken = (d: string) => picked.some((c) => isDomainMatch(d, c.domain) || isDomainMatch(c.domain, d))
+  const lists = input.results.map((list) => [...new Set(list)])
+  const depth = Math.max(0, ...lists.map((l) => l.length))
+  for (let rank = 0; rank < depth && picked.length < limit; rank++) {
+    for (const list of lists) {
+      if (picked.length >= limit) break
+      const d = list[rank]
+      if (!d || isSelf(d) || isNonCompetitor(d) || taken(d)) continue
+      picked.push({ domain: d, validated: true, seenIn: 1, source: 'search' })
+    }
+  }
+  return picked.slice(0, limit)
 }
 
 async function searchOnce(deps: StageADeps, query: string, market: { gl: string; hl: string }): Promise<SearchRecord> {
@@ -1010,13 +1034,17 @@ async function a4Search(ctx: StepContext): Promise<StepOutcome> {
   const answered = results.filter((r) => r.ok)
   if (answered.length === 0) return finished('failed', results[0]?.code ?? 'search_failed', ctx.summary, { detail })
 
-  const competitors = rankCompetitors({
+  // Ranked past the five shown, so a domain the owner already removed (never
+  // added again) or already lists does not take the room of the next one.
+  const ranked = rankCompetitors({
     candidates: insight?.competitors ?? [],
     results: answered.map((r) => r.domains),
     siteKey: ctx.summary.domain,
+    limit: MAX_COMPETITOR_CANDIDATES,
   })
+  const competitors = ranked.slice(0, MAX_COMPETITORS)
   const summary = withCounters({ ...ctx.summary, competitors })
-  const added = await (ctx.writes ?? PROJECT_WRITES).addCompetitors(ctx.admin, ctx.scope, competitors.map((c) => c.domain), ctx.deps.now())
+  const added = await (ctx.writes ?? PROJECT_WRITES).addCompetitors(ctx.admin, ctx.scope, ranked.map((c) => c.domain), ctx.deps.now())
   if (added === 'error') return finished('failed', 'competitors_write_failed', summary, { itemCount: competitors.length, detail })
   return finished('done', null, summary, { itemCount: competitors.length, detail: { ...detail, added } })
 }
