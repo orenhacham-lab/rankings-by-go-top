@@ -8,6 +8,8 @@
 import { clientIpFrom, hashClient } from '@/lib/free-check/store'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { handleReportRequest } from '@/lib/presignup/http'
+import { runAfterResponse } from '@/lib/notifications/after-response'
+import { notifyReportRequested } from '@/lib/notifications/operator-alerts'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
@@ -18,6 +20,8 @@ export async function POST(request: Request) {
     enabled: () => presignupResearchOn(process.env),
     admin: () => createAdminClient(),
     clientHash: (req) => hashClient(clientIpFrom(req.headers)),
+    afterSaved: ({ checkId, email, locale }) =>
+      runAfterResponse(() => notifyReportRequested({ admin: createAdminClient(), checkId, email, locale })),
     now: () => new Date(),
   })
 }

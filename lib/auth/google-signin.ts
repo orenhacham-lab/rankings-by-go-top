@@ -37,6 +37,30 @@ export function googleSignInVisible(args: { enabled: boolean; nextPath: string; 
   return args.enabled && !args.framed && !isShopifyDestination(args.nextPath)
 }
 
+/**
+ * The site's own Google client (lib/auth/google-direct.ts), as the browser
+ * bundle sees it: when its id is set, the button starts the flow on this
+ * origin, so Google's consent screen names this site instead of the Supabase
+ * project. Unset keeps the Supabase-hosted flow below, exactly as before.
+ */
+export function googleDirectConfigured(value: string | undefined = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID): boolean {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+/** The same-origin start of that flow, with a sanitized `next` and the form's language. */
+export function googleStartPath(nextPath: string, lang: Locale): string {
+  const params = new URLSearchParams({ next: sanitizeNextPath(nextPath, '/dashboard'), lang })
+  return `/api/auth/google?${params.toString()}`
+}
+
+/** Where a Google sign-in that did not complete lands: the sign-in form, in its language, with one generic line. */
+export function googleSignInFailureUrl(origin: string, lang: string | null | undefined): string {
+  const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)
+  failed.searchParams.set('error', 'google')
+  if (lang === 'he') failed.searchParams.set('lang', 'he')
+  return failed.toString()
+}
+
 /** Where Google returns to: the auth callback on this origin, with a sanitized `next` and the form's language. */
 export function googleRedirectTo(origin: string, nextPath: string, lang: Locale): string {
   const url = new URL('/api/auth/callback', origin)
@@ -47,8 +71,8 @@ export function googleRedirectTo(origin: string, nextPath: string, lang: Locale)
 
 /** The button's words, per language: kept here, out of the shared auth components (lib/i18n/__qa__/auth-surface-language.qa.ts). */
 const COPY = {
-  he: { label: 'המשך עם Google', or: 'או', failed: 'לא הצלחנו להתחיל את ההתחברות עם Google. נסו שוב, או המשיכו עם אימייל.' },
-  en: { label: 'Continue with Google', or: 'or', failed: "We couldn't start signing in with Google. Try again, or continue with email." },
+  he: { label: 'המשך עם Google', or: 'או', failed: 'לא הצלחנו להתחיל את ההתחברות עם Google. נסו שוב, או המשיכו עם אימייל.', returnFailed: 'ההתחברות עם Google לא הושלמה. נסו שוב, או המשיכו עם אימייל.' },
+  en: { label: 'Continue with Google', or: 'or', failed: "We couldn't start signing in with Google. Try again, or continue with email.", returnFailed: "Signing in with Google didn't complete. Try again, or continue with email." },
 } as const
 
 export function googleSignInCopy(lang: Locale): (typeof COPY)[Locale] {

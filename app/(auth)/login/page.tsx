@@ -11,6 +11,7 @@ import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import { googleSignInCopy } from '@/lib/auth/google-signin'
 import AuthShell, { AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
 import { NoticeBox } from '@/components/ui/Notice'
 import { cn } from '@/lib/utils'
@@ -94,7 +95,10 @@ export function AuthForm() {
   // The email-confirmation callback sends a failed exchange back here as
   // ?error=oauth. It used to be dropped silently: the visitor saw an empty
   // sign-in form and no word about the link they had just clicked.
-  const [error, setError] = useState(searchParams.get('error') ? t.err.linkInvalid : '')
+  // A Google sign-in that did not complete comes back as ?error=google: one
+  // generic line in the form's language, never the provider's own message.
+  const errorParam = searchParams.get('error')
+  const [error, setError] = useState(errorParam === 'google' ? googleSignInCopy(lang).returnFailed : errorParam ? t.err.linkInvalid : '')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

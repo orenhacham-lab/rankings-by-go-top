@@ -50,6 +50,8 @@ export type ResearchDeps = {
   ) => Promise<string | null>
   /** The free check's claim token for a ledger row (lib/free-check/claim.ts issueClaimToken). */
   issueClaim: (admin: ServiceRoleClient, checkId: string) => Promise<string | null>
+  /** Operator alert for a freshly recorded run. Optional, fire-and-forget: it can never change the response. */
+  afterRecorded?: (info: { checkId: string; domain: string; locale: Locale; result: FreeCheckResult }) => void
   now: () => Date
   env: Record<string, string | undefined>
 }
@@ -195,6 +197,11 @@ export async function handleResearchPost(request: Request, deps: ResearchDeps): 
         })
         .catch(() => null)
       const claimToken = checkId ? await deps.issueClaim(admin, checkId).catch(() => null) : null
+      if (checkId) {
+        try {
+          deps.afterRecorded?.({ checkId, domain, locale, result: publicResult(research.summary, research.spend, deps.now()) })
+        } catch { /* an alert never touches the research */ }
+      }
       await finishResearchRun(admin, runId, { status: 'done', checkId, spend: research.spend, errorCode: research.errorCode, now: deps.now() })
       console.log('[presignup] research ended', {
         runId,
@@ -220,7 +227,10 @@ export const REPORT_CLIENT_HOURLY_CAP = 5
 /** Deliberately plain: a real address has one @, no spaces, and a dot in its domain. */
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,185}\.[^\s@]{2,}$/
 
-export type ReportDeps = Pick<ResearchDeps, 'enabled' | 'admin' | 'clientHash' | 'now'>
+export type ReportDeps = Pick<ResearchDeps, 'enabled' | 'admin' | 'clientHash' | 'now'> & {
+  /** Operator alert for a newly saved request (not for a repeat of the same one). Optional, fire-and-forget. */
+  afterSaved?: (info: { checkId: string; email: string; locale: Locale }) => void
+}
 
 function answer(status: number, body: ReportRequestResponse): Response {
   return Response.json(body, { status, headers: NO_STORE })
@@ -282,6 +292,11 @@ export async function handleReportRequest(request: Request, deps: ReportDeps): P
     if (saved.error && saved.error.code !== '23505') {
       console.error('[presignup] report request not saved', { code: saved.error.code ?? null })
       return answer(503, { ok: false, code: 'unavailable' })
+    }
+    if (!saved.error) {
+      try {
+        deps.afterSaved?.({ checkId, email, locale })
+      } catch { /* an alert never touches the request */ }
     }
     console.log('[presignup] report requested', { checkId })
     return answer(200, { ok: true, code: 'saved' })
