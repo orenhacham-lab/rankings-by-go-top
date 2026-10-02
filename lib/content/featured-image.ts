@@ -10,7 +10,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
+import { generateArticleImage, normalizeFeaturedImage, sanitizeImageConceptForCommercialUse, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { assertContentGenerationAllowedForProject, gateDenialCode } from '@/lib/content/entitlement-guard'
 import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
 
@@ -75,6 +75,9 @@ export async function createFeaturedImageForArticle(
   const gen = await generateArticleImage({
     title: String(a.title || ''), imagePrompt: concept, topic: topicText || null, language,
     style: style.imageStyle, brandColors: style.brandColors, aspectRatio: style.heroRatio,
+    // The article's subject is pinned as the focal point, so a mood-only concept cannot drift off topic.
+    // A candidate that is only a brand name sanitizes to nothing, so the next one is used.
+    subject: [primaryKeyword, topicText, String(a.title || '')].find((c) => sanitizeImageConceptForCommercialUse(c)) || null,
   })
   if ('error' in gen) return { error: gen.error }
 

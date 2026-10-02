@@ -98,12 +98,46 @@ export async function GET(request: Request) {
   const loadArticles = (cols: string) => supabase
     .from('generated_articles').select(cols).eq('project_id', projectId)
     .order('updated_at', { ascending: false }).limit(1000)
-  let { data: articlesData, error: articlesError } = await loadArticles(`${WP_COLS}, ${SHOPIFY_COLS}`)
   // The Shopify-publishing columns are behind a later migration — if they are absent,
   // retry WordPress-only so a not-yet-migrated (WordPress) project never regresses.
-  if (articlesError && (articlesError as { code?: string }).code === '42703') {
-    ;({ data: articlesData, error: articlesError } = await loadArticles(WP_COLS))
-  }
+  const articlesRead = (async () => {
+    const first = await loadArticles(`${WP_COLS}, ${SHOPIFY_COLS}`)
+    if (first.error && (first.error as { code?: string }).code === '42703') return await loadArticles(WP_COLS)
+    return first
+  })()
+
+  // SPEED: every read below depends only on the (already ownership-checked)
+  // project id, so they are sent together instead of one after another. The
+  // database sits in another region from the functions, so each sequential
+  // read cost a full round trip; this tab paid six of them in a row. Each
+  // result is still handled exactly as before, in the same order.
+  const PENDING_QUEUE_STATUSES = ['queued', 'scheduled', 'generating', 'generated', 'publishing']
+  const queueRead = supabase
+    .from('article_pool_items')
+    .select('article_id', { count: 'exact' })
+    .eq('project_id', projectId)
+    .in('status', PENDING_QUEUE_STATUSES)
+  const wpRead = supabase
+    .from('wordpress_connections')
+    .select('site_url, connection_status, last_tested_at')
+    .eq('project_id', projectId)
+    .maybeSingle()
+  const shopifyRead = supabase
+    .from('shopify_connections')
+    .select('shop_domain, connection_status, granted_scopes, default_blog_id')
+    .eq('project_id', projectId)
+    .is('archived_at', null)
+    .maybeSingle()
+  const siteRead = supabase
+    .from(SITE_TABLE)
+    .select('platform, connection_status')
+    .eq('project_id', projectId)
+    .maybeSingle()
+  const alertsRead = loadActiveAlerts(supabase as never, projectId)
+  const [articlesResult, queueResult, wpResult, shopifyResult, siteResult, alertResult] =
+    await Promise.all([articlesRead, queueRead, wpRead, shopifyRead, siteRead, alertsRead])
+
+  const { data: articlesData, error: articlesError } = articlesResult
   if (articlesError) {
     // 42P01 = undefined_table (migration not run yet) — degrade gracefully.
     if ((articlesError as { code?: string }).code !== '42P01') {
@@ -129,14 +163,9 @@ export async function GET(request: Request) {
   // still heading toward publish. Deliberately excludes published / skipped /
   // failed / quality_check_failed / paused so finished or halted work is never
   // shown as "scheduled". Tolerates the automation table not existing yet.
-  const PENDING_QUEUE_STATUSES = ['queued', 'scheduled', 'generating', 'generated', 'publishing']
   // A queue item whose article is already counted as scheduled above is the
   // same work, so it is skipped (the tile used to show 2 for one article).
-  const { data: queueRows, count: queueCount, error: queueError } = await supabase
-    .from('article_pool_items')
-    .select('article_id', { count: 'exact' })
-    .eq('project_id', projectId)
-    .in('status', PENDING_QUEUE_STATUSES)
+  const { data: queueRows, count: queueCount, error: queueError } = queueResult
   if (queueError) {
     if ((queueError as { code?: string }).code !== '42P01') {
       console.error('[content overview] pool items count failed:', queueError.message)
@@ -154,11 +183,7 @@ export async function GET(request: Request) {
     status: null,
     lastTestedAt: null,
   }
-  const { data: wpData, error: wpError } = await supabase
-    .from('wordpress_connections')
-    .select('site_url, connection_status, last_tested_at')
-    .eq('project_id', projectId)
-    .maybeSingle()
+  const { data: wpData, error: wpError } = wpResult
 
   if (wpError) {
     if ((wpError as { code?: string }).code !== '42P01') {
@@ -178,12 +203,7 @@ export async function GET(request: Request) {
   let shopify: { connected: boolean; shopDomain: string | null; status: string | null; canPublish: boolean; defaultBlogId: string | null } = {
     connected: false, shopDomain: null, status: null, canPublish: false, defaultBlogId: null,
   }
-  const { data: shData, error: shError } = await supabase
-    .from('shopify_connections')
-    .select('shop_domain, connection_status, granted_scopes, default_blog_id')
-    .eq('project_id', projectId)
-    .is('archived_at', null)
-    .maybeSingle()
+  const { data: shData, error: shError } = shopifyResult
   if (shError) {
     if ((shError as { code?: string }).code !== '42P01') console.error('[content overview] shopify status load failed:', shError.message)
   } else if (shData) {
@@ -202,11 +222,7 @@ export async function GET(request: Request) {
   // right panel; two genuinely-connected platforms are an explicit conflict.
   // Wix / custom site (webhook): safe columns only, through the caller's own RLS
   // client. A missing table (migration not yet applied) reads as "none".
-  const { data: siteData, error: siteError } = await supabase
-    .from(SITE_TABLE)
-    .select('platform, connection_status')
-    .eq('project_id', projectId)
-    .maybeSingle()
+  const { data: siteData, error: siteError } = siteResult
   if (siteError && !isMissingRelation(siteError)) console.error('[content overview] site platform status load failed:', (siteError as { code?: string }).code ?? 'unknown')
   const site = siteConnectionState(siteError ? null : siteData as { platform?: unknown; connection_status?: unknown } | null)
 
@@ -227,7 +243,6 @@ export async function GET(request: Request) {
   // an empty list, so the client can say the alert store is unavailable.
   let alerts: ActiveAlert[] = []
   let alertsUnavailable: 'migration_required' | 'unavailable' | null = null
-  const alertResult = await loadActiveAlerts(supabase as never, projectId)
   if (alertResult.ok) alerts = alertResult.alerts
   else alertsUnavailable = alertResult.reason
 

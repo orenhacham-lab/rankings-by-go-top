@@ -581,8 +581,12 @@ async function main() {
     const created = await startRun(admin, { trigger: 'claim', domain: HE_WP.key, url: 'https://plumber-tlv.co.il/', claim: claimedScan() })
     await run(admin, created, { fetchImpl: new FakeNetwork(heWordPressSite()).fetch, insight: fakeModel({ ok: true, insight: HE_WP_INSIGHT }).fn, search: fakeSearch(LEAK_RESULTS).fn, now: () => NOW })
     const s = summaryOf(tables)
-    check('the same searches from a teaser: the locked competitor never checked, three findings listed and two by count',
-      s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il' && s.findings.length === 3 && s.findingsOmitted === 2,
+    // Wave 10: a domain that ranks for one of the business's searches fills the
+    // room left under five, so the firm the teaser locked now appears, but only
+    // as a search find (never as the model's), after every two-search one.
+    const leak = s.competitors.find((c) => c.domain === 'leak-finders.co.il')
+    check('the same searches from a teaser: the locked competitor is not the model\'s, only a one-search find after the rest; three findings listed and two by count',
+      s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il,leak-finders.co.il' && leak?.source === 'search' && leak?.seenIn === 1 && s.findings.length === 3 && s.findingsOmitted === 2,
       s.competitors.map((c) => c.domain).join(','))
   }
   {

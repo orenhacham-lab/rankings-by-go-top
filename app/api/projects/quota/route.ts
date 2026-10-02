@@ -24,12 +24,15 @@ export async function GET() {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const entitlement = await getUserEntitlement(user.id, createAdminClient())
-    const { count, error } = await supabase
-      .from('projects')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_active', true)
+    // SPEED: the plan and the project count are independent; read them together.
+    const [entitlement, { count, error }] = await Promise.all([
+      getUserEntitlement(user.id, createAdminClient()),
+      supabase
+        .from('projects')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_active', true),
+    ])
     return Response.json(projectQuota({
       isAdmin: entitlement.isAdmin,
       plan: entitlement.plan,

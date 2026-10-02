@@ -145,3 +145,48 @@ export function advanceNextPublishAt(
   while (inst <= now && guard < 500) { k += step; inst = zonedWallToUtc(y, mo, d + k, h, mi, timeZone); guard++ }
   return new Date(inst).toISOString()
 }
+
+/**
+ * SPREAD THE PLAN'S ARTICLES OVER THE BILLING CYCLE.
+ *
+ * The cadence the owner picked decides the slots; the plan's article allowance
+ * was never consulted. A cadence with more slots before the cycle ends than
+ * articles left (Basic: 4 a month on a weekly cadence has 5 Sundays in some
+ * cycles; twice a week has ~8) published the allowance early and then stood
+ * still, its next item failing as quota_exceeded until the cycle renewed.
+ *
+ * Given the cadence's next slot (`cadenceNextIso`) and `slotAfter` (the
+ * cadence's next slot strictly after an instant), this keeps the cadence's own
+ * slot whenever the articles left (`remaining` unconsumed + `ready` already
+ * generated) cover every slot before `periodEndIso`. Otherwise it aims the next
+ * publish at an even share of the time left, `(end - now) / (articles + 1)`
+ * (the "+1" is the next cycle's first article), and takes the cadence's first
+ * slot at or after that. Nothing left at all: the first slot of the next cycle.
+ * Never earlier than the cadence's own slot. Pure; the allowance is only read.
+ */
+export function spreadNextPublishAt(input: {
+  cadenceNextIso: string
+  nowMs: number
+  periodEndIso: string | null
+  remaining: number
+  ready: number
+  slotAfter: (fromMs: number) => string
+}): string {
+  const next = Date.parse(input.cadenceNextIso)
+  const end = input.periodEndIso ? Date.parse(input.periodEndIso) : NaN
+  if (!Number.isFinite(next) || !Number.isFinite(end) || end <= input.nowMs || next >= end) return input.cadenceNextIso
+  const articles = Math.max(0, Math.floor(input.remaining)) + Math.max(0, Math.floor(input.ready))
+
+  let slots = 0
+  for (let at = next, guard = 0; at < end && guard < 400; guard++) {
+    slots++
+    at = Date.parse(input.slotAfter(at))
+    if (!Number.isFinite(at)) break
+  }
+  if (slots <= articles) return input.cadenceNextIso
+
+  const target = articles <= 0 ? end : input.nowMs + (end - input.nowMs) / (articles + 1)
+  if (target <= next) return input.cadenceNextIso
+  const spread = input.slotAfter(Math.ceil(target) - 1)
+  return Date.parse(spread) > next ? spread : input.cadenceNextIso
+}

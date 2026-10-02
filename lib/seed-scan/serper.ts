@@ -121,6 +121,8 @@ const NON_COMPETITOR_DOMAINS = [
 
 export function isNonCompetitor(domain: string): boolean {
   if (NON_COMPETITOR_DOMAINS.some((d) => isDomainMatch(domain, d))) return true
+  // Government, academic and military sites inform; they do not compete: campus.gov.il, tau.ac.il, mit.edu.
+  if (/(^|\.)(gov|mil|edu)(\.[a-z]{2})?$/.test(domain) || /\.ac\.[a-z]{2}$/.test(domain)) return true
   // google.co.il, google.de, maps.google.co.uk …
   return /(^|\.)google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(domain)
 }

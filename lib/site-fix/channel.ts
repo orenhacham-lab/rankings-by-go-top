@@ -49,7 +49,7 @@ const missing = (e: unknown) => ['42P01', 'PGRST205'].includes(String((e as { co
 
 export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: string) => string, targetDomain: string | null): Promise<FixContext> {
   const { projectId, userId } = scope
-  const [shop, wp, site, profile] = await Promise.all([
+  const [shop, wp, site, profile, plugin] = await Promise.all([
     admin.from('shopify_connections').select('connection_status, archived_at')
       .eq('project_id', projectId).eq('user_id', userId).is('archived_at', null).maybeSingle(),
     admin.from('wordpress_connections').select('site_url, wp_username, wp_application_password_encrypted, connection_status')
@@ -58,6 +58,8 @@ export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: st
       .eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     admin.from('project_profiles').select('detected_platform')
       .eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
+    // Independent of the four above: read with them, not after them.
+    readPluginLink(admin, scope),
   ])
   const shopRow = (shop.error ? null : shop.data) as { connection_status?: string } | null
   const wpRow = (wp.error ? null : wp.data) as { site_url: string; wp_username: string; wp_application_password_encrypted: string; connection_status: string | null } | null
@@ -74,7 +76,6 @@ export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: st
     try { webhook = { endpointUrl: siteRow.endpoint_url, secret: decrypt(siteRow.secret_encrypted) } }
     catch { console.error('[site-fix] webhook secret unreadable') }
   }
-  const plugin = await readPluginLink(admin, scope)
   let pluginLink: PluginLink | null = null
   if (plugin) {
     try { pluginLink = { siteUrl: plugin.site_url, keyId: plugin.key_id, secret: decrypt(plugin.secret_encrypted) } }
