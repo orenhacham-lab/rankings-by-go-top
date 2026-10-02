@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
 
 interface Article {
   id: string
@@ -87,16 +88,8 @@ export async function GET() {
     applicationCategory: 'BusinessApplication',
     description: 'Advanced SEO rank tracking system for monitoring Google search and Google Maps rankings',
     url: baseUrl,
-    offers: {
-      '@type': 'Offer',
-      price: 'varies',
-      priceCurrency: 'ILS',
-    },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '5',
-      ratingCount: '100',
-    },
+    // No aggregateRating: only real, collected reviews may be marked up.
+    offers: SOFTWARE_OFFER,
   }
 
   // Generate article schemas

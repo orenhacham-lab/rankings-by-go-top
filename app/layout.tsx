@@ -7,6 +7,7 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
+import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
 
 /**
  * The two faces of the type system (see --font-sans in globals.css): Inter for
@@ -139,16 +140,10 @@ export default async function RootLayout({
                 url: 'https://www.gotopseo.com',
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
-                aggregateRating: {
-                  '@type': 'AggregateRating',
-                  ratingValue: '4.8',
-                  ratingCount: '156',
-                },
-                offers: {
-                  '@type': 'Offer',
-                  price: '0',
-                  priceCurrency: 'ILS',
-                },
+                // No aggregateRating: a rating may only describe real, collected
+                // reviews (Google's review-snippet policy; FTC fake-review rule).
+                // The offer is the real plan range from the catalog.
+                offers: SOFTWARE_OFFER,
                 author: {
                   '@type': 'Organization',
                   name: 'Go Top',
