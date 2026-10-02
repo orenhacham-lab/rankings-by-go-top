@@ -12,6 +12,8 @@ import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
 import { pricingEn as copy } from '@/lib/i18n/public/pricing-en'
 import { cn } from '@/lib/utils'
+import { formatPlanPrice, planPriceIn } from '@/lib/billing/market'
+import { resolveBillingMarket } from '@/lib/billing/server-market'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -29,10 +31,6 @@ const PLAN_NAME: Record<PlanCode, string> = {
 /** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
 const HIGHLIGHTED_PLAN: PlanCode = 'advanced'
 
-function formatUSD(amount: number): string {
-  return `$${amount.toLocaleString('en-US')}`
-}
-
 /**
  * The words around the grid (hero, what every plan includes, why it pays, how
  * usage is counted, the questions, the close) are in lib/i18n/public/pricing-en.ts
@@ -42,6 +40,11 @@ function formatUSD(amount: number): string {
 export default async function EnglishPricingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  // w17 — the price is in the VISITOR's currency, decided on the server from
+  // the country header (or the signed-in account's market), not the page's
+  // language: an Israeli on either page sees shekels, anyone else dollars.
+  // The page reads cookies and headers, so it renders per request.
+  const { market } = await resolveBillingMarket(supabase, user)
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -108,7 +111,7 @@ export default async function EnglishPricingPage() {
 
                   <div className="mb-6 flex items-baseline gap-1.5">
                     <span className={cn('text-display font-bold tracking-tight tabular-nums', highlighted ? 'text-contrast-ink' : 'text-ink')}>
-                      {formatUSD(plan.priceUSD)}
+                      {formatPlanPrice(planPriceIn(plan, market), market, 'en-US')}
                     </span>
                     <span className={cn('text-copy', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.perMonth}</span>
                   </div>

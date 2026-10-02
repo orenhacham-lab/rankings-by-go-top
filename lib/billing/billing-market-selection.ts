@@ -1,93 +1,75 @@
 /**
- * Phase 3 (review correction) — the DB/decision-side logic for
- * POST /api/billing-market/select, extracted so it's directly testable
- * without needing to emulate the Supabase Admin Auth API (updateUserById)
- * inside the FakeAdmin harness. The route wires the real checks (Shopify
- * governance, existing-subscription lookup, locale persistence) as plain
- * injectable async functions; this function only decides the OUTCOME from
- * already-known inputs plus those three checks — it never talks to Next.js
- * request/cookie machinery directly.
+ * w17 — the billing market LOCKS at the first PayPal checkout.
  *
- * Every requirement this function enforces (see the route for the full
- * rationale on each):
- *  - only 'ILS' | 'USD' are ever accepted;
- *  - an already-set locale is never overwritten (one-time fill-in, not a
- *    switcher — and since `existingLocale` is always the caller's freshly
- *    re-read live value, repeated/concurrent calls after a value is
- *    observed are correctly refused every time, not just the first);
- *  - a Shopify-governed account is refused outright (billing authority
- *    belongs to Shopify App Pricing, not this endpoint);
- *  - a user who already has a paid PayPal subscription (locale somehow
- *    unset) is refused — this app cannot re-derive which currency that
- *    existing subscription actually bills in, so it must not be guessed;
- *  - 2nd review correction — ATOMIC first-write: two genuinely concurrent
- *    requests (both observing existingLocale as unset before either writes)
- *    can no longer both proceed to persistLocale. `claimSelectionSlot`
- *    (supabase/migrations/20260828180000_add_billing_market_claim_gate.sql) is a
- *    CONDITIONAL UPDATE against a dedicated concurrency-gate column — only
- *    one concurrent caller ever wins it; the loser gets `already_set`
- *    immediately, without ever touching user_metadata.locale. If the WINNER
- *    then fails to persist (a real DB/network error), `releaseSelectionSlot`
- *    releases the claim so a retried request is not permanently locked out.
+ * Before w17 this module decided POST /api/billing-market/select, where the
+ * client sent the currency it wanted and the choice was written into
+ * user_metadata.locale (the language). Both are gone: the client never sends
+ * a currency, and billing never writes the language. The market is now
+ * decided on the server (lib/billing/server-market.ts) and stored in its own
+ * place — auth app_metadata.billing_market, which only the server can write —
+ * exactly once, by app/api/paypal/activate after PayPal has verified the
+ * subscription.
+ *
+ * The market stored is the one PayPal really charges: the market of the
+ * VERIFIED PayPal plan id (lib/paypal/checkout-plans.ts marketForPayPalPlanId),
+ * never a value from the request body.
+ *
+ * Invariants kept from the old route:
+ *  - only a known market is ever written;
+ *  - an already-stored market is never overwritten (one-time, not a switcher)
+ *    — `existingMarket` is the caller's freshly re-read live value;
+ *  - ATOMIC first write: `claimSelectionSlot` is the conditional UPDATE on
+ *    public.profiles.billing_market_claimed_at
+ *    (supabase/migrations/20260828180000_add_billing_market_claim_gate.sql,
+ *    already in production; users cannot write it since the OWASP hardening).
+ *    Only one concurrent caller wins; the loser gets `already_set` without
+ *    writing. If the winner's write fails, the claim is released so a later
+ *    checkout can still lock it.
+ *  - a Shopify-governed account is refused (Shopify bills it).
  */
 
-export type BillingMarketSelectionOutcome =
-  | { kind: 'invalid_market' }
+import { isBillingMarket, type BillingMarket } from '@/lib/billing/market'
+
+export type BillingMarketLockOutcome =
+  | { kind: 'unknown_market' }
   | { kind: 'already_set' }
   | { kind: 'shopify_governed' }
-  | { kind: 'existing_paid_subscription' }
-  | { kind: 'lookup_failed'; message: string }
   | { kind: 'claim_failed'; message: string }
   | { kind: 'persist_failed'; message: string }
-  | { kind: 'persisted'; locale: 'he' | 'en' }
+  | { kind: 'persisted'; market: BillingMarket }
 
-export interface BillingMarketSelectionDeps {
-  /** Combines hasPendingShopifyLinkCookie(request) and
-   *  isShopifyBillingRequiredForUser(admin, userId) — both already exist and
-   *  are independently tested elsewhere; this route only needs their OR. */
+export interface BillingMarketLockDeps {
   isShopifyGoverned: () => Promise<boolean>
-  hasExistingPaidPaypalSubscription: () => Promise<{ ok: true; exists: boolean } | { ok: false; message: string }>
-  /** Atomic first-write gate — a conditional UPDATE that only ONE concurrent
-   *  caller can win. `wonClaim: false` (not an error) means a concurrent
-   *  request already claimed this slot. */
+  /** Atomic first-write gate — a conditional UPDATE only ONE concurrent
+   *  caller can win. `wonClaim: false` (not an error) means it is taken. */
   claimSelectionSlot: () => Promise<{ ok: true; wonClaim: boolean } | { ok: false; message: string }>
-  /** Releases a won-but-unused claim after a downstream persist failure, so
-   *  the user is never permanently locked out by a transient DB error. */
+  /** Releases a won-but-unused claim after a failed write. */
   releaseSelectionSlot: () => Promise<void>
-  persistLocale: (locale: 'he' | 'en') => Promise<{ ok: true } | { ok: false; message: string }>
+  /** Writes app_metadata.billing_market. Never user_metadata. */
+  persistMarket: (market: BillingMarket) => Promise<{ ok: true } | { ok: false; message: string }>
 }
 
-export async function resolveBillingMarketSelection(
-  existingLocale: string | null | undefined,
-  requestedMarket: string | undefined,
-  deps: BillingMarketSelectionDeps,
-): Promise<BillingMarketSelectionOutcome> {
-  const locale = requestedMarket === 'ILS' ? 'he' : requestedMarket === 'USD' ? 'en' : null
-  if (!locale) return { kind: 'invalid_market' }
+export async function lockBillingMarket(
+  existingMarket: unknown,
+  paidMarket: BillingMarket | null | undefined,
+  deps: BillingMarketLockDeps,
+): Promise<BillingMarketLockOutcome> {
+  if (!isBillingMarket(paidMarket)) return { kind: 'unknown_market' }
 
-  // Always checked FIRST, against the live value the caller just re-read —
-  // never a value cached from an earlier request in this process. This is
-  // what makes repeated/concurrent calls after a market is already set safe:
-  // every one of them independently re-reads the current record and refuses.
-  if (existingLocale === 'he' || existingLocale === 'en') return { kind: 'already_set' }
+  // Checked FIRST, against the live value the caller just re-read.
+  if (isBillingMarket(existingMarket)) return { kind: 'already_set' }
 
   if (await deps.isShopifyGoverned()) return { kind: 'shopify_governed' }
 
-  const existingSub = await deps.hasExistingPaidPaypalSubscription()
-  if (!existingSub.ok) return { kind: 'lookup_failed', message: existingSub.message }
-  if (existingSub.exists) return { kind: 'existing_paid_subscription' }
-
-  // 2nd review correction — the atomic gate. Placed as the LAST check before
-  // any write, so the claim is only ever taken by a request that has already
-  // passed every other refusal condition.
+  // The atomic gate, as the LAST check before the write.
   const claim = await deps.claimSelectionSlot()
   if (!claim.ok) return { kind: 'claim_failed', message: claim.message }
   if (!claim.wonClaim) return { kind: 'already_set' }
 
-  const persisted = await deps.persistLocale(locale)
+  const persisted = await deps.persistMarket(paidMarket)
   if (!persisted.ok) {
     await deps.releaseSelectionSlot()
     return { kind: 'persist_failed', message: persisted.message }
   }
-  return { kind: 'persisted', locale }
+  return { kind: 'persisted', market: paidMarket }
 }

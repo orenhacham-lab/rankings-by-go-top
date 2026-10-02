@@ -108,19 +108,22 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
   const ILS = { trial: 0, regular: PLAN_LIMITS.regular.price, advanced: PLAN_LIMITS.advanced.price, premium: PLAN_LIMITS.premium.price, large_agency: PLAN_LIMITS.large_agency.price }
   const USD = { trial: 0, regular: PLAN_LIMITS.regular.priceUSD, advanced: PLAN_LIMITS.advanced.priceUSD, premium: PLAN_LIMITS.premium.priceUSD, large_agency: PLAN_LIMITS.large_agency.priceUSD }
   const base = { plan: 'trial', hasActiveSubscription: false, trialActive: true, trialEndsAt: '2026-10-04T00:00:00Z', subscriptionEndsAt: null,
-    hasPaypalSubscriptionId: false, renewalCancelled: false, shopifyConnected: false, shopifyMigrationStatus: null, planPricesILS: ILS, planPricesUSD: USD }
+    hasPaypalSubscriptionId: false, renewalCancelled: false, shopifyConnected: false, shopifyMigrationStatus: null, marketLocked: false }
+  // w17 — the page passes the prices of the server's market only.
+  const pricesFor = (m: 'ILS' | 'USD') => (m === 'USD' ? USD : ILS)
   const render = (locale: Locale, props: Record<string, unknown>) =>
     renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: locale } as never, createElement(BillingView, { ...base, ...props })))
   const PAID = ['regular', 'advanced', 'premium', 'large_agency'] as const
 
-  for (const locale of ['he', 'en'] as Locale[]) {
+  // w17 — the currency no longer follows the language: every language is
+  // checked with every market (a Hebrew screen in dollars, an English one in shekels).
+  for (const locale of ['he', 'en'] as Locale[]) for (const market of ['ILS', 'USD'] as const) {
     const t = getDashboardDictionary(locale).billing
-    const market = locale === 'he' ? 'ILS' : 'USD'
     const sym = market === 'USD' ? '$' : '₪'
-    const rawPrices = market === 'USD' ? USD : ILS
+    const rawPrices = pricesFor(market)
     // w7 P2-13: grouped like the public pricing page (₪1,999, not ₪1999), in the screen's locale.
     const prices = Object.fromEntries(Object.entries(rawPrices).map(([k, v]) => [k, Number(v).toLocaleString(locale === 'en' ? 'en-US' : 'he-IL')])) as Record<keyof typeof rawPrices, string>
-    const html = render(locale, { market })
+    const html = render(locale, { market, planPrices: rawPrices })
     const plansComplete = (h: string) => {
       const missing: string[] = []
       for (const p of PAID) {
@@ -135,35 +138,34 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
       return missing
     }
     const missing = plansComplete(html)
-    check(`C1 (${locale}) every plan with its ${market} price, features and PayPal container`, missing.length === 0, missing.join(', '))
-    check(`C1-MUT (${locale}) a plan whose price changed fails C1`, plansComplete(html.split(`${sym}${prices.advanced}`).join(`${sym}1`)).length > 0)
-    check(`C2 (${locale}) the header is the screen header (text-title), not the old text-3xl`, /<h1 class="[^"]*text-title/.test(html) && !/text-3xl/.test(html))
+    check(`C1 (${locale}/${market}) every plan with its ${market} price, features and PayPal container`, missing.length === 0, missing.join(', '))
+    check(`C1-MUT (${locale}/${market}) a plan whose price changed fails C1`, plansComplete(html.split(`${sym}${prices.advanced}`).join(`${sym}1`)).length > 0)
+    check(`C2 (${locale}/${market}) the header is the screen header (text-title), not the old text-3xl`, /<h1 class="[^"]*text-title/.test(html) && !/text-3xl/.test(html))
 
-    const prompt = render(locale, { market: null })
-    const promptOk = (h: string) => {
+    // w17 — replaces the Phase-3 "no stored currency: switch + continue" view:
+    // there is no switcher and no continue button; PayPal renders in the
+    // server's market, and ONE quiet line says which currency applies.
+    const name = t.marketPrompt.currencyName[market]
+    const locked = render(locale, { market, planPrices: rawPrices, marketLocked: true })
+    const quietOk = (h: string, isLocked: boolean) => {
       const missing: string[] = []
-      for (const p of PAID) {
-        if (!h.includes(`data-plan-card="${p}"`)) missing.push(`${p} card`)
-        if (!h.includes(`${sym}${prices[p]}`)) missing.push(`${p} ${market} price`)
-        if (!h.includes(`data-continue-to-payment="${p}"`)) missing.push(`${p} continue button`)
-      }
-      if (!h.includes(`data-billing-market-choice="${market}"`)) missing.push(`default display currency ${market}`)
-      if (!new RegExp(`aria-pressed="true"[^>]*data-currency-option="${market}"`).test(h)) missing.push('switch default')
-      if (!h.includes('data-currency-option="ILS"') || !h.includes('data-currency-option="USD"')) missing.push('switch options')
-      if (!h.includes(esc(t.marketPrompt.ilsOption)) || !h.includes(esc(t.marketPrompt.usdOption))) missing.push('switch labels')
-      if (/paypal-button-/.test(h)) missing.push('a PayPal button before the currency is stored')
+      if (/data-currency-option=|data-billing-market-choice=|data-continue-to-payment=|aria-pressed=/.test(h)) missing.push('a currency switcher')
+      if ((h.match(/data-billing-market="/g) || []).length !== 1 || !h.includes(`data-billing-market="${market}"`)) missing.push('the one currency line')
+      const line = isLocked ? t.marketPrompt.locked(name) : t.marketPrompt.byLocation(name)
+      if (!h.includes(esc(line))) missing.push('its words')
+      for (const p of PAID) if (!h.includes(`id="paypal-button-${p}"`)) missing.push(`${p} PayPal container`)
       return missing
     }
-    const promptMissing = promptOk(prompt)
-    check(`C3 (${locale}) no stored currency: every plan shows at once in ${market}, with the currency switch and no PayPal button`, promptMissing.length === 0, promptMissing.join(', '))
-    check(`C3-MUT (${locale}) a view that also shows PayPal buttons fails C3`, promptOk(prompt + '<div id="paypal-button-regular"></div>').length > 0)
-    check(`C3-MUT (${locale}) the old prompt without plans fails C3`, promptOk(prompt.replace(/data-plan-card="[^"]*"/g, '')).length > 0)
-    check(`C3-MUT (${locale}) the other language's currency by default fails C3`, promptOk(prompt.split(`${sym}${prices.regular}`).join('x')).length > 0)
+    const qMissing = [...quietOk(html, false), ...quietOk(locked, true)]
+    check(`C3 (${locale}/${market}) no switcher: one quiet currency line (by location / locked) and the PayPal buttons`, qMissing.length === 0, qMissing.join(', '))
+    check(`C3-MUT (${locale}/${market}) the old ILS/USD switch fails C3`, quietOk(html + '<button aria-pressed="true" data-currency-option="ILS"></button>', false).length > 0)
+    check(`C3-MUT (${locale}/${market}) the old continue-to-payment button fails C3`, quietOk(html + '<button data-continue-to-payment="regular"></button>', false).length > 0)
+    check(`C3-MUT (${locale}/${market}) the other market's line fails C3`, quietOk(html.split(esc(name)).join('x'), false).length > 0)
 
-    const shop = render(locale, { market, shopifyConnected: true, trialActive: false })
-    const shopOk = (h: string) => h.includes('href="/api/shopify/billing/start-intent"') && h.includes(esc(t.shopify.title)) && !/paypal-button-|data-plan-card/.test(h) && !h.includes(esc(t.marketPrompt.title))
-    check(`C4 (${locale}) a Shopify-billed account sees the Shopify panel and nothing of PayPal`, shopOk(shop))
-    check(`C4-MUT (${locale}) a plan card in the Shopify view fails C4`, !shopOk(shop + '<div data-plan-card="regular"></div>'))
+    const shop = render(locale, { market, planPrices: rawPrices, shopifyConnected: true, trialActive: false })
+    const shopOk = (h: string) => h.includes('href="/api/shopify/billing/start-intent"') && h.includes(esc(t.shopify.title)) && !/paypal-button-|data-plan-card|data-billing-market=/.test(h)
+    check(`C4 (${locale}/${market}) a Shopify-billed account sees the Shopify panel and nothing of PayPal`, shopOk(shop))
+    check(`C4-MUT (${locale}/${market}) a plan card in the Shopify view fails C4`, !shopOk(shop + '<div data-plan-card="regular"></div>'))
   }
 
   // The Shopify panel on the primitives (R4). WHAT it links to and how is
@@ -188,8 +190,8 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
   for (const locale of ['he', 'en'] as const) {
     const t = getDashboardDictionary(locale).billing
     const states = (h: string) => h.includes('data-notice="wait"') && h.includes(esc(t.shopify.migrationPending))
-    const pending = render(locale, { market: locale === 'en' ? 'USD' : 'ILS', shopifyConnected: true, trialActive: false, shopifyMigrationStatus: 'pending' })
-    const failed = render(locale, { market: locale === 'en' ? 'USD' : 'ILS', shopifyConnected: true, trialActive: false, shopifyMigrationStatus: 'paypal_cancel_failed' })
+    const pending = render(locale, { market: 'USD', planPrices: USD, shopifyConnected: true, trialActive: false, shopifyMigrationStatus: 'pending' })
+    const failed = render(locale, { market: 'ILS', planPrices: ILS, shopifyConnected: true, trialActive: false, shopifyMigrationStatus: 'paypal_cancel_failed' })
     check(`C5b (${locale}) the two migration states render as Notices (wait, warn) inside the Shopify card`,
       states(pending) && failed.includes('data-notice="warn"') && failed.includes(esc(t.shopify.migrationNeedsAttention)) && !/bg-blue-|bg-amber-/.test(pending + failed))
     check(`C5b-MUT (${locale}) a pending view without its notice fails C5b`, !states(pending.replace('data-notice="wait"', '')))
@@ -197,28 +199,21 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
   const rest = strip(src)
   check('C6: no raw palette colours anywhere on the billing view (the Shopify panel included)', !RAW_COLOUR.test(rest), (RAW_COLOUR.exec(rest) || [])[0])
   check('C6-MUT: the old plan card colours fail C6', RAW_COLOUR.test(rest + 'border-blue-500 bg-blue-50'))
-  // The display currency is display only. The currency is persisted by exactly
-  // the request the old prompt sent (same route, method, header and body), only
-  // from a plan's "continue" button with the currency on screen, and PayPal's
-  // checkout still receives the STORED market, never the display one.
+  // w17 — replaces the Phase-3 C7 (the client saved its currency through
+  // /api/billing-market/select). Now the view never sends or chooses a
+  // currency: no request but the cancel one, no market state, and PayPal is
+  // given the server's market unconditionally.
   const code = strip(src)
-  const OLD_REQUEST = `const res = await fetch('/api/billing-market/select', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ market: chosen }),
-      })`
-  const persistOk = (s: string) =>
-    s.includes(OLD_REQUEST)
-    && s.split('/api/billing-market/select').length === 2
-    && (s.match(/fetch\(/g) || []).length === 2 // this request and /api/paypal/cancel, nothing else
-    && /onClick=\{\(\) => selectMarket\(shownMarket\)\}/.test(s)
-    && (s.match(/selectMarket\(/g) || []).length === 1 // called from the continue button only
-    && /onClick=\{\(\) => setPickedMarket\(m\)\}/.test(s)
-    && s.includes('{market !== null && <BillingClient market={market} />}')
-    && /market === null \? \(\s*<Button/.test(s)
-  check('C7: the currency is saved only by the unchanged request, from a plan\'s continue button; PayPal gets the stored market', persistOk(code))
-  check('C7-MUT: a changed request body fails C7', !persistOk(code.replace('JSON.stringify({ market: chosen })', 'JSON.stringify({ market: chosen, source: "plans" })')))
-  check('C7-MUT: a continue button that saves a fixed currency fails C7', !persistOk(code.replace('selectMarket(shownMarket)', "selectMarket('ILS')")))
-  check('C7-MUT: a switch that saves on click fails C7', !persistOk(code.replace('onClick={() => setPickedMarket(m)}', 'onClick={() => { setPickedMarket(m); selectMarket(m) }}')))
-  check('C7-MUT: PayPal given the display currency fails C7', !persistOk(code.replace('<BillingClient market={market} />', '<BillingClient market={shownMarket} />')))
+  const serverMarketOk = (s: string) =>
+    !s.includes('/api/billing-market/select')
+    && (s.match(/fetch\(/g) || []).length === 1 // /api/paypal/cancel, nothing else
+    && !/setPickedMarket|shownMarket|selectMarket|useState<BillingMarket/.test(s)
+    && /\n\s*<BillingClient market=\{market\} \/>/.test(s)
+    && !/language === 'en' \? 'USD'|=== 'he' \? 'ILS'/.test(s)
+  check('C7: the view never sends or picks a currency; PayPal gets the server market', serverMarketOk(code))
+  check('C7-MUT: the old select request fails C7', !serverMarketOk(code + "\nfetch('/api/billing-market/select', {})"))
+  check('C7-MUT: a display currency picked in the view fails C7', !serverMarketOk(code.replace('<BillingClient market={market} />', '<BillingClient market={shownMarket} />')))
+  check('C7-MUT: a language-derived currency fails C7', !serverMarketOk(code + "\nconst m = language === 'en' ? 'USD' : 'ILS'"))
   const noAmber = (s: string) => !/\b(?:bg|border|ring|text)-commit\b/.test(s)
   check('C8: no amber (commit) colour on the billing screen; "recommended" uses the action colour', noAmber(code) && /bg-action px-2\.5 py-0\.5 text-caption font-semibold text-action-ink/.test(code))
   check('C8-MUT: the old amber "recommended" badge fails C8', !noAmber(code + ' bg-commit text-commit-ink'))

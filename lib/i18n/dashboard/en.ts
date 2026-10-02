@@ -1,4 +1,5 @@
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '@/lib/plans/features'
+import type { BillingMarket } from '@/lib/billing/market'
 import type { DashboardDictionary } from './he'
 import { researchCompetitiveEn } from './research-competitive'
 
@@ -5672,19 +5673,12 @@ export const dashboardEn = {
     },
     keywordCheckNote: `${CHECKS_EXPLAINER.en} Article allowances are shared across all websites in your account, and every allowance renews each month. Unused allowances do not roll over.`,
     trialNoChargeNotice: 'No payment method was added, and you will not be charged automatically.',
+    // w17 — the billing currency is decided by the server (by country; fixed at
+    // the first payment). One quiet line, no switcher. Keyed by billing market.
     marketPrompt: {
-      title: 'Payment currency',
-      shownIn: (currency: string) => `Prices are shown in ${currency}. The currency is saved to your account when you continue to payment, and it can’t be changed after that.`,
-      ilsName: 'shekels',
-      usdName: 'US dollars',
-      continueToPayment: 'Continue to payment',
-      saveFailed: 'We couldn’t save the currency. Try again.',
-      ilsOption: '₪ ILS (Israeli Shekel)',
-      usdOption: '$ USD (US Dollar)',
-      saving: 'Saving...',
-      currentMarketPrefix: 'Your billing currency:',
-      ilsLabel: '₪ ILS',
-      usdLabel: '$ USD',
+      currencyName: { ILS: 'Israeli shekels (₪)', USD: 'US dollars ($)' } satisfies Record<BillingMarket, string>,
+      byLocation: (currency: string) => `Prices are shown in ${currency}, based on your location. The currency is set at your first payment.`,
+      locked: (currency: string) => `Your account is billed in ${currency}.`,
     },
     manage: {
       title: 'Manage subscription',
