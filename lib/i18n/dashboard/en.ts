@@ -2165,6 +2165,27 @@ export const dashboardEn = {
   contentStrategy: {
     nextEyebrow: 'Up next',
     nextNotScheduled: 'Not in the publishing queue yet',
+    nextPaused: 'Automatic publishing is paused',
+    // The project's first article, written the moment the first topic is approved
+    // (lib/content/strategy/first-article.ts). "Publish now" is offered for it only.
+    first: {
+      approveHint: 'Approving writes your first article right away (counts toward your allowance)',
+      writingTitle: 'Writing your first article…',
+      writingBody: 'This takes a few minutes. You can leave the page; the writing carries on without you.',
+      readyTitle: 'Your first article is ready',
+      readyBody: 'It is first on the publishing schedule and goes live on {date}. Want it live right now? You can.',
+      readyBodyNoDate: 'It is first on the publishing schedule. Want it live right now? You can.',
+      publishNow: 'Publish now',
+      publishing: 'Publishing…',
+      published: 'Your first article is live. The rest follow the publishing schedule.',
+      publishError: 'We could not publish it right now. It will go live automatically on its date.',
+      noSite: 'To publish now, connect your site first. Until then the article waits, ready, for its date.',
+      connect: 'Connect your site',
+      open: 'Open the article',
+      rhythm: 'Every other article goes live automatically at your plan\'s pace.',
+      stoppedTile: 'Writing stopped',
+      pausedHint: 'Automatic publishing is paused, so there are no dates. You can turn it on in the publishing queue.',
+    },
     whyTitle: 'Why this topic',
     whyFallback: {
       queued: 'It is first in the publishing queue, so it is written and published before the rest.',
@@ -2259,7 +2280,8 @@ export const dashboardEn = {
       swapShort: 'Swap',
       swapAria: 'Swap for the next topic: {title}',
       approvedNow: 'Approved',
-      approved: 'Topic approved and moved to Planned.',
+      approved: 'Topic approved and on the publishing schedule with its date.',
+      approvedFirst: 'Topic approved. Your first article is being written now; it will be ready in a few minutes.',
       existing: 'Your plan already has this topic, so no duplicate was made.',
       covered: 'Your site already has content on this topic, so no new topic was made.',
       rejected: 'Idea removed. It will not be suggested again.',

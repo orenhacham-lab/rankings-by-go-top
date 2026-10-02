@@ -5,10 +5,15 @@
  * the date it is projected to go live, and why it was chosen, in the one dark card the
  * screen opens with.
  *
- * Before the project has any article, its one action is "write the first article"
- * (decision 6 of the per-tab plan: the first article is never written automatically,
- * because it counts toward the article allowance). It goes through the existing flow
- * and nothing else:
+ * Where the publishing queue exists (automation on), approving IS scheduling: the
+ * approved topic goes straight into the queue with its date, and the FIRST approval on a
+ * project writes the first article on the server (lib/content/strategy/first-article.ts;
+ * the owner's ask of 2026-10-02 replaced decision 6, "never automatically"). The card
+ * then shows it being written, and once it is ready, the one "publish now" of the whole
+ * plan (FirstArticlePanel); every later article goes out on the plan's rhythm.
+ *
+ * Without automation (no queue), its one action before any article is still "write the
+ * first article", through the existing flow and nothing else:
  *   - a topic that already exists: POST /api/content/articles/generate, the same call
  *     the topics list makes, where the allowance is reserved and checked;
  *   - an idea that is not a topic yet: the existing "new article topic" brief, filled
@@ -17,14 +22,14 @@
  * When the next article is still an idea, it is acted on right here, with the board
  * card's own actions (useIdeaActions): approve it, swap it for the next pending idea
  * (no model call, nothing rejected), or say it is not a fit. Nothing on this card leads
- * to the list view to approve an idea. The two links that remain lead to what only the
- * list view has: the publishing queue, and adding a topic to it with its link review.
+ * to the list view to approve an idea. The link that remains leads to what only the
+ * list view has: the publishing queue (and, without automation, the topics list).
  */
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, Check, KeyRound, ListOrdered, Loader2, PenLine, Plus, Shuffle, Sparkles, X } from 'lucide-react'
+import { CalendarClock, Check, CircleCheck, ExternalLink, KeyRound, ListOrdered, Loader2, PauseCircle, PenLine, Plus, Send, Shuffle, Sparkles, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { NextArticle, StrategyOrigin } from '@/lib/content/strategy/board'
@@ -33,7 +38,9 @@ import type { Locale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { generationErrorCopy } from '@/lib/content/strategy/copy'
 import { canRejectIdea, type IdeaTarget } from '@/lib/content/strategy/ideas'
-import { dateTile, fill } from './format'
+import { dateTile, fill, longDate } from './format'
+import type { FirstArticleView } from '@/lib/content/strategy/first-article'
+import { BILLING_HREF } from '@/lib/onboarding/links'
 import type { BoardIdeaActions } from './StrategyBoard'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
 import TopicFacts from './TopicFacts'
@@ -46,6 +53,74 @@ const GENERATE_TIMEOUT_MS = 180_000
 const SPINNER = <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
 const INK_ACTION = 'inline-flex h-9 items-center gap-1.5 rounded-control border border-white/15 px-4 text-copy font-semibold text-contrast-ink transition-colors duration-150 ease-snappy hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50'
 
+/** Why the first article could not be written, in the onboarding's own friendly words. */
+type FirstErrors = Dict['seedOnboarding']['firstArticle']['errors']
+
+/**
+ * The project's first article, on the dark card: being written, ready (with the plan's
+ * one "publish now"), or stopped. Shown only for the first article (firstArticleView).
+ */
+function FirstArticlePanel({ first, date, lang, dict, hasSite, connectHref, publishing, onPublish }: {
+  first: Exclude<FirstArticleView, { kind: 'none' }>
+  date: string | null
+  lang: Locale
+  dict: Dict
+  /** null while the connection is not read yet. */
+  hasSite: boolean | null
+  connectHref: string
+  publishing: boolean
+  onPublish: () => void
+}) {
+  const f = dict.contentStrategy.first
+  if (first.kind === 'writing') {
+    return (
+      <div data-first-article="writing" role="status" aria-live="polite" className="mt-4 flex items-start gap-3 rounded-control border border-white/10 bg-white/[0.06] p-4">
+        <Loader2 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-contrast-ink/80 motion-safe:animate-spin" />
+        <div className="min-w-0">
+          <p className="text-copy font-semibold">{f.writingTitle}</p>
+          <p className="mt-0.5 text-caption text-contrast-ink/70">{f.writingBody}</p>
+          <div aria-hidden="true" className="mt-3 h-1 w-full max-w-xs overflow-hidden rounded-pill bg-white/10">
+            <div className="progress-sweep h-full rounded-pill bg-white/55" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (first.kind === 'failed') {
+    const errors = dict.seedOnboarding.firstArticle.errors as FirstErrors
+    const needsPlan = first.reason === 'quota' || first.reason === 'billing'
+    return (
+      <div data-first-article="failed" role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-white/10 bg-white/[0.06] p-4">
+        <p className="min-w-0 text-copy text-contrast-ink/90">{errors[first.reason]}</p>
+        {needsPlan && <Link href={BILLING_HREF} className={INK_ACTION}>{dict.seedOnboarding.actions.billing}</Link>}
+      </div>
+    )
+  }
+  const when = longDate(date, lang)
+  return (
+    <div data-first-article="ready" className="mt-4 rounded-control border border-white/20 bg-white/[0.08] p-4 motion-safe:animate-pop-in">
+      <p className="inline-flex items-center gap-2 text-copy font-semibold">
+        <CircleCheck aria-hidden="true" className="size-5 text-contrast-ink" /> {f.readyTitle}
+      </p>
+      <p className="mt-1 text-copy text-contrast-ink/80">{when ? fill(f.readyBody, { date: when }) : f.readyBodyNoDate}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {hasSite === false ? (
+          <p data-first-article-no-site className="w-full text-caption text-contrast-ink/75">{f.noSite}</p>
+        ) : null}
+        {hasSite === false ? (
+          <Link href={connectHref} className={INK_ACTION}><ExternalLink aria-hidden="true" className="size-4" /> {f.connect}</Link>
+        ) : (
+          <Button onClick={onPublish} loading={publishing} disabled={publishing || hasSite === null} data-first-article-publish>
+            {!publishing && <Send aria-hidden="true" className="size-4" />} {publishing ? f.publishing : f.publishNow}
+          </Button>
+        )}
+        <Link href={`/content/articles/${encodeURIComponent(first.articleId)}`} className={INK_ACTION}>{f.open}</Link>
+      </div>
+      <p className="mt-3 text-caption text-contrast-ink/60">{f.rhythm}</p>
+    </div>
+  )
+}
+
 function originOf(next: NextArticle): StrategyOrigin {
   if (next.kind === 'scan') return 'scan'
   if (next.kind === 'idea') return 'plan'
@@ -54,7 +129,18 @@ function originOf(next: NextArticle): StrategyOrigin {
 
 export default function NextArticleCard({
   next, hasArticles, lang, dict, idea = null, act = null, insight = null, onOpenBrief, onCreateTopic, onGenerated, onError,
+  automation = false, first = { kind: 'none' }, queuePaused = false, hasSite = null, connectHref = '/settings', publishing = false, onPublishFirst,
 }: {
+  /** The publishing queue exists: approving schedules, and the first approval writes the first article. */
+  automation?: boolean
+  /** The project's first article (firstArticleView): the only one with "publish now". */
+  first?: FirstArticleView
+  /** The queue is paused, so a queued article has no date. */
+  queuePaused?: boolean
+  hasSite?: boolean | null
+  connectHref?: string
+  publishing?: boolean
+  onPublishFirst?: () => void
   next: NextArticle | null
   hasArticles: boolean
   lang: Locale
@@ -123,12 +209,17 @@ export default function NextArticleCard({
     }
   }
 
-  // The queue and "add it to the queue" (with its link review) live only in the list view.
+  // The queue lives only in the list view. With automation an approved topic is already
+  // in it, so there is no "add it to the queue" step; without it, the topics list remains.
   const secondary = next.kind === 'queued'
     ? { href: strategyHref('list', STRATEGY_ANCHORS.queue), label: s.manageQueue }
-    : next.kind === 'topic'
+    : next.kind === 'topic' && !automation
       ? { href: strategyHref('list', STRATEGY_ANCHORS.topics), label: s.queueIt }
       : null
+  // The first article's panel sits on its own topic: queued while it is written or ready,
+  // and a topic again (out of the queue's waiting line) when writing it stopped.
+  const firstShown = first.kind !== 'none' && (next.kind === 'queued' || (first.kind === 'failed' && next.kind === 'topic'))
+  const firstStopped = firstShown && first.kind === 'failed'
   const a = s.ideaActions
   const ideaActs = (next.kind === 'idea' || next.kind === 'scan') && idea && act ? { idea, act } : null
   const busy = ideaActs ? ideaActs.act.actions.busy[ideaActs.idea.key] : undefined
@@ -146,8 +237,13 @@ export default function NextArticleCard({
             </div>
           ) : (
             <div className="flex w-24 shrink-0 flex-col items-center gap-1.5 rounded-control border border-dashed border-white/20 px-2 py-3 text-center md:w-full">
-              <CalendarClock className="size-6 text-contrast-ink/60" aria-hidden="true" />
-              <span className="text-caption text-contrast-ink/70">{s.nextNotScheduled}</span>
+              {next.kind === 'queued' && queuePaused
+                ? <PauseCircle className="size-6 text-contrast-ink/60" aria-hidden="true" />
+                : <CalendarClock className="size-6 text-contrast-ink/60" aria-hidden="true" />}
+              {/* A queued article is in the queue: without a date, that is because the queue is paused. */}
+              <span data-next-date-state={next.kind === 'queued' ? 'paused' : firstStopped ? 'stopped' : 'unscheduled'} className="text-caption text-contrast-ink/70">
+                {next.kind === 'queued' ? s.nextPaused : firstStopped ? s.first.stoppedTile : s.nextNotScheduled}
+              </span>
             </div>
           )}
         </div>
@@ -177,8 +273,16 @@ export default function NextArticleCard({
             {insight && <TopicFacts insight={insight} lang={lang} dict={dict} tone="ink" className="mt-3" />}
           </div>
 
+          {firstShown && (
+            <FirstArticlePanel
+              first={first} date={next.date} lang={lang} dict={dict} hasSite={hasSite} connectHref={connectHref}
+              publishing={publishing} onPublish={() => onPublishFirst?.()}
+            />
+          )}
+          {next.kind === 'queued' && queuePaused && <p className="mt-3 text-caption text-contrast-ink/65">{s.first.pausedHint}</p>}
+
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            {!hasArticles && (
+            {!hasArticles && !automation && (
               <>
                 <Button onClick={writeFirst} loading={writing} disabled={writing}>
                   {!writing && <PenLine aria-hidden="true" className="size-4" />} {writing ? s.writing : s.writeFirst}
@@ -188,8 +292,9 @@ export default function NextArticleCard({
             )}
             {ideaActs && (
               <div role="group" aria-label={fill(a.groupLabel, { title: next.title })} data-next-idea-actions className="flex flex-wrap items-center gap-2">
-                {/* Before the first article, "write" is the one filled action; after it, approving is. */}
-                {hasArticles ? (
+                {/* Without automation, "write" is the one filled action before the first article;
+                    otherwise approving is (and the first approval writes the first article). */}
+                {hasArticles || automation ? (
                   <Button onClick={() => void ideaActs.act.actions.approve(ideaActs.idea)} loading={busy === 'approve'} disabled={!!busy}
                     aria-label={fill(a.approveAria, { title: next.title })} data-idea-action="approve">
                     {busy !== 'approve' && <Check aria-hidden="true" className="size-4" />} {a.approve}
@@ -211,6 +316,9 @@ export default function NextArticleCard({
                     aria-busy={busy === 'reject' || undefined} aria-label={fill(a.rejectAria, { title: next.title })} data-idea-action="reject">
                     {busy === 'reject' ? SPINNER : <X aria-hidden="true" className="size-4" />} {a.reject}
                   </button>
+                )}
+                {automation && !hasArticles && (
+                  <span data-approve-first-hint className="basis-full text-caption text-contrast-ink/60">{s.first.approveHint}</span>
                 )}
               </div>
             )}

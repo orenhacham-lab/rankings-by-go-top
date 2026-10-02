@@ -9,6 +9,7 @@
  * publishing, no cron — that arrives in Phases 5-7. Gated by the caller.
  */
 
+import { canPublishFirstNow } from '@/lib/content/strategy/first-article'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
@@ -66,7 +67,10 @@ export default function AutomationSchedule({
   language,
   refreshKey,
   onChanged,
+  articles,
 }: {
+  /** The project's articles (id + status), for "publish now", which only the first article has. */
+  articles?: readonly { id: string; status: string }[]
   projectId: string
   language: 'he' | 'en'
   refreshKey: number
@@ -108,6 +112,8 @@ export default function AutomationSchedule({
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [items, setItems] = useState<QueueItem[]>([])
+  // Without the workspace's list, the queue's own articles stand in for the project's.
+  const articlesForFirst = articles ?? items.filter((i) => !!i.articleId).map((i) => ({ id: i.articleId!, status: i.status === 'published' ? 'published' : 'ready' }))
   const [health, setHealth] = useState<{ needsAttention: boolean; overdue: boolean; failedCount: number; stuckCount: number; latestError: string | null } | null>(null)
   // Phase 4B.1 — persisted final-failure alerts (one per item, owner-scoped).
   // The API now returns the shared read model: a channel, a derived heading and a
@@ -600,9 +606,16 @@ export default function AutomationSchedule({
                   {it.status === 'publishing' && <span className="text-caption text-muted">{t.publishingNow}</span>}
                   {it.status === 'published' && <span className="text-caption text-ok">{t.publishedDone}</span>}
                   {/* The row's one inline action; the rest is in the row menu. */}
-                  {(it.status === 'generated' || (it.status === 'failed' && it.articleId)) && (
+                  {/* "Publish now" belongs to the project's first article only (lib/content/strategy/first-article.ts);
+                      every other article goes out on the plan's rhythm. A failed publish keeps its retry. */}
+                  {it.status === 'generated' && canPublishFirstNow({ articles: articlesForFirst, queue: items, itemId: it.id }) && (
                     <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                       {busyItem === it.id ? t.publishingNow : t.publishNow}
+                    </Button>
+                  )}
+                  {it.status === 'failed' && it.articleId && (
+                    <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                      {busyItem === it.id ? t.publishingNow : t.retry}
                     </Button>
                   )}
                   {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (

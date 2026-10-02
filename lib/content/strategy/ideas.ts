@@ -212,3 +212,21 @@ export function overrideSettled(data: StrategyData, o: IdeaOverride): boolean {
 export function deferIdea(deferred: readonly string[], key: string): string[] {
   return [...deferred.filter((k) => k !== key), key]
 }
+
+/**
+ * The topic an approval created or found (the topics route's `topic.id`, or the bulk
+ * route's first resolved topic): what is then sent to the publishing queue
+ * (lib/content/strategy/first-article.ts, POST /api/content/strategy/schedule).
+ */
+export function readApprovedTopicId(url: string, body: unknown): string | null {
+  if (!body || typeof body !== 'object') return null
+  if (url === IDEA_ENDPOINTS.topic) {
+    const topic = (body as { topic?: unknown }).topic
+    const id = topic && typeof topic === 'object' ? (topic as { id?: unknown }).id : null
+    return typeof id === 'string' && id ? id : null
+  }
+  const resolved = (body as { resolvedTopics?: unknown }).resolvedTopics
+  const first = Array.isArray(resolved) ? resolved[0] : null
+  const id = first && typeof first === 'object' ? (first as { topicId?: unknown }).topicId : null
+  return typeof id === 'string' && id ? id : null
+}

@@ -2170,6 +2170,27 @@ export const dashboardHe = {
   contentStrategy: {
     nextEyebrow: 'הבא בתור',
     nextNotScheduled: 'עוד לא בתור הפרסום',
+    nextPaused: 'הפרסום האוטומטי מושהה',
+    // The project's first article, written the moment the first topic is approved
+    // (lib/content/strategy/first-article.ts). "Publish now" is offered for it only.
+    first: {
+      approveHint: 'האישור כותב מיד את המאמר הראשון (נספר במכסת המאמרים)',
+      writingTitle: 'כותבים את המאמר הראשון…',
+      writingBody: 'זה לוקח כמה דקות. אפשר לצאת מהדף, הכתיבה ממשיכה גם בלעדיכם.',
+      readyTitle: 'המאמר הראשון מוכן',
+      readyBody: 'הוא ראשון בלוח הפרסום ויעלה לאתר ב{date}. רוצים שיעלה כבר עכשיו? אפשר.',
+      readyBodyNoDate: 'הוא ראשון בלוח הפרסום. רוצים שיעלה כבר עכשיו? אפשר.',
+      publishNow: 'פרסם עכשיו',
+      publishing: 'מפרסם…',
+      published: 'המאמר הראשון עלה לאתר. השאר יתפרסמו לפי לוח הפרסום.',
+      publishError: 'לא הצלחנו לפרסם עכשיו. המאמר יעלה לאתר אוטומטית במועד שלו.',
+      noSite: 'כדי לפרסם עכשיו צריך קודם לחבר את האתר. בלי חיבור המאמר מחכה מוכן במועד שלו.',
+      connect: 'לחיבור האתר',
+      open: 'פתיחת המאמר',
+      rhythm: 'כל שאר המאמרים יעלו אוטומטית לפי קצב התוכנית שלכם.',
+      stoppedTile: 'הכתיבה נעצרה',
+      pausedHint: 'הפרסום האוטומטי מושהה, ולכן אין תאריכים. אפשר להפעיל אותו בתור הפרסום.',
+    },
     whyTitle: 'למה הנושא הזה',
     whyFallback: {
       queued: 'הוא הראשון בתור הפרסום, ולכן ייכתב ויעלה לפני כל השאר.',
@@ -2264,7 +2285,8 @@ export const dashboardHe = {
       swapShort: 'החלף',
       swapAria: 'החלף בנושא הבא: {title}',
       approvedNow: 'אושר',
-      approved: 'הנושא אושר ועבר לעמודת "מתוכנן".',
+      approved: 'הנושא אושר ונכנס ללוח הפרסום עם התאריך שלו.',
+      approvedFirst: 'הנושא אושר. כותבים עכשיו את המאמר הראשון, הוא יהיה מוכן בעוד כמה דקות.',
       existing: 'כבר יש נושא כזה בתוכנית, אז לא נוצרה כפילות.',
       covered: 'באתר כבר יש תוכן על הנושא הזה, אז לא נוצר נושא נוסף.',
       rejected: 'הרעיון הוסר ולא יוצע שוב.',
