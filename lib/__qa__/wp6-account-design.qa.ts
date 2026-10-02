@@ -290,11 +290,14 @@ console.log('\nE) admin articles and setup: in-page questions, our words, Hebrew
   const authorOk = (form: string, page: string) => {
     const f = stripComments(form), pg = stripComments(page)
     return !/@[\w-]+\.[a-z]{2,}/i.test(f + pg) && /author: initial\?\.author \?\? defaultAuthor,/.test(f)
-      && /\.from\('profiles'\)\.select\('full_name'\)\.eq\('id', user\.id\)/.test(pg) && /<ArticleForm defaultAuthor=\{defaultAuthor\} \/>/.test(pg)
+      && /user\?\.user_metadata/.test(pg) && /supabase\.auth\.getUser\(\)/.test(pg) && /<ArticleForm defaultAuthor=\{defaultAuthor\} \/>/.test(pg)
       && !/createAdminClient/.test(pg)
+      // profiles has no full_name column in Production: a select of it only fails.
+      && !/\.from\('profiles'\)\.select\([^)]*full_name/.test(pg)
   }
-  check('E5: a new article\'s author is the admin\'s own profile name (own session), never a hard-coded email', authorOk(formRaw, newPageRaw))
+  check('E5: a new article\'s author is the admin\'s own account name (own session), never a hard-coded email', authorOk(formRaw, newPageRaw))
   check('MUTATION CONTROL: the hard-coded email default fails E5', !authorOk(formRaw.replace('author: initial?.author ?? defaultAuthor,', "author: initial?.author ?? 'someone@example.com',"), newPageRaw))
+  check('MUTATION CONTROL: reading the missing profiles.full_name column again fails E5', !authorOk(formRaw, newPageRaw.replace('const metaName =', "const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user!.id).maybeSingle()\n  const metaName =")))
   const noRail = (s: string) => {
     const c = stripComments(s)
     return !/border-s-\[?\d/.test(c) && /ICON_TONE\[copy\.tone\]/.test(c) && /bad: 'bg-bad-soft text-bad'/.test(c)

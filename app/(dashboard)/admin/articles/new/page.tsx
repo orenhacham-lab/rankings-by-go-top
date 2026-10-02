@@ -3,15 +3,14 @@ import ArticleForm from '@/components/admin/ArticleForm'
 import BackLink from '@/components/ui/BackLink'
 
 export default async function NewArticlePage() {
-  // The author defaults to the signed-in admin's own name (their profile, read
-  // through their own session), never to an email address.
+  // The author defaults to the signed-in admin's own name, from their own
+  // session's account metadata (where sign-up stores full_name), never to an
+  // email address. profiles has no full_name column (id, role, timestamps), so
+  // it is not read here: that query only ever failed.
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = user
-    ? await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
-    : { data: null }
   const metaName = (user?.user_metadata as { full_name?: unknown } | undefined)?.full_name
-  const defaultAuthor = (profile?.full_name as string | null | undefined)?.trim() || (typeof metaName === 'string' ? metaName.trim() : '')
+  const defaultAuthor = typeof metaName === 'string' ? metaName.trim() : ''
 
   return (
     <div dir="rtl" className="space-y-8">
