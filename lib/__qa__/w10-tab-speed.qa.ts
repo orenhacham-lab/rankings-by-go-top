@@ -6,7 +6,7 @@
  * Measured on the stub at 200 ms per read (scratchpad w10-content/api-depth-*):
  *   /api/content/overview   1455 → 436 ms   (7 round trips → 2)
  *   /api/content/topics      638 → 434 ms
- *   /api/gsc/status          843 → 442 ms
+ *   /api/gsc/status          843 → 442 ms   (with OAuth configured, as in production)
  *   /api/projects/quota      842 → 659 ms
  *   /api/site-health/fixes  1062 → 653 ms
  * Each read below depends only on the owner-checked project/user, so it is
@@ -34,7 +34,7 @@ check('topics: the plan status is requested before the topics are awaited', topi
 check('topics: ownership first', topics.indexOf('authContentProject(projectId)') < topics.indexOf('planStatusRead'))
 
 const gsc = read('app/api/gsc/status/route.ts')
-check('gsc status: connection, property, windows and role read together', /await Promise\.allSettled\(\[\s*loadUserConnection\([\s\S]*?loadProjectProperty\([\s\S]*?runsRead,[\s\S]*?isAdminUser\(/.test(gsc))
+check('gsc status: connection, property and windows read together', /await Promise\.allSettled\(\[\s*loadUserConnection\([\s\S]*?loadProjectProperty\([\s\S]*?runsRead,\s*\]\)/.test(gsc))
 check('gsc status: failures surface in the old order and windows count only with a property', gsc.indexOf("connectionRead.status === 'rejected'") < gsc.indexOf("propertyRead.status === 'rejected'") && /if \(property\) \{\s*const read = runsResult/.test(gsc))
 
 const quota = read('app/api/projects/quota/route.ts')

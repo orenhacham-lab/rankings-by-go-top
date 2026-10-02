@@ -63,15 +63,12 @@ export async function GET(request: Request) {
     const oauthConfigured = isGscOAuthConfigured()
     const runsRead = Promise.all(GSC_WINDOWS.map((w) => latestSucceededRun(auth.admin, auth.project.id, w as GscWindowDays)))
       .then((runs) => ({ runs }), (error: unknown) => ({ error }))
-    const [connectionRead, propertyRead, runsResult, adminRead] = await Promise.allSettled([
+    const [connectionRead, propertyRead, runsResult] = await Promise.allSettled([
       loadUserConnection(auth.admin, auth.user.id),
       loadProjectProperty(auth.admin, auth.project.id),
       runsRead,
-      // Why it is unavailable (server configuration) is for an administrator to read; a merchant
-      // sees only that it is unavailable. The role comes from profiles via the service-role client.
-      oauthConfigured ? Promise.resolve(false) : isAdminUser(auth.admin, auth.user.id),
     ])
-    // Failures surface in the order the reads used to run: connection, property, windows, role.
+    // Failures surface in the order the reads used to run: connection, property, windows.
     if (connectionRead.status === 'rejected') throw connectionRead.reason
     if (propertyRead.status === 'rejected') throw propertyRead.reason
     const connection = connectionRead.value
@@ -84,8 +81,10 @@ export async function GET(request: Request) {
       const runs = read.runs
       GSC_WINDOWS.forEach((w, i) => { windows[String(w)] = summaryCard(runs[i]) })
     }
-    if (adminRead.status === 'rejected') throw adminRead.reason
-    const opsDetail = adminRead.value
+    // Why it is unavailable (server configuration) is for an administrator to read; a merchant
+    // sees only that it is unavailable. The role comes from profiles via the service-role client.
+    // (Only read when OAuth is not configured, so it costs nothing in production.)
+    const opsDetail = !oauthConfigured && await isAdminUser(auth.admin, auth.user.id)
 
     return Response.json({
       ok: true,
