@@ -9,6 +9,7 @@
  */
 import type { PricingCopy } from '@/components/public/pricing/PricingSections'
 import { PLAN_CATALOG, TRIAL_CATALOG } from '@/lib/plans/catalog'
+import { CHECKS_EXPLAINER } from '@/lib/plans/features'
 
 const DAYS = TRIAL_CATALOG.days
 const BASIC_ARTICLES = PLAN_CATALOG.regular.maxArticlesPerPeriodAccountWide
@@ -28,12 +29,14 @@ export const pricingEn: PricingCopy = {
     cta: `Try free for ${DAYS} days`,
     dashboard: 'Go to my dashboard',
     noCard: 'No credit card needed',
+    checksNote: CHECKS_EXPLAINER.en,
     everyPlanLabel: 'In every plan',
     everyPlan: [
-      'Google and Google Maps tracking',
-      'Visibility checks in 6 AI engines',
-      'Publishing to WordPress and Shopify',
-      'PDF and Excel reports',
+      'Automatic scheduled publishing to WordPress, Shopify and Wix',
+      'Tracking of where you rank in Google and Google Maps',
+      'A check of whether 6 AI engines, like ChatGPT and Gemini, mention you',
+      'A website health score with a list of fixes',
+      'PDF and Excel reports you can send',
       'Personal support',
     ],
   },
@@ -44,7 +47,7 @@ export const pricingEn: PricingCopy = {
   included: {
     eyebrow: 'In every plan',
     title: 'No add-ons. Everything is in from day one.',
-    body: 'Plans differ only in volume: how many projects, articles and checks you get each month. The features are the same in all of them.',
+    body: 'Plans differ only in volume: how many websites, articles and checks you get each month. The features are the same in all of them.',
     items: [
       {
         title: 'Articles written and published',
@@ -94,22 +97,22 @@ export const pricingEn: PricingCopy = {
   usage: {
     eyebrow: 'How usage is counted',
     title: 'No fine print',
-    body: 'Three simple units, and every allowance resets each monthly billing period.',
+    body: 'Three simple units, and every allowance renews each month.',
     items: [
       {
         title: 'Article',
         desc: 'Creating a new article uses one from your allowance. Editing, scheduling or publishing an existing one uses nothing.',
       },
       {
-        title: 'Google check',
-        desc: 'One phrase in one place: Google or Google Maps. The same phrase in both counts as two checks.',
+        title: 'Google ranking check',
+        desc: 'Looking up where one keyword appears, in one place: Google or Google Maps. The same keyword in both counts as two checks.',
       },
       {
-        title: 'AI check',
-        desc: 'One query in one AI engine. The same query in ChatGPT and Gemini counts as two checks.',
+        title: 'AI visibility check',
+        desc: 'Asking one AI engine one question and seeing whether your business is mentioned. The same question in ChatGPT and Gemini counts as two checks.',
       },
     ],
-    note: 'The article allowance is per account. On plans with more than one project, it is shared across your projects.',
+    note: 'The article allowance is per account. On plans with more than one website, it is shared across your websites.',
   },
   faq: {
     eyebrow: 'Questions',
@@ -122,7 +125,7 @@ export const pricingEn: PricingCopy = {
       },
       {
         q: 'What\'s in the free trial?',
-        a: `${DAYS} days, no credit card: one project, up to ${TRIAL_CATALOG.maxKeywordsPerProject} keywords, up to ${TRIAL_CATALOG.maxGoogleChecksLifetime} Google checks, up to ${TRIAL_CATALOG.maxAIChecksLifetime} AI checks, and one article so you can see the whole process from start to publish.`,
+        a: `${DAYS} days, no credit card: one website, up to ${TRIAL_CATALOG.maxKeywordsPerProject} keywords, up to ${TRIAL_CATALOG.maxGoogleChecksLifetime} Google ranking checks, up to ${TRIAL_CATALOG.maxAIChecksLifetime} AI visibility checks, and one article so you can see the whole process from start to publish.`,
       },
       {
         q: `What happens after the ${DAYS}-day trial?`,
@@ -134,15 +137,15 @@ export const pricingEn: PricingCopy = {
       },
       {
         q: 'What happens to unused articles?',
-        a: 'The allowance resets every billing period, and unused articles don\'t roll over.',
+        a: 'The allowance renews every month, and unused articles don\'t roll over.',
       },
       {
         q: 'Do scans run on their own?',
-        a: 'Run a manual scan whenever you like, or turn on an automatic monthly scan that runs by itself each billing period. There\'s no daily or weekly automatic scan at the moment.',
+        a: 'Run a manual scan whenever you like, or turn on an automatic monthly scan that runs by itself every month. There\'s no daily or weekly automatic scan at the moment.',
       },
       {
         q: 'Can articles be scheduled and published automatically?',
-        a: 'Yes. Schedule an article for a future date, or publish it right away to a connected WordPress or Shopify site.',
+        a: 'Yes. Schedule an article for a future date, or publish it right away to a connected site: WordPress, Shopify or Wix.',
       },
       {
         q: 'How is our data protected?',

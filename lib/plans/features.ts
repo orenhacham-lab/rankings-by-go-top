@@ -21,25 +21,29 @@
  *
  * Numbers come from the catalog. Only the sentence FRAMES live here.
  *
- * THE ARTICLE LINE SAYS "MONTHLY" EXPLICITLY. The cards used to read "per
- * billing period" while the Shopify plan descriptions read "per month" — two
- * phrasings for one quota, which is the shape a customer dispute takes. Every
- * plan is monthly and annual billing is out of scope, so the period is stated
- * rather than implied, in the same words on every surface. The underlying
- * period RESOLVER is untouched; this is what the sentence calls it.
+ * THE LINES SAY "A MONTH", NOT "BILLING PERIOD". Every plan is billed monthly
+ * (the cards and the checkout say "per month", annual billing does not exist),
+ * and "billing period" is the engineers' word for it. A small-business owner
+ * reads "a month". The same goes for "project" (a website, to the customer) and
+ * for the two check quotas, whose lines now name what is checked. The underlying
+ * period RESOLVER (lib/billing/usage-period.ts) is untouched; this is only what
+ * the sentence calls it. lib/plans/__qa__/plan-copy-plain.qa.ts keeps the
+ * jargon out and the article line first.
  *
  * PURE — no React, no database, no server-only import — so the public pricing
  * pages, the dashboard billing view and the server-side entitlement module can
  * all read it without pulling anything into a page bundle.
  */
 
-import { PLAN_CATALOG, type PlanCode } from './catalog'
+import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from './catalog'
 import type { Locale } from '@/lib/i18n/locales'
 
 /**
- * A plan capped at ONE project describes its allowances per account, because
- * "per project" would be noise where only one project can exist. Above one, the
- * per-project scope is load-bearing and is stated.
+ * A plan capped at ONE website describes its allowances per account, because
+ * "per website" would be noise where only one can exist. Above one, the
+ * per-website scope is load-bearing and is stated. (The catalog and the code
+ * call a website a "project"; a customer calls it a website, so every line
+ * below says website.)
  */
 function isSingleProject(code: PlanCode): boolean {
   return PLAN_CATALOG[code].maxProjects === 1
@@ -48,79 +52,116 @@ function isSingleProject(code: PlanCode): boolean {
 /**
  * THE FIVE LIMIT LINES, each addressable by name so the ORDER can be a
  * decision rather than an accident of how the array was typed.
+ *
+ * WRITTEN FOR A SMALL-BUSINESS OWNER, NOT FOR AN ENGINEER. Three words used to
+ * stand between the customer and the number: "billing period" (the plan is
+ * monthly, so the line says "a month"), "project" (a website) and "Google
+ * checks" / "AI checks" (nothing said what one is). The check lines now name
+ * what is checked, and the one-sentence definition sits under the plan grid
+ * (CHECKS_EXPLAINER below), so a visitor never has to guess what a "check" is.
  */
-interface LimitLines { projects: string; keywords: string; google: string; ai: string; articles: string }
+interface LimitLines { articles: string; projects: string; keywords: string; google: string; ai: string }
 
 function limitLinesFor(code: PlanCode, locale: Locale): LimitLines {
   const c = PLAN_CATALOG[code]
   const single = isSingleProject(code)
   if (locale === 'en') {
     return {
-      projects: single ? '1 project' : `Up to ${c.maxProjects} projects`,
-      keywords: single ? `Up to ${c.maxKeywordsPerProject} keywords` : `Up to ${c.maxKeywordsPerProject} keywords per project`,
-      google: single
-        ? `Up to ${c.maxGoogleChecksPerPeriodPerProject} Google checks per billing period`
-        : `Up to ${c.maxGoogleChecksPerPeriodPerProject} Google checks per billing period per project`,
-      ai: single
-        ? `Up to ${c.maxAIChecksPerPeriodPerProject} AI checks per billing period`
-        : `Up to ${c.maxAIChecksPerPeriodPerProject} AI checks per billing period per project`,
-      // "Shared across your account" answers "shared with WHAT?" — a question a
-      // one-project plan does not raise. On Basic and Advanced the clause reads
-      // as a hint that other projects exist, which is the opposite of the
-      // positioning, so it is stated only where sharing is real.
+      // THE MAIN VALUE, and the first line of every plan: articles written and
+      // published to the customer's site without them lifting a finger.
       articles: single
-        ? `${c.maxArticlesPerPeriodAccountWide} articles per monthly billing period`
-        : `${c.maxArticlesPerPeriodAccountWide} articles per monthly billing period, shared across your account`,
+        ? `${c.maxArticlesPerPeriodAccountWide} articles a month, written and published to your website automatically`
+        : `${c.maxArticlesPerPeriodAccountWide} articles a month, written and published automatically, shared across all your websites`,
+      projects: single ? '1 website' : `Up to ${c.maxProjects} websites`,
+      keywords: single ? `Track up to ${c.maxKeywordsPerProject} keywords` : `Track up to ${c.maxKeywordsPerProject} keywords per website`,
+      google: single
+        ? `Up to ${c.maxGoogleChecksPerPeriodPerProject} Google ranking checks a month`
+        : `Up to ${c.maxGoogleChecksPerPeriodPerProject} Google ranking checks a month per website`,
+      ai: single
+        ? `Up to ${c.maxAIChecksPerPeriodPerProject} AI visibility checks a month`
+        : `Up to ${c.maxAIChecksPerPeriodPerProject} AI visibility checks a month per website`,
     }
   }
   return {
-    projects: single ? 'פרויקט אחד' : `עד ${c.maxProjects} פרויקטים`,
-    keywords: single ? `עד ${c.maxKeywordsPerProject} מילות מפתח` : `עד ${c.maxKeywordsPerProject} מילות מפתח לפרויקט`,
-    google: single
-      ? `עד ${c.maxGoogleChecksPerPeriodPerProject} בדיקות גוגל בכל מחזור חיוב`
-      : `עד ${c.maxGoogleChecksPerPeriodPerProject} בדיקות גוגל בכל מחזור חיוב לפרויקט`,
-    ai: single
-      ? `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב`
-      : `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב לפרויקט`,
     articles: single
-      ? `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב חודשי`
-      : `${c.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון`,
+      ? `${c.maxArticlesPerPeriodAccountWide} מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית`
+      : `${c.maxArticlesPerPeriodAccountWide} מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם`,
+    projects: single ? 'אתר אחד' : `עד ${c.maxProjects} אתרים`,
+    keywords: single ? `מעקב אחרי עד ${c.maxKeywordsPerProject} מילות מפתח` : `מעקב אחרי עד ${c.maxKeywordsPerProject} מילות מפתח לכל אתר`,
+    google: single
+      ? `עד ${c.maxGoogleChecksPerPeriodPerProject} בדיקות מיקום בגוגל בחודש`
+      : `עד ${c.maxGoogleChecksPerPeriodPerProject} בדיקות מיקום בגוגל בחודש לכל אתר`,
+    ai: single
+      ? `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות נראות ב-AI בחודש`
+      : `עד ${c.maxAIChecksPerPeriodPerProject} בדיקות נראות ב-AI בחודש לכל אתר`,
   }
 }
 
 /**
  * THE ORDER IS PART OF THE POSITIONING, not a formatting detail.
  *
- * On a ONE-WEBSITE plan the article allowance is the reason to move up a tier —
- * Basic and Advanced differ by 4 vs 12 articles far more than by anything else —
- * so it is read SECOND, immediately after the project line, before the tracking
- * limits. Burying it under three check-quota lines made the two plans look
- * nearly identical at a glance.
- *
- * On a MULTI-PROJECT plan the per-project limits are what scale with the tier,
- * and the account-wide article pool is the qualifier at the end of the list, so
- * that order is unchanged.
+ * The article line is FIRST on every plan. It is the product: a customer who
+ * reads one line of a plan card should read that the site gets articles written
+ * and published for it. Then how many websites, then what is tracked.
  *
  * Ordering lives HERE, once. A page that re-sorted the array itself would be
  * the same drift this module exists to prevent.
  */
 export function planLimitLines(code: PlanCode, locale: Locale): string[] {
   const l = limitLinesFor(code, locale)
-  return isSingleProject(code)
-    ? [l.projects, l.articles, l.keywords, l.google, l.ai]
-    : [l.projects, l.keywords, l.google, l.ai, l.articles]
+  return [l.articles, l.projects, l.keywords, l.google, l.ai]
 }
 
-/** The article sentence on its own — its POSITION differs per plan, so callers
- *  that want the sentence must ask for it rather than index into the array. */
+/** The article sentence on its own, for callers that want the sentence rather
+ *  than an index into the array. */
 export function planArticleLine(code: PlanCode, locale: Locale): string {
   return limitLinesFor(code, locale).articles
 }
 
-/** Where the article sentence sits in `planLimitLines` for this plan: second on
- *  a one-project plan, last on a multi-project one. */
+/** Where the article sentence sits in `planLimitLines`: first on every plan. */
 export function planArticleLineIndex(code: PlanCode): number {
-  return isSingleProject(code) ? 1 : 4
+  void code
+  return 0
+}
+
+/**
+ * WHAT A "CHECK" IS, in one sentence each, for the line under the plan grid
+ * (both pricing pages) and the note under the dashboard's plan cards. The plan
+ * lines name what is checked ("Google ranking checks", "AI visibility checks");
+ * this says what one of them is, in the words a customer uses. Same definitions
+ * as the "how usage is counted" section: a Google check is one keyword in one
+ * place (Google or Google Maps), an AI check is one question to one AI engine.
+ */
+export const CHECKS_EXPLAINER: Record<Locale, string> = {
+  en: 'A Google ranking check looks up where one keyword appears in Google or Google Maps. An AI visibility check asks one AI engine one question, for example ChatGPT, and sees whether your business is mentioned in the answer.',
+  he: 'בדיקת מיקום בגוגל בודקת איפה מילת מפתח אחת מופיעה בגוגל או בגוגל מפות. בדיקת נראות ב-AI שואלת מנוע AI אחד שאלה אחת, למשל ChatGPT, ובודקת אם העסק שלכם מוזכר בתשובה.',
+}
+
+/**
+ * The free trial's lines, in the same words and the same order as the paid
+ * plans, from TRIAL_CATALOG. The trial allowances are for the whole trial, not
+ * per month, and the lines say so.
+ */
+export function trialLimitLines(locale: Locale): string[] {
+  const t = TRIAL_CATALOG
+  if (locale === 'en') {
+    return [
+      'One article to try, from writing to publishing',
+      '1 website',
+      `Up to ${t.maxKeywordsPerProject} keywords`,
+      `Up to ${t.maxGoogleChecksLifetime} Google ranking checks during the trial`,
+      `Up to ${t.maxAIChecksLifetime} AI visibility checks during the trial`,
+      `${t.days}-day trial`,
+    ]
+  }
+  return [
+    'מאמר אחד לניסיון, מהכתיבה ועד הפרסום',
+    'אתר אחד',
+    `עד ${t.maxKeywordsPerProject} מילות מפתח`,
+    `עד ${t.maxGoogleChecksLifetime} בדיקות מיקום בגוגל בתקופת הניסיון`,
+    `עד ${t.maxAIChecksLifetime} בדיקות נראות ב-AI בתקופת הניסיון`,
+    `${t.days} ימי ניסיון`,
+  ]
 }
 
 /**
@@ -152,16 +193,16 @@ export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<Locale, string>> = {
  */
 export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<Locale, string>> = {
   regular: {
-    en: 'One project, a perfect starting point',
-    he: 'פרויקט אחד, בסיס מושלם להתחלה',
+    en: 'One website, a simple place to start',
+    he: 'אתר אחד, התחלה פשוטה',
   },
   advanced: {
-    en: 'For one website with higher content and tracking needs',
-    he: 'לאתר אחד עם צרכי תוכן ומעקב מתקדמים',
+    en: 'For one website that needs more articles and more tracking',
+    he: 'לאתר אחד שצריך יותר מאמרים ויותר מעקב',
   },
   premium: {
-    en: 'For businesses and agencies with advanced needs',
-    he: 'לעסקים ולסוכנויות עם צרכים מתקדמים',
+    en: 'For businesses and agencies running several websites',
+    he: 'לעסקים ולסוכנויות שמנהלים כמה אתרים',
   },
   large_agency: {
     en: 'For agencies with many clients',
