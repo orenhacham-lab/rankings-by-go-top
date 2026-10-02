@@ -6,13 +6,16 @@
  * Shopify destination, not inside a frame); otherwise it renders nothing, and
  * the page is exactly as before.
  *
- * Supabase hosts the OAuth dance (PKCE) and returns to the existing callback.
+ * With the site's own Google client configured (googleDirectConfigured), the
+ * button goes to the same-origin start route, so Google names this site;
+ * otherwise Supabase hosts the OAuth dance (PKCE), exactly as before. Both
+ * return to the existing callback.
  * A failure to start it is one sentence in the page's language; the provider's
  * own message is never shown.
  */
 import { useState, useSyncExternalStore } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { googleRedirectTo, googleSignInCopy, googleSignInEnabled, googleSignInVisible, isFramed } from '@/lib/auth/google-signin'
+import { googleDirectConfigured, googleRedirectTo, googleSignInCopy, googleStartPath, googleSignInEnabled, googleSignInVisible, isFramed } from '@/lib/auth/google-signin'
 import type { Locale } from '@/lib/i18n/locales'
 
 // A page never moves in or out of a frame: nothing to subscribe to.
@@ -31,6 +34,11 @@ export default function GoogleSignInButton({ lang, nextPath, disabled = false }:
     if (busy || disabled) return
     setBusy(true)
     setError(false)
+    if (googleDirectConfigured()) {
+      // A full navigation: the start route sets the flow's cookie and redirects to Google.
+      window.location.assign(googleStartPath(nextPath, lang))
+      return
+    }
     try {
       const { error: oauthError } = await createClient().auth.signInWithOAuth({
         provider: 'google',
