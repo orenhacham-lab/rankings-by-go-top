@@ -180,7 +180,7 @@ const rhythmSrc = src('lib/content/automation/plan-rhythm.ts')
 check('H1: the pools route projects with the runner\'s functions (no plain weekly projection left)', /projectPublishDates\(/.test(route) && /makeSlotAfter\(/.test(route) && !/projectedPublishAt\(/.test(route) && /rhythm: rhythmDTO\(rhythm\)/.test(route))
 check('H2: create and update both take the first slot from the plan rhythm', /firstSlot\([^)]*rhythm\)/.test(route) && /readPublishRhythm\(/.test(route) && /readPublishRhythmForProject\(/.test(patch) && /makeSlotAfter\(/.test(patch))
 check('H3: the rhythm read writes nothing', !/\.(insert|update|upsert|delete)\(/.test(rhythmSrc))
-check('H4: the screen states the rhythm when the plan sets it and hides the day picker', /rhythm\?\.source === 'plan'/.test(screen) && /t\.planRhythmLine/.test(screen) && /t\.noWeekendNote/.test(screen))
+check('H4: the screen states the rhythm when the plan sets it and hides the day picker', /rhythm\?\.source === 'plan'/.test(screen) && /t\.planRhythmLineOne : t\.planRhythmLine\)/.test(screen) && /data-plan-rhythm="">\{rhythmLine\}</.test(screen) && /t\.noWeekendNote/.test(screen) && /\{!planRhythm && <Button[^>]*saveSettings/.test(screen))
 check('H5: the screen never offers Friday or Saturday', /WORKING_WEEKDAYS/.test(screen) && !/t\.weekdays\.map\(/.test(screen))
 for (const lang of ['he', 'en'] as const) {
   const dict = readFileSync(join(root, `lib/i18n/dashboard/${lang}.ts`), 'utf8')
