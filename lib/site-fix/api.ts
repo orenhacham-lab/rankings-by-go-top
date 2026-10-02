@@ -101,8 +101,11 @@ async function load(projectId: unknown, deps: FixesDeps): Promise<Loaded | Answe
   if (error) return refuse('store_failed')
   if (!data) return refuse('not_found')
   const project = data as Loaded['project']
-  const available = await queueAvailable(deps.admin, scope)
-  const ctx = await loadFixContext(deps.admin, scope, deps.decrypt, project.target_domain)
+  // SPEED: both reads need only the owner-checked scope; one round trip, not two.
+  const [available, ctx] = await Promise.all([
+    queueAvailable(deps.admin, scope),
+    loadFixContext(deps.admin, scope, deps.decrypt, project.target_domain),
+  ])
   const caps = resolveCapabilities(ctx, available)
   const siteKeys = new Set(ctx.siteUrls.map((u) => siteKeyOf(u)).filter((k): k is string => !!k))
   return { scope, project, ctx, caps, siteKeys }

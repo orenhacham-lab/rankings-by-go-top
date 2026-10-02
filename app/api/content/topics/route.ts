@@ -27,6 +27,9 @@ export async function GET(request: Request) {
 
   // Session client → RLS ensures only the caller's rows are visible.
   const supabase = await createClient()
+  // SPEED: the topics and their saved-plan status are read together (one round trip, not two).
+  const planStatusRead = loadPlanSummariesForProject(auth.admin, auth.project.id)
+  planStatusRead.catch(() => {}) // an early return below must not leave it unhandled
   const { data, error } = await supabase
     .from('article_topics')
     .select('id, project_id, source, topic, primary_keyword, secondary_keywords, search_intent, target_audience, status, anchors_json, brief_notes, language, tone_of_voice, desired_word_count, cta_preference, created_at, updated_at')
@@ -44,7 +47,7 @@ export async function GET(request: Request) {
 
   // ONE-SHOT saved-plan status for every topic (no N+1) so the row link badges are TRUTHFUL
   // after a full page refresh — not just within the session that saved them.
-  const planStatus = await loadPlanSummariesForProject(auth.admin, auth.project.id)
+  const planStatus = await planStatusRead
   return Response.json({ topics: data || [], planStatus })
 }
 
