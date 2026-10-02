@@ -91,6 +91,8 @@ export type StrategyQueueItem = {
   position: number
   projectedPublishAt: string | null
   topicTitle?: string | null
+  /** Why the item stopped, as stored (read only as a code; never shown). */
+  lastError?: string | null
 }
 
 /**

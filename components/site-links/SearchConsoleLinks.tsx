@@ -6,7 +6,8 @@
  * The Search Console API has no links report (lib/site-links/search-console-links.ts
  * says what was checked), so there is no number to show and none is made up: one
  * honest line, and a button that opens the Links report in Search Console on the
- * project's own property. The property comes from the Search Console status the
+ * project's own property. Below it, an OPTIONAL import of the report's export file
+ * (GscLinksImport): a snapshot that does not update by itself, and says so. The property comes from the Search Console status the
  * other widgets already read (components/gsc/gsc-data.ts, shared and cached); a
  * project without a property, or with Search Console off, shows nothing here.
  */
@@ -17,6 +18,7 @@ import { gscStatusUrl, useGscResponse } from '@/components/gsc/gsc-data'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { searchConsoleLinksUrl } from '@/lib/site-links/search-console-links'
 import ExternalLink from './ExternalLink'
+import GscLinksImport from './GscLinksImport'
 
 type Copy = ReturnType<typeof getDashboardDictionary>['siteLinks']
 
@@ -50,6 +52,7 @@ export default function SearchConsoleLinks({ projectId, copy }: { projectId: str
           {g.open}
         </ExternalLink>
       </div>
+      <GscLinksImport projectId={projectId} copy={copy} />
     </section>
   )
 }

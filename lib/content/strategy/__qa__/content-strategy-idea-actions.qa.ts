@@ -235,9 +235,13 @@ async function main() {
     check('U4: the screen hands the actions to the card and to the board', wired(screen))
     check('U4-MUT: a board without actions fails U4', !wired(screen.replace(/<StrategyBoard ([^>]*) act=\{act\}/, '<StrategyBoard $1')))
     // Requests only from a click: the hook sends through one helper, called by the three actions, never from an effect.
-    const clickOnly = (s: string) => !/useEffect/.test(s) && (s.match(/await send\(/g) ?? []).length === 3
+    // w13: approving also schedules (one more send, to the schedule route), and only
+    // from inside the approve and add-keyword handlers (scheduleApproved).
+    const clickOnly = (s: string) => !/useEffect/.test(s) && (s.match(/await send\(/g) ?? []).length === 4
       && (s.match(/fetch\(/g) ?? []).length === 1 && /fetch\(req\.url/.test(s)
       && /send\(req\)[\s\S]*send\(rejectRequest\(/.test(s)
+      && /await send\(\{ url: STRATEGY_SCHEDULE_ENDPOINTS\.schedule/.test(s)
+      && (s.match(/await scheduleApproved\(/g) ?? []).length === 2
     check('U5: every request is one of the three actions, never on its own', clickOnly(hook))
     check('U5-MUT: a hook that approves on mount fails U5', !clickOnly(hook.replace("import { useCallback, useMemo, useRef, useState } from 'react'", "import { useCallback, useEffect, useMemo, useRef, useState } from 'react'") + '\nuseEffect(() => { void send(approveRequest(x, p, true)) }, [])'))
     const ownWords = (s: string) => {

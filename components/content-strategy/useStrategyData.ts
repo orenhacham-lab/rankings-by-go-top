@@ -33,6 +33,8 @@ export type StrategyLoad = {
   status: 'loading' | 'ready' | 'error'
   data: StrategyData | null
   queue: StrategyQueueItem[] | null
+  /** The publishing queue runs (true), is paused (false), or there is none / it could not be read (null). */
+  queueActive: boolean | null
   seed: SeedPlan
   /** The scan's route answered: the mapping can be offered for this project (its flag, or an admin). */
   mappingAvailable: boolean
@@ -60,8 +62,16 @@ function readQueue(body: unknown): StrategyQueueItem[] | null {
       position: typeof r.position === 'number' ? r.position : 0,
       projectedPublishAt: typeof r.projectedPublishAt === 'string' ? r.projectedPublishAt : null,
       topicTitle: typeof r.topicTitle === 'string' ? r.topicTitle : null,
+      lastError: typeof r.lastError === 'string' ? r.lastError : null,
     }]
   })
+}
+
+function readQueueActive(ok: boolean, body: unknown): boolean | null {
+  const pool = ok && body && typeof body === 'object' ? (body as { pool?: unknown }).pool : null
+  if (!pool || typeof pool !== 'object') return null
+  const active = (pool as { isActive?: unknown }).isActive
+  return typeof active === 'boolean' ? active : null
 }
 
 function readSeed(ok: boolean, body: unknown): SeedPlan {
@@ -85,7 +95,7 @@ function readBoard(ok: boolean, body: unknown): StrategyData | null {
 export function useStrategyData(projectId: string, refreshKey: unknown): StrategyLoad {
   // Tagged with the project it belongs to: a new project reads as loading until its own
   // answer lands, so the previous project's plan is never shown under the new one.
-  const [state, setState] = useState<Omit<StrategyLoad, 'reload'> & { projectId: string }>({ projectId: '', status: 'loading', data: null, queue: null, seed: NO_SEED_PLAN, mappingAvailable: false })
+  const [state, setState] = useState<Omit<StrategyLoad, 'reload'> & { projectId: string }>({ projectId: '', status: 'loading', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false })
   const request = useRef(0)
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
@@ -109,6 +119,7 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
           // A failed refresh keeps what was already on screen, for the same project.
           data: data ?? (prev.projectId === projectId ? prev.data : null),
           queue: queue.ok ? readQueue(queue.body) : null,
+          queueActive: readQueueActive(queue.ok, queue.body),
           seed: readSeed(seed.ok, seed.body),
           mappingAvailable: seed.ok && !!seed.body && typeof seed.body === 'object' && (seed.body as { ok?: unknown }).ok === true,
         }))
@@ -116,7 +127,7 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
         if (mine === request.current) {
           setState((prev) => (prev.projectId === projectId && prev.data
             ? { ...prev, status: 'ready' }
-            : { projectId, status: 'error', data: null, queue: null, seed: NO_SEED_PLAN, mappingAvailable: false }))
+            : { projectId, status: 'error', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false }))
         }
       }
     }, 120)
@@ -139,6 +150,6 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
     return () => window.clearInterval(id)
   }, [projectId, building, reload])
 
-  if (!current) return { status: 'loading', data: null, queue: null, seed: NO_SEED_PLAN, mappingAvailable: false, reload }
-  return { status: state.status, data: state.data, queue: state.queue, seed: state.seed, mappingAvailable: state.mappingAvailable, reload }
+  if (!current) return { status: 'loading', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false, reload }
+  return { status: state.status, data: state.data, queue: state.queue, queueActive: state.queueActive, seed: state.seed, mappingAvailable: state.mappingAvailable, reload }
 }

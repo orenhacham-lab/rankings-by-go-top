@@ -8,7 +8,7 @@
 import { authContentProject } from '@/lib/content/api-auth'
 import { isAdminUser } from '@/lib/auth/admin-role'
 import { isGscReadOnlyEnabled, isGscOAuthConfigured } from '@/lib/gsc/config'
-import { loadUserConnection, loadProjectProperty, latestSucceededRun, sanitizeConnection, GscServiceError } from '@/lib/gsc/service'
+import { loadUserConnection, loadProjectProperty, loadSyncState, latestSucceededRun, sanitizeConnection, GscServiceError } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
 import type { GscSyncRun } from '@/lib/supabase/types'
 
@@ -63,6 +63,9 @@ export async function GET(request: Request) {
     const oauthConfigured = isGscOAuthConfigured()
     const runsRead = Promise.all(GSC_WINDOWS.map((w) => latestSucceededRun(auth.admin, auth.project.id, w as GscWindowDays)))
       .then((runs) => ({ runs }), (error: unknown) => ({ error }))
+    // Started with the reads below and awaited after them: whether a sync is running
+    // (the automatic one after linking) and whether the latest one failed.
+    const syncRead = loadSyncState(auth.admin, auth.project.id).catch(() => null)
     const [connectionRead, propertyRead, runsResult] = await Promise.allSettled([
       loadUserConnection(auth.admin, auth.user.id),
       loadProjectProperty(auth.admin, auth.project.id),
@@ -86,6 +89,8 @@ export async function GET(request: Request) {
     // (Only read when OAuth is not configured, so it costs nothing in production.)
     const opsDetail = !oauthConfigured && await isAdminUser(auth.admin, auth.user.id)
 
+    const sync = property ? await syncRead : null
+
     return Response.json({
       ok: true,
       oauthConfigured,
@@ -93,6 +98,7 @@ export async function GET(request: Request) {
       connection: sanitizeConnection(connection),
       property: property ? { siteUrl: property.site_url, permissionLevel: property.permission_level, selectedAt: property.selected_at } : null,
       windows,
+      sync,
     })
   } catch (e) {
     // A DB read failure must NOT be shown as "no connection / no property / empty windows".

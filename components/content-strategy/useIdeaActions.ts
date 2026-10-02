@@ -12,12 +12,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   applyIdeaOverrides, approveRequest, deferIdea, keywordRequest, normalizeKeyword, overrideSettled,
-  readApproveOutcome, readCreatedOverlap, readRejectOutcome, rejectRequest,
+  readApproveOutcome, readApprovedTopicId, readCreatedOverlap, readRejectOutcome, rejectRequest,
   type IdeaOutcome, type IdeaOverride, type IdeaRequest, type IdeaTarget,
 } from '@/lib/content/strategy/ideas'
 import { sameTopicKey, type StrategyData } from '@/lib/content/strategy/board'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { overlapMessage, type OverlapPayload } from '@/lib/content/cannibalization/client'
+import { STRATEGY_SCHEDULE_ENDPOINTS, readScheduleAnswer } from '@/lib/content/strategy/first-article'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 type Copy = Dict['contentStrategy']['ideaActions']
@@ -60,13 +61,27 @@ function outcomeCopy(a: Copy, o: IdeaOutcome, created: string, failed: string): 
   return o === 'created' ? created : o === 'existing' ? a.existing : o === 'covered' ? a.covered : failed
 }
 
-export function useIdeaActions({ projectId, automation, dict, toast, onChanged }: {
+/**
+ * Approving IS scheduling: the topic an approval created (or found) goes straight into
+ * the publishing queue with its date, and the first approval on a project writes its
+ * first article (POST /api/content/strategy/schedule). Only where the queue exists
+ * (automation on). A failure here leaves the topic approved; the screen sends it to the
+ * queue again the next time it opens.
+ */
+async function scheduleApproved(projectId: string, topicId: string | null): Promise<{ writingFirst: boolean } | null> {
+  const { ok, body } = await send({ url: STRATEGY_SCHEDULE_ENDPOINTS.schedule, body: { projectId, ...(topicId ? { topicIds: [topicId] } : {}) } })
+  return readScheduleAnswer(ok, body)
+}
+
+export function useIdeaActions({ projectId, automation, dict, toast, onChanged, onScheduled }: {
   projectId: string
   automation: boolean
   dict: Dict
   toast: Toasts
   /** Read the board (and the workspace's topics) again after a change. */
   onChanged: () => void
+  /** The approval reached the queue; `writingFirst` when it started the first article. */
+  onScheduled?: (r: { writingFirst: boolean }) => void
 }) {
   const a = dict.contentStrategy.ideaActions
   const overlapCopy = useCallback((o: OverlapPayload) => dict.topicOverlap.addedWithOverlap.replace('{message}', overlapMessage(dict.topicOverlap, o)), [dict])
@@ -113,13 +128,19 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged }
       // "existing" and "covered" leave no topic of this title to wait for; a failure undoes it.
       ops.drop(t.key)
     }
+    // Approved = in the publishing queue with its date (and, the first time, the first article).
+    const scheduled = automation && (outcome === 'created' || outcome === 'existing')
+      ? await scheduleApproved(projectId, readApprovedTopicId(req.url, body))
+      : null
+    if (scheduled) onScheduled?.(scheduled)
     // Approved, but the site already covers it (the cannibalization check): say so.
     const overlap = outcome === 'created' ? readCreatedOverlap(req.url, body) : null
-    say(outcomeCopy(a, outcome, overlap ? overlapCopy(overlap) : a.approved, a.approveError), outcome === 'failed' ? 'error' : 'success')
+    const approvedLine = scheduled?.writingFirst ? a.approvedFirst : a.approved
+    say(outcomeCopy(a, outcome, overlap ? overlapCopy(overlap) : approvedLine, a.approveError), outcome === 'failed' ? 'error' : 'success')
     if (outcome !== 'failed') onChanged()
     ops.busy(t.key, null)
     inFlight.current.delete(t.key)
-  }, [projectId, automation, a, ops, say, onChanged, overlapCopy])
+  }, [projectId, automation, a, ops, say, onChanged, onScheduled, overlapCopy])
 
   const reject = useCallback(async (t: IdeaTarget) => {
     if (!projectId || !t.ideaId || inFlight.current.has(t.key)) return
@@ -158,10 +179,13 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged }
     if (outcome === 'created') { ops.settle(key); ops.approvedNow(keyword) } else ops.drop(key)
     inFlight.current.delete(key)
     if (outcome === 'failed') { ops.announce(a.keywordError); return { ok: false, error: a.keywordError } }
-    say(outcomeCopy(a, outcome, a.keywordAdded, a.keywordError), 'success')
+    // A keyword of your own is an approved topic: it joins the queue the same way.
+    const scheduled = automation ? await scheduleApproved(projectId, readApprovedTopicId(req.url, body)) : null
+    if (scheduled) onScheduled?.(scheduled)
+    say(outcomeCopy(a, outcome, scheduled?.writingFirst ? a.approvedFirst : a.keywordAdded, a.keywordError), 'success')
     onChanged()
     return { ok: true }
-  }, [projectId, a, ops, say, onChanged])
+  }, [projectId, automation, a, ops, say, onChanged, onScheduled])
 
   const { overrides } = scope
   /** The rows the board is built from, with what was just done applied. */

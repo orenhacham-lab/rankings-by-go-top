@@ -37,3 +37,11 @@ export function monthLabel(key: string, lang: Locale, now: Date = new Date()): s
 export function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, k: string) => (k in values ? String(values[k]) : `{${k}}`))
 }
+
+/** "Sunday, 4 October" / "יום ראשון, 4 באוקטובר": a publish date in a sentence. */
+export function longDate(iso: string | null, lang: Locale): string | null {
+  if (!iso) return null
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return null
+  return new Intl.DateTimeFormat(intlLocale(lang), { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(ms))
+}
