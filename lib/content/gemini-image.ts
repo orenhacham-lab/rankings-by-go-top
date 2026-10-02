@@ -114,9 +114,18 @@ export function buildImagePrompt(input: {
   /** Brand colours an illustrated style builds its palette around. */
   brandColors?: readonly string[]
   aspectRatio?: HeroRatio
+  /**
+   * What the article is ABOUT (its main keyword, else its topic, else its
+   * title). The concept alone once drifted to a mood metaphor (an article on
+   * eau de cologne got "water drops over green citrus leaves") because the
+   * title never reached the image model once a concept existed. When given,
+   * the subject is pinned as the focal point; absent, the prompt is unchanged.
+   */
+  subject?: string | null
 }): string {
   const rawConcept = (input.imagePrompt || '').trim() || (input.topic || '').trim() || input.title.trim()
   const concept = sanitizeImageConceptForCommercialUse(rawConcept)
+  const subject = sanitizeImageConceptForCommercialUse(input.subject || '')
   const look = imageStylePrompt(input.style, input.brandColors)
   const photo = !input.style || input.style === 'realistic'
   const ratio = input.aspectRatio === '1:1' ? 'SQUARE 1:1' : 'LANDSCAPE 16:9'
@@ -124,6 +133,9 @@ export function buildImagePrompt(input: {
     photo
       ? `Create a premium, photorealistic EDITORIAL featured image for a professional website blog article.`
       : `Create a premium EDITORIAL featured image for a professional website blog article.`,
+    subject && subject !== concept
+      ? `MAIN SUBJECT (the article is about this; it must be the clear, instantly recognizable focal point of the image): ${subject}. Show the subject itself as a concrete generic, unbranded object or scene; never replace it with an abstract metaphor, mood, texture, ingredient or nature scene.`
+      : '',
     concept ? `Depict a GENERIC, UNBRANDED, category-relevant scene for this concept: ${concept}.` : `Depict a generic, unbranded, category-relevant editorial scene.`,
     `${look.look.replace(/\.$/, '')}, ${ratio}. It must look expensive and trustworthy, never cheap or obviously AI-generated.`,
     // --- Commercial-safety policy (applied to EVERY image) ---
@@ -164,8 +176,10 @@ export async function writeCommercialSafeConcept(input: {
   const prompt = [
     `Write ONE concise ${outLang} visual concept (1-2 sentences) for a PREMIUM EDITORIAL blog hero image about the article below.`,
     `Article title: ${input.title}`,
+    input.primaryKeyword?.trim() ? `Main subject: ${input.primaryKeyword.trim()}` : '',
     ctx ? `Context: ${ctx}` : '',
-    `Rules: describe a GENERIC, UNBRANDED, CATEGORY-BASED scene (category + mood + scene + composition). NEVER mention any brand name, product or model name, or SKU-like identifier. NEVER request a real bottle/product, official packaging, logo, label text, or branded object. No text/letters in the image. Editorial, premium, photorealistic, clean, commercial-safe.`,
+    `Rules: the scene MUST literally show the article's main subject as a concrete, recognizable object or scene and make it the focal point (for a product category, show a generic unbranded example of that product, e.g. an unbranded perfume or cologne bottle with a blank label). NEVER replace the subject with an abstract metaphor, mood, texture, ingredient or nature scene (water drops, leaves, light, colour layers) that would not tell a reader what the article is about.`,
+    `Describe a GENERIC, UNBRANDED, CATEGORY-BASED scene (subject + mood + scene + composition). NEVER mention any brand name, product or model name, or SKU-like identifier. NEVER request a real branded bottle/product, official packaging, logo, label text, or branded object. No text/letters in the image. Editorial, premium, photorealistic, clean, commercial-safe.`,
     `Output ONLY the concept sentence(s) in ${outLang}. No quotes, no preamble.`,
   ].filter(Boolean).join('\n')
 
@@ -199,6 +213,7 @@ export async function generateArticleImage(input: {
   style?: ImageStyle | null
   brandColors?: readonly string[]
   aspectRatio?: HeroRatio
+  subject?: string | null
 }): Promise<GeneratedImage | { error: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return { error: 'missing_gemini_api_key' }
