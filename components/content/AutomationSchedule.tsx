@@ -42,6 +42,10 @@ interface Pool {
 
 const DEFAULT_DAYS_1 = [0]      // Sunday
 const DEFAULT_DAYS_2 = [0, 3]   // Sunday + Wednesday (never Saturday by default)
+/** Nothing is published on Friday or Saturday, so they are never offered. */
+const WORKING_WEEKDAYS = [0, 1, 2, 3, 4]
+/** Who sets the rhythm: the plan (paid plans) or the owner's own choice (admin, trial). */
+type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[] } | { source: 'owner' }
 interface QueueItem {
   id: string
   topicId: string | null
@@ -130,6 +134,8 @@ export default function AutomationSchedule({
   const [publishTime, setPublishTime] = useState('09:00')
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
   const [weekdays, setWeekdays] = useState<number[]>(DEFAULT_DAYS_1)
+  const [rhythm, setRhythm] = useState<Rhythm | null>(null)
+  const weekdayOptions = WORKING_WEEKDAYS.map((i) => ({ value: String(i), label: t.weekdays[i] as string }))
   const [approvedExpanded, setApprovedExpanded] = useState(false)
   const [queueExpanded, setQueueExpanded] = useState(false)
 
@@ -153,8 +159,9 @@ export default function AutomationSchedule({
       setPool(p)
       setItems(Array.isArray(pd.items) ? pd.items : [])
       setHealth(pd.health ?? null)
+      setRhythm(pd.rhythm && typeof pd.rhythm === 'object' ? pd.rhythm as Rhythm : null)
       if (p) {
-        const days = Array.isArray(p.publishDays) ? p.publishDays : []
+        const days = (Array.isArray(p.publishDays) ? p.publishDays : []).filter((d) => WORKING_WEEKDAYS.includes(d))
         // Preset from weekday count first, else fall back to interval-days.
         const nextPreset: Preset = days.length === 1 ? 'weekly1' : days.length === 2 ? 'weekly2' : p.intervalDays === 7 ? 'weekly1' : p.intervalDays === 3 ? 'weekly2' : 'custom'
         setPreset(nextPreset)
@@ -392,6 +399,14 @@ export default function AutomationSchedule({
   const toggle = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const active = pool?.isActive ?? false
+  // The plan sets the rhythm for a paid plan: the day picker does not apply, the
+  // screen says what the plan gives (the dates below are the real ones).
+  const planRhythm = rhythm?.source === 'plan' ? rhythm : null
+  const rhythmLine = planRhythm
+    ? (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
+      .replace('{n}', String(planRhythm.perWeek))
+      .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
+    : null
 
   // Flat inside the strategy's "advanced" card, below a divider (final review R14).
   return (
@@ -410,7 +425,10 @@ export default function AutomationSchedule({
       <div className="mb-2 text-copy font-semibold text-ink">{t.settingsTitle}</div>
       <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-          {/* Cadence */}
+          {/* Cadence — the owner's choice only when the plan does not set it */}
+          {rhythm?.source === 'plan' ? (
+            <p className="min-w-0 max-w-prose text-copy text-body" data-plan-rhythm="">{rhythmLine}</p>
+          ) : (<>
           <div className="min-w-0 max-w-full">
             <div className="mb-1.5 text-caption font-semibold text-ink">{t.cadenceLabel}</div>
             <div className="flex flex-wrap items-center gap-2">
@@ -451,26 +469,27 @@ export default function AutomationSchedule({
               <div className="flex flex-wrap items-center gap-1.5">
                 <Select value={String(weekdays[0] ?? 0)} aria-label={t.weekdayLabel}
                   onChange={(e) => setWeekdays(preset === 'weekly1' ? [Number(e.target.value)] : [Number(e.target.value), weekdays[1] ?? DEFAULT_DAYS_2[1]!])}
-                  options={t.weekdays.map((d: string, i: number) => ({ value: String(i), label: d }))} className="h-9 w-auto" />
+                  options={weekdayOptions} className="h-9 w-auto" />
                 {preset === 'weekly2' && (
                   <Select value={String(weekdays[1] ?? DEFAULT_DAYS_2[1]!)} aria-label={t.weekdayLabel}
                     onChange={(e) => setWeekdays([weekdays[0] ?? DEFAULT_DAYS_2[0]!, Number(e.target.value)])}
-                    options={t.weekdays.map((d: string, i: number) => ({ value: String(i), label: d }))} className="h-9 w-auto" />
+                    options={weekdayOptions} className="h-9 w-auto" />
                 )}
               </div>
             </div>
           )}
+          </>)}
 
           {/* Actions */}
           <div className="ms-auto flex items-center gap-2">
-            <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+            {!planRhythm && <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>}
             <Button size="sm" variant="secondary" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
           </div>
         </div>
 
         {/* Publish-day note + next publish on one compact line */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-0.5">
-          <p className="text-caption text-muted">{t.publishDayNote}</p>
+          <p className="text-caption text-muted">{planRhythm ? t.noWeekendNote : `${t.publishDayNote} ${t.noWeekendNote}`}</p>
           <div className="text-caption text-muted">
             {t.nextPublish}: <span className="font-semibold text-ink">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
           </div>
