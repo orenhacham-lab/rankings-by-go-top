@@ -8,6 +8,8 @@ import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
 import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
+import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
+import { GoogleTags } from '@/components/consent/GoogleTags'
 
 /**
  * The two faces of the type system (see --font-sans in globals.css): Inter for
@@ -88,20 +90,16 @@ export default async function RootLayout({
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
         <meta name="theme-color" content="#0666C2" />
 
-        {/* Google Tag Manager - Initialize data layer BEFORE GTM script */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'GTM-PC29G3NQ');
-            `,
-          }}
-        />
-
-        {/* Google Tag Manager Script */}
-        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
+        {/*
+          CONSENT MODE v2 DEFAULT — the first script on the page, and the reason
+          the tag loader below is safe to exist at all. It creates the dataLayer
+          and declares every optional storage bucket DENIED before any tag can
+          be evaluated. Ordering is the whole point: a default pushed after a tag
+          has fired cannot un-fire it, so this is inline in <head> rather than a
+          component. It contacts nothing; gtm.js itself is requested only once a
+          visitor has allowed a category (components/consent/GoogleTags.tsx).
+        */}
+        <script dangerouslySetInnerHTML={{ __html: GOOGLE_CONSENT_DEFAULT_SCRIPT }} />
 
         {/* JSON-LD Schema for SEO */}
         <script
@@ -155,13 +153,12 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full bg-canvas text-body antialiased overflow-x-hidden">
-        {/* Google Tag Manager (noscript) - must be first element in body */}
-        <div
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PC29G3NQ" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`,
-          }}
-        />
+        {/*
+          The GTM <noscript> iframe used to be here. It is gone: it loaded the
+          container for every visitor with JavaScript disabled — the one visitor
+          who can neither be asked for consent nor withdraw it.
+        */}
+        <GoogleTags />
         <RootThemeProvider>
           {children}
           <PublicSiteWidgets isAuthenticated={isAuthenticated} />

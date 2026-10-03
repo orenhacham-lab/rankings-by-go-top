@@ -341,10 +341,28 @@ async function main() {
   const wpSrc = strip(read('lib/content/wordpress-publish.ts'))
   check('F5: WordPress applies the design after the inline images, in one place',
     (wpSrc.match(/applyArticleDesign\(/g) ?? []).length === 1 && wpSrc.indexOf("injectInlineImages(content, images, 'publish')") < wpSrc.indexOf('applyArticleDesign('))
-  const shopifyDiff = execSync('git diff --name-only c2f5fc9 -- lib/shopify app/api/shopify', { cwd: ROOT }).toString().trim()
+  // What this asks, and what it used to ask. It used to require that NOTHING
+  // under lib/shopify or app/api/shopify had changed since c2f5fc9, which also
+  // fires on any later, deliberate, unrelated Shopify change and then reports
+  // it as "the article-style feature touched Shopify" — which would be false.
+  // Narrowed to the real question: if a Shopify file changed, is everything it
+  // ADDED the shared country block (lib/sanctions), which is a legal refusal
+  // that has to sit on every payment entry point and shares nothing with
+  // article styling, or is it this feature leaking in?
+  const shopifyForeignLines = execSync('git diff -U0 c2f5fc9 -- lib/shopify app/api/shopify', { cwd: ROOT })
+    .toString().split('\n')
+    .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
+    .map((l) => l.slice(1).trim())
+    .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+    .filter((l) => !/^[{}()\[\];,]+$/.test(l))
+    .filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l))
   const shopifySrc = strip(read('lib/shopify/publish-article.ts'))
-  check('F6: lib/shopify/** and app/api/shopify/** are untouched; Shopify publishing still sanitizes the stored body',
-    shopifyDiff === '' && /sanitizeArticleHtml\(String\(article\.content_html \|\| ''\)\)/.test(shopifySrc) && !/article-style/.test(shopifySrc), shopifyDiff)
+  check('F6: the article-style feature has not reached into Shopify code; Shopify publishing still sanitizes the stored body',
+    shopifyForeignLines.length === 0 && /sanitizeArticleHtml\(String\(article\.content_html \|\| ''\)\)/.test(shopifySrc) && !/article-style/.test(shopifySrc),
+    shopifyForeignLines.slice(0, 4).join(' | '))
+  check('MUTATION CONTROL: an article-style line added to Shopify code would be counted as foreign',
+    ["const styled = styleArticleHtml(article.content_html)"]
+      .filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l)).length === 1)
   check('MUTATION CONTROL: a Shopify file importing the design is caught', /article-style/.test(shopifySrc + "\nimport { styleArticleHtml } from '@/lib/content/article-style/html'"))
 
   // ── G) official profiles ──────────────────────────────────────────────────

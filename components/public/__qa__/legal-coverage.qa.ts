@@ -15,7 +15,7 @@
  * Also: the product name is "Go Top SEO" (never the old name) in the six pages'
  * text and metadata, source comments stripped; the last-updated line is
  * 3 October 2026 on the terms (refunds aligned with the refund policy) and
- * 29 September 2026 on the others; Hebrew and English carry the same number of sections.
+ * 3 October 2026 on all three, revised together; Hebrew and English carry the same number of sections.
  *
  * MUTATION CONTROL. Every single pattern below is re-run against a copy of the
  * real text with that pattern's matches removed, and must then fail.
@@ -89,12 +89,45 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { terms: [/הודעות דוא”ל/, /הודעת תזכורת/, /הסרה בלחיצה אחת/, /דוח התקדמות חודשי/, /הודעות חשבון ושירות/], privacy: [/הודעות דוא”ל/, /Resend/, /הסרה\s+בלחיצה אחת/, /דוח התקדמות חודשי/, /הודעות חשבון ושירות/] },
   },
   '8 sub-processors': {
-    en: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/] },
-    he: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/] },
+    en: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \(Nominatim\):/, /Wix:/] },
+    he: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \(Nominatim\):/, /Wix:/] },
+  },
+  // 10-13 are the four gaps Oren found on 2026-10-03: the documents described
+  // three connections while the code offers six, and three live sub-processors
+  // (PDFShift, Nominatim, the Google Ads API) were not named anywhere.
+  '10 every platform a site can be connected on': {
+    en: { terms: [/Installing the app in your store/, /Connecting a Wix site uses an API key/, /through a webhook/i, /signing secret/i, /every kind of connection the Service offers/], privacy: [/Connecting a Site on Another Platform/, /Wix/, /Webhook/i, /access token the store issues/] },
+    he: { terms: [/התקנת האפליקציה בחנות שלכם/, /חיבור אתר Wix נעשה באמצעות מפתח API/, /webhook/, /סוד החתימה/, /כל סוגי החיבורים שהשירות מציע/], privacy: [/חיבור אתר בפלטפורמה אחרת/, /Wix/, /webhook/, /אסימון הגישה/] },
+  },
+  '11 the PDF conversion provider': {
+    en: { privacy: [/Converting a Report to PDF/, /PDFShift/, /only when you pressed\s+to download a report/] },
+    he: { privacy: [/המרת דוח ל-PDF/, /PDFShift/, /רק כשלחצת להוריד דוח/] },
+  },
+  '12 the address lookup service': {
+    en: { privacy: [/Turning an Address into Coordinates/, /Nominatim/, /OpenStreetMap Foundation/, /do not send your name/] },
+    he: { privacy: [/תרגום כתובת לקואורדינטות/, /Nominatim/, /OpenStreetMap Foundation/, /איננו שולחים את שמך/] },
+  },
+  '13 the Google Ads keyword interface': {
+    en: { privacy: [/Google Ads API/, /search volumes/, /not an advertising account of yours/] },
+    he: { privacy: [/Google Ads/, /נפחי חיפוש/, /אינו חשבון פרסום שלך/] },
+  },
+  // The link network IS live (see the comment above the section in the terms).
+  // A clause that disclaims its own application would leave a placed link with
+  // no contractual basis, so the "from the moment you join" wording is pinned
+  // and the old "not active today" sentence is asserted gone.
+  '14 the link network clause applies on joining': {
+    en: { terms: [/applies from the moment you choose to join/] },
+    he: { terms: [/חל מהרגע שבחרתם להצטרף/] },
   },
   '9 accessibility measures': {
-    en: { a11y: [/contrast/i, /Level AA/, /Keyboard-only navigation/, /prefers-reduced-motion/, /reduce motion/, /right-to-left, RTL/, /left-to-right, LTR/, /oren@gotop\.co\.il/, /054-9489377/] },
-    he: { a11y: [/ניגודיות/, /דרגה AA/, /לוח המקלדת בלבד/, /prefers-reduced-motion/, /הפחתת תנועה/, /RTL/, /LTR/, /oren@gotop\.co\.il/, /054-9489377/] },
+    // The direction bullet is pinned by its two direction markers plus the
+    // sentence that makes the statement cover every language version. The exact
+    // phrase "right-to-left, RTL" used to be pinned here; it was replaced when
+    // the bullet stopped listing the languages the product offers (a list that
+    // Spanish was about to make untrue) and started describing how each
+    // direction is handled instead.
+    en: { a11y: [/contrast/i, /Level AA/, /Keyboard-only navigation/, /prefers-reduced-motion/, /reduce motion/, /right-to-left \(RTL\)/, /left-to-right \(LTR\)/, /applies to all language versions/, /oren@gotop\.co\.il/, /054-9489377/] },
+    he: { a11y: [/ניגודיות/, /דרגה AA/, /לוח המקלדת בלבד/, /prefers-reduced-motion/, /הפחתת תנועה/, /RTL/, /LTR/, /חלה על כל גרסאות השפה/, /oren@gotop\.co\.il/, /054-9489377/] },
   },
 }
 
@@ -118,14 +151,15 @@ const OLD_NAME = /Rankings by Go Top/i
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  const dated = doc === 'terms'
-    ? (lang === 'he' ? /3 באוקטובר 2026/ : /October 3, 2026/)
-    : (lang === 'he' ? /29 בספטמבר 2026/ : /September 29, 2026/)
+  // All three documents were revised together for the privacy, consent and
+  // accessibility work, so they all carry the same date now. A page that is
+  // changed without its date being moved is the failure this catches.
+  const dated = lang === 'he' ? /3 באוקטובר 2026/ : /October 3, 2026/
   const hit = dated.exec(p.body)
   const body = hit ? p.body.slice(0, hit.index + hit[0].length) : p.body
   check(`${lang} ${doc}: the old product name is gone from the text, metadata and code`, !OLD_NAME.test(body) && !OLD_NAME.test(p.meta) && !OLD_NAME.test(p.src))
   check(`${lang} ${doc}: the page names GO TOP`, /Go Top SEO/.test(p.text) && /Go Top SEO/.test(p.meta))
-  check(`${lang} ${doc}: last updated ${doc === 'terms' ? '3 October' : '29 September'} 2026`, dated.test(p.text))
+  check(`${lang} ${doc}: last updated 3 October 2026`, dated.test(p.text))
 }
 check('MUTATION — the old name put back into a page is caught', OLD_NAME.test(pages.en.terms.src + ' Rankings by Go Top') && !OLD_NAME.test(pages.en.terms.src))
 check('MUTATION — an old last-updated date is caught', !/October 3, 2026/.test(pages.en.terms.text.replace('October 3, 2026', 'September 29, 2026')))
@@ -135,6 +169,156 @@ for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   check(`${doc}: Hebrew and English have the same number of sections (${pages.he[doc].h2} / ${pages.en[doc].h2})`, pages.he[doc].h2 === pages.en[doc].h2)
 }
 check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 !== pages.en.terms.h2 + 1)
+
+/*
+ * DERIVED FROM THE CODE, not from a list someone remembered to update.
+ *
+ * The four gaps Oren found on 2026-10-03 were all the same failure: a
+ * connection or a sub-processor was added to the product and nobody went back
+ * to the legal pages. Pinning the words is not enough to stop that happening
+ * again, because the next provider is one nobody has written a pattern for.
+ *
+ * So these two blocks read the truth out of the source: the platform union a
+ * project can choose, and the third-party hosts that non-QA code actually
+ * fetches. Each entry has to be named in both privacy policies. Adding a
+ * platform to CHOOSABLE_PLATFORMS, or a `fetch` to a new provider, fails this
+ * suite until the documents say so — which is the whole point.
+ */
+{
+  const platformsSrc = readFileSync('lib/site-platforms/types.ts', 'utf8')
+  const union = /CHOOSABLE_PLATFORMS:\s*readonly ChoosablePlatform\[\]\s*=\s*\[([^\]]+)\]/.exec(platformsSrc)?.[1] ?? ''
+  const platforms = [...union.matchAll(/'([a-z]+)'/g)].map((m) => m[1])
+  check(`the platform union was read from the source (${platforms.join(', ')})`, platforms.length >= 4)
+  // How each platform's name reads to a customer in each language.
+  const NAMED: Record<string, Record<Lang, RegExp>> = {
+    wordpress: { en: /WordPress/, he: /וורדפרס/ },
+    shopify: { en: /Shopify/, he: /Shopify/ },
+    wix: { en: /Wix/, he: /Wix/ },
+    webhook: { en: /webhook/i, he: /webhook/i },
+  }
+  for (const platform of platforms) {
+    const named = NAMED[platform]
+    // An unmapped platform is a NEW one: it must be added here and to the documents.
+    check(`platform "${platform}" has a name the documents can be checked against`, !!named,
+      'add it to NAMED in this suite and to the terms and both privacy policies')
+    if (!named) continue
+    for (const lang of ['he', 'en'] as Lang[]) {
+      check(`platform "${platform}" is named in the ${lang} terms`, named[lang].test(pages[lang].terms.text))
+      check(`platform "${platform}" is named in the ${lang} privacy policy`, named[lang].test(pages[lang].privacy.text))
+    }
+  }
+  check('MUTATION — a platform the documents do not mention is caught',
+    !/Squarespace/.test(pages.en.terms.text) && !/Squarespace/.test(pages.he.terms.text))
+}
+
+{
+  /*
+   * A CLOSED WORLD over the hosts shipped code mentions. Every one of them has
+   * to be accounted for: either it receives data and the documents name its
+   * provider (RECIPIENTS), or it receives nothing and is listed as such with a
+   * reason (NOT_RECIPIENTS). A host in neither list fails the suite, so a new
+   * integration cannot be added without someone deciding, in writing, which of
+   * the two it is. That is the part a pinned list of words cannot do.
+   *
+   * Scope and its limits, stated rather than implied: __qa__ is excluded (it is
+   * full of deliberately fake hosts), and a provider reached only through an
+   * SDK has no literal host to find, so those are pinned by name at the end.
+   */
+  const RECIPIENTS: Record<string, Record<Lang, RegExp>> = {
+    'generativelanguage.googleapis.com': { en: /Gemini/, he: /Gemini/ },
+    'googleads.googleapis.com': { en: /Google Ads API/, he: /Google Ads/ },
+    'maps.googleapis.com': { en: /Google/, he: /Google/ },
+    'searchconsole.googleapis.com': { en: /Search Console/, he: /Search Console/ },
+    'www.googleapis.com': { en: /Google/, he: /Google/ },
+    'oauth2.googleapis.com': { en: /Google/, he: /Google/ },
+    'accounts.google.com': { en: /Google/, he: /Google/ },
+    'myaccount.google.com': { en: /Google/, he: /Google/ },
+    'mybusiness.googleapis.com': { en: /Business Profile/, he: /Business Profile/ },
+    'mybusinessaccountmanagement.googleapis.com': { en: /Business Profile/, he: /Business Profile/ },
+    'mybusinessbusinessinformation.googleapis.com': { en: /Business Profile/, he: /Business Profile/ },
+    'google.serper.dev': { en: /Serper/, he: /Serper/ },
+    'api.paypal.com': { en: /PayPal/, he: /PayPal/ },
+    'www.paypal.com': { en: /PayPal/, he: /PayPal/ },
+    'api.pdfshift.io': { en: /PDFShift/, he: /PDFShift/ },
+    'api.scrapellm.com': { en: /ScrapeLLM/, he: /ScrapeLLM/ },
+    'nominatim.openstreetmap.org': { en: /Nominatim/, he: /Nominatim/ },
+    'www.wixapis.com': { en: /Wix/, he: /Wix/ },
+    'admin.shopify.com': { en: /Shopify/, he: /Shopify/ },
+    'cdn.shopify.com': { en: /Shopify/, he: /Shopify/ },
+    'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
+    'supabase.com': { en: /Supabase/, he: /Supabase/ },
+  }
+  /**
+   * Hosts that receive nothing about a customer, each with the reason it is
+   * here rather than above. A host moved into this list without the reason
+   * being true is the one way past this guard, which is why the reason is
+   * written down next to it.
+   */
+  const NOT_RECIPIENTS: Record<string, string> = {
+    'gotopseo.com': 'our own service',
+    'www.gotopseo.com': 'our own service',
+    'schema.org': 'the JSON-LD vocabulary, written into the customer’s own markup; not fetched',
+    'www.w3.org': 'XML and sitemap namespaces written into markup; not fetched',
+    'llmstxt.org': 'the llms.txt specification, named in generated files; not fetched',
+    'developers.google.com': 'a documentation link shown to the owner',
+    'help.shopify.com': 'a documentation link shown to a merchant',
+    'search.google.com': 'a link a customer clicks to their own Search Console',
+    'google.com': 'the search engine whose public results are read, with no customer data attached',
+    'www.google.com': 'the search engine whose public results are read, with no customer data attached',
+    'en.wikipedia.org': 'a reference URL recognised in a site’s existing links',
+    'he.wikipedia.org': 'a reference URL recognised in a site’s existing links',
+    'www.wikidata.org': 'a sameAs profile URL a customer may enter themselves',
+    'www.facebook.com': 'a sameAs profile URL a customer may enter themselves; the Meta pixel is covered by its own section',
+    'www.instagram.com': 'a sameAs profile URL a customer may enter themselves',
+    'www.linkedin.com': 'a sameAs profile URL a customer may enter themselves',
+    'www.youtube.com': 'a sameAs profile URL a customer may enter themselves',
+    'www.tiktok.com': 'a sameAs profile URL a customer may enter themselves',
+    'x.com': 'a sameAs profile URL a customer may enter themselves',
+    'biz.yelp.com': 'a directory named in advice text; not contacted',
+    'business.trustpilot.com': 'a directory named in advice text; not contacted',
+    'businessconnect.apple.com': 'a directory named in advice text; not contacted',
+    'www.bingplaces.com': 'a directory named in advice text; not contacted',
+    'www.capterra.com': 'a directory named in advice text; not contacted',
+    'www.tripadvisor.com': 'a directory named in advice text; not contacted',
+    // Literals that are examples or test shapes even outside __qa__.
+    'example.com': 'placeholder in a comment or default',
+    'www.example.com': 'placeholder in a comment or default',
+    'app.example.com': 'placeholder in a comment or default',
+    'shop.com': 'placeholder in a comment or default',
+    'destination.com': 'placeholder in a comment or default',
+    'acme.myshopify.com': 'placeholder in a comment or default',
+    'evil.com': 'a hostile host in a security comment or default',
+  }
+  const { execSync } = require('child_process') as typeof import('child_process')
+  const out = execSync(
+    `grep -rhoE "https://[a-z0-9.-]+\\.(com|org|io|dev|net|ai)" lib app ` +
+    `--include=*.ts --include=*.tsx --exclude-dir=__qa__ | sed 's|https://||' | sort -u`,
+    { encoding: 'utf8', cwd: process.cwd() },
+  )
+  const hosts = out.split('\n').map((h) => h.trim()).filter(Boolean)
+  check(`the host list was read from shipped code (${hosts.length} hosts)`, hosts.length > 20)
+  for (const host of hosts) {
+    const named = RECIPIENTS[host]
+    if (!named) {
+      check(`${host} is accounted for`, host in NOT_RECIPIENTS,
+        'it is a host shipped code names: add it to RECIPIENTS and to both privacy policies, or to NOT_RECIPIENTS with the reason it receives nothing')
+      continue
+    }
+    for (const lang of ['he', 'en'] as Lang[]) {
+      check(`${host} → its provider is named in the ${lang} privacy policy`, named[lang].test(pages[lang].privacy.text))
+    }
+  }
+  // Providers reached only through an SDK, which have no literal host above.
+  for (const lang of ['he', 'en'] as Lang[]) {
+    for (const re of [/Supabase/, /Resend/, /Vercel/]) {
+      check(`SDK provider ${re.source} is named in the ${lang} privacy policy`, re.test(pages[lang].privacy.text))
+    }
+  }
+  check('MUTATION — a disclosed provider removed from the policy is caught',
+    !/PDFShift/.test(pages.en.privacy.text.replace(/PDFShift/g, '')))
+  check('MUTATION — an unaccounted-for host is caught',
+    !('tracker.unknown-vendor.com' in RECIPIENTS) && !('tracker.unknown-vendor.com' in NOT_RECIPIENTS))
+}
 
 // No pricing text was touched: the plan-limits list and the billing channels are as they were.
 check('terms keep the billing-channel wording', /billed exclusively through Shopify App Pricing/.test(pages.en.terms.text) && /Shopify App Pricing/.test(pages.he.terms.text))

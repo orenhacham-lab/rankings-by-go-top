@@ -150,10 +150,38 @@ export const he = {
   cookie: {
     aria: 'הודעת פרטיות',
     title: 'אנחנו מכבדים את הפרטיות שלך',
-    body: 'אנו משתמשים בעוגיות כדי לשפר את חוויית הגלישה. המשך השימוש באתר מהווה הסכמה לשימוש בהן בהתאם ל',
-    short: 'המשך הגלישה מהווה הסכמה לשימוש בעוגיות בהתאם ל',
+    // The notice no longer says that continued browsing is agreement: it is not.
+    // Non-essential storage needs a prior, affirmative choice, so the text says
+    // what is off until the visitor decides, and the two buttons are equals.
+    body: 'אנו משתמשים בעוגיות הדרושות לתפעול האתר. עוגיות מדידה ושיווק לא נטענות עד שתאשרו. פרטים ב',
+    short: 'עוגיות מדידה ושיווק נטענות רק באישורך. פרטים ב',
     privacy: 'מדיניות הפרטיות',
-    accept: 'אישור',
+    accept: 'אישור הכל',
+    rejectAll: 'דחיית הכל',
+    customize: 'התאמה אישית',
+    save: 'שמירת הבחירה',
+    back: 'חזרה',
+    settings: 'הגדרות עוגיות',
+    settingsTitle: 'בחירת סוגי העוגיות',
+    settingsIntro: 'אפשר לאשר או לדחות כל סוג בנפרד, ולשנות את הבחירה בכל רגע.',
+    always: 'תמיד פעיל',
+    withdrawHint: 'לשינוי או לביטול ההסכמה בכל עת: קישור "הגדרות עוגיות" בתחתית כל עמוד.',
+    gpcTitle: 'ההסכמה נדחתה אוטומטית',
+    gpcBody: 'הדפדפן שלך שולח אות Global Privacy Control, ולכן לא נטענו עוגיות מדידה או שיווק. הבחירה תועדה.',
+    categories: {
+      necessary: {
+        title: 'עוגיות הכרחיות',
+        desc: 'התחברות לחשבון, שמירת שפת הממשק, אבטחה והגנה מפני שימוש לרעה. בלעדיהן השירות אינו פועל, ולכן אינן טעונות הסכמה.',
+      },
+      analytics: {
+        title: 'מדידה וניתוח',
+        desc: 'כמה אנשים ביקרו, אילו עמודים נקראו ומה לא עבד. משמש אותנו לשיפור האתר, ואינו משמש לפרסום.',
+      },
+      marketing: {
+        title: 'שיווק ופרסום',
+        desc: 'מדידת הצלחת מודעות ופרסום מותאם ברשתות של Google ו-Meta. דחייה אינה פוגעת בשירות.',
+      },
+    },
   },
   contact: {
     region: 'אזור יצירת קשר',

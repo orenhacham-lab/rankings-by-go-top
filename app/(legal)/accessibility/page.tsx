@@ -31,6 +31,17 @@ export default function AccessibilityPage() {
           לאנשים עם מוגבלות (התאמות נגישות לשירות), התשע&quot;ג-2013. אנו פועלים להתאים את האתר והמערכת לתקן זה
           ברמה AA, ובנחיות WCAG 2.1 ברמה AA שאנו מיישמים כלולות גם דרישות WCAG 2.0.
         </p>
+        <p className="mt-3">
+          <strong>הצהרת ההתאמה:</strong> האתר והמערכת מותאמים חלקית לתקן, ברמה AA. &ldquo;חלקית&rdquo;
+          ולא &ldquo;מלאה&rdquo; מפני שחלקים מסוימים טרם נבדקו מקצה לקצה, ומפני שתוכן של צד שלישי
+          אינו בשליטתנו. החלקים הידועים שאינם נגישים במלואם מפורטים בהמשך העמוד.
+        </p>
+        <p className="mt-3">
+          <strong>מבקרים מהאיחוד האירופי:</strong> הדירקטיבה האירופית לנגישות ((EU) 2019/882),
+          שחלה מ-28 ביוני 2025, פוטרת מיקרו-עסקים נותני שירות (פחות מעשרה עובדים ומחזור או מאזן
+          שאינם עולים על שני מיליון אירו) מדרישות הנגישות שבה. אנו עומדים בהגדרה הזו, ולכן הדרישות
+          אינן חלות עלינו. בחרנו לפעול לפי WCAG 2.1 ברמה AA בכל זאת, כי נגישות אינה שאלה של חובה.
+        </p>
       </section>
 
       <section>
@@ -44,8 +55,18 @@ export default function AccessibilityPage() {
           <li>סימון פוקוס ברור בניווט במקלדת, ותפריט נגישות באתר להתאמת גודל הטקסט, הניגודיות ועוד</li>
           <li>תמיכה בהעדפת &ldquo;הפחתת תנועה&rdquo; (prefers-reduced-motion) של מערכת ההפעלה: אנימציות ומעברים
           מופחתים או מבוטלים למי שביקש זאת</li>
-          <li>תמיכה מלאה בעברית (כיוון מימין לשמאל, RTL) ובאנגלית (משמאל לימין, LTR), כולל כיוון הטקסט, הפריסה
-          והניווט</li>
+          {/*
+            The languages are described by how each is HANDLED, not as a list of
+            the languages the product happens to offer today. A list dates: the
+            Spanish site and dashboard exist on preview, so "Hebrew and English"
+            was already on its way to being untrue, and an accessibility
+            statement that overstates what it covers is exactly the kind of
+            claim that costs more than it buys. This wording stays true before
+            and after any language is added, and each language version of the
+            statement names the language it is written in.
+          */}
+          <li>כיוון הטקסט, הפריסה והניווט מותאמים לכל שפה שהאתר מתפרסם בה: עברית מימין לשמאל (RTL), אנגלית
+          וכל שפה נוספת משמאל לימין (LTR). ההצהרה הזאת חלה על כל גרסאות השפה של האתר</li>
         </ul>
       </section>
 
@@ -65,7 +86,8 @@ export default function AccessibilityPage() {
       <section>
         <h2>דיווח על בעיות נגישות</h2>
         <p>
-          אם נתקלתם בבעיה בנגישות, אנא צרו קשר עם צוות התמיכה שלנו, המשמש גם כרכז הנגישות של השירות:
+          אם נתקלתם בבעיה בנגישות — עמוד שלא נקרא, פעולה שאי אפשר להשלים במקלדת, טקסט שקורא
+          המסך מדלג עליו — כתבו לנו ונטפל בה. רכז הנגישות של השירות:
         </p>
         <p className="mt-2">
           <strong>דואר אלקטרוני:</strong>{' '}
@@ -80,15 +102,33 @@ export default function AccessibilityPage() {
           </a>
         </p>
         <p className="mt-2">
-          אנחנו נשתדל להשיב בתוך 48 שעות ולעבוד על פתרון הבעיה.
+          אנחנו משיבים בתוך 48 שעות, ומוסרים בתשובה מה נעשה ומתי. אם הפנייה כוללת בקשה להתאמה
+          מסוימת, נציין אם היא אפשרית ומה לוח הזמנים.
+        </p>
+        <p className="mt-4">
+          <strong>אם לא קיבלתם מאיתנו מענה, או שהמענה לא פתר את הבעיה:</strong> אפשר לפנות
+          לנציבות שוויון זכויות לאנשים עם מוגבלות במשרד המשפטים
+          (<a href="https://www.gov.il/he/departments/commission_for_equal_rights_of_persons_with_disabilities" target="_blank" rel="noopener noreferrer">
+            נציבות שוויון זכויות לאנשים עם מוגבלות
+          </a>). פנייה אלינו אינה תנאי לכך.
         </p>
       </section>
 
       <section>
         <h2>חלקים שעדיין לא נגישים במלואם</h2>
         <p>
-          ייתכן שחלקים מסוימים, בעיקר תוכן של צד שלישי או קבצים שהועלו אלינו, עדיין אינם נגישים במלואם.
-          אם נתקלתם בחלק כזה, כתבו לנו ונטפל בו.
+          הצהרה כללית על נגישות מלאה היא הצהרה שאי אפשר לקיים, ולכן אנו מפרטים מה ידוע לנו:
+        </p>
+        <ul>
+          <li><strong>תוכן של צד שלישי</strong> שמוצג בתוך המערכת (תוצאות מגוגל, תצוגות מספקים
+          חיצוניים): אינו בשליטתנו ואינו מובטח כנגיש.</li>
+          <li><strong>קבצים שהועלו אלינו</strong> על ידי משתמשים, לרבות קובצי CSV ודוחות: נשמרים
+          כפי שהם ואינם מונגשים אוטומטית.</li>
+          <li><strong>מסכים חדשים</strong> בשבועות הראשונים לאחר שעלו: נבדקים ידנית, וייתכן שעד
+          שהבדיקה מסתיימת יימצאו בהם פערים.</li>
+        </ul>
+        <p className="mt-4">
+          אם נתקלתם בחלק כזה, או בכל חלק אחר, כתבו לנו ונטפל בו. בקשה להתאמה פרטנית תיבדק לגופה.
         </p>
       </section>
 
@@ -117,7 +157,7 @@ export default function AccessibilityPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          עמוד זה עודכן לאחרונה ב-29 בספטמבר 2026
+          עמוד זה עודכן לאחרונה ב-3 באוקטובר 2026
         </p>
       </section>
     </LegalDoc>

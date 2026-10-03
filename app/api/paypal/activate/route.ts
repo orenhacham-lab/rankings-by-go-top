@@ -7,6 +7,7 @@ import { hasPendingShopifyLinkCookie } from '@/lib/shopify/pending-link'
 import { marketForPayPalPlanId } from '@/lib/paypal/checkout-plans'
 import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
+import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 
 /**
  * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
@@ -30,6 +31,16 @@ import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/b
  */
 export async function POST(request: Request) {
   try {
+    // Taking money from a restricted country is the dealing the Trading with
+    // the Enemy Ordinance makes criminal, so it is refused here as well as at
+    // the /billing page (proxy.ts) — this route is reachable directly, and the
+    // page block is the only thing in front of it. lib/sanctions/countries.ts
+    // carries the list and the law; the payer is never told which.
+    const restricted = restrictionForRequest(request.headers)
+    if (restricted) {
+      logRestrictedAttempt('paypal-activate', restricted)
+      return Response.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {

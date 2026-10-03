@@ -53,6 +53,7 @@ import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { buildShopifyPricingUrl } from '@/lib/shopify/billing-urls'
 import { createBillingIntent, signBillingIntentHandoff, BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS, BILLING_INTENT_RESUME_PATH, BILLING_INTENT_ACTION_EMBEDDED, BILLING_INTENT_ACTION_WEBSITE } from '@/lib/shopify/billing-intent'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
+import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 
 interface ResolvedConnection {
   id: string
@@ -76,6 +77,14 @@ export { isAdminUser }
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
+
+  // A Shopify merchant reaching the hosted pricing page is the start of a
+  // payment, so it is refused for a restricted country like the PayPal path.
+  const restricted = restrictionForRequest(request.headers)
+  if (restricted) {
+    logRestrictedAttempt('shopify-billing-start', restricted)
+    return Response.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
+  }
 
   const admin = createAdminClient()
   const authHeader = request.headers.get('authorization') || ''

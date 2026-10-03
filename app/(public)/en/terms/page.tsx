@@ -111,6 +111,31 @@ export default function EnglishTermsPage() {
           submitted in writing to the Company&rsquo;s email address. Full details are in our{' '}
           <Link href="/en/refund-policy">Cancellation and Refund Policy</Link>.
         </p>
+        <p className="mt-4">
+          <strong>7.1 Consumers in the EU and the UK.</strong> If you bought the Service as a private
+          consumer, not for business purposes, and you reside in the European Union or the United
+          Kingdom, you have the right to withdraw from the contract within 14 days of entering into
+          it, without giving a reason. To exercise it, send us written notice at the email address in
+          section 21 within those 14 days.
+        </p>
+        <p className="mt-4">
+          <strong>7.2 Waiver of the withdrawal right once the service starts.</strong> The Service is
+          a digital service that begins operating immediately. By opening an account you expressly
+          request that we begin supplying it at once, and you acknowledge that if we fully supply the
+          Service within those 14 days you will lose the right of withdrawal. If you withdraw while
+          the Service has been supplied in part, we will refund the price less a proportionate amount
+          for what was already supplied.
+        </p>
+        <p className="mt-4">
+          <strong>7.3 Consumers in Israel.</strong> The Israeli Consumer Protection Law, 5741-1981,
+          and the regulations under it give a consumer — someone buying other than for business
+          purposes — cancellation rights in a distance sale and in a continuing transaction. Nothing
+          in these terms derogates from those rights.
+        </p>
+        <p className="mt-4">
+          <strong>7.4</strong> Sections 7.1 to 7.3 apply to private consumers only. For business
+          customers, the refund policy in section 7 applies unchanged.
+        </p>
       </section>
 
       <section>
@@ -209,13 +234,30 @@ export default function EnglishTermsPage() {
         </p>
       </section>
 
-      {/* DRAFT, NEW SECTION (link network, lib/link-network) — wording for the owner's review before publishing. */}
+      {/*
+        The link network (lib/link-network). This clause applies from the moment a
+        project joins, because the feature IS live: the tables exist, the placement
+        step runs from lib/content/article-generation.ts, and nothing but a
+        per-project opt-in stands between a member and a placed link. An earlier
+        draft of this section said the service was not active yet — it was, so the
+        sentence was removed. If the service is ever switched off (the
+        LINK_NETWORK_DISABLED kill switch, or the tables going away), say so here
+        in the same breath as switching it off, never the other way round.
+      */}
       <section id="link-network">
-        <h2>15A. Link Network (draft wording, under review)</h2>
+        <h2>15A. Link Network</h2>
         <p>
           The link network is an optional service in which the Service may place a link between the
           sites of customers who joined it, inside articles the Service writes for them. It is off by
           default and is not available for Shopify stores.
+        </p>
+        <p className="mt-4">
+          <strong>This section applies from the moment you choose to join the network for a given
+          project, and not before.</strong> Until you join, the Service places no link from your
+          articles and places no links to your site in other customers&rsquo; articles, and this section
+          creates no obligation or right for either party. The network is not part of what you pay for
+          and is not included in a plan as a commitment, and the Company may suspend or discontinue it
+          as stated at the end of this section.
         </p>
         <ul>
           <li>
@@ -299,7 +341,31 @@ export default function EnglishTermsPage() {
             <strong>WordPress.</strong> Connecting a WordPress site is used to read the site&rsquo;s content, to
             publish articles and for the site fixes in section 15C.
           </li>
+          <li>
+            <strong>Shopify.</strong> Installing the app in your store lets the Service read the store&rsquo;s
+            content, products and pages, and publish articles to the store blog. The scope is set by the
+            permissions you approved at installation, and you can remove the app from the store at any time.
+            If you are billed through Shopify, the billing sections of these Terms apply as well. The link
+            network in section 15A is not available for Shopify stores.
+          </li>
+          <li>
+            <strong>Wix.</strong> Connecting a Wix site uses an API key you issue in your own account, and is
+            used to read the site&rsquo;s content and to publish articles to its blog. The key is stored
+            encrypted, is never shown again on screen after it is saved, and is deleted when you disconnect.
+            You can also revoke it on the Wix side at any time.
+          </li>
+          <li>
+            <strong>A site on another platform, through a webhook.</strong> For a site that is not WordPress,
+            Shopify or Wix, you can connect an endpoint you control, and the Service sends the article to it
+            in a signed request. The signing secret is stored encrypted, is never shown again after it is
+            saved, and is deleted when you disconnect. What happens to the article once it reaches that
+            endpoint, and your own code&rsquo;s compliance with any law, are your responsibility.
+          </li>
         </ul>
+        <p className="mt-4">
+          This list is every kind of connection the Service offers. A connection added in the future will
+          appear here and in the Privacy Policy before it can be used.
+        </p>
       </section>
 
       <section id="site-fixes">
@@ -440,9 +506,22 @@ export default function EnglishTermsPage() {
       <section>
         <h2>19. Changes to the Terms</h2>
         <p>
-          The Company may update these terms from time to time. The updated version will be published
-          on the website and will take effect upon publication. Continued use of the Service after
-          the terms are updated constitutes acceptance of the updated terms.
+          The Company may update these terms from time to time. A technical change or a clarification
+          takes effect when the updated version is published on the website.
+        </p>
+        <p className="mt-4">
+          <strong>19.1 Material changes.</strong> A change that reduces your rights or widens your
+          obligations — including a change in price, a reduction in the scope of the Service, or a
+          change to the cancellation policy — will be notified to you by email to the address on your
+          account at least 14 days before it takes effect. If you do not agree to it, you may cancel
+          the subscription before that date; in that case you may keep using the Service to the end
+          of the period you paid for, on the terms in force when you paid.
+        </p>
+        <p className="mt-4">
+          <strong>19.2</strong> Continued use after the notice period has ended, or after a
+          non-material change is published, constitutes acceptance of the updated version. This does
+          not derogate from the mandatory protections that the law of a private consumer&rsquo;s
+          country of residence gives them.
         </p>
       </section>
 
@@ -452,6 +531,18 @@ export default function EnglishTermsPage() {
           These terms are governed by the laws of the State of Israel. Exclusive jurisdiction over
           any dispute arising from or related to these terms or the use of the Service lies with the
           competent courts in Israel.
+        </p>
+        <p className="mt-4">
+          <strong>20.1 Consumers.</strong> If you are a private consumer, the choice of law and
+          jurisdiction above does not deprive you of the mandatory protections of the law of your
+          country of residence, nor of the right to bring proceedings in a court there where that law
+          gives you one.
+        </p>
+        <p className="mt-4">
+          <strong>20.2 Sanctions and restricted countries.</strong> We do not provide the Service to
+          anyone located in a country or territory subject to sanctions by Israel, the United States
+          or the European Union, nor to anyone on a restricted-party list of those authorities. By
+          using the Service you confirm that you fall into neither category.
         </p>
       </section>
 

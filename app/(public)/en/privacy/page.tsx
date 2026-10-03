@@ -45,6 +45,14 @@ export default function EnglishPrivacyPage() {
           <li><strong>WordPress connection:</strong> the site address, a username and Application Password and the
           plugin&rsquo;s signing key (both stored encrypted), and the log of fixes on the site — see &ldquo;WordPress
           Connection&rdquo; below</li>
+          <li><strong>Shopify connection:</strong> the store address, the store identifier, the permissions you
+          approved at installation, and the access token the store issues (stored encrypted) — see
+          &ldquo;Connecting a Site on Another Platform&rdquo; below</li>
+          <li><strong>Wix or webhook connection:</strong> the site address or the endpoint you configured, and
+          the Wix API key or the signing secret (stored encrypted and never shown again after saving) — see
+          &ldquo;Connecting a Site on Another Platform&rdquo; below</li>
+          <li><strong>An address for local rank tracking:</strong> if you typed an exact address, it is stored
+          together with the coordinates returned — see &ldquo;Turning an Address into Coordinates&rdquo; below</li>
           <li><strong>Link network:</strong> your joining consent (who accepted, when, the wording and the link
           type) and the placement log — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Results and content:</strong> AI visibility check results, and content generated for you:
@@ -83,7 +91,11 @@ export default function EnglishPrivacyPage() {
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>
           <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
           <li><strong>Vercel:</strong> for hosting the site and the Service</li>
-          <li><strong>Google (Gemini API, Search Console, Business Profile):</strong> our AI provider for generating text and images, and the connections you choose to make — see &ldquo;AI Providers&rdquo; and &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Google (Gemini API, Search Console, Business Profile, Google Ads API):</strong> our AI provider for generating text and images, the connections you choose to make, and the Google Ads API, to which we send keywords to get search volumes and further keyword ideas. That interface is a Company account and not an advertising account of yours; we do not run campaigns for you — see &ldquo;AI Providers&rdquo; and &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Wix:</strong> only if you connected a Wix site — to read the site&rsquo;s content and publish articles to its blog</li>
+          <li><strong>The endpoint you configured yourself (webhook):</strong> only if you connected a site on another platform — the article is sent to the address you gave, in a signed request</li>
+          <li><strong>PDFShift:</strong> to convert a report to PDF, and only when you asked to download one. We send the report&rsquo;s content as displayed in order to get the PDF file back</li>
+          <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
           <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below.
@@ -235,6 +247,54 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Connecting a Site on Another Platform</h2>
+        <p>
+          Besides WordPress, you can connect a Shopify store, a Wix site, or a site on any other platform
+          through an endpoint you configure. Each connection is optional and is made by you.
+        </p>
+        <ul>
+          <li><strong>Shopify:</strong> installing the app in your store lets us read the store&rsquo;s content,
+          products and pages, and publish articles to the store blog, within the permissions you approved at
+          installation. The store&rsquo;s access token is stored encrypted. Removing the app from the store
+          revokes the access.</li>
+          <li><strong>Wix:</strong> the connection uses an API key you issue in your own account, and is used
+          to read the site&rsquo;s content and publish articles to its blog. We send Wix the article&rsquo;s
+          content and its publishing details, and no other account data. The key is stored encrypted, is never
+          shown again after saving, and is deleted when you disconnect. You can revoke it on the Wix side at
+          any time.</li>
+          <li><strong>Webhook:</strong> the Service sends the article to the endpoint you configured, in a
+          signed request. The endpoint is yours, so what happens to the article once it arrives is under your
+          control. The signing secret is stored encrypted, is never shown again after saving, and is deleted
+          when you disconnect.</li>
+          <li><strong>Errors:</strong> if publishing fails we store an internal error code only. We do not
+          store or display the provider&rsquo;s or your server&rsquo;s own error text.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Turning an Address into Coordinates</h2>
+        <p>
+          To track rankings from an exact point you can type an address instead of coordinates. When you do, we
+          send the address you typed and the project&rsquo;s country name to OpenStreetMap&rsquo;s
+          <strong> Nominatim</strong> service to get coordinates back. We do not send your name, your email
+          address or any other account details. The address and the coordinates returned are stored with us as
+          the tracking target&rsquo;s definition, and you can change or delete them in the target&rsquo;s
+          settings. OpenStreetMap is operated by the OpenStreetMap Foundation, and the Nominatim service has
+          its own usage and privacy policy.
+        </p>
+      </section>
+
+      <section>
+        <h2>Converting a Report to PDF</h2>
+        <p>
+          When you ask to download a report as a PDF, we send the report&rsquo;s content as displayed to the
+          <strong> PDFShift</strong> service, which returns the file to us. This happens only when you pressed
+          to download a report, never on a regular or scheduled basis, and the content is sent for the
+          conversion alone. Retention at PDFShift is governed by their own privacy policy and terms.
+        </p>
+      </section>
+
+      <section>
         <h2>Link Network</h2>
         <p>
           Joining the link network is optional, is done for each project separately, is off by default, and is not
@@ -321,23 +381,56 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <h2>Cookies</h2>
-        <p>We use cookies for essential purposes:</p>
+        <p>We sort cookies into three categories, and we ask you about two of them before they load:</p>
         <ul>
-          <li><strong>Session cookies:</strong> for secure server communication and session management</li>
-          <li><strong>Analytics cookies:</strong> for site usage analysis via Google Analytics and Google Tag Manager</li>
+          <li><strong>Strictly necessary:</strong> signing in, remembering your interface language,
+          security and abuse prevention. The service cannot run without them, so they need no consent.</li>
+          <li><strong>Measurement:</strong> how many people visited, which pages they read and what
+          did not work. Loaded only if you allow it.</li>
+          <li><strong>Marketing:</strong> measuring how our ads perform and showing relevant ads on
+          the Google and Meta networks. Loaded only if you allow it.</li>
         </ul>
-        <p className="mt-4">By continuing to use the site, you agree to the use of cookies as described above.</p>
+        <p className="mt-4">
+          <strong>Before you choose, no measurement or marketing cookie is set and no request is
+          made to Google&rsquo;s servers.</strong>{' '}
+          Accepting and refusing are two equal buttons on the notice, and each category can be
+          allowed on its own.
+        </p>
+        <p className="mt-4">
+          <strong>Changing or withdrawing your consent:</strong> at any time, through the
+          &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
+          easy as giving consent, and costs you nothing in the service.
+        </p>
+        <p className="mt-4">
+          If your browser sends a Global Privacy Control signal, we treat it as a refusal: no
+          measurement or marketing cookies are loaded, and we do not show you the notice.
+        </p>
+        <p className="mt-4">
+          So that we can demonstrate what you chose, we record every decision: what you were shown,
+          what you chose, when, in which language, on which page, and a one-way hash of your IP
+          address. <strong>The IP address itself is not stored in that log.</strong> The log is
+          append-only and cannot be edited or deleted from within the system.
+        </p>
       </section>
 
       <section>
         <h2>Analytics &amp; Marketing Services</h2>
-        <p>We use the following services for user behavior analysis and marketing channel management:</p>
+        <p>
+          Our measurement and marketing tools are managed through Google Tag Manager, which loads
+          only after you have allowed measurement or marketing. The tools that may run through it:
+        </p>
         <ul>
-          <li><strong>Google Analytics:</strong> to analyze traffic and acquisition channels</li>
-          <li><strong>Google Tag Manager:</strong> to manage tags and analyze user composition</li>
+          <li><strong>Google Analytics:</strong> traffic and acquisition analysis (subject to measurement consent)</li>
+          <li><strong>Google Ads:</strong> conversion measurement and personalised advertising (subject to marketing consent)</li>
+          <li><strong>Meta Pixel:</strong> conversion measurement and advertising on Facebook and Instagram (subject to marketing consent)</li>
         </ul>
         <p className="mt-4">
-          These cookies do not personally identify you and are used to improve user experience and the service.
+          Which tools are active changes from time to time. What does not change: none of them loads
+          before you have allowed its category, and withdrawing your consent stops the collection.
+        </p>
+        <p className="mt-4">
+          We declare your consent state to Google through the Consent Mode v2 protocol, so the tools
+          are bound by your choice even if we add a new tag in the future.
         </p>
       </section>
 
@@ -394,6 +487,168 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Legal Basis for Processing</h2>
+        <p>
+          We process personal data only where we have a legal basis for it. Each purpose has its own
+          basis, which is why your options differ from one purpose to the next:
+        </p>
+        <ul>
+          <li><strong>Performance of a contract</strong> (GDPR Art. 6(1)(b)): opening an account,
+          running the subscription, performing scans and checks, generating content and publishing it
+          to the site you connected. Without this there is no service.</li>
+          <li><strong>Consent</strong> (Art. 6(1)(a) and the ePrivacy rules): measurement and
+          marketing cookies, marketing email, and joining the link network. Each is separate, and
+          each can be withdrawn at any time.</li>
+          <li><strong>Legitimate interests</strong> (Art. 6(1)(f)): securing the system, preventing
+          abuse, operational reminders about your own account, and improving the service from
+          aggregate data. You may object to processing on this basis.</li>
+          <li><strong>Legal obligation</strong> (Art. 6(1)(c)): keeping billing records and
+          reporting to the tax authorities.</li>
+        </ul>
+        <p className="mt-4">
+          In Israel we are subject to the Protection of Privacy Law, 5741-1981, including Amendment
+          13, which took effect on 14 August 2025. We are not required to appoint a data protection
+          officer under that amendment, and we are not a data broker: we do not sell personal data to
+          anyone, for any consideration.
+        </p>
+      </section>
+
+      <section>
+        <h2>How Long We Keep Data</h2>
+        <p>We keep data only as long as it is needed for the purpose it was collected for:</p>
+        <ul>
+          <li><strong>Account and the content generated for you:</strong> for the life of the
+          account, and up to 90 days after it is deleted so an accidental deletion can be undone.
+          Then erased.</li>
+          <li><strong>Billing records and invoices:</strong> seven years, as Israeli tax law
+          requires. We have no discretion here, even if you ask for erasure.</li>
+          <li><strong>Connection credentials</strong> (WordPress, Shopify, Search Console): until you
+          disconnect or delete the account, and then erased immediately.</li>
+          <li><strong>Free site check:</strong> cached for up to 24 hours, then erased if no account
+          was opened from it.</li>
+          <li><strong>Cookie decision log:</strong> up to three years from the decision, so that we
+          can demonstrate what you chose. That is the legal basis for keeping it, which is why it is
+          not erased together with the account.</li>
+          <li><strong>Security and server logs:</strong> up to 90 days.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>International Transfers</h2>
+        <p>
+          The service runs on international cloud and infrastructure providers, so data may be stored
+          or processed outside your country of residence. The main providers: Vercel (application
+          hosting), Supabase (the database, in the Mumbai region in India), and every other provider listed
+          under &ldquo;Information Sharing&rdquo; above, among them the AI and search providers, the PDF
+          conversion provider and the address lookup service.
+        </p>
+        <p className="mt-4">
+          For data about residents of the European Economic Area, Switzerland or the United Kingdom:
+          Israel has been recognised by the European Commission as providing an adequate level of
+          protection, so a transfer to us requires no further instrument. For transfers to providers
+          outside the EU in countries without an adequacy decision we rely on the European
+          Commission&rsquo;s Standard Contractual Clauses, within those providers&rsquo; own terms.
+        </p>
+        <p className="mt-4">
+          You may ask us which instrument we rely on for a particular transfer, and we will answer in
+          writing.
+        </p>
+      </section>
+
+      <section>
+        <h2>Rights of Residents of the EEA, Switzerland and the UK</h2>
+        <p>
+          If you are in the European Economic Area, Switzerland or the United Kingdom, you also have
+          the following rights under the GDPR and the UK GDPR:
+        </p>
+        <ul>
+          <li><strong>Access</strong> (Art. 15): a copy of the data we hold about you.</li>
+          <li><strong>Rectification</strong> (Art. 16) and <strong>erasure</strong> (Art. 17).</li>
+          <li><strong>Restriction of processing</strong> (Art. 18).</li>
+          <li><strong>Portability</strong> (Art. 20): your data in a structured, machine-readable format.</li>
+          <li><strong>Objection</strong> (Art. 21), including an absolute right to object to marketing.</li>
+          <li><strong>Withdrawal of consent</strong> (Art. 7(3)) at any time, without affecting the
+          lawfulness of processing carried out before it.</li>
+        </ul>
+        <p className="mt-4">
+          We answer within 30 days. We will not charge you and will not degrade your service because
+          you exercised a right.
+        </p>
+        <p className="mt-4">
+          <strong>Right to complain:</strong> if you are not satisfied with our answer, you may
+          complain to the supervisory authority in your country of residence, or to the Israeli
+          Privacy Protection Authority
+          (<a href="https://www.gov.il/en/departments/the_privacy_protection_authority" target="_blank" rel="noopener noreferrer">
+            Privacy Protection Authority
+          </a>). Contacting us first is not a condition of complaining, though we would welcome the
+          chance to put it right.
+        </p>
+      </section>
+
+      <section>
+        <h2>Rights of United States Residents</h2>
+        <p>
+          If you are a resident of California, or of another state that has enacted a state privacy
+          law, you have the right to know which categories of data were collected about you, to
+          obtain a copy, to request deletion, to correct inaccurate data, and not to be discriminated
+          against for exercising a right.
+        </p>
+        <p className="mt-4">
+          <strong>We do not sell personal information and we do not transfer it for
+          consideration.</strong> We do share identifiers and usage events with the Google and Meta
+          advertising networks for targeted advertising, which may count as &ldquo;sharing&rdquo;
+          under California law. That sharing happens <strong>only</strong> if you allowed the
+          marketing category, and it stops the moment you withdraw.
+        </p>
+        <p className="mt-4">
+          We honour the browser&rsquo;s Global Privacy Control signal as a &ldquo;do not sell or
+          share my personal information&rdquo; request, and we record it. No form is needed: the
+          signal itself is enough.
+        </p>
+      </section>
+
+      <section>
+        <h2>Automated Decisions</h2>
+        <p>
+          The service produces recommendations and content with AI models, but it makes no automated
+          decision with a legal or similarly significant effect on you: no credit scoring, no
+          candidate screening, and no eligibility decision made without a person. Content is
+          published to the site you connected according to the schedule and the approvals you set.
+        </p>
+      </section>
+
+      <section>
+        <h2>Minimum Age</h2>
+        <p>
+          The service is intended for businesses and site owners, not for children. We do not
+          knowingly collect data from anyone under 18, and the service may not be used below that
+          age. If such data has reached us, write to us and we will erase it.
+        </p>
+      </section>
+
+      <section>
+        <h2>Privacy Contact and Representatives</h2>
+        <p>For any privacy matter, including exercising the rights above:</p>
+        <p className="mt-2">
+          <strong>Email:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>Phone:</strong>{' '}
+          <a href="tel:0549489377" dir="ltr">
+            +972-54-948-9377
+          </a>
+        </p>
+        <p className="mt-4">
+          We are not required to appoint a data protection officer under Amendment 13 to the Israeli
+          Protection of Privacy Law, and we have not appointed one. Requests are handled by the
+          contact above.
+        </p>
+      </section>
+
+      <section>
         <h2>Updates to This Policy</h2>
         <p>
           We may update this policy from time to time. Changes take effect immediately upon publication. We encourage you
@@ -420,7 +675,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on September 29, 2026
+          This policy was last updated on October 3, 2026
         </p>
       </section>
     </LegalDoc>

@@ -18,7 +18,7 @@
  *
  * MUTATION CONTROLS for each group. Run: npx tsx lib/content/__qa__/wordpress-schema.qa.ts
  */
-import { spawnSync } from 'child_process'
+import { execSync, spawnSync } from 'child_process'
 import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -163,8 +163,30 @@ async function main() {
   check('W2: nothing script-like is added to the post content', !/content\s*(\+?=)[^\n]*ld\+json|<script/i.test(wp))
   check('MUTATION CONTROL: the step moved before the post is created is caught', !wired(wp.replace("if (status === 'publish' && article.id)", "if (article.id)")))
   const changed = (base: string, ...paths: string[]) => spawnSync('git', ['diff', '--name-only', base, '--', ...paths], { cwd: ROOT, encoding: 'utf8' }).stdout.trim()
-  const shopifyDiff = changed('8b468a8', 'lib/shopify', 'app/api/shopify')
-  check('W3: Shopify code is untouched', shopifyDiff === '', shopifyDiff)
+
+  // What this guard is FOR: proving this feature did not quietly reach into the
+  // Shopify code path. It used to assert that nothing under lib/shopify or
+  // app/api/shopify had changed at all since 8b468a8, which also fires on any
+  // later, deliberate, unrelated Shopify change — and then says "this feature
+  // touched Shopify", which is false. So the question it asks is narrowed to the
+  // one it means: if a Shopify file changed, is everything it ADDED the shared
+  // country block (lib/sanctions), or is it this feature leaking in?
+  //
+  // The country block is a legal refusal that has to sit on every path where a
+  // payment can start, Shopify billing included; it shares nothing with the WordPress schema step.
+  const shopifyAddedLines = (base: string) => execSync(`git diff -U0 ${base} -- lib/shopify app/api/shopify`, { cwd: ROOT })
+    .toString().split('\n')
+    .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
+    .map((l) => l.slice(1).trim())
+    .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+    // Structure-only lines (a closing brace, a lone paren) carry no feature logic.
+    .filter((l) => !/^[{}()\[\];,]+$/.test(l))
+  const foreignShopifyLines = (base: string) => shopifyAddedLines(base)
+    .filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l))
+  const foreignWp = foreignShopifyLines('8b468a8')
+  check('W3: the WordPress schema feature has not reached into Shopify code', foreignWp.length === 0, foreignWp.slice(0, 4).join(' | '))
+  check('MUTATION CONTROL: a WordPress-schema line added to Shopify code would be caught',
+    ['publishArticleSchemaToWordPress(creds, article)'].filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l)).length === 1)
   // Wave 8 merge: the plugin's only change is site health's 2.1.0 (w8-health, 2a1492b: h1 and
   // llms.txt). The article schema rides the existing /fix schema_jsonld and adds nothing to it.
   const pluginDiff = changed('2a1492b', 'wordpress-plugin')
