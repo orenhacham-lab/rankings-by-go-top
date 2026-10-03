@@ -23,7 +23,7 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>Introduction</h2>
         <p>
-          Go Top Digital Marketing &amp; Advertising Ltd. (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
+          GO TOP MARKETING GRUO LTD (company number 517274346) (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
           at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
           use, and disclosure of personal information when you use our Service.
         </p>

@@ -157,7 +157,7 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
           <p className="text-caption font-semibold text-contrast-ink/80" data-footer-credit-line>
             {creditBefore}
             <a
-              href="https://gotop.co.il"
+              href="https://www.gotop.co.il"
               className="rounded-control underline decoration-white/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:text-contrast-ink hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
               data-footer-credit
             >

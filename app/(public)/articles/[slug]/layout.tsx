@@ -159,7 +159,7 @@ export default async function ArticleLayout({
         publisher: {
           '@type': 'Organization',
           name: 'GO TOP',
-          url: 'https://gotop.co.il',
+          url: 'https://www.gotop.co.il',
           logo: {
             '@type': 'ImageObject',
             url: 'https://www.gotopseo.com/gotop-primary.png',
