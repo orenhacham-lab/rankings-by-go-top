@@ -100,13 +100,28 @@ check('1-MUT1: a provider holding one locale would fail 1a',
 check('1-MUT2: a narrowing that answered Hebrew would fail 1c',
   ((l: string) => (l === 'en' ? 'en' : 'he'))('es') !== 'en')
 
+/** Every leaf es.ts names, used by group 2 to pick a fallback and by group 7 to count. */
+const translatedPaths = new Set(leaves(dashboardEs as DeepPartial<typeof dashboardHe>).map((l) => l.path))
+
 console.log('\n2. An untranslated section is ENGLISH, and the merge leaves English alone')
 const es = getDashboardDictionary('es')
 const en = getDashboardDictionary('en')
 const he = getDashboardDictionary('he')
 check('2a: a translated section is Spanish', str(es.sidebar.dashboard) === 'Panel' && str(es.common.save) === 'Guardar')
+// Picked from what es.ts has NOT translated yet, rather than named here: a
+// section named in a test stops being a fallback the day it is translated, and
+// the test then proves nothing while still passing.
+const untranslated = leaves(en).find((l) => {
+  if (translatedPaths.has(l.path)) return false
+  const esLeaf = leaves(es).find((e) => e.path === l.path)
+  const heLeaf = leaves(he).find((h) => h.path === l.path)
+  return !!esLeaf && !!heLeaf && l.text !== heLeaf.text
+})
 check('2b: a section es.ts has not reached is the ENGLISH string, not the Hebrew one',
-  str(es.reports.title) === str(en.reports.title) && str(es.reports.title) !== str(he.reports.title))
+  !!untranslated
+  && str(leaves(es).find((e) => e.path === untranslated.path)?.text) === untranslated.text
+  && str(leaves(es).find((e) => e.path === untranslated.path)?.text) !== str(leaves(he).find((h) => h.path === untranslated.path)?.text),
+  untranslated ? untranslated.path : 'everything is translated — retire this check')
 check('2c: every key the English dictionary has, the Spanish one has',
   leaves(en).every((l) => leaves(es).some((e) => e.path === l.path)),
   `${leaves(en).length} English leaves vs ${leaves(es).length} Spanish`)
@@ -284,7 +299,7 @@ console.log('\n9. Signing in does not reset a Spanish reader to English')
 }
 
 console.log('\n7. Coverage — the honest progress report')
-const translated = new Set(leaves(dashboardEs as DeepPartial<typeof dashboardHe>).map((l) => l.path))
+const translated = translatedPaths
 const total = leaves(dashboardEn).length
 const pct = Math.round((translated.size / total) * 1000) / 10
 const sections = Object.keys(dashboardEs)
