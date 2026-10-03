@@ -14,6 +14,8 @@ import Notice from '@/components/ui/Notice'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
+import { PaddleCheckoutProvider, PaddleManageButton, PaddlePlanButton, type PaddleCheckoutProps } from './paddle-checkout'
+import type { PlanCode } from '@/lib/plans/catalog'
 
 /** The 5 plans this view actually has cards/labels for. */
 type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium' | 'large_agency'
@@ -50,6 +52,12 @@ interface BillingViewProps {
   marketLocked: boolean
   /** The plans' prices in `market`, from the plan catalog. */
   planPrices: Record<PlanKey, number>
+  /** w21 — set by the server ONLY when Paddle is fully configured and switched
+   *  on (lib/paddle/config.ts) for a website-billed, non-PayPal-subscribed
+   *  account. null/absent: the PayPal screen exactly as before. */
+  paddle?: PaddleCheckoutProps | null
+  /** w21 — the current row is a Paddle subscription (only read while Paddle is on). */
+  hasPaddleSubscription?: boolean
 }
 
 export default function BillingView({
@@ -66,6 +74,8 @@ export default function BillingView({
   market,
   marketLocked,
   planPrices,
+  paddle = null,
+  hasPaddleSubscription = false,
 }: BillingViewProps) {
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
@@ -81,6 +91,15 @@ export default function BillingView({
   // Shown in the page in our words; the route's own error text never reaches the merchant.
   const [cancelResult, setCancelResult] = useState<'ok' | 'failed' | null>(null)
   const { confirm, dialog: confirmDialog } = useConfirm()
+
+  // w21 — with Paddle off this is always undefined, so every PlanCard renders
+  // its PayPal container exactly as before. A Paddle subscriber is never
+  // offered a second checkout (that would bill twice).
+  const paddleAction = (code: PlanCode, inverse: boolean): React.ReactNode | undefined => {
+    if (!paddle) return undefined
+    if (hasPaddleSubscription) return <p className={cn('text-center text-caption', inverse ? 'text-contrast-ink/70' : 'text-muted')}>{t.paddle.changePlan}</p>
+    return <PaddlePlanButton plan={code} inverse={inverse} />
+  }
 
   const handleCancel = async () => {
     // The in-app confirmation (ui/ConfirmDialog) in place of the browser's box:
@@ -112,6 +131,77 @@ export default function BillingView({
       setCancelling(false)
     }
   }
+
+  const planGrid = (
+  <div className="grid grid-cols-1 gap-5 pt-3 md:grid-cols-2 xl:grid-cols-4">
+    <PlanCard
+      name={t.planLabels.regular}
+      price={planPrices.regular}
+      currencySymbol={currencySymbol}
+      period={t.perMonth}
+      features={t.features.regular}
+      isPopular={false}
+      isCurrent={plan === 'regular' && hasActiveSubscription}
+      plan="regular"
+      action={paddleAction('regular', false)}
+      audience={PLAN_AUDIENCE_LABEL.regular[language]}
+      description={PLAN_AUDIENCE_DESCRIPTION.regular[language]}
+      numberLocale={numberLocale}
+      recommendedLabel={t.recommended}
+      currentLabel={t.currentPlan}
+    />
+    <PlanCard
+      name={t.planLabels.advanced}
+      price={planPrices.advanced}
+      currencySymbol={currencySymbol}
+      period={t.perMonth}
+      features={t.features.advanced}
+      isPopular={true}
+      isCurrent={plan === 'advanced' && hasActiveSubscription}
+      plan="advanced"
+      action={paddleAction('advanced', true)}
+      audience={PLAN_AUDIENCE_LABEL.advanced[language]}
+      description={PLAN_AUDIENCE_DESCRIPTION.advanced[language]}
+      numberLocale={numberLocale}
+      recommendedLabel={t.recommended}
+      currentLabel={t.currentPlan}
+    />
+    <PlanCard
+      name={t.planLabels.premium}
+      price={planPrices.premium}
+      currencySymbol={currencySymbol}
+      period={t.perMonth}
+      features={t.features.premium}
+      isPopular={false}
+      isCurrent={plan === 'premium' && hasActiveSubscription}
+      plan="premium"
+      action={paddleAction('premium', false)}
+      audience={PLAN_AUDIENCE_LABEL.premium[language]}
+      description={PLAN_AUDIENCE_DESCRIPTION.premium[language]}
+      numberLocale={numberLocale}
+      recommendedLabel={t.recommended}
+      currentLabel={t.currentPlan}
+    />
+    {planPrices.large_agency !== undefined && (
+      <PlanCard
+        name={t.planLabels.large_agency}
+        price={planPrices.large_agency}
+        currencySymbol={currencySymbol}
+        period={t.perMonth}
+        features={t.features.large_agency}
+        isPopular={false}
+        isCurrent={plan === 'large_agency' && hasActiveSubscription}
+        plan="large_agency"
+        action={paddleAction('large_agency', false)}
+        audience={PLAN_AUDIENCE_LABEL.large_agency[language]}
+        description={PLAN_AUDIENCE_DESCRIPTION.large_agency[language]}
+        numberLocale={numberLocale}
+        recommendedLabel={t.recommended}
+        currentLabel={t.currentPlan}
+      />
+    )}
+  </div>
+  )
 
   return (
     <div>
@@ -205,6 +295,8 @@ export default function BillingView({
                     </span>
                   )}
                 </p>
+              ) : paddle && hasPaddleSubscription ? (
+                <PaddleManageButton />
               ) : hasPaypalSubscriptionId ? (
                 <>
                   <p className="mb-4 text-copy text-muted">{t.manage.description}</p>
@@ -240,72 +332,16 @@ export default function BillingView({
             currentLabel={t.currentPlan}
           />
 
-          <div className="grid grid-cols-1 gap-5 pt-3 md:grid-cols-2 xl:grid-cols-4">
-            <PlanCard
-              name={t.planLabels.regular}
-              price={planPrices.regular}
-              currencySymbol={currencySymbol}
-              period={t.perMonth}
-              features={t.features.regular}
-              isPopular={false}
-              isCurrent={plan === 'regular' && hasActiveSubscription}
-              plan="regular"
-              audience={PLAN_AUDIENCE_LABEL.regular[language]}
-              description={PLAN_AUDIENCE_DESCRIPTION.regular[language]}
-              numberLocale={numberLocale}
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            <PlanCard
-              name={t.planLabels.advanced}
-              price={planPrices.advanced}
-              currencySymbol={currencySymbol}
-              period={t.perMonth}
-              features={t.features.advanced}
-              isPopular={true}
-              isCurrent={plan === 'advanced' && hasActiveSubscription}
-              plan="advanced"
-              audience={PLAN_AUDIENCE_LABEL.advanced[language]}
-              description={PLAN_AUDIENCE_DESCRIPTION.advanced[language]}
-              numberLocale={numberLocale}
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            <PlanCard
-              name={t.planLabels.premium}
-              price={planPrices.premium}
-              currencySymbol={currencySymbol}
-              period={t.perMonth}
-              features={t.features.premium}
-              isPopular={false}
-              isCurrent={plan === 'premium' && hasActiveSubscription}
-              plan="premium"
-              audience={PLAN_AUDIENCE_LABEL.premium[language]}
-              description={PLAN_AUDIENCE_DESCRIPTION.premium[language]}
-              numberLocale={numberLocale}
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            {planPrices.large_agency !== undefined && (
-              <PlanCard
-                name={t.planLabels.large_agency}
-                price={planPrices.large_agency}
-                currencySymbol={currencySymbol}
-                period={t.perMonth}
-                features={t.features.large_agency}
-                isPopular={false}
-                isCurrent={plan === 'large_agency' && hasActiveSubscription}
-                plan="large_agency"
-                audience={PLAN_AUDIENCE_LABEL.large_agency[language]}
-                description={PLAN_AUDIENCE_DESCRIPTION.large_agency[language]}
-                numberLocale={numberLocale}
-                recommendedLabel={t.recommended}
-                currentLabel={t.currentPlan}
-              />
-            )}
-          </div>
-
-          <BillingClient market={market} />
+          {paddle ? (
+            <PaddleCheckoutProvider config={paddle}>
+              {planGrid}
+            </PaddleCheckoutProvider>
+          ) : (
+            <>
+              {planGrid}
+              <BillingClient market={market} />
+            </>
+          )}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}
