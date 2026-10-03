@@ -314,8 +314,18 @@ function main() {
       /const legalPrefix = locale === 'he' \? '' : '\/en'/.test(footer)
       && ['privacy', 'terms', 'refund-policy', 'accessibility'].every((p) => footer.includes('${legalPrefix}/' + p)))
     check('6b5: …and its home link follows the page\'s locale', /const homeHref = localeHomeHref\(locale\)/.test(footer))
+    // THE COMPANY'S LEGAL NAME IS NEVER TRANSLATED (Oren, 2026-10-03): the
+    // Hebrew pages carry the Hebrew name, and English and every other
+    // language carry the English name exactly as registered. The Spanish tree
+    // names no legal entity today — the legal pages are not translated — so
+    // this guards the rule for whatever adds one later.
+    check('6b6: no Spanish copy carries a translated company name',
+      !allSpanishStrings().some((s) => /\bS\.L\.|Sociedad Limitada|Marketing Digital y Publicidad/i.test(s.text)),
+      allSpanishStrings().filter((s) => /\bS\.L\.|Sociedad Limitada|Marketing Digital y Publicidad/i.test(s.text)).map((s) => s.path).join(' / '))
     // MUTATION CONTROL
     check('6b-MUT: a doubled prefix would fail 6b2', /\/(es|en)\/(es|en)\//.test('/es/es/features/x'))
+    check('6b-MUT2: a translated company name would fail 6b6',
+      /\bS\.L\.|Sociedad Limitada|Marketing Digital y Publicidad/i.test('Go Top Marketing Digital y Publicidad S.L.'))
   }
 
   // ── 7) Nothing bilingual was widened by accident ────────────────────────────
