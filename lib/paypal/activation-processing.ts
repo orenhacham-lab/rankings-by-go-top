@@ -34,10 +34,17 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
 
-export interface PaidSubscriptionFields {
+/** The provider reference written with a verified paid plan: PayPal's
+ *  subscription id, or (w21) Paddle's subscription + customer ids. */
+export type PaidProviderReference =
+  | { paypal_subscription_id: string }
+  | { paddle_subscription_id: string; paddle_customer_id: string | null }
+
+export type PaidSubscriptionFields = PaidProviderReference & {
   plan_code: string
-  status: 'active'
-  paypal_subscription_id: string
+  /** 'active', or (w21, Paddle only) 'cancelled' when the renewal is already
+   *  scheduled to stop at period end at the moment the row is first linked. */
+  status: 'active' | 'cancelled'
   current_period_end: string
   /** Phase 3 — authoritative period start from PayPal's own verified
    *  response (lib/paypal/client.ts::verifyPayPalActivation); null when

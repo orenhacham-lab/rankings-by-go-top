@@ -10,8 +10,16 @@ import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
 import { planPriceIn } from '@/lib/billing/market'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
+import { paddleEnvSnapshot, resolvePaddleConfig } from '@/lib/paddle/config'
 import BillingView from './BillingView'
 import AdminBillingView from './AdminBillingView'
+
+interface CurrentSubscriptionRow {
+  status: string
+  paypal_subscription_id: string | null
+  /** Selected only while Paddle is on (the column comes with its migration). */
+  paddle_subscription_id?: string | null
+}
 
 export default async function BillingPage() {
   const supabase = await createClient()
@@ -39,9 +47,15 @@ export default async function BillingPage() {
     return <AdminBillingView />
   }
 
+  // w21 — Paddle (merchant of record) is a second checkout behind a switch
+  // that is OFF unless every value is set (lib/paddle/config.ts). Off: this
+  // page reads and renders exactly what it did before Paddle existed — the
+  // paddle_* columns are not even selected, so the screen keeps working where
+  // the Paddle migration has not been applied.
+  const paddleConfig = resolvePaddleConfig(paddleEnvSnapshot())
   const { data: activeSub } = await supabase
     .from('subscriptions')
-    .select('status, paypal_subscription_id')
+    .select<string, CurrentSubscriptionRow>(paddleConfig.enabled ? 'status, paypal_subscription_id, paddle_subscription_id' : 'status, paypal_subscription_id')
     .eq('user_id', user.id)
     .in('status', ['active', 'cancelled'])
     .order('created_at', { ascending: false })
@@ -91,6 +105,15 @@ export default async function BillingPage() {
   // the dashboard language toggle, never a client choice, no switcher.
   const { market, locked: marketLocked } = await resolveBillingMarket(supabase, user)
 
+  // w21 — Paddle is offered only to a website-billed account (never while
+  // Shopify governs it or governance is unreadable: checked above, first) that
+  // has no PayPal subscription on its current row (a second provider would
+  // bill it twice). Admins never reach this line.
+  const currentSub = activeSub
+  const paddle = paddleConfig.enabled && !governanceUnavailable && !shopifyConnected && !currentSub?.paypal_subscription_id
+    ? { ...paddleConfig.checkout, userId: user.id, email: user.email ?? null }
+    : null
+
   return (
     <BillingView
       plan={entitlement.plan}
@@ -112,6 +135,8 @@ export default async function BillingPage() {
         premium: planPriceIn(PLAN_CATALOG.premium, market),
         large_agency: planPriceIn(PLAN_CATALOG.large_agency, market),
       }}
+      paddle={paddle}
+      hasPaddleSubscription={!!paddle && !!currentSub?.paddle_subscription_id}
     />
   )
 }
