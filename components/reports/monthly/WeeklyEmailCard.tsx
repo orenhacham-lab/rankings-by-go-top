@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Mail } from 'lucide-react'
 import SettingsCard from '@/components/settings/SettingsCard'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 import { monthlyCopy } from './copy'
 
@@ -24,7 +24,7 @@ export function WeeklyEmailSwitch({ on, busy, onChange, language, note }: {
   on: boolean
   busy: boolean
   onChange: (next: boolean) => void
-  language: Locale
+  language: PublicLocale
   note: 'saved' | 'failed' | null
 }) {
   const t = monthlyCopy(language).email
@@ -60,7 +60,7 @@ export function WeeklyEmailSwitch({ on, busy, onChange, language, note }: {
   )
 }
 
-export default function WeeklyEmailCard({ projectId, language }: { projectId: string; language: Locale }) {
+export default function WeeklyEmailCard({ projectId, language }: { projectId: string; language: PublicLocale }) {
   const t = monthlyCopy(language).email
   const [load, setLoad] = useState<Load>({ status: 'loading' })
   const [busy, setBusy] = useState(false)

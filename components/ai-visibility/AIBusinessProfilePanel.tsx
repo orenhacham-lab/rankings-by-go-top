@@ -96,8 +96,8 @@ export default function AIBusinessProfilePanel({
   onChange: (profile: ManualAIProfile | null) => void
   onProfileSaved?: () => void
 }) {
-  const { language: dashboardLanguage } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const { language: dashboardLanguage, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
   const isHebrew = dashboardLanguage === 'he'
 
   const [mode, setMode] = useState<'auto' | 'manual'>(initialProfile?.mode ?? 'auto')

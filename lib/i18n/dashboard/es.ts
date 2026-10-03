@@ -36,7 +36,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     clients: 'Clientes',
     projects: 'Webs',
     keywords: 'Palabras clave',
-    keywordResearch: 'Investigación de palabras clave',
+    keywordResearch: 'Buscar palabras clave',
     siteLinks: 'Enlaces',
     mapsPosts: 'Publicaciones en Google Maps',
     aiVisibility: 'Visibilidad en IA',
@@ -2371,7 +2371,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
   dashboardStart: {
     title: 'Empieza por aquí',
     subtitle: (domain: string) => `Unos pocos pasos y este panel se llena de datos sobre ${domain}.`,
-    progress: (done: number, total: number) => `${done} de ${total} hechos`,
+    progress: (done: number, total: number) => `${done} de ${total} completados`,
     stepLabel: (n: number) => `Paso ${n}`,
     done: 'Hecho',
     running: 'En curso ahora',

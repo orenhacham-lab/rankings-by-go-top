@@ -1,172 +1,189 @@
 /**
  * Lightweight i18n helper for the AI Visibility module.
- * Returns Hebrew strings when language='he' or country='IL', English otherwise.
+ *
+ * Hebrew when language='he' or country='IL', Spanish when language='es', and
+ * English otherwise — including for a Spanish key that has no `es` yet, the
+ * same partial-then-English fallback the dashboard dictionary uses
+ * (lib/i18n/dashboard/merge.ts). So a string translated here lands on the
+ * screen and an untranslated one reads English, never Hebrew.
  *
  * Usage: const t = createI18n(language, country); t('regenerate')
  */
 
 const STRINGS = {
   // Modal & button labels
-  regenerate: { he: 'צור מחדש', en: 'Regenerate' },
-  generate_again: { he: 'צור שוב', en: 'Generate again' },
-  close: { he: 'סגור', en: 'Close' },
-  cancel: { he: 'ביטול', en: 'Cancel' },
-  add: { he: 'הוסף', en: 'Add' },
-  add_selected: { he: 'הוסף נבחרים', en: 'Add selected' },
-  edit: { he: 'עריכה', en: 'Edit' },
-  selected: { he: 'נבחרו', en: 'selected' },
-  of: { he: 'מתוך', en: 'of' },
-  delete: { he: 'מחק', en: 'Delete' },
-  remove_tag: { he: 'הסרת התגית', en: 'Remove tag' },
-  priority_tag_help_label: { he: 'מה המשמעות של גבוה/טוב?', en: 'What do High and Good mean?' },
-  priority_tag_help: { he: 'התגית מציינת עדיפות למעקב, לא ציון הסריקה.', en: 'The tag marks tracking priority, not the scan score.' },
-  delete_permanently: { he: 'מחק לצמיתות', en: 'Delete permanently' },
+  regenerate: { he: 'צור מחדש', en: 'Regenerate', es: 'Volver a generar' },
+  generate_again: { he: 'צור שוב', en: 'Generate again', es: 'Generar otra vez' },
+  close: { he: 'סגור', en: 'Close', es: 'Cerrar' },
+  cancel: { he: 'ביטול', en: 'Cancel', es: 'Cancelar' },
+  add: { he: 'הוסף', en: 'Add', es: 'Añadir' },
+  add_selected: { he: 'הוסף נבחרים', en: 'Add selected', es: 'Añadir los seleccionados' },
+  edit: { he: 'עריכה', en: 'Edit', es: 'Editar' },
+  selected: { he: 'נבחרו', en: 'selected', es: 'seleccionadas' },
+  of: { he: 'מתוך', en: 'of', es: 'de' },
+  delete: { he: 'מחק', en: 'Delete', es: 'Eliminar' },
+  remove_tag: { he: 'הסרת התגית', en: 'Remove tag', es: 'Quitar la etiqueta' },
+  priority_tag_help_label: { he: 'מה המשמעות של גבוה/טוב?', en: 'What do High and Good mean?', es: '¿Qué significan Alta y Buena?' },
+  priority_tag_help: { he: 'התגית מציינת עדיפות למעקב, לא ציון הסריקה.', en: 'The tag marks tracking priority, not the scan score.', es: 'La etiqueta marca la prioridad de seguimiento, no la nota de la comprobación.' },
+  delete_permanently: { he: 'מחק לצמיתות', en: 'Delete permanently', es: 'Eliminar definitivamente' },
 
   // Header
-  ai_visibility: { he: 'נראות ב-AI', en: 'AI Search Visibility' },
-  ai_visibility_platform: { he: 'נראות ב-AI', en: 'AI Search Visibility Platform' },
-  monitor_engines: { he: 'מעקב אחר 6 מנועי AI', en: 'Monitor across 6 AI engines' },
-  beta: { he: 'בטא', en: 'Beta' },
-  suggest: { he: 'הצע', en: 'Suggest' },
-  new_query: { he: 'שאלת AI חדשה', en: 'New AI query' },
-  recommend_questions: { he: 'שאלות מומלצות', en: 'Recommended questions' },
+  ai_visibility: { he: 'נראות ב-AI', en: 'AI Search Visibility', es: 'Visibilidad en IA' },
+  ai_visibility_platform: { he: 'נראות ב-AI', en: 'AI Search Visibility Platform', es: 'Plataforma de visibilidad en IA' },
+  monitor_engines: { he: 'מעקב אחר 6 מנועי AI', en: 'Monitor across 6 AI engines', es: 'Seguimiento en 6 motores de IA' },
+  beta: { he: 'בטא', en: 'Beta', es: 'Beta' },
+  suggest: { he: 'הצע', en: 'Suggest', es: 'Proponer' },
+  new_query: { he: 'שאלת AI חדשה', en: 'New AI query', es: 'Nueva pregunta de IA' },
+  recommend_questions: { he: 'שאלות מומלצות', en: 'Recommended questions', es: 'Preguntas recomendadas' },
 
   // KPI labels
-  visibility_score: { he: 'ציון נראות', en: 'Visibility Score' },
-  ai_visibility_percent: { he: '% נראות AI', en: 'AI Visibility %' },
-  mention_frequency: { he: 'תדירות הזכרה', en: 'Mention Frequency' },
-  citation_share: { he: '% נתח ציטוט', en: 'Citation Share' },
-  engine_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
-  engines_coverage_help: { he: 'מספר מנועי AI שמצאו לפחות הזכרה אחת של העסק', en: 'Number of AI engines that found at least one mention of the business' },
-  share_of_voice: { he: 'נתח מהאזכורים', en: 'Share of mentions' },
-  recommendation_present: { he: 'המלצה נוכחת', en: 'Recommendation Present' },
-  mentioned: { he: 'הוזכר', en: 'Mentioned' },
-  not_mentioned: { he: 'לא הוזכר', en: 'Not mentioned' },
-  target_cited: { he: 'דומיין צוטט', en: 'Target Cited' },
-  not_cited: { he: 'לא צוטט', en: 'Not cited' },
-  citations: { he: 'ציטוטים', en: 'Citations' },
-  sources_cited: { he: 'מקורות צוטטו', en: 'Sources cited' },
-  in_ai_response: { he: 'בתשובת AI', en: 'In AI response' },
-  not_found: { he: 'לא נמצא', en: 'Not found' },
-  as_source: { he: 'כמקור', en: 'As source' },
-  high_visibility: { he: '🔥 נראות גבוהה', en: '🔥 High visibility' },
-  moderate_visibility: { he: '⚠️ נראות בינונית', en: '⚠️ Moderate visibility' },
-  low_visibility: { he: '📌 נראות נמוכה', en: '📌 Low visibility' },
+  visibility_score: { he: 'ציון נראות', en: 'Visibility Score', es: 'Puntuación de visibilidad' },
+  ai_visibility_percent: { he: '% נראות AI', en: 'AI Visibility %', es: '% de visibilidad en IA' },
+  mention_frequency: { he: 'תדירות הזכרה', en: 'Mention Frequency', es: 'Frecuencia de menciones' },
+  citation_share: { he: '% נתח ציטוט', en: 'Citation Share', es: '% de citas' },
+  engine_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage', es: 'Cobertura de motores' },
+  engines_coverage_help: { he: 'מספר מנועי AI שמצאו לפחות הזכרה אחת של העסק', en: 'Number of AI engines that found at least one mention of the business', es: 'Cuántos motores de IA han encontrado al menos una mención del negocio' },
+  share_of_voice: { he: 'נתח מהאזכורים', en: 'Share of mentions', es: 'Cuota de menciones' },
+  recommendation_present: { he: 'המלצה נוכחת', en: 'Recommendation Present', es: 'Aparece una recomendación' },
+  mentioned: { he: 'הוזכר', en: 'Mentioned', es: 'Mencionado' },
+  not_mentioned: { he: 'לא הוזכר', en: 'Not mentioned', es: 'No mencionado' },
+  target_cited: { he: 'דומיין צוטט', en: 'Target Cited', es: 'Dominio citado' },
+  not_cited: { he: 'לא צוטט', en: 'Not cited', es: 'No citado' },
+  citations: { he: 'ציטוטים', en: 'Citations', es: 'Citas' },
+  sources_cited: { he: 'מקורות צוטטו', en: 'Sources cited', es: 'Fuentes citadas' },
+  in_ai_response: { he: 'בתשובת AI', en: 'In AI response', es: 'En la respuesta de IA' },
+  not_found: { he: 'לא נמצא', en: 'Not found', es: 'No encontrado' },
+  as_source: { he: 'כמקור', en: 'As source', es: 'Como fuente' },
+  high_visibility: { he: '🔥 נראות גבוהה', en: '🔥 High visibility', es: '🔥 Visibilidad alta' },
+  moderate_visibility: { he: '⚠️ נראות בינונית', en: '⚠️ Moderate visibility', es: '⚠️ Visibilidad media' },
+  low_visibility: { he: '📌 נראות נמוכה', en: '📌 Low visibility', es: '📌 Visibilidad baja' },
 
   // Insights strip
-  brand_mentioned_yes: { he: 'המותג שלך הוזכר', en: 'Your brand was mentioned' },
-  brand_mentioned_no: { he: 'המותג שלך לא הוזכר', en: 'Your brand was not mentioned' },
-  domain_cited_yes: { he: 'הדומיין שלך מצוטט כמקור', en: 'Your domain is cited as a source' },
-  domain_cited_no: { he: 'הדומיין שלך לא צוטט', en: 'Your domain was not cited' },
-  best_engine: { he: 'מנוע מצטיין', en: 'Best engine' },
-  top_source: { he: 'מקור מוביל', en: 'Top source' },
-  sources_influencing: { he: 'מקורות שמשפיעים על התשובה', en: 'Sources influencing AI answer' },
+  brand_mentioned_yes: { he: 'המותג שלך הוזכר', en: 'Your brand was mentioned', es: 'Han mencionado tu marca' },
+  brand_mentioned_no: { he: 'המותג שלך לא הוזכר', en: 'Your brand was not mentioned', es: 'No han mencionado tu marca' },
+  domain_cited_yes: { he: 'הדומיין שלך מצוטט כמקור', en: 'Your domain is cited as a source', es: 'Tu dominio aparece citado como fuente' },
+  domain_cited_no: { he: 'הדומיין שלך לא צוטט', en: 'Your domain was not cited', es: 'No han citado tu dominio' },
+  best_engine: { he: 'מנוע מצטיין', en: 'Best engine', es: 'Mejor motor' },
+  top_source: { he: 'מקור מוביל', en: 'Top source', es: 'Fuente principal' },
+  sources_influencing: { he: 'מקורות שמשפיעים על התשובה', en: 'Sources influencing AI answer', es: 'Fuentes que influyen en la respuesta de la IA' },
 
   // Workspace
-  query: { he: 'שאלת AI', en: 'AI Query' },
-  ai_query: { he: 'שאלת AI', en: 'AI Query' },
-  ai_answer: { he: 'תשובת AI', en: 'AI Answer' },
-  sources: { he: 'מקורות', en: 'Sources' },
-  show_full_answer: { he: 'הצג תשובה מלאה', en: 'Show full answer' },
-  show_less: { he: 'הצג פחות', en: 'Show less' },
-  more_paragraphs: { he: 'פסקאות נוספות', en: 'more paragraphs' },
-  no_response: { he: 'לא התקבלה תשובה', en: 'No response text returned' },
-  no_sources_cited: { he: 'לא צוטטו מקורות בתשובה זו', en: 'No sources cited' },
-  your_domain: { he: 'הדומיין שלך', en: 'Your domain' },
-  scanning_engine: { he: 'סורק מנוע AI...', en: 'Scanning AI engine…' },
-  scan: { he: 'סרוק', en: 'Scan' },
-  scan_query: { he: 'סרוק שאלה', en: 'Scan query' },
+  query: { he: 'שאלת AI', en: 'AI Query', es: 'Pregunta de IA' },
+  ai_query: { he: 'שאלת AI', en: 'AI Query', es: 'Pregunta de IA' },
+  ai_answer: { he: 'תשובת AI', en: 'AI Answer', es: 'Respuesta de la IA' },
+  sources: { he: 'מקורות', en: 'Sources', es: 'Fuentes' },
+  show_full_answer: { he: 'הצג תשובה מלאה', en: 'Show full answer', es: 'Ver la respuesta completa' },
+  show_less: { he: 'הצג פחות', en: 'Show less', es: 'Ver menos' },
+  more_paragraphs: { he: 'פסקאות נוספות', en: 'more paragraphs', es: 'párrafos más' },
+  no_response: { he: 'לא התקבלה תשובה', en: 'No response text returned', es: 'No se ha recibido ninguna respuesta' },
+  no_sources_cited: { he: 'לא צוטטו מקורות בתשובה זו', en: 'No sources cited', es: 'No se ha citado ninguna fuente' },
+  your_domain: { he: 'הדומיין שלך', en: 'Your domain', es: 'Tu dominio' },
+  scanning_engine: { he: 'סורק מנוע AI...', en: 'Scanning AI engine…', es: 'Comprobando el motor de IA…' },
+  scan: { he: 'סרוק', en: 'Scan', es: 'Comprobar' },
+  scan_query: { he: 'סרוק שאלה', en: 'Scan query', es: 'Comprobar la pregunta' },
 
   // Engine card states
-  scan_btn: { he: 'סרוק', en: 'Scan' },
-  scanning: { he: 'סורק...', en: 'Scanning…' },
-  failed: { he: 'נכשל', en: 'Failed' },
-  success: { he: 'הצליח', en: 'Success' },
-  error: { he: 'שגיאה', en: 'Error' },
-  cited: { he: 'צוטט', en: 'cited' },
-  mention: { he: 'הזכרה', en: 'mention' },
-  no_mention: { he: 'ללא הזכרה', en: 'no mention' },
+  scan_btn: { he: 'סרוק', en: 'Scan', es: 'Comprobar' },
+  scanning: { he: 'סורק...', en: 'Scanning…', es: 'Comprobando…' },
+  failed: { he: 'נכשל', en: 'Failed', es: 'Ha fallado' },
+  success: { he: 'הצליח', en: 'Success', es: 'Correcto' },
+  error: { he: 'שגיאה', en: 'Error', es: 'Error' },
+  cited: { he: 'צוטט', en: 'cited', es: 'citado' },
+  mention: { he: 'הזכרה', en: 'mention', es: 'mención' },
+  no_mention: { he: 'ללא הזכרה', en: 'no mention', es: 'sin menciones' },
 
   // Empty states
-  no_queries: { he: 'אין שאלות עדיין', en: 'No AI queries yet' },
+  no_queries: { he: 'אין שאלות עדיין', en: 'No AI queries yet', es: 'Todavía no hay preguntas' },
   // The questions tab, for an owner who never used an AI tool for business:
   // what a question is, and the one next step on an empty list.
   queries_explainer: {
     he: 'שאלה היא מה שלקוח היה כותב ל-ChatGPT או ל-Gemini כשהוא מחפש את מה שאתם מציעים, למשל בקשה להמלצה על עסק בתחום שלכם. אנחנו שואלים את המנועים את השאלה ובודקים אם העסק שלכם מופיע בתשובה. שאלות טובות הן כאלה שלקוחות באמת שואלים, בלי שם העסק.',
     en: 'A question is what a customer would type into ChatGPT or Gemini when looking for what you offer, for example asking for a recommended business in your field. We ask the engines that question and check whether your business shows up in the answer. Good questions are ones real customers ask, without your business name.',
+    es: 'Una pregunta es lo que escribiría un cliente en ChatGPT o Gemini buscando lo que tú ofreces, por ejemplo pedir que le recomienden un negocio de tu sector. Le hacemos esa pregunta a los motores y comprobamos si tu negocio aparece en la respuesta. Las buenas preguntas son las que hacen los clientes de verdad, sin el nombre de tu negocio.',
   },
-  no_queries_title: { he: 'עוד אין שאלות במעקב', en: 'No questions tracked yet' },
+  no_queries_title: { he: 'עוד אין שאלות במעקב', en: 'No questions tracked yet', es: 'Todavía no hay preguntas en seguimiento' },
   no_queries_body: {
     he: 'הצעד הראשון: בחרו שאלה אחת או שתיים שלקוחות שלכם שואלים. אפשר לבחור מהשאלות המוצעות למטה או לכתוב שאלה משלכם. הוספת שאלה לא עולה כלום, רק בדיקה נספרת במכסה.',
     en: 'First step: pick one or two questions your customers ask. Choose from the suggestions below or write your own. Adding a question costs nothing; only a check counts toward your allowance.',
+    es: 'Primer paso: elige una o dos preguntas que hagan tus clientes. Escoge entre las propuestas de abajo o escribe la tuya. Añadir una pregunta no cuesta nada; solo las comprobaciones cuentan dentro de tu límite.',
   },
-  no_queries_pick: { he: 'בחירה מהשאלות המוצעות', en: 'Pick a suggested question' },
-  no_queries_write: { he: 'כתיבת שאלה משלכם', en: 'Write your own question' },
+  no_queries_pick: { he: 'בחירה מהשאלות המוצעות', en: 'Pick a suggested question', es: 'Elegir una pregunta propuesta' },
+  no_queries_write: { he: 'כתיבת שאלה משלכם', en: 'Write your own question', es: 'Escribir tu propia pregunta' },
   no_queries_help: {
     he: 'צור שאלות חכמות מותאמות לעסק שלך, או צור שאלה באופן ידני.',
     en: 'Generate smart AI questions tailored to your business, or create one manually.',
+    es: 'Genera preguntas inteligentes hechas a medida de tu negocio, o crea una a mano.',
   },
-  no_scans: { he: 'אין סריקות עדיין', en: 'No scans yet' },
+  no_scans: { he: 'אין סריקות עדיין', en: 'No scans yet', es: 'Todavía no hay comprobaciones' },
   no_scans_help: {
     he: 'סרוק שאלה מול מנוע AI כדי להתחיל לעקוב.',
     en: 'Scan an AI query against an engine to start tracking activity.',
+    es: 'Comprueba una pregunta en un motor de IA para empezar a seguirla.',
   },
 
   // Scan history
-  scan_activity: { he: 'פעילות סריקה', en: 'Scan activity' },
-  scan_history: { he: 'היסטוריית סריקה', en: 'Scan history' },
-  events: { he: 'אירועים', en: 'events' },
-  event: { he: 'אירוע', en: 'event' },
-  viewing: { he: 'מוצג', en: 'Viewing' },
-  open: { he: 'פתח', en: 'Open' },
-  just_now: { he: 'עכשיו', en: 'just now' },
-  loading: { he: 'טוען...', en: 'Loading…' },
+  scan_activity: { he: 'פעילות סריקה', en: 'Scan activity', es: 'Actividad de comprobación' },
+  scan_history: { he: 'היסטוריית סריקה', en: 'Scan history', es: 'Historial de comprobaciones' },
+  events: { he: 'אירועים', en: 'events', es: 'eventos' },
+  event: { he: 'אירוע', en: 'event', es: 'evento' },
+  viewing: { he: 'מוצג', en: 'Viewing', es: 'Viendo' },
+  open: { he: 'פתח', en: 'Open', es: 'Abrir' },
+  just_now: { he: 'עכשיו', en: 'just now', es: 'ahora mismo' },
+  loading: { he: 'טוען...', en: 'Loading…', es: 'Cargando…' },
 
   // Delete modal
-  delete_scan_title: { he: 'למחוק תוצאת סריקה?', en: 'Delete scan result?' },
+  delete_scan_title: { he: 'למחוק תוצאת סריקה?', en: 'Delete scan result?', es: '¿Eliminar el resultado?' },
   delete_scan_body: {
     he: 'פעולה זו תמחק לצמיתות את תוצאת הסריקה, התשובה וכל הציטוטים. לא ניתן לבטל פעולה זו.',
     en: 'This will permanently delete the AI scan result, response, and all associated citations. This action cannot be undone.',
+    es: 'Se eliminarán definitivamente el resultado de la comprobación, la respuesta y todas sus citas. Esto no se puede deshacer.',
   },
 
   // Smart AI questions modal
-  smart_questions_title: { he: 'שאלות AI מומלצות', en: 'Recommended AI Questions' },
+  smart_questions_title: { he: 'שאלות AI מומלצות', en: 'Recommended AI Questions', es: 'Preguntas de IA recomendadas' },
   smart_questions_subtitle: {
     he: 'רק שאלות שהעסק יכול לזכות בהן: בתחום שלו, עם לקוח שעומד להחליט, ועם עמוד שעונה או מאמר שאפשר לכתוב. בדיקה רצה רק על שאלה שהוספתם.',
     en: 'Only questions the business can win: in its field, asked by someone about to decide, with a page that answers or an article to write. A check runs only on a question you add.',
+    es: 'Solo preguntas que el negocio puede ganar: de su sector, hechas por alguien a punto de decidir, y con una página que responde o un artículo que se puede escribir. Solo se comprueba una pregunta que hayas añadido.',
   },
   smart_questions_help: {
     he: 'שאלות מוכנות מותאמות לעסק שלך. בחר מרובה, ערוך, או הוסף בודד.',
     en: 'Smart AI questions tailored to your business. Select multiple, edit, or add one-by-one.',
+    es: 'Preguntas de IA hechas a medida de tu negocio. Selecciona varias, edítalas o añádelas de una en una.',
   },
-  add_question_label: { he: 'הוסף שאלה למעקב', en: 'Add question to tracking' },
-  already_tracked: { he: 'כבר במעקב', en: 'Already tracked' },
-  all_added: { he: 'כל השאלות נוספו', en: 'All questions were added' },
+  add_question_label: { he: 'הוסף שאלה למעקב', en: 'Add question to tracking', es: 'Añadir la pregunta al seguimiento' },
+  already_tracked: { he: 'כבר במעקב', en: 'Already tracked', es: 'Ya está en seguimiento' },
+  all_added: { he: 'כל השאלות נוספו', en: 'All questions were added', es: 'Se han añadido todas las preguntas' },
   loading_suggestions: {
     he: 'טוען שאלות מומלצות...',
     en: 'Loading suggested questions...',
+    es: 'Cargando las preguntas recomendadas…',
   },
   no_new_suggestions: {
     he: 'לא נמצאו שאלות מומלצות חדשות כרגע.',
     en: 'No new suggested questions found right now.',
+    es: 'Ahora mismo no hemos encontrado preguntas recomendadas nuevas.',
   },
   no_diverse_suggestions: {
     he: 'לא נמצאו כרגע עוד שאלות מגוונות. כדי לקבל עוד המלצות, הוסיפו מילות מפתח נוספות, שירותים או קטגוריות.',
     en: 'No more diverse questions were found right now. Add more keywords, services, or categories to get more suggestions.',
+    es: 'Ahora mismo no hay más preguntas variadas. Para recibir más propuestas, añade palabras clave, servicios o categorías.',
   },
   pool_exhausted_rich: {
     he: 'כל השאלות האיכותיות הזמינות כבר מוצגות. ניתן להוסיף שאלות ידנית או להרחיב את קטגוריות השירות בפרופיל.',
     en: 'All available high-quality questions are already displayed. You can add questions manually or expand service categories in the profile.',
+    es: 'Ya se muestran todas las preguntas de calidad disponibles. Puedes añadir preguntas a mano o ampliar las categorías de servicio en el perfil.',
   },
   pool_exhausted_thin: {
     he: 'כדי לקבל עוד שאלות, הוסיפו מילות מפתח, שירותים או קטגוריות בפרופיל.',
     en: 'To get more questions, add keywords, services, or categories to the profile.',
+    es: 'Para recibir más preguntas, añade palabras clave, servicios o categorías en el perfil.',
   },
-  refresh_suggestions: { he: 'רענן', en: 'Refresh' },
-  generate_more_suggestions: { he: 'צור עוד שאלות', en: 'Generate more questions' },
-  generating_more: { he: 'יוצר שאלות נוספות...', en: 'Generating more questions...' },
-  rescan: { he: 'סריקה מחדש', en: 'Rescan' },
-  scan_this_engine: { he: 'סרוק במנוע הזה', en: 'Scan this engine' },
+  refresh_suggestions: { he: 'רענן', en: 'Refresh', es: 'Actualizar' },
+  generate_more_suggestions: { he: 'צור עוד שאלות', en: 'Generate more questions', es: 'Generar más preguntas' },
+  generating_more: { he: 'יוצר שאלות נוספות...', en: 'Generating more questions...', es: 'Generando más preguntas…' },
+  rescan: { he: 'סריקה מחדש', en: 'Rescan', es: 'Volver a comprobar' },
+  scan_this_engine: { he: 'סרוק במנוע הזה', en: 'Scan this engine', es: 'Comprobar en este motor' },
   // The engine chips ARE the run control, but they read as status badges — a
   // reviewer looking for a "Run" action found only the delete icon. A visible
   // instruction above them, and an accessible name that says what the click
@@ -177,21 +194,22 @@ const STRINGS = {
   run_a_check_hint: {
     he: 'כל שאלה נבדקת ב-ChatGPT, ב-Gemini וב-Google AI בלחיצה אחת. בדיקה במנוע אחד, או במנועים נוספים (Perplexity, Copilot, Grok), נמצאת בתפריט ⋯ של השאלה. כל מנוע הוא בדיקה אחת מהמכסה.',
     en: 'Each question is checked on ChatGPT, Gemini and Google AI in one click. A check on a single engine, or on more engines (Perplexity, Copilot, Grok), is in the ⋯ menu of the question. Each engine is one check from your allowance.',
+    es: 'Cada pregunta se comprueba en ChatGPT, Gemini y Google AI con un solo clic. La comprobación en un único motor, o en más motores (Perplexity, Copilot, Grok), está en el menú ⋯ de la pregunta. Cada motor es una comprobación de tu límite.',
   },
-  check_question_all: { he: 'בדיקה עכשיו ({n} בדיקות)', en: 'Check now ({n} checks)' },
-  recheck_question_all: { he: 'בדיקה חוזרת ({n} בדיקות)', en: 'Recheck ({n} checks)' },
-  recheck_not_enough: { he: 'אין מספיק בדיקות החודש', en: 'Not enough checks left this month' },
-  recheck_running: { he: 'בודקים… {done}/{n}', en: 'Checking… {done}/{n}' },
-  recheck_partial_failed: { he: 'חלק מהבדיקות לא הושלמו. אפשר לנסות שוב בעוד רגע.', en: 'Some of the checks did not finish. You can try again in a moment.' },
-  check_on_engine_menu: { he: 'בדיקה ב-{engine} (בדיקה אחת)', en: 'Check on {engine} (1 check)' },
+  check_question_all: { he: 'בדיקה עכשיו ({n} בדיקות)', en: 'Check now ({n} checks)', es: 'Comprobar ahora ({n} comprobaciones)' },
+  recheck_question_all: { he: 'בדיקה חוזרת ({n} בדיקות)', en: 'Recheck ({n} checks)', es: 'Volver a comprobar ({n} comprobaciones)' },
+  recheck_not_enough: { he: 'אין מספיק בדיקות החודש', en: 'Not enough checks left this month', es: 'No quedan suficientes comprobaciones este mes' },
+  recheck_running: { he: 'בודקים… {done}/{n}', en: 'Checking… {done}/{n}', es: 'Comprobando… {done}/{n}' },
+  recheck_partial_failed: { he: 'חלק מהבדיקות לא הושלמו. אפשר לנסות שוב בעוד רגע.', en: 'Some of the checks did not finish. You can try again in a moment.', es: 'Algunas comprobaciones no han terminado. Puedes volver a intentarlo dentro de un momento.' },
+  check_on_engine_menu: { he: 'בדיקה ב-{engine} (בדיקה אחת)', en: 'Check on {engine} (1 check)', es: 'Comprobar en {engine} (1 comprobación)' },
   engine_status_label: { he: '{engine}: {status}', en: '{engine}: {status}' },
-  run_tag_automatic: { he: 'אוטומטית', en: 'Automatic' },
-  run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ' },
-  rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ' },
-  engines_show_rest: { he: 'הצגת כל המנועים (עוד {n})', en: 'Show all engines ({n} more)' },
-  ai_allowance: { he: 'בדיקות AI שנוצלו', en: 'AI checks used' },
-  ai_allowance_unknown: { he: 'לא ניתן לאמת כרגע את המכסה', en: 'The allowance could not be read right now' },
-  ai_allowance_unmetered: { he: 'ללא מגבלה', en: 'Unmetered' },
+  run_tag_automatic: { he: 'אוטומטית', en: 'Automatic', es: 'Automática' },
+  run_check_on: { he: 'הרץ בדיקת AI ב-', en: 'Run an AI check on ', es: 'Hacer una comprobación de IA en ' },
+  rerun_check_on: { he: 'הרץ שוב בדיקת AI ב-', en: 'Run another AI check on ', es: 'Hacer otra comprobación de IA en ' },
+  engines_show_rest: { he: 'הצגת כל המנועים (עוד {n})', en: 'Show all engines ({n} more)', es: 'Ver todos los motores ({n} más)' },
+  ai_allowance: { he: 'בדיקות AI שנוצלו', en: 'AI checks used', es: 'Comprobaciones de IA usadas' },
+  ai_allowance_unknown: { he: 'לא ניתן לאמת כרגע את המכסה', en: 'The allowance could not be read right now', es: 'Ahora mismo no se puede leer el límite' },
+  ai_allowance_unmetered: { he: 'ללא מגבלה', en: 'Unmetered', es: 'Sin límite' },
   ai_allowance_exhausted: {
     he: 'ניצלתם את כל בדיקות ה-AI שכלולות בחבילה',
     en: 'You have used every AI check your plan includes',
@@ -919,8 +937,10 @@ export function isHebrew(language: string | null | undefined, country?: string |
 
 export function createI18n(language: string | null | undefined, country?: string | null) {
   const heb = isHebrew(language, country)
+  const spa = !heb && language?.toLowerCase() === 'es'
   return function t(key: StringKey): string {
-    const entry = STRINGS[key]
-    return heb ? entry.he : entry.en
+    const entry = STRINGS[key] as { he: string; en: string; es?: string }
+    if (heb) return entry.he
+    return (spa && entry.es) || entry.en
   }
 }

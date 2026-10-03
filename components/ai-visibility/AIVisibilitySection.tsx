@@ -147,7 +147,7 @@ export default function AIVisibilitySection({
   resultsRefreshKey?: number
 }) {
   const { language: dashboardLanguage, uiLocale } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
   const isHebrew = dashboardLanguage === 'he'
 
   const [currentTab, setCurrentTab] = useState<TabType>(initialTab ?? 'results')

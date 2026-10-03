@@ -390,7 +390,7 @@ function ReportsContent() {
       <MonthlyReports
         projectId={activeProjectId}
         projectLabel={projects.find((p) => p.id === activeProjectId)?.name ?? ''}
-        language={language}
+        language={uiLocale}
         toasts={toasts}
       />
 

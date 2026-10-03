@@ -53,8 +53,8 @@ import type { Project } from '@/lib/supabase/types'
 import { Reveal } from '@/components/ui/motion'
 
 export default function AIVisibilityPage() {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(language), [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
 
   if (process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true') {
     return (

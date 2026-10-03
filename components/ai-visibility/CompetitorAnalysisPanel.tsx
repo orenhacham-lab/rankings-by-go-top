@@ -22,6 +22,7 @@ import { TrendingUp, ChevronDown, BarChart3 } from 'lucide-react'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { ENGINE_META } from './EngineIcon'
+import { intlLocaleOf } from '@/lib/i18n/locales'
 
 const SMALL_SAMPLE_THRESHOLD = 5
 
@@ -95,8 +96,8 @@ type AnalysisResponse = {
 }
 
 export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: { projectId: string; refreshKey?: number }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(language), [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
 
   const [data, setData] = useState<AnalysisResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -177,7 +178,7 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
   const showSmallSampleWarning = totalResults > 0 && totalResults < SMALL_SAMPLE_THRESHOLD
 
   const updatedAt = data.meta?.scanCompletedAt
-    ? new Date(data.meta.scanCompletedAt).toLocaleDateString(language === 'he' ? 'he-IL' : 'en-US')
+    ? new Date(data.meta.scanCompletedAt).toLocaleDateString(intlLocaleOf(uiLocale))
     : null
 
   // One row of the comparison: the business first (with the one accent), then each competitor.

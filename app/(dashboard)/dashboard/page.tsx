@@ -477,7 +477,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
           )}
           {/* The latest automatic monthly report, once there is one. */}
           <Reveal index={3} className={`order-9 min-w-0 ${fold} empty:hidden`}>
-            <MonthlyReportTeaser projectId={project.id} language={language} onlyWithData />
+            <MonthlyReportTeaser projectId={project.id} language={uiLocale} onlyWithData />
           </Reveal>
           {show.ai && (
             <Reveal index={4} className={`order-10 min-w-0 ${fold}`}>

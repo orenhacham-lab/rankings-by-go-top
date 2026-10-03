@@ -76,8 +76,8 @@ function aliasesToText(aliases: string[]): string {
 const emptyDraft: DraftForm = { name: '', domain: '', aliasesText: '' }
 
 export default function CompetitorsPanel({ projectId, defaultCollapsed = true, onCompetitorsChanged }: { projectId: string; defaultCollapsed?: boolean; onCompetitorsChanged?: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(language), [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
   const isRTL = language === 'he'
 
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)

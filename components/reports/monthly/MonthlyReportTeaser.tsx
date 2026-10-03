@@ -8,7 +8,7 @@
  * to say without it).
  */
 import { CalendarRange } from 'lucide-react'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { MonthlyGetResponse } from '@/lib/reports/monthly/http'
 import { HeaderLink, LinkButton, Widget, WidgetEmpty, WidgetLoading } from '@/components/dashboard/ui'
 import { count, dayMonth, monthName, monthlyCopy } from './copy'
@@ -17,7 +17,7 @@ import { useMonthlyReports } from './useMonthlyReports'
 
 const REPORTS_HREF = `/reports#${MONTHLY_REPORTS_ANCHOR}`
 
-export function MonthlyTeaserBody({ body, language: l }: { body: MonthlyGetResponse; language: Locale }) {
+export function MonthlyTeaserBody({ body, language: l }: { body: MonthlyGetResponse; language: PublicLocale }) {
   const t = monthlyCopy(l)
   const latest = body.months[0]
   if (!latest) {
@@ -49,7 +49,7 @@ export function MonthlyTeaserBody({ body, language: l }: { body: MonthlyGetRespo
 }
 
 /** `onlyWithData`: nothing until a report exists (the dashboard shows widgets that have something to show). */
-export default function MonthlyReportTeaser({ projectId, language, onlyWithData = false }: { projectId: string; language: Locale; onlyWithData?: boolean }) {
+export default function MonthlyReportTeaser({ projectId, language, onlyWithData = false }: { projectId: string; language: PublicLocale; onlyWithData?: boolean }) {
   const t = monthlyCopy(language)
   const { load } = useMonthlyReports(projectId)
   if (load.status === 'unavailable' || load.status === 'error') return null

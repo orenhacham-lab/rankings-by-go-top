@@ -275,8 +275,8 @@ async function main() {
       ownState: (kp: string) => /targetsLoading=\{targetsLoading\}/.test(kp) && /targetsError=\{targetsError\}/.test(kp),
       memo: (ai: string) => /const projectKeywords = useMemo\(\(\) => keywords\.filter\(Boolean\), \[keywords\]\)/.test(ai)
         && /projectKeywords=\{projectKeywords\}/.test(ai),
-      hooksFirst: (ai: string) => ai.indexOf('useMemo(() => createI18n(language)') > 0
-        && ai.indexOf('useMemo(() => createI18n(language)') < ai.indexOf("if (process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true')"),
+      hooksFirst: (ai: string) => ai.indexOf('useMemo(() => createI18n(uiLocale)') > 0
+        && ai.indexOf('useMemo(() => createI18n(uiLocale)') < ai.indexOf("if (process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true')"),
       failureIsTerminal: (hook: string) => /if \(!res \|\| res\.error\) \{/.test(hook)
         && /row: null, failed: true/.test(hook)
         && /if \(read\.failed\) return \{ project: null, status: read\.attempt === attempt \? 'error' : 'loading' \}/.test(hook),
@@ -328,8 +328,8 @@ async function main() {
       !rule.memo(aiPage.replace('projectKeywords={projectKeywords}', 'projectKeywords={keywords.filter(Boolean)}')))
     // The hook moved from above the flag return to below it.
     check('B-MUT7: a hook after the flag return fails B12',
-      !rule.hooksFirst(aiPage.replace('const t = useMemo(() => createI18n(language), [language])', 'const t = null')
-        + '\nconst late = useMemo(() => createI18n(language), [language])'))
+      !rule.hooksFirst(aiPage.replace('const t = useMemo(() => createI18n(uiLocale), [uiLocale])', 'const t = null')
+        + '\nconst late = useMemo(() => createI18n(uiLocale), [uiLocale])'))
     check('B-MUT8: a failure that keeps the spinner fails B10',
       !rule.failureIsTerminal(rowHook.replace("read.attempt === attempt ? 'error' : 'loading'", "'loading'")))
   }
