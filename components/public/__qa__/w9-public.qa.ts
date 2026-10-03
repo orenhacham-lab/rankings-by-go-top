@@ -95,8 +95,8 @@ function main() {
     check('MUT: a two-line "Rankings / by Go Top" lockup back is caught', !lockOk([...lockups, '<span>Rankings</span><span>by Go Top</span>']))
     const schema = strip(read('app/api/schema/route.ts')), layout = strip(read('app/layout.tsx')), llms = read('app/llms.txt/route.ts')
     const schemaOk = (s: string) => /name: 'Go Top SEO',\s*alternateName: \['Rankings by Go Top'\]/.test(s)
-      && /publisher: \{ '@type': 'Organization', name: 'GO TOP', url: 'https:\/\/gotop\.co\.il' \}/.test(s)
-    check('C3: schema — Go Top SEO with alternateName, publisher GO TOP (gotop.co.il)', schemaOk(schema) && schemaOk(layout))
+      && /publisher: \{ '@type': 'Organization', name: 'GO TOP', url: 'https:\/\/www\.gotop\.co\.il' \}/.test(s)
+    check('C3: schema — Go Top SEO with alternateName, publisher GO TOP (www.gotop.co.il)', schemaOk(schema) && schemaOk(layout))
     check('MUT: the old name as the schema name fails C3', !schemaOk(schema.replace(/name: 'Go Top SEO',(\s*)alternateName/g, "name: 'Rankings by Go Top',$1alternateName")))
     check('C4: llms.txt says "Go Top SEO (previously Rankings by Go Top)"', llms.includes('Name: Go Top SEO (previously Rankings by Go Top)'))
     const shopify = [read('app/shopify/app/ConnectorHomeClient.tsx'), read('app/shopify/link/page.tsx')]

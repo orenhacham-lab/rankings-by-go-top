@@ -83,8 +83,8 @@ export async function GET() {
     '@type': 'SoftwareApplication',
     name: 'Go Top SEO',
     alternateName: ['Rankings by Go Top'],
-    publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://gotop.co.il' },
-    brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://gotop.co.il' },
+    publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
+    brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
     applicationCategory: 'BusinessApplication',
     description: 'Advanced SEO rank tracking system for monitoring Google search and Google Maps rankings',
     url: baseUrl,
@@ -114,7 +114,7 @@ export async function GET() {
     publisher: {
       '@type': 'Organization',
       name: 'GO TOP',
-      url: 'https://gotop.co.il',
+      url: 'https://www.gotop.co.il',
       logo: {
         '@type': 'ImageObject',
         url: `${baseUrl}/gotop-primary.png`,

@@ -72,7 +72,9 @@ export default function RefundPolicyPage() {
       <section>
         <h2>7. יצירת קשר</h2>
         <p>
-          <strong>Go Top Digital Marketing &amp; Advertising Ltd.</strong>
+          <strong>גו טופ שיווק ופרסום דיגיטלי בע״מ</strong>
+          <br />
+          ח.פ. 517274346
           <br />
           דוא&quot;ל: <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>
         </p>
