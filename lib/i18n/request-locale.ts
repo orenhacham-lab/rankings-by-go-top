@@ -86,7 +86,7 @@ export function isEnglishPath(pathname: string | null | undefined): boolean {
  * from it, so it cannot drift silently.
  */
 const PUBLIC_MARKETING_SEGMENTS = new Set([
-  'about', 'accessibility', 'articles', 'features', 'free-check', 'pricing', 'privacy', 'sitemap', 'terms',
+  'about', 'accessibility', 'articles', 'features', 'free-check', 'pricing', 'privacy', 'refund-policy', 'sitemap', 'terms',
 ])
 
 /**

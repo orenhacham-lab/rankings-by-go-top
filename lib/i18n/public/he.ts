@@ -52,6 +52,7 @@ export const he = {
     legal: 'משפטי',
     privacy: 'מדיניות פרטיות',
     terms: 'תקנון ותנאי שימוש',
+    refundPolicy: 'מדיניות ביטול והחזרים',
     accessibility: 'נגישות',
     contact: 'יצירת קשר',
     copyright: '© 2026 Go Top SEO. כל הזכויות שמורות.',

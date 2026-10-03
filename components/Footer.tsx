@@ -87,6 +87,11 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
                 </Link>
               </li>
               <li>
+                <Link href={`${prefix}/refund-policy`} className={linkClass}>
+                  {dict.footer.refundPolicy}
+                </Link>
+              </li>
+              <li>
                 <Link href={`${prefix}/accessibility`} className={linkClass}>
                   {dict.footer.accessibility}
                 </Link>

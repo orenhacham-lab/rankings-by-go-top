@@ -107,6 +107,12 @@ export async function GET() {
       priority: '0.3',
     },
     {
+      url: `${baseUrl}/refund-policy`,
+      lastmod: today,
+      changefreq: 'yearly',
+      priority: '0.3',
+    },
+    {
       url: `${baseUrl}/accessibility`,
       lastmod: today,
       changefreq: 'yearly',
@@ -189,6 +195,12 @@ export async function GET() {
     },
     {
       url: `${baseUrl}/en/terms`,
+      lastmod: today,
+      changefreq: 'yearly',
+      priority: '0.3',
+    },
+    {
+      url: `${baseUrl}/en/refund-policy`,
       lastmod: today,
       changefreq: 'yearly',
       priority: '0.3',

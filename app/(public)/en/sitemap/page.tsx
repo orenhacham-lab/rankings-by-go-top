@@ -47,6 +47,7 @@ export default function EnglishSitemapPage() {
       links: [
         { label: 'Privacy Policy', href: '/en/privacy' },
         { label: 'Terms of Use', href: '/en/terms' },
+        { label: 'Cancellation and Refund Policy', href: '/en/refund-policy' },
         { label: 'Accessibility', href: '/en/accessibility' },
       ],
     },

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
@@ -98,9 +99,9 @@ export default function HebrewTermsPage() {
       <section>
         <h2>7. החזרים</h2>
         <p>
-          ככלל, דמי המנוי אינם ניתנים להחזר עבור תקופה שכבר החלה או שולמה. החברה רשאית, לפי שיקול
-          דעתה הבלעדי או על פי הוראות הדין, להעניק החזר כספי במקרים מיוחדים. בקשות להחזר תועברנה
-          בכתב לכתובת המייל של החברה.
+          דמי המנוי אינם ניתנים להחזר עבור תקופה שכבר החלה או שולמה, למעט מקרים שבהם הדין מחייב
+          החזר. בקשות לביטול לפי דין תועברנה בכתב לכתובת המייל של החברה. הפרטים המלאים מופיעים
+          ב<Link href="/refund-policy">מדיניות הביטול וההחזרים</Link>.
         </p>
       </section>
 
@@ -432,7 +433,7 @@ export default function HebrewTermsPage() {
         <p className={LEGAL_FOOTNOTE}>
           מסמך זה הוא טיוטה עסקית. מומלץ להעבירו לבדיקת עורך דין לפני שימוש סופי.
           <br />
-          עדכון אחרון: 29 בספטמבר 2026
+          עדכון אחרון: 3 באוקטובר 2026
         </p>
       </section>
     </LegalDoc>
