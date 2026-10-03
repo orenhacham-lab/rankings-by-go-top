@@ -195,7 +195,16 @@ function ReportRequest({ locale, token }: { locale: PublicLocale; token: string 
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const privacyHref = locale === 'en' ? '/en/privacy' : '/privacy'
+  /*
+   * The privacy policy this consent points at must be the one the visitor
+   * can read. The old form answered '/privacy' for anything that was not
+   * English, so a Spanish visitor ticking the box was sent to the HEBREW
+   * document -- a disclosure in a language they were never shown is not a
+   * disclosure (GDPR Art. 12(1) requires it in clear and plain language).
+   * Hebrew is the unprefixed tree; every other language is its own prefix,
+   * so this stays right for the next language without being edited.
+   */
+  const privacyHref = locale === 'he' ? '/privacy' : `/${locale}/privacy`
 
   async function submit(e: FormEvent) {
     e.preventDefault()
