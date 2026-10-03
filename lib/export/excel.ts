@@ -4,6 +4,7 @@ import { getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
 import { getEstimatedCtrByPosition, getEstimatedOrganicClicks } from './traffic-estimate'
+import { intlLocaleOf } from '@/lib/i18n/locales'
 
 interface ExportData {
   client: Client
@@ -32,7 +33,7 @@ export function exportToExcel(data: ExportData): void {
   const language = normalizeExportLanguage(data.language)
   const L = getExportLabels(language)
   const isRtl = language === 'he'
-  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const dateLocale = intlLocaleOf(language)
 
   const wb = XLSX.utils.book_new()
 
@@ -253,7 +254,7 @@ export function exportAIVisibilityToExcel(data: AIExportData): void {
   const language = normalizeExportLanguage(data.language)
   const L = getExportLabels(language)
   const isRtl = language === 'he'
-  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const dateLocale = intlLocaleOf(language)
   const generatedAt = new Date().toLocaleDateString(dateLocale)
 
   const wb = XLSX.utils.book_new()
@@ -282,7 +283,7 @@ export function exportAIVisibilityToExcel(data: AIExportData): void {
     [L.domainCited, data.summary.citedCount],
     [L.totalCitations, data.summary.totalCitations],
     [L.citationRate, `${Math.round(data.summary.citationRate)}%`],
-    [language === 'he' ? 'מנועים פעילים' : 'Active engines', activeEngines.length],
+    [L.activeEngines, activeEngines.length],
     [L.overallVisibility, `${overallVisibility}%`],
   ]
 
@@ -323,8 +324,8 @@ export function exportAIVisibilityToExcel(data: AIExportData): void {
     L.domainCited,
     L.citations,
     L.date,
-    language === 'he' ? 'תגובה' : 'Response',
-    language === 'he' ? 'מקורות (URL)' : 'Source URLs',
+    L.response,
+    L.sourceUrls,
   ]
 
   const resultRows = data.results.map((r) => [

@@ -19,7 +19,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/i18n/format-date'
-import type { Locale } from '@/lib/i18n/locales'
+import type { Locale, PublicLocale } from '@/lib/i18n/locales'
 import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
 import ScanHistory from '@/components/scans/ScanHistory'
@@ -284,7 +284,7 @@ function ReportsContent() {
         targets: googleReportData.targets,
         latestResults: googleReportData.latestResults,
         allHistory: googleReportData.allHistory,
-        language,
+        language: uiLocale,
       })
     } else if (reportType === 'ai' && aiReportData) {
       if (!aiReportData.results || aiReportData.results.length === 0) {
@@ -307,7 +307,7 @@ function ReportsContent() {
           response_text: r.response_text || r.responseText || null,
           citations: r.citations || null,
         })),
-        language,
+        language: uiLocale,
       })
     }
 
@@ -330,12 +330,12 @@ function ReportsContent() {
     const payload: {
       projectId: string
       reportType: ReportType
-      language: Locale
+      language: PublicLocale
       aiReportData?: { summary: unknown; results: unknown }
     } = {
       projectId: selectedProjectId,
       reportType,
-      language,
+      language: uiLocale,
     }
     if (reportType === 'ai' && aiReportData) {
       payload.aiReportData = {

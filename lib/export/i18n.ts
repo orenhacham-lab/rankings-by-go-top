@@ -1,7 +1,14 @@
-export type ExportLanguage = 'he' | 'en'
+import { normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
+
+/**
+ * A report is written in the language of the dashboard that asked for it, so a
+ * Spanish reader gets a Spanish PDF rather than an English one. Anything this
+ * does not recognise stays Hebrew, as it always did.
+ */
+export type ExportLanguage = PublicLocale
 
 export function normalizeExportLanguage(value: unknown): ExportLanguage {
-  return value === 'en' ? 'en' : 'he'
+  return normalizePublicLocale(value) ?? 'he'
 }
 
 export const exportLabels = {
@@ -64,6 +71,9 @@ export const exportLabels = {
     citations: 'ציטוטים',
     engineScans: 'סריקות',
     engineMentions: 'אזכורים',
+    activeEngines: 'מנועים פעילים',
+    response: 'תגובה',
+    sourceUrls: 'מקורות (URL)',
     engineCitations: 'ציטוטים',
   },
   en: {
@@ -124,7 +134,73 @@ export const exportLabels = {
     citations: 'Citations',
     engineScans: 'Scans',
     engineMentions: 'Mentions',
+    activeEngines: 'Active engines',
+    response: 'Response',
+    sourceUrls: 'Source URLs',
     engineCitations: 'Citations',
+  },
+  es: {
+    rankingReport: 'Informe de posiciones',
+    aiVisibilityReport: 'Informe de visibilidad en IA',
+    generatedOn: 'Generado el',
+    generationDate: 'Fecha de generación',
+    client: 'Cliente',
+    project: 'Proyecto',
+    domain: 'Dominio',
+    keyword: 'Palabra clave',
+    keywordCol: 'Palabra clave',
+    engine: 'Motor',
+    engineSearch: 'Motor de búsqueda',
+    position: 'Posición',
+    previousPosition: 'Posición anterior',
+    change: 'Cambio',
+    ranking: 'Posición',
+    found: 'Encontrada',
+    foundPlural: 'Encontradas',
+    notFoundPlural: 'No encontradas',
+    yes: 'Sí',
+    no: 'No',
+    date: 'Fecha',
+    checkDate: 'Fecha de comprobación',
+    resultUrl: 'URL del resultado',
+    titleOrAddress: 'Título / Dirección',
+    notes: 'Notas',
+    searchVolume: 'Volumen de búsqueda',
+    totalKeywords: 'Total de palabras clave',
+    coverage: 'Cobertura',
+    estimatedOrganicTraffic: 'Tráfico orgánico estimado',
+    estimatedTrafficUnit: 'visitas/mes',
+    estimatedTrafficCaption: 'A partir del volumen de búsqueda y la posición actual.',
+    estimatedCtr: 'CTR estimado',
+    estimatedOrganicClicks: 'Clics orgánicos estimados',
+    summaryLine: '— Resumen —',
+    keywordsFound: 'Palabras clave encontradas',
+    keywordsNotFound: 'Palabras clave no encontradas',
+    sheetSummary: 'Resumen',
+    sheetCurrentRankings: 'Posiciones actuales',
+    sheetFullHistory: 'Historial completo',
+    excelTitle: 'Go Top SEO — Informe de posiciones',
+    rankingsFilename: 'Informe_de_posiciones',
+    // AI report
+    aiQueries: 'Consultas de IA',
+    aiScans: 'Comprobaciones',
+    mentions: 'Menciones',
+    mentionRate: 'Tasa de menciones',
+    domainCited: 'Dominio citado',
+    citationRate: 'Tasa de citas',
+    totalCitations: 'Total de citas',
+    overallVisibility: 'Visibilidad general',
+    performanceByEngine: 'Resultados por motor',
+    aiQueryResults: 'Resultados de las consultas de IA',
+    query: 'Consulta',
+    mentioned: 'Mencionado',
+    citations: 'Citas',
+    engineScans: 'Comprobaciones',
+    engineMentions: 'Menciones',
+    activeEngines: 'Motores activos',
+    response: 'Respuesta',
+    sourceUrls: 'URL de las fuentes',
+    engineCitations: 'Citas',
   },
 } as const
 
