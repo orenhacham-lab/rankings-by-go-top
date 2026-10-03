@@ -23,6 +23,7 @@
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '@/lib/plans/features'
 import type { DashboardDictionary } from './he'
 import type { DeepPartial } from './merge'
+import { researchCompetitiveEs } from './research-competitive'
 
 export const dashboardEs: DeepPartial<DashboardDictionary> = {
   sidebar: {
@@ -96,6 +97,12 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
   // rail, and a rail that is nine-tenths Spanish reads as broken rather than
   // as unfinished.
   contentHub: {
+    selectProjectMessage: 'Elige un proyecto en el selector de arriba para ver y gestionar su contenido.',
+    noProjectsTitle: 'Crea tu primer proyecto para usar esta herramienta',
+    projectsLoadError: 'No hemos podido cargar tus proyectos ahora mismo. Es temporal.',
+    projectsLoadRetry: 'Volver a intentarlo',
+    projectsLoading: 'Cargando tus proyectos…',
+    noProjectsCta: 'Crear proyecto',
     editor: {
       removeFaq: 'Quitar',
       statusDraft: 'Borrador',
@@ -5959,4 +5966,5 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       projectScope: { title: 'Cada proyecto, sus propios datos', body: 'Esta pantalla muestra el proyecto elegido aquí; al cambiarlo se actualiza sin salir.' },
     },
   },
+  researchCompetitive: researchCompetitiveEs,
 }
