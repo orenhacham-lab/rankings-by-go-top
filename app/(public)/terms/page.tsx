@@ -25,7 +25,7 @@ export default function HebrewTermsPage() {
         <h2>1. מבוא והגדרת השירות</h2>
         <p>
           Go Top SEO (להלן: &ldquo;השירות&rdquo; או &ldquo;המערכת&rdquo;) הוא שירות SaaS המופעל על ידי
-          Go Top Digital Marketing &amp; Advertising Ltd. (להלן: &ldquo;החברה&rdquo;), המאפשר ללקוחות לעקוב אחר
+          גו טופ שיווק ופרסום דיגיטלי בע״מ, ח.פ. 517274346 (להלן: &ldquo;החברה&rdquo;), המאפשר ללקוחות לעקוב אחר
           מיקומים בתוצאות החיפוש של Google, נראות בתוצאות Google Maps, נראות במנועי AI כגון ChatGPT, Gemini,
           Perplexity ואחרים, לבצע מחקר ביטויים ולהפיק דוחות מקצועיים. השירות כולל גם סריקת אתרים, חיבור
           לחשבונות Google ולאתרי וורדפרס, תיקוני אתר באישורכם, יצירת תוכן באמצעות AI ושליחת הודעות דוא&rdquo;ל,
@@ -420,7 +420,9 @@ export default function HebrewTermsPage() {
         <h2>21. יצירת קשר</h2>
         <p>בכל שאלה הנוגעת לתקנון זה או לשירות, ניתן לפנות אלינו בכתובת הדוא&rdquo;ל:</p>
         <p className="mt-4">
-          <strong>Go Top Digital Marketing &amp; Advertising Ltd.</strong>
+          <strong>גו טופ שיווק ופרסום דיגיטלי בע״מ</strong>
+          <br />
+          ח.פ. 517274346
           <br />
           דוא&rdquo;ל:{' '}
           <a href="mailto:oren@gotop.co.il">

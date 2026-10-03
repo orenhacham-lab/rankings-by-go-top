@@ -138,7 +138,7 @@ async function main() {
   check('D4: with the menu open, the contact bar, WhatsApp, accessibility button and privacy card step aside (no cover over "start free")', floatOk(css, floats.map(read)))
   check('D-MUT: a contact bar that is not marked is caught', !floatOk(css, floats.map(read).map((s, i) => i === 0 ? s.replace('data-public-float', 'data-x') : s)))
   const footer = code('components/Footer.tsx')
-  const creditOk = (s: string) => /const \[creditBefore, creditAfter = ''\] = dict\.footer\.credit\.split\(CREDIT_ANCHOR\)/.test(s) && /CREDIT_ANCHOR = 'GO TOP'/.test(s) && /\{creditBefore\}\s*<a\s+href="https:\/\/gotop\.co\.il"/.test(s) && /\{CREDIT_ANCHOR\}\s*<\/a>/.test(s)
+  const creditOk = (s: string) => /const \[creditBefore, creditAfter = ''\] = dict\.footer\.credit\.split\(CREDIT_ANCHOR\)/.test(s) && /CREDIT_ANCHOR = 'GO TOP'/.test(s) && /\{creditBefore\}\s*<a\s+href="https:\/\/www\.gotop\.co\.il"/.test(s) && /\{CREDIT_ANCHOR\}\s*<\/a>/.test(s)
   check('D5: the footer credit links only the words "GO TOP" (he and en), the rest is plain text', creditOk(footer))
   check('D-MUT: the whole line as the anchor is caught', !creditOk(footer.replace('{CREDIT_ANCHOR}', '{dict.footer.credit}')))
 
