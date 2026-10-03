@@ -4,6 +4,7 @@ description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de
 locale: es
 source: app/(public)/en/terms/page.tsx
 lastUpdated: 2026-10-03
+register: usted
 ---
 
 # Términos de Uso
