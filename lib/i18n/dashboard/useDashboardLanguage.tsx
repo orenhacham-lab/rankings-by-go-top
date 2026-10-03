@@ -121,3 +121,20 @@ export function useDashboardLanguage(): DashboardLanguageContextValue {
   if (ctx) return ctx
   return { language: assertProviderPresent(), setDashboardLanguage: () => {}, isLoaded: true }
 }
+
+/**
+ * A subtree whose language is decided by its ROUTE, not by the visitor's
+ * dashboard preference: a public page such as the free check (/free-check is
+ * Hebrew, /en/free-check English) that reuses dashboard components (the
+ * onboarding progress and research summary). It reads no cookie and no
+ * storage and writes neither, so a public page never changes the dashboard's
+ * remembered language, and the server's first render and the client's agree
+ * by construction. The document's own lang/dir stay the public layout's.
+ */
+export function FixedDashboardLanguage({ locale, children }: { locale: Locale; children: ReactNode }) {
+  return (
+    <DashboardLanguageContext.Provider value={{ language: locale, setDashboardLanguage: () => {}, isLoaded: true }}>
+      {children}
+    </DashboardLanguageContext.Provider>
+  )
+}

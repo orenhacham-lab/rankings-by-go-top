@@ -1,4 +1,4 @@
-# robots.txt for Rankings by Go Top
+# robots.txt for Go Top SEO
 # https://www.robotstxt.org/
 
 User-agent: *

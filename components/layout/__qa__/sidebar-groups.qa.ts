@@ -19,7 +19,7 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_TOPICS_PATH } from '../../../lib/content/content-workspace-nav'
+import { CONTENT_SCREENS, CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH, CONTENT_EXISTING_PATH, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH } from '../../../lib/content/content-workspace-nav'
 import { getDashboardDictionary } from '../../../lib/i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -124,7 +124,35 @@ function main() {
   const flagged = [...aiList.matchAll(entryPattern)].map((m) => ({ href: m[1], labelKey: m[2] }))
   const allEntries = [...entries, ...flagged]
 
-  check('nav entries were found at all', allEntries.length >= 8, `found ${allEntries.length}`)
+  check('nav entries were found at all', allEntries.length >= 7, `found ${allEntries.length}`)
+
+  // ── No Scans tab (UX review, decision 5) ──────────────────────────────────
+  // Its history is a section of Keywords and Reports; /scans redirects there.
+  const noScansTab = (hrefs: readonly string[]) => !hrefs.some((h) => h === '/scans' || h.startsWith('/scans/'))
+  check('there is no Scans entry (declared)', noScansTab(allEntries.map((e) => e.href)))
+  check('…nor at runtime', noScansTab(navItemKeys.map((i) => i.href)))
+  check('…and no label for it in either dictionary', !/\n\s{4}scans:\s*'/.test(he) && !/\n\s{4}scans:\s*'/.test(en))
+  check('MUT: a nav with the Scans entry back fails that check', !noScansTab([...navItemKeys.map((i) => i.href), '/scans']))
+
+  // ── Icons: lucide, remapped and drawn the same way (UX review, decision 3) ──
+  const ICONS: Record<string, string> = {
+    '/dashboard': 'LayoutGrid', '/keyword-research': 'Telescope', '/keywords': 'TrendingUp',
+    '/ai-visibility': 'Sparkles', '/reports': 'FileChartColumn', '/settings': 'Settings2', '/billing': 'CreditCard',
+  }
+  const wrongIcons = (sidebar: string) => Object.entries(ICONS)
+    .filter(([href, icon]) => !new RegExp(`href: '${href.replace('/', '\\/')}', labelKey: '\\w+', icon: ${icon}\\b`).test(sidebar))
+    .map(([href]) => href)
+  check('every entry has its remapped icon', wrongIcons(src).length === 0, wrongIcons(src).join(', '))
+  check('the content screens: CalendarRange for the strategy, FileText for the articles',
+    /strategy: CalendarRange,\s*articles: FileText,/.test(src))
+  check('MUT: the old KeyRound on Keywords fails the icon check',
+    wrongIcons(src.replace("labelKey: 'keywords', icon: TrendingUp", "labelKey: 'keywords', icon: KeyRound")).length > 0)
+  const uniform = (sidebar: string) =>
+    /export const NAV_ICON = \{ size: 20, strokeWidth: 1\.75, absoluteStrokeWidth: false \}/.test(sidebar)
+    && /<IconComponent\s+\{\.\.\.NAV_ICON\}/.test(sidebar)
+    && !/<IconComponent[^>]*\bsize=\{/.test(sidebar)
+  check('every nav icon is 20px at a 1.75 stroke, from one declaration', uniform(src))
+  check('MUT: a nav icon with its own size fails that check', !uniform(src.replace('{...NAV_ICON}\n        aria-hidden', '{...NAV_ICON}\n        size={18}\n        aria-hidden')))
 
   for (const { href, labelKey } of allEntries) {
     check(`"${href}" resolves to a real page`, routeExists(href))
@@ -144,8 +172,15 @@ function main() {
   // ── Mobile and desktop cannot drift apart ─────────────────────────────────
   check('the flat mobile list is DERIVED from the groups, never re-declared',
     /const navItemKeys\s*=\s*navGroupKeys\.flatMap/.test(src))
-  check('both surfaces render the shared NavLink component',
-    (src.match(/<NavLink\b/g) ?? []).length >= 2)
+  // The rail and the phone drawer render the SAME groups component, which renders
+  // the shared NavLink: one list, two surfaces, no drift.
+  const sharedGroups = (sidebar: string) =>
+    (sidebar.match(/<NavGroups\b/g) ?? []).length >= 2
+    && /function NavGroups[\s\S]*?<NavLink\b/.test(sidebar)
+    && (sidebar.match(/<NavLink\b/g) ?? []).length === 1
+  check('the rail and the drawer render the shared NavGroups (and it the shared NavLink)', sharedGroups(src))
+  check('MUT: a drawer with its own flat tile list fails that check',
+    !sharedGroups(src.replace(/<NavGroups dict=\{dict\} activeHref=\{activeHref\} isAdmin=\{isAdmin\} counts=\{counts\} \/>/, '<ul>{navItemKeys.map((item) => <NavLink key={item.href} item={item} isActive={false} label="" />)}</ul>')))
 
   // ── The content screens are entries of their own, derived from one list ───
   const iResearch = src.indexOf(`groupKey: 'groupResearch'`)
@@ -177,7 +212,33 @@ function main() {
   const noSearchConsoleEntry = (sidebar: string) => !/searchConsole|\/content\/search-console|NEXT_PUBLIC_GSC_READ_ONLY_ENABLED/.test(sidebar)
   check('the sidebar has no Search Console entry, icon or flag', noSearchConsoleEntry(src))
   check('MUT: a sidebar with the Search Console icon back fails that check',
-    !noSearchConsoleEntry(src.replace('automation: CalendarClock,', 'automation: CalendarClock,\n  searchConsole: LineChart,')))
+    !noSearchConsoleEntry(src.replace('articles: FileText,', 'articles: FileText,\n  searchConsole: LineChart,')))
+
+  // ── "Topics" and "automation" are ONE entry now: the content strategy (W6c) ──
+  // Two entries for what will be written split one question across two screens. The
+  // merged tab is one entry, it comes before the articles, and the old two are gone
+  // from the declaration, the icons, the runtime list and both dictionaries.
+  const contentHrefs = navItemKeys.map((i) => i.href).filter((h) => h === CONTENT_ROOT_PATH || h.startsWith(`${CONTENT_ROOT_PATH}/`))
+  // The existing content (what was on the site before us) follows the articles.
+  const oneStrategyEntry = (hrefs: readonly string[]) =>
+    JSON.stringify(hrefs) === JSON.stringify([CONTENT_STRATEGY_PATH, CONTENT_ROOT_PATH, CONTENT_EXISTING_PATH])
+  check('the content entries are the content strategy, then the articles, then the existing content, and nothing else',
+    oneStrategyEntry(contentHrefs), contentHrefs.join(', '))
+  check('MUT: a nav that keeps the topics and automation entries fails that check',
+    !oneStrategyEntry([...contentHrefs, CONTENT_TOPICS_PATH, CONTENT_AUTOMATION_PATH])
+    && !oneStrategyEntry([CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH]))
+  const noOldEntries = (sidebar: string) => !/\b(topics|automation):\s*[A-Z]\w*,/.test(sidebar) && /strategy: [A-Z]\w*,/.test(sidebar)
+  check('the sidebar icons name the strategy entry, not the two old ones', noOldEntries(src))
+  check('MUT: a sidebar with the topics icon back fails that check',
+    !noOldEntries(src.replace('articles: FileText,', 'articles: FileText,\n  topics: Target,')))
+  for (const loc of ['he', 'en'] as const) {
+    const screens = getDashboardDictionary(loc).contentHub.screens as Record<string, string>
+    check(`(${loc}) the dictionary labels the strategy entry and no longer the two old ones`,
+      typeof screens.strategy === 'string' && screens.strategy.length > 0 && !('topics' in screens) && !('automation' in screens))
+  }
+  check('the strategy label is the plan\'s own name for the tab',
+    getDashboardDictionary('he').contentHub.screens.strategy === 'אסטרטגיית תוכן'
+    && (getDashboardDictionary('en').contentHub.screens.strategy as string) === 'Content strategy')
 
   // ── Every screen is a tab of the current project ──────────────────────────
   // The project is picked in the top bar's workspace switcher, so there is no
@@ -208,7 +269,7 @@ function main() {
     !aiGated(src.replace(/process\.env\.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'\s*\?/, 'true ?')))
 
   // ── Exactly one entry is current, whichever content screen is open ────────
-  // /content is a PREFIX of /content/topics, so a plain prefix test lit up two
+  // /content is a PREFIX of /content/strategy, so a plain prefix test lit up two
   // entries at once. The resolution keeps the longest match.
   // The naive rule this replaced — "pathname starts with href" — matches BOTH the
   // articles entry and the nested one. Asserting that it still would is what proves
@@ -218,8 +279,8 @@ function main() {
   check('the articles entry is current on the workspace root',
     activeNavHref(CONTENT_ROOT_PATH, navItemKeys) === CONTENT_ROOT_PATH)
   check('a nested screen matches TWO entries by prefix, and only the nested one is current',
-    naiveMatches(CONTENT_TOPICS_PATH) === 2
-    && activeNavHref(CONTENT_TOPICS_PATH, navItemKeys) === CONTENT_TOPICS_PATH)
+    naiveMatches(CONTENT_STRATEGY_PATH) === 2
+    && activeNavHref(CONTENT_STRATEGY_PATH, navItemKeys) === CONTENT_STRATEGY_PATH)
   check('the article editor keeps the articles entry current',
     activeNavHref(`${CONTENT_ROOT_PATH}/articles/abc-123`, navItemKeys) === CONTENT_ROOT_PATH)
   check('an unrelated path lights nothing', activeNavHref('/nowhere', navItemKeys) === null)

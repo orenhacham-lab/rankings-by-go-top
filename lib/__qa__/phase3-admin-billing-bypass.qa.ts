@@ -160,7 +160,7 @@ async function main() {
 
   console.log('\n8) Hebrew and English admin billing text exists verbatim')
   {
-    check('8: Hebrew title matches exactly', dashboardHe.billing.admin.title === 'חשבון מנהל — גישה מלאה')
+    check('8: Hebrew title matches exactly', dashboardHe.billing.admin.title === 'חשבון מנהל: גישה מלאה')
     check('8: Hebrew description matches exactly', dashboardHe.billing.admin.description === 'לחשבון זה יש גישה מלאה למערכת ואינו דורש תוכנית חיוב.')
     check('8: English admin section exists with non-empty title and description', typeof dashboardEn.billing.admin.title === 'string' && dashboardEn.billing.admin.title.length > 0 && typeof dashboardEn.billing.admin.description === 'string' && dashboardEn.billing.admin.description.length > 0)
     const enTitle: string = dashboardEn.billing.admin.title
@@ -175,7 +175,7 @@ async function main() {
     const adminGateIdx = pageSrc.indexOf('if (entitlement.isAdmin) {')
     const activeSubIdx = pageSrc.indexOf(".from('subscriptions')")
     const shopifyConnIdx = pageSrc.indexOf(".from('shopify_connections')")
-    const marketIdx = pageSrc.indexOf('billingMarketFromLocale(')
+    const marketIdx = pageSrc.indexOf('resolveBillingMarket(') // w17: the server market resolver (was billingMarketFromLocale)
     check('9: entitlement is resolved first', entitlementIdx !== -1)
     check('9: the page no longer queries shopify_connections — a connection never decides the billing provider', shopifyConnIdx === -1)
     check('9: the admin gate (early return) exists and comes right after entitlement resolution, before ANY further query', adminGateIdx !== -1 && entitlementIdx < adminGateIdx && adminGateIdx < activeSubIdx && adminGateIdx < marketIdx)

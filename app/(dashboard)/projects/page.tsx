@@ -4,13 +4,17 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Button from '@/components/ui/Button'
+import { Plus } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import ProjectForm from '@/components/projects/ProjectForm'
 import ProjectsTable from '@/components/projects/ProjectsTable'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import Link from 'next/link'
+import { isSingleClientAccount } from '@/lib/clients/single-client'
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams()
@@ -86,21 +90,34 @@ export default function ProjectsPage() {
     <div>
       <Header
         title={dict.projects.title}
-        subtitle={`${dict.projects.countPrefix} ${projects.length} ${dict.projects.countSuffix}`}
+        subtitle={dict.projects.subtitle}
         actions={
           <Button onClick={() => setShowCreate(true)}>
+            <Plus aria-hidden="true" className="size-4" />
             {dict.projects.newProject}
           </Button>
         }
-      />
+      >
+        {!loading && (
+          <p className="text-caption text-muted">{`${dict.projects.countPrefix} ${projects.length} ${dict.projects.countSuffix}`}</p>
+        )}
+      </Header>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          {dict.common.loading}
-        </div>
+        <TableSkeleton label={dict.common.loading} rows={4} />
       ) : (
-        <ProjectsTable projects={projects} clients={clients} onProjectsChange={loadData} />
+        <>
+          {/* One business, one client: no client column; the way to add clients stays, quietly. */}
+          <ProjectsTable projects={projects} clients={clients} showClient={!isSingleClientAccount(clients)} onProjectsChange={loadData} />
+          {isSingleClientAccount(clients) && (
+            <p className="mt-4 text-caption text-muted" data-projects="agency-hint">
+              {dict.projects.agencyHint}{' '}
+              <Link href="/clients" className="font-medium text-action underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action">
+                {dict.projects.agencyLink}
+              </Link>
+            </p>
+          )}
+        </>
       )}
 
       <Modal

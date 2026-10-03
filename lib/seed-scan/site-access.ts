@@ -158,10 +158,14 @@ function isPasswordPath(url: string): boolean {
  *
  * Both halves are required: evidence that this is Shopify (its headers, its
  * markup, or a myshopify.com host) AND evidence of the password gate (the
- * redirect to /password, or the password template's own form).
+ * redirect to /password, or the password template's own form). A store the
+ * merchant just installed the app on is known to be Shopify (`knownShopify`)
+ * even behind a proxy that strips Shopify's headers; the password gate must
+ * still be seen.
  */
-export function isLockedStorefront(input: { trace: FetchHop[]; html: string | null; siteHost: string }): boolean {
+export function isLockedStorefront(input: { trace: FetchHop[]; html: string | null; siteHost: string; knownShopify?: boolean }): boolean {
   const shopify =
+    input.knownShopify === true ||
     input.trace.some((h) => h.shopify) ||
     input.siteHost.endsWith('.myshopify.com') ||
     (input.html !== null && detectPlatform(input.html) === 'Shopify')

@@ -15,13 +15,15 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import TopicsList from '@/components/content/TopicsList'
 import NewTopicsLinkPlanPanel from '@/components/content/NewTopicsLinkPlanPanel'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import GscRecommendations from '@/components/content/GscRecommendations'
-import { Plus } from 'lucide-react'
+import { ChevronDown, ListTodo, Plus } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import SectionHeading from '@/components/ui/SectionHeading'
+import EmptyState from '@/components/ui/EmptyState'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT } from './types'
 
@@ -155,25 +157,24 @@ export default function TopicsScreen() {
   }
 
   return (
-    <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 scroll-mt-4">
-      <div className="mb-3">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t.queueExplain}</p>
-      </div>
+    <div className="mt-8 scroll-mt-4 space-y-4 border-t border-line pt-8">
+      <SectionHeading title={t.topicsHeading} description={t.topicsSubtitle} className="mb-0" />
 
       {/* "Review links" helper when several topics were just approved. */}
       {reviewLinksHint && (
-        <div className="mb-3 rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-500/10 px-3 py-2 flex flex-wrap items-start gap-2">
-          <span className="text-xs text-indigo-800 dark:text-indigo-200 flex-1 min-w-[12rem]">{t.reviewRowsHint}</span>
-          <button type="button" onClick={() => setReviewLinksHint(false)} className="text-indigo-700/70 dark:text-indigo-300/70 hover:text-indigo-900 dark:hover:text-indigo-100 text-xs">✕</button>
-        </div>
+        <Notice tone="info" onDismiss={() => setReviewLinksHint(false)}>{t.reviewRowsHint}</Notice>
       )}
       {/* Workflow help — collapsed by default so it doesn't add standing
           vertical weight. Wraps ONLY the help text. */}
-      <details className="mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-3 py-2">
-        <summary className="cursor-pointer select-none text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</summary>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">{t.topicsHelpText}</p>
+      <details className="group">
+        <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1.5 rounded-control text-copy font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" />
+          {t.topicsHelpTitle}
+        </summary>
+        <div className="mt-2 max-w-prose space-y-2 text-copy text-muted">
+          <p>{t.topicsHelpText}</p>
+          <p>{t.queueExplain}</p>
+        </div>
       </details>
 
       {/* Internal-link index status (Phase 2E.1) — flag-gated, read-only +
@@ -181,28 +182,25 @@ export default function TopicsScreen() {
           bottom of the page; it reports on the index the link plans on THIS
           screen are built from, so this is where it belongs. */}
       {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && (
-        <div className="mb-3">
+        <div>
           <InternalLinkIndexStatus projectId={projectId} language={language} />
         </div>
       )}
 
-      {/* Batch action bar — only when there are topics without an article. */}
-      {selectableTopics.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" checked={allSelectableSelected} onChange={toggleSelectAll} disabled={batchRunning} className="cursor-pointer" />
-            {t.batch.selectAll}
-          </label>
-          <span className="text-sm text-slate-600 dark:text-slate-300">{t.batch.selected.replace('{n}', String(selected.size))}</span>
+      {/* Batch action bar — only once something is selected (or a batch runs).
+          Selecting all is the table's header checkbox. */}
+      {selectableTopics.length > 0 && (selected.size > 0 || batchRunning) && (
+        <div data-bulk-bar="" className="sticky top-16 z-20 flex flex-wrap items-center gap-3 rounded-inset bg-contrast px-4 py-2.5 text-contrast-ink shadow-pop motion-safe:animate-pop-in">
+          <span className="text-copy font-semibold tabular-nums">{t.batch.selected.replace('{n}', String(selected.size))}</span>
           <Button size="sm" onClick={runBatch} loading={batchRunning} disabled={batchRunning || selected.size === 0 || selected.size > BATCH_LIMIT}>
             {batchRunning ? t.batch.running : t.batch.createSelected.replace('{n}', String(selected.size))}
           </Button>
           {batchRunning ? (
-            <Button size="sm" variant="ghost" onClick={cancelBatch}>{t.batch.cancel}</Button>
+            <Button size="sm" variant="ghost" onClick={cancelBatch} className="text-contrast-ink hover:bg-white/10 hover:text-contrast-ink">{t.batch.cancel}</Button>
           ) : (
-            selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection}>{t.batch.clear}</Button>
+            selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection} className="text-contrast-ink hover:bg-white/10 hover:text-contrast-ink">{t.batch.clear}</Button>
           )}
-          {selected.size > BATCH_LIMIT && <span className="text-xs text-amber-600 dark:text-amber-400">{t.batch.tooMany}</span>}
+          {selected.size > BATCH_LIMIT && <span className="text-caption text-contrast-ink/80">{t.batch.tooMany}</span>}
         </div>
       )}
 
@@ -228,10 +226,13 @@ export default function TopicsScreen() {
         />
       )}
       {selectableTopics.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>
-          <Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>
-        </Card>
+        // Flat inside the strategy's "advanced" card; the page's call to action is above.
+        <EmptyState
+          icon={<ListTodo />}
+          title={t.topicsEmptyTitle}
+          action={<Button variant="secondary" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" /> {t.newTopicButton}</Button>}
+          className="border-y border-line"
+        />
       ) : (
         <>
           <TopicsList
@@ -244,6 +245,8 @@ export default function TopicsScreen() {
             onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
             selectedIds={selected}
             onToggleSelect={toggleSelect}
+            allSelected={allSelectableSelected}
+            onToggleAll={toggleSelectAll}
             batchState={batchState}
             batchRunning={batchRunning}
             onRetry={retryTopic}

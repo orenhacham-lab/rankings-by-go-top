@@ -12,6 +12,9 @@ import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-au
 import { createClient } from '@/lib/supabase/server'
 import { validateTopicBrief } from '@/lib/content/topic-brief'
 import { loadPlanSummariesForProject } from '@/lib/content/internal-link-plan-store'
+import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
+import { loadOverlapIndex } from '@/lib/content/cannibalization/load'
+import { checkOverlap, overlapPayload, SITE_AND_PLAN_KINDS } from '@/lib/content/cannibalization/check'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) {
@@ -24,6 +27,9 @@ export async function GET(request: Request) {
 
   // Session client → RLS ensures only the caller's rows are visible.
   const supabase = await createClient()
+  // SPEED: the topics and their saved-plan status are read together (one round trip, not two).
+  const planStatusRead = loadPlanSummariesForProject(auth.admin, auth.project.id)
+  planStatusRead.catch(() => {}) // an early return below must not leave it unhandled
   const { data, error } = await supabase
     .from('article_topics')
     .select('id, project_id, source, topic, primary_keyword, secondary_keywords, search_intent, target_audience, status, anchors_json, brief_notes, language, tone_of_voice, desired_word_count, cta_preference, created_at, updated_at')
@@ -41,7 +47,7 @@ export async function GET(request: Request) {
 
   // ONE-SHOT saved-plan status for every topic (no N+1) so the row link badges are TRUTHFUL
   // after a full page refresh — not just within the session that saved them.
-  const planStatus = await loadPlanSummariesForProject(auth.admin, auth.project.id)
+  const planStatus = await planStatusRead
   return Response.json({ topics: data || [], planStatus })
 }
 
@@ -69,6 +75,13 @@ export async function POST(request: Request) {
     return Response.json({ error: validated.error }, { status: 400 })
   }
   const v = validated.value
+
+  // The cannibalization check (lib/content/cannibalization). A manual path WARNS and
+  // never blocks: the topic is created either way, and the answer carries `overlap`
+  // (the existing page, and where "improve it" goes) for the screen to say so. Read
+  // alongside the insert; the new topic is excluded, so it is never its own match.
+  const overlapIndex = loadOverlapIndex(auth.admin, { projectId: auth.project.id, userId: auth.user.id }, { gsc: isGscReadOnlyEnabled() })
+    .catch(() => null)
 
   const { data, error } = await auth.admin
     .from('article_topics')
@@ -108,5 +121,7 @@ export async function POST(request: Request) {
   }
 
   console.log('[content-topics] created topic id', { id: (data as { id: string }).id, anchors: v.anchors_json.length })
-  return Response.json({ topic: data })
+  const index = await overlapIndex
+  const overlap = index ? overlapPayload(checkOverlap(index, { title: v.topic, keyword: v.primary_keyword }, { kinds: SITE_AND_PLAN_KINDS, excludeTopicIds: [(data as { id: string }).id] })) : null
+  return Response.json({ topic: data, overlap })
 }

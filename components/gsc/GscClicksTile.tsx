@@ -20,11 +20,17 @@ import { useGscStatus } from './gsc-data'
 import GscSetupPrompt, { GscLoadError, GscLoading } from './GscSetupPrompt'
 import { formatCount } from './format'
 
-export default function GscClicksTile({ projectId, className }: { projectId: string | null | undefined; className?: string }) {
+/**
+ * `onlyWithData`: render only the figure itself (or a failed read's retry), never a
+ * setup prompt or a loading tile: the dashboard's row of figures, where connecting
+ * Search Console is the setup checklist's job, not one more button among the numbers.
+ */
+export default function GscClicksTile({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const { view, reload } = useGscStatus(projectId)
   if (view.state === 'disabled') return null
+  if (onlyWithData && !(view.state === 'ready' && view.summary) && view.state !== 'error') return null
   // A sync that predates the property totals has rows but no total yet: one more sync.
   const state = view.state === 'ready' && !view.summary ? 'never_synced' : view.state
   const icon = <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />
@@ -36,7 +42,8 @@ export default function GscClicksTile({ projectId, className }: { projectId: str
           className="h-full"
           label={t.clicks.title}
           value={formatCount(view.summary.clicks, language)}
-          source={t.source28}
+          // In the dashboard's row (five tiles at 1440) the long source wrapped to two lines.
+          source={onlyWithData ? t.source28Short : t.source28}
           icon={icon}
         />
       </div>
@@ -50,7 +57,7 @@ export default function GscClicksTile({ projectId, className }: { projectId: str
       className={cn('flex h-full flex-col gap-2 rounded-card border border-line bg-surface p-4', className)}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted">{t.clicks.title}</span>
+        <span className="text-caption font-medium text-muted">{t.clicks.title}</span>
         <span className="shrink-0 text-muted">{icon}</span>
       </div>
       {isGscSetupState(state) ? (

@@ -53,6 +53,19 @@ export type SiteSignals = {
   llmsTxt: boolean
 }
 
+/**
+ * A questions-and-answers block written the usual way: a heading that names it ("שאלות נפוצות",
+ * "FAQ") with its questions one level down, as H3s. The FAQ block the site-health fix adds is
+ * exactly that (lib/site-fix/content.ts), so without this a page fixed with it still read
+ * "no FAQ" on the next check (wave 9).
+ */
+function faqBlockBelow(clean: string, upper: string[]): boolean {
+  const named = upper.some((t) => FAQ_NAMES.some((n) => t.toLowerCase().includes(n)))
+  if (!named) return false
+  return headings(clean, 'h3').filter((t) => /[?？]\s*$/.test(t)).length >= 2
+}
+const FAQ_NAMES = ['שאלות נפוצות', 'שאלות ותשובות', 'faq', 'frequently asked']
+
 const QUESTION_MARKERS = [
   'איך', 'מה ', 'מהו', 'מהי', 'למה', 'כמה', 'מתי', 'האם', 'איפה', 'שאלות נפוצות',
   'how ', 'what ', 'why ', 'when ', 'where ', 'which ', 'faq', 'frequently asked',
@@ -240,7 +253,7 @@ function metaContent(html: string, key: string): string | null {
   return null
 }
 
-function headings(html: string, tag: 'h1' | 'h2'): string[] {
+function headings(html: string, tag: 'h1' | 'h2' | 'h3'): string[] {
   const out: string[] = []
   const hay = html.toLowerCase()
   let i = 0
@@ -457,7 +470,7 @@ export function extractSiteSignals(
     schemaTypes,
     hasOrganizationSchema: schemaTypes.some((t) => ORGANIZATION_TYPES.has(t)),
     hasFaqSchema,
-    hasFaqSection: hasFaqSchema || questionHeadings.length >= 3,
+    hasFaqSection: hasFaqSchema || questionHeadings.length >= 3 || faqBlockBelow(clean, [...h1, ...h2]),
     wordCount,
     text,
     internalLinks,

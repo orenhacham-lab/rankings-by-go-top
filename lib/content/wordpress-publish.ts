@@ -16,7 +16,10 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { uploadMedia, createPost, updatePost, getCategories, getTags, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { reconcileInlineImagesForWordPress, injectInlineImages, type InlineWpResult } from '@/lib/content/inline-images'
+import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { resolveTaxonomy, type ResolvedTaxonomy } from '@/lib/content/wordpress-taxonomy'
+import { publishArticleSchemaToWordPress, type ArticleSchemaDeps, type ArticleSchemaOutcome } from '@/lib/content/wordpress-schema'
+import { decryptCredential } from '@/lib/security/credentials-crypto'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -63,6 +66,8 @@ export interface WpCreateResult {
   taxonomyWarning?: boolean
   /** True when this was an in-place update of an existing post (not a new post). */
   updated?: boolean
+  /** The article's JSON-LD through the GO TOP Bridge plugin (lib/content/wordpress-schema.ts); publish only. */
+  schema?: ArticleSchemaOutcome
 }
 /** The publish sub-stage a wpCreatePost failure surfaced in (for typed mapping). */
 export type WpCreateStage = 'media_upload' | 'inline_image_reconciliation' | 'taxonomy_resolution' | 'post_creation'
@@ -93,6 +98,8 @@ export async function wpCreatePost(
      *  Automation never passes this (behavior unchanged). featuredMediaId, when
      *  provided, is REUSED (no re-upload → no duplicate media on re-export). */
     existing?: { postId: number; featuredMediaId?: number | null }
+    /** Tests only: the plugin transport and the key decryption for the schema step. */
+    schemaDeps?: ArticleSchemaDeps
   },
 ): Promise<WpCreateResult | WpCreateError> {
   const status = opts.status
@@ -146,6 +153,10 @@ export async function wpCreatePost(
     inlineImages = result
     if (result.failed.length > 0) imageWarning = true
   }
+  // The project's article design (lib/content/article-style): the formatted
+  // design in the brand colours, as inline styles WordPress keeps. Minimal (the
+  // default) leaves the body exactly as above.
+  content = await applyArticleDesign(admin, article.id, content, 'wordpress')
 
   // Phase 4E — resolve taxonomy (primary-in-list, dedupe, drop invalid/deleted
   // terms as a safe fallback). Fetch the site's terms ONLY when something is
@@ -191,6 +202,13 @@ export async function wpCreatePost(
     const post = opts.existing
       ? await updatePost(creds, opts.existing.postId, postFields)
       : await createPost(creds, postFields)
+    // The article's structured data, once the post is live and has its address: through the
+    // plugin when it is connected, never into the post content. Best-effort; never fails the publish.
+    let schema: ArticleSchemaOutcome | undefined
+    if (status === 'publish' && article.id) {
+      schema = await publishArticleSchemaToWordPress(admin, { articleId: article.id, postUrl: post.link, status }, opts.schemaDeps ?? { decrypt: decryptCredential })
+      if (schema !== 'no_plugin') console.log('[wordpress-publish] article schema', { outcome: schema })
+    }
     return {
       ok: true,
       wpPostId: post.id,
@@ -201,6 +219,7 @@ export async function wpCreatePost(
       taxonomy,
       taxonomyWarning: taxonomy?.warning ?? false,
       updated: !!opts.existing,
+      ...(schema ? { schema } : {}),
     }
   } catch (err) {
     const detail = err instanceof WordPressClientError ? err.message : 'Post creation failed.'

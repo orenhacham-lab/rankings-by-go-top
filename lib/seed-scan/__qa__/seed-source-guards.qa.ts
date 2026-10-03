@@ -19,7 +19,9 @@
  *   G3  every site request of a1 and b1 goes through hostPinnedFetch, and
  *       every read of b1 but robots.txt itself is refused by robots.txt.
  *   G4  the model is called once, after its `attempted` mark is saved; the
- *       searches likewise, at most MAX_SEARCHES (3) of them. Stage B: every
+ *       searches likewise, at most MAX_SEARCHES (3) of them in a4, and at most
+ *       MAX_INDEX_SEARCHES (2) in a1's search-index fallback, which fetches
+ *       nothing (no URL a search returned is ever requested). Stage B: every
  *       paid or counted call (Google Ads, the content engine, the question
  *       model, the rank check) has one call site, behind its step's mark,
  *       within its cap; the crawl within its page and sitemap caps.
@@ -500,7 +502,17 @@ function main() {
     const callAt = a2.indexOf('ctx.deps.insight(')
     if (!(guard >= 0 && mark > guard && callAt > mark)) out.push('a2: the attempted mark is not saved (and checked) before the model call')
     const searchCalls = [...code.matchAll(/deps\.search\(/g)]
-    if (searchCalls.length !== 1) out.push(`${searchCalls.length} search call sites`)
+    if (searchCalls.length !== 2) out.push(`${searchCalls.length} search call sites`)
+    // a1's fallback: checked, then marked, then at most two searches; and no fetch at all.
+    const idx = code.slice(code.indexOf('async function a1SearchIndex('), code.indexOf('async function a1Claim('))
+    const iGuard = idx.indexOf('ctx.details.a1?.searchAttempted === true')
+    const iMark = idx.indexOf('ctx.save({ ...blocked, searchAttempted: true })')
+    const iCall = idx.indexOf('deps.search(')
+    if (!(iGuard >= 0 && iMark > iGuard && iCall > iMark)) out.push('a1: the fallback does not check, then save, its mark before searching')
+    if (!/for \(const query of searchIndexQueries\(siteKey\)\)/.test(idx) || !/\.slice\(0, MAX_INDEX_SEARCHES\)/.test(code) || !/export const MAX_INDEX_SEARCHES = 2\b/.test(code)) {
+      out.push('a1: the fallback searches are not capped at two')
+    }
+    if (/fetchImpl|fetchHtml|fetchText|discoverSitemap|hostPinnedFetch|\bfetch\(/.test(idx)) out.push('a1: the fallback fetches something')
     const a4 = code.slice(code.indexOf('async function a4('))
     const sMark = a4.indexOf('ctx.save({ attempted: true, queries, market })')
     const sGuard = a4.indexOf('own.attempted === true')
@@ -515,6 +527,12 @@ function main() {
     spendOffenders(steps.replace('if (!(await ctx.save({ attempted: true }))) return ABORT\n', '').replace("if (answer.kind === 'timeout')", "if (!(await ctx.save({ attempted: true }))) return ABORT\n    if (answer.kind === 'timeout')")).length > 0)
   check('MUTATION CONTROL: a fourth search is caught', spendOffenders(steps.replace('export const MAX_SEARCHES = 3', 'export const MAX_SEARCHES = 4')).length > 0)
   check('MUTATION CONTROL: a second model call site is caught', spendOffenders(`${steps}\nconst again = () => ctx.deps.insight(signals, 'he', 'x')`).length > 0)
+  check('MUTATION CONTROL: a third search call site is caught', spendOffenders(`${steps}\nconst again = () => ctx.deps.search('q', { gl: 'il', hl: 'he' })`).length > 0)
+  check('MUTATION CONTROL: a fallback that searches before saving its mark is caught',
+    spendOffenders(steps.replace('if (!(await ctx.save({ ...blocked, searchAttempted: true }))) return ABORT\n', '')).some((o) => o.startsWith('a1:')))
+  check('MUTATION CONTROL: a third fallback search is caught', spendOffenders(steps.replace('export const MAX_INDEX_SEARCHES = 2', 'export const MAX_INDEX_SEARCHES = 3')).some((o) => o.startsWith('a1:')))
+  check('MUTATION CONTROL: a fallback that fetches a search result is caught',
+    spendOffenders(steps.replace("records.push({ query, ok: true, code: null, pages: own.length })", "records.push({ query, ok: true, code: null, pages: own.length })\n    await deps.fetchHtml(new URL(own[0].url), { fetchImpl: deps.fetchImpl })")).some((o) => o === 'a1: the fallback fetches something'))
 
   console.log('\nG4b) stage B: every paid or counted call has one call site, behind its mark, within its cap')
   const spendOffendersB = (src: string, crawlSrc: string): string[] => {
@@ -682,7 +700,7 @@ function main() {
   const routeCap = capOf(read('app/api/projects/[id]/ai-visibility/competitors/route.ts'))
   const ourCap = capOf(read('lib/seed-scan/settings.ts'))
   check(`MAX_ACTIVE_COMPETITORS matches (${ourCap} = ${routeCap})`, Number.isFinite(routeCap) && ourCap === routeCap)
-  check('MUTATION CONTROL: a drifted cap is caught', capOf(read('lib/seed-scan/settings.ts').replace('MAX_ACTIVE_COMPETITORS = 3', 'MAX_ACTIVE_COMPETITORS = 5')) !== routeCap)
+  check('MUTATION CONTROL: a drifted cap is caught', capOf(read('lib/seed-scan/settings.ts').replace('MAX_ACTIVE_COMPETITORS = 5', 'MAX_ACTIVE_COMPETITORS = 6')) !== routeCap)
 
   console.log('\nG8) the cron resumes stalled runs behind its auth, after the runner, isolated, never as the merchant')
   const cronOffenders = (cronSrc: string, resumeSrc: string): string[] => {

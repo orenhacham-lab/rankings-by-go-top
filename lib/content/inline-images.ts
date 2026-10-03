@@ -17,6 +17,7 @@ import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcep
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
 import { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages, type InlineImage, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { assertContentGenerationAllowedForProject, gateDenialCode, isTransientGateDenial } from '@/lib/content/entitlement-guard'
+import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
 
 // Re-export the pure engine (back-compat for existing server-side imports).
 export { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages }
@@ -74,7 +75,9 @@ export async function generateInlineImage(
     if (topicId) { const { data: t } = await admin.from('article_topics').select('language').eq('id', topicId).maybeSingle(); language = String((t as { language?: string } | null)?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he' }
     // Brand-neutral concept from the user's prompt (sanitized by the shared helper).
     const concept = await writeCommercialSafeConcept({ title, excerpt: row.prompt || null, topic: null, primaryKeyword: null, language })
-    const gen = await generateArticleImage({ title, imagePrompt: row.prompt || concept, topic: null, language })
+    // The project's image style (lib/content/article-style), so the inline images match the hero. Always 16:9 inside the body.
+    const { style } = await readArticleStyleForArticle(admin, row.article_id)
+    const gen = await generateArticleImage({ title, imagePrompt: row.prompt || concept, topic: null, language, style: style.imageStyle, brandColors: style.brandColors })
     if ('error' in gen) { await admin.from('article_inline_images').update({ status: 'failed', last_error: gen.error, updated_at: nowIso() }).eq('id', imageId); return { ok: false, error: gen.error } }
     let bytes = gen.data, mimeType = gen.mimeType
     try { const norm = await normalizeFeaturedImage(gen.data); bytes = norm.data; mimeType = norm.mimeType } catch { /* keep original */ }

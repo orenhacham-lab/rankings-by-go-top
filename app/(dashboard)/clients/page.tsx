@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import Header from '@/components/layout/Header'
 import Button from '@/components/ui/Button'
+import { TableSkeleton } from '@/components/ui/Skeleton'
+import { Plus } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import ClientForm from '@/components/clients/ClientForm'
 import ClientsTable from '@/components/clients/ClientsTable'
@@ -41,7 +43,6 @@ export default function ClientsPage() {
     setLoading(false)
   }
 
-  // ✅ useEffect מתוקן (מונע בעיות טעינה)
   useEffect(() => {
     let isMounted = true
 
@@ -71,16 +72,14 @@ export default function ClientsPage() {
         subtitle={`${dict.clients.countPrefix} ${clients.length} ${dict.clients.countSuffix}`}
         actions={
           <Button onClick={() => setShowCreate(true)}>
+            <Plus aria-hidden="true" className="size-4" />
             {dict.clients.newClient}
           </Button>
         }
       />
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          {dict.common.loading}
-        </div>
+        <TableSkeleton label={dict.common.loading} rows={4} />
       ) : (
         <ClientsTable clients={clients} onClientsChange={loadClients} />
       )}

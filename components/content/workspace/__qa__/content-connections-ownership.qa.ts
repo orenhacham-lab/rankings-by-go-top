@@ -66,7 +66,10 @@ function main() {
   // already asks for exactly that, and two cards asking one question is the clutter this
   // split exists to remove.
   check('…only when a platform is connected, so it never duplicates the setup card',
-    /\{activePlatform !== 'none' && \([\s\S]{0,200}<ContentHubPlatformCard/.test(articles))
+    // …and only once THIS project's overview said which platform (lib/connection-status).
+    /\{data && activePlatform !== 'none' && \([\s\S]{0,200}<ContentHubPlatformCard/.test(articles))
+  check('MUT: the card drawn before the overview answered (no data gate) fails that check',
+    !/\{data && activePlatform !== 'none' && \([\s\S]{0,200}<ContentHubPlatformCard/.test(articles.replace("{data && activePlatform !== 'none' && (", "{activePlatform !== 'none' && (")))
   // The link and its target are both built from one constant, so they cannot drift.
   const linksToSettings = (src: string) => /href=\{platformSetupHref\(projectId\)\}/.test(src) && /t\.manageConnection/.test(src)
   const anchorsPlatform = (src: string) => /id=\{PROJECT_CONNECTION_ANCHOR\}[\s\S]{0,120}<ContentSection /.test(src)

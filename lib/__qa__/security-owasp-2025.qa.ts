@@ -135,7 +135,7 @@ function main() {
   check('MUTATION CONTROL: the permissive owner check is recognised', permissive.test('if (ownerId && ownerId !== user.id) {'))
   const tt = strip(read('app/actions/tracking-targets.ts'))
   check('both keyword-create actions assert project ownership before inserting',
-    (tt.match(/await assertOwnedProject\(supabase, user\.id, projectId\)/g) || []).length === 2)
+    (tt.match(/await assertOwnedProject\(supabase, user\.id, projectId(?:, m)?\)/g) || []).length === 2)
   const dbg = strip(read('app/api/google-ads/debug-customers/route.ts'))
   check('google-ads/debug-customers is admin-only', /isAdminUser\(createAdminClient\(\), user\.id\)/.test(dbg))
 

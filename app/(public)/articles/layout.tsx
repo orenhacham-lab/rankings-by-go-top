@@ -1,7 +1,7 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי | Rankings by Go Top',
+  title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי | Go Top SEO',
   description: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי של מומחי השיווק מהגדולים בישראל. להמשך קריאה כנסו עכשיו >>',
   openGraph: {
     title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי',

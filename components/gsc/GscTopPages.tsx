@@ -36,13 +36,15 @@ function describePage(url: string, homePage: string): { label: string; isPath: b
   }
 }
 
-export default function GscTopPages({ projectId, className }: { projectId: string | null | undefined; className?: string }) {
+/** `onlyWithData`: render only pages that were found (or a failed read's retry): no setup prompt, no loading card. */
+export default function GscTopPages({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).gscWidgets
   const status = useGscStatus(projectId)
   const pages = useGscMetrics(projectId, status.view, 'pages', pickPages)
   const data = pages.data
   if (data.state === 'disabled') return null
+  if (onlyWithData && !(data.state === 'ready' && data.data.length > 0) && data.state !== 'error') return null
   const retry = () => { status.reload(); pages.reload() }
   const max = data.state === 'ready' ? Math.max(1, ...data.data.map((p) => p.clicks)) : 1
 
@@ -50,13 +52,13 @@ export default function GscTopPages({ projectId, className }: { projectId: strin
     <section data-gsc-widget="top-pages" data-gsc-state={data.state} className={className}>
       <Card padding={false}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line p-4">
-          <h2 className="text-base font-semibold text-ink">{t.topPages.title}</h2>
-          {data.state === 'ready' && <span className="text-[11px] text-muted">{t.source28}</span>}
+          <h2 className="text-section font-semibold text-ink">{t.topPages.title}</h2>
+          {data.state === 'ready' && <span className="text-overline text-muted">{t.source28}</span>}
         </div>
         <div className="p-4">
           {data.state === 'ready' ? (
             data.data.length === 0 ? (
-              <p className="text-sm text-muted">{t.topPages.none}</p>
+              <p className="text-copy text-muted">{t.topPages.none}</p>
             ) : (
               <ol className="flex flex-col gap-3">
                 {data.data.map((p) => {
@@ -65,20 +67,22 @@ export default function GscTopPages({ projectId, className }: { projectId: strin
                   return (
                     <li key={p.page}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="min-w-0 truncate text-sm text-ink" title={page.full}>
+                        <span className="min-w-0 truncate text-copy text-body" title={page.full}>
                           {page.href ? (
                             <a href={page.href} target="_blank" rel="noopener noreferrer" className="hover:text-action hover:underline">{text}</a>
                           ) : text}
                         </span>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums text-ink">
+                        <span className="shrink-0 text-copy font-semibold tabular-nums text-ink">
                           {t.topPages.clicks(formatCount(p.clicks, language))}
                         </span>
                       </div>
-                      <div
-                        className="mt-1.5 h-2 rounded-e-[4px] bg-action"
-                        style={{ width: `${Math.max(2, Math.round((p.clicks / max) * 100))}%` }}
-                        aria-hidden="true"
-                      />
+                      {/* §10 bar: the action colour on a sunk track, the figure in words beside it. */}
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-sunk" aria-hidden="true">
+                        <div
+                          className="h-full rounded-pill bg-action"
+                          style={{ width: `${Math.max(2, Math.round((p.clicks / max) * 100))}%` }}
+                        />
+                      </div>
                     </li>
                   )
                 })}

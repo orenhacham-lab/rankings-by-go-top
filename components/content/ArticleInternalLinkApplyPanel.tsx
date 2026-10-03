@@ -23,9 +23,11 @@ import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { Link2, ChevronDown, ChevronUp } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import { Check, ChevronDown, Circle, CircleDot, ExternalLink, Link2, Minus } from 'lucide-react'
 
 interface PreviewItem {
   linkId: string
@@ -111,6 +113,8 @@ export default function ArticleInternalLinkApplyPanel({
   onPreviewSummaryChange?: (s: PreviewSummary | null) => void
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.linkApply, [language])
+  const cf = useMemo(() => getDashboardDictionary(language).contentHub.confirms, [language])
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const isHebrew = language === 'he'
   const isDraft = status === 'draft' && !isPublished
 
@@ -272,7 +276,7 @@ export default function ArticleInternalLinkApplyPanel({
 
   const apply = useCallback(async () => {
     if (applying || !canApply || !previewToken) return
-    if (!window.confirm(t.applyConfirm)) return
+    if (!(await confirm({ title: cf.applyTitle, body: t.applyConfirm, confirmLabel: cf.applyAction }))) return
     setApplying(true); setError(null); onNoticeChange(null)
     try {
       const res = await fetch(APPLY_URL, {
@@ -310,11 +314,11 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setApplying(false)
     }
-  }, [applying, canApply, previewToken, previewResult, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
+  }, [applying, canApply, previewToken, previewResult, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t, cf, confirm])
 
   const rollback = useCallback(async () => {
     if (rollingBack) return
-    if (!window.confirm(t.rollbackConfirm)) return
+    if (!(await confirm({ title: cf.rollbackTitle, body: t.rollbackConfirm, confirmLabel: cf.rollbackAction }))) return
     setRollingBack(true); setError(null); onNoticeChange(null)
     try {
       const res = await fetch(ROLLBACK_URL, {
@@ -339,7 +343,7 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setRollingBack(false)
     }
-  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
+  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t, cf, confirm])
 
   if (process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING !== 'true') return null
 
@@ -358,11 +362,11 @@ export default function ArticleInternalLinkApplyPanel({
 
   // Compact status chip so the current state is obvious at a glance.
   const s = t.state as Record<string, string>
-  const chipTones: Record<string, string> = {
-    neutral: 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300',
-    amber: 'border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400',
-    emerald: 'border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300',
-    indigo: 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300',
+  const chipTones: Record<string, 'neutral' | 'warning' | 'success' | 'info'> = {
+    neutral: 'neutral',
+    amber: 'warning',
+    emerald: 'success',
+    indigo: 'info',
   }
   let chip: { label: string; tone: string }
   if (!isDraft) chip = { label: s.nonDraft, tone: 'amber' }
@@ -377,47 +381,45 @@ export default function ArticleInternalLinkApplyPanel({
   } else chip = { label: s.readyToPreview, tone: 'neutral' }
 
   return (
-    <Card className="hover:translate-y-0 border-indigo-100 dark:border-indigo-500/20">
+    <Card className="p-5 sm:p-6">
       <div dir={isHebrew ? 'rtl' : 'ltr'}>
         {/* Header — distinct from the QA card; toggle does NOT fetch. */}
-        <button type="button" onClick={() => setCollapsed((v) => !v)} className="w-full flex items-center justify-between gap-3 text-start">
+        <button type="button" onClick={() => setCollapsed((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 rounded-control text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
           <span className="inline-flex items-center gap-2">
-            <Link2 size={16} className="text-indigo-600 dark:text-indigo-400" />
-            <span className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</span>
+            <Link2 aria-hidden="true" className="size-4 text-action" />
+            <span className="text-section font-semibold text-ink">{t.title}</span>
           </span>
-          <span className="inline-flex items-center gap-2 text-slate-400 flex-wrap justify-end">
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${chipTones[chip.tone]}`}>{chip.label}</span>
+          <span className="inline-flex items-center gap-2 text-muted flex-wrap justify-end">
+            <Badge variant={chipTones[chip.tone]}>{chip.label}</Badge>
             {rollbackAvailable && <Badge variant="neutral">{t.rollbackAvailable}</Badge>}
-            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <ChevronDown aria-hidden="true" className={`size-4 transition-transform duration-150 ease-snappy ${open ? 'rotate-180' : ''}`} />
           </span>
         </button>
 
         {open && (
           <div className="mt-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.subtitle}</p>
+            <p className="mb-4 max-w-prose text-copy text-muted">{t.subtitle}</p>
 
             {/* Non-draft guard — warning only, no controls, no calls. */}
             {!isDraft ? (
-              <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                {t.draftOnly}
-              </p>
+              <Notice tone="warn">{t.draftOnly}</Notice>
             ) : (
               <>
-                {error && <p className="mb-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
-                {notice && <p className="mb-2 text-xs text-slate-600 dark:text-slate-300">{notice}</p>}
+                {error && <Notice tone="bad" className="mb-3">{error}</Notice>}
+                {notice && <Notice tone="info" className="mb-3">{notice}</Notice>}
 
                 {/* Manual actions */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={runPreview} loading={loadingPreview} disabled={loadingPreview || applying || rollingBack}>
+                  <Button size="sm" variant={canApply ? 'secondary' : 'primary'} onClick={runPreview} loading={loadingPreview} disabled={loadingPreview || applying || rollingBack}>
                     {loadingPreview ? t.previewing : t.runPreview}
                   </Button>
                   {canApply && (
-                    <Button size="sm" onClick={apply} loading={applying} disabled={applying}>
+                    <Button size="sm" variant="secondary" onClick={apply} loading={applying} disabled={applying}>
                       {applying ? t.applying : t.apply}
                     </Button>
                   )}
                   {rollbackAvailable && (
-                    <Button size="sm" variant="ghost" onClick={rollback} loading={rollingBack} disabled={rollingBack} className="text-red-600 dark:text-red-400">
+                    <Button size="sm" variant="ghost" onClick={rollback} loading={rollingBack} disabled={rollingBack} className="text-bad">
                       {rollingBack ? t.rollingBack : t.rollback}
                     </Button>
                   )}
@@ -425,60 +427,60 @@ export default function ArticleInternalLinkApplyPanel({
 
                 {/* Session-only rollback explanation (shown once rollback is available). */}
                 {rollbackAvailable && (
-                  <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">{t.rollbackSessionOnly}</p>
+                  <p className="mt-2 max-w-prose text-caption text-muted">{t.rollbackSessionOnly}</p>
                 )}
 
                 {/* Content-edited-since-preview invalidation */}
                 {contentChanged && (
-                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.contentChangedRepreview}</p>
+                  <Notice tone="warn" className="mt-3">{t.contentChangedRepreview}</Notice>
                 )}
 
                 {/* Apply result */}
                 {applyOutcome && (
-                  <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                  <Notice tone="ok" className="mt-3">
                     {/* Phase 3J — the definitive success line: inserted + already-
                         existing links both count as embedded, out of all approved. */}
                     {typeof applyOutcome.approvedTotal === 'number' && applyOutcome.approvedTotal > 0 && (
-                      <p className="mb-0.5 text-sm font-semibold">
+                      <p className="font-semibold">
                         {t.embeddedLine
                           .replace('{x}', String(applyOutcome.applied + (applyOutcome.alreadyLinked ?? 0)))
                           .replace('{y}', String(applyOutcome.approvedTotal))}
                       </p>
                     )}
-                    <span className="font-medium">{t.appliedTitle}</span>
-                    {' · '}{t.appliedCount}: {applyOutcome.applied} · {t.skippedCount}: {applyOutcome.skipped}
-                    {applyOutcome.snapshotId && <span className="text-emerald-600/80 dark:text-emerald-400/70"> · {t.snapshotLabel}: {applyOutcome.snapshotId.slice(0, 8)}</span>}
-                    {rollbackAvailable && <span className="font-medium"> · {t.rollbackAvailable}</span>}
-                  </div>
+                    <p className="text-caption tabular-nums">
+                      <span className="font-medium">{t.appliedTitle}</span>
+                      {' · '}{t.appliedCount}: {applyOutcome.applied} · {t.skippedCount}: {applyOutcome.skipped}
+                      {applyOutcome.snapshotId && <span> · {t.snapshotLabel}: {applyOutcome.snapshotId.slice(0, 8)}</span>}
+                      {rollbackAvailable && <span className="font-medium"> · {t.rollbackAvailable}</span>}
+                    </p>
+                  </Notice>
                 )}
 
                 {/* Preview result */}
                 {previewResult && previewResult.reason === 'no_plan_batch' && (
-                  <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  <div className="mt-3 text-copy text-muted">
                     <p>{t.noPlan}</p>
-                    <Link href={`/content?projectId=${projectId}`} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{t.noPlanHint}</Link>
+                    <Link href={`/content?projectId=${projectId}`} className="rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">{t.noPlanHint}</Link>
                   </div>
                 )}
                 {previewResult && previewResult.reason === 'no_approved_links' && (
                   previewResult.plannedLinks > 0 ? (
-                    <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
-                      <p className="text-sm text-amber-800 dark:text-amber-300">
-                        {t.plannedAvailable.replace('{n}', String(previewResult.plannedLinks))}
-                      </p>
-                      <div className="mt-2">
-                        <Button size="sm" onClick={approvePlanned} loading={approvingPlanned} disabled={approvingPlanned || loadingPreview}>
+                    <Notice tone="info" className="mt-3">
+                      <span className="flex flex-wrap items-center gap-3">
+                        <span className="min-w-0 flex-1">{t.plannedAvailable.replace('{n}', String(previewResult.plannedLinks))}</span>
+                        <Button size="sm" variant="secondary" onClick={approvePlanned} loading={approvingPlanned} disabled={approvingPlanned || loadingPreview}>
                           {approvingPlanned ? t.approvingPlanned : t.approvePlanned}
                         </Button>
-                      </div>
-                    </div>
+                      </span>
+                    </Notice>
                   ) : (
-                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t.noApproved}</p>
+                    <p className="mt-3 text-copy text-muted">{t.noApproved}</p>
                   )
                 )}
 
                 {previewResult && !previewResult.reason && (
-                  <div className="mt-3">
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.previewTitle}</div>
+                  <div className="mt-4">
+                    <div className="mb-2 text-overline font-semibold uppercase tracking-wide text-muted">{t.previewTitle}</div>
                     {/* Phase 3J.1 — a PREVIEW is not a final count: separate the
                         three states so "ready to embed" isn't mistaken for a skip.
                         already-existing (success) · ready to embed · skipped. */}
@@ -487,7 +489,7 @@ export default function ArticleInternalLinkApplyPanel({
                       const ready = previewResult.wouldInsert
                       const skipped = Math.max(0, previewResult.approvedLinks - already - ready)
                       return (
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                        <p className="mb-1 text-copy font-semibold text-ink tabular-nums">
                           {t.previewStatusLine
                             .replace('{a}', String(already))
                             .replace('{r}', String(ready))
@@ -495,33 +497,39 @@ export default function ArticleInternalLinkApplyPanel({
                         </p>
                       )
                     })()}
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                    <p className="mb-3 text-caption text-muted tabular-nums">
                       {t.summaryApproved}: {previewResult.approvedLinks} · {t.summaryWouldInsert}: {previewResult.wouldInsert} · {t.summaryWouldSkip}: {previewResult.wouldSkip} · {t.contentUnchanged}
                     </p>
-                    {staleWarn && <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{staleWarn}{previewResult.planStale && previewResult.planStaleReasons.length ? ` (${previewResult.planStaleReasons.join(', ')})` : ''}</p>}
+                    {staleWarn && <Notice tone="warn" className="mb-3">{staleWarn}</Notice>}
                     <div className="space-y-2">
                       {previewResult.items.map((it) => {
                         const alreadyLinked = (it.reason || '').startsWith('target_already_linked')
                         return (
-                        <div key={it.linkId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
+                        <div key={it.linkId} className="rounded-inset border border-line px-4 py-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium text-slate-800 dark:text-slate-100 break-words">{it.anchorText || '—'}</span>
+                            <span className="text-copy font-medium text-ink break-words">{it.anchorText || '—'}</span>
                             <Badge variant={it.status === 'would_insert' || alreadyLinked ? 'success' : 'neutral'}>
                               {it.status === 'would_insert' ? t.statusWouldInsert : t.statusSkipped}
                             </Badge>
-                            <span className={`text-[11px] ${alreadyLinked ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{reasonLabel(it.reason)}</span>
+                            <span className="text-caption text-muted">{reasonLabel(it.reason)}</span>
                           </div>
-                          <a href={it.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-1 block text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{it.targetUrl}</a>
+                          <a href={it.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={it.targetUrl} className="mt-1 inline-flex max-w-64 items-center gap-1 text-caption text-muted hover:text-action hover:underline"><span className="truncate">{it.targetUrl}</span><ExternalLink aria-hidden="true" className="size-3.5 shrink-0" /></a>
                           {it.sentencePreview && (
-                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><span className="text-slate-400">{t.sentenceLabel}:</span> “{it.sentencePreview}”</p>
+                            <p className="mt-1 text-caption text-muted"><span className="text-muted">{t.sentenceLabel}:</span> “{it.sentencePreview}”</p>
                           )}
                           {it.checks && Object.keys(it.checks).length > 0 && (
-                            <details className="mt-1">
-                              <summary className="cursor-pointer select-none text-[10px] text-slate-400">{t.techDetails}</summary>
-                              <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                            <details className="group mt-2">
+                              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 rounded-control text-caption text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 [&::-webkit-details-marker]:hidden">
+                                {t.techDetails}
+                                <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 ease-snappy group-open:rotate-180" />
+                              </summary>
+                              <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-caption text-muted">
                                 {Object.entries(it.checks).map(([k, v]) => (
                                   <div key={k} className="flex items-center gap-1">
-                                    <span className={v ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}>{v ? '✓' : '✕'}</span>
+                                    {v
+                                      ? <Check aria-hidden="true" className="size-3.5 shrink-0 text-ok" />
+                                      : <Minus aria-hidden="true" className="size-3.5 shrink-0 text-muted" />}
+                                    <span className="sr-only">{String(!!v)}</span>
                                     <span dir="ltr">{k}</span>
                                   </div>
                                 ))}
@@ -537,13 +545,13 @@ export default function ArticleInternalLinkApplyPanel({
                         anchor text is missing from the draft body. Links that place
                         normally are shown above unchanged. */}
                     {missingAnchorItems.length > 0 && (
-                      <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
-                        <p className="text-sm text-amber-800 dark:text-amber-300">{t.reanchorExplain}</p>
-                        <p className="mt-1 text-[11px] text-amber-700/80 dark:text-amber-400/70">{t.reanchorGuidance}</p>
+                      <div className="mt-4 rounded-inset border border-line bg-sunk/60 p-4">
+                        <Notice tone="warn">{t.reanchorExplain}</Notice>
+                        <p className="mt-2 max-w-prose text-caption text-muted">{t.reanchorGuidance}</p>
 
                         {!reanchorLinks && (
                           <div className="mt-2">
-                            <Button size="sm" variant="outline" onClick={findReanchors} loading={reanchorLoading} disabled={reanchorLoading || applying || rollingBack}>
+                            <Button size="sm" variant="secondary" onClick={findReanchors} loading={reanchorLoading} disabled={reanchorLoading || applying || rollingBack}>
                               {reanchorLoading ? t.reanchorFinding : t.reanchorFind}
                             </Button>
                           </div>
@@ -557,51 +565,57 @@ export default function ArticleInternalLinkApplyPanel({
                           return (
                           <div className="mt-2 space-y-2">
                             {hasAnyAlternatives
-                              ? <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.reanchorSelectHint}</p>
-                              : <p className="text-[11px] text-slate-700 dark:text-slate-300">{t.reanchorNoneAll}</p>}
+                              ? <p className="text-caption text-muted">{t.reanchorSelectHint}</p>
+                              : <p className="text-caption text-body">{t.reanchorNoneAll}</p>}
                             {reanchorLinks.map((link) => (
-                              <div key={link.linkId} className="rounded-md border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/30 p-2">
-                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                                  <span className="text-slate-400">{t.reanchorOriginalLabel}:</span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-200 break-words">{link.originalAnchor || '—'}</span>
+                              <div key={link.linkId} className="rounded-inset border border-line bg-surface p-3">
+                                <div className="flex flex-wrap items-center gap-2 text-caption text-muted">
+                                  <span className="text-muted">{t.reanchorOriginalLabel}:</span>
+                                  <span className="font-medium text-body break-words">{link.originalAnchor || '—'}</span>
                                   {link.originalAnchor && (
-                                    <button type="button" onClick={() => copyAnchor(link.linkId, link.originalAnchor)} className="inline-flex items-center rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                                    <button type="button" onClick={() => copyAnchor(link.linkId, link.originalAnchor)} className="inline-flex h-7 items-center rounded-control border border-line px-2 text-caption text-muted transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
                                       {copiedAnchor === link.linkId ? t.reanchorCopied : t.reanchorCopy}
                                     </button>
                                   )}
                                 </div>
-                                <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-0.5 block text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetTitle || link.targetUrl}</a>
+                                <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" title={link.targetUrl} className="mt-1 block max-w-64 truncate text-caption text-muted hover:text-action hover:underline">{link.targetTitle || link.targetUrl}</a>
                                 {link.suggestions.length === 0 ? (
-                                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.reanchorNone}</p>
+                                  <p className="mt-1 text-caption text-muted">{t.reanchorNone}</p>
                                 ) : (
                                   <>
-                                    <div className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{t.reanchorSuggestLabel}</div>
-                                    <div className="mt-1 space-y-1">
-                                      {link.suggestions.map((s, i) => (
-                                        <label key={`${link.linkId}-${i}`} className="flex flex-wrap items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/60 p-1.5 text-[11px] cursor-pointer">
-                                          <input
-                                            type="radio"
-                                            name={`reanchor-${link.linkId}`}
-                                            checked={reanchorSel[link.linkId] === s.anchorText}
-                                            onChange={() => chooseReanchor(link.linkId, s.anchorText)}
-                                            disabled={reanchorApplying}
-                                            className="mt-0.5 accent-indigo-600"
-                                          />
-                                          <span className="flex-1 min-w-0">
-                                            <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{s.anchorText}</span>
-                                            {s.sentence && <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-slate-500">“{s.sentence}”</span>}
+                                    <div className="mt-1.5 text-caption font-medium text-muted">{t.reanchorSuggestLabel}</div>
+                                    <div role="radiogroup" aria-label={t.reanchorSuggestLabel} className="mt-1 space-y-1">
+                                      {link.suggestions.map((s, i) => {
+                                        const on = reanchorSel[link.linkId] === s.anchorText
+                                        return (
+                                        <button
+                                          key={`${link.linkId}-${i}`}
+                                          type="button"
+                                          role="radio"
+                                          aria-checked={on}
+                                          onClick={() => chooseReanchor(link.linkId, s.anchorText)}
+                                          disabled={reanchorApplying}
+                                          className={`flex w-full items-start gap-2 rounded-control border px-3 py-2 text-start text-caption transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:cursor-not-allowed disabled:opacity-50 ${on ? 'border-action bg-action-soft' : 'border-line bg-sunk/60 hover:border-line-strong'}`}
+                                        >
+                                          {on
+                                            ? <CircleDot aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-action" />
+                                            : <Circle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />}
+                                          <span className="min-w-0 flex-1">
+                                            <span className="font-medium text-ink break-words">{s.anchorText}</span>
+                                            {s.sentence && <span className="mt-0.5 block text-caption text-muted">“{s.sentence}”</span>}
                                           </span>
-                                        </label>
-                                      ))}
+                                        </button>
+                                        )
+                                      })}
                                     </div>
                                   </>
                                 )}
                               </div>
                             ))}
-                            <p className="text-[11px] text-slate-400 dark:text-slate-500">{t.reanchorFutureNote}</p>
+                            <p className="max-w-prose text-caption text-muted">{t.reanchorFutureNote}</p>
                             {hasAnyAlternatives && (
                               <div>
-                                <Button size="sm" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
+                                <Button size="sm" variant="secondary" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
                                   {reanchorApplying ? t.reanchorApproving : t.reanchorApprove}
                                 </Button>
                               </div>
@@ -618,6 +632,7 @@ export default function ArticleInternalLinkApplyPanel({
           </div>
         )}
       </div>
+      {confirmDialog}
     </Card>
   )
 }

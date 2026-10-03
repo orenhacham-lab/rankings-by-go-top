@@ -1,32 +1,44 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
+import GoTopMark from '@/components/brand/GoTopMark'
+import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
+import { useWaiting } from '@/components/nudges/useWaiting'
+import { pillText, railCounts } from '@/lib/nudges/rows'
+import { NAV_DRAWER_EVENT, type NavDrawerRequest } from '@/lib/shell/nav-drawer'
 import type { LucideIcon } from 'lucide-react'
 import {
-  BarChart3,
-  KeyRound,
-  Sparkles,
-  Search,
+  LayoutGrid,
+  Telescope,
+  TrendingUp,
+  CalendarRange,
   FileText,
+  Sparkles,
+  FileChartColumn,
+  Gauge,
+  Settings2,
   CreditCard,
+  Newspaper,
   Plug,
   ClipboardList,
   LogOut,
-  MessageCircle,
-  Lightbulb,
-  Newspaper,
-  Settings,
-  Target,
-  CalendarClock,
+  Library,
+  Menu,
+  X,
+  Waypoints,
+  MapPinned,
 } from 'lucide-react'
 import {
+  CONTENT_ROOT_PATH,
+  CONTENT_STRATEGY_PATH,
   CONTENT_SCREENS,
   isContentScreenEnabled,
   type ContentScreenKey,
@@ -54,15 +66,21 @@ type NavGroup = {
   items: readonly NavItem[]
 }
 
+/**
+ * Every nav icon is drawn the same way (UX review, decision 3): 20px, a 1.75
+ * stroke that scales with the icon. Inline icons elsewhere are 16px at 2.
+ */
+export const NAV_ICON = { size: 20, strokeWidth: 1.75, absoluteStrokeWidth: false } as const
+
 /** Read as literal member expressions, which is what lets Next inline them. */
 const CONTENT_FLAGS = {
   NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION: process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION,
 }
 
 const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
-  articles: Newspaper,
-  topics: Target,
-  automation: CalendarClock,
+  strategy: CalendarRange,
+  articles: FileText,
+  existing: Library,
 }
 
 /**
@@ -73,6 +91,9 @@ const CONTENT_SCREEN_ICONS: Record<ContentScreenKey, LucideIcon> = {
  * sidebar, found a hub, and had to open it to learn what was inside. The entries are
  * DERIVED from the same CONTENT_SCREENS declaration the routes and the guards read,
  * so the sidebar cannot list a screen that has no page, or miss one that does.
+ *
+ * "Topics" and "automation" were two entries; they are one now, "content strategy",
+ * first, because what will be written comes before what was.
  *
  * Gated by the build-time content flag, exactly as the one hub entry was; each screen
  * is additionally subject to its own flag, so a screen hidden on its route is hidden
@@ -103,58 +124,75 @@ const aiVisibilityNavItems: readonly NavItem[] =
  * "what am I paying". A new screen joins the group that matches its
  * question — it does not get appended to the end.
  *
- * Desktop renders the group headings. Mobile deliberately does not: the nav
- * there is a two-column grid of tiles, where four headings would cost more
- * vertical space than the tiles they label. The order is identical in both,
- * so the grouping still governs what sits next to what.
+ * The desktop rail and the phone drawer render the same groups, with the same
+ * headings, in the same order.
+ *
+ * There is no Scans entry: its history is a section of Keywords and of Reports
+ * (UX review, decision 5), and /scans redirects there.
  */
+/**
+ * Posts on Google Maps (lib/gbp), behind the same build-time mirror of the server
+ * flag. Off everywhere until Google approves API access; the page itself 404s
+ * without GBP_POSTS_ENABLED, so the entry never leads to nothing.
+ */
+const mapsPostsNavItems: readonly NavItem[] =
+  process.env.NEXT_PUBLIC_GBP_POSTS_ENABLED === 'true'
+    ? [{ href: '/maps-posts', labelKey: 'mapsPosts', icon: MapPinned }]
+    : []
+
 const navGroupKeys: readonly NavGroup[] = [
   {
     groupKey: 'groupMain',
     items: [
-      { href: '/dashboard', labelKey: 'dashboard', icon: BarChart3 },
+      { href: '/dashboard', labelKey: 'dashboard', icon: LayoutGrid },
     ],
   },
   {
     groupKey: 'groupResearch',
     items: [
-      { href: '/keyword-research', labelKey: 'keywordResearch', icon: Lightbulb, onboarding: 'keyword-research' },
-      { href: '/keywords', labelKey: 'keywords', icon: KeyRound },
+      { href: '/keyword-research', labelKey: 'keywordResearch', icon: Telescope, onboarding: 'keyword-research' },
+      { href: '/keywords', labelKey: 'keywords', icon: TrendingUp },
       ...contentNavItems,
+      { href: '/site-links', labelKey: 'siteLinks', icon: Waypoints },
+      ...mapsPostsNavItems,
     ],
   },
   {
     groupKey: 'groupMonitoring',
     items: [
       ...aiVisibilityNavItems,
-      { href: '/scans', labelKey: 'scans', icon: Search },
-      { href: '/reports', labelKey: 'reports', icon: FileText, onboarding: 'reports' },
+      // Site health: the site's own technical state (lib/site-health). A gauge, for
+      // the score it leads with.
+      { href: '/site-health', labelKey: 'siteHealth', icon: Gauge },
+      { href: '/reports', labelKey: 'reports', icon: FileChartColumn, onboarding: 'reports' },
     ],
   },
   {
     groupKey: 'groupAccount',
     items: [
-      { href: '/settings', labelKey: 'projectSettings', icon: Settings },
+      { href: '/settings', labelKey: 'projectSettings', icon: Settings2 },
       { href: '/billing', labelKey: 'billing', icon: CreditCard },
     ],
   },
 ]
 
-/** Flattened in group order — what the mobile grid renders, and what a guard can
- *  assert the active-entry resolution against. */
+/** Flattened in group order — what a guard can assert the active-entry resolution against. */
 export const navItemKeys = navGroupKeys.flatMap((g) => g.items)
 
-const adminItemKeys = [
-  { href: '/admin/articles', labelKey: 'articleManagement' as const, icon: FileText },
-  { href: '/setup', labelKey: 'connectionStatus' as const, icon: Plug },
-  { href: '/admin/logs', labelKey: 'errorLogs' as const, icon: ClipboardList },
+const adminItemKeys: readonly NavItem[] = [
+  { href: '/admin/articles', labelKey: 'articleManagement', icon: Newspaper },
+  { href: '/setup', labelKey: 'connectionStatus', icon: Plug },
+  { href: '/admin/logs', labelKey: 'errorLogs', icon: ClipboardList },
 ]
+
+/** The administrator's entries, for the tab title (components/layout/DocumentTitle.tsx). */
+export const adminNavItems = adminItemKeys
 
 /**
  * The entry that owns a pathname: the LONGEST matching href wins.
  *
  * With the content screens promoted to entries of their own, /content is a prefix of
- * /content/topics — a plain prefix test would light up two entries at once. The
+ * /content/strategy — a plain prefix test would light up two entries at once. The
  * article editor at /content/articles/<id> has no entry, and correctly lights up the
  * articles entry it was opened from.
  */
@@ -173,12 +211,19 @@ function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem
   return dict.sidebar[item.labelKey]
 }
 
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus focus-visible:ring-offset-2 focus-visible:ring-offset-rail'
+
 /**
- * One nav entry, shared by the mobile grid and the desktop groups so the two
- * cannot drift apart. The tile shape (stacked icon over label) is the mobile
- * presentation; `md:` restores the row shape used in the sidebar proper.
+ * One nav entry, shared by the desktop rail and the phone drawer so the two
+ * cannot drift apart.
+ *
+ * The active entry is FILLED with the action blue, white icon and text (UX
+ * review, decision 2). On the desktop rail the fill is one element that slides
+ * between entries (the pill below); until it has measured itself, and in the
+ * drawer, the entry carries the fill itself. Inactive entries: muted icon, text
+ * white at 86%.
  */
-function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; label: string }) {
+function NavLink({ item, isActive, label, count = 0, countLabel }: { item: NavItem; isActive: boolean; label: string; count?: number; countLabel?: string }) {
   const IconComponent = item.icon
   return (
     <Link
@@ -186,21 +231,90 @@ function NavLink({ item, isActive, label }: { item: NavItem; isActive: boolean; 
       data-onboarding={item.onboarding}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors duration-150 text-center md:text-start leading-tight break-words',
+        'group relative flex h-9 w-full min-w-0 items-center gap-3 rounded-control px-3 text-copy',
+        'transition-[background-color,color] duration-150 ease-snappy',
+        FOCUS_RING,
         isActive
-          ? 'bg-indigo-600 dark:bg-indigo-600 text-white'
-          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
+          ? 'bg-rail-active font-semibold text-rail-active-ink group-data-[pill=on]/nav:bg-transparent'
+          : 'font-medium text-rail-ink/86 hover:bg-rail-hover hover:text-rail-ink'
       )}
     >
       <IconComponent
-        size={18}
+        {...NAV_ICON}
+        aria-hidden="true"
         className={cn(
-          'shrink-0 transition-colors',
-          isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+          'shrink-0 transition-[color,transform] duration-200 ease-snappy motion-safe:group-hover:-translate-y-px',
+          isActive ? 'text-rail-active-ink' : 'text-rail-muted group-hover:text-rail-ink'
         )}
-        strokeWidth={2}
       />
-      <span>{label}</span>
+      <span className="min-w-0 truncate">{label}</span>
+      {count > 0 && (
+        // What waits on this screen: hidden at 0 (lib/nudges/rows.ts), read by a screen reader as its own words.
+        <span
+          data-nav-count={count}
+          aria-label={countLabel}
+          className={cn(
+            'ms-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-pill bg-rail-ink px-1.5 text-overline font-semibold tabular-nums',
+            isActive ? 'text-rail-active' : 'text-rail'
+          )}
+        >
+          {pillText(count)}
+        </span>
+      )}
+    </Link>
+  )
+}
+
+/** The groups under their headings: the same list for the rail and the drawer. */
+function NavGroups({ dict, activeHref, isAdmin, counts }: {
+  dict: ReturnType<typeof getDashboardDictionary>
+  activeHref: string | null
+  isAdmin: boolean
+  /** How many things wait on each entry's screen, by href; absent or 0 draws nothing. */
+  counts: Readonly<Record<string, number>>
+}) {
+  const groups: { key: SidebarLabelKey; items: readonly NavItem[] }[] = [
+    ...navGroupKeys.map((g) => ({ key: g.groupKey, items: g.items })),
+    ...(isAdmin ? [{ key: 'system' as SidebarLabelKey, items: adminItemKeys }] : []),
+  ]
+  return (
+    <>
+      {groups.map((group) => (
+        group.items.length === 0 ? null : (
+          <div key={group.key}>
+            <p className="mb-1.5 px-3 text-overline font-semibold text-rail-section ltr:uppercase ltr:tracking-wider">
+              {dict.sidebar[group.key]}
+            </p>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => (
+                <li key={item.href}>
+                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} count={counts[item.href] ?? 0} countLabel={dict.railWaiting.aria(counts[item.href] ?? 0)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      ))}
+    </>
+  )
+}
+
+/**
+ * The mark and the product name (UX review, decision 1): the light-blue Go Top
+ * mark as inline SVG at 28px, 10px from a two-line wordmark. The name is the
+ * brand, in Latin, in both languages.
+ */
+function Brand({ logoAlt }: { logoAlt: string }) {
+  return (
+    <Link
+      href="/dashboard"
+      className={cn('flex min-w-0 items-center gap-2.5 rounded-control', FOCUS_RING)}
+    >
+      <GoTopMark size={28} label={logoAlt} className="shrink-0" />
+      <span className="flex min-w-0 flex-col" dir="ltr">
+        <span className="text-lead font-semibold leading-5 text-rail-ink">Go Top</span>
+        <span className="text-overline font-medium text-rail-tagline">SEO</span>
+      </span>
     </Link>
   )
 }
@@ -209,166 +323,222 @@ interface SidebarProps {
   isAdmin?: boolean
 }
 
+const WHATSAPP_SUPPORT =
+  'https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94'
+
+const QUIET_ROW = cn(
+  'group flex h-9 w-full items-center gap-3 rounded-control px-3 text-copy font-medium text-rail-ink/86 transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink',
+  FOCUS_RING
+)
+
+/** Support, the two preferences and logout: the same foot on the rail and in the drawer. */
+function RailFoot({ dict, isAdmin }: { dict: ReturnType<typeof getDashboardDictionary>; isAdmin: boolean }) {
+  return (
+    <div className="space-y-2">
+      {!isAdmin && (
+        <a
+          href={WHATSAPP_SUPPORT}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={dict.sidebar.supportAria}
+          data-support="whatsapp"
+          className={QUIET_ROW}
+        >
+          <WhatsAppGlyph size={NAV_ICON.size} className="shrink-0 text-rail-muted transition-colors duration-150 group-hover:text-whatsapp" />
+          <span>{dict.sidebar.support}</span>
+        </a>
+      )}
+      <div className="grid grid-cols-2 gap-2 px-1">
+        <DashboardLanguageSwitcher />
+        <ThemeToggle />
+      </div>
+      <form action="/api/auth/signout" method="post">
+        <button type="submit" className={QUIET_ROW}>
+          <LogOut {...NAV_ICON} aria-hidden="true" className="shrink-0 text-rail-muted group-hover:text-rail-ink" />
+          <span>{dict.common.logout}</span>
+        </button>
+      </form>
+    </div>
+  )
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
-  const activeHref = activeNavHref(pathname ?? '', navItemKeys)
+  const activeHref = activeNavHref(pathname, isAdmin ? [...navItemKeys, ...adminItemKeys] : navItemKeys)
+
+  // Count pills: what waits for the owner of the active project (the dashboard card's own
+  // read, so the two agree). Asked again when the screen changes; a failure draws nothing.
+  const { activeProjectId } = useActiveProject()
+  const { waiting, safeFixes } = useWaiting(activeProjectId, pathname)
+  const rail = railCounts(waiting, safeFixes)
+  const counts: Record<string, number> = {
+    [CONTENT_ROOT_PATH]: rail.articles,
+    [CONTENT_STRATEGY_PATH]: rail.strategy,
+    '/site-health': rail.siteHealth,
+  }
+
+  // Phones: the nav is a drawer behind one button. It is open AT a pathname:
+  // navigating anywhere closes it without an effect, because the pathname it was
+  // opened at is no longer the current one.
+  const [menuOpenAt, setMenuOpenAt] = useState<string | null>(null)
+  const menuOpen = menuOpenAt !== null && menuOpenAt === pathname
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const wasOpenRef = useRef(false)
+  // Opened or closed by the guided tour (lib/shell/nav-drawer.ts): focus stays in
+  // the tour's bubble instead of moving into the drawer and back to the button.
+  const tourDrivenRef = useRef(false)
+
+  useEffect(() => {
+    const onRequest = (e: Event) => {
+      const { open, restoreFocus } = (e as CustomEvent<NavDrawerRequest>).detail ?? { open: false, restoreFocus: true }
+      tourDrivenRef.current = !restoreFocus
+      setMenuOpenAt(open ? pathname : null)
+    }
+    window.addEventListener(NAV_DRAWER_EVENT, onRequest)
+    return () => window.removeEventListener(NAV_DRAWER_EVENT, onRequest)
+  }, [pathname])
+
+  // The drawer is modal: focus moves into it, the page behind does not scroll,
+  // and when it closes focus returns to the button that opened it.
+  useEffect(() => {
+    if (menuOpen) {
+      if (!tourDrivenRef.current) drawerRef.current?.querySelector<HTMLElement>('[data-drawer-close]')?.focus()
+      const root = document.documentElement
+      const previous = root.style.overflow
+      root.style.overflow = 'hidden'
+      wasOpenRef.current = true
+      return () => { root.style.overflow = previous }
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false
+      if (!tourDrivenRef.current) menuButtonRef.current?.focus()
+    }
+  }, [menuOpen])
+
+  /** Escape closes; Tab and Shift+Tab stay inside the drawer. */
+  function onDrawerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setMenuOpenAt(null)
+      return
+    }
+    if (e.key !== 'Tab' || !drawerRef.current) return
+    const items = [...drawerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null)
+    if (items.length === 0) return
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  }
+
+  // The desktop rail's active fill is ONE element that slides between entries
+  // (200ms). It is placed from the DOM, not from state: no re-render, and the
+  // first placement jumps instead of sliding in from the top.
+  const railRef = useRef<HTMLDivElement>(null)
+  const pillRef = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const rail = railRef.current
+    const pill = pillRef.current
+    if (!rail || !pill) return
+    const active = rail.querySelector<HTMLElement>('a[aria-current="page"]')
+    if (!active || active.offsetHeight === 0) {
+      rail.dataset.pill = 'off'
+      return
+    }
+    pill.style.height = `${active.offsetHeight}px`
+    pill.style.transform = `translateY(${active.offsetTop}px)`
+    rail.dataset.pill = 'on'
+    const frame = requestAnimationFrame(() => { pill.dataset.slide = 'on' })
+    return () => cancelAnimationFrame(frame)
+  }, [activeHref, isAdmin, language])
 
   return (
-    <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
-      {/* Logo */}
-      <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 md:gap-1.5">
-        {/* Logo beside the wordmark, on both surfaces. */}
-        <div className="flex items-center justify-center gap-2 w-full">
-          <div className="flex items-center justify-center flex-shrink-0">
-            <Image
-              src="/gotop-primary.png"
-              alt="Go Top logo"
-              width={140}
-              height={56}
-              className="block dark:hidden w-[51px] md:w-[93px] h-auto object-contain"
-              sizes="(max-width: 768px) 51px, 93px"
-              priority
-            />
-            <Image
-              src="/gotop-dark-transparent.png"
-              alt="Go Top logo"
-              width={140}
-              height={56}
-              className="hidden dark:block w-[51px] md:w-[93px] h-auto object-contain"
-              sizes="(max-width: 768px) 51px, 93px"
-              priority
-            />
-          </div>
-
-          <div className="text-center md:text-center">
-            <div className="font-semibold text-slate-800 dark:text-slate-100 text-xs md:text-sm leading-tight">Rankings by</div>
-            <div className="font-bold text-blue-600 dark:text-blue-300 text-sm md:text-base leading-tight">Go Top</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Language Switcher - Desktop */}
-      <div className="hidden md:block border-b border-slate-200 dark:border-slate-800">
-        <DashboardLanguageSwitcher />
-      </div>
-
-      {/* Language Switcher - Mobile (uses same DashboardLanguageProvider state) */}
-      <div className="block md:hidden border-b border-slate-200 dark:border-slate-800">
-        <DashboardLanguageSwitcher />
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
-        {/* Mobile: one flat two-column grid of tiles, logout included. */}
-        <ul className="grid grid-cols-2 gap-2 w-full md:hidden">
-          {navItemKeys.map((item) => (
-            <li key={item.href}>
-              <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
-            </li>
-          ))}
-
-          {/* Mobile logout button - appears in grid next to the last nav tile */}
-          <li>
-            <form action="/api/auth/signout" method="post" className="w-full h-full">
-              <button
-                type="submit"
-                className={cn(
-                  'group w-full min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-colors duration-150 text-center leading-tight break-words',
-                  'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
-                )}
-              >
-                <LogOut size={18} className="text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 shrink-0 transition-colors" strokeWidth={2} />
-                <span>{dict.common.logout}</span>
-              </button>
-            </form>
-          </li>
-        </ul>
-
-        {/* Desktop: the same order, split under its group headings. */}
-        <div className="hidden md:block space-y-2">
-          {navGroupKeys.map((group) => (
-            group.items.length === 0 ? null : (
-              <div key={group.groupKey}>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 px-3 mb-1">
-                  {dict.sidebar[group.groupKey]}
-                </p>
-                <ul className="space-y-1">
-                  {group.items.map((item) => (
-                    <li key={item.href}>
-                      <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          ))}
-        </div>
-      </nav>
-
-      {/* Admin section — only shown to admins */}
-      {isAdmin && (
-        <div className="px-3 pb-3 hidden md:block">
-          <p className="text-xs font-medium text-slate-400 dark:text-slate-400 px-3 mb-1">{dict.sidebar.system}</p>
-          <ul className="space-y-1">
-            {adminItemKeys.map((item) => {
-              const IconComponent = item.icon
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              const label = dict.sidebar[item.labelKey]
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                      isActive
-                        ? 'bg-indigo-600 dark:bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
-                    )}
-                  >
-                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
-                    <span>{label}</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* Support link — shown to non-admins */}
-      {!isAdmin && (
-        <div className="px-3 pb-3 hidden md:block">
-          <a
-            href="https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-          >
-            <MessageCircle size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
-            <span>{dict.sidebar.support}</span>
-          </a>
-        </div>
-      )}
-
-      {/* Footer - Mobile only */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-700 block md:hidden">
-        <ThemeToggle />
-      </div>
-
-      {/* Footer - Desktop only */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-700 hidden md:block space-y-2">
-        <ThemeToggle />
-        <form action="/api/auth/signout" method="post">
+    // On a phone the rail takes no height of its own: it is a zero-height strip
+    // that sticks to the top, and its one visible control, the menu button, sits
+    // at the start of the top bar's row (which leaves room for it), so the phone
+    // has ONE 56px bar instead of a navy brand bar above the top bar.
+    <aside className="sticky top-0 z-40 h-0 w-full text-rail-ink md:relative md:h-auto md:w-64 md:shrink-0 md:border-e md:border-rail-line md:bg-rail">
+      <div className="flex flex-col md:sticky md:top-0 md:h-dvh">
+        {/* Brand — 64px on the rail. On a phone only the menu button, in the top bar's row. */}
+        <div className="absolute start-0 top-0 flex h-14 shrink-0 items-center ps-3 md:static md:h-16 md:justify-between md:gap-3 md:px-4">
+          <span className="hidden md:contents"><Brand logoAlt={dict.sidebar.logoAlt} /></span>
           <button
-            type="submit"
-            className="w-full text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center justify-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            ref={menuButtonRef}
+            type="button"
+            onClick={() => setMenuOpenAt(pathname)}
+            aria-expanded={menuOpen}
+            aria-controls="app-nav-drawer"
+            aria-haspopup="dialog"
+            aria-label={dict.sidebar.openMenu}
+            data-nav-menu-button=""
+            className="inline-flex size-10 items-center justify-center rounded-control border border-line bg-surface text-ink shadow-card transition-colors hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action md:hidden"
           >
-            <LogOut size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
-            <span>{dict.common.logout}</span>
+            <Menu size={NAV_ICON.size} strokeWidth={NAV_ICON.strokeWidth} aria-hidden="true" />
           </button>
-        </form>
+        </div>
+
+        {/* Phones: a drawer from the logical start (the right in Hebrew), over a
+            navy scrim, with the rail's groups, support, the preferences and logout. */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div aria-hidden="true" data-drawer-scrim="" onClick={() => setMenuOpenAt(null)} className="scrim-in absolute inset-0 bg-scrim" />
+            <div
+              ref={drawerRef}
+              id="app-nav-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={dict.sidebar.navLabel}
+              onKeyDown={onDrawerKeyDown}
+              className="drawer-start absolute inset-y-0 start-0 flex w-[85vw] max-w-[22rem] flex-col bg-rail text-rail-ink shadow-pop"
+            >
+              <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-rail-line px-4">
+                <Brand logoAlt={dict.sidebar.logoAlt} />
+                <button
+                  type="button"
+                  data-drawer-close=""
+                  onClick={() => setMenuOpenAt(null)}
+                  aria-label={dict.sidebar.closeMenu}
+                  className={cn('inline-flex size-10 items-center justify-center rounded-control text-rail-ink transition-colors hover:bg-rail-hover', FOCUS_RING)}
+                >
+                  <X size={NAV_ICON.size} strokeWidth={NAV_ICON.strokeWidth} aria-hidden="true" />
+                </button>
+              </div>
+              <nav aria-label={dict.sidebar.navLabel} className="flex-1 overflow-y-auto px-3 py-4">
+                <div className="space-y-5">
+                  <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
+                </div>
+              </nav>
+              <div className="shrink-0 border-t border-rail-line px-3 py-3">
+                <RailFoot dict={dict} isAdmin={isAdmin} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop: the same groups, with the sliding active fill behind them. */}
+        <nav aria-label={dict.sidebar.navLabel} className="hidden flex-1 overflow-y-auto px-3 py-4 md:block">
+          <div ref={railRef} data-pill="off" className="group/nav relative space-y-5">
+            <span
+              ref={pillRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 hidden rounded-control bg-[linear-gradient(90deg,var(--color-rail-active),color-mix(in_srgb,var(--color-rail-active)_78%,var(--color-brand)))] shadow-glow ring-1 ring-inset ring-rail-ink/10 group-data-[pill=on]/nav:block data-[slide=on]:transition-[transform,height] data-[slide=on]:duration-300 data-[slide=on]:ease-spring motion-reduce:transition-none"
+            >
+              {/* A lit edge on the pill's start side, so the active entry reads at a glance. */}
+              <span className="absolute inset-y-2 start-0 w-[3px] rounded-pill bg-rail-tagline" />
+            </span>
+            <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
+          </div>
+        </nav>
+
+        {/* Desktop foot: support, then the two preferences, then logout. */}
+        <div className="hidden shrink-0 border-t border-rail-line px-3 py-3 md:block">
+          <RailFoot dict={dict} isAdmin={isAdmin} />
+        </div>
       </div>
     </aside>
   )

@@ -10,16 +10,27 @@
  *
  * Secrets never reach this component: the server returns only sanitized connection
  * metadata (status/scope) and precomputed metrics — never a token.
+ *
+ * Drawn like the settings screen's platform card (an icon tile, the name, one
+ * line of what it is for, the one action beside it), with the design tokens;
+ * what it does is unchanged.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search as SearchIcon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Loader2, Search as SearchIcon, X } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscMetricsTable from '@/components/content/GscMetricsTable'
+import { useGscEnabled } from '@/components/gsc/GscFeature'
+import { gscStatusUrl, peekGscResponse, readGscResponse, type GscResponse } from '@/components/gsc/gsc-data'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { gscStatusView } from '@/lib/gsc/widget-state'
 import { AUTO_SYNC_MIN_INTERVAL_DAYS } from '@/lib/gsc/auto-sync'
 import { formatDateTime } from '@/lib/utils'
 
@@ -28,18 +39,43 @@ interface SanitizedConnection { id: string; status: ConnStatus; grantedScope: st
 interface AssignedProperty { siteUrl: string; permissionLevel: string | null; selectedAt: string }
 // The read-only metrics view (windows summary + table) lives in GscMetricsTable now.
 // `windows` is still read here for Area A's last-sync / next-eligible derivation.
-interface StatusResponse { ok: boolean; oauthConfigured: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null> }
+interface StatusResponse { ok: boolean; oauthConfigured: boolean; /** Server says the viewer is an administrator and may read why. */ opsDetail?: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null>; /** A sync running now / the latest one's failure (code only). */ sync?: { running: boolean; lastFailure: { code: string; at: string | null } | null } | null }
 
 interface PropertyView { siteUrl: string; permissionLevel: string; kind: 'domain' | 'url_prefix'; covers: boolean; assignable: boolean }
 
 type Dict = ReturnType<typeof getDashboardDictionary>['projectDetail']['contentSection']['gsc']
 
+/** The status route's answer, as the panel needs it: the body only when the route
+ *  really answered; switched off and failed reads are their own states. */
+type PanelRead = { kind: 'loading' } | { kind: 'disabled' } | { kind: 'error' } | { kind: 'ready'; status: StatusResponse }
+function panelRead(response: GscResponse | undefined): PanelRead {
+  if (!response) return { kind: 'loading' }
+  const view = gscStatusView(response.status, response.body)
+  if (view.state === 'disabled') return { kind: 'disabled' }
+  if (view.state === 'error') return { kind: 'error' }
+  return { kind: 'ready', status: response.body as StatusResponse }
+}
+
 export default function GscPanel({ projectId, connectOrigin = 'project' }: { projectId: string; connectOrigin?: 'hub' | 'project' }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
+  // In-app questions (never window.confirm): both disconnects are destructive, so danger.
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
-  const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<StatusResponse | null>(null)
+  // What the status route answered, decided once (lib/gsc/widget-state): the panel
+  // draws "not connected" only from an answer that says so. Read through the same
+  // shared request as every Search Console widget, so when the screen already asked,
+  // the first render has the answer.
+  const gscEnabled = useGscEnabled()
+  const statusUrl = gscStatusUrl(projectId)
+  const [initial] = useState(() => panelRead(peekGscResponse(statusUrl)))
+  const [loading, setLoading] = useState(initial.kind === 'loading')
+  const [status, setStatus] = useState<StatusResponse | null>(initial.kind === 'ready' ? initial.status : null)
+  // 'disabled': Search Console switched off on the server (nothing to offer);
+  // 'error': the status could not be read (never drawn as "not connected").
+  const [unavailable, setUnavailable] = useState<'disabled' | 'error' | null>(
+    initial.kind === 'disabled' || initial.kind === 'error' ? initial.kind : null,
+  )
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   const [connecting, setConnecting] = useState(false)
@@ -51,6 +87,12 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   const [properties, setProperties] = useState<PropertyView[] | null>(null)
   const [loadingProps, setLoadingProps] = useState(false)
   const [assigning, setAssigning] = useState<string | null>(null)
+  // The sync starts by itself on the server once a property is linked (after connecting, or
+  // after choosing one). While we are waiting for it to show up, the screen polls the status.
+  const [awaitingAuto, setAwaitingAuto] = useState(false)
+  const waitStart = useRef(0)
+  const wasRunning = useRef(false)
+  const beginAwaiting = useCallback(() => { waitStart.current = Date.now(); setAwaitingAuto(true) }, [])
   // Bumped after a sync / property change to force GscMetricsTable to re-fetch.
   const [dataRefresh, setDataRefresh] = useState(0)
 
@@ -59,16 +101,20 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     return (t.errors as Record<string, string>)[code] ?? t.genericError
   }, [t])
 
-  const loadStatus = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/gsc/status?projectId=${projectId}`)
-      if (res.status === 404) { setStatus(null); return }
-      const data = (await res.json()) as StatusResponse
-      setStatus(data)
-    } catch { /* leave prior state */ } finally { setLoading(false) }
-  }, [projectId])
+  const loadStatus = useCallback(async (fresh = true) => {
+    // Search Console is off on this server: the route answers 404, so do not ask.
+    if (gscEnabled === false) { setStatus(null); setUnavailable('disabled'); setLoading(false); return }
+    const read = panelRead(await readGscResponse(statusUrl, fresh))
+    if (read.kind === 'ready') { setStatus(read.status); setUnavailable(null) }
+    else if (read.kind === 'disabled') { setStatus(null); setUnavailable('disabled') }
+    // A re-read that failed keeps what is on screen; a first one says it failed.
+    else setUnavailable((was) => (statusRef.current ? was : 'error'))
+    setLoading(false)
+  }, [statusUrl, gscEnabled])
+  const statusRef = useRef(status)
+  statusRef.current = status
 
-  useEffect(() => { loadStatus() }, [loadStatus])
+  useEffect(() => { if (initial.kind === 'loading' || gscEnabled === false) void loadStatus(false) }, [loadStatus, initial.kind, gscEnabled])
 
   // Surface the OAuth callback result (?gsc / ?gsc_error), then strip the params so a
   // refresh doesn't re-show the banner.
@@ -76,7 +122,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     const sp = new URLSearchParams(window.location.search)
     const ok = sp.get('gsc')
     const err = sp.get('gsc_error')
-    if (ok === 'connected') setMessage({ text: t.statusConnected, ok: true })
+    if (ok === 'connected') { setMessage({ text: t.statusConnected, ok: true }); beginAwaiting() }
     else if (err) setMessage({ text: errText(err), ok: false })
     if (ok || err) {
       sp.delete('gsc'); sp.delete('gsc_error')
@@ -104,6 +150,42 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     () => (lastSyncedAt ? new Date(Date.parse(lastSyncedAt) + AUTO_SYNC_MIN_INTERVAL_DAYS * 24 * 60 * 60 * 1000).toISOString() : null),
     [lastSyncedAt],
   )
+
+  const sync = status?.sync ?? null
+  const syncFailure = sync?.lastFailure && (!lastSyncedAt || (sync.lastFailure.at && Date.parse(sync.lastFailure.at) > Date.parse(lastSyncedAt))) ? sync.lastFailure : null
+  // Shown while the server runs a sync, or while the one that starts by itself has not
+  // produced anything yet (it begins a moment after the property is linked).
+  const syncRunning = !!sync?.running || (awaitingAuto && !!property && !lastSyncedAt && !syncFailure)
+  const autoLinking = awaitingAuto && !!status && !property
+
+  // Poll the status while a sync is running or expected, until it shows data or fails.
+  useEffect(() => {
+    if (!sync?.running && !awaitingAuto) return
+    const id = window.setInterval(() => {
+      if (!sync?.running && Date.now() - waitStart.current > 120_000) { setAwaitingAuto(false); return }
+      void loadStatus(true)
+    }, 3000)
+    return () => window.clearInterval(id)
+  }, [sync?.running, awaitingAuto, loadStatus])
+
+  // A sync that was running has finished: show its data (or its failure, below).
+  useEffect(() => {
+    if (sync?.running) { wasRunning.current = true; return }
+    if (wasRunning.current && sync) {
+      wasRunning.current = false
+      setAwaitingAuto(false)
+      setDataRefresh((k) => k + 1)
+      if (!sync.lastFailure) setMessage({ text: t.autoSyncDone, ok: true })
+    }
+  }, [sync, t])
+
+  // Stop waiting once there is something to show (data or a failure), or when no property
+  // could be linked on its own (the user then chooses one, which starts the sync).
+  useEffect(() => {
+    if (!awaitingAuto || !status || sync?.running) return
+    if (property && (lastSyncedAt || syncFailure)) { setAwaitingAuto(false); setDataRefresh((k) => k + 1); return }
+    if (!property && Date.now() - waitStart.current > 20_000) setAwaitingAuto(false)
+  }, [awaitingAuto, status, property, sync, lastSyncedAt, syncFailure])
 
   async function handleConnect() {
     setConnecting(true); setMessage(null)
@@ -135,7 +217,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     try {
       const res = await fetch('/api/gsc/property', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, siteUrl: view.siteUrl }) })
       const data = await res.json()
-      if (data.ok) { setPickerOpen(false); await loadStatus(); setDataRefresh((k) => k + 1) }
+      if (data.ok) { setPickerOpen(false); beginAwaiting(); await loadStatus(); setDataRefresh((k) => k + 1) }
       else setMessage({ text: errText(data.error), ok: false })
     } catch { setMessage({ text: t.genericError, ok: false }) } finally { setAssigning(null) }
   }
@@ -143,7 +225,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   // Normal project-level disconnect: removes ONLY this project's property assignment.
   // Historical metrics and the shared Google connection are preserved.
   async function handleUnassign() {
-    if (!window.confirm(t.unassignConfirm)) return
+    if (!(await confirm({ title: t.unassignConfirmTitle, body: t.unassignConfirmBody, confirmLabel: t.revoke, tone: 'danger' }))) return
     setUnassigning(true); setMessage(null)
     try {
       const res = await fetch(`/api/gsc/property?projectId=${projectId}`, { method: 'DELETE' })
@@ -171,7 +253,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   // GLOBAL, destructive: revokes the user's Google authorization for the WHOLE account.
   // Fails closed (409 connection_in_use) while any project still uses the connection.
   async function handleGlobalRevoke() {
-    if (!window.confirm(t.confirmRevoke)) return
+    if (!(await confirm({ title: t.confirmRevokeTitle, body: t.confirmRevokeBody, confirmLabel: t.confirmRevokeAction, tone: 'danger' }))) return
     setRevoking(true); setMessage(null)
     try {
       const res = await fetch(`/api/gsc/connection?projectId=${projectId}`, { method: 'DELETE' })
@@ -190,48 +272,67 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
     return <Badge variant="danger">{t.statusError}</Badge>
   }
 
+  // Switched off on the server: like every Search Console widget, nothing at all.
+  if (unavailable === 'disabled' || gscEnabled === false) return null
+
   return (
-    <Card className="hover:translate-y-0">
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <div className="flex items-center gap-2">
-          <SearchIcon size={18} className="text-indigo-600 dark:text-indigo-400" />
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+    <Card className="p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4" data-gsc-card={loading ? 'loading' : unavailable ? 'error' : connected ? 'connected' : 'none'}>
+        <div className="flex min-w-0 items-center gap-3">
+          <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-inset bg-action-soft text-action">
+            <SearchIcon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="flex flex-wrap items-center gap-2 text-section font-semibold text-ink">
+              {t.title}
+              {statusBadge()}
+            </h3>
+            <p className="mt-0.5 text-copy text-muted">{t.subtitle}</p>
+          </div>
         </div>
-        {statusBadge()}
+        {!loading && !unavailable && status?.oauthConfigured !== false && !connected && (
+          <Button size="sm" onClick={handleConnect} loading={connecting} disabled={connecting} className="shrink-0" data-gsc-connect>
+            {connecting ? t.connecting : t.connect}
+          </Button>
+        )}
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.subtitle}</p>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4">
-          <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <div aria-busy="true" data-connection-loading="gsc"><Skeleton className="mt-4 h-12 w-full rounded-inset" /></div>
+      ) : unavailable === 'error' ? (
+        <ConnectionLoadFailed className="mt-4" onRetry={() => { setLoading(true); void loadStatus() }} />
       ) : status && !status.oauthConfigured ? (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-          {t.notConfigured}
-        </div>
+        // A merchant reads that it is unavailable, with nothing to press; only an administrator
+        // (the server's opsDetail) also reads the configuration reason.
+        <Notice tone="info" className="mt-4">
+          <span data-gsc-unavailable={status.opsDetail ? 'admin' : 'merchant'}>{t.unavailable}</span>
+          {status.opsDetail && <span className="mt-1 block text-caption text-body">{t.notConfigured}</span>}
+        </Notice>
       ) : !connected ? (
-        <div className="text-center py-6">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.notConnected}</p>
-          <Button size="sm" onClick={handleConnect} loading={connecting} disabled={connecting}>{connecting ? t.connecting : t.connect}</Button>
-        </div>
+        <>
+          <p className="mt-3 text-caption text-muted">{t.notConnected}</p>
+          {message && (
+            <Notice tone="bad" className="mt-3">{message.text}</Notice>
+          )}
+        </>
       ) : (
-        <div className="space-y-4">
+        <div className="mt-4 space-y-4">
           {/* Connection row. The GLOBAL Google-authorization revoke is intentionally
               de-emphasized (a small text link, not a primary button) — the normal
               per-project disconnect lives on the property row below. */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+          <div className="rounded-inset border border-line bg-sunk/60 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-slate-700 dark:text-slate-200">{t.connectedAccount}</span>
+              <span className="text-copy text-body">{t.connectedAccount}</span>
               {connection?.status === 'reauth_required' && (
                 <Button size="sm" className="ms-auto" onClick={handleConnect} loading={connecting} disabled={connecting}>{t.reconnect}</Button>
               )}
             </div>
             {connection?.status === 'reauth_required' && (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.reauthHint}</p>
+              <Notice tone="warn" className="mt-2">{t.reauthHint}</Notice>
             )}
             <div className="mt-2">
               <button type="button" onClick={handleGlobalRevoke} disabled={revoking}
-                className="text-xs text-red-600/80 dark:text-red-400/80 hover:underline disabled:opacity-50">
+                className="text-caption font-medium text-bad hover:underline disabled:opacity-50">
                 {revoking ? t.revoking : t.globalRevoke}
               </button>
             </div>
@@ -239,22 +340,22 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
 
           {/* Property assignment / picker */}
           {pickerOpen ? (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.selectPropertyTitle}</h4>
-                <button type="button" onClick={() => setPickerOpen(false)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">✕</button>
+            <div className="rounded-inset border border-line p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-copy font-semibold text-ink">{t.selectPropertyTitle}</h4>
+                <button type="button" onClick={() => setPickerOpen(false)} aria-label={getDashboardDictionary(language).common.close} className="grid size-8 place-items-center rounded-control text-muted transition-colors duration-150 hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"><X className="size-4" aria-hidden="true" /></button>
               </div>
               {loadingProps ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400 py-3">{t.loadingProperties}</div>
+                <div className="py-3 text-copy text-muted">{t.loadingProperties}</div>
               ) : !properties || properties.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400 py-3">{t.noProperties}</div>
+                <div className="py-3 text-copy text-muted">{t.noProperties}</div>
               ) : (
                 <ul className="space-y-2">
                   {properties.map((p) => {
                     const isUnverified = p.permissionLevel === 'siteUnverifiedUser'
                     return (
-                      <li key={p.siteUrl} className="flex flex-wrap items-center gap-2 rounded border border-slate-200 dark:border-slate-700 p-2">
-                        <span className="font-mono text-xs text-slate-800 dark:text-slate-100 truncate max-w-full min-w-0" dir="ltr">{p.siteUrl}</span>
+                      <li key={p.siteUrl} className="flex flex-wrap items-center gap-2 rounded-control border border-line px-3 py-2">
+                        <span className="min-w-0 max-w-64 truncate text-copy text-ink" dir="ltr" title={p.siteUrl}>{p.siteUrl}</span>
                         <Badge variant="neutral">{p.kind === 'domain' ? t.propertyKindDomain : t.propertyKindUrlPrefix}</Badge>
                         {isUnverified ? (
                           <Badge variant="danger">{t.unverified}</Badge>
@@ -265,7 +366,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                         )}
                         <div className="ms-auto">
                           {/* Non-covering or unverified → visible for diagnostics but NOT assignable. */}
-                          <Button size="sm" variant="outline" disabled={isUnverified || !p.covers || assigning === p.siteUrl} loading={assigning === p.siteUrl} onClick={() => handleAssign(p)}>
+                          <Button size="sm" variant="secondary" disabled={isUnverified || !p.covers || assigning === p.siteUrl} loading={assigning === p.siteUrl} onClick={() => handleAssign(p)}>
                             {assigning === p.siteUrl ? t.assigning : t.assign}
                           </Button>
                         </div>
@@ -275,20 +376,25 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                 </ul>
               )}
             </div>
+          ) : !property && autoLinking ? (
+            <div role="status" aria-live="polite" data-gsc-autosync="linking" className="flex items-center justify-center gap-2 rounded-inset border border-line p-4 text-copy text-body">
+              <Loader2 className="size-4 text-action motion-safe:animate-spin" aria-hidden="true" />
+              {t.autoLinking}
+            </div>
           ) : !property ? (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 text-center">
-              <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{t.noPropertyAssigned}</p>
+            <div className="rounded-inset border border-line p-4 text-center">
+              <p className="mb-3 text-copy text-body">{t.noPropertyAssigned}</p>
               <Button size="sm" onClick={openPicker}>{t.selectProperty}</Button>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div className="rounded-inset border border-line bg-sunk/60 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">{t.assignedProperty}:</span>
-                <span className="font-mono text-sm text-slate-800 dark:text-slate-100 truncate max-w-full min-w-0" dir="ltr">{property.siteUrl}</span>
-                <div className="flex flex-wrap items-center gap-2 ms-auto">
-                  <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
-                  <Button size="sm" variant="outline" onClick={openPicker}>{t.changeProperty}</Button>
-                  <Button size="sm" variant="outline" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">
+                <span className="text-caption text-muted">{t.assignedProperty}:</span>
+                <span className="min-w-0 max-w-full truncate text-copy font-medium text-ink" dir="ltr" title={property.siteUrl}>{property.siteUrl}</span>
+                <div className="ms-auto flex flex-wrap items-center gap-2">
+                  <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || syncRunning || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
+                  <Button size="sm" variant="ghost" onClick={openPicker}>{t.changeProperty}</Button>
+                  <Button size="sm" variant="ghost" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-bad hover:bg-bad-soft hover:text-bad">
                     {unassigning ? t.unassigning : t.unassignProperty}
                   </Button>
                 </div>
@@ -298,28 +404,42 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                   The weekly auto-sync is a daily dispatcher, so the shown time is the
                   EARLIEST the project becomes eligible (a lower bound), never a promise
                   of an exact run time. The manual "Sync now" button stays available. */}
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted">
                 <span>{t.lastSyncedAt}: {lastSyncedAt ? formatDateTime(lastSyncedAt) : t.neverSyncedShort}</span>
                 {nextEligibleSyncAt && (
                   <span title={t.nextAutoSyncHint}>{t.nextAutoSyncFrom}: {formatDateTime(nextEligibleSyncAt)}</span>
                 )}
               </div>
-              {nextEligibleSyncAt && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.nextAutoSyncHint}</p>}
+              {nextEligibleSyncAt && <p className="mt-1 text-caption text-muted">{t.nextAutoSyncHint}</p>}
+              {syncRunning && (
+                <div role="status" aria-live="polite" data-gsc-autosync="running" className="mt-3 flex items-center gap-2 rounded-control bg-action-soft px-3 py-2 text-copy font-medium text-action">
+                  <Loader2 className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+                  {t.autoSyncRunning}
+                </div>
+              )}
             </div>
           )}
 
           {message && (
-            <div className={`text-sm rounded-lg px-3 py-2 border ${message.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+            <Notice tone={message.ok ? 'ok' : 'bad'}>
               {message.text}
-            </div>
+            </Notice>
           )}
 
-          {/* Diagnostics — the read-only SC data view (shared GscMetricsTable). */}
-          {property && !pickerOpen && (
-            <GscMetricsTable projectId={projectId} refreshKey={dataRefresh} />
+          {syncFailure && !syncRunning && (
+            <Notice tone="bad"><span data-gsc-autosync="failed">{(t.errors as Record<string, string>)[syncFailure.code] ?? t.autoSyncFailed}</span></Notice>
           )}
+
+          {/* Diagnostics — the read-only SC data view (shared GscMetricsTable). While the
+              first sync is still running there is nothing to read yet: a skeleton, then the data. */}
+          {property && !pickerOpen && (syncRunning && !lastSyncedAt ? (
+            <div aria-busy="true" data-gsc-autosync="skeleton" className="space-y-2"><Skeleton className="h-20 w-full rounded-inset" /><Skeleton className="h-40 w-full rounded-inset" /></div>
+          ) : (
+            <GscMetricsTable projectId={projectId} refreshKey={dataRefresh} />
+          ))}
         </div>
       )}
+      {confirmDialog}
     </Card>
   )
 }

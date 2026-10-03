@@ -5,7 +5,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
 import { getUserEntitlement } from '@/lib/subscription'
-import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
+import { buildQuotaError, EntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
+import { actionMessages, asActionResult, type ActionResult } from '@/lib/i18n/action-messages'
+import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { deleteOwnedRecord, type DeleteOwnedResult } from '@/lib/data/delete-owned-record'
 
 // Note: createProjectAction is deprecated - project creation now uses API route /api/projects/create
@@ -14,7 +16,8 @@ export async function createProjectAction(formData: FormData) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('לא מחובר')
+  const { locale, m } = await actionMessages(user?.user_metadata?.locale)
+  if (!user) throw new UserFacingError(m.notSignedIn)
 
   // Enforce plan limits
   // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
@@ -25,7 +28,7 @@ export async function createProjectAction(formData: FormData) {
   // A read failure is not an exhausted quota. Throwing a quota message here is
   // what surfaced to the reviewer as a generic server error on "Add keyword".
   if (isEntitlementUnknown(entitlement.plan)) {
-    throw new Error(buildEntitlementUnavailableError().error)
+    throw new EntitlementUnavailableError(locale)
   }
   if (!entitlement.isAdmin) {
     const { count } = await supabase
@@ -35,9 +38,8 @@ export async function createProjectAction(formData: FormData) {
       .eq('is_active', true)
 
     if ((count ?? 0) >= entitlement.limits.maxProjects) {
-      throw new Error(
-        `הגעת למגבלת ${entitlement.limits.maxProjects} פרויקטים בתוכנית ${entitlement.limits.label}. שדרג את המנוי להוספת פרויקטים נוספים.`
-      )
+      const q = buildQuotaError('QUOTA_PROJECTS', entitlement.plan, entitlement.limits, entitlement.limits.maxProjects)
+      throw new UserFacingError(locale === 'en' ? q.errorEn : q.error, q.code)
     }
   }
 
@@ -45,7 +47,7 @@ export async function createProjectAction(formData: FormData) {
   // Phase 3 — reject weekly (and any other unsupported value) server-side,
   // never relying solely on the DB CHECK constraint.
   if (!isValidScanFrequency(rawScanFrequency)) {
-    throw new Error('תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.')
+    throw new UserFacingError(m.unsupportedFrequency)
   }
   const scanFrequency = rawScanFrequency
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
@@ -80,7 +82,7 @@ export async function updateProjectAction(id: string, formData: FormData) {
 
   const rawScanFrequency = (formData.get('scan_frequency') as string) || 'manual'
   if (!isValidScanFrequency(rawScanFrequency)) {
-    throw new Error('תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.')
+    throw new UserFacingError((await actionMessages()).m.unsupportedFrequency)
   }
   const scanFrequency = rawScanFrequency
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
@@ -132,4 +134,9 @@ export async function deleteProjectAction(id: string): Promise<DeleteOwnedResult
     revalidatePath('/dashboard')
   }
   return res
+}
+
+/** The project form's save: updateProjectAction, with its refusal returned in the merchant's language. */
+export async function saveProjectAction(id: string, formData: FormData): Promise<ActionResult<object>> {
+  return asActionResult(() => updateProjectAction(id, formData), 'projects')
 }

@@ -19,6 +19,9 @@ import { usePathname } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Header from '@/components/layout/Header'
+import EmptyState from '@/components/ui/EmptyState'
+import { ScreenSkeleton } from '@/components/ui/Skeleton'
+import { FolderOpen, FolderPlus, RotateCw } from 'lucide-react'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import ContentHubSetup from '@/components/content/ContentHubSetup'
 import { ToastHost } from '@/components/content/Toast'
@@ -28,11 +31,31 @@ import type { ReactNode } from 'react'
 
 export default function ContentWorkspaceShell({ children }: { children: ReactNode }) {
   const {
-    t, isHebrew, toast, projectId, projects, data, loading,
+    t, isHebrew, toast, projectId, projects, data, loading, topics,
     projectsResolved, projectsError, reloadProjects,
-    briefOpen, setBriefOpen, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
+    briefOpen, closeBrief, briefPrefill, editingTopic, setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, loadTopics,
   } = useContentWorkspace()
   const screen = activeContentScreen(usePathname() ?? '')
+  // The content strategy tab opens with its plan (it works without a site connection),
+  // so there the connection cards follow the screen instead of preceding it.
+  const setupAfterScreen = screen === 'strategy'
+
+  // K5 — missing-connections onboarding (two independent setup cards, each hidden when
+  // its dimension is ready; whole block hidden when both are). Its buttons LINK to the
+  // screen that owns each connection.
+  // Mounted as soon as the project is known, so its Search Console status is asked
+  // beside the overview; it draws nothing until both answered. The platform is known
+  // only from an overview of THIS project: the first overview is read before the
+  // project is resolved and has no platform, which used to read as "not connected".
+  const overview = data && projectId && data.selected === projectId ? data : null
+  const setup = projectId ? (
+    <ContentHubSetup
+      projectId={projectId}
+      platform={overview ? overview.platform?.platform ?? 'none' : null}
+      platformFailed={!!overview && (overview.wordpress?.status === 'failed' || overview.shopify?.status === 'failed' || ((overview.platform?.platform === 'wix' || overview.platform?.platform === 'webhook') && overview.platform?.siteActive === false))}
+      shopifyNeedsScope={!!overview?.platform?.shopifyNeedsScope}
+    />
+  ) : null
 
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
@@ -41,55 +64,45 @@ export default function ContentWorkspaceShell({ children }: { children: ReactNod
       {/* The accessible-project list FAILED to load — never rendered as "you have
           no projects", which is a different fact and offers no way forward. */}
       {projectsResolved && projectsError ? (
-        <Card className="p-10 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.projectsLoadError}</p>
-          <Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>
+        <Card padding={false}>
+          <EmptyState icon={<RotateCw />} title={t.projectsLoadError} action={<Button onClick={reloadProjects}>{t.projectsLoadRetry}</Button>} />
         </Card>
       ) : !projectsResolved ? (
         /* Still resolving — do NOT flash an empty state at a user who has projects. */
-        <Card className="p-10 text-center">
-          <p className="text-sm text-slate-400 dark:text-slate-500">{t.projectsLoading}</p>
-        </Card>
+        <ScreenSkeleton label={t.projectsLoading} />
       ) : /* No projects → empty state */
       !loading && projects.length === 0 ? (
-        <Card className="p-10 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{t.noProjectsTitle}</p>
-          <Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>
+        <Card padding={false}>
+          <EmptyState icon={<FolderPlus />} title={t.noProjectsTitle} action={<Link href="/projects/new"><Button>{t.noProjectsCta}</Button></Link>} />
         </Card>
       ) : (
         <>
           {/* No project selector here: the top bar's switcher is the one control
               that picks the project, on this screen as on every other. */}
 
-          {/* K5 — missing-connections onboarding (two independent setup cards, each
-              hidden when its dimension is ready; whole block hidden when both are).
-              Its buttons now LINK to the screen that owns each connection. */}
-          {projectId && data && (
-            <ContentHubSetup
-              projectId={projectId}
-              platform={data.platform?.platform ?? 'none'}
-              platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed'}
-              shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
-            />
-          )}
+          {!setupAfterScreen && setup}
 
           {/* No project selected yet (multi-project) */}
           {!projectId ? (
-            <Card className="p-10 text-center text-slate-500 dark:text-slate-400">
-              {t.selectProjectMessage}
+            <Card padding={false}>
+              <EmptyState icon={<FolderOpen />} title={t.selectProjectMessage} />
             </Card>
           ) : (
             children
           )}
+
+          {setupAfterScreen && <div className="mt-8">{setup}</div>}
         </>
       )}
 
       <ArticleBriefModal
         open={briefOpen}
-        onClose={() => setBriefOpen(false)}
+        onClose={closeBrief}
         projects={projects}
         defaultProjectId={projectId}
         editing={editingTopic}
+        prefill={briefPrefill}
+        exampleTerm={topics.find((tp) => tp.primary_keyword?.trim())?.primary_keyword ?? null}
         onSaved={loadTopics}
         onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
         onTopicsCreated={(created) => { if (created.length) { setNewTopicsUnchecked({}); setNewTopicsSelected({}); setNewTopics(created) } }}

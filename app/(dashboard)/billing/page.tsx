@@ -2,14 +2,24 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
+import { getUserEntitlement } from '@/lib/subscription'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
-import { billingMarketFromLocale } from '@/lib/paypal/checkout-plans'
+import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { planPriceIn } from '@/lib/billing/market'
+import { PLAN_CATALOG } from '@/lib/plans/catalog'
+import { paddleEnvSnapshot, resolvePaddleConfig } from '@/lib/paddle/config'
 import BillingView from './BillingView'
 import AdminBillingView from './AdminBillingView'
+
+interface CurrentSubscriptionRow {
+  status: string
+  paypal_subscription_id: string | null
+  /** Selected only while Paddle is on (the column comes with its migration). */
+  paddle_subscription_id?: string | null
+}
 
 export default async function BillingPage() {
   const supabase = await createClient()
@@ -37,9 +47,15 @@ export default async function BillingPage() {
     return <AdminBillingView />
   }
 
+  // w21 — Paddle (merchant of record) is a second checkout behind a switch
+  // that is OFF unless every value is set (lib/paddle/config.ts). Off: this
+  // page reads and renders exactly what it did before Paddle existed — the
+  // paddle_* columns are not even selected, so the screen keeps working where
+  // the Paddle migration has not been applied.
+  const paddleConfig = resolvePaddleConfig(paddleEnvSnapshot())
   const { data: activeSub } = await supabase
     .from('subscriptions')
-    .select('status, paypal_subscription_id')
+    .select<string, CurrentSubscriptionRow>(paddleConfig.enabled ? 'status, paypal_subscription_id, paddle_subscription_id' : 'status, paypal_subscription_id')
     .eq('user_id', user.id)
     .in('status', ['active', 'cancelled'])
     .order('created_at', { ascending: false })
@@ -82,13 +98,21 @@ export default async function BillingPage() {
   const shopifyMigrationStatus =
     (migrationResult.ok && migrationResult.migration?.status as 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | undefined) || null
 
-  // Phase 3 — the billing CURRENCY is resolved from the durable, persisted
-  // signup locale (user_metadata.locale), NEVER from the mutable dashboard
-  // display-language toggle (useDashboardLanguage) and NEVER from browser
-  // locale. A legacy account with no stored locale resolves to `null` here —
-  // BillingView shows an explicit market-selection prompt instead of
-  // guessing or defaulting silently (see app/api/billing-market/select).
-  const market = billingMarketFromLocale((user.user_metadata as { locale?: string } | null)?.locale ?? null)
+  // w17 — the billing CURRENCY comes from the ONE server-side resolver
+  // (lib/billing/server-market.ts): the market stored at the first PayPal
+  // checkout, else (accounts that already paid before w17) the pre-w17
+  // locale market, else the visitor's country (IL -> ILS, else USD). Never
+  // the dashboard language toggle, never a client choice, no switcher.
+  const { market, locked: marketLocked } = await resolveBillingMarket(supabase, user)
+
+  // w21 — Paddle is offered only to a website-billed account (never while
+  // Shopify governs it or governance is unreadable: checked above, first) that
+  // has no PayPal subscription on its current row (a second provider would
+  // bill it twice). Admins never reach this line.
+  const currentSub = activeSub
+  const paddle = paddleConfig.enabled && !governanceUnavailable && !shopifyConnected && !currentSub?.paypal_subscription_id
+    ? { ...paddleConfig.checkout, userId: user.id, email: user.email ?? null }
+    : null
 
   return (
     <BillingView
@@ -103,20 +127,16 @@ export default async function BillingPage() {
       billingStateUnavailable={governanceUnavailable}
       shopifyMigrationStatus={shopifyMigrationStatus}
       market={market}
-      planPricesILS={{
-        trial: PLAN_LIMITS.trial.price,
-        regular: PLAN_LIMITS.regular.price,
-        advanced: PLAN_LIMITS.advanced.price,
-        premium: PLAN_LIMITS.premium.price,
-        large_agency: PLAN_LIMITS.large_agency.price,
+      marketLocked={marketLocked}
+      planPrices={{
+        trial: 0,
+        regular: planPriceIn(PLAN_CATALOG.regular, market),
+        advanced: planPriceIn(PLAN_CATALOG.advanced, market),
+        premium: planPriceIn(PLAN_CATALOG.premium, market),
+        large_agency: planPriceIn(PLAN_CATALOG.large_agency, market),
       }}
-      planPricesUSD={{
-        trial: PLAN_LIMITS.trial.priceUSD,
-        regular: PLAN_LIMITS.regular.priceUSD,
-        advanced: PLAN_LIMITS.advanced.priceUSD,
-        premium: PLAN_LIMITS.premium.priceUSD,
-        large_agency: PLAN_LIMITS.large_agency.priceUSD,
-      }}
+      paddle={paddle}
+      hasPaddleSubscription={!!paddle && !!currentSub?.paddle_subscription_id}
     />
   )
 }

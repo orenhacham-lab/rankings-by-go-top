@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { ideasSectionFromParam, ideasSectionToParam } from '../content-hub-ideas-section'
+import { strategyHref, STRATEGY_ANCHORS } from '../strategy/view'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -45,15 +46,29 @@ function main() {
   check('all create-topic buttons use handleCreateTopic (2 on articles, 1 on topics)',
     (articles.match(/onClick=\{handleCreateTopic\}/g) || []).length === 2
     && (topics.match(/onClick=\{handleCreateTopic\}/g) || []).length === 1)
-  check('handleCreateTopic → ideas section when automation on, else the modal',
-    /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) goToIdeas\(\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(workspace))
-  // It used to scroll to a section of the one big page. The ideas destination is its own
-  // route now, so the same intent is a navigation — which survives a refresh and a share.
-  check('goToIdeas navigates to the automation screen on the automatic sub-tab',
-    /goToIdeas = useCallback[\s\S]*?router\.push\(`\$\{CONTENT_AUTOMATION_PATH\}\?section=\$\{ideasSectionToParam\('auto'\)\}`\)/.test(workspace))
+  // "New topic" used to land on the list view's automatic ideas, the old design, where
+  // approving an idea was the only thing it offered. It now opens the content strategy
+  // board's "add a keyword" field (the keyword becomes an approved topic); approving an
+  // idea happens on the board (content-strategy-idea-actions.qa.ts).
+  const createsOnBoard = (src: string) =>
+    /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) router\.push\(strategyAddKeywordHref\(\)\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(src)
+  check('handleCreateTopic → the board\'s keyword field when automation on, else the modal', createsOnBoard(workspace))
+  check('MUT: handleCreateTopic back to the list view\'s ideas fails that check',
+    !createsOnBoard(workspace.replace('router.push(strategyAddKeywordHref())', 'goToIdeas()')))
+  // It used to scroll to a section of the one big page, then to navigate to the
+  // automation screen. That screen is the ideas section of the content strategy tab's
+  // list view now (W6c), so the same intent navigates there, on the automatic sub-tab —
+  // which survives a refresh and a share.
+  const toIdeas = (src: string) =>
+    /goToIdeas = useCallback[\s\S]*?router\.push\(strategyHref\('list', STRATEGY_ANCHORS\.ideas, \{ section: ideasSectionToParam\('auto'\) \}\)\)/.test(src)
+  check('goToIdeas navigates to the ideas section of the strategy list view, on the automatic sub-tab', toIdeas(workspace))
+  check('MUT: goToIdeas that still pushes the retired automation screen fails that check',
+    !toIdeas(workspace.replace("router.push(strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }))", "router.push('/content/automation?section=ideas')")))
+  check('…and that href is the list view at the ideas, with the sub-tab',
+    strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }) === '/content/strategy?view=list&section=ideas#ideas')
 
   // 2 — the ideas destination has auto + manual sub-tabs; manual reuses the SAME modal.
-  check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(automation) && /t\.ideasSubTabs\.manual/.test(automation) && /changeIdeasSection\(key\)/.test(automation))
+  check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(automation) && /t\.ideasSubTabs\.manual/.test(automation) && /onChange=\{changeIdeasSection\}/.test(automation) && /<Segmented/.test(automation))
   check("manual sub-tab reuses ArticleBriefModal (setBriefOpen) — not a new topic type",
     /ideasSection === 'manual' \?[\s\S]*?manualTopicTitle[\s\S]*?onClick=\{\(\) => \{ setEditingTopic\(null\); setBriefOpen\(true\) \}\}/.test(automation))
   check('manual create button is the ONLY direct setBriefOpen across the workspace',

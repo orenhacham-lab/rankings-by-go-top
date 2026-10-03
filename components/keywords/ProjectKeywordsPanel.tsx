@@ -13,22 +13,32 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Search, FileText } from 'lucide-react'
+import { BarChart3, FileText, KeyRound, Plus, Search, SearchX, Telescope } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
-import { formatDateTime } from '@/lib/utils'
 import Button from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import EmptyState from '@/components/ui/EmptyState'
+import Segmented from '@/components/ui/Segmented'
+import { FIELD_CLASSES } from '@/components/ui/Input'
+import { useToasts, ToastHost } from '@/components/ui/Toast'
 import Modal from '@/components/ui/Modal'
-import Badge from '@/components/ui/Badge'
+import { ContextCardSkeleton } from '@/components/ui/Skeleton'
+import { Crossfade } from '@/components/ui/motion'
+import KeywordsHero, { keywordStanding } from '@/components/keywords/KeywordsHero'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import CompetitorSummary from '@/components/competitors/CompetitorSummary'
 import { useCompetitorComparison, type CompetitorView } from '@/components/competitors/useCompetitorComparison'
 import type { OwnCheck } from '@/lib/competitors/comparison'
-import { GscKeywordsNotice, useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
+import { GscKeywordsNotice, useGscKeywordInsights } from '@/components/gsc/GscKeywordFigures'
+import type { TrackOutcome } from '@/components/gsc/GscUntrackedQueries'
+
+/** How many of a keyword's checks its row's trend line shows. */
+const TREND_CHECKS = 8
 
 export default function ProjectKeywordsPanel({ project }: { project: Project }) {
   const id = project.id
@@ -39,6 +49,9 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
 
   const [targets, setTargets] = useState<TrackingTarget[]>([])
   const [latestResults, setLatestResults] = useState<Record<string, ScanResult>>({})
+  /** Each keyword's last checks, oldest first (its position, or null where it was not
+   *  found): the row's trend line. From the same read as the latest result. */
+  const [positionHistory, setPositionHistory] = useState<Record<string, (number | null)[]>>({})
   /** The keyword table's own data. Reported on the table, never by the page. */
   const [targetsLoading, setTargetsLoading] = useState(true)
   const [targetsError, setTargetsError] = useState(false)
@@ -47,8 +60,8 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const [showAddTarget, setShowAddTarget] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanningTargets, setScanningTargets] = useState<Set<string>>(new Set())
-  const [scanMessage, setScanMessage] = useState('')
-  const [scanError, setScanError] = useState(false)
+  // What a scan or a volume refresh came to: the app's one toast (§8), not a hand-made popup.
+  const toasts = useToasts()
   const [updatingVolumes, setUpdatingVolumes] = useState(false)
   // A NEW KEYWORD HAS NO SEARCH VOLUME UNTIL SOMETHING FETCHES ONE. The direct
   // "+ Add keyword" path never scheduled that (only the keyword-research path
@@ -88,12 +101,19 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
         supabase.from('scan_results').select('*').in('tracking_target_id', targetIds).order('checked_at', { ascending: false }))
       // Keep only the latest result per target
       const latest: Record<string, ScanResult> = {}
+      const history: Record<string, (number | null)[]> = {}
       for (const result of resultsRes?.data || []) {
         if (!latest[result.tracking_target_id]) latest[result.tracking_target_id] = result
+        // The same rows, newest first: the last TREND_CHECKS positions of each keyword.
+        const line = (history[result.tracking_target_id] ??= [])
+        if (line.length < TREND_CHECKS) line.push(result.found ? result.position : null)
       }
+      for (const line of Object.values(history)) line.reverse()
       setLatestResults(latest)
+      setPositionHistory(history)
     } else {
       setLatestResults({})
+      setPositionHistory({})
     }
     setTargetsLoading(false)
   }, [id])
@@ -165,16 +185,14 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   }
 
   function showScanResult(message: string, isError: boolean) {
-    setScanMessage(message)
-    setScanError(isError)
-    setTimeout(() => setScanMessage(''), 5000)
+    if (isError) toasts.error(message)
+    else toasts.success(message)
   }
 
   async function handleScanAll() {
     if (scanAllInFlight.current) return
     scanAllInFlight.current = true
     setScanning(true)
-    setScanMessage('')
     try {
       const response = await fetch('/api/scan', {
         method: 'POST',
@@ -202,7 +220,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     if (volumeRequestInFlight.current) return
     volumeRequestInFlight.current = true
     setUpdatingVolumes(true)
-    setScanMessage('')
     try {
       const response = await fetch('/api/google-ads/keyword-metrics', {
         method: 'POST',
@@ -257,7 +274,6 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     if (targetScansInFlight.current.has(targetId)) return
     targetScansInFlight.current.add(targetId)
     setScanningTargets((prev) => new Set([...prev, targetId]))
-    setScanMessage('')
     try {
       const response = await fetch('/api/scan', {
         method: 'POST',
@@ -293,7 +309,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const filtering = search.trim() !== '' || engineFilter !== ''
 
   const activeTargets = targets.filter((t) => t.is_active)
-  const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict)
+  const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict, language)
 
   // You vs. competitors: each keyword's latest check, the one the table shows,
   // paired with the competitor positions recorded in that same check.
@@ -307,105 +323,152 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     ? { ...comparedView, status: 'error', retry: () => { void loadTargets() } }
     : comparedView
 
-  // Clicks and impressions from Search Console, per keyword: read again when the list changes.
+  // Google's own 28-day average per keyword, and the searches it shows the site for that
+  // are not tracked yet, from Search Console: read again when the list changes.
   const targetsKey = useMemo(() => targets.map((t) => t.id).join(','), [targets])
-  const gscKeywords = useGscKeywordFigures(id, targetsKey)
+  const gscKeywords = useGscKeywordInsights(id, targetsKey)
+  // Google reports searches, not engines: only the Google-search keywords are matched.
+  const gscTargets = useMemo(() => targets.filter((t) => t.engine_type === 'google_search').map((t) => ({ id: t.id, keyword: t.keyword })), [targets])
+
+  /**
+   * "Track it" on a search Google already shows the site for. The EXISTING
+   * add-to-project request (keyword research's): its ownership check, its plan keyword
+   * limit (402) and its duplicate check decide, exactly as for every other add. The new
+   * keyword then gets its search volume like one added by hand.
+   */
+  const trackGscQuery = useCallback(async (query: string): Promise<TrackOutcome> => {
+    const g = dict.gscWidgets.untracked
+    try {
+      const response = await fetch('/api/keyword-research/add-to-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id, engineType: 'google_search', language, source: 'search_console', keywords: [{ keyword: query }] }),
+      })
+      const body = await response.json().catch(() => null) as { success?: boolean; added?: number } | null
+      if (response.ok && body?.success) {
+        const added = (body.added ?? 0) > 0
+        if (added) toasts.success(g.addedToast(query))
+        else toasts.success(g.existsToast(query))
+        void loadTargets().then(() => { if (added) void refreshMissingVolumes() })
+        return added ? 'added' : 'exists'
+      }
+      // Our own words only: the route's message is for the log.
+      toasts.error(response.status === 402 ? g.quota : g.failed)
+      return response.status === 402 ? 'quota' : 'failed'
+    } catch {
+      toasts.error(g.failed)
+      return 'failed'
+    }
+  }, [id, language, dict, toasts, loadTargets, refreshMissingVolumes])
+
+  const standing = useMemo(() => keywordStanding(targets, latestResults), [targets, latestResults])
+  // A project with no keywords yet (known, not still loading): one invitation, not an empty toolbar and table.
+  const empty = targets.length === 0 && !targetsLoading && !targetsError
 
   return (
-    <div>
-      {scanMessage && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md sm:w-auto z-[100] animate-pop-in"
-        >
-          <div
-            className={`p-3 pr-2 rounded-control text-sm flex items-center gap-2 shadow-pop border ${
-              scanError ? 'bg-bad-soft border-bad/20 text-bad' : 'bg-ok-soft border-ok/20 text-ok'
-            }`}
-          >
-            <span>{scanError ? '✗' : '✓'}</span>
-            <span className="flex-1">{scanMessage}</span>
-            <button
-              type="button"
-              onClick={() => setScanMessage('')}
-              aria-label="Close"
-              className="shrink-0 w-6 h-6 inline-flex items-center justify-center rounded hover:bg-black/5"
-            >
-              ×
-            </button>
+    <div className="stagger-in">
+      {/* Wave 9 (the owner's layout): Search Console first, Google's own positions for the
+          site's searches (a 28-day average, rounded, labelled so), then our live rank
+          tracking under its own heading. Before Search Console is set up, the top slot is
+          empty and the connect card waits under the live tracking. */}
+      <GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top" className="mb-8" />
+
+      <LiveTrackingHeading title={kp.live.title} body={kp.live.body} badge={kp.live.badge} />
+
+      {/* Where the keywords stand: the tab's context card, from the rows below. Its
+          skeleton crossfades into it when the list arrives. */}
+      {!empty && !(targetsError && targets.length === 0) && (
+        <Crossfade loading={targetsLoading && targets.length === 0} skeleton={<ContextCardSkeleton className="mb-6 min-h-[22rem]" />}>
+          <KeywordsHero
+            project={project}
+            standing={standing}
+            marketLine={facts.line}
+            frequency={facts.frequency}
+            scanning={scanning}
+            onScanAll={handleScanAll}
+            canScan={activeTargets.length > 0}
+          />
+        </Crossfade>
+      )}
+
+      {empty && (
+        <Card padding={false} className="relative mb-6 overflow-hidden">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(40rem_16rem_at_50%_0%,color-mix(in_srgb,var(--color-action)_7%,transparent),transparent_70%)]" />
+          <EmptyState
+            className="relative py-16"
+            icon={<KeyRound />}
+            title={kp.empty.title}
+            body={kp.empty.body}
+            action={(
+              <Button size="lg" onClick={() => setShowAddTarget(true)}>
+                <Plus aria-hidden="true" className="size-4" />
+                {k.keywordsSection.addKeywordButton}
+              </Button>
+            )}
+            secondary={(
+              <Link href="/keyword-research" className="inline-flex items-center gap-1.5 font-semibold text-action transition-colors hover:text-action-hover">
+                <Telescope aria-hidden="true" className="size-4" />
+                {kp.empty.research}
+              </Link>
+            )}
+          />
+        </Card>
+      )}
+
+      <CompetitorSummary view={competitorView} variant="full" className="mb-6 shadow-card" />
+
+      {!empty && (
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Narrowing the table: a search field and the engine as one segmented control. */}
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:max-w-xs">
+              <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                placeholder={kp.searchPlaceholder}
+                aria-label={kp.searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className={`${FIELD_CLASSES} h-10 rounded-pill ps-9 shadow-control`}
+              />
+            </div>
+            <Segmented
+              ariaLabel={k.table.scanType}
+              value={engineFilter as '' | 'google_search' | 'google_maps'}
+              onChange={(v) => setEngineFilter(v)}
+              className="max-w-full self-start overflow-x-auto sm:self-auto"
+              options={[
+                { value: '', label: kp.allEngines },
+                { value: 'google_search', label: kp.engineGoogleSearch },
+                { value: 'google_maps', label: kp.engineGoogleMaps },
+              ]}
+            />
+          </div>
+          {/* The primary (check every keyword) is on the card above; these are quiet. */}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setShowAddTarget(true)}>
+              <Plus aria-hidden="true" className="size-4" />
+              {k.keywordsSection.addKeywordButton}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleUpdateVolumes} loading={updatingVolumes} disabled={targets.length === 0}>
+              {!updatingVolumes && <BarChart3 aria-hidden="true" className="size-4" />}
+              {updatingVolumes ? k.keywordsSection.updatingVolumes : k.keywordsSection.updateVolumesButton}
+            </Button>
+            <Link href="/reports" className="inline-flex h-8 items-center gap-1.5 rounded-control px-3 text-caption font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+              <FileText aria-hidden="true" className="size-4" />
+              {k.keywordsSection.reportButton}
+            </Link>
           </div>
         </div>
       )}
 
-      {/* What every scan of this project is measured against: the facts that used
-          to be the project page's summary row. */}
-      <dl className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line lg:grid-cols-4">
-        <Fact label={k.summary.domain}><span dir="ltr" className="font-mono">{project.target_domain}</span></Fact>
-        <Fact label={k.summary.lastScan}>{project.last_scan_at ? formatDateTime(project.last_scan_at) : '—'}</Fact>
-        <Fact label={k.summary.frequency}>
-          <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>{facts.frequency}</Badge>
-        </Fact>
-        <Fact label={k.summary.scanParameters}>
-          <span className="text-caption">
-            {facts.engine} · {facts.device} · gl={facts.gl} · hl={facts.hl}
-            {facts.location !== '—' && <> · {facts.location}</>}
-          </span>
-        </Fact>
-      </dl>
-
-      <CompetitorSummary view={competitorView} variant="full" className="mb-6" />
-
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 gap-2">
-          <input
-            type="search"
-            placeholder={kp.searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full max-w-xs rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-action"
-          />
-          <select
-            value={engineFilter}
-            onChange={(e) => setEngineFilter(e.target.value)}
-            aria-label={k.table.scanType}
-            className="rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-action"
-          >
-            <option value="">{kp.allEngines}</option>
-            <option value="google_search">{kp.engineGoogleSearch}</option>
-            <option value="google_maps">{kp.engineGoogleMaps}</option>
-          </select>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={handleScanAll} loading={scanning} disabled={activeTargets.length === 0} size="sm" className="gap-2">
-            <Search size={16} strokeWidth={2} />
-            {scanning ? k.keywordsSection.scanning : k.keywordsSection.scanAllButton}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowAddTarget(true)}>
-            {k.keywordsSection.addKeywordButton}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleUpdateVolumes} loading={updatingVolumes} disabled={targets.length === 0}>
-            {updatingVolumes ? k.keywordsSection.updatingVolumes : k.keywordsSection.updateVolumesButton}
-          </Button>
-          <Link href="/reports">
-            <Button variant="ghost" size="sm" className="gap-1.5">
-              <FileText size={16} strokeWidth={2} />
-              {k.keywordsSection.reportButton}
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* What the line under each search volume is, or, before Search Console is set
-          up, what it will be and the one step that is missing. */}
-      <GscKeywordsNotice projectId={id} view={gscKeywords} className="mb-3" />
-
       {filtering && targets.length > 0 && visibleTargets.length === 0 ? (
-        <p className="rounded-card border border-line bg-surface px-4 py-10 text-center text-sm text-muted">{kp.noMatches}</p>
-      ) : (
+        <Card padding={false}><EmptyState compact icon={<SearchX />} title={kp.noMatches} /></Card>
+      ) : empty ? null : (
         <TrackingTargetsTable
           targets={visibleTargets}
           latestResults={latestResults}
+          positionHistory={positionHistory}
           projectId={id}
           projectCity={project.city}
           projectCountry={project.country}
@@ -422,9 +485,18 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           projectDevice={project.device_type}
           onActionComplete={loadTargets}
           competitorView={competitorView}
-          gscKeywords={gscKeywords}
+          emptyAction={(
+            <Button onClick={() => setShowAddTarget(true)}>
+              <Plus aria-hidden="true" className="size-4" />
+              {k.keywordsSection.addKeywordButton}
+            </Button>
+          )}
         />
       )}
+
+      {/* Before Search Console is set up: what connecting adds and the one step that is
+          missing, under the live tracking (connected, the block is the tab's top). */}
+      <GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom" className="mt-6" />
 
       <Modal open={showAddTarget} onClose={() => setShowAddTarget(false)} title={k.modals.addKeywordTitle} size="md">
         <TrackingTargetForm
@@ -443,39 +515,58 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
           onCancel={() => setShowAddTarget(false)}
         />
       </Modal>
+      <ToastHost toasts={toasts.toasts} dismiss={toasts.dismiss} dir={language === 'he' ? 'rtl' : 'ltr'} />
     </div>
   )
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+/** The heading of our own live rank tracking: it is a live check, not Search Console. */
+function LiveTrackingHeading({ title, body, badge }: { title: string; body: string; badge: string }) {
   return (
-    <div className="bg-surface px-4 py-3">
-      <dt className="text-caption text-muted">{label}</dt>
-      <dd className="mt-1 truncate text-sm font-medium text-ink">{children}</dd>
+    <div className="mb-4 flex flex-wrap items-start gap-x-3 gap-y-1" data-live-tracking="">
+      <h2 className="flex items-center gap-2 text-section font-semibold text-ink">
+        <span className="relative flex size-2.5" aria-hidden="true">
+          <span className="absolute inline-flex size-full rounded-full bg-ok opacity-60 motion-safe:animate-ping" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-ok" />
+        </span>
+        {title}
+        <span className="rounded-pill bg-ok-soft px-2 py-0.5 text-overline font-semibold uppercase tracking-wide text-ok">{badge}</span>
+      </h2>
+      <p className="basis-full text-copy text-muted">{body}</p>
     </div>
   )
 }
 
-/** The scan parameters in words, exactly as the project page derived them. */
-function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>) {
-  const map = dict.projects.frequency as Record<string, string>
-  const frequency = (project.scan_frequency || 'manual').toLowerCase() === 'monthly' ? map.monthly : map.manual
+/** A country or language code by its name in the screen's language ("IL" → "ישראל"); the code when the browser cannot name it. */
+function displayName(lang: 'he' | 'en', type: 'region' | 'language', code: string | null | undefined): string {
+  if (!code) return ''
+  try {
+    return new Intl.DisplayNames([lang], { type }).of(type === 'region' ? code.toUpperCase() : code.toLowerCase()) ?? code
+  } catch {
+    return code
+  }
+}
+
+/**
+ * The scan parameters in words. It used to read "גוגל אורגני — מחשב · gl=il ·
+ * hl=he", Google's own parameter codes; it now says the market the way a merchant
+ * would (UX review P2-6): "גוגל ישראל · עברית · מחשב · תל אביב".
+ */
+function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>, lang: 'he' | 'en') {
+  const f = dict.projects.frequency
+  const frequency = (project.scan_frequency || 'manual').toLowerCase() === 'monthly' ? f.monthly : f.manual
 
   const device = project.device_type === 'mobile' ? dict.common.deviceMobile
     : project.device_type === 'desktop' ? dict.common.deviceDesktop
     : dict.common.deviceDefault
 
-  const engine = primaryEngine === 'google_search'
-    ? (project.device_type === 'mobile' ? dict.common.searchTypeGoogleMobile : dict.common.searchTypeGoogleDesktop)
-    : primaryEngine === 'google_maps' ? dict.common.engineGoogleMaps
-    : primaryEngine
+  const region = displayName(lang, 'region', project.country)
+  const market = primaryEngine === 'google_maps'
+    ? [dict.common.engineGoogleMaps, region].filter(Boolean).join(' · ')
+    : dict.projectDetail.summary.market(region)
 
   return {
     frequency,
-    engine,
-    device,
-    gl: project.country.toLowerCase(),
-    hl: project.language,
-    location: project.city || '—',
+    line: [market, displayName(lang, 'language', project.language), device, project.city || ''].filter(Boolean).join(' · '),
   }
 }

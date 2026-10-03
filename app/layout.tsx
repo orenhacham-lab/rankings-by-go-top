@@ -1,4 +1,5 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
 import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
@@ -6,6 +7,25 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
+import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
+
+/**
+ * The two faces of the type system (see --font-sans in globals.css): Inter for
+ * Latin and every digit, Heebo for Hebrew. Self-hosted by next/font, so no page
+ * waits on a third-party stylesheet and the fallback is metric-adjusted — the
+ * text does not jump when the font arrives.
+ */
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
+const heebo = Heebo({ subsets: ['hebrew', 'latin'], display: 'swap', variable: '--font-heebo' })
+
+/**
+ * The viewport is its own export: inside `metadata` Next ignores it and logs
+ * "Unsupported metadata viewport" on every render. Same values as before.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
 
 /**
  * The document's metadata follows the SAME resolved locale as <html lang/dir>.
@@ -21,21 +41,16 @@ export async function generateMetadata(): Promise<Metadata> {
     title: m.title,
     description: m.description,
     keywords: m.keywords,
-    icons: {
-      icon: [
-        { url: '/favicon.ico' },
-        { url: '/favicon-192.png', sizes: '192x192', type: 'image/png' },
-        { url: '/favicon-512.png', sizes: '512x512', type: 'image/png' },
-      ],
-      shortcut: '/favicon.ico',
-      apple: '/apple-touch-icon.png',
-    },
+    // No `icons` here, and no <link rel="icon"> in <head> below: the icons are
+    // the file conventions app/favicon.ico, app/icon.png and app/apple-icon.png
+    // (rendered by scripts/brand/icons.ts), which Next links ONCE each, with a
+    // content hash. Declaring them here too put every icon in the head three times.
     openGraph: {
       title: m.ogTitle,
       description: m.ogDescription,
       images: ['/gotop-primary.png'],
       url: 'https://www.gotopseo.com',
-      siteName: 'Rankings by Go Top',
+      siteName: 'Go Top SEO',
       locale: m.ogLocale,
       type: 'website',
     },
@@ -43,7 +58,6 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: 'https://www.gotopseo.com',
       languages: buildHreflangAlternates('/', '/en'),
     },
-    viewport: 'width=device-width, initial-scale=1',
     robots: 'index, follow',
     authors: [{ name: 'Go Top' }],
   }
@@ -68,18 +82,10 @@ export default async function RootLayout({
   const { lang, dir } = documentLocaleAttributes(locale)
 
   return (
-    <html lang={lang} dir={dir} className="h-full" suppressHydrationWarning>
+    <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
-        {/* Favicon - Go Top logo */}
-        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=7" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=7" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=7" />
-        <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=7" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=7" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=7" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=7" />
         <meta name="theme-color" content="#0666C2" />
 
         {/* Google Tag Manager - Initialize data layer BEFORE GTM script */}
@@ -97,12 +103,6 @@ export default async function RootLayout({
         {/* Google Tag Manager Script */}
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
 
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
         {/* JSON-LD Schema for SEO */}
         <script
           type="application/ld+json"
@@ -111,7 +111,8 @@ export default async function RootLayout({
               {
                 '@context': 'https://schema.org',
                 '@type': 'Organization',
-                name: 'Rankings by Go Top',
+                name: 'Go Top SEO',
+                alternateName: ['Rankings by Go Top'],
                 url: 'https://www.gotopseo.com',
                 logo: 'https://www.gotopseo.com/gotop-primary.png',
                 description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
@@ -124,28 +125,25 @@ export default async function RootLayout({
                 },
                 parentOrganization: {
                   '@type': 'Organization',
-                  name: 'Go Top',
+                  name: 'GO TOP',
                   url: 'https://www.gotop.co.il',
                 },
               },
               {
                 '@context': 'https://schema.org',
                 '@type': 'SoftwareApplication',
-                name: 'Rankings by Go Top',
+                name: 'Go Top SEO',
+                alternateName: ['Rankings by Go Top'],
+                publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://gotop.co.il' },
+                brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://gotop.co.il' },
                 description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
                 url: 'https://www.gotopseo.com',
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
-                aggregateRating: {
-                  '@type': 'AggregateRating',
-                  ratingValue: '4.8',
-                  ratingCount: '156',
-                },
-                offers: {
-                  '@type': 'Offer',
-                  price: '0',
-                  priceCurrency: 'ILS',
-                },
+                // No aggregateRating: a rating may only describe real, collected
+                // reviews (Google's review-snippet policy; FTC fake-review rule).
+                // The offer is the real plan range from the catalog.
+                offers: SOFTWARE_OFFER,
                 author: {
                   '@type': 'Organization',
                   name: 'Go Top',
@@ -156,7 +154,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
+      <body className="min-h-full bg-canvas text-body antialiased overflow-x-hidden">
         {/* Google Tag Manager (noscript) - must be first element in body */}
         <div
           suppressHydrationWarning

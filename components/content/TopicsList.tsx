@@ -6,13 +6,18 @@
  * explicit confirm. "Create article" is a disabled placeholder (later phase).
  */
 
-import { useState, useEffect, useCallback, type MouseEvent } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import RowMenu from '@/components/ui/RowMenu'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { Check, ChevronDown, Loader2, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
@@ -24,13 +29,14 @@ import type { ArticleTopic } from '@/lib/supabase/types'
 export default function TopicsList({
   topics,
   projectId,
-  projectName,
   articleByTopic = {},
   onEdit,
   onChanged,
   onToast,
   selectedIds,
   onToggleSelect,
+  allSelected = false,
+  onToggleAll,
   batchState = {},
   batchRunning = false,
   onRetry,
@@ -51,6 +57,9 @@ export default function TopicsList({
   onToast?: (kind: 'success' | 'error', text: string) => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
+  /** The header checkbox: every selectable topic is chosen / choose or clear them all. */
+  allSelected?: boolean
+  onToggleAll?: () => void
   batchState?: Record<string, { status: 'queued' | 'generating' | 'success' | 'failed'; error?: string }>
   batchRunning?: boolean
   onRetry?: (id: string) => void
@@ -72,8 +81,8 @@ export default function TopicsList({
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
-  const isHebrew = language === 'he'
   const router = useRouter()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [busyId, setBusyId] = useState<string | null>(null)
   // Phase 2E.2: internal-link planning (flag-gated). Status is loaded lazily by
   // the drawer (never per-row), so rendering the list triggers zero plan fetches.
@@ -90,31 +99,7 @@ export default function TopicsList({
   }, [onPlanStatusChange])
   const [creatingId, setCreatingId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false) // show first 3 rows by default
-  // The "More" menu renders in a portal at fixed coords so it's never clipped by
-  // the table's overflow-x container (even on the last row).
-  const [menu, setMenu] = useState<{ topicId: string; top: number; left: number } | null>(null)
   const [genError, setGenError] = useState<{ topicId: string; text: string } | null>(null)
-
-  // Reposition-safe: close the menu on scroll/resize (coords would go stale).
-  useEffect(() => {
-    if (!menu) return
-    const close = () => setMenu(null)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => {
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-    }
-  }, [menu])
-
-  const MENU_WIDTH = 180
-  function openMenu(e: MouseEvent<HTMLButtonElement>, topicId: string) {
-    const r = e.currentTarget.getBoundingClientRect()
-    const left = isHebrew
-      ? Math.max(8, r.right - MENU_WIDTH)
-      : Math.min(r.left, window.innerWidth - MENU_WIDTH - 8)
-    setMenu({ topicId, top: r.bottom + 4, left })
-  }
 
   // Build a clear, human failure message from the safe audit debug (no alert).
   function genErrorMessage(data: { reason?: unknown; audit?: { blockers?: unknown } }): string {
@@ -172,7 +157,7 @@ export default function TopicsList({
   }
 
   async function remove(id: string) {
-    if (!window.confirm(c.topicActions.confirmDelete)) return
+    if (!(await confirm({ title: c.topicActions.confirmDeleteTitle, body: c.topicActions.confirmDelete, confirmLabel: c.topicActions.delete, tone: 'danger' }))) return
     setBusyId(id)
     try {
       const res = await fetch(`/api/content/topics/${id}`, { method: 'DELETE' })
@@ -186,7 +171,7 @@ export default function TopicsList({
   // Create a NEW draft article for a topic that already has one. Never deletes
   // or overwrites the existing article — /generate always inserts a new row.
   async function regenerateArticle(topicId: string) {
-    if (!window.confirm(c.topicActions.regenerateConfirm)) return
+    if (!(await confirm({ title: c.topicActions.regenerateConfirmTitle, body: c.topicActions.regenerateConfirm, confirmLabel: c.topicActions.regenerate }))) return
     await createArticle(topicId)
   }
 
@@ -208,28 +193,39 @@ export default function TopicsList({
   return (
     <div className="overflow-x-auto">
       {genError && (
-        <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-          <span>{genError.text}</span>
-          <button type="button" onClick={() => setGenError(null)} className="shrink-0 text-red-500 hover:text-red-700" aria-label="close">✕</button>
-        </div>
+        <Notice tone="bad" className="mb-3" onDismiss={() => setGenError(null)}>
+          {genError.text}
+        </Notice>
       )}
       <Table>
         <TableHead>
           <tr>
-            <Th> </Th>
-            <Th>{c.topicsTable.project}</Th>
+            {/* The row's project is the one the top bar names, so it has no column (UX review P1-18). */}
+            <Th className="w-10">
+              {onToggleAll && topics.some((tp) => !articleByTopic[tp.id]) && (
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={!allSelected && (selectedIds?.size ?? 0) > 0}
+                  onChange={() => onToggleAll()}
+                  disabled={batchRunning}
+                  aria-label={c.batch.selectAll}
+                />
+              )}
+            </Th>
             <Th>{c.topicsTable.topic}</Th>
-            <Th>{c.topicsTable.primaryKeyword}</Th>
-            <Th>{c.topicsTable.searchIntent}</Th>
-            <Th>{c.topicsTable.status}</Th>
-            <Th>{c.topicsTable.anchors}</Th>
-            <Th>{c.topicsTable.created}</Th>
-            <Th>{c.topicsTable.actions}</Th>
+            {/* Below md the row stacks: keyword, intent and status move under the title,
+                and the secondary columns step aside (final review R14/R15). */}
+            <Th className="hidden md:table-cell">{c.topicsTable.primaryKeyword}</Th>
+            <Th className="hidden lg:table-cell">{c.topicsTable.searchIntent}</Th>
+            <Th className="hidden md:table-cell">{c.topicsTable.status}</Th>
+            <Th className="hidden text-end lg:table-cell">{c.topicsTable.anchors}</Th>
+            <Th className="hidden lg:table-cell">{c.topicsTable.created}</Th>
+            <Th className="text-end"><span className="sr-only md:not-sr-only">{c.topicsTable.actions}</span></Th>
           </tr>
         </TableHead>
         <TableBody>
           {topics.length === 0 ? (
-            <EmptyRow colSpan={9} message={c.topicsTable.empty} />
+            <EmptyRow colSpan={8} message={c.topicsTable.empty} />
           ) : (
             visibleTopics.map((topic) => {
               const anchorCount = Array.isArray(topic.anchors_json) ? topic.anchors_json.length : 0
@@ -239,76 +235,84 @@ export default function TopicsList({
               const bs = batchState[topic.id]
               const selectable = !hasArticle
               const highlighted = highlightIds.includes(topic.id)
+              const intentLabel = topic.search_intent ? ((c.brief.intents as Record<string, string>)[topic.search_intent] ?? topic.search_intent).split(' — ')[0] : null
+              // The same status reads in its column from md up, and under the title below it.
+              const statusCell = bs && bs.status !== 'success' ? (
+                bs.status === 'generating' ? (
+                  <span className="inline-flex items-center gap-1.5 text-caption text-muted">
+                    <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+                    {c.batch.generating}
+                  </span>
+                ) : bs.status === 'queued' ? (
+                  <Badge variant="neutral">{c.batch.queued}</Badge>
+                ) : (
+                  <span className="inline-flex flex-col gap-0.5">
+                    <span className="inline-flex items-center gap-2">
+                      <Badge variant="danger">{c.batch.failed}</Badge>
+                      <Button size="sm" variant="ghost" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-action"><RefreshCw className="size-4" aria-hidden="true" />{c.batch.retry}</Button>
+                    </span>
+                    {bs.error && <span className="max-w-64 truncate text-caption text-muted" title={bs.error}>{bs.error}</span>}
+                  </span>
+                )
+              ) : (
+                <Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge>
+              )
               return (
-                <TableRow key={topic.id} className={highlighted ? 'bg-emerald-50 dark:bg-emerald-900/20 transition-colors duration-1000' : undefined}>
+                <TableRow key={topic.id} className={cn(highlighted ? 'bg-action-soft' : selectedIds?.has(topic.id) && 'bg-action-soft hover:bg-action-soft')}>
                   {/* Batch selection — only for topics without an article. */}
                   <Td>
                     {selectable && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedIds?.has(topic.id) ?? false}
                         disabled={batchRunning}
                         onChange={() => onToggleSelect?.(topic.id)}
-                        className="cursor-pointer disabled:cursor-not-allowed"
-                        aria-label={c.topicsTable.topic}
+                        aria-label={`${c.topicsTable.topic}: ${topic.topic}`}
                       />
                     )}
                   </Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{projectName}</span></Td>
-                  {/* De-emphasize topics that already produced an article. */}
-                  <Td><span className={hasArticle ? 'text-slate-500 dark:text-slate-400' : 'font-medium'}>{topic.topic}</span></Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.primary_keyword || '—'}</span></Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.search_intent || '—'}</span></Td>
-                  <Td>
-                    {bs && bs.status !== 'success' ? (
-                      bs.status === 'generating' ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          {c.batch.generating}
-                        </span>
-                      ) : bs.status === 'queued' ? (
-                        <Badge variant="neutral">{c.batch.queued}</Badge>
-                      ) : (
-                        <span className="inline-flex flex-col gap-0.5">
-                          <span className="inline-flex items-center gap-2">
-                            <Badge variant="danger">{c.batch.failed}</Badge>
-                            <button type="button" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50">{c.batch.retry}</button>
-                          </span>
-                          {bs.error && <span className="text-[11px] text-red-600 dark:text-red-400 max-w-[16rem] truncate" title={bs.error}>{bs.error}</span>}
-                        </span>
-                      )
-                    ) : (
-                      <Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge>
+                  {/* De-emphasize topics that already produced an article. The link plan is
+                      the topic's own status, so its chip sits with the title, not as a
+                      second button beside the row's one action. */}
+                  <Td className="min-w-40 md:min-w-48">
+                    <span className={hasArticle ? 'text-muted' : 'font-medium text-ink'}>{topic.topic}</span>
+                    <span data-topic-meta="" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-caption text-muted md:hidden">
+                      {topic.primary_keyword && <span>{topic.primary_keyword}</span>}
+                      {statusCell}
+                    </span>
+                    {planningOn && (
+                      <span className="mt-1.5 flex">
+                        <TopicPlanBadge summary={planStatus[topic.id]} checking={planStatusLoading && !planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
+                      </span>
                     )}
                   </Td>
-                  <Td><span className="text-sm tabular-nums">{anchorCount}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
+                  <Td className="hidden md:table-cell"><span className="text-copy text-body">{topic.primary_keyword || '—'}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="text-copy text-body">{intentLabel || '—'}</span></Td>
+                  <Td className="hidden md:table-cell">{statusCell}</Td>
+                  <Td className="hidden text-end lg:table-cell"><span className="text-copy tabular-nums">{anchorCount}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(topic.created_at)}</span></Td>
                   <Td>
-                    <div className="flex items-center gap-1 justify-end">
-                      {/* Internal-link planning entry point (flag-gated). Opens the
-                          drawer; status is loaded there, never per row. */}
-                      {planningOn && (
-                        <TopicPlanBadge summary={planStatus[topic.id]} checking={planStatusLoading && !planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
-                      )}
+                    {/* Below md the two actions stack, so the row fits a 390 screen
+                        without scrolling the table sideways (final review R15). */}
+                    <div className="flex flex-col items-end gap-1 md:flex-row md:items-center md:justify-end md:gap-1.5">
                       {/* Visible feedback while (re)generating — the primary button
                           may be "Edit article" during a regenerate. */}
                       {creatingId === topic.id && (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <span className="hidden items-center gap-1.5 text-caption text-muted lg:inline-flex">
+                          <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
                           {c.creatingArticleWithImage}
                         </span>
                       )}
                       {/* Primary action: create OR edit the article. */}
                       {articleByTopic[topic.id] ? (
                         <Link href={`/content/articles/${articleByTopic[topic.id].id}`}>
-                          <Button size="sm" variant="outline" className="h-7 whitespace-nowrap shadow-sm hover:translate-y-0">{c.openArticle}</Button>
+                          <Button size="sm" variant="ghost" className="whitespace-nowrap text-action">{c.openArticle}</Button>
                         </Link>
                       ) : (
-                        // Flatten the primary button's lift/shadow so it aligns with the
-                        // outline link-planning + open buttons as equal row actions.
+                        // The row's one inline action; everything else is in the row menu.
                         <Button
                           size="sm"
-                          className="h-7 whitespace-nowrap shadow-sm hover:translate-y-0 hover:shadow-md"
+                          variant="secondary"
+                          className="whitespace-nowrap"
                           onClick={() => createArticle(topic.id)}
                           loading={creatingId === topic.id}
                           disabled={busy || creatingId === topic.id || batchRunning}
@@ -317,17 +321,18 @@ export default function TopicsList({
                         </Button>
                       )}
 
-                      {/* Secondary actions live in a compact "More" menu (portal). */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => openMenu(e, topic.id)}
-                        disabled={busy || batchRunning}
-                        aria-label={c.topicActions.more}
-                        title={c.topicActions.more}
-                      >
-                        ⋯
-                      </Button>
+                      {/* Secondary actions: the shared row menu (edit / approve / reject /
+                          regenerate / delete — delete still asks first). */}
+                      <RowMenu
+                        label={`${c.topicActions.more}: ${topic.topic}`}
+                        items={[
+                          { key: 'edit', label: c.topicActions.edit, onSelect: () => onEdit(topic), disabled: busy || batchRunning, icon: <Pencil className="size-4" aria-hidden="true" /> },
+                          ...(topic.status !== 'approved' ? [{ key: 'approve', label: c.topicActions.approve, onSelect: () => setStatus(topic.id, 'approved'), disabled: busy || batchRunning, icon: <Check className="size-4" aria-hidden="true" /> }] : []),
+                          ...(topic.status !== 'rejected' ? [{ key: 'reject', label: c.topicActions.reject, onSelect: () => setStatus(topic.id, 'rejected'), disabled: busy || batchRunning, icon: <X className="size-4" aria-hidden="true" /> }] : []),
+                          ...(hasArticle ? [{ key: 'regenerate', label: c.topicActions.regenerate, onSelect: () => regenerateArticle(topic.id), disabled: busy || batchRunning, icon: <RefreshCw className="size-4" aria-hidden="true" /> }] : []),
+                          { key: 'delete', label: c.topicActions.delete, danger: true, onSelect: () => remove(topic.id), disabled: busy || batchRunning, icon: <Trash2 className="size-4" aria-hidden="true" /> },
+                        ]}
+                      />
                     </div>
                   </Td>
                 </TableRow>
@@ -342,42 +347,14 @@ export default function TopicsList({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+            aria-expanded={expanded}
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors duration-150 hover:border-line-strong hover:bg-action-soft"
           >
             {expanded ? c.showLess : `${c.showMore} (${topics.length - 3})`}
+            <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform duration-150', expanded && 'rotate-180')} />
           </button>
         </div>
       )}
-
-      {menu && typeof document !== 'undefined' && (() => {
-        const topic = topics.find((t) => t.id === menu.topicId)
-        if (!topic) return null
-        const hasArticle = !!articleByTopic[topic.id]
-        const item = 'block w-full text-start px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800'
-        return createPortal(
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} />
-            <div
-              dir={isHebrew ? 'rtl' : 'ltr'}
-              style={{ position: 'fixed', top: menu.top, left: menu.left, minWidth: MENU_WIDTH }}
-              className="z-50 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1"
-            >
-              <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); onEdit(topic) }}>{c.topicActions.edit}</button>
-              {topic.status !== 'approved' && (
-                <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); setStatus(topic.id, 'approved') }}>{c.topicActions.approve}</button>
-              )}
-              {topic.status !== 'rejected' && (
-                <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); setStatus(topic.id, 'rejected') }}>{c.topicActions.reject}</button>
-              )}
-              {hasArticle && (
-                <button type="button" className={`${item} text-indigo-600 dark:text-indigo-400`} onClick={() => { setMenu(null); regenerateArticle(topic.id) }}>{c.topicActions.regenerate}</button>
-              )}
-              <button type="button" className={`${item} text-red-600 dark:text-red-400`} onClick={() => { setMenu(null); remove(topic.id) }}>{c.topicActions.delete}</button>
-            </div>
-          </>,
-          document.body,
-        )
-      })()}
 
       {/* Internal-link planning drawer (one at a time, flag-gated). */}
       {planningOn && projectId && (
@@ -393,6 +370,7 @@ export default function TopicsList({
           onSaveAndQueue={onSaveAndQueue}
         />
       )}
+      {confirmDialog}
     </div>
   )
 }

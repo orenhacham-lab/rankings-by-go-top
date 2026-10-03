@@ -18,7 +18,7 @@ export async function GET() {
   const baseUrl = 'https://www.gotopseo.com'
 
   // Build the llms.txt content
-  let content = `# LLMs.txt - AI Agent Guidelines for Rankings by Go Top
+  let content = `# LLMs.txt - AI Agent Guidelines for Go Top SEO
 # https://llms.txt
 
 User-agent: *
@@ -41,7 +41,7 @@ Contact: oren@gotop.co.il
 Phone: 054-9489377
 
 # Company Information
-Name: Rankings by Go Top
+Name: Go Top SEO (previously Rankings by Go Top)
 Description: Advanced location tracking system for SEO promotion - Google organic results and Google Maps rankings
 Website: ${baseUrl}
 Language: he

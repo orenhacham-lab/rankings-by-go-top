@@ -136,8 +136,15 @@ async function main() {
     const html = firstRender('en', createElement(Switcher as never))
     check('B1: it renders on the FIRST render (it used to return null until hydration)',
       html.includes('EN') && html.includes('עברית'), html)
+    // The active option is marked twice: for assistive tech (aria-pressed) and on screen
+    // (its own classes). The check used to pin one colour class; it now reads both marks,
+    // so a restyle keeps it and a switch that marks the wrong language still fails it.
+    const buttonOf = (h: string, lang: string) => h.match(new RegExp(`<button[^>]*\\blang="${lang}"[^>]*>`))?.[0] ?? ''
+    const classOf = (tag: string) => /\bclass="([^"]*)"/.exec(tag)?.[1] ?? ''
+    const [enTag, heTag] = [buttonOf(html, 'en'), buttonOf(html, 'he')]
     check('B2: …and it marks the ACTIVE language from the server-resolved value',
-      /bg-indigo-600[^"]*"[^>]*>\s*EN/.test(html) || html.indexOf('bg-indigo-600') > html.indexOf('עברית'), html)
+      /\baria-pressed="true"/.test(enTag) && /\baria-pressed="false"/.test(heTag)
+      && classOf(enTag) !== '' && classOf(enTag) !== classOf(heTag), html)
     const heHtml = firstRender('he', createElement(Switcher as never))
     check('B3: …and the Hebrew button is the active one under initialLocale="he"',
       heHtml !== html)

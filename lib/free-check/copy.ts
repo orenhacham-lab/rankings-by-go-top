@@ -10,7 +10,13 @@
 import type { Locale } from '@/lib/i18n/locales'
 
 export type FreeCheckCopy = {
-  page: { badge: string; title: string; titleAccent: string; subtitle: string }
+  page: {
+    badge: string; title: string; titleAccent: string; subtitle: string
+    /** Short, true reassurances under the form, each with a check (w7 P1-9). */
+    trust: string[]
+    /** What the check shows, one card each under the form (w7 P1-9). */
+    expect: { title: string; body: string }[]
+  }
   form: {
     label: string
     placeholder: string
@@ -56,6 +62,12 @@ const he: FreeCheckCopy = {
     title: 'בדיקת SEO ו-AI לאתר שלכם,',
     titleAccent: 'בפחות מדקה',
     subtitle: 'הכניסו כתובת אתר. אנחנו קוראים את האתר באמת, מבינים במה העסק עוסק, ומראים מה מעכב אתכם בגוגל ובמנועי AI.',
+    trust: ['חינם, בלי כרטיס אשראי', 'בלי להתקין כלום', 'בלי הרשמה'],
+    expect: [
+      { title: 'מה הבנו על העסק', body: 'במה העסק עוסק ומי הלקוחות שלו, כמו שהאתר עצמו מספר.' },
+      { title: 'מה מעכב אתכם', body: 'מה בעמוד מפריע לגוגל ולמנועי AI להבין אתכם, מהחשוב ביותר.' },
+      { title: 'כמה אתם מוכנים ל-AI', body: 'האם ChatGPT ו-Gemini יכולים לקרוא את האתר ולצטט אותו.' },
+    ],
   },
   form: {
     label: 'כתובת האתר',
@@ -163,6 +175,12 @@ const en: FreeCheckCopy = {
     title: 'An SEO and AI check for your site,',
     titleAccent: 'in under a minute',
     subtitle: 'Enter your site address. We actually read the site, work out what the business does, and show what is holding you back in Google and in AI answers.',
+    trust: ['Free, no credit card', 'Nothing to install', 'No sign-up'],
+    expect: [
+      { title: 'What we understood', body: 'What the business does and who its customers are, as the site itself tells it.' },
+      { title: 'What holds you back', body: 'What on the page keeps Google and AI engines from understanding you, most important first.' },
+      { title: 'How ready you are for AI', body: 'Whether ChatGPT and Gemini can read your site and quote it.' },
+    ],
   },
   form: {
     label: 'Site address',

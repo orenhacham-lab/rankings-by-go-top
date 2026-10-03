@@ -1,9 +1,17 @@
 'use client'
 
 /**
- * AIBusinessProfilePanel — manual override for the AI Business Profile.
+ * AIBusinessProfilePanel — what the business is, for the suggested AI questions.
  *
- * Shows the currently-detected category (auto) and lets the user override:
+ * One line says what the business was identified as and from where ("העסק
+ * זוהה כ־ מדריך טיולים ליפן לישראלים · לפי סריקת האתר · שינוי"). The value is
+ * resolved by lib/ai-visibility/business-identity.ts: the owner's own words,
+ * then the site scan, then the name/domain, then a clear keyword majority.
+ * When none of them answers, the line asks the owner instead of guessing.
+ * After a save the questions follow the new profile at once, and the notice
+ * offers to generate new ones.
+ *
+ * The owner can set:
  *   • Primary category — combobox: pick a predefined one OR type freeform
  *     Hebrew (e.g. "משלוחי פרחים", "בשמי נישה", "ניקיון משרדים")
  *   • Secondary categories (free-text tag input)
@@ -15,14 +23,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
+import Notice from '@/components/ui/Notice'
+import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import { ChevronDown, HelpCircle, Pencil, ScanSearch, X } from 'lucide-react'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { cn } from '@/lib/utils'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import {
-  detectCategory,
-  type BusinessCategory,
-  type ManualAIProfile,
-} from '@/lib/ai-visibility/prompt-templates'
+import type { BusinessCategory, ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import type { BusinessIdentity } from '@/lib/ai-visibility/business-identity'
 
 type CategoryOption = { value: BusinessCategory; labelKey: string }
 
@@ -35,6 +44,8 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'appliance_store', labelKey: 'cat_appliance_store' },
   { value: 'ecommerce', labelKey: 'cat_ecommerce' },
   { value: 'local_service', labelKey: 'cat_local_service' },
+  { value: 'home_improvement_service', labelKey: 'cat_home_improvement_service' },
+  { value: 'product_brand', labelKey: 'cat_product_brand' },
   { value: 'cleaning', labelKey: 'cat_cleaning' },
   { value: 'saas', labelKey: 'cat_saas' },
   { value: 'restaurant', labelKey: 'cat_restaurant' },
@@ -45,6 +56,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'beauty', labelKey: 'cat_beauty' },
   { value: 'education', labelKey: 'cat_education' },
   { value: 'second_hand_fashion', labelKey: 'cat_second_hand_fashion' },
+  { value: 'travel', labelKey: 'cat_travel' },
   { value: 'generic', labelKey: 'cat_generic' },
 ]
 
@@ -56,34 +68,37 @@ function categoryLabelText(
   const opt = CATEGORY_OPTIONS.find((o) => o.value === raw)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (opt) return t(opt.labelKey as any)
+  // A code the list does not name yet is never shown raw (home_improvement_service
+  // was): the owner sees "Other" instead. A category they typed stays as typed.
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(raw)) return t('cat_generic')
   return raw
 }
 
 export default function AIBusinessProfilePanel({
   projectId,
-  businessName,
-  domain,
-  keywords,
+  identity,
+  scanDescription,
+  ready,
   initialProfile,
+  onRegenerate,
   onChange,
   onProfileSaved,
 }: {
   projectId: string
-  businessName: string | null
-  domain: string | null
-  keywords: string[]
+  /** What the business is and where that came from (business-identity.ts). */
+  identity: BusinessIdentity
+  /** The site scan's description, shown in the editor so the owner sees what it read. */
+  scanDescription: string | null
+  /** False until the saved profile and the scan have been read. */
+  ready: boolean
   initialProfile: ManualAIProfile | null
+  onRegenerate: () => void
   onChange: (profile: ManualAIProfile | null) => void
   onProfileSaved?: () => void
 }) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const isHebrew = dashboardLanguage === 'he'
-
-  const autoCategory = useMemo<BusinessCategory>(
-    () => detectCategory(businessName || '', domain || '', keywords || []),
-    [businessName, domain, keywords],
-  )
 
   const [mode, setMode] = useState<'auto' | 'manual'>(initialProfile?.mode ?? 'auto')
   const [primaryCategory, setPrimaryCategory] = useState<string>(
@@ -102,10 +117,9 @@ export default function AIBusinessProfilePanel({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  // Always start collapsed. User must click to open even when a manual
-  // profile was previously saved, so the section doesn't auto-expand and
-  // take up space on every visit.
+  // Always start collapsed: the line above says what the business is.
   const [expanded, setExpanded] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const primaryInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -120,15 +134,20 @@ export default function AIBusinessProfilePanel({
     setExcludedTopics(initialProfile?.excludedTopics ?? [])
   }, [initialProfile])
 
-  useEffect(() => {
-    if (!success) return
-    const id = window.setTimeout(() => setSuccess(null), 3500)
-    return () => window.clearTimeout(id)
-  }, [success])
-
-  const displayedCategoryRaw =
-    mode === 'manual' && primaryCategory ? primaryCategory : autoCategory
-  const displayedCategoryLabel = categoryLabelText(t, displayedCategoryRaw)
+  // What the line names: the owner's words or the scan's niche when there are
+  // some, the category's name otherwise. Never "Other": a business nothing
+  // could identify gets the question instead (source 'unknown').
+  const identifiedLabel = identity.label
+    ? categoryLabelText(t, identity.label)
+    : categoryLabelText(t, identity.category)
+  const isUnknown = identity.source === 'unknown' || !identifiedLabel || identifiedLabel === t('cat_generic')
+  const sourceKey = identity.source === 'manual'
+    ? 'profile_source_manual'
+    : identity.source === 'scan'
+      ? 'profile_source_scan'
+      : identity.source === 'site'
+        ? 'profile_source_site'
+        : 'profile_source_keywords'
 
   const filteredSuggestions = useMemo(() => {
     const q = primaryCategory.trim().toLowerCase()
@@ -153,6 +172,12 @@ export default function AIBusinessProfilePanel({
 
   function removeTag(tag: string, list: string[], setter: (v: string[]) => void) {
     setter(list.filter((it) => it !== tag))
+  }
+
+  function openEditor() {
+    setExpanded(true)
+    setSuccess(null)
+    setTimeout(() => primaryInputRef.current?.focus(), 50)
   }
 
   async function save() {
@@ -194,11 +219,11 @@ export default function AIBusinessProfilePanel({
       }
       setMode(saved.mode)
       onChange(saved.mode === 'manual' ? saved : null)
-      setSuccess(t('profile_saved'))
+      setSuccess(t('profile_saved_questions'))
       setExpanded(false)
       onProfileSaved?.()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('profile_save_failed'))
+    } catch {
+      setError(t('profile_save_failed'))
     } finally {
       setSaving(false)
     }
@@ -219,254 +244,265 @@ export default function AIBusinessProfilePanel({
       setSecondaryCategories([])
       setExcludedTopics([])
       onChange(null)
-      setSuccess(t('profile_reset'))
+      setSuccess(t('profile_saved_questions'))
       setExpanded(false)
       onProfileSaved?.()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('profile_reset_failed'))
+    } catch {
+      setError(t('profile_reset_failed'))
     } finally {
       setSaving(false)
     }
   }
 
-  function openEditor() {
-    if (!expanded) setExpanded(true)
-    setTimeout(() => primaryInputRef.current?.focus(), 50)
-  }
+  const tagClasses = 'inline-flex h-7 items-center gap-1 rounded-pill border ps-2.5 pe-1 text-caption font-medium'
+  const tagButtonClasses = 'grid size-5 place-items-center rounded-pill transition-colors duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'
 
   return (
-    <div
-      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 mb-4 overflow-hidden"
-      dir={isHebrew ? 'rtl' : 'ltr'}
-    >
-      {/* Collapsed/header — the WHOLE row is clickable */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full text-start p-4 hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 transition flex items-center gap-4 cursor-pointer"
-        aria-expanded={expanded}
+    <div className="space-y-3" dir={isHebrew ? 'rtl' : 'ltr'} data-ai-profile-panel="" data-ai-profile-source={ready ? identity.source : 'loading'}>
+      <div
+        className={cn(
+          'overflow-hidden rounded-card border border-line bg-surface shadow-card',
+          ready && isUnknown && 'border-s-[3px] border-s-warn',
+        )}
       >
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
-          {/* gear icon */}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 p-5 sm:flex-nowrap sm:p-6">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+            {ready && isUnknown ? <HelpCircle className="size-5" /> : <ScanSearch className="size-5" />}
+          </span>
+
+          <div className="min-w-0 flex-1 basis-48">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-overline font-semibold uppercase tracking-wide text-muted">{t('ai_business_profile')}</h3>
+            </div>
+            {!ready ? (
+              <div className="mt-2" aria-busy="true" aria-label={t('profile_loading')}>
+                <Skeleton className="h-5 w-64 max-w-full" />
+              </div>
+            ) : isUnknown ? (
+              <div className="mt-1 space-y-0.5" data-ai-profile-unknown="">
+                <p className="text-copy font-semibold text-ink">{t('profile_unknown_title')}</p>
+                <p className="max-w-prose text-caption text-muted">{t('profile_unknown_help')}</p>
+              </div>
+            ) : (
+              <div className="mt-1 space-y-0.5" data-ai-profile-detected="">
+                <p className="text-copy text-body">
+                  <span className="text-muted">{t('profile_identified_as')}</span>
+                  <span className="font-semibold text-ink">{identifiedLabel}</span>
+                </p>
+                <p className="text-caption text-muted">{t(sourceKey)}</p>
+              </div>
+            )}
+          </div>
+
+          {ready && (
+            isUnknown && !expanded ? (
+              <Button size="sm" onClick={openEditor} className="shrink-0">
+                <Pencil aria-hidden="true" className="size-4" />
+                {t('profile_set')}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => (expanded ? setExpanded(false) : openEditor())}
+                aria-expanded={expanded}
+                className="shrink-0"
+              >
+                {expanded ? t('close_panel') : (
+                  <>
+                    <Pencil aria-hidden="true" className="size-4" />
+                    {t('profile_change')}
+                  </>
+                )}
+              </Button>
+            )
+          )}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('ai_business_profile')}</h3>
-            <Badge variant={mode === 'manual' ? 'warning' : 'info'}>
-              {mode === 'manual' ? t('manual_badge') : t('auto_badge')}
-            </Badge>
-          </div>
-          <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
-            <span className="text-slate-500 dark:text-slate-400">
-              {mode === 'manual' ? t('manually_set') : t('auto_detected')}:
-            </span>{' '}
-            <span className="font-medium text-slate-800 dark:text-slate-100">{displayedCategoryLabel}</span>
-          </div>
-        </div>
+        {expanded && (
+          <div className="space-y-4 border-t border-line p-5 sm:p-6" data-ai-profile-editor="">
+            {scanDescription && (
+              <div className="space-y-1 rounded-inset bg-sunk px-4 py-3">
+                <p className="text-overline font-semibold uppercase tracking-wide text-muted">{t('profile_scan_found')}</p>
+                <p className="max-w-prose text-caption text-body">{scanDescription}</p>
+              </div>
+            )}
 
-        <span
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition pointer-events-none"
-          aria-hidden="true"
-        >
-          {expanded ? t('close_panel') : t('edit_ai_profile')}
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-      </button>
-
-      {/* Expanded editor */}
-      {expanded && (
-        <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-700">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('ai_business_profile_help')}</p>
-
-          {/* Primary category — freeform combobox */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              {t('primary_category')}
-            </label>
-            <div className="relative">
-              <input
-                ref={primaryInputRef}
-                type="text"
-                value={primaryCategory}
-                onChange={(e) => {
-                  setPrimaryCategory(e.target.value)
-                  setSuggestionsOpen(true)
-                }}
-                onFocus={() => setSuggestionsOpen(true)}
-                onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)}
-                placeholder={t('primary_category_placeholder')}
-                className="w-full rounded-md border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
-                dir={isHebrew ? 'rtl' : 'ltr'}
-                autoComplete="off"
-              />
-              {suggestionsOpen && filteredSuggestions.length > 0 && (
-                <div
-                  className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
+            {/* What the business does — freeform, or one of the known categories */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={`ai-profile-primary-${projectId}`} className={FIELD_LABEL_CLASSES}>
+                {t('profile_what_business')}
+              </label>
+              <div className="relative">
+                <input
+                  id={`ai-profile-primary-${projectId}`}
+                  ref={primaryInputRef}
+                  type="text"
+                  value={primaryCategory}
+                  onChange={(e) => {
+                    setPrimaryCategory(e.target.value)
+                    setSuggestionsOpen(true)
+                  }}
+                  onFocus={() => setSuggestionsOpen(true)}
+                  onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)}
+                  placeholder={identity.label && identity.source === 'scan' ? identity.label : t('profile_what_business_placeholder')}
+                  className={cn(FIELD_CLASSES, 'py-2')}
                   dir={isHebrew ? 'rtl' : 'ltr'}
-                >
-                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-700">
-                    {t('category_suggestions')}
+                  autoComplete="off"
+                />
+                {suggestionsOpen && filteredSuggestions.length > 0 && (
+                  <div
+                    className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-card border border-line bg-surface p-1 shadow-pop"
+                    dir={isHebrew ? 'rtl' : 'ltr'}
+                  >
+                    <div className="px-2.5 py-1.5 text-overline font-semibold uppercase tracking-wide text-muted">
+                      {t('category_suggestions')}
+                    </div>
+                    {filteredSuggestions.map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setPrimaryCategory(opt.value)
+                          setSuggestionsOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-control px-2.5 py-1.5 text-start text-copy text-ink transition-colors duration-150 ease-snappy hover:bg-sunk"
+                      >
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        <span>{t(opt.labelKey as any)}</span>
+                      </button>
+                    ))}
                   </div>
-                  {filteredSuggestions.map((opt) => (
-                    <button
-                      type="button"
-                      key={opt.value}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        setPrimaryCategory(opt.value)
-                        setSuggestionsOpen(false)
+                )}
+              </div>
+              {primaryCategory.trim().length > 0 && (
+                <p className="text-caption text-muted">
+                  {t('manually_set')}: <span className="font-medium text-ink">{categoryLabelText(t, primaryCategory)}</span>
+                </p>
+              )}
+            </div>
+
+            {/* More topics / excluded topics, folded: most owners need only the line above */}
+            <div className="rounded-inset border border-line">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-expanded={moreOpen}
+                className="flex w-full items-center justify-between gap-2 px-4 py-3 text-start text-copy font-medium text-ink transition-colors duration-150 ease-snappy hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-action/20"
+              >
+                {t('profile_more_topics')}
+                <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-muted transition-transform duration-150 ease-snappy', moreOpen && 'rotate-180')} />
+              </button>
+              {moreOpen && (
+                <div className="space-y-4 border-t border-line px-4 py-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor={`ai-profile-secondary-${projectId}`} className={FIELD_LABEL_CLASSES}>
+                      {t('secondary_categories')}
+                    </label>
+                    {secondaryCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {secondaryCategories.map((tag) => (
+                          <span key={tag} className={cn(tagClasses, 'border-line bg-sunk text-ink')}>
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag, secondaryCategories, setSecondaryCategories)}
+                              className={cn(tagButtonClasses, 'text-muted hover:bg-line hover:text-ink')}
+                              aria-label={t('remove_tag')}
+                            >
+                              <X aria-hidden="true" className="size-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      id={`ai-profile-secondary-${projectId}`}
+                      type="text"
+                      value={secondaryInput}
+                      onChange={(e) => setSecondaryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault()
+                          addTag(secondaryInput, secondaryCategories, setSecondaryCategories, () => setSecondaryInput(''))
+                        }
                       }}
-                      className="w-full text-start px-2.5 py-1.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 flex items-center justify-between gap-2"
-                    >
-                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      <span>{t(opt.labelKey as any)}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{opt.value}</span>
-                    </button>
-                  ))}
+                      onBlur={() => addTag(secondaryInput, secondaryCategories, setSecondaryCategories, () => setSecondaryInput(''))}
+                      placeholder={t('add_secondary_placeholder')}
+                      className={cn(FIELD_CLASSES, 'py-2')}
+                      dir={isHebrew ? 'rtl' : 'ltr'}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor={`ai-profile-excluded-${projectId}`} className={FIELD_LABEL_CLASSES}>
+                      {t('excluded_topics')}
+                    </label>
+                    {excludedTopics.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {excludedTopics.map((tag) => (
+                          <span key={tag} className={cn(tagClasses, 'border-bad/20 bg-bad-soft text-bad')}>
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag, excludedTopics, setExcludedTopics)}
+                              className={cn(tagButtonClasses, 'hover:bg-bad/10')}
+                              aria-label={t('remove_tag')}
+                            >
+                              <X aria-hidden="true" className="size-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      id={`ai-profile-excluded-${projectId}`}
+                      type="text"
+                      value={excludedInput}
+                      onChange={(e) => setExcludedInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault()
+                          addTag(excludedInput, excludedTopics, setExcludedTopics, () => setExcludedInput(''))
+                        }
+                      }}
+                      onBlur={() => addTag(excludedInput, excludedTopics, setExcludedTopics, () => setExcludedInput(''))}
+                      placeholder={t('add_excluded_placeholder')}
+                      className={cn(FIELD_CLASSES, 'py-2')}
+                      dir={isHebrew ? 'rtl' : 'ltr'}
+                    />
+                  </div>
                 </div>
               )}
             </div>
-            {primaryCategory.trim().length > 0 && (
-              <p className="mt-1 text-[11px] text-slate-500">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {t('manually_set')}: <span className="font-medium">{primaryCategory}</span>
-              </p>
-            )}
-          </div>
 
-          {/* Secondary categories tag input */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              {t('secondary_categories')}
-            </label>
-            <div className="flex flex-wrap gap-1.5 mb-1.5">
-              {secondaryCategories.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-xs text-indigo-700"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag, secondaryCategories, setSecondaryCategories)}
-                    className="text-indigo-400 hover:text-indigo-700"
-                    aria-label="Remove tag"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={secondaryInput}
-              onChange={(e) => setSecondaryInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault()
-                  addTag(secondaryInput, secondaryCategories, setSecondaryCategories, () =>
-                    setSecondaryInput(''),
-                  )
-                }
-              }}
-              onBlur={() =>
-                addTag(secondaryInput, secondaryCategories, setSecondaryCategories, () =>
-                  setSecondaryInput(''),
-                )
-              }
-              placeholder={t('add_secondary_placeholder')}
-              className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              dir={isHebrew ? 'rtl' : 'ltr'}
-            />
-          </div>
+            <p className="text-caption text-muted">{t('ai_business_profile_help')}</p>
 
-          {/* Excluded topics tag input */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              {t('excluded_topics')}
-            </label>
-            <div className="flex flex-wrap gap-1.5 mb-1.5">
-              {excludedTopics.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-xs text-red-700"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag, excludedTopics, setExcludedTopics)}
-                    className="text-red-400 hover:text-red-700"
-                    aria-label="Remove tag"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={excludedInput}
-              onChange={(e) => setExcludedInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault()
-                  addTag(excludedInput, excludedTopics, setExcludedTopics, () =>
-                    setExcludedInput(''),
-                  )
-                }
-              }}
-              onBlur={() =>
-                addTag(excludedInput, excludedTopics, setExcludedTopics, () =>
-                  setExcludedInput(''),
-                )
-              }
-              placeholder={t('add_excluded_placeholder')}
-              className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              dir={isHebrew ? 'rtl' : 'ltr'}
-            />
-          </div>
+            {error && <Notice tone="bad">{error}</Notice>}
 
-          {error && (
-            <div className="p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 mb-3">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="p-2 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 mb-3">
-              {success}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button size="sm" onClick={save} loading={saving} disabled={saving}>
-              {t('save_profile')}
-            </Button>
-            {mode === 'manual' && (
-              <Button size="sm" variant="outline" onClick={resetToAuto} disabled={saving}>
-                {t('reset_to_auto')}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={save} loading={saving} disabled={saving}>
+                {t('save_profile')}
               </Button>
-            )}
-            {/* placate unused-warning for openEditor; exposed for parent triggers if ever needed */}
-            <span className="hidden" aria-hidden onClick={openEditor} />
+              {mode === 'manual' && (
+                <Button size="sm" variant="secondary" onClick={resetToAuto} disabled={saving}>
+                  {t('reset_to_auto')}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      {success && !expanded && (
+        <Notice
+          tone="ok"
+          action={{ label: t('profile_regenerate'), onClick: () => { setSuccess(null); onRegenerate() } }}
+          onDismiss={() => setSuccess(null)}
+        >
+          {success}
+        </Notice>
       )}
     </div>
   )

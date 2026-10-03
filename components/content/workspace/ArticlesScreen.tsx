@@ -9,29 +9,62 @@
  * their own screens now, so this file is about articles and nothing else.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { ARTICLES_WAITING_STATUS } from '@/lib/nudges/rows'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
-import { formatDate } from '@/lib/utils'
-import { ExternalLink, Plus } from 'lucide-react'
+import SiteHubCard from '@/components/content/site-platforms/SiteHubCard'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { cn, formatDate } from '@/lib/utils'
+import SectionHeading from '@/components/ui/SectionHeading'
+import EmptyState from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
+import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
+import Checkbox from '@/components/ui/Checkbox'
+import { CheckCircle2, ChevronDown, ExternalLink, FileText, Lightbulb, Loader2, Pencil, Plus, Search, Send, ShieldCheck, Trash2, Upload, X } from 'lucide-react'
+import { resolvePublishCta } from '@/lib/content/publish-cta'
+import { CitedBadge } from '@/components/content/ArticleAiVisibilityCard'
+import RowMenu from '@/components/ui/RowMenu'
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 import { BATCH_LIMIT, STATUS_TONE, type ArticleRow } from './types'
+import ArticlesHero from './ArticlesHero'
+import { articleStanding } from './articles-standing'
+import { useFirstEntrance } from '@/components/ui/motion'
+
+/** Rows shown before "show more" (design contract §7). */
+const ARTICLES_PAGE = 25
 
 export default function ArticlesScreen() {
   const {
-    t, projectId, data, counts, toast, selectedProject,
-    activePlatform, isShopify, exportedIdOf, load, loadTopics, patchArticle, shopifyPublishError,
+    t, projectId, data, overviewSettled, counts, toast,
+    activePlatform, isShopify, isSite, exportedIdOf, load, loadTopics, patchArticle, shopifyPublishError,
     handleCreateTopic,
   } = useContentWorkspace()
+  // Wix / custom-site wording (the rest of this screen's copy is the content hub's).
+  const { language } = useDashboardLanguage()
+  const sp = getDashboardDictionary(language).sitePlatforms
+  const siteError = (code: unknown) => (sp.errors as Record<string, string>)[String(code ?? '')] ?? sp.errors.unexpected
+  // Publishing goes live, so it asks first — in the app's own dialog, not the browser's.
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const cf = t.confirms
+  const confirmPublish = (body: string) => confirm({ title: cf.publishTitle, body, confirmLabel: cf.publishAction })
 
-  const [statusFilter, setStatusFilter] = useState('')
+  // A nudge ("articles waiting for your OK") opens this screen already filtered on them; only
+  // that one fixed value is read from the address, anything else is the unfiltered list.
+  const urlParams = useSearchParams()
+  const [statusFilter, setStatusFilter] = useState(() => (urlParams?.get('status') === ARTICLES_WAITING_STATUS ? ARTICLES_WAITING_STATUS : ''))
   const [search, setSearch] = useState('')
-  const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
+  const [articlesExpanded, setArticlesExpanded] = useState(false) // show the first ARTICLES_PAGE rows by default
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
 
   // ── Batch publish/draft on the active platform (client-side, sequential) ──
@@ -43,14 +76,37 @@ export default function ArticlesScreen() {
   const articleBatchRef = useRef(false)
   const cancelArticleRef = useRef(false)
 
-  async function deleteArticle(id: string) {
-    if (!window.confirm(t.confirmDeleteArticle)) return
+  // C9 — which published articles a stored AI citation points at (by live URL).
+  const [cited, setCited] = useState<Record<string, string[]>>({})
+  const articleCount = data?.articles?.length ?? 0
+  useEffect(() => {
+    if (!projectId || articleCount === 0) { setCited({}); return }
+    let live = true
+    fetch(`/api/content/citations?projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => (r.ok ? r.json() : { cited: {} }))
+      .then((d: { cited?: Record<string, string[]> }) => { if (live) setCited(d.cited ?? {}) })
+      .catch(() => { if (live) setCited({}) })
+    return () => { live = false }
+  }, [projectId, articleCount])
+
+  // C1 — the same invitation as the article viewer's top bar: with no site
+  // connected (or a Shopify store without the publishing scope) an unpublished
+  // row offers the connect / scope-upgrade link instead of a publish button.
+  const rowCta = resolvePublishCta({
+    projectId,
+    platform: activePlatform,
+    shopifyNeedsScope: !!data?.platform?.shopifyNeedsScope,
+    shopDomain: data?.shopify?.shopDomain ?? null,
+  })
+
+  // The article whose deletion is being confirmed (the "⋯" menu opens the dialog).
+  const [deleting, setDeleting] = useState<ArticleRow | null>(null)
+  async function deleteArticle(id: string): Promise<{ ok: boolean }> {
     try {
       const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
-      if (res.ok) { load(); loadTopics(); toast.success(t.toasts.articleDeleted) }
-      else toast.error(t.deleteFailed)
+      return { ok: res.ok }
     } catch {
-      toast.error(t.deleteFailed)
+      return { ok: false }
     }
   }
 
@@ -63,10 +119,11 @@ export default function ArticlesScreen() {
     if (activePlatform === 'conflict') { toast.error(t.rowShopify.conflict); return }
     if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
     if (activePlatform === 'shopify') { await exportRowShopify(a, wpStatus); return }
-    if (wpStatus === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
+    if (isSite) { await exportRowSite(a, wpStatus); return }
+    if (wpStatus === 'publish' && !(await confirmPublish(t.rowWp.publishConfirm))) return
     let force = false
     if (a.wp_post_id) {
-      if (!window.confirm(t.rowWp.newPostConfirm)) return
+      if (!(await confirm({ title: cf.newPostTitle, body: t.rowWp.newPostConfirm, confirmLabel: cf.newPostAction }))) return
       force = true
     }
     setRowBusy({ id: a.id, action: wpStatus })
@@ -107,7 +164,7 @@ export default function ArticlesScreen() {
   // shopify_article_id (a retry reconciles the same article, never a duplicate). Surfaces the
   // exact corrective action for a real Shopify prerequisite (scope / blog) — never hidden.
   async function exportRowShopify(a: ArticleRow, status: 'draft' | 'publish') {
-    if (status === 'publish' && !window.confirm(t.rowShopify.publishConfirm)) return
+    if (status === 'publish' && !(await confirmPublish(t.rowShopify.publishConfirm))) return
     setRowBusy({ id: a.id, action: status })
     try {
       const res = await fetch(`/api/content/articles/${a.id}/shopify`, {
@@ -134,6 +191,29 @@ export default function ArticlesScreen() {
       toast.error(shopifyPublishError(d.reason ?? d.error))
     } catch {
       toast.error(t.rowShopify.errGeneric)
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  // Wix / custom site: publish only (these platforms have no draft step).
+  // Idempotent server-side: an article already on the site is reconciled.
+  async function exportRowSite(a: ArticleRow, mode: 'draft' | 'publish') {
+    if (mode === 'draft') { toast.error(sp.publish.draftUnsupported); return }
+    if (!(await confirm({ title: sp.publish.confirm, confirmLabel: cf.publishAction }))) return
+    setRowBusy({ id: a.id, action: 'publish' })
+    try {
+      const res = await fetch(`/api/content/articles/${a.id}/site-platform`, { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) {
+        patchArticle(a.id, { status: 'published', published_at: new Date().toISOString() })
+        toast.success(sp.publish.published)
+        load()
+        return
+      }
+      toast.error(siteError(d.reason ?? d.error))
+    } catch {
+      toast.error(sp.errors.unexpected)
     } finally {
       setRowBusy(null)
     }
@@ -170,6 +250,7 @@ export default function ArticlesScreen() {
   function alreadyExported(a: ArticleRow): boolean {
     return activePlatform === 'shopify'
       ? !!a.shopify_article_id || a.status === 'published'
+      : isSite ? a.status === 'published'
       : !!a.wp_post_id || a.status === 'published'
   }
 
@@ -210,6 +291,13 @@ export default function ArticlesScreen() {
     const timer = setTimeout(() => controller.abort(), 60_000)
     const publishedPatch = (extra: ExportOnePatch): ExportOnePatch => ({ ...extra, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
     try {
+      if (isSite) {
+        if (mode === 'draft') return { ok: false, error: sp.publish.draftUnsupported }
+        const res = await fetch(`/api/content/articles/${id}/site-platform`, { method: 'POST', signal: controller.signal })
+        const d = await res.json().catch(() => ({}))
+        if (res.ok && d.ok) return { ok: true, patch: publishedPatch({}) }
+        return { ok: false, error: siteError(d.reason ?? d.error) }
+      }
       if (activePlatform === 'shopify') {
         const res = await fetch(`/api/content/articles/${id}/shopify`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -229,7 +317,7 @@ export default function ArticlesScreen() {
       return { ok: false, error: reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
-      return { ok: false, error: (activePlatform === 'shopify' ? t.rowShopify.errGeneric : t.rowWp.errGeneric) }
+      return { ok: false, error: (activePlatform === 'shopify' ? t.rowShopify.errGeneric : isSite ? sp.errors.unexpected : t.rowWp.errGeneric) }
     } finally {
       clearTimeout(timer)
     }
@@ -245,7 +333,14 @@ export default function ArticlesScreen() {
     })
     if (ids.length === 0) return
     if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
-    if (mode === 'publish' && !window.confirm(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : t.rowWp.publishConfirm)) return
+    if (isSite && mode === 'draft') { toast.error(sp.publish.draftUnsupported); return }
+    if (mode === 'publish') {
+      // The lock is taken only after the answer, so a cancelled question leaves nothing held.
+      const ok = isSite
+        ? await confirm({ title: sp.publish.confirm, confirmLabel: cf.publishAction })
+        : await confirmPublish(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : t.rowWp.publishConfirm)
+      if (!ok || articleBatchRef.current) return
+    }
     articleBatchRef.current = true
     cancelArticleRef.current = false
     setArticleBatchRunning(true); setArticleBatchMode(mode)
@@ -263,7 +358,7 @@ export default function ArticlesScreen() {
       const r = await exportOne(id, mode)
       if (r.ok && r.patch) {
         ok++
-        if (activePlatform !== 'shopify' && r.seoStatus && r.seoStatus !== 'verified' && r.seoStatus !== 'plugin_unavailable') seoUnverified++
+        if (activePlatform !== 'shopify' && !isSite && r.seoStatus && r.seoStatus !== 'verified' && r.seoStatus !== 'plugin_unavailable') seoUnverified++
         patchArticle(id, r.patch)
         setArticleBatchState((s) => ({ ...s, [id]: { status: 'success' } }))
       } else {
@@ -292,17 +387,40 @@ export default function ArticlesScreen() {
   const wpState = (a: ArticleRow): 'published' | 'exported' | 'none' =>
     a.wp_post_id && a.status === 'published' ? 'published' : a.wp_post_id ? 'exported' : 'none'
 
-  const statCards = counts
-    ? [
-        { key: 'total', label: t.stats.total, value: counts.total },
-        { key: 'draft', label: t.stats.draft, value: counts.draft },
-        { key: 'ready', label: t.stats.ready, value: counts.ready },
-        { key: 'scheduled', label: t.stats.scheduled, value: counts.scheduled },
-        { key: 'published', label: t.stats.published, value: counts.published },
-        { key: 'failed', label: t.stats.failed, value: counts.failed },
-      ]
-    : []
+  // Where the articles stand, for the hero (the overview's counts plus the pace read
+  // from the rows). With no articles the empty state below speaks instead; the hero
+  // keeps design contract §7: a figure that says "0" says nothing.
+  const standing = useMemo(
+    () => (counts && counts.total > 0 ? articleStanding(counts, data?.articles ?? []) : null),
+    [counts, data?.articles],
+  )
+  // The rows rise in once, when the first articles arrive; a filter, "show more" or a
+  // reload after a publish shows them at once.
+  const rowsEnter = useFirstEntrance(filteredArticles.length > 0)
+  const shownArticles = articlesExpanded ? filteredArticles : filteredArticles.slice(0, ARTICLES_PAGE)
+  const selectedCount = selectedArticles.size
+  const someArticlesSelected = selectedCount > 0 && !allArticlesSelected
 
+
+  // With WordPress connected the destination card is only this one line (the card renders
+  // its children), and above the hero it floated on its own (review P2-11). When the hero
+  // is on screen the line is the hero's footer instead; everything else is unchanged.
+  const heroShown = !!standing && (data?.articles?.length ?? 0) > 0
+  const connectionInHero = heroShown && data?.platform?.platform === 'wordpress'
+  // One line, drawn in two places: on the page (dark text) or in the hero (light text).
+  const connectionLine = (onHero: boolean) => (
+    <>
+      <span className={onHero ? undefined : 'text-copy text-body'}>{t.manageConnection}</span>
+      <Link
+        href={platformSetupHref(projectId)}
+        className={onHero
+          ? 'whitespace-nowrap rounded-control font-semibold text-contrast-ink underline decoration-contrast-ink/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:decoration-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-contrast-ink/25'
+          : 'text-copy font-medium text-action hover:underline'}
+      >
+        {t.manageConnectionCta}
+      </Link>
+    </>
+  )
 
   return (
     <>
@@ -316,90 +434,100 @@ export default function ArticlesScreen() {
           It is shown only once a platform IS connected. With none connected the
           setup card above already asks for exactly that, with the same links,
           and two cards asking one question is the clutter this split removes. */}
-      {activePlatform !== 'none' && (
+      {/* Only once this project's overview says which platform: until then the
+          platform is not known, and a guess drew the wrong card for a second. */}
+      {data && activePlatform !== 'none' && (connectionInHero ? null :
         <div className="mb-4">
+          {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-slate-600 dark:text-slate-300">{t.manageConnection}</span>
-              <Link href={platformSetupHref(projectId)} className="text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:underline">
-                {t.manageConnectionCta}
-              </Link>
-            </div>
+            <div className="flex flex-wrap items-center gap-3">{connectionLine(false)}</div>
           </ContentHubPlatformCard>
+          )}
         </div>
       )}
 
-      {/* Primary action */}
-      <div className="flex justify-end mb-4">
-        <Button onClick={handleCreateTopic}>
-          <Plus size={16} /> {t.newTopicButton}
-        </Button>
-      </div>
+      {/* Where the articles stand: the headline, the figures, the spread and the pace. */}
+      {heroShown && standing && <ArticlesHero standing={standing} connection={connectionInHero ? connectionLine(true) : undefined} />}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {statCards.map((s) => (
-          <Card key={s.key} className="p-3 hover:translate-y-0">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">{s.label}</div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{s.value}</div>
-          </Card>
-        ))}
-      </div>
+      {/* ── Section 1: generated articles, with the screen's primary action ── */}
+      <SectionHeading
+        title={t.articlesHeading}
+        description={t.articlesSubtitle}
+        // With no articles the empty state's own button is the one primary on the screen.
+        action={(data?.articles?.length ?? 0) > 0 ? <Button onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button> : undefined}
+      />
 
-      {/* ── Section 1: generated articles ── */}
-      <div className="mt-2 mb-3 border-t border-slate-200 dark:border-slate-800 pt-5">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.articlesHeading}</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t.articlesSubtitle}</p>
-      </div>
-
-      {(data?.articles?.length ?? 0) === 0 ? (
-        <Card className="p-8 text-center mb-6">
-          <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.articlesEmptyTitle}</p>
-          <Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>
+      {!overviewSettled ? (
+        // The list's shape while this project's articles are read: never
+        // "no articles yet" to a merchant whose articles are on their way.
+        <div className="mb-6" data-articles-loading="">
+          <TableSkeleton label={getDashboardDictionary(language).common.loading} rows={4} />
+        </div>
+      ) : (data?.articles?.length ?? 0) === 0 ? (
+        <Card padding={false} className="mb-6">
+          <EmptyState
+            icon={<FileText />}
+            title={t.articlesEmptyTitle}
+            body={t.articlesEmptyBody}
+            action={<Button size="lg" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>}
+            secondary={(
+              <Link href="/content/strategy" className="inline-flex items-center gap-1.5 font-medium text-action hover:underline">
+                <Lightbulb aria-hidden="true" className="size-4" />{t.articlesEmptyIdeas}
+              </Link>
+            )}
+          />
         </Card>
       ) : (
       <>
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-3">
-        <select
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1 basis-56 sm:max-w-xs">
+          <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <Input
+            type="search"
+            placeholder={t.filters.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t.filters.search}
+            className="h-10 rounded-pill ps-9 shadow-control"
+          />
+        </div>
+        <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">{t.filters.allStatuses}</option>
-          {['draft', 'ready', 'scheduled', 'publishing', 'published', 'failed'].map((s) => (
-            <option key={s} value={s}>{statusLabel(s)}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder={t.filters.search}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 max-w-xs px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={t.filters.status}
+          className="h-10 w-auto"
+          options={[
+            { value: '', label: t.filters.allStatuses },
+            ...['draft', 'ready', 'scheduled', 'publishing', 'published', 'failed'].map((s) => ({ value: s, label: statusLabel(s) })),
+          ]}
         />
       </div>
 
-      {/* Batch WordPress export bar — only when there are eligible articles. */}
-      {selectableArticles.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" checked={allArticlesSelected} onChange={toggleArticleSelectAll} disabled={articleBatchRunning} className="cursor-pointer" />
-            {t.batch.selectAll}
-          </label>
-          <span className="text-sm text-slate-600 dark:text-slate-300">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
-          <Button size="sm" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
-            {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedArticles.size))}
+      {/* Bulk bar (design contract §7) — only while something is selected or a
+          batch runs: sticky, dark, three actions at most. Select-all lives in
+          the table head. */}
+      {(selectedCount > 0 || articleBatchRunning) && (
+        <div data-bulk-bar="" role="region" aria-label={t.batch.selected.replace('{n}', String(selectedCount))} className="bar-rise sticky top-16 z-20 mb-3 flex flex-wrap items-center gap-2 overflow-hidden rounded-card bg-contrast bg-[linear-gradient(100deg,var(--color-contrast),color-mix(in_srgb,var(--color-contrast)_82%,var(--color-action)))] px-3 py-2.5 text-contrast-ink shadow-pop ring-1 ring-contrast-ink/10 sm:px-4">
+          {/* The count, as a lit pill: what the three actions will act on. */}
+          <span className="me-2 inline-flex items-center gap-2 text-copy font-semibold tabular-nums">
+            <span aria-hidden="true" className="grid h-7 min-w-7 place-items-center rounded-pill bg-rail-focus px-2 text-caption font-bold text-contrast">{selectedCount}</span>
+            {t.batch.selected.replace('{n}', String(selectedCount))}
+          </span>
+          <Button size="sm" variant="ghost" className="text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedCount === 0 || selectedCount > BATCH_LIMIT}>
+            {!(articleBatchRunning && articleBatchMode === 'publish') && <Upload aria-hidden="true" className="size-4" />}
+            {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedCount))}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
-            {articleBatchRunning && articleBatchMode === 'draft' ? t.rowWp.sending : t.batch.draftSelected.replace('{n}', String(selectedArticles.size))}
-          </Button>
+          {!isSite && <Button size="sm" variant="ghost" className="text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedCount === 0 || selectedCount > BATCH_LIMIT}>
+            {!(articleBatchRunning && articleBatchMode === 'draft') && <Send aria-hidden="true" className="size-4 rtl:-scale-x-100" />}
+            {articleBatchRunning && articleBatchMode === 'draft' ? t.rowWp.sending : t.batch.draftSelected.replace('{n}', String(selectedCount))}
+          </Button>}
           {articleBatchRunning ? (
-            <Button size="sm" variant="ghost" onClick={cancelArticleBatch}>{t.batch.cancel}</Button>
+            <Button size="sm" variant="ghost" className="ms-auto text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={cancelArticleBatch}>{t.batch.cancel}</Button>
           ) : (
-            selectedArticles.size > 0 && <Button size="sm" variant="ghost" onClick={clearArticleSelection}>{t.batch.clear}</Button>
+            <Button size="sm" variant="ghost" className="ms-auto text-contrast-ink hover:bg-surface/10 hover:text-contrast-ink" onClick={clearArticleSelection}><X aria-hidden="true" className="size-4" />{t.batch.clear}</Button>
           )}
-          {selectedArticles.size > BATCH_LIMIT && <span className="text-xs text-amber-600 dark:text-amber-400">{t.batch.tooMany}</span>}
+          {selectedCount > BATCH_LIMIT && <span className="basis-full text-caption">{t.batch.tooMany}</span>}
         </div>
       )}
 
@@ -407,78 +535,105 @@ export default function ArticlesScreen() {
       <div className="overflow-x-auto mb-6">
         <Table>
           <TableHead>
-            <tr>
-              <Th> </Th>
+            <tr className="max-sm:[&>th]:px-2.5">
+              <Th className="w-10">
+                {selectableArticles.length > 0 && (
+                  <Checkbox
+                    checked={allArticlesSelected}
+                    indeterminate={someArticlesSelected}
+                    onChange={toggleArticleSelectAll}
+                    disabled={articleBatchRunning}
+                    aria-label={t.batch.selectAll}
+                  />
+                )}
+              </Th>
               <Th>{t.table.title}</Th>
-              <Th>{t.table.project}</Th>
-              <Th>{t.table.status}</Th>
-              <Th>{t.table.created}</Th>
-              <Th>{t.table.updated}</Th>
-              <Th>{t.table.scheduledAt}</Th>
-              <Th>{t.table.publishedAt}</Th>
+              {/* No "project / site" column: every row is the project the top bar
+                  names (UX review P1-18). */}
+              {/* PRIORITY COLUMNS: on a phone the row is checkbox, title (with its
+                  status under it) and actions; dates and publication return as
+                  the screen widens, instead of the table scrolling sideways. */}
+              <Th className="hidden sm:table-cell">{t.table.status}</Th>
+              <Th className="hidden md:table-cell">{t.table.created}</Th>
+              <Th className="hidden xl:table-cell">{t.table.updated}</Th>
+              <Th className="hidden lg:table-cell">{t.table.scheduledAt}</Th>
+              <Th className="hidden lg:table-cell">{t.table.publishedAt}</Th>
               {/* The column carries the row's PUBLICATION state, which is
                   WordPress or Shopify depending on the active platform.
                   Labelling it "WordPress" for a Shopify project was simply
                   wrong; a neutral heading is used whenever the row is not
                   WordPress. */}
-              <Th>{isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
+              <Th className="hidden md:table-cell">{isSite ? t.table.publication : isShopify ? t.table.publication : t.table.wordpressUrl}</Th>
               <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
-          <TableBody>
+          <TableBody enter={rowsEnter}>
             {filteredArticles.length === 0 ? (
-              <EmptyRow colSpan={10} message={t.table.emptyTitle} />
+              <EmptyRow colSpan={9} message={t.table.emptyTitle} />
             ) : (
-              (articlesExpanded ? filteredArticles : filteredArticles.slice(0, 3)).map((a) => {
+              shownArticles.map((a) => {
                 const selectableArticle = !alreadyExported(a)
                 return (
-                <TableRow key={a.id}>
-                  <Td>
+                <TableRow key={a.id} className={cn('max-sm:[&>td]:px-2.5', selectedArticles.has(a.id) && 'bg-action-soft/60')}>
+                  <Td className="w-10">
                     {selectableArticle && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedArticles.has(a.id)}
                         disabled={articleBatchRunning}
                         onChange={() => toggleArticleSelect(a.id)}
-                        className="cursor-pointer disabled:cursor-not-allowed"
-                        aria-label={t.table.title}
+                        aria-label={t.table.selectArticle(a.title)}
                       />
                     )}
                   </Td>
-                  <Td><span className="font-medium">{a.title}</span></Td>
-                  <Td><span className="text-sm text-slate-600 dark:text-slate-300">{selectedProject?.name ?? '—'}</span></Td>
-                  <Td><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
-                  <Td><span className="text-xs text-slate-500">{formatDate(a.created_at)}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{formatDate(a.updated_at)}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{a.scheduled_at ? formatDate(a.scheduled_at) : '—'}</span></Td>
-                  <Td><span className="text-xs text-slate-500">{a.published_at ? formatDate(a.published_at) : '—'}</span></Td>
-                  <Td>
+                  <Td className="min-w-[9rem] sm:min-w-[12rem]">
+                    <div className="flex items-center gap-3">
+                      <ArticleThumb src={a.featured_image_url} />
+                      <div className="min-w-0">
+                        <Link href={`/content/articles/${a.id}`} className="font-semibold text-ink hover:text-action hover:underline">{a.title}</Link>
+                        <div className="mt-1 sm:hidden"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></div>
+                        {a.status === 'published' && cited[a.id]?.length ? (
+                          <div className="mt-1"><CitedBadge t={t.editor.aiVisibility} engines={cited[a.id]} /></div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </Td>
+                  <Td className="hidden sm:table-cell"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
+                  <Td className="hidden md:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.created_at, language)}</span></Td>
+                  <Td className="hidden xl:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.updated_at, language)}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.scheduled_at ? formatDate(a.scheduled_at, language) : '—'}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.published_at ? formatDate(a.published_at, language) : '—'}</span></Td>
+                  <Td className="hidden md:table-cell">
                     {(() => {
                       // Platform-aware publication state — a Shopify project shows Shopify
                       // status/URL and never WordPress wording.
+                      if (isSite) {
+                        return a.status === 'published'
+                          ? <Badge variant="success">{sp.publish.live}</Badge>
+                          : <NotSent label={sp.publish.notSent} />
+                      }
                       if (isShopify) {
-                        if (!a.shopify_article_id) return <span className="text-xs text-slate-400 dark:text-slate-500">{t.shopifyState.notSent}</span>
+                        if (!a.shopify_article_id) return <NotSent label={t.shopifyState.notSent} />
                         const published = a.status === 'published' || a.shopify_status === 'published'
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant={published ? 'success' : 'neutral'}>{published ? t.shopifyState.published : t.shopifyState.exported}</Badge>
                             {a.shopify_article_url && (
-                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
-                                {t.shopifyState.open}<ExternalLink size={12} />
+                              <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+                                {t.shopifyState.open}<ExternalLink aria-hidden="true" className="size-3.5" />
                               </a>
                             )}
                           </span>
                         )
                       }
                       const s = wpState(a)
-                      if (s === 'none') return <span className="text-xs text-slate-400 dark:text-slate-500">{t.wpState.notSent}</span>
+                      if (s === 'none') return <NotSent label={t.wpState.notSent} />
                       const published = s === 'published'
                       return (
                         <span className="inline-flex items-center gap-2">
                           <Badge variant={published ? 'success' : 'neutral'}>{published ? t.wpState.published : t.wpState.exported}</Badge>
                           {a.wp_post_url && (
-                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
-                              {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink size={12} />
+                            <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-control text-caption font-medium text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+                              {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink aria-hidden="true" className="size-3.5" />
                             </a>
                           )}
                         </span>
@@ -491,8 +646,8 @@ export default function ArticlesScreen() {
                       if (abs && abs.status !== 'success') {
                         if (abs.status === 'running') {
                           return (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            <span className="inline-flex items-center gap-1.5 text-caption text-muted">
+                              <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
                               {articleBatchMode === 'publish' ? t.rowWp.publishing : t.rowWp.sending}
                             </span>
                           )
@@ -501,35 +656,60 @@ export default function ArticlesScreen() {
                         return (
                           <span className="inline-flex items-center gap-2">
                             <Badge variant="danger">{t.batch.failed}</Badge>
-                            {abs.error && <span className="text-[11px] text-red-600 dark:text-red-400 max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
+                            {abs.error && <span className="max-w-56 truncate text-caption text-muted" title={abs.error}>{abs.error}</span>}
                           </span>
                         )
                       }
+                      // Row actions (design contract §7): at most ONE inline action,
+                      // the most useful next step for this row; everything else sits
+                      // behind "⋯". Every action and every condition is the same as
+                      // before — only where it is drawn changed.
+                      const canAct = activePlatform !== 'conflict' && activePlatform !== 'none' && rowCta.kind !== 'grant_scope' && a.status !== 'published'
+                      const canPublish = canAct && (a.status === 'ready' || !!exportedIdOf(a))
+                      const canSendDraft = canAct && !isSite && a.status === 'ready' && !exportedIdOf(a)
+                      const canMarkReady = a.status === 'draft' && !exportedIdOf(a)
+                      const busyHere = rowBusy?.id === a.id
+                      const rowLocked = !!rowBusy || articleBatchRunning
+                      const publishLabel = isShopify ? t.rowShopify.publish : isSite ? sp.publish.button : t.rowWp.publish
+                      const draftLabel = isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft
+                      const INLINE = 'inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-caption font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:whitespace-nowrap'
+                      // With no site connected the rows never repeat "connect the site to
+                      // publish": the setup card at the top of the workspace says it once
+                      // (final review R24). A draft still offers "mark ready" inline.
+                      const inline = a.status !== 'published' && rowCta.kind === 'grant_scope' ? (
+                        <a href={rowCta.href} data-cta="grant_scope" className={INLINE}>
+                          <ShieldCheck aria-hidden="true" className="size-4" /> {t.editor.topBar.grantScope}
+                        </a>
+                      ) : canPublish ? (
+                        <Button size="sm" variant="ghost" className="whitespace-nowrap text-action hover:bg-action-soft hover:text-action" onClick={() => exportRow(a, 'publish')} loading={busyHere && rowBusy?.action === 'publish'} disabled={rowLocked}>
+                          {busyHere && rowBusy?.action === 'publish' ? t.rowWp.publishing : publishLabel}
+                        </Button>
+                      ) : canMarkReady ? (
+                        <Button size="sm" variant="ghost" className="whitespace-nowrap text-action hover:bg-action-soft hover:text-action" onClick={() => markReadyRow(a)} loading={busyHere && rowBusy?.action === 'ready'} disabled={rowLocked}>
+                          {t.rowWp.markReady}
+                        </Button>
+                      ) : null
+                      const inlineIsMarkReady = !canPublish && canMarkReady && !(a.status !== 'published' && rowCta.kind === 'grant_scope')
+                      const menuBusy = busyHere && (rowBusy?.action === 'draft' || (rowBusy?.action === 'ready' && !inlineIsMarkReady))
                       return (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {/* State-based publish actions — routed by the active platform
-                              (WordPress or Shopify). Hidden entirely for conflict/none. */}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
-                            <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
-                              {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : t.rowWp.publish)}
-                            </Button>
-                          )}
-                          {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status === 'ready' && !exportedIdOf(a) && (
-                            <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
-                              {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : (isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft)}
-                            </Button>
-                          )}
-                          {a.status === 'draft' && !exportedIdOf(a) && (
-                            <Button size="sm" variant="outline" onClick={() => markReadyRow(a)} loading={rowBusy?.id === a.id && rowBusy.action === 'ready'} disabled={!!rowBusy || articleBatchRunning}>
-                              {t.rowWp.markReady}
-                            </Button>
-                          )}
-                          <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-                            {t.actions.edit}
-                          </Link>
-                          <button type="button" onClick={() => deleteArticle(a.id)} className="text-sm text-red-600 dark:text-red-400 hover:underline">
-                            {t.delete}
-                          </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {menuBusy ? (
+                            <span className="inline-flex items-center gap-1.5 text-caption text-muted">
+                              <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+                              {rowBusy?.action === 'draft' ? t.rowWp.sending : t.rowWp.markReady}
+                            </span>
+                          ) : inline}
+                          {/* Edit and delete behind "⋯" (UX review P2-3): delete opens
+                              the confirmation dialog; it never deletes on the click. */}
+                          <RowMenu
+                            label={t.table.rowMenu(a.title)}
+                            items={[
+                              { key: 'edit', label: t.actions.edit, href: `/content/articles/${a.id}`, icon: <Pencil className="size-4" aria-hidden="true" /> },
+                              ...(canSendDraft ? [{ key: 'draft', label: draftLabel, onSelect: () => { void exportRow(a, 'draft') }, disabled: rowLocked, icon: <Send className="size-4 rtl:-scale-x-100" aria-hidden="true" /> }] : []),
+                              ...(canMarkReady && !inlineIsMarkReady ? [{ key: 'ready', label: t.rowWp.markReady, onSelect: () => { void markReadyRow(a) }, disabled: rowLocked, icon: <CheckCircle2 className="size-4" aria-hidden="true" /> }] : []),
+                              { key: 'delete', label: t.delete, danger: true, onSelect: () => setDeleting(a), icon: <Trash2 className="size-4" aria-hidden="true" /> },
+                            ]}
+                          />
                         </div>
                       )
                     })()}
@@ -541,22 +721,68 @@ export default function ArticlesScreen() {
           </TableBody>
         </Table>
         {filteredArticles.length === 0 && (
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">{t.table.emptyHint}</p>
+          <p className="mt-2 px-1 text-caption text-muted">{t.table.emptyHint}</p>
         )}
-        {filteredArticles.length > 3 && (
+        {filteredArticles.length > ARTICLES_PAGE && (
           <div className="mt-3 px-1">
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => setArticlesExpanded((v) => !v)}
-              className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+              aria-expanded={articlesExpanded}
             >
-              {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - 3})`}
-            </button>
+              {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - ARTICLES_PAGE})`}
+              <ChevronDown aria-hidden="true" className={cn('size-4 transition-transform duration-150 ease-snappy', articlesExpanded && 'rotate-180')} />
+            </Button>
           </div>
         )}
       </div>
       </>
       )}
+
+      <DeleteConfirmDialog
+        open={deleting !== null}
+        name={deleting?.title ?? ''}
+        labels={t.deleteDialog}
+        onConfirm={() => (deleting ? deleteArticle(deleting.id) : Promise.resolve({ ok: false }))}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => { load(); loadTopics(); toast.success(t.toasts.articleDeleted) }}
+      />
+      {confirmDialog}
     </>
   )
+}
+
+/**
+ * The article's picture beside its title: its featured image, small, or a quiet
+ * document tile when it has none (or the image does not load). Decorative: the
+ * title next to it says what the row is. Hidden on a phone, where the row is
+ * checkbox, title and actions.
+ */
+function ArticleThumb({ src }: { src: string | null }) {
+  const [failed, setFailed] = useState(false)
+  const box = 'relative hidden size-10 shrink-0 overflow-hidden rounded-inset ring-1 ring-inset ring-line sm:grid'
+  if (!src || failed) {
+    return (
+      <span aria-hidden="true" data-article-thumb="none" className={cn(box, 'place-items-center bg-action-soft text-action [&_svg]:size-4')}>
+        <FileText />
+      </span>
+    )
+  }
+  return (
+    <span aria-hidden="true" data-article-thumb="image" className={cn(box, 'bg-sunk')}>
+      {/* A plain <img>: the picture is on the merchant's own storage or site, not ours to optimise. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="size-full object-cover" />
+    </span>
+  )
+}
+
+/**
+ * "Not sent yet" is every new article's normal state, so it is not a badge on each
+ * row (only the exceptions are: exported, published). A quiet dash keeps the column
+ * aligned, and the words stay for a screen reader.
+ */
+function NotSent({ label }: { label: string }) {
+  return <span className="text-caption text-muted" title={label}><span aria-hidden="true">—</span><span className="sr-only">{label}</span></span>
 }

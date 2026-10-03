@@ -25,11 +25,35 @@
  * `search_interrupted`. One model call and three searches per run is a hard
  * ceiling whatever happens.
  *
+ * A HOST THAT REFUSES US (a firewall answering 401/403/406/429/503 to a
+ * data-centre address, or dropping the connection) is not a failed run. a1
+ * then reads the site the way Google's index shows it: one `site:` search, and
+ * the bare domain when that one shows too little (at most two searches, inside
+ * one search budget). The indexed titles, snippets and URLs stand in for the
+ * page text a2 hands the model; a3 and b1 report what needs the site itself as
+ * unavailable, for the firewall's reason, never as the site's problems. No URL
+ * a search returned is ever fetched. Only when Google shows no page of the
+ * site either does a1 fail: `site_forbidden` when the host answered with a
+ * refusal, `site_unreachable` when it never answered at all.
+ *
  * A CLAIMED RUN (trigger 'claim') seeds a1-a3 from the free check the visitor
  * already watched, stored on a1 when the run was created: no fetch and no model
  * call. From the check's seed when its row has one — every finding, every
  * competitor, the home page's links (b1's fallback) — and from its public
  * teaser when it does not (claim.ts). a4 still searches.
+ *
+ * A CLAIMED RESEARCH (trigger 'claim' with a research marker on a1, see
+ * claim.ts readResearchSeed) is the visitor's anonymous stage A itself
+ * (lib/presignup): every step's own saved result is on its row before the run
+ * starts, so a1 takes its snapshot, a2 and a4 take their saved answers, and a3
+ * recomputes from the saved page. NOTHING is fetched, asked or searched again:
+ * a step whose saved answer is missing fails `claim_payload_missing` rather
+ * than spend. Only the project's own writes (settings, competitors) happen, as
+ * if the scan had run for the project.
+ *
+ * WHERE a2 AND a4 WRITE. A project's run fills its settings and competitors
+ * (settings.ts). An anonymous run has no project: lib/presignup passes writes
+ * that keep everything in the snapshot and touch no table (`ctx.writes`).
  *
  * Failures are stable codes. Nothing a site, the model or the search provider
  * said is stored, returned or logged.
@@ -54,7 +78,17 @@ import {
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { claimMatchesProject, cleanList, readClaimSnapshot, toSeedBusiness } from './claim'
 import { robotsAnswer } from './crawl'
-import { createSerperSearch, isDomainMatch, isNonCompetitor, type SearchFn, type SearchOutcome } from './serper'
+import {
+  createSerperSearch,
+  isDomainMatch,
+  isNonCompetitor,
+  normalizeResultDomain,
+  PAGE_SNIPPET_CHARS,
+  PAGE_TITLE_CHARS,
+  type SearchFn,
+  type SearchOutcome,
+  type SearchPage,
+} from './serper'
 import {
   addValidatedCompetitors,
   applyBusinessToSettings,
@@ -62,8 +96,11 @@ import {
   competitorDomainKey,
   type SeedProject,
 } from './settings'
+import { readResearchMarker, type ResearchMarker } from './claim'
 import { hostPinnedFetch, isLockedStorefront, type FetchHop } from './site-access'
 import { withCounters } from './summary'
+import { siteIconFromHtml } from './site-icon'
+import { SEED_STEP_ERROR_CODES } from './types'
 import type {
   SeedBusiness,
   SeedCompetitor,
@@ -109,7 +146,23 @@ export const SITEMAP_URL_LIMIT = 1_000
 /** Page text kept for a resumed a2; the model prompt uses the first 6,000 characters. */
 const STORED_TEXT_CHARS = 8_000
 export const MAX_SEARCHES = 3
+/** a1's search-index fallback: at most this many searches, all inside one `searchMs`. */
+export const MAX_INDEX_SEARCHES = 2
+/** Indexed pages of the site a1 keeps for a2; enough to characterise the business. */
+export const MAX_INDEX_PAGES = 10
+/** With this many of its pages from the `site:` search, the bare-domain search is not sent. */
+const ENOUGH_INDEX_PAGES = 3
+/** The second search is sent only with at least this much of the budget left. */
+const MIN_SECOND_SEARCH_MS = 1_500
+/**
+ * Statuses a host answers when it refuses WHO is asking rather than WHAT is
+ * asked: a firewall or a bot filter in front of a site that opens fine in a
+ * browser. Any other error status still reads as unreachable.
+ */
+export const REFUSAL_STATUSES: readonly number[] = [401, 403, 406, 429, 503]
 export const MAX_COMPETITORS = 5
+/** How far down the ranking a4 offers domains to the project; the five-active cap still decides. */
+export const MAX_COMPETITOR_CANDIDATES = 12
 const MAX_RESULT_DOMAINS = 10
 
 // ── Dependencies ────────────────────────────────────────────────────────────
@@ -154,6 +207,22 @@ export function stageADeps(input: StageADepsInput = {}): StageADeps {
 
 // ── The step contract ───────────────────────────────────────────────────────
 
+/** Where a2 and a4 put what they found, besides the snapshot. */
+export type StageAWrites = {
+  applyBusiness: typeof applyBusinessToSettings
+  addCompetitors: typeof addValidatedCompetitors
+}
+
+/**
+ * A project's run: its settings and its competitors, under the field-ownership
+ * rules. Looked up at call time, never captured, so settings.ts stays the one
+ * place these writes live (the owner-data suite swaps it for broken copies).
+ */
+export const PROJECT_WRITES: StageAWrites = {
+  applyBusiness: (...args) => applyBusinessToSettings(...args),
+  addCompetitors: (...args) => addValidatedCompetitors(...args),
+}
+
 export type StepContext = {
   admin: ServiceRoleClient
   scope: SeedScope
@@ -169,6 +238,8 @@ export type StepContext = {
    * False means the run is no longer this worker's: the step must stop.
    */
   save: (detail: Record<string, unknown>) => Promise<boolean>
+  /** Where a2 and a4 write; a project's own tables when absent. */
+  writes?: StageAWrites
 }
 
 export type StepResult = {
@@ -262,7 +333,7 @@ export function readStoredSignals(v: unknown): SiteSignals | null {
 }
 
 /** What a2 learned, in the form a2 saves it and a4 reads it. */
-type StoredInsight = {
+export type StoredInsight = {
   business: SeedBusiness
   audiences: string[]
   keywords: string[]
@@ -270,7 +341,12 @@ type StoredInsight = {
   competitors: string[]
 }
 
-function insightFromModel(insight: BusinessInsight): StoredInsight | null {
+/**
+ * The model's answer through a2's cleaners. Exported so the settings screen's
+ * "detect again with AI" (lib/project-settings/redetect.ts) offers exactly what
+ * a2 would have written from the same answer.
+ */
+export function insightFromModel(insight: BusinessInsight): StoredInsight | null {
   const business = toSeedBusiness(insight.business)
   if (!business) return null
   return {
@@ -330,11 +406,53 @@ function readSearchRecords(v: unknown): SearchRecord[] | null {
 
 // ── a1: read the site ───────────────────────────────────────────────────────
 
+/** The research a claimed run replays, when it is one (trigger 'claim' and a1's marker). */
+function researchOf(ctx: StepContext): ResearchMarker | null {
+  return ctx.trigger === 'claim' ? readResearchMarker(ctx.details.a1) : null
+}
+
 async function a1(ctx: StepContext): Promise<StepOutcome> {
+  const research = researchOf(ctx)
+  if (research) return a1Research(ctx, research)
   return ctx.trigger === 'claim' ? a1Claim(ctx) : a1Live(ctx)
 }
 
-async function a1Live(ctx: StepContext): Promise<StepOutcome> {
+/**
+ * a1 of a claimed research: the visitor's own read of this site, as it was
+ * saved (the page's signals, robots, sitemap, or Google's index of it). Nothing
+ * is fetched; the site must be this project's site.
+ */
+function a1Research(ctx: StepContext, research: ResearchMarker): StepOutcome {
+  if (research.domain !== ctx.summary.domain || research.steps.a1?.status !== 'done') {
+    return finished('failed', 'claim_payload_missing', ctx.summary, { detail: ctx.details.a1 ?? {} })
+  }
+  const summary = withCounters({
+    ...ctx.summary,
+    url: research.url,
+    scannedAt: research.scannedAt,
+    storefrontLocked: research.storefrontLocked,
+    siteAccess: research.siteAccess,
+    sitemapUrlCount: research.sitemapUrlCount,
+    sitemapTruncated: research.sitemapTruncated,
+  })
+  return finished('done', null, summary, { itemCount: research.sitemapUrlCount, detail: ctx.details.a1 ?? {} })
+}
+
+/**
+ * A step of a claimed research that did not finish 'done' when the visitor
+ * watched it ends here the same way, with its saved detail, and asks nothing.
+ * Only a2 and a4 come here: a1 must be done for a claim to exist, and a3
+ * always recomputes from the saved page.
+ */
+function replayResearchStep(ctx: StepContext, step: 'a2' | 'a4', research: ResearchMarker): StepOutcome | null {
+  const saved = research.steps[step]
+  if (!saved || saved.status === 'done') return null
+  const status = saved.status === 'skipped' ? 'skipped' : 'failed'
+  const code = SEED_STEP_ERROR_CODES.find((c) => c === saved.errorCode) ?? 'internal_error'
+  return finished(status, code, ctx.summary, { detail: ctx.details[step] ?? {} })
+}
+
+export async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   const { deps } = ctx
   const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { mode: 'live' } })
 
@@ -363,8 +481,9 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   const fetched = page.kind === 'value' && page.value.ok && !(page.value.truncated && pageCutShort) ? page.value : null
 
   // A password-locked store answers with its password page (200 or 401). It is
-  // read as "locked", not as a site full of problems.
-  if (isLockedStorefront({ trace, html: fetched?.html ?? null, siteHost: start.hostname })) {
+  // read as "locked", not as a site full of problems. A store that was just
+  // installed IS Shopify, whatever its headers say (shopify-steps.ts).
+  if (isLockedStorefront({ trace, html: fetched?.html ?? null, siteHost: start.hostname, knownShopify: ctx.trigger === 'shopify_install' })) {
     const summary = withCounters({
       ...ctx.summary,
       url: fetched?.url ?? start.toString(),
@@ -378,6 +497,10 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
 
   if (!fetched) {
     if (offHost.hit) return fail('site_offsite_redirect')
+    // The host answered, and refused us; or it never answered in time. DNS
+    // resolved (admission above), so the site exists: read Google's view of it.
+    const refused = hostRefusal(page, pageCutShort)
+    if (refused) return a1SearchIndex(ctx, start, siteKey, refused)
     if (page.kind !== 'value' || page.value.ok) return fail('site_unreachable')
     const reason = page.value.reason
     if (reason === 'blocked') return fail('site_blocked')
@@ -422,6 +545,8 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
   const sitemapUrlCount = discovery.kind === 'value' ? discovery.value.entries.length : null
   const sitemapTruncated = discovery.kind === 'value' && (discovery.value.truncated || cutShort)
 
+  // The icon the page declares, read off the page already in hand (nothing is fetched for it).
+  const siteIcon = siteIconFromHtml(fetched.html, fetched.url)
   const summary = withCounters({
     ...ctx.summary,
     url: fetched.url,
@@ -429,6 +554,7 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
     storefrontLocked: false,
     sitemapUrlCount,
     sitemapTruncated,
+    ...(siteIcon ? { siteIcon } : {}),
   })
   return finished('done', null, summary, {
     itemCount: sitemapUrlCount,
@@ -445,6 +571,155 @@ async function a1Live(ctx: StepContext): Promise<StepOutcome> {
         documents: discovery.kind === 'value' ? discovery.value.sitemaps.length : 0,
       },
     },
+  })
+}
+
+/** Why the home page could not be read although its host exists. */
+export type HostRefusal = { reason: 'http_status' | 'timeout' | 'network'; status: number | null }
+
+function hostRefusal(page: Settled<Awaited<ReturnType<typeof fetchSiteHtml>>>, cutShort: boolean): HostRefusal | null {
+  if (page.kind === 'timeout') return { reason: 'timeout', status: null }
+  if (page.kind === 'error') return null
+  const v = page.value
+  // A page this deadline cut short: the host answered too slowly to read.
+  if (v.ok) return cutShort ? { reason: 'timeout', status: null } : null
+  if (v.reason === 'http_error' && typeof v.status === 'number' && REFUSAL_STATUSES.includes(v.status)) return { reason: 'http_status', status: v.status }
+  if (v.reason === 'timeout' || v.reason === 'network') return { reason: v.reason, status: null }
+  return null
+}
+
+/** The searches of the fallback, in order: the site's indexed pages, then its bare domain. */
+export function searchIndexQueries(siteKey: string): string[] {
+  return [`site:${siteKey}`, siteKey].slice(0, MAX_INDEX_SEARCHES)
+}
+
+const oneLine = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '')
+
+/**
+ * The indexed pages of THIS site among search results, as a1 stores them:
+ * on the site's host (or a subdomain of it), an http(s) URL, distinct, capped.
+ * Read back through the same function, so a stored row is re-validated.
+ */
+export function readIndexPages(v: unknown, siteKey: string): SearchPage[] {
+  if (!Array.isArray(v)) return []
+  const out: SearchPage[] = []
+  for (const x of v) {
+    if (!x || typeof x !== 'object') continue
+    const r = x as Record<string, unknown>
+    if (typeof r.url !== 'string' || r.url.length > 2_000 || !/^https?:\/\//i.test(r.url)) continue
+    if (!isDomainMatch(normalizeResultDomain(r.url), siteKey)) continue
+    if (out.some((p) => p.url === r.url)) continue
+    const title = oneLine(r.title, PAGE_TITLE_CHARS)
+    const snippet = oneLine(r.snippet, PAGE_SNIPPET_CHARS)
+    if (!title && !snippet) continue
+    out.push({ url: r.url, title, snippet })
+    if (out.length >= MAX_INDEX_PAGES) break
+  }
+  return out
+}
+
+/**
+ * The page signals a2 hands the model when the site could not be read: what
+ * Google's index shows of it. Only the fields the model reads carry anything;
+ * every measured property (schema, images, links, robots, llms.txt) is empty,
+ * and nothing downstream measures from these (a3 and b1 read `mode`).
+ */
+export function signalsFromSearchIndex(pages: SearchPage[], finalUrl: string): SiteSignals {
+  const isHome = (p: SearchPage) => {
+    try {
+      return new URL(p.url).pathname === '/'
+    } catch {
+      return false
+    }
+  }
+  const home = pages.find(isHome) ?? pages[0]
+  const lines = pages.map((p) => [p.title, p.snippet, p.url].filter(Boolean).join(' | '))
+  const text = [
+    "The site's firewall refused our reader. Below is how Google's search index shows this site: the title, snippet and address of each indexed page.",
+    ...lines,
+  ]
+    .join('\n')
+    .slice(0, STORED_TEXT_CHARS)
+  return {
+    finalUrl,
+    htmlLang: null,
+    title: home?.title || null,
+    metaDescription: home?.snippet || null,
+    canonical: null,
+    h1: [],
+    h2: pages.filter((p) => p !== home).map((p) => p.title).filter(Boolean).slice(0, 20),
+    images: { total: 0, missingAlt: 0 },
+    schemaTypes: [],
+    hasOrganizationSchema: false,
+    hasFaqSchema: false,
+    hasFaqSection: false,
+    wordCount: text.split(/\s+/).filter(Boolean).length,
+    text,
+    internalLinks: 0,
+    // Never the search results' URLs: nothing a search returned is fetched.
+    internalLinkUrls: [],
+    externalDomains: [],
+    contact: { address: null, phone: null },
+    platform: null,
+    viewportMeta: false,
+    openGraph: false,
+    robotsTxt: null,
+    llmsTxt: false,
+  }
+}
+
+type IndexSearchRecord = { query: string; ok: boolean; code: SearchFailure | null; pages: number }
+
+/**
+ * a1 when the host refused us: Google's view of the site in place of the site.
+ * At most MAX_INDEX_SEARCHES searches, one after the other inside one
+ * `searchMs`, the second only when the first showed too little. Spend is
+ * bounded per run like a4's: the attempt is saved first, and a resumed a1 that
+ * finds it does not search again.
+ */
+async function a1SearchIndex(ctx: StepContext, start: URL, siteKey: string, refused: HostRefusal): Promise<StepOutcome> {
+  const { deps } = ctx
+  const blocked = { mode: 'search_index', blockedReason: refused.reason, blockedStatus: refused.status }
+  // A host that answered with a refusal is a firewall; one that never answered may just be down.
+  const noIndex: SeedErrorCode = refused.reason === 'http_status' ? 'site_forbidden' : 'site_unreachable'
+  if (ctx.details.a1?.searchAttempted === true) {
+    return finished('failed', 'search_interrupted', ctx.summary, { detail: { ...blocked, searchAttempted: true } })
+  }
+  if (!(await ctx.save({ ...blocked, searchAttempted: true }))) return ABORT
+
+  const market = searchMarket(ctx.project)
+  const records: IndexSearchRecord[] = []
+  let found: SearchPage[] = []
+  const startedAt = performance.now()
+  for (const query of searchIndexQueries(siteKey)) {
+    const left = deps.budgets.searchMs - (performance.now() - startedAt)
+    if (records.length > 0 && (found.length >= ENOUGH_INDEX_PAGES || left < MIN_SECOND_SEARCH_MS)) break
+    const answer = await settleWithin<SearchOutcome>(() => deps.search(query, market), Math.max(0, left))
+    if (answer.kind !== 'value' || !answer.value || typeof answer.value !== 'object' || !answer.value.ok) {
+      const said = answer.kind === 'value' ? (answer.value as { code?: unknown } | null)?.code : null
+      const code: SearchFailure = answer.kind === 'timeout' ? 'search_timeout' : (SEARCH_FAILURES.find((c) => c === said) ?? 'search_failed')
+      records.push({ query, ok: false, code, pages: 0 })
+      continue
+    }
+    const own = readIndexPages(answer.value.pages, siteKey)
+    records.push({ query, ok: true, code: null, pages: own.length })
+    found = readIndexPages([...found, ...own], siteKey)
+  }
+
+  const detail = { ...blocked, searchAttempted: true, market, searches: records }
+  if (found.length === 0) return finished('failed', noIndex, ctx.summary, { detail })
+
+  const summary = withCounters({
+    ...ctx.summary,
+    url: start.toString(),
+    scannedAt: deps.now().toISOString(),
+    storefrontLocked: false,
+    siteAccess: 'search_index',
+    sitemapUrlCount: null,
+    sitemapTruncated: false,
+  })
+  return finished('done', null, summary, {
+    detail: { ...detail, storefrontLocked: false, signals: null, searchIndex: { pages: found } },
   })
 }
 
@@ -472,19 +747,31 @@ async function a1Claim(ctx: StepContext): Promise<StepOutcome> {
 const MODEL_UNAVAILABLE_REASONS = new Set(['missing_gemini_api_key', 'gemini_init_failed'])
 
 async function a2(ctx: StepContext): Promise<StepOutcome> {
+  const research = researchOf(ctx)
+  if (research) {
+    const replayed = replayResearchStep(ctx, 'a2', research)
+    if (replayed) return replayed
+    // The saved answer is the only answer a claimed research may use: never the model.
+    if (!readStoredInsight(ctx.details.a2?.insight)) return finished('failed', 'claim_payload_missing', ctx.summary, { detail: ctx.details.a2 ?? {} })
+    return a2Live(ctx)
+  }
   return ctx.trigger === 'claim' ? a2Claim(ctx) : a2Live(ctx)
 }
 
-async function a2Live(ctx: StepContext): Promise<StepOutcome> {
+export async function a2Live(ctx: StepContext): Promise<StepOutcome> {
   const a1Detail = ctx.details.a1 ?? {}
   if (a1Detail.storefrontLocked === true) return finished('skipped', 'storefront_locked', ctx.summary)
-  const signals = readStoredSignals(a1Detail.signals)
+  // A host that refused us: the model reads Google's view of the site instead of its page.
+  const fromIndex = a1Detail.mode === 'search_index'
+  const indexed = fromIndex ? readIndexPages((a1Detail.searchIndex as { pages?: unknown } | undefined)?.pages, ctx.summary.domain) : []
+  const signals = fromIndex ? (indexed.length > 0 ? signalsFromSearchIndex(indexed, ctx.summary.url) : null) : readStoredSignals(a1Detail.signals)
   if (!signals) return finished('failed', 'site_unreadable', ctx.summary)
+  const basis = fromIndex ? { mode: 'search_index' } : {}
 
   const own = ctx.details.a2 ?? {}
   let insight = readStoredInsight(own.insight)
   if (!insight) {
-    const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { attempted: true } })
+    const fail = (code: SeedErrorCode) => finished('failed', code, ctx.summary, { detail: { ...basis, attempted: true } })
     // Resumed after the model was already asked and the answer was lost: the
     // run's one model call is spent.
     if (own.attempted === true) return fail('model_interrupted')
@@ -498,7 +785,7 @@ async function a2Live(ctx: StepContext): Promise<StepOutcome> {
     if (!insight) return fail('model_failed')
     if (!(await ctx.save({ attempted: true, insight }))) return ABORT
   }
-  return applyInsight(ctx, insight, { attempted: true, insight })
+  return applyInsight(ctx, insight, { ...basis, attempted: true, insight })
 }
 
 async function a2Claim(ctx: StepContext): Promise<StepOutcome> {
@@ -538,7 +825,7 @@ async function applyInsight(ctx: StepContext, insight: StoredInsight, detail: Re
     topics: insight.articles,
     competitors: suggestedCompetitors(insight.competitors, ctx.summary.domain),
   })
-  const applied = await applyBusinessToSettings(ctx.admin, ctx.scope, {
+  const applied = await (ctx.writes ?? PROJECT_WRITES).applyBusiness(ctx.admin, ctx.scope, {
     project: ctx.project,
     business: insight.business,
     audiences: insight.audiences,
@@ -562,15 +849,25 @@ const SEVERITY_RANK: Record<FreeCheckFinding['severity'], number> = { blocker: 0
 const bySeverity = (list: FreeCheckFinding[]) => [...list].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
 
 async function a3(ctx: StepContext): Promise<StepOutcome> {
+  // A claimed research recomputes from the page it saved: no I/O either way.
+  if (researchOf(ctx)) return a3Live(ctx)
   return ctx.trigger === 'claim' ? a3Claim(ctx) : a3Live(ctx)
 }
 
-async function a3Live(ctx: StepContext): Promise<StepOutcome> {
+export async function a3Live(ctx: StepContext): Promise<StepOutcome> {
   const a1Detail = ctx.details.a1 ?? {}
   if (a1Detail.storefrontLocked === true) {
     // Not measured, which is not the same as failing all four.
     const geo: SeedGeo = { state: 'unavailable', unavailableReason: 'storefront_locked', passed: 0, total: 0, signals: [] }
     return finished('skipped', 'storefront_locked', withCounters({ ...ctx.summary, findings: [], findingsOmitted: 0, geo }))
+  }
+  if (a1Detail.mode === 'search_index') {
+    // The firewall showed us nothing of the site itself: not measured, which
+    // is not the same as a site with no findings, or one failing all four.
+    const geo: SeedGeo = { state: 'unavailable', unavailableReason: 'site_firewall', passed: 0, total: 0, signals: [] }
+    return finished('skipped', 'site_forbidden', withCounters({ ...ctx.summary, findings: [], findingsOmitted: 0, geo }), {
+      detail: { mode: 'search_index', blockedStatus: typeof a1Detail.blockedStatus === 'number' ? a1Detail.blockedStatus : null },
+    })
   }
   const signals = readStoredSignals(a1Detail.signals)
   if (!signals) return finished('failed', 'site_unreadable', ctx.summary)
@@ -637,10 +934,19 @@ export function searchMarket(project: Pick<SeedProject, 'country' | 'language'>)
  *     itself or an obvious non-competitor (social, video, encyclopedias, the
  *     search engine);
  *   - suggestions first, then discoveries, each by how many searches showed
- *     them; at most MAX_COMPETITORS.
+ *     them;
+ *   - when that still leaves room, the best-placed domains of each search
+ *     fill it, one rank at a time across the searches (the top result of
+ *     every search, then the second…), under the same exclusions. The three
+ *     seed keywords are often different product lines, so few domains rank
+ *     for two of them: requiring two left real competitors (a store ranking
+ *     first for one line) out, and a scan mapped one competitor of five.
+ *     Every one of these still ranks for the business's own keyword: that
+ *     is the validation. No extra search is sent.
+ * At most `limit` (MAX_COMPETITORS by default).
  * A suggestion no search showed is dropped: it was never validated.
  */
-export function rankCompetitors(input: { candidates: string[]; results: string[][]; siteKey: string }): SeedCompetitor[] {
+export function rankCompetitors(input: { candidates: string[]; results: string[][]; siteKey: string; limit?: number }): SeedCompetitor[] {
   const isSelf = (d: string) => isDomainMatch(d, input.siteKey) || isDomainMatch(input.siteKey, d)
   const seenIn = (domain: string) => input.results.filter((list) => list.some((d) => isDomainMatch(d, domain))).length
 
@@ -668,7 +974,20 @@ export function rankCompetitors(input: { candidates: string[]; results: string[]
     .sort(([, a], [, b]) => b.lists - a.lists || a.bestRank - b.bestRank)
     .map(([domain, t]) => ({ domain, validated: true, seenIn: t.lists, source: 'search' as const }))
 
-  return [...suggested, ...discovered].slice(0, MAX_COMPETITORS)
+  const limit = input.limit ?? MAX_COMPETITORS
+  const picked = [...suggested, ...discovered]
+  const taken = (d: string) => picked.some((c) => isDomainMatch(d, c.domain) || isDomainMatch(c.domain, d))
+  const lists = input.results.map((list) => [...new Set(list)])
+  const depth = Math.max(0, ...lists.map((l) => l.length))
+  for (let rank = 0; rank < depth && picked.length < limit; rank++) {
+    for (const list of lists) {
+      if (picked.length >= limit) break
+      const d = list[rank]
+      if (!d || isSelf(d) || isNonCompetitor(d) || taken(d)) continue
+      picked.push({ domain: d, validated: true, seenIn: 1, source: 'search' })
+    }
+  }
+  return picked.slice(0, limit)
 }
 
 async function searchOnce(deps: StageADeps, query: string, market: { gl: string; hl: string }): Promise<SearchRecord> {
@@ -683,6 +1002,17 @@ async function searchOnce(deps: StageADeps, query: string, market: { gl: string;
 }
 
 async function a4(ctx: StepContext): Promise<StepOutcome> {
+  const research = researchOf(ctx)
+  if (research) {
+    const replayed = replayResearchStep(ctx, 'a4', research)
+    if (replayed) return replayed
+    // The searches the visitor's run made are the only ones a claimed research may use.
+    if (!readSearchRecords(ctx.details.a4?.results)) return finished('failed', 'claim_payload_missing', ctx.summary, { detail: ctx.details.a4 ?? {} })
+  }
+  return a4Search(ctx)
+}
+
+async function a4Search(ctx: StepContext): Promise<StepOutcome> {
   const insight = readStoredInsight(ctx.details.a2?.insight)
   const queries = (insight?.keywords ?? []).slice(0, MAX_SEARCHES)
   if (queries.length === 0) return finished('skipped', 'no_seed_keywords', ctx.summary)
@@ -704,13 +1034,17 @@ async function a4(ctx: StepContext): Promise<StepOutcome> {
   const answered = results.filter((r) => r.ok)
   if (answered.length === 0) return finished('failed', results[0]?.code ?? 'search_failed', ctx.summary, { detail })
 
-  const competitors = rankCompetitors({
+  // Ranked past the five shown, so a domain the owner already removed (never
+  // added again) or already lists does not take the room of the next one.
+  const ranked = rankCompetitors({
     candidates: insight?.competitors ?? [],
     results: answered.map((r) => r.domains),
     siteKey: ctx.summary.domain,
+    limit: MAX_COMPETITOR_CANDIDATES,
   })
+  const competitors = ranked.slice(0, MAX_COMPETITORS)
   const summary = withCounters({ ...ctx.summary, competitors })
-  const added = await addValidatedCompetitors(ctx.admin, ctx.scope, competitors.map((c) => c.domain), ctx.deps.now())
+  const added = await (ctx.writes ?? PROJECT_WRITES).addCompetitors(ctx.admin, ctx.scope, ranked.map((c) => c.domain), ctx.deps.now())
   if (added === 'error') return finished('failed', 'competitors_write_failed', summary, { itemCount: competitors.length, detail })
   return finished('done', null, summary, { itemCount: competitors.length, detail: { ...detail, added } })
 }

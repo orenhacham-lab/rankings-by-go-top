@@ -32,7 +32,7 @@ export default function GscSparkline({
   const [hover, setHover] = useState<number | null>(null)
 
   if (points.length < 2) {
-    return <p className="flex h-10 items-center text-[11px] text-muted">{pending}</p>
+    return <p className="flex h-10 items-center text-overline text-muted">{pending}</p>
   }
 
   const values = points.map((p) => p.value)
@@ -73,7 +73,7 @@ export default function GscSparkline({
           <>
             <Dot x={shown.x} y={shown.y} />
             <span
-              className="pointer-events-none absolute bottom-full z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-control border border-line bg-surface px-2 py-1 text-[11px] text-ink shadow-card"
+              className="pointer-events-none absolute bottom-full z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-control border border-line bg-surface px-2 py-1 text-overline text-ink shadow-card"
               style={{ left: `${Math.min(85, Math.max(15, shown.x))}%` }}
             >
               {shown.point.label}: <span className="font-semibold tabular-nums">{format(shown.point.value)}</span>

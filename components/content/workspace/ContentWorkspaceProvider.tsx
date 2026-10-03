@@ -9,9 +9,10 @@
  * internal useState tabs. Nothing had its own URL and nothing could be reasoned
  * about in isolation.
  *
- * The workspace is now one route per concern (/content, /content/topics,
- * /content/automation; Search Console feeds the other screens and has none of its
- * own) and this provider owns only what genuinely crosses those screens:
+ * The workspace is now one route per concern (/content for the articles and
+ * /content/strategy for the content strategy, whose list view holds what used to be
+ * the topics and automation screens; Search Console feeds the other screens and has
+ * none of its own) and this provider owns only what genuinely crosses those screens:
  *   - the overview payload (/api/content/overview): counts, articles, platform
  *   - the topic list + per-topic link-plan summaries
  *   - the cross-screen enqueue workflow (ideas → link review → publishing queue)
@@ -28,7 +29,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { localizeShopifyPublishError } from '@/lib/i18n/dashboard/shopify-publish-error'
 import { ideasSectionFromParam, ideasSectionToParam, type IdeasSection } from '@/lib/content/content-hub-ideas-section'
-import { CONTENT_AUTOMATION_PATH, CONTENT_TOPICS_PATH } from '@/lib/content/content-workspace-nav'
+import { STRATEGY_ANCHORS, strategyAddKeywordHref, strategyHref } from '@/lib/content/strategy/view'
 import type { NewTopic } from '@/components/content/NewTopicsLinkPlanPanel'
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import type { ArticleTopic } from '@/lib/supabase/types'
@@ -76,15 +77,27 @@ function useWorkspaceValue() {
     [t],
   )
 
-  const [data, setData] = useState<Overview | null>(null)
+  const [overviewRead, setData] = useState<Overview | null>(null)
+  // The overview of THIS project, or null while it is on its way. The workspace reads
+  // an overview before the active project is resolved (the project list only) and
+  // keeps the previous project's until the next one answers; drawn as this project's,
+  // either said "no platform connected" and "no articles yet" for a second to a
+  // merchant who has both. Screens show their skeleton while it is null.
+  const data = overviewRead && (!projectId || overviewRead.selected === projectId) ? overviewRead : null
+  // The overview could not be read: the screens stop waiting and draw what they can.
+  const [overviewFailed, setOverviewFailed] = useState(false)
+  /** This project's overview answered, or failed: past this, an empty list is an answer. */
+  const overviewSettled = !!data || overviewFailed
   // The project's ACTIVE publishing platform (resolved server-side by connection validity).
   // Manual publish/draft actions route by this — a Shopify project never calls WordPress.
   const activePlatform: ActivePlatform = data?.platform?.platform ?? 'wordpress'
   const isShopify = activePlatform === 'shopify'
+  // Wix / custom site (webhook): publish-only platforms with no draft step.
+  const isSite = activePlatform === 'wix' || activePlatform === 'webhook'
   // Already exported on the ACTIVE platform (row eligibility + status).
   const exportedIdOf = useCallback(
-    (a: ArticleRow): string | number | null => (isShopify ? (a.shopify_article_id ?? null) : a.wp_post_id),
-    [isShopify],
+    (a: ArticleRow): string | number | null => (isShopify ? (a.shopify_article_id ?? null) : isSite ? null : a.wp_post_id),
+    [isShopify, isSite],
   )
   const [loading, setLoading] = useState(true)
   // M — ideas destination sub-tab (automatic ideas vs manual topic), carried in the URL
@@ -94,6 +107,10 @@ function useWorkspaceValue() {
   const [topics, setTopics] = useState<ArticleTopic[]>([])
   const [briefOpen, setBriefOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
+  // The brief modal's create-mode prefill: the content strategy tab opens it with the
+  // next idea's title, so "write the first article" goes through the ordinary topic
+  // flow. Cleared whenever the modal closes, so no other opener inherits it.
+  const [briefPrefill, setBriefPrefill] = useState<{ topic?: string; primaryKeyword?: string } | null>(null)
   // Phase 2F.1: internal-link planning step for freshly-created topics. Lifted
   // planStatus so the panel can seed the topic-row badges for those IDs only.
   const [newTopics, setNewTopics] = useState<NewTopic[] | null>(null)
@@ -118,25 +135,27 @@ function useWorkspaceValue() {
   // Phase 3F.3.7i — bumped when an enqueue succeeds from the drawer/review panel, so
   // the Automatic Ideas section shows + scrolls its success box into view.
   const [ideasSuccessSignal, setIdeasSuccessSignal] = useState<{ n: number; count: number } | null>(null)
-  // The publishing queue lives on the automation screen; the topics screen asks to be
-  // taken to it rather than scrolling a shared page.
+  // The publishing queue lives in the content strategy tab's list view; from anywhere
+  // else, asking for it is a navigation there.
   const scheduleSectionRef = useRef<HTMLDivElement>(null)
   const goToQueue = useCallback(() => {
     if (scheduleSectionRef.current) scheduleSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    else router.push(CONTENT_AUTOMATION_PATH)
+    else router.push(strategyHref('list', STRATEGY_ANCHORS.queue))
   }, [router])
 
   const handleTopicsQueued = useCallback((info: { topicIds: string[] }) => {
     setHighlightTopicIds(info.topicIds)
     window.setTimeout(() => setHighlightTopicIds([]), 4500)
   }, [])
-  // "Review the links first" used to scroll to the topic rows further down the same
-  // page. The topics are their own screen now, so it navigates there instead — and the
-  // highlight + hint survive the navigation because they live in this provider.
+  // "Review the links first" goes to the topic rows: in the content strategy tab's list
+  // view they sit below the ideas, so it scrolls there, and from anywhere else it
+  // navigates there. The highlight + hint survive either because they live here.
   const handleReviewLinks = useCallback((topicIds: string[]) => {
     setHighlightTopicIds(topicIds)
     setReviewLinksHint(true)
-    router.push(CONTENT_TOPICS_PATH)
+    const rows = document.getElementById(STRATEGY_ANCHORS.topics)
+    if (rows) rows.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else router.push(strategyHref('list', STRATEGY_ANCHORS.topics))
     window.setTimeout(() => setHighlightTopicIds([]), 6000)
   }, [router])
   const handleScheduled = useCallback(() => {
@@ -158,28 +177,36 @@ function useWorkspaceValue() {
     params.set('section', ideasSectionToParam(section))
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [router, pathname, searchParams])
-  // The "New article topic" button leads to the automatic article-ideas SCREEN. It used
-  // to scroll to a section of the one big page; it is now its own route, so the same
-  // intent is a navigation and the destination survives a refresh or a shared link.
+  // The automatic article ideas engine, in the content strategy tab's list view (asking
+  // for new ideas, "improve with Pro", link review before queueing). A navigation, so the
+  // destination survives a refresh or a shared link. Not the way to approve an idea:
+  // that happens on the board itself.
   const goToIdeas = useCallback(() => {
-    router.push(`${CONTENT_AUTOMATION_PATH}?section=${ideasSectionToParam('auto')}`)
+    router.push(strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }))
   }, [router])
-  // Retargeted create-topic action: to the ideas destination when automation is on;
-  // otherwise the manual brief modal directly (so manual creation always works).
+  // The create-topic action: with automation on, the content strategy board with its
+  // "add a keyword" field open (the keyword becomes an approved topic, through the
+  // server's dedupe and keyword guard), never the list view; otherwise the manual brief
+  // modal directly (so manual creation always works).
   const handleCreateTopic = useCallback(() => {
-    if (automationEnabled) goToIdeas()
+    if (automationEnabled) router.push(strategyAddKeywordHref())
     else { setEditingTopic(null); setBriefOpen(true) }
-  }, [automationEnabled, goToIdeas])
+  }, [automationEnabled, router])
   const openManualBrief = useCallback(() => { setEditingTopic(null); setBriefOpen(true) }, [])
+  const openPrefilledBrief = useCallback((prefill: { topic?: string; primaryKeyword?: string }) => {
+    setEditingTopic(null); setBriefPrefill(prefill); setBriefOpen(true)
+  }, [])
+  const closeBrief = useCallback(() => { setBriefOpen(false); setBriefPrefill(null) }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
       const res = await fetch(`/api/content/overview${qs}`)
-      if (res.ok) setData(await res.json())
+      if (res.ok) { setData(await res.json()); setOverviewFailed(false) } else setOverviewFailed(true)
     } catch {
       // Non-fatal: the page still renders its empty/selector states.
+      setOverviewFailed(true)
     } finally {
       setLoading(false)
     }
@@ -307,7 +334,7 @@ function useWorkspaceValue() {
     projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects,
     language, t, isHebrew, toast,
     // overview
-    data, loading, counts, activePlatform, isShopify, exportedIdOf, load, patchArticle, shopifyPublishError,
+    data, overviewSettled, loading, counts, activePlatform, isShopify, isSite, exportedIdOf, load, patchArticle, shopifyPublishError,
     // topics
     topics, selectableTopics, articleByTopic, topicsLoading, loadTopics,
     planStatus, setPlanStatus, highlightTopicIds,
@@ -320,6 +347,7 @@ function useWorkspaceValue() {
     handleDrawerPlanSaved, handleReturnToQueue,
     // the shared "new article topic" action + its modal
     handleCreateTopic, openManualBrief, briefOpen, setBriefOpen, editingTopic, setEditingTopic,
+    briefPrefill, openPrefilledBrief, closeBrief,
   }
 }
 

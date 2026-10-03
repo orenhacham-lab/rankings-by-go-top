@@ -79,12 +79,15 @@ async function main() {
     check('that one handler is POST', exportedMethods[0] === 'POST')
   }
 
-  console.log('\n4) SOURCE) the route calls the pure gates with the REAL request/URL values, not a hardcoded/mocked substitute')
+  // w17 — the route is retired (the currency is decided on the server and
+  // locks at the first PayPal checkout), so the old "the gates read the real
+  // request" pins are obsolete: the handler no longer reads the request at all.
+  console.log('\n4) SOURCE) w17 — the retired handler takes no input from the client and writes nothing')
   {
-    const route = read('app/api/billing-market/select/route.ts')
-    check('appOrigin is derived from request.url (the actual incoming request), never a hardcoded string or env var alone', /new URL\(request\.url\)\.origin/.test(route))
-    check('requestOrigin is read from the REAL Origin header on this exact request', /request\.headers\.get\('origin'\)/.test(route))
-    check('the Content-Type check reads the REAL header on this exact request', /request\.headers\.get\('content-type'\)/.test(route))
+    const route = read('app/api/billing-market/select/route.ts').replace(/\/\*[\s\S]*?\*\//g, '')
+    check('the POST handler takes no request argument (no body, no client market)', /export async function POST\(\)/.test(route))
+    check('it answers 410 Gone after authentication', route.indexOf("status: 401") < route.indexOf('status: 410'))
+    check('it never writes user_metadata.locale, app_metadata or profiles', !/updateUserById|user_metadata|\.update\(/.test(route))
   }
 
   console.log('\n5) SCOPE — explicitly documented, not silently absent: a full live end-to-end request/response test against the real POST handler (with real Supabase auth + DB) requires a running server or a real Supabase project, out of reach in this sandbox')

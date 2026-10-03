@@ -23,7 +23,7 @@ export type ArticleRow = {
   shopify_article_id?: string | null; shopify_article_url?: string | null; shopify_status?: string | null; shopify_blog_id?: string | null
 }
 
-export type ActivePlatform = 'wordpress' | 'shopify' | 'conflict' | 'none'
+export type ActivePlatform = 'wordpress' | 'shopify' | 'wix' | 'webhook' | 'conflict' | 'none'
 
 export type Overview = {
   projects: ProjectOption[]
@@ -32,7 +32,7 @@ export type Overview = {
   articles: ArticleRow[]
   wordpress: { connected: boolean; siteUrl: string | null; status: string | null } | null
   shopify?: { connected: boolean; shopDomain: string | null; status: string | null; canPublish: boolean; defaultBlogId: string | null } | null
-  platform?: { platform: ActivePlatform; shopifyNeedsScope?: boolean } | null
+  platform?: { platform: ActivePlatform; shopifyNeedsScope?: boolean; siteActive?: boolean } | null
 }
 
 export const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {

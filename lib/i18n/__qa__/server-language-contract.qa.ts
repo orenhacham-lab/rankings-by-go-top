@@ -511,7 +511,7 @@ async function main() {
     check('9a: the two locales have genuinely different titles', he.title !== en.title)
     check('9b: the English title carries no Hebrew characters', !/[\u0590-\u05FF]/.test(en.title), en.title)
     check('9c: the Hebrew title is unchanged from the previous constant',
-      he.title === 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top')
+      he.title === 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top SEO')
     check('9d: og:locale follows the document locale', he.ogLocale === 'he_IL' && en.ogLocale === 'en_US')
     check('9e: description and keywords are localized too',
       he.description !== en.description && he.keywords !== en.keywords

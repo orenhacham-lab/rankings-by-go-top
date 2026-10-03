@@ -32,6 +32,7 @@ fi
 if [ "$BUILD" = 1 ]; then
   if NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:5555 NEXT_PUBLIC_SUPABASE_ANON_KEY=stub-anon-key \
      SUPABASE_SERVICE_ROLE_KEY=stub-service-key NEXT_PUBLIC_ENABLE_AI_VISIBILITY=true ENABLE_AI_VISIBILITY=true \
+     NEXT_PUBLIC_ENABLE_CONTENT=true \
      npx next build > "$LOG_DIR/build.log" 2>&1; then echo "build: ok"; else echo "build: FAILED — see $LOG_DIR/build.log"; exit 1; fi
 fi
 

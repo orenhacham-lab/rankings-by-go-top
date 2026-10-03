@@ -11,13 +11,13 @@
  *
  * The action throws on every refusal, with copy meant for the tab. Only the
  * error's class is read here (KeywordQuotaError for the per-project limit) and
- * the one message the action builds for an entitlement outage; anything else
- * is keywords_add_failed. No error text is returned or logged.
+ * the code of the action's entitlement-outage refusal; anything else is
+ * keywords_add_failed. No error text is returned or logged.
  *
  * Afterwards the new rows are read back (the service role, filtered by the
  * owner) so step b6 checks exactly those keywords and nothing else.
  */
-import { buildEntitlementUnavailableError, KeywordQuotaError } from '@/lib/quota'
+import { buildEntitlementUnavailableError, ENTITLEMENT_UNAVAILABLE_CODE, KeywordQuotaError } from '@/lib/quota'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { MAX_CONTINUE_KEYWORDS, type SeedScope, type SeedTrackingOutcome } from './types'
 
@@ -32,6 +32,17 @@ function isQuotaRefusal(err: unknown): boolean {
   if (err instanceof KeywordQuotaError) return true
   // The same class loaded twice (another bundle) still carries its code.
   return !!err && typeof err === 'object' && (err as { code?: unknown }).code === 'QUOTA_KEYWORDS_PER_PROJECT'
+}
+
+/**
+ * The action's entitlement-outage refusal. Told apart by its code: its text is
+ * now in the merchant's language (EntitlementUnavailableError). The Hebrew text
+ * is still recognised, for an action built before the code existed.
+ */
+function isEntitlementOutage(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  if ((err as { code?: unknown }).code === ENTITLEMENT_UNAVAILABLE_CODE) return true
+  return err instanceof Error && err.message === buildEntitlementUnavailableError().error
 }
 
 /**
@@ -74,7 +85,7 @@ export async function addSeedKeywords(
     await action(form)
   } catch (err) {
     if (isQuotaRefusal(err)) return { outcome: outcome(0, 'keyword_quota_exceeded'), targetIds: [] }
-    if (err instanceof Error && err.message === buildEntitlementUnavailableError().error) {
+    if (isEntitlementOutage(err)) {
       return { outcome: outcome(0, 'keyword_entitlement_unavailable'), targetIds: [] }
     }
     return { outcome: outcome(0, 'keywords_add_failed'), targetIds: [] }

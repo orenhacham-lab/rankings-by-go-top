@@ -11,10 +11,19 @@
  * showed it is gone), so there is exactly one SC data model and no duplicated sync logic.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Notice from '@/components/ui/Notice'
+import Segmented from '@/components/ui/Segmented'
+import Select from '@/components/ui/Select'
+import StatTile from '@/components/ui/StatTile'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { Table, TableHead, TableBody, TableRow, Th, Td } from '@/components/ui/Table'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { gscStatusUrl, peekGscResponse, readGscResponse } from '@/components/gsc/gsc-data'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { gscStatusView } from '@/lib/gsc/widget-state'
 
 type WindowDays = 28 | 90
 const WINDOWS: WindowDays[] = [28, 90]
@@ -35,16 +44,26 @@ const safeDecodeUrl = (u: string) => { try { return decodeURI(u) } catch { retur
 type Dict = ReturnType<typeof getDashboardDictionary>['projectDetail']['contentSection']['gsc']
 
 function Note({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 text-sm text-slate-500 dark:text-slate-400">{children}</div>
+  return <div className="rounded-inset border border-line bg-sunk/60 px-4 py-3 text-copy text-muted">{children}</div>
 }
 
 export default function GscMetricsTable({ projectId, refreshKey = 0 }: { projectId: string; refreshKey?: number }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
 
-  const [statusLoading, setStatusLoading] = useState(true)
-  const [status, setStatus] = useState<StatusResponse | null>(null)
-  const [notFound, setNotFound] = useState(false)
+  // The status, read through the shared Search Console request (the panel above has
+  // usually just read it): drawn from the first render when it is in hand, and a
+  // failed read is an error with a retry, never "not connected".
+  const statusUrl = gscStatusUrl(projectId)
+  const [initialRead] = useState(() => peekGscResponse(statusUrl))
+  const initialState = initialRead ? gscStatusView(initialRead.status, initialRead.body).state : null
+  const [statusLoading, setStatusLoading] = useState(!initialRead)
+  const [status, setStatus] = useState<StatusResponse | null>(
+    initialRead && initialState !== 'error' && initialState !== 'disabled' ? (initialRead.body as StatusResponse) : null,
+  )
+  const [notFound, setNotFound] = useState(initialState === 'disabled')
+  const [statusFailed, setStatusFailed] = useState(initialState === 'error')
+  const [statusAttempt, setStatusAttempt] = useState(0)
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
   const [activeTab, setActiveTab] = useState<'queries' | 'opportunities' | 'multipage'>('queries')
@@ -56,19 +75,22 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   const [rowsError, setRowsError] = useState(false)
 
   useEffect(() => {
+    // Nothing to ask on the first render when the answer was already in hand.
+    if (initialRead && refreshKey === 0 && statusAttempt === 0) return
     let cancelled = false
-    setStatusLoading(true); setNotFound(false)
-    void (async () => {
-      try {
-        const res = await fetch(`/api/gsc/status?projectId=${encodeURIComponent(projectId)}`)
-        if (cancelled) return
-        if (res.status === 404) { setNotFound(true); setStatus(null); return }
-        setStatus(await res.json() as StatusResponse)
-      } catch { if (!cancelled) setStatus(null) } finally { if (!cancelled) setStatusLoading(false) }
-    })()
+    setStatusLoading(true); setNotFound(false); setStatusFailed(false)
+    void readGscResponse(statusUrl, refreshKey > 0 || statusAttempt > 0).then((res) => {
+      if (cancelled) return
+      const view = gscStatusView(res.status, res.body)
+      if (view.state === 'disabled') { setNotFound(true); setStatus(null) }
+      else if (view.state === 'error') { setStatusFailed(true); setStatus(null) }
+      else setStatus(res.body as StatusResponse)
+      setStatusLoading(false)
+    })
     return () => { cancelled = true }
     // refreshKey lets a parent (GscPanel) force a re-fetch after a sync / property change.
-  }, [projectId, refreshKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusUrl, refreshKey, statusAttempt])
 
   const connection = status?.connection ?? null
   const property = status?.property ?? null
@@ -88,146 +110,136 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   useEffect(() => { if (property) loadRows() }, [loadRows, property])
 
   // ── Connection/property states (read-only messages — setup lives in the GSC panel). ──
-  if (statusLoading) return <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4"><span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
-  if (notFound || !status?.connection) return <Note>{t.errors.not_connected}</Note>
-  if (connection?.status === 'reauth_required') return <Note><span className="inline-flex items-center gap-1"><AlertTriangle size={14} className="text-amber-600 dark:text-amber-400" />{t.statusReauthRequired} — {t.reauthHint}</span></Note>
+  if (statusLoading) return <div aria-busy="true" data-connection-loading="gsc-metrics"><Skeleton className="h-24 w-full rounded-inset" /></div>
+  if (notFound) return null
+  if (statusFailed) return <ConnectionLoadFailed onRetry={() => setStatusAttempt((n) => n + 1)} />
+  if (!status?.connection) return <Note>{t.errors.not_connected}</Note>
+  if (connection?.status === 'reauth_required') return <Notice tone="warn">{t.statusReauthRequired} — {t.reauthHint}</Notice>
   if (connection?.status === 'revoked' || connection?.status === 'error') return <Note>{t.errors.not_connected}</Note>
   if (!property) return <Note>{t.noPropertyAssigned}</Note>
 
   const summary = status?.windows?.[String(activeWindow)] ?? null
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Window toggle */}
-      <div className="flex gap-2">
-        {WINDOWS.map((w) => (
-          <button key={w} type="button" onClick={() => setActiveWindow(w)}
-            className={`text-xs px-3 py-1.5 rounded-lg border ${activeWindow === w ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
-            {w === 28 ? t.window28 : t.window90}
-          </button>
-        ))}
-      </div>
+      <Segmented<`${WindowDays}`>
+        ariaLabel={t.windowLabel}
+        value={`${activeWindow}`}
+        onChange={(v) => setActiveWindow(Number(v) as WindowDays)}
+        options={WINDOWS.map((w) => ({ value: `${w}` as `${WindowDays}`, label: w === 28 ? t.window28 : t.window90 }))}
+      />
 
       {!summary ? (
-        <div className="text-sm text-slate-500 dark:text-slate-400 py-2">{t.neverSynced}</div>
+        <Note>{t.neverSynced}</Note>
       ) : summary.summaryResyncRequired ? (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-3 text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
-          <AlertTriangle size={14} /><span>{t.summaryResyncRequired}</span>
-        </div>
+        <Notice tone="warn">{t.summaryResyncRequired}</Notice>
       ) : (
-        <>
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.propertySummaryLabel}</div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="space-y-3">
+          <h4 className="text-overline font-semibold uppercase tracking-wide text-muted">{t.propertySummaryLabel}</h4>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: t.cardClicks, value: fmtInt(summary.clicks ?? 0) },
               { label: t.cardImpressions, value: fmtInt(summary.impressions ?? 0) },
               { label: t.cardCtr, value: fmtCtr(summary.ctr ?? 0) },
               { label: t.cardAvgPosition, value: summary.avgPosition != null ? fmtPos(summary.avgPosition) : '—' },
             ].map((c) => (
-              <div key={c.label} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-                <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{c.label}</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{c.value}</div>
-              </div>
+              <StatTile key={c.label} label={c.label} value={c.value} className="rounded-inset bg-sunk/60 p-3 shadow-none sm:p-4" />
             ))}
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            {summary.startDate && summary.endDate && <span>{t.dateRange}: <span dir="ltr">{summary.startDate} → {summary.endDate}</span></span>}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted">
+            {summary.startDate && summary.endDate && <span>{t.dateRange}: <span dir="ltr">{summary.startDate} – {summary.endDate}</span></span>}
             {summary.latestAvailableDate && <span>{t.latestAvailableDate}: <span dir="ltr">{summary.latestAvailableDate}</span></span>}
             <span>{t.rowsFetched}: {fmtInt(summary.rowsFetched)}</span>
-            {summary.truncated && <span className="text-amber-600 dark:text-amber-400 inline-flex items-center gap-1"><AlertTriangle size={12} />{t.truncatedNote}</span>}
           </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">{t.detailVsSummaryNote}</p>
-        </>
+          {summary.truncated && <Notice tone="warn">{t.truncatedNote}</Notice>}
+          <p className="max-w-prose text-caption text-muted">{t.detailVsSummaryNote}</p>
+        </div>
       )}
 
       {/* View tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700">
-        {([['queries', t.tabQueries], ['opportunities', t.tabOpportunities], ['multipage', t.tabMultipage]] as const).map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setActiveTab(key)}
-            className={`text-xs px-3 py-2 -mb-px border-b-2 ${activeTab === key ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-      {activeTab === 'opportunities' && <p className="text-xs text-slate-500 dark:text-slate-400">{t.opportunitiesHint}</p>}
-      {activeTab === 'multipage' && <p className="text-xs text-slate-500 dark:text-slate-400">{t.multipageHint}</p>}
+      <Segmented<'queries' | 'opportunities' | 'multipage'>
+        ariaLabel={t.viewsLabel}
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[{ value: 'queries', label: t.tabQueries }, { value: 'opportunities', label: t.tabOpportunities }, { value: 'multipage', label: t.tabMultipage }]}
+        className="max-w-full overflow-x-auto"
+      />
+      {activeTab === 'opportunities' && <p className="max-w-prose text-caption text-muted">{t.opportunitiesHint}</p>}
+      {activeTab === 'multipage' && <p className="max-w-prose text-caption text-muted">{t.multipageHint}</p>}
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        {loadingRows ? (
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4"><span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
-        ) : rowsError ? (
-          <div className="text-sm text-red-600 dark:text-red-400 py-4">{t.genericError}</div>
-        ) : rows.length === 0 ? (
-          <div className="text-sm text-slate-500 dark:text-slate-400 py-4">{t.emptyRows}</div>
-        ) : activeTab === 'multipage' ? (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                <th className="text-start font-medium py-2 pe-3">{t.colQuery}</th>
-                <th className="text-end font-medium py-2 px-3">{t.colDistinctPages}</th>
-                <th className="text-end font-medium py-2 px-3">{t.colClicks}</th>
-                <th className="text-end font-medium py-2 ps-3">{t.colImpressions}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(rows as MultiPageRow[]).map((r, i) => (
-                <tr key={`${r.query}-${i}`} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="py-2 pe-3 text-slate-800 dark:text-slate-100">{r.query}</td>
-                  <td className="py-2 px-3 text-end tabular-nums">{r.distinctPageCount}</td>
-                  <td className="py-2 px-3 text-end tabular-nums">{fmtInt(r.totalClicks)}</td>
-                  <td className="py-2 ps-3 text-end tabular-nums">{fmtInt(r.totalImpressions)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                <th className="text-start font-medium py-2 pe-3">{t.colQuery}</th>
-                <th className="text-start font-medium py-2 px-3">{t.colPage}</th>
-                <th className="text-end font-medium py-2 px-3">{t.colClicks}</th>
-                <th className="text-end font-medium py-2 px-3">{t.colImpressions}</th>
-                <th className="text-end font-medium py-2 px-3">{t.colCtr}</th>
-                <th className="text-end font-medium py-2 ps-3">{t.colPosition}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(rows as MetricRow[]).map((r, i) => (
-                <tr key={`${r.query}-${r.page}-${i}`} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="py-2 pe-3 text-slate-800 dark:text-slate-100">{r.query}</td>
-                  <td className="py-2 px-3 max-w-[20rem]">
-                    <a href={r.page} target="_blank" rel="noopener noreferrer" title={safeDecodeUrl(r.page)} dir="ltr"
-                      className="inline-flex items-start gap-1 font-mono text-xs text-indigo-600 dark:text-indigo-400 hover:underline [overflow-wrap:anywhere] break-all line-clamp-2">
-                      <ExternalLink size={11} className="mt-0.5 shrink-0" /><span>{safeDecodeUrl(r.page)}</span>
-                    </a>
-                  </td>
-                  <td className="py-2 px-3 text-end tabular-nums">{fmtInt(r.clicks)}</td>
-                  <td className="py-2 px-3 text-end tabular-nums">{fmtInt(r.impressions)}</td>
-                  <td className="py-2 px-3 text-end tabular-nums">{fmtCtr(r.ctr)}</td>
-                  <td className="py-2 ps-3 text-end tabular-nums">{fmtPos(r.position)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {loadingRows ? (
+        <div role="status" aria-busy="true" className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full rounded-control" />)}</div>
+      ) : rowsError ? (
+        <Notice tone="bad">{t.genericError}</Notice>
+      ) : rows.length === 0 ? (
+        <Note>{t.emptyRows}</Note>
+      ) : activeTab === 'multipage' ? (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>{t.colQuery}</Th>
+              <Th className="text-end">{t.colDistinctPages}</Th>
+              <Th className="text-end">{t.colClicks}</Th>
+              <Th className="text-end">{t.colImpressions}</Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {(rows as MultiPageRow[]).map((r, i) => (
+              <TableRow key={`${r.query}-${i}`}>
+                <Td className="font-medium text-ink">{r.query}</Td>
+                <Td className="text-end">{r.distinctPageCount}</Td>
+                <Td className="text-end">{fmtInt(r.totalClicks)}</Td>
+                <Td className="text-end">{fmtInt(r.totalImpressions)}</Td>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : (
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>{t.colQuery}</Th>
+              <Th>{t.colPage}</Th>
+              <Th className="text-end">{t.colClicks}</Th>
+              <Th className="text-end">{t.colImpressions}</Th>
+              <Th className="text-end">{t.colCtr}</Th>
+              <Th className="text-end">{t.colPosition}</Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {(rows as MetricRow[]).map((r, i) => (
+              <TableRow key={`${r.query}-${r.page}-${i}`}>
+                <Td className="font-medium text-ink">{r.query}</Td>
+                <Td>
+                  <a href={r.page} target="_blank" rel="noopener noreferrer" title={safeDecodeUrl(r.page)} dir="ltr"
+                    className="inline-flex max-w-64 items-center gap-1 text-caption text-muted hover:text-action hover:underline">
+                    <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" /><span className="truncate">{safeDecodeUrl(r.page)}</span>
+                  </a>
+                </Td>
+                <Td className="text-end">{fmtInt(r.clicks)}</Td>
+                <Td className="text-end">{fmtInt(r.impressions)}</Td>
+                <Td className="text-end">{fmtCtr(r.ctr)}</Td>
+                <Td className="text-end">{fmtPos(r.position)}</Td>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       {/* Pagination + page-size selector (L1) */}
       {total > 0 && !rowsError && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500 dark:text-slate-400">{t.pageSizeLabel}</label>
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
-              className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {PAGE_SIZE_OPTIONS.map((n) => (<option key={n} value={n}>{n}</option>))}
-            </select>
+            <label htmlFor={`gsc-page-size-${projectId}`} className="text-caption text-muted">{t.pageSizeLabel}</label>
+            <Select id={`gsc-page-size-${projectId}`} value={String(pageSize)} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
+              options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))} className="h-8 w-20" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400">{t.pageOf(page * pageSize + 1, Math.min((page + 1) * pageSize, total), total)}</span>
-            <Button size="sm" variant="outline" disabled={page === 0 || loadingRows} onClick={() => setPage((p) => Math.max(0, p - 1))}>{t.prevPage}</Button>
-            <Button size="sm" variant="outline" disabled={(page + 1) * pageSize >= total || loadingRows} onClick={() => setPage((p) => p + 1)}>{t.nextPage}</Button>
+            <span className="text-caption text-muted tabular-nums">{t.pageOf(page * pageSize + 1, Math.min((page + 1) * pageSize, total), total)}</span>
+            <Button size="sm" variant="secondary" disabled={page === 0 || loadingRows} onClick={() => setPage((p) => Math.max(0, p - 1))}>{t.prevPage}</Button>
+            <Button size="sm" variant="secondary" disabled={(page + 1) * pageSize >= total || loadingRows} onClick={() => setPage((p) => p + 1)}>{t.nextPage}</Button>
           </div>
         </div>
       )}

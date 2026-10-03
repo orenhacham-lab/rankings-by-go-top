@@ -1,0 +1,77 @@
+{
+  "capturedFrom": "wave 7 review fixes",
+  "scenarios": {
+    "he/initial": {
+      "sha256": "a17b2f0b77fabd05d0009976ff0c89064cf5c0939ba35a4c952d5e7eae2870fb",
+      "length": 15650
+    },
+    "he/results": {
+      "sha256": "417904d61107c27206dd88b33ec46618ab76a7141e45a182ad481ed11a2a7747",
+      "length": 40243
+    },
+    "he/selectedWithOpportunities": {
+      "sha256": "cde63a4fd09d5f3f102099a9fe3ec8deacf1796785d06b7db2f027f47158ec38",
+      "length": 53350
+    },
+    "he/added": {
+      "sha256": "8fdc6bf31367c6932c135ebcb00c5ac6fd71e323c75bc4815bd47c1232bbaf97",
+      "length": 48058
+    },
+    "he/addAndAiErrors": {
+      "sha256": "1ec2b5acfc56c35ebc9d14d565bbb5dd330821e3c7a8e86c2454c3289ea1643a",
+      "length": 49383
+    },
+    "he/error": {
+      "sha256": "2a6052eab6f0815d2cab67d762f60241b384badd7fd9e8e25bedcd218f1eb74d",
+      "length": 14448
+    },
+    "he/formKeywordUrlLoading": {
+      "sha256": "2515936d0effa7506af64dca4102477887cdd7c12f3c54be2bbfa8b679fc233b",
+      "length": 14303
+    },
+    "he/fewResults": {
+      "sha256": "f6d64f9ad1df49102026f9f9140175cafe4c72b112c7051c6d9caadcf3ecb0c2",
+      "length": 24539
+    },
+    "he/filteredSorted": {
+      "sha256": "41fe608b856c1a1294b25b5da6159778a15dd7854211b3e044be558417d54433",
+      "length": 41002
+    },
+    "en/initial": {
+      "sha256": "d37c16c679f587cb7d90224c10b11aa2199773a162c970411c1dfbf6c25c3018",
+      "length": 15855
+    },
+    "en/results": {
+      "sha256": "e7119823ddafed4283335510ae39897b1279a02646031e473946b94e413e5bd8",
+      "length": 40470
+    },
+    "en/selectedWithOpportunities": {
+      "sha256": "e8bdd9e682cc64657c32bd55aa1b67ef245f23f502e7aa57630273369ecbfc03",
+      "length": 53684
+    },
+    "en/added": {
+      "sha256": "258d09e6dcc27f326ff1680d2c9facb8bd970659a2dfd8fe9cc65c9a5faec379",
+      "length": 48327
+    },
+    "en/addAndAiErrors": {
+      "sha256": "2b156567c00794fb22ab256f9014be80e1a9972db243e2f50b681a2827753677",
+      "length": 49644
+    },
+    "en/error": {
+      "sha256": "66a5cff0993c6faa00e350c5d65fd155666724f5161eec3ce043a4288bb59cce",
+      "length": 14651
+    },
+    "en/formKeywordUrlLoading": {
+      "sha256": "b45b9c377aec0d701f52fbe5fcf640936a3f6a69915e1facac156444b4aa22d2",
+      "length": 14493
+    },
+    "en/fewResults": {
+      "sha256": "76a1a0cac72eddded17178b845278fbe5ab0ae7a245fdc46eaec1731eddeb33c",
+      "length": 24821
+    },
+    "en/filteredSorted": {
+      "sha256": "0afeeb9a547a72f50b9bbcbf1caa6981183b89c7648e759e91478f0324d2efb8",
+      "length": 41253
+    }
+  }
+}

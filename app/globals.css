@@ -13,84 +13,249 @@
    `border-line`, `text-muted`, `bg-action`, and dark mode is one override of the
    same names — never a second set of classes.
 
-   The palette stays ours (indigo, slate). What is borrowed from the competitor
-   is the SYSTEM: flat surfaces with a real border instead of stacked shadows,
-   one accent colour, a second colour reserved for commitment, and a fixed set of
-   radii and shadows.
+   ── The palette, and why ─────────────────────────────────────────────
+   Paper and cobalt. The canvas is a warm off-white (not the blue-grey every
+   dashboard template ships with), cards are pure white on it, and ONE accent
+   carries every ordinary action: a cobalt taken from the Go Top mark, so the
+   product reads as ours and not as a default indigo. What is borrowed from the
+   competitor is the SYSTEM, not the colours: flat surfaces with a real border
+   instead of stacked shadows, one accent, a second colour reserved for
+   commitment, and a fixed set of radii and shadows.
+
+   Every text/background pair below is WCAG AA (4.5:1) in both themes; the
+   figures are in the comments so a change has to re-check them.
 
    ── Two action colours, and only two ────────────────────────────────
    `action`  — every ordinary action: save, generate, connect, publish.
    `commit`  — the few that cost money or cannot be taken back: upgrade, buy.
+              A warm amber fill with dark text, so it can never be mistaken
+              for the cobalt one.
    A third filled colour would make neither of them mean anything, so warnings
    and errors are SOFT (tinted background + dark text), never filled buttons.
    ═══════════════════════════════════════════════════════════════════ */
 @theme {
+  /* Type. Inter for Latin, Heebo for Hebrew: Inter has no Hebrew glyphs, so ONE
+     stack serves both languages — Latin (and the digits every metric is made of)
+     in Inter, Hebrew in Heebo, whose proportions sit well beside it. The two
+     variables are set by next/font in app/layout.tsx. */
+  --font-sans: var(--font-inter), var(--font-heebo), ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif;
+
   /* Surfaces */
-  --color-canvas: #f7f8fb;        /* the page behind everything */
+  --color-canvas: #f7f6f2;        /* the page behind everything: warm paper (action as text on it 4.5:1) */
   --color-surface: #ffffff;       /* cards, panels, table rows */
-  --color-sunk: #f1f5f9;          /* table heads, insets, hover fills */
-  --color-line: #e2e8f0;          /* every default border */
-  --color-line-strong: #cbd5e1;   /* a border that has to be noticed */
 
-  /* Text */
-  --color-ink: #0f172a;           /* headings */
-  --color-body: #334155;          /* body copy */
-  --color-muted: #64748b;         /* labels, sub-labels, placeholders */
+  /* The rail: the sidebar is the one confident, branded surface of the shell —
+     the navy of gotop.co.il (#0A1B3D, the UX review's value: the site itself is
+     unreachable from the build environment, so it was not re-sampled) — so the
+     paper-and-white screen beside it reads as the work area. On the navy: ink 17:1,
+     muted 8.5:1, section titles 5.6:1 (the review's #6F82A8 is 4.4:1, under AA for
+     11px text, so it is one step lighter), the tagline 9:1, the focus ring 7.9:1.
+     The active tab is FILLED with the action blue: white on it 4.9:1. */
+  --color-rail: #0a1b3d;
+  --color-rail-ink: #ffffff;
+  --color-rail-muted: #a9b8d6;
+  --color-rail-section: #8494b8;
+  --color-rail-tagline: #7fc3ff;
+  --color-rail-line: rgba(255, 255, 255, 0.08);
+  --color-rail-hover: rgba(0, 134, 245, 0.12);
+  --color-rail-active: #0070d6;
+  --color-rail-active-ink: #ffffff;
+  --color-rail-focus: #5cb8ff;
+  /* A menu drawn over the page dims it with the rail's own navy. */
+  --color-scrim: rgba(10, 27, 61, 0.5);
+  /* A dialog dims the page behind it with a neutral ink (ui/Modal, dialog::backdrop). */
+  --color-backdrop: rgba(21, 23, 28, 0.42);
 
-  /* Actions — exactly two */
-  --color-action: #4f46e5;
-  --color-action-hover: #4338ca;
+  /* The Go Top light blue, sampled from the mark (public/gotop-primary.png). For
+     the logo, indicators, icons and charts ONLY: white on it is 3.7:1, which fails
+     AA for text, so it is never a text background; `action` is. */
+  --color-brand: #0086f5;
+  /* WhatsApp's own green, on the support glyph's hover only. */
+  --color-whatsapp: #25d366;
+  --color-sunk: #f0eee9;          /* table heads, insets, hover fills */
+  --color-line: #e6e3dc;          /* every default border */
+  --color-line-strong: #d3cfc6;   /* a border that has to be noticed */
+
+  /* Text — ink 16.4:1, body 9.7:1, muted 4.8:1 on canvas (4.55:1 on sunk) */
+  --color-ink: #15171c;           /* headings */
+  --color-body: #3b3f46;          /* body copy */
+  --color-muted: #686c73;         /* labels, sub-labels, placeholders */
+
+  /* Actions — exactly two. The action is the Go Top blue one step darker than the
+     mark (white on #0086F5 fails AA): white on it 4.9:1, as text 4.9:1 on surface
+     and 4.5:1 on canvas. Its soft tint is lighter than the review's #E6F2FE, on
+     which the action as text is only 4.3:1; on this one it is 4.5:1. */
+  --color-action: #0070d6;
+  --color-action-hover: #005cb3;
   --color-action-ink: #ffffff;
-  --color-action-soft: #eef2ff;   /* selected rows, active chips */
-  --color-commit: #d97706;
-  --color-commit-hover: #b45309;
-  --color-commit-ink: #ffffff;
-  --color-commit-soft: #fffbeb;
+  --color-action-soft: #f0f7ff;   /* selected rows, active chips, icon squircles */
+  --color-commit: #f0b03f;        /* commit-ink on it 9.2:1 */
+  --color-commit-hover: #e39e22;
+  --color-commit-ink: #231703;
+  --color-commit-soft: #fdf6e7;
 
-  /* States — soft pairs, never filled buttons */
-  --color-ok: #15803d;
-  --color-ok-soft: #f0fdf4;
-  --color-warn: #b45309;
-  --color-warn-soft: #fffbeb;
-  --color-bad: #b91c1c;
-  --color-bad-soft: #fef2f2;
-  --color-info: #1d4ed8;
-  --color-info-soft: #eff6ff;
+  /* States — soft pairs, never filled buttons (each pair ≥ 5:1) */
+  --color-ok: #157a3c;
+  --color-ok-soft: #eef8f1;
+  --color-warn: #a04a06;
+  --color-warn-soft: #fdf6e7;
+  --color-bad: #b42318;
+  --color-bad-soft: #fdf1ef;
+  --color-bad-ink: #ffffff;       /* text on a filled `bad` (a destructive confirm): 6.0:1 */
+  --color-info: #005cb3;
+  --color-info-soft: #eef6fe;
 
-  /* The one dark surface: a screen's opening context card. Its own token,
-     because it must stay dark in dark mode instead of inverting. */
-  --color-contrast: #0f172a;
-  --color-contrast-ink: #f8fafc;
+  /* The one dark surface: a screen's opening context card, in the rail's navy.
+     Its own token, because it must stay dark in dark mode instead of inverting. */
+  --color-contrast: #0a1b3d;
+  --color-contrast-ink: #f5f6f8;
+  /* A deeper navy beside --color-contrast: two dark bands of the public pages never touch in the same tone. */
+  --color-contrast-deep: #06122b;
+  /* The same dark strip when time is short (the trial bar's last three days). */
+  --color-contrast-urgent: #7a2e0e;
 
-  /* Radii — a card, a control, a pill. Nothing else. */
-  --radius-card: 1.25rem;
-  --radius-control: 0.5rem;
+  /* Loading placeholders: a quiet two-stop shimmer (see .skeleton). */
+  --color-skeleton: #eef1f6;
+  --color-skeleton-shine: #f7f9fc;
+  /* The same shimmer on the dark context surface (.skeleton-contrast): the
+     contrast ink at 10% and 18%, so it stays dark in dark mode too. */
+  --color-skeleton-contrast: rgba(245, 246, 248, 0.1);
+  --color-skeleton-contrast-shine: rgba(245, 246, 248, 0.18);
+  /* The plate a site's favicon sits on (ui/SiteAvatar). Always white, in dark
+     mode too: most favicons are drawn for a white page, and a dark logo on a
+     transparent background would vanish on the dark surface. */
+  --color-plate: #ffffff;
+
+  /* The accent scale. Legacy screens still say `indigo-600` where the new ones
+     say `action`; remapping the scale to the same Go Top blue makes the two agree
+     without touching a single screen. 600 is the action (white on it 4.9:1). */
+  --color-indigo-50: #eef6fe;
+  --color-indigo-100: #d9ebfd;
+  --color-indigo-200: #b5d8fb;
+  --color-indigo-300: #84bef8;
+  --color-indigo-400: #4da0f0;
+  --color-indigo-500: #1f86e6;
+  --color-indigo-600: #0070d6;
+  --color-indigo-700: #005cb3;
+  --color-indigo-800: #004a91;
+  --color-indigo-900: #003a73;
+  --color-indigo-950: #00254a;
+
+  /* Radii — a card, an inset inside a card, a control, a pill. Nothing else. */
+  --radius-card: 1rem;
+  --radius-inset: 0.75rem;
+  --radius-control: 0.625rem;
   --radius-pill: 9999px;
 
-  /* Shadows — two. Depth comes from the border, not from stacked glows. */
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -16px rgba(15, 23, 42, 0.18);
-  --shadow-pop: 0 12px 32px -8px rgba(15, 23, 42, 0.18);
+  /* Shadows — depth comes from the border; a shadow only says "this floats".
+     `card` lifts a card a hair off the canvas, `control` gives a bordered
+     button its edge, `pop` is for what opens over the page. */
+  --shadow-card: 0 1px 2px rgba(28, 25, 18, 0.04), 0 4px 14px -8px rgba(28, 25, 18, 0.08);
+  --shadow-control: 0 1px 1px rgba(28, 25, 18, 0.05);
+  --shadow-pop: 0 18px 44px -14px rgba(22, 20, 15, 0.28), 0 2px 6px rgba(22, 20, 15, 0.06);
+  /* `lift` is a card answering the pointer: a softer, longer shadow than pop. */
+  --shadow-lift: 0 14px 32px -16px rgba(22, 20, 15, 0.22), 0 2px 6px rgba(22, 20, 15, 0.05);
+  /* `glow` is the one lit thing on a screen (the active tab, the hero's primary):
+     a soft halo of the brand blue under it. `edge-ltr` / `edge-rtl` is the 3px
+     action bar on a row's start edge (hover, selected); the start is the left in
+     English and the right in Hebrew, so each direction names its own. */
+  --shadow-glow: 0 10px 24px -10px color-mix(in srgb, var(--color-brand) 85%, transparent);
+  --shadow-edge-ltr: inset 3px 0 0 var(--color-action);
+  --shadow-edge-rtl: inset -3px 0 0 var(--color-action);
 
-  /* Type rhythm — four steps, each with its own line height, and nothing between them:
-     screen title / section title / copy / caption. A screen that needs a fifth size is a
-     screen that needs a different layout. (Named so no step shares a name with a colour
-     token: `text-body` is the body COLOUR, and one utility must mean one thing.) */
-  --text-title: 1.5rem;
-  --text-title--line-height: 2rem;
-  --text-section: 1rem;
+  /* Type rhythm. Each step has its own line height, and nothing sits between them:
+       display  — the one big number of a context card
+       title    — the screen's title
+       metric   — a figure in a stat tile
+       section  — a card or section heading
+       lead     — the line under a screen's title, the wordmark, a large button
+       copy     — body text
+       caption  — labels, sources, meta
+       overline — group labels in the sidebar, eyebrows above a title
+     (Named so no step shares a name with a colour token: `text-body` is the body
+     COLOUR, and one utility must mean one thing.) */
+  --text-display: 2.5rem;
+  --text-display--line-height: 2.875rem;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.25rem;
+  --text-metric: 1.75rem;
+  --text-metric--line-height: 2rem;
+  --text-section: 1.0625rem;
   --text-section--line-height: 1.5rem;
+  --text-lead: 0.9375rem;
+  --text-lead--line-height: 1.5rem;
   --text-copy: 0.875rem;
   --text-copy--line-height: 1.5rem;
   --text-caption: 0.75rem;
-  --text-caption--line-height: 1rem;
+  --text-caption--line-height: 1.125rem;
+  --text-overline: 0.6875rem;
+  --text-overline--line-height: 1rem;
 
-  /* Motion — one entrance, short and slightly springy, for anything that appears on
-     demand (a dropdown, a popover). Nothing animates on its own. */
-  --animate-pop-in: pop-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+  /* Marketing-only steps (the public site; the app keeps the scale above).
+     Fluid between a 390px phone and a 1440px desktop, so ONE utility carries
+     both sizes the design specifies (wave 8, UX decision D):
+       hero      32/35 → 54/59, weight 800   the home hero's headline (w9: large, not dominant)
+       hero-page 34/40 → 56/64               the About hero's headline
+       h2-mkt    28/36 → 44/52, weight 700   a marketing section title
+       lead-mkt  17/27 → 21/32               a marketing subtitle
+       numeral   44 → 56                     a step's big numeral
+       eyebrow   13, semibold                the line above a marketing title
+     Hebrew is never tracked wider than 0; the negative tracking only tightens. */
+  --text-hero: clamp(2rem, 1.4893rem + 2.0952vw, 3.5rem);
+  --text-hero--line-height: 1.1;
+  --text-hero--font-weight: 800;
+  --text-hero--letter-spacing: -0.01em;
+  --text-hero-page: clamp(2.125rem, 1.6143rem + 2.0952vw, 3.5rem);
+  --text-hero-page--line-height: 1.15;
+  --text-hero-page--font-weight: 800;
+  --text-hero-page--letter-spacing: -0.01em;
+  --text-h2-mkt: clamp(1.75rem, 1.3786rem + 1.5238vw, 2.75rem);
+  --text-h2-mkt--line-height: 1.2;
+  --text-h2-mkt--font-weight: 700;
+  --text-lead-mkt: clamp(1.0625rem, 0.9696rem + 0.381vw, 1.3125rem);
+  --text-lead-mkt--line-height: 1.55;
+  --text-numeral: clamp(2.75rem, 2.4714rem + 1.1429vw, 3.5rem);
+  --text-numeral--line-height: 1;
+  --text-numeral--font-weight: 800;
+  --text-eyebrow: 0.8125rem;
+  --text-eyebrow--line-height: 1.25rem;
+  --text-eyebrow--font-weight: 600;
+
+  /* Motion — alive, and out of the way: an ease that arrives quickly and settles.
+     The budget (UX review decision 4, widened in wave 7 at the owner's request:
+     "where is the animation?" — the first pass was too quiet to be noticed):
+       tab content enters   340ms, 50ms apart for the first six blocks
+       a KPI counts up      600ms (.count-up) or 900ms (AnimatedNumber), once, when first on screen (never on a refetch)
+       a dashboard card     280ms, once, when first on screen, 40ms apart
+       a score ring draws   700ms
+       a menu pops in       160ms
+       a dialog springs in  420ms, its backdrop fades 240ms
+       a bulk bar rises     380ms on a soft spring, when the first row is selected (.bar-rise)
+       the phone drawer     240ms, its scrim 200ms
+       the active tab pill  320ms, sliding between entries on a soft spring
+       a segmented thumb    320ms, sliding to the chosen item
+       a list's items enter 180ms, 30ms apart for the first four (.list-enter)
+       a block's items rise 480ms, 55ms apart for the first eight (.stagger-in)
+       a table's rows enter 420ms, 32ms apart for the first twelve, ONCE, on the
+                            first data only (.rows-enter; never on sort, filter or refetch)
+       a bar grows          900ms from its start edge (.grow-x)
+       a line draws itself  1100ms (.draw-line)
+       content replaces its skeleton: 320ms crossfade (.fade-in / .fade-out)
+       a card lifts         220ms, 3px, only where it is a link or a button (.lift)
+       a hero's glow drifts 18s, a slow loop, opacity only in its own layer
+       a skeleton shimmers  1.2s, a loop, gone when the data arrives
+       a long action's bar  1.4s, a loop, gone when the action ends
+     Never replayed on scroll, nothing over 400ms between tabs, and every one of
+     them exists only with prefers-reduced-motion: no-preference. One helper
+     drives the on-screen ones: components/ui/motion.tsx. */
+  --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes pop-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -102,41 +267,328 @@
   }
 }
 
-/* Dark mode redefines the SAME names, so no component carries a second palette. */
+/* ── Motion utilities: CSS only, and each exists only with no-preference ── */
+
+/* Tab content: the screen's blocks rise 8px and fade in as the tab opens.
+   `backwards` fill, so no transform is left behind once they land (a leftover
+   transform would become the containing block of every fixed dialog inside). */
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(14px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tab-enter > * > * {
+    animation: page-in 340ms var(--ease-out-expo) backwards;
+  }
+  .tab-enter > * > :nth-child(2) { animation-delay: 50ms; }
+  .tab-enter > * > :nth-child(3) { animation-delay: 100ms; }
+  .tab-enter > * > :nth-child(4) { animation-delay: 150ms; }
+  .tab-enter > * > :nth-child(5) { animation-delay: 200ms; }
+  .tab-enter > * > :nth-child(n + 6) { animation-delay: 250ms; }
+}
+
+/* A list's items (idea cards, queue entries, stat tiles) enter the same way when the
+   list first renders or grows: the same 180ms rise, 30ms apart for the first four.
+   Never on table rows (a <tbody> is not a list here, see design-tokens D4). */
+@media (prefers-reduced-motion: no-preference) {
+  .list-enter > * {
+    animation: tab-in 180ms var(--ease-snappy) backwards;
+  }
+  .list-enter > :nth-child(2) { animation-delay: 30ms; }
+  .list-enter > :nth-child(3) { animation-delay: 60ms; }
+  .list-enter > :nth-child(n + 4) { animation-delay: 90ms; }
+}
+
+/* A KPI counts up from 0 to its value once, when it first renders. The real,
+   formatted value is in the DOM the whole time (for screen readers, copy and
+   print) and only held transparent while ::after draws the count over it. */
+@property --count {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+@keyframes count-up {
+  from { --count: 0; visibility: visible; }
+  to { --count: var(--count-to); visibility: hidden; }
+}
+@keyframes count-up-hold {
+  from, to { color: transparent; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .count-up { position: relative; display: inline-block; }
+  .count-up > .count-up-value { animation: count-up-hold 600ms ease-out; }
+  .count-up::after {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    counter-reset: count var(--count);
+    content: counter(count);
+    animation: count-up 600ms ease-out forwards;
+    pointer-events: none;
+  }
+  /* Not on screen yet (components/ui/CountUp.tsx): the count waits at 0 and
+     starts the first time the figure is seen. */
+  .count-up[data-count='wait'] > .count-up-value,
+  .count-up[data-count='wait']::after { animation-play-state: paused; }
+}
+
+/* A block that enters the first time it scrolls into view (<Reveal>,
+   components/ui/motion.tsx): it rises 8px and fades in, 280ms, staggered by
+   --reveal-delay. `backwards` fill, so no transform is left behind. */
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal[data-reveal='wait'] { opacity: 0; }
+  .reveal[data-reveal='in'] { animation: reveal-in 280ms var(--ease-snappy) var(--reveal-delay, 0ms) backwards; }
+}
+
+/* The site health score ring (components/site-health/ScoreCard.tsx): its arc
+   draws from 0 to the score once, 900ms. With reduced motion it is simply there. */
+@keyframes score-arc-in {
+  from { stroke-dasharray: 0 1000; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .score-arc { animation: score-arc-in 900ms var(--ease-snappy) 120ms backwards; }
+}
+
+/* A long action's progress (components/ui/Toast.tsx): an indeterminate bar
+   sweeping across. With reduced motion it is a still, half-filled bar. */
+@keyframes progress-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@keyframes progress-sweep-rtl {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-250%); }
+}
+.progress-sweep { width: 40%; }
+@media (prefers-reduced-motion: no-preference) {
+  .progress-sweep { animation: progress-sweep 1.4s var(--ease-snappy) infinite; }
+  [dir='rtl'] .progress-sweep { animation-name: progress-sweep-rtl; }
+}
+
+/* A score ring draws itself: the dash starts empty and grows to its share. */
+@keyframes ring-draw {
+  from { stroke-dashoffset: var(--ring-length); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ring-draw { animation: ring-draw 700ms var(--ease-snappy) backwards; }
+}
+
+/* The phone menu: a drawer from the logical start, over the navy scrim. */
+@keyframes drawer-in-ltr {
+  from { transform: translateX(-100%); }
+}
+@keyframes drawer-in-rtl {
+  from { transform: translateX(100%); }
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .drawer-start { animation: drawer-in-ltr 240ms var(--ease-snappy); }
+  [dir='rtl'] .drawer-start { animation-name: drawer-in-rtl; }
+  .scrim-in { animation: scrim-in 200ms ease-out; }
+}
+
+/* ── Motion layer (wave 7): the app's shared movement ─────────────────────
+   Every class below animates ONLY under no-preference; with reduced motion each
+   element is simply there, in its final state. All use `backwards` fill (never
+   `forwards`/`both`), so no transform is left behind once they land; the one
+   exception is `.fade-out`, the skeleton leaving, which is removed right after. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+@keyframes draw-line {
+  from { stroke-dashoffset: 1; }
+}
+@keyframes dialog-spring {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+}
+@keyframes glow-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+  50% { transform: translate3d(-4%, 3%, 0) scale(1.08); opacity: 0.8; }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes bar-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+@keyframes dot-ping {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Where a bar grows from: its start edge, which is the right in Hebrew. */
+.grow-x { transform-origin: left center; }
+[dir='rtl'] .grow-x { transform-origin: right center; }
+/* A line that draws itself needs pathLength="1" on the path. */
+.draw-line { stroke-dasharray: 1; stroke-dashoffset: 0; }
+/* The crossfade's outgoing skeleton sits over the content that replaces it. */
+.fade-out { pointer-events: none; }
+
+/* A card that is a link or a button answers the pointer by rising a little. */
+.lift {
+  transition: transform 220ms var(--ease-out-expo), box-shadow 220ms var(--ease-out-expo), border-color 150ms var(--ease-snappy);
+}
+@media (hover: hover) {
+  .lift:hover { box-shadow: var(--shadow-lift); border-color: var(--color-line-strong); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-in > * { animation: rise-in 480ms var(--ease-out-expo) backwards; }
+  .stagger-in > :nth-child(2) { animation-delay: 55ms; }
+  .stagger-in > :nth-child(3) { animation-delay: 110ms; }
+  .stagger-in > :nth-child(4) { animation-delay: 165ms; }
+  .stagger-in > :nth-child(5) { animation-delay: 220ms; }
+  .stagger-in > :nth-child(6) { animation-delay: 275ms; }
+  .stagger-in > :nth-child(7) { animation-delay: 330ms; }
+  .stagger-in > :nth-child(n + 8) { animation-delay: 385ms; }
+
+  .rows-enter > tr { animation: row-in 420ms var(--ease-out-expo) backwards; }
+  .rows-enter > tr:nth-child(2) { animation-delay: 32ms; }
+  .rows-enter > tr:nth-child(3) { animation-delay: 64ms; }
+  .rows-enter > tr:nth-child(4) { animation-delay: 96ms; }
+  .rows-enter > tr:nth-child(5) { animation-delay: 128ms; }
+  .rows-enter > tr:nth-child(6) { animation-delay: 160ms; }
+  .rows-enter > tr:nth-child(7) { animation-delay: 192ms; }
+  .rows-enter > tr:nth-child(8) { animation-delay: 224ms; }
+  .rows-enter > tr:nth-child(9) { animation-delay: 256ms; }
+  .rows-enter > tr:nth-child(10) { animation-delay: 288ms; }
+  .rows-enter > tr:nth-child(11) { animation-delay: 320ms; }
+  .rows-enter > tr:nth-child(n + 12) { animation-delay: 352ms; }
+
+  .fade-in { animation: fade-in 320ms ease-out backwards; }
+  .fade-out { animation: fade-out 320ms ease-out forwards; }
+  .grow-x { animation: grow-x 900ms var(--ease-out-expo) backwards; animation-delay: var(--grow-delay, 120ms); }
+  .draw-line { animation: draw-line 1100ms var(--ease-out-expo) backwards; animation-delay: var(--draw-delay, 150ms); }
+
+  dialog.dialog-spring[open] { animation: dialog-spring 420ms var(--ease-spring); }
+  dialog.dialog-spring[open]::backdrop { animation: backdrop-in 240ms ease-out; }
+
+  .glow-drift { animation: glow-drift 18s ease-in-out infinite; }
+  .float-y { animation: float-y 6s ease-in-out infinite; animation-delay: var(--float-delay, 0ms); }
+  .dot-ping { animation: dot-ping 1.8s var(--ease-out-expo) infinite; }
+  .bar-rise { animation: bar-rise 380ms var(--ease-spring) backwards; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lift:hover { transform: translateY(-3px); }
+}
+
+/* A loading placeholder. The shimmer is the one animation allowed to loop, and
+   it stops by construction: the skeleton is replaced when the data arrives. */
+.skeleton {
+  background-color: var(--color-skeleton);
+  background-image: linear-gradient(90deg, var(--color-skeleton) 0%, var(--color-skeleton-shine) 50%, var(--color-skeleton) 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+}
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+/* On the dark context surface (a hero card loading): the same shimmer in the
+   contrast ink, so a dark card's placeholders do not read as light holes. */
+.skeleton-contrast {
+  background-color: var(--color-skeleton-contrast);
+  background-image: linear-gradient(90deg, var(--color-skeleton-contrast) 0%, var(--color-skeleton-contrast-shine) 50%, var(--color-skeleton-contrast) 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton { animation: shimmer 1.2s linear infinite; }
+  .skeleton-contrast { animation: shimmer 1.2s linear infinite; }
+}
+
+/* Dark mode redefines the SAME names, so no component carries a second palette.
+   Ink-blue night, not pure black. The accent is LIGHTER here and carries dark
+   text (7.6:1), because white on a blue light enough to read as text on the
+   dark surface would fail; as text it is 7.1:1 on surface. */
 .dark {
-  --color-canvas: #0b1120;
-  --color-surface: #111827;
-  --color-sunk: #1e293b;
-  --color-line: #1f2b3d;
-  --color-line-strong: #334155;
+  --color-canvas: #0d1117;
+  --color-surface: #14171e;
+  /* The rail stays NAVY in the dark, so it separates from the neutral canvas by
+     hue and by a lit edge (it was #0a0c11 on #0d0f14: one surface). */
+  --color-rail: #081329;
+  --color-rail-line: rgba(92, 184, 255, 0.16);
+  --color-rail-hover: rgba(77, 168, 255, 0.12);
+  --color-sunk: #1b1f28;
+  --color-line: #252a35;
+  --color-line-strong: #353b48;
 
-  --color-ink: #f8fafc;
-  --color-body: #cbd5e1;
-  --color-muted: #94a3b8;
+  --color-ink: #f3f4f6;
+  --color-body: #c8ccd3;
+  --color-muted: #9097a3;         /* 6.1:1 on surface, 5.6:1 on sunk */
 
-  --color-action: #6366f1;
-  --color-action-hover: #818cf8;
-  --color-action-ink: #ffffff;
-  --color-action-soft: #1e1b4b;
-  --color-commit: #f59e0b;
-  --color-commit-hover: #fbbf24;
-  --color-commit-ink: #1c1917;
-  --color-commit-soft: #292014;
+  --color-action: #4da8ff;        /* 7.1:1 on surface; the dark ink on it 7.6:1 */
+  --color-action-hover: #7dbeff;
+  --color-action-ink: #0a0f24;
+  --color-action-soft: #0f2542;
+  --color-commit: #f0b03f;
+  --color-commit-hover: #f5c262;
+  --color-commit-ink: #231703;
+  --color-commit-soft: #2a2110;
 
-  --color-ok: #4ade80;
-  --color-ok-soft: #052e1b;
-  --color-warn: #fbbf24;
-  --color-warn-soft: #2a2010;
-  --color-bad: #f87171;
-  --color-bad-soft: #2c1414;
-  --color-info: #93c5fd;
-  --color-info-soft: #0f2038;
+  --color-ok: #5bd08a;
+  --color-ok-soft: #0f2419;
+  --color-warn: #f3bf5b;
+  --color-warn-soft: #2a2110;
+  --color-bad: #f58c80;
+  --color-bad-soft: #2e1614;
+  --color-bad-ink: #2a0c08;
+  --color-info: #7dbeff;
+  --color-info-soft: #0f2138;
 
-  --color-contrast: #1e293b;
-  --color-contrast-ink: #f8fafc;
+  --color-contrast: #0f2247;
+  --color-contrast-ink: #f5f6f8;
+  --color-contrast-deep: #0a1834;
+  --color-contrast-urgent: #7a2e0e;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
-  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --color-skeleton: #1b1f28;
+  --color-skeleton-shine: #252a35;
+  --color-backdrop: rgba(0, 0, 0, 0.6);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px -10px rgba(0, 0, 0, 0.5);
+  --shadow-control: 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 18px 44px -12px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lift: 0 14px 32px -14px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Base: one focus ring for everything that does not draw its own, the selection
+   in the accent, and tighter tracking for Latin headings only — spacing Hebrew
+   letters apart breaks the word, so Hebrew keeps the font's own spacing.
+   In @layer base so a component's own focus style still wins. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-action) 22%, transparent);
+  }
+  :where([lang='en'], [dir='ltr']) :where(h1, h2) {
+    letter-spacing: -0.015em;
+  }
 }
 
 /* ── Base RTL setup ────────────────────────────────────────────── */
@@ -164,9 +616,12 @@ html[dir="ltr"],
 }
 
 body {
-  /* Rubik loaded from Google Fonts in layout.tsx */
-  font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
+  /* Inter + Heebo, self-hosted by next/font in layout.tsx (see --font-sans). */
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11';
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background: var(--color-canvas);
   color: var(--color-body);
   min-height: 100vh;
@@ -209,8 +664,8 @@ select {
 
 /* ── Native dialog backdrop ────────────────────── */
 dialog::backdrop {
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(2px);
+  background: var(--color-backdrop);
+  backdrop-filter: blur(3px);
 }
 
 /* ── Article Content Styles ───────────────────────────────────────── */
@@ -584,3 +1039,8 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
 @media (max-width: 640px) {
   .article-content table { display: block; overflow-x: auto; white-space: nowrap; }
 }
+
+/* Public site, menu open: the floating widgets (contact bar, WhatsApp, accessibility button,
+   privacy notice) step aside so none of them covers the menu's "start free" button. PublicNav
+   sets the attribute on <html> while its menu is open. */
+html[data-public-menu='open'] [data-public-float] { display: none !important; }

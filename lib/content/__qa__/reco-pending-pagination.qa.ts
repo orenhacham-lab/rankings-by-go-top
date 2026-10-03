@@ -58,7 +58,11 @@ function main() {
   console.log('WIRING) the component actually implements this model')
   check('initial visibleCount = 3 (INITIAL_VISIBLE), step = 5 (PAGE_STEP)',
     /const INITIAL_VISIBLE = 3/.test(src) && /const PAGE_STEP = 5/.test(src) && /useState\(INITIAL_VISIBLE\)/.test(src))
-  check('renders an actual SLICE (not all cards hidden via CSS)', /suggestions\.slice\(0, visibleCount\)\.map\(/.test(src) && !/ideasExpanded/.test(src))
+  // The slice is named (shownIdeas) because the "no links" notice reads the same rows
+  // (final review R14); the rendered list must still map exactly that slice.
+  const rendersSlice = (s: string) => /const shownIdeas = suggestions\.slice\(0, visibleCount\)/.test(s) && /\{shownIdeas\.map\(/.test(s) && !/\{suggestions\.map\(/.test(s) && !/ideasExpanded/.test(s)
+  check('renders an actual SLICE (not all cards hidden via CSS)', rendersSlice(src))
+  check('renders an actual SLICE — MUT: mapping every suggestion is caught', !rendersSlice(src.replace('{shownIdeas.map(', '{suggestions.map(')))
   check('"show more" adds +5 bounded by total', /setVisibleCount\(\(v\) => Math\.min\(suggestions\.length, v \+ PAGE_STEP\)\)/.test(src))
   check('"show all" reveals the rest', /setVisibleCount\(suggestions\.length\)/.test(src))
   check('two adjacent buttons: הצג עוד + הצג הכל (localized keys)', /t\.showMoreIdeas/.test(src) && /t\.showAllIdeas/.test(src) && /ideas-show-more/.test(src) && /ideas-show-all/.test(src))

@@ -44,6 +44,8 @@ export type PromptIntent =
   | 'pre_purchase'
   | 'gift'
 
+import type { QuestionWorth } from './question-worth'
+
 export type BusinessCategory =
   | 'agency'
   | 'ecommerce'
@@ -65,6 +67,7 @@ export type BusinessCategory =
   | 'beauty'
   | 'education'
   | 'second_hand_fashion'
+  | 'travel'
   | 'generic'
 
 export type BusinessProfile = {
@@ -96,6 +99,8 @@ export type PromptSuggestion = {
   reason: string
   chips: string[] // signal-based, e.g. 'chip_commercial_phrase', 'chip_competitor_gap'
   valueReason: string // localized 1-line explanation of business value
+  /** Set by rankByWorth (question-worth.ts): why this question, and whether a page already answers it. */
+  worth?: QuestionWorth
 }
 
 type TemplateContext = {
@@ -179,6 +184,7 @@ const HE_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   beauty: 'יופי וטיפוח',
   education: 'הכשרה והוראה',
   second_hand_fashion: 'בגדי יד שנייה לנשים',
+  travel: 'תיירות וטיולים',
   generic: 'עסק',
 }
 
@@ -203,8 +209,12 @@ const EN_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   beauty: 'beauty & wellness',
   education: 'education',
   second_hand_fashion: 'second-hand women\'s fashion',
+  travel: 'travel & tourism',
   generic: 'business',
 }
+
+/** Words that say a business is about travel: trips, tourism, holidays, flights. */
+export const TRAVEL_PATTERN = /(טיול|טיולים|מטייל|תיירות|תייר|נופש|חופשה|חופשות|סוכנות נסיעות|טיסה|טיסות|מלון|מלונות|travel|touris|\btours?\b|\btrips?\b|vacation|itinerar|\bhotels?\b|\bflights?\b)/i
 
 /**
  * Niche detection from business name + domain + keywords.
@@ -275,6 +285,9 @@ export function detectCategory(
 
   if (/(appliance|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
   if (/\b(saas|software)\b/.test(text)) return 'saas'
+  // Travel before restaurant: a travel site's keywords name the food of the
+  // destination ("אוכל רחוב יפן"), and the destination is not a restaurant.
+  if (TRAVEL_PATTERN.test(text)) return 'travel'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
   if (/(clinic|hospital|medical|doctor|dental|מרפאה|רופא|רפואה|שיניים)/.test(text)) return 'healthcare'
   if (/(law|legal|attorney|lawyer|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
@@ -596,6 +609,22 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
   ],
 
+  travel: [
+    // Primary: planning & choosing (70%)
+    { intent: 'recommendation', text: 'איזה אתר מומלץ לתכנון טיול לחו״ל?', score: 92, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איך מתכננים מסלול לטיול עצמאי?', score: 90, offering: 'primary' },
+    { intent: 'comparison', text: 'עדיף טיול מאורגן או טיול עצמאי?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'מתי הכי משתלם להזמין טיסה לחו״ל?', score: 86, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני שמזמינים חבילת נופש?', score: 85, offering: 'primary' },
+
+    // Secondary: pricing (20%)
+    { intent: 'commercial', text: 'כמה עולה טיול מאורגן לחו״ל?', score: 87, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'recommendation', text: 'איזה ביטוח נסיעות כדאי לקחת לטיול בחו״ל?', score: 82, offering: 'secondary' },
+
+    // Generic: brand (fallback)
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
+  ],
+
   healthcare: [
     // Primary: selection & recommendations (70%)
     { intent: 'recommendation', text: 'מרפאות פרטיות מומלצות בישראל', score: 91, offering: 'primary' },
@@ -831,6 +860,15 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
   restaurant: [
     { intent: 'recommendation', text: 'Best restaurants in {{city}}', score: 91, offering: 'primary', requiresCity: true },
     { intent: 'local', text: 'Romantic dinner places in {{city}}', score: 85, offering: 'local', requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  travel: [
+    { intent: 'recommendation', text: 'Which website is best for planning a trip abroad?', score: 92, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'How do I plan a self-guided travel itinerary?', score: 90, offering: 'primary' },
+    { intent: 'comparison', text: 'Is a guided tour better than traveling independently?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'When is the cheapest time to book international flights?', score: 86, offering: 'primary' },
+    { intent: 'commercial', text: 'How much does a guided tour abroad cost?', score: 85, offering: 'secondary', themeBoost: { price: 4 } },
     { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
   ],
 
@@ -1588,11 +1626,29 @@ const CATEGORY_PROFILES: Record<BusinessCategory, CategoryProfile> = {
       'שירותי כלליים', 'חנויות כלליות', 'general services', 'generic retailers',
     ],
   },
+  travel: {
+    primaryOfferings: [
+      'טיול', 'טיולים', 'תכנון טיול', 'מסלול טיול', 'חופשה', 'טיסות',
+      'travel', 'trip planning', 'itinerary', 'tours', 'flights',
+    ],
+    secondaryOfferings: [
+      'לינה', 'ביטוח נסיעות', 'אטרקציות', 'accommodation', 'travel insurance', 'attractions',
+    ],
+    // The food of a destination is part of the trip, never the business itself.
+    excludedTopics: [
+      'הזמנת שולחן', 'תפריט המסעדה', 'table reservation', 'restaurant menu',
+    ],
+  },
   generic: {
     primaryOfferings: [],
     secondaryOfferings: [],
     excludedTopics: [],
   },
+}
+
+/** The words a category's business offers (CATEGORY_PROFILES), for relevance scoring. */
+export function categoryOfferings(category: BusinessCategory): readonly string[] {
+  return (CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.generic).primaryOfferings
 }
 
 /**
@@ -1631,9 +1687,11 @@ export function inferBusinessProfile(args: {
   keywords?: string[]
   city?: string | null
   country?: string | null
+  /** The category already resolved for the business (business-identity.ts); detection runs only without it. */
+  category?: BusinessCategory | null
 }): BusinessProfile & { primaryCategory: BusinessCategory } {
   const { businessName, domain, keywords = [], city, country } = args
-  const category = detectCategory(businessName || '', domain || '', keywords)
+  const category = args.category ?? detectCategory(businessName || '', domain || '', keywords)
   const template = CATEGORY_PROFILES[category] || CATEGORY_PROFILES.generic
 
   const primaryOfferings = new Set<string>(template.primaryOfferings)
@@ -1739,7 +1797,7 @@ const BUSINESS_CATEGORY_SET: ReadonlySet<BusinessCategory> = new Set<BusinessCat
   'agency', 'ecommerce', 'perfume', 'sports_store', 'gifts', 'appliance_store',
   'saas', 'product_brand', 'local_service', 'cleaning', 'florist', 'restaurant', 'healthcare',
   'legal', 'real_estate', 'fitness', 'beauty', 'education', 'second_hand_fashion', 'generic',
-  'home_improvement_service',
+  'home_improvement_service', 'travel',
 ])
 
 function isBusinessCategory(value: string): value is BusinessCategory {
@@ -1770,6 +1828,8 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
   // Perfume / fragrance
   if (/(בושם|בשמ|בשמי נישה|פרפיום|או דה פרפיום|או דה טואלט|perfume|fragrance|cologne)/.test(t))
     return 'perfume'
+  // Travel — before agency, so "סוכנות נסיעות" is not a marketing agency.
+  if (TRAVEL_PATTERN.test(t)) return 'travel'
   // Agency / paid ads / SEO
   if (/(פרסום ממומן|ממומן בגוגל|google ads|adwords|פרסום|שיווק|סוכנות|דיגיטל|seo|ppc|sem|קידום אתרים|agency|marketing)/.test(t))
     return 'agency'
@@ -2657,6 +2717,7 @@ function getCategoryLabel(category: BusinessCategory, lang: string): string {
     gifts: 'מתנות',
     education: 'חינוך',
     second_hand_fashion: 'ביגוד יד שנייה',
+    travel: 'תיירות',
     generic: 'עסק',
   }
 
@@ -2681,6 +2742,7 @@ function getCategoryLabel(category: BusinessCategory, lang: string): string {
     gifts: 'gifts',
     education: 'education',
     second_hand_fashion: 'fashion',
+    travel: 'travel',
     generic: 'business',
   }
 
@@ -2974,6 +3036,11 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     he: 'מסעדה', hePlural: 'מסעדות',
     en: 'restaurant', enPlural: 'restaurants',
   },
+  travel: {
+    he: 'שירות תכנון טיולים', hePlural: 'שירותי תכנון טיולים',
+    en: 'trip planning service', enPlural: 'trip planning services',
+    hePrice: 'תכנון טיול', enPrice: 'trip planning',
+  },
   fitness: {
     he: 'חדר כושר', hePlural: 'חדרי כושר',
     en: 'gym', enPlural: 'gyms',
@@ -3046,6 +3113,7 @@ export function inferBusinessType(
     case 'home_improvement_service':
     case 'local_service':
     case 'agency':
+    case 'travel':
       return 'service_provider'
     case 'legal':
     case 'real_estate':
@@ -3686,6 +3754,7 @@ export function generatePromptSuggestions({
   previousSet = [],
   recentlyUsedSecondaryCategories = [],
   diversify = true,
+  category: identityCategory = null,
 }: {
   businessName: string | null
   domain: string | null
@@ -3701,6 +3770,13 @@ export function generatePromptSuggestions({
   previousSet?: string[]
   recentlyUsedSecondaryCategories?: string[]
   diversify?: boolean
+  /**
+   * The business category resolved by resolveBusinessIdentity (manual profile,
+   * site scan, name/domain, keyword majority). When given it decides the
+   * templates, so a single tracked keyword can no longer turn the business into
+   * something else. Without it the old detection over name + domain + keywords runs.
+   */
+  category?: BusinessCategory | null
 }): PromptSuggestion[] {
   const business = businessName || ''
   const dom = domain || ''
@@ -3711,7 +3787,7 @@ export function generatePromptSuggestions({
   // Always derive a BusinessProfile — infer from project data when none given.
   // This is what drives the 70/20/10 weighting + excluded-topic filtering.
   const autoProfile = profile ?? inferBusinessProfile({
-    businessName, domain, keywords, city, country,
+    businessName, domain, keywords, city, country, category: identityCategory,
   })
 
   // ========================================================================
@@ -3725,7 +3801,9 @@ export function generatePromptSuggestions({
     // overrides apply consistently.
     const hasManualEarly = manualProfile && manualProfile.mode === 'manual'
     let resolvedCategory: BusinessCategory
-    if (hasManualEarly && manualProfile.primaryCategory) {
+    if (identityCategory) {
+      resolvedCategory = identityCategory
+    } else if (hasManualEarly && manualProfile.primaryCategory) {
       const r = resolveManualPrimaryCategory(manualProfile.primaryCategory)
       resolvedCategory = r || (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
     } else {
@@ -3782,7 +3860,7 @@ export function generatePromptSuggestions({
 
   if (hasManual && manualProfile.primaryCategory) {
     const resolved = resolveManualPrimaryCategory(manualProfile.primaryCategory)
-    category = resolved || (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+    category = identityCategory || resolved || (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
     // If custom text didn't map to a known category, include it as a secondary
     // signal so it still influences question scoring even though we fell back to auto.
     if (!resolved) {

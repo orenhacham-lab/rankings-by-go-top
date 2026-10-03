@@ -279,16 +279,23 @@ async function main() {
     const sw = code('components/layout/WorkspaceSwitcher.tsx')
     const anchored = (src: string) => (src.match(/data-onboarding="workspace"/g) ?? []).length === 4
     check('E1: every state the switcher renders carries the tour anchor (error, loading, first project, list)', anchored(sw))
-    check('E-MUT: a state without the anchor fails E1', !anchored(sw.replace('data-onboarding="workspace" className="text-sm text-muted"', 'className="text-sm text-muted"')))
+    // (The loading state is a skeleton pill since w7 P2-1; it keeps the anchor.)
+    check('E-MUT: a state without the anchor fails E1', !anchored(sw.replace(/data-onboarding="workspace"(\s+data-switcher-skeleton)/, '$1')))
     check('E2: the menu keeps a link to the project list, where inactive projects are',
       /href="\/projects"/.test(sw) && /\{t\.manage\}/.test(sw))
-    const tour = code('components/onboarding/DashboardOnboardingTour.tsx')
-    check('E3: the tour starts at the switcher for a new account, past it otherwise',
-      /\{ step: 'createProject', selector: '\[data-onboarding="workspace"\]' \}/.test(tour)
-      && /const getStartStep = useCallback\(\(\) => \(totalProjects === 0 \? 0 : 1\), \[totalProjects\]\)/.test(tour))
-    const dash = code('app/(dashboard)/dashboard/page.tsx')
-    check('E4: the tour waits for the project list before it decides',
-      /\{isResolved && !projectsError && <DashboardOnboardingTour totalProjects=\{projects\.length\} \/>\}/.test(dash))
+    // The tour moved to the Guide pill (lib/guide/tours.ts, components/guide/GuideMenu.tsx);
+    // its own contracts live in lib/guide/__qa__/guide-tours.qa.ts.
+    const tours = code('lib/guide/tours.ts')
+    const firstStopIsSwitcher = (src: string) =>
+      /FULL_TOUR: readonly TourStep\[\] = \[\s*\{ key: 'switcher', target: SWITCHER_TARGET \}/.test(src)
+      && /SWITCHER_TARGET = '\[data-onboarding="workspace"\]'/.test(src)
+    check('E3: the full tour starts at the switcher, whatever state it is in', firstStopIsSwitcher(tours))
+    check('E3-MUT: a tour that starts elsewhere fails E3',
+      !firstStopIsSwitcher(tours.replace("{ key: 'switcher', target: SWITCHER_TARGET },", '')))
+    const guide = code('components/guide/GuideMenu.tsx')
+    const waitsForList = (src: string) => /if \(run \|\| pendingFull \|\| fullState === null \|\| !isResolved \|\| !pathname\) return/.test(src)
+    check('E4: no tour starts on its own before the project list is known', waitsForList(guide))
+    check('E4-MUT: dropping the wait fails E4', !waitsForList(guide.replace('|| !isResolved ', '')))
   }
 
   // ── F) the workspace gate ────────────────────────────────────────────────
@@ -352,9 +359,20 @@ async function main() {
           + (src.match(/\.in\('tracking_target_id', targetIds\)/g) ?? []).length === reads.length
     }
     const dash = code('app/(dashboard)/dashboard/page.tsx')
-    const scans = code('app/(dashboard)/scans/page.tsx')
+    // The scans list is the check-history section of Keywords and Reports now. Its
+    // runs are read by the project; a run's keywords by the id of a run from that list.
+    const history = code('components/scans/ScanHistory.tsx')
+    const historyScoped = (src: string) => {
+      const reads = src.match(/\.from\('[a-z_]+'\)/g) ?? []
+      return reads.length === 2
+        && /\.from\('scans'\)[\s\S]{0,200}?\.eq\('project_id', projectId\)/.test(src)
+        && /\.from\('scan_results'\)[\s\S]{0,200}?\.eq\('scan_id', run\.id\)/.test(src)
+        && !/\.from\('(clients|projects)'\)/.test(src) && !/\.eq\('user_id'/.test(src)
+    }
     check('H1: every dashboard read is filtered to the current project', scoped(dash))
-    check('H2: the scans list reads the current project\'s scans only', scoped(scans))
+    check('H2: the check history reads the current project\'s runs only', historyScoped(history))
+    check('H2-MUT: a history that reads every run in the account fails H2',
+      !historyScoped(history.replace(".eq('project_id', projectId)", '')))
     check('H-MUT: an account-wide read fails H1',
       !scoped(dash + "\nsupabase.from('clients').select('*').eq('user_id', user.id)"))
     const research = code('app/(dashboard)/keyword-research/page.tsx')

@@ -25,7 +25,10 @@
  *     sentence and exactly one button to settings (the REAL components, first render),
  *     and nothing at all when Search Console is switched off;
  *  E) no merchant screen hides a widget: each is mounted unconditionally, and no screen
- *     reads the connection to decide; the raw opportunity browser stays behind its flag;
+ *     reads the connection to decide; the raw opportunity browser stays behind its flag.
+ *     The one exception is the dashboard, which shows a widget only once it has
+ *     something to show (lib/dashboard/start.ts): it asks the widget for that with
+ *     `onlyWithData`, and the widget alone decides (a failed read still shows its retry);
  *  F) the copy exists in both languages, one sentence each, English without Hebrew;
  *  G) the two widgets that act and keep their own data: what they report reaches the
  *     screen, and a project switch starts them afresh;
@@ -349,22 +352,35 @@ async function main() {
     const GscClicksTile = load('components/gsc/GscClicksTile.tsx')
     const GscTopPages = load('components/gsc/GscTopPages.tsx')
     const GscPerformance = load('components/gsc/GscPerformance.tsx')
-    const { GscKeywordsNotice, GscKeywordLine, useGscKeywordFigures } = require(join(ROOT, 'components/gsc/GscKeywordFigures.tsx'))
+    const { GscKeywordsNotice, GscGoogleAverage, googleLineShown, useGscKeywordInsights } = require(join(ROOT, 'components/gsc/GscKeywordFigures.tsx'))
     const GscOpportunities = load('components/content/GscOpportunities.tsx')
     const GscRecommendations = load('components/content/GscRecommendations.tsx')
 
+    // Wave 8: the Keywords tab's widget is the section under the table (the searches Google
+    // shows the site for, or, before setup, the card on what connecting adds), and the
+    // Google line under each keyword's name, which the table draws only once there is
+    // something to draw (googleLineShown). The harness is the table's own composition.
     function KeywordsHarness({ projectId }: { projectId: string | null }) {
-      const view = useGscKeywordFigures(projectId, 't1')
+      const view = useGscKeywordInsights(projectId, 't1')
       return createElement(Fragment, null,
-        createElement(GscKeywordsNotice, { projectId, view }),
-        createElement(GscKeywordLine, { view, targetId: 't1' }))
+        googleLineShown(view) ? createElement(GscGoogleAverage, { view, targetId: 't1' }) : null,
+        createElement(GscKeywordsNotice, { projectId, view }))
     }
-    type W = { name: string; copy: 'clicks' | 'topPages' | 'performance' | 'keywords' | 'opportunities' | 'recommendations'; el: (projectId: string | null) => unknown }
+    type Dict = ReturnType<typeof getDashboardDictionary>['gscWidgets']
+    type W = {
+      name: string
+      copy: 'clicks' | 'topPages' | 'performance' | 'keywords' | 'opportunities' | 'recommendations'
+      el: (projectId: string | null) => unknown
+      /** Before setup, a widget whose card has its own words (the Keywords tab's card: a
+       *  title naming the step that is missing, never a connection that does not exist). */
+      setup?: (w: Dict, state: SetupState) => { title: string; about: string }
+    }
     const WIDGETS: W[] = [
       { name: 'clicks', copy: 'clicks', el: (projectId) => createElement(GscClicksTile, { projectId }) },
       { name: 'top-pages', copy: 'topPages', el: (projectId) => createElement(GscTopPages, { projectId }) },
       { name: 'performance', copy: 'performance', el: (projectId) => createElement(GscPerformance, { projectId }) },
-      { name: 'keywords', copy: 'keywords', el: (projectId) => createElement(KeywordsHarness, { projectId }) },
+      { name: 'keywords', copy: 'keywords', el: (projectId) => createElement(KeywordsHarness, { projectId }),
+        setup: (w, state) => ({ title: w.connect.titles[state], about: w.connect.body }) },
       { name: 'opportunities', copy: 'opportunities', el: (projectId) => createElement(GscOpportunities, { projectId: projectId ?? '' }) },
       { name: 'recommendations', copy: 'recommendations', el: (projectId) => createElement(GscRecommendations, { projectId: projectId ?? '' }) },
     ]
@@ -394,11 +410,12 @@ async function main() {
           const html = render(locale, widget.el('p1'))
           if (widget.name === 'clicks' && state === 'not_connected' && locale === 'en') sample = html
           const t = text(html)
+          const copy = widget.setup ? widget.setup(w, state) : w[widget.copy]
           const problems = [
             !html.includes(`data-gsc-widget="${widget.name}"`) && 'no widget marker',
             !html.includes(`data-gsc-state="${state}"`) && `state is not ${state}`,
-            !html.includes(esc(w[widget.copy].title)) && 'title missing',
-            count(html, esc(w[widget.copy].about)) !== 1 && `sentence shown ${count(html, esc(w[widget.copy].about))} times`,
+            !html.includes(esc(copy.title)) && 'title missing',
+            count(html, esc(copy.about)) !== 1 && `sentence shown ${count(html, esc(copy.about))} times`,
             !oneSettingsButton(html, '/settings?projectId=p1#search-console', w.actions[state]) && 'not exactly one button to settings',
             /(^|\s)0(\s|$)/.test(t) && 'a bare zero',
             locale === 'en' && HEBREW.test(html) && 'Hebrew in English',
@@ -408,6 +425,14 @@ async function main() {
         }
         check(`D1 (${locale}) ${widget.name}: title, one sentence, one button to settings in all four setup states`, failures.length === 0, failures.join(' | '))
       }
+      // UX review P1-8: before Search Console gives figures, the performance section on
+      // Reports is ONE card. It used to add three tiles that each said "waiting for
+      // Search Console" with their own source line: the same placeholder four times.
+      const oneCard = (html: string) => !html.includes('data-gsc-tile=') && count(html, esc(w.emptyTile)) === 0 && count(html, esc(w.source28)) === 0
+      const perfSetup = GSC_SETUP_STATES.map((state) => { prime('p1', 200, STATUS_BODY[state]); return render(locale, createElement(GscPerformance, { projectId: 'p1' })) })
+      check(`D1b (${locale}) performance before Search Console: one card, no "waiting" tiles`, perfSetup.every(oneCard))
+      check(`D1b-MUT (${locale}) a "waiting" tile beside the card fails D1b`,
+        !oneCard(perfSetup[0].replace('</section>', `<div data-gsc-tile="clicks">${esc(w.emptyTile)}</div></section>`)))
       // Feature switched off on the server: nothing to connect, so nothing at all, not even
       // the title. Then an account with no project yet.
       prime('p1', 404, { error: 'Not found' })
@@ -419,8 +444,9 @@ async function main() {
       check(`D2-MUT (${locale}) the widgets as the old mapping drew the 404 ("Connect") fail D2`,
         !renderedNothing(WIDGETS.map((widget) => render(locale, widget.el('p1')))))
       const noProject = WIDGETS.map((widget) => render(locale, widget.el(null)))
+      const setupTitle = (i: number) => WIDGETS[i].setup?.(w, 'not_connected').title ?? w[WIDGETS[i].copy].title
       check(`D3 (${locale}) without a project every widget still shows, its button to settings`,
-        noProject.every((html, i) => html.includes(esc(w[WIDGETS[i].copy].title)) && oneSettingsButton(html, '/settings#search-console', w.actions.not_connected)))
+        noProject.every((html, i) => html.includes(esc(setupTitle(i))) && oneSettingsButton(html, '/settings#search-console', w.actions.not_connected)))
       // A failed read: the title, the error and a retry; no setup button, no zero.
       prime('p1', 500, { ok: false, error: 'gsc_error' })
       const errored = WIDGETS.map((widget) => render(locale, widget.el('p1')))
@@ -457,7 +483,9 @@ async function main() {
       { startDate: '2026-07-27', endDate: '2026-08-23', clicks: 1000, impressions: 50000, position: 9.1 },
       { startDate: '2026-08-24', endDate: '2026-09-20', clicks: 1234, impressions: 56789, position: 8.4 },
     ] } })
-    data.primeGscResponse(data.gscMetricsUrl('p-ready', 'keywords'), { status: 200, body: { ok: true, run: {}, keywords: { t1: { clicks: 1500, impressions: 34567 } } } })
+    data.primeGscResponse(data.gscMetricsUrl('p-ready', 'keywords'), { status: 200, body: { ok: true, run: {}, keywords: { t1: { clicks: 1500, impressions: 34567 } },
+      averages: { t1: { clicks: 1500, impressions: 34567, position: 8.4 } },
+      untracked: [{ query: 'trail sandals', clicks: 12, impressions: 2400, position: 14.2 }], untrackedTotal: 1, queriesTotal: 2, syncedAt: '2026-09-27T05:41:00Z' } })
     const en = getDashboardDictionary('en').gscWidgets
     const tile = render('en', createElement(GscClicksTile, { projectId: 'p-ready' }))
     check('D6: ready, the clicks tile shows the 28-day total and its source', tile.includes('data-gsc-state="ready"') && tile.includes('1,234') && tile.includes(esc(en.source28)) && !/<a\b/.test(tile))
@@ -465,23 +493,43 @@ async function main() {
     check('D7: ready, top pages name the home page and decode paths, with clicks in words',
       top.includes(getDashboardDictionary('he').gscWidgets.topPages.homePage) && top.includes('/נעליים') && top.includes(esc(getDashboardDictionary('he').gscWidgets.topPages.clicks('700'))))
     const perf = render('en', createElement(GscPerformance, { projectId: 'p-ready' }))
-    check('D8: ready, performance shows the three totals and the change against the previous 28 days',
-      perf.includes('1,234') && perf.includes('56,789') && perf.includes('8.4') && perf.includes(esc(en.performance.vsPrevious)) && perf.includes('▲ 23%') && perf.includes('▲ 0.7') && !/<a\b/.test(perf))
+    // The change is a lucide arrow (not a ▲ glyph) in the ok tone, then the figure.
+    const up = (html: string, figure: string) =>
+      new RegExp(`data-gsc-delta="up" class="[^"]*text-ok[^"]*"><svg[^>]*lucide-arrow-up[\\s\\S]*?</svg><span class="sr-only">\\+</span>${figure.replace('.', '\\.')}</span>`).test(html)
+    const d8 = (html: string) =>
+      html.includes('1,234') && html.includes('56,789') && html.includes('8.4') && html.includes(esc(en.performance.vsPrevious)) && up(html, '23%') && up(html, '0.7') && !/[▲▼•]/.test(text(html)) && !/<a\b/.test(html)
+    check('D8: ready, performance shows the three totals and the change against the previous 28 days', d8(perf))
+    check('MUT: the ▲ glyph back instead of the arrow fails D8', !d8(perf.replace(/<svg[^>]*lucide-arrow-up[\s\S]*?<\/svg>/, '▲ ')))
     const kw = render('en', createElement(KeywordsHarness, { projectId: 'p-ready' }))
-    check('D9: ready, the keyword line shows clicks · impressions, compact, with the full figures for screen readers',
-      kw.includes('data-gsc-keyword="figures"') && kw.includes('1.5K') && kw.includes('34.6K') && kw.includes(esc(en.keywords.figures('1,500', '34,567'))))
-    const kwNone = render('en', createElement(GscKeywordLine, { view: { data: { state: 'ready', data: {} }, retry: () => {} }, targetId: 'zz' }))
-    check('D10: a keyword Google reports nothing for shows a dash that says so, not a 0',
-      kwNone.includes('data-gsc-keyword="none"') && kwNone.includes(esc(en.keywords.none)) && !/(^|\s)0(\s|$)/.test(text(kwNone)))
+    const line = /<span[^>]*data-gsc-keyword="figures"[\s\S]*?<\/span><\/span>|<span[^>]*data-gsc-keyword="figures"[\s\S]*$/.exec(kw)?.[0] ?? ''
+    const d9 = (html: string) => html.includes('data-gsc-keyword="figures"')
+      && html.includes(esc(en.googleAverage.label)) && html.includes(esc(en.googleAverage.position('8.4')))
+      && html.includes(esc(en.googleAverage.clicks('1.5K'))) && html.includes(esc(en.googleAverage.impressions('34.6K')))
+      && html.includes(esc(en.googleAverage.full('8.4', '1,500', '34,567', 'Sep 27')))
+    check('D9: ready, the Google line under a keyword is labelled "Google average, 28 days": position, clicks, impressions, and the sync date for screen readers',
+      d9(kw), line.slice(0, 300))
+    check('D9-MUT: a line without its "Google average, 28 days" label (a second position column) fails D9',
+      !d9(kw.split(esc(en.googleAverage.label)).join('')))
+    const d9b = (html: string) => html.includes('data-gsc-state="ready"') && html.includes(esc(en.keywords.title))
+      // Wave 9: Google's average position is a whole number on this tab (14.2 → 14).
+      && html.includes('trail sandals') && html.includes('2,400') && />14</.test(html) && !html.includes('14.2')
+      && html.includes(esc(en.untracked.addAria('trail sandals'))) && html.includes(esc(en.googleAverage.synced('Sep 27')))
+      && !html.includes('/settings')
+    check('D9b: ready, the section lists the searches Google shows the site for that are not tracked, with "Track it" and the sync date, no settings link', d9b(kw))
+    check('D9b-MUT: a section that drops the untracked searches fails D9b', !d9b(kw.replace(/trail sandals/g, '')))
+    const kwNone = render('en', createElement(GscGoogleAverage, { view: { data: { state: 'ready', data: { averages: {}, untracked: [], untrackedTotal: 0, queriesTotal: 0, syncedAt: null } }, retry: () => {} }, targetId: 'zz' }))
+    check('D10: a keyword Google reports nothing for says so in words, not a 0',
+      kwNone.includes('data-gsc-keyword="none"') && kwNone.includes(esc(en.googleAverage.noneFull)) && !/(^|\s)0(\s|$)/.test(text(kwNone)))
   }
 
   // ── E) no screen hides a widget ─────────────────────────────────────────
   console.log('\nE) every merchant screen mounts its widgets unconditionally; the raw browser stays behind its flag')
   {
     const SCREENS: [string, string[]][] = [
-      ['app/(dashboard)/dashboard/page.tsx', ['<GscClicksTile projectId={project.id} />', '<GscTopPages projectId={project.id} />']],
+      ['app/(dashboard)/dashboard/page.tsx', ['<GscClicksTile projectId={project.id} onlyWithData />', '<GscTopPages projectId={project.id} onlyWithData />']],
       ['app/(dashboard)/reports/page.tsx', ['<GscPerformance projectId={activeProjectId}']],
-      ['components/keywords/ProjectKeywordsPanel.tsx', ['<GscKeywordsNotice projectId={id} view={gscKeywords}', 'gscKeywords={gscKeywords}']],
+      // Wave 9: mounted twice, unconditionally: the positions on top, the setup card under the live tracking.
+      ['components/keywords/ProjectKeywordsPanel.tsx', ['<GscKeywordsNotice projectId={id} view={gscKeywords} onTrack={trackGscQuery} targets={gscTargets} slot="top"', '<GscKeywordsNotice projectId={id} view={gscKeywords} slot="bottom"']],
       ['components/content/workspace/TopicsScreen.tsx', ['<GscRecommendations']],
     ]
     /** The element is there, nothing between it and the previous tag decides whether it
@@ -499,9 +547,16 @@ async function main() {
     check('E1: the dashboard, reports, keywords and Topics mount their widgets whatever the connection', hidden(all).length === 0, hidden(all).join(' | '))
     const dash = all[0][1]
     check('E1-MUT: a dashboard that shows top pages only when connected fails E1',
-      hidden([['dash', dash.replace('<GscTopPages projectId={project.id} />', '{gscConnected && <GscTopPages projectId={project.id} />}'), '<GscTopPages projectId={project.id} />']]).length === 1)
+      hidden([['dash', dash.replace('<GscTopPages projectId={project.id} onlyWithData />', '{gscConnected && <GscTopPages projectId={project.id} onlyWithData />}'), '<GscTopPages projectId={project.id} onlyWithData />']]).length === 1)
     check('E1-MUT2: a dashboard that puts its tile behind a Search Console flag fails E1',
-      hidden([['dash', `${dash}\nconst on = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'`, '<GscClicksTile projectId={project.id} />']]).length === 1)
+      hidden([['dash', `${dash}\nconst on = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'`, '<GscClicksTile projectId={project.id} onlyWithData />']]).length === 1)
+    // Only the dashboard asks for data-only widgets: every other screen keeps its setup
+    // prompts and loading states.
+    const dataOnlyElsewhere = (list: [string, string][]) => list.filter(([, src]) => /\bonlyWithData\b/.test(src)).map(([p]) => p)
+    const others = SCREENS.slice(1).map(([p]) => [p, code(p)] as [string, string])
+    check('E1b: only the dashboard mounts a widget with onlyWithData', dataOnlyElsewhere(others).length === 0, dataOnlyElsewhere(others).join(', '))
+    check('E1b-MUT: reports asking for a data-only performance widget fails E1b',
+      dataOnlyElsewhere([['reports', others[0][1].replace('<GscPerformance projectId={activeProjectId}', '<GscPerformance onlyWithData projectId={activeProjectId}')]]).length === 1)
 
     // The raw opportunity browser is a diagnostic: on main and on the base branch it was
     // rendered only when NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true', and it still is.
@@ -517,20 +572,27 @@ async function main() {
     check('E4-MUT3: a second, ungated mount of the browser fails E4',
       !behindRawFlag(`${research}\nconst extra = <GscOpportunities projectId={selectedProject} />`))
 
-    // The volume cell: GscVolumeCell alone decides whether a line goes under the volume
-    // (and, switched off, whether there is a column to stack it in at all).
+    // Wave 9 (the owner: the Google chip on a live-tracked row is unclear): the live
+    // tracking table shows our live check only. Google's figure for a tracked keyword
+    // lives in the Search Console section at the top of the tab. The volume cell is the
+    // volume alone, as before.
     const table = code('components/keywords/TrackingTargetsTable.tsx')
-    const volumeInCell = (src: string) => /<Td>\s*<GscVolumeCell view=\{gscKeywords\} targetId=\{target\.id\}>\s*\{target\.avg_monthly_searches !== null[\s\S]*?<\/GscVolumeCell>\s*<\/Td>/.test(src)
-      && !/<GscKeywordLine\b/.test(src)
-    check('E2: the keywords table puts every search volume in the Search Console cell, which alone decides what goes under it', volumeInCell(table))
-    check('E2-MUT: a table that stacks the line itself, in a column kept in every state, fails E2',
-      !volumeInCell(table.replace('<GscVolumeCell view={gscKeywords} targetId={target.id}>', '<div className="flex flex-col items-start gap-1">')
-        .replace('</GscVolumeCell>', '{gscKeywords && <GscKeywordLine view={gscKeywords} targetId={target.id} />}</div>')))
+    const liveOnly = (src: string) => {
+      const volumeCell = /<Td className="hidden sm:table-cell">\s*\{target\.avg_monthly_searches !== null[\s\S]*?<\/Td>/.exec(src)?.[0] ?? ''
+      return volumeCell !== '' && !/Gsc[A-Z]|gscKeywords|data-gsc-/.test(src) && !/GscVolumeCell|GscKeywordLine|googleLineShown/.test(src)
+    }
+    check('E2: the live tracking table carries no Search Console line or chip on any row, and leaves the volume cell alone', liveOnly(table))
+    check('E2-MUT: the Google line back under a keyword\'s name fails E2',
+      !liveOnly(table.replace('{target.avg_monthly_searches !== null', '{gscKeywords && <GscGoogleAverage view={gscKeywords} targetId={target.id} />}{target.avg_monthly_searches !== null')))
 
     // The widgets never remove themselves, except when Search Console is switched off on
     // the server; none reads a Search Console flag to decide.
-    const widgetFiles = ['components/gsc/GscClicksTile.tsx', 'components/gsc/GscTopPages.tsx', 'components/gsc/GscPerformance.tsx', 'components/gsc/GscKeywordFigures.tsx', 'components/gsc/GscSetupPrompt.tsx', 'components/content/GscOpportunities.tsx', 'components/content/GscRecommendations.tsx']
-    const hidesOnlyWhenOff = (src: string) => (src.match(/return null\b/g) ?? []).length === (src.match(/if \((?:[\w.]+\.)?state === 'disabled'\) return null\b/g) ?? []).length
+    const widgetFiles = ['components/gsc/GscClicksTile.tsx', 'components/gsc/GscTopPages.tsx', 'components/gsc/GscPerformance.tsx', 'components/gsc/GscKeywordFigures.tsx', 'components/gsc/GscUntrackedQueries.tsx', 'components/gsc/GscSetupPrompt.tsx', 'components/content/GscOpportunities.tsx', 'components/content/GscRecommendations.tsx']
+    // Also allowed: the dashboard's `onlyWithData` return, which never hides a failed read.
+    // And wave 9's two mounts of the Keywords tab's block: each slot leaves to the other
+    // the states it does not draw (the block itself is always mounted, twice).
+    const allowedNull = /if \((?:[\w.]+\.)?state === 'disabled'\) return null\b|if \(onlyWithData && [^\n]*?\.state !== 'error'\) return null\b|if \(slot === '(?:top|bottom)'\) return null\b/g
+    const hidesOnlyWhenOff = (src: string) => (src.match(/return null\b/g) ?? []).length === (src.match(allowedNull) ?? []).length
       && !/NEXT_PUBLIC_GSC_(READ_ONLY|RAW_BROWSER)/.test(src)
     const selfHiding = (files: [string, string][]) => files.filter(([, src]) => !hidesOnlyWhenOff(src)).map(([p]) => p)
     const widgetSrc = widgetFiles.map((p) => [p, code(p)] as [string, string])
@@ -539,6 +601,8 @@ async function main() {
       selfHiding([['tile', widgetSrc[0][1].replace("if (view.state === 'ready' && view.summary) {", "if (view.state === 'not_connected') return null\n  if (view.state === 'ready' && view.summary) {")]]).length === 1)
     check('E3-MUT2: a widget that hides behind a Search Console flag fails E3',
       selfHiding([['tile', `${widgetSrc[0][1]}\nconst off = process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED !== 'true'`]]).length === 1)
+    check('E3-MUT3: a data-only tile that also hides its failed read fails E3',
+      selfHiding([['tile', widgetSrc[0][1].replace(" && view.state !== 'error') return null", ') return null')]]).length === 1)
   }
 
   // ── F) the copy ─────────────────────────────────────────────────────────
@@ -639,15 +703,25 @@ async function main() {
     const bareVolume = (cell: string) => /^<(span|button)\b/.test(cell) && !/<div\b|data-gsc-/.test(cell)
     const looksAsBefore = (off: string, without: string) =>
       off === without && volumeCells(off).length === TARGETS.length && volumeCells(off).every(bareVolume)
+    /** The keyword cell (the first) of every body row. */
+    const nameCells = (html: string) => html.split('<tr').filter((row) => row.includes('<td'))
+      .map((row) => [...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)][0]?.[1] ?? '')
+    const insights = { averages: { t1: { clicks: 1500, impressions: 34567, position: 8.4 } }, untracked: [], untrackedTotal: 0, queriesTotal: 3, syncedAt: '2026-09-27T05:41:00Z' }
     for (const locale of ['he', 'en'] as Locale[]) {
       const without = table(locale)
       const off = table(locale, view({ state: 'disabled' }))
       check(`H1 (${locale}) switched off, the keywords table is the table without Search Console: each volume cell is the volume alone`,
         looksAsBefore(off, without), volumeCells(off).map((c) => c.slice(0, 80)).join(' | '))
-      const on = table(locale, view({ state: 'ready', data: { t1: { clicks: 1500, impressions: 34567 } } }))
-      check(`H1b (${locale}) switched on, the same cells stack the Search Console box under the volume`,
-        volumeCells(on).length === TARGETS.length
-        && volumeCells(on).every((c) => c.startsWith('<div class="flex flex-col items-start gap-1">') && /data-gsc-keyword="(figures|none)"/.test(c)))
+      const on = table(locale, view({ state: 'ready', data: insights }))
+      // Wave 9: switched on, the rows are still our live check alone (Google's figures sit
+      // in the section at the top of the tab).
+      check(`H1b (${locale}) switched on, no keyword row carries a Google line, and the volume cells stay the volume alone`,
+        nameCells(on).length === TARGETS.length
+        && nameCells(on).every((c) => !/data-gsc-keyword/.test(c))
+        && volumeCells(on).every(bareVolume))
+      const setup = table(locale, view({ state: 'not_connected' }))
+      check(`H1c (${locale}) before Search Console is set up, no row carries a Google line (the card under the table says it once)`,
+        setup === without && !setup.includes('data-gsc-'))
       if (locale === 'en') {
         const first = volumeCells(off)[0]
         check('H1-MUT: a cell that keeps its stacking column when switched off, with nothing under it, fails H1',
@@ -660,8 +734,9 @@ async function main() {
     const dash = code('app/(dashboard)/dashboard/page.tsx')
     const closesUp = (src: string) => {
       const at = src.indexOf('<GscClicksTile')
-      const open = src.lastIndexOf('<div className="grid', at)
-      const cls = open < 0 ? '' : (/^<div className="([^"]*)"/.exec(src.slice(open))?.[1] ?? '')
+      // The row is a div, or the dashboard's entrance wrapper (Reveal renders a div).
+      const open = Math.max(src.lastIndexOf('<div className="grid', at), src.lastIndexOf('<Reveal ', at))
+      const cls = open < 0 ? '' : (/^<(?:div|Reveal)\b[^>]*?\bclassName="([^"]*)"/.exec(src.slice(open))?.[1] ?? '')
       return /(^|\s)sm:grid-flow-col(\s|$)/.test(cls) && /(^|\s)sm:auto-cols-fr(\s|$)/.test(cls) && !/(^|\s)sm:grid-cols-\d/.test(cls)
     }
     check('H2: the dashboard tile row has one equal column per tile, so it closes up when the clicks tile renders nothing', closesUp(dash))
@@ -687,6 +762,38 @@ async function main() {
     const recOn = render('en', createElement(GscRecommendations, { projectId: 'p1', className: SEPARATOR }))
     check('H3b: …and the section draws them itself: on the section when it shows, nowhere when switched off',
       recOff === '' && new RegExp(`^<section [^>]*class="${SEPARATOR}"`).test(recOn), `${recOff.length} ${recOn.slice(0, 120)}`)
+  }
+
+  // A phone (390px) scrolled sideways on Keywords: 481px in English. In a
+  // wrapping row, a `flex-1` sentence with no basis gives up all of its width,
+  // so the unbreakable "Connect Search Console" button never wraps and runs past
+  // the screen's edge. Measured before/after in a browser at 390px.
+  console.log('\nI) on a phone, an inline notice wraps instead of running off the screen')
+  {
+    const inlineSentence = (src: string) => {
+      const m = src.match(/<p className=\{cn\('text-(?:sm|copy) text-muted', layout === 'inline' && '([^']*)'\)\}/)
+      return m ? m[1] : null
+    }
+    const wraps = (cls: string | null) => !!cls && /\bflex-1\b/.test(cls) && /\bbasis-(?!0\b)[\w[\].]+/.test(cls)
+    const prompt = code('components/gsc/GscSetupPrompt.tsx')
+    check('I1: an inline prompt\'s sentence keeps a basis, so its button wraps under it', wraps(inlineSentence(prompt)), String(inlineSentence(prompt)))
+    check('I1-MUT: the sentence without a basis is caught',
+      !wraps(inlineSentence(prompt.replace(/'min-w-0 flex-1 basis-[\w[\].]+'/, "'min-w-0 flex-1'"))))
+
+    // Wave 8: the Keywords tab's Search Console blocks, a phone wide. Every part of a
+    // wrapping row that sits beside another keeps a basis, so it drops under instead of
+    // pushing the screen sideways; each untracked search is a two-column grid on a phone.
+    const notice = code('components/gsc/GscKeywordFigures.tsx')
+    const body = notice.slice(notice.indexOf('export function GscKeywordsNotice'))
+    const beside = (src: string) => [...src.matchAll(/className="(min-w-0 flex-1[^"]*|flex min-w-0 flex-1[^"]*)"/g)].map((m) => m[1])
+    const besideOk = (src: string) => beside(src).length === 2 && beside(src).every(wraps)
+    check('I2: every part beside another in the Keywords tab\'s Search Console blocks keeps a basis, so it drops under on a phone', besideOk(body), beside(body).join(' | '))
+    check('I2-MUT: one part without a basis is caught', !besideOk(body.replace('min-w-0 flex-1 basis-72', 'min-w-0 flex-1')))
+    const list = code('components/gsc/GscUntrackedQueries.tsx')
+    const phoneRow = (src: string) => /<li\s+key=\{q\.query\}\s+className="grid grid-cols-\[minmax\(0,1fr\)_auto\][^"]*md:grid-cols-/.test(src)
+      && /className="min-w-0 truncate[^"]*"/.test(src)
+    check('I3: each untracked search is query + button on a phone (the query truncates), the figures columns from a tablet up', phoneRow(list))
+    check('I3-MUT: a row with the tablet columns on a phone fails I3', !phoneRow(list.replace('grid grid-cols-[minmax(0,1fr)_auto]', 'grid grid-cols-[minmax(0,1fr)_7rem_5rem_6rem_8.5rem]')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

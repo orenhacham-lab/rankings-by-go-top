@@ -3,10 +3,16 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ArrowLeft, FileText, Newspaper } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import EmptyState from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
+import { PageHero, Section } from '@/components/public/marketing'
+import { ArticlesPromo, type ArticlesPromoCopy } from '@/components/public/ArticlesPromo'
+import { authHref } from '@/lib/i18n/auth-href'
 
 interface Article {
   id: string
@@ -42,105 +48,90 @@ export default function ArticlesPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav />
 
-      {/* Hero Section */}
-      <section className="relative pt-28 lg:pt-36 pb-16 lg:pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.15),_transparent_50%)]" />
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, rgb(226 232 240) 1px, transparent 1px), linear-gradient(to bottom, rgb(226 232 240) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse 60% 50% at 50% 30%, black, transparent)',
-          }}
+      <main className="flex-1">
+        <PageHero
+          compact
+          before={<Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }]} />}
+          eyebrow="בלוג Go Top SEO"
+          title="מאמרים, מדריכים"
+          accent="ותובנות"
+          subtitle="תכנים מקצועיים בנושאי קידום אתרים, נראות ב-AI, שיווק דיגיטלי וטכנולוגיה — מהצוות של Go Top."
         />
 
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }]} />
-
-          <div className="text-center mt-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs lg:text-sm font-medium mb-6">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              בלוג Rankings by Go Top
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight mb-4">
-              מאמרים, מדריכים <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ותובנות</span>
-            </h1>
-            <p className="text-lg lg:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              תכנים מקצועיים בנושאי קידום אתרים, נראות ב-AI, שיווק דיגיטלי וטכנולוגיה — מהצוות של Go Top.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <main className="flex-1 pb-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Section className="pt-10 sm:pt-12 lg:pt-14">
           {loading ? (
-            <div className="flex items-center justify-center py-20 text-slate-500">
-              <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-              טוען מאמרים...
+            <div role="status" aria-busy="true" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <span className="sr-only">טוען מאמרים...</span>
+              {[0, 1, 2].map((i) => (
+                <div key={i} aria-hidden="true" className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
+                  <Skeleton className="aspect-[16/9] w-full rounded-none" />
+                  <div className="space-y-3 p-5">
+                    <Skeleton className="h-4 w-4/5" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : articles.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-lg text-slate-600">בקרוב יפורסמו כאן מאמרים חדשים.</p>
+            <div className="rounded-card border border-line bg-surface shadow-card">
+              <EmptyState icon={<Newspaper />} title="בקרוב יפורסמו כאן מאמרים חדשים." />
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {articles.map((article) => (
-                <Link key={article.id} href={`/articles/${article.slug}`} className="group">
-                  <article className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all duration-300 h-full flex flex-col">
+                <Link
+                  key={article.id}
+                  href={`/articles/${article.slug}`}
+                  className="group rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                >
+                  <article className="flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card transition-[border-color,box-shadow] duration-150 ease-snappy group-hover:border-line-strong group-hover:shadow-pop">
                     {article.featured_image_url ? (
-                      <div className="relative w-full aspect-[16/9] bg-slate-100 overflow-hidden">
+                      <div className="relative aspect-[16/9] w-full overflow-hidden bg-sunk">
                         <Image
                           src={article.featured_image_url}
                           alt={article.featured_image_alt || article.title}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="object-cover"
                         />
                       </div>
                     ) : (
-                      <div className="relative w-full aspect-[16/9] bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 flex items-center justify-center overflow-hidden">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,_rgba(255,255,255,0.5),_transparent_50%)]" />
-                        <svg className="relative w-16 h-16 text-blue-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                        </svg>
+                      <div className="flex aspect-[16/9] w-full items-center justify-center bg-sunk text-muted" aria-hidden="true">
+                        <FileText className="size-10" strokeWidth={1.5} />
                       </div>
                     )}
 
-                    <div className="p-6 flex flex-col flex-1">
-                      <h2 className="text-xl font-bold text-slate-900 mb-3 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    <div className="flex flex-1 flex-col p-5 sm:p-6">
+                      <h2 className="mb-2 line-clamp-2 text-section font-semibold text-ink transition-colors duration-150 ease-snappy group-hover:text-action">
                         {article.title}
                       </h2>
 
                       {article.excerpt && (
-                        <p className="text-slate-600 text-sm mb-4 line-clamp-3 leading-relaxed flex-1">
+                        <p className="mb-4 line-clamp-3 flex-1 text-copy text-body">
                           {article.excerpt}
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
-                        <div className="flex flex-col">
+                      <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4">
+                        <div className="flex min-w-0 flex-col">
                           {article.author && (
-                            <span className="text-xs font-medium text-slate-700">
+                            <span className="truncate text-caption font-medium text-ink">
                               {article.author}
                             </span>
                           )}
                           {article.published_at && (
-                            <span className="text-xs text-slate-400">
+                            <span className="text-caption tabular-nums text-muted">
                               {new Date(article.published_at).toLocaleDateString('he-IL')}
                             </span>
                           )}
                         </div>
-                        <span className="inline-flex items-center gap-1 text-blue-600 group-hover:text-blue-700 font-semibold text-sm">
+                        <span className="inline-flex shrink-0 items-center gap-1 text-copy font-semibold text-action">
                           לקריאת המאמר
-                          <svg className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                          </svg>
+                          <ArrowLeft className="size-4 ltr:-scale-x-100" aria-hidden="true" />
                         </span>
                       </div>
                     </div>
@@ -151,99 +142,31 @@ export default function ArticlesPage() {
           )}
 
           {/* Software Promo Section */}
-          <div className="mt-20 space-y-8">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-500 p-8 lg:p-12 shadow-2xl">
-              <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-
-              <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="text-white">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur text-white text-xs font-semibold mb-4">
-                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    Rankings by Go Top
-                  </div>
-                  <h3 className="text-3xl lg:text-4xl font-extrabold mb-4 leading-tight">
-                    עקבו אחר הדירוגים שלכם<br />בגוגל, מתי שתרצו
-                  </h3>
-                  <p className="text-blue-100 text-lg mb-6 leading-relaxed">
-                    מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <Link
-                      href="/signup"
-                      className="px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
-                    >
-                      התחילו ניסיון חינם
-                    </Link>
-                    <Link
-                      href="/pricing"
-                      className="px-6 py-3 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white font-semibold text-base hover:bg-white/20 transition-all"
-                    >
-                      צפו במחירים
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { num: '1000+', label: 'מילות מפתח' },
-                    { num: '2', label: 'מנועי דירוג (Google + Maps)' },
-                    { num: '100%', label: 'בעברית' },
-                    { num: '7 ימים', label: 'ניסיון חינם' },
-                  ].map((stat) => (
-                    <div key={stat.label} className="bg-white/10 backdrop-blur rounded-2xl p-4 lg:p-6 border border-white/20">
-                      <div className="text-2xl lg:text-3xl font-extrabold text-white mb-1">{stat.num}</div>
-                      <div className="text-sm text-blue-100">{stat.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                {
-                  title: 'גוגל אורגני',
-                  desc: 'מעקב אחר דירוגים בעמודי 1-2 בגוגל עם תוצאות מדויקות',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: 'גוגל מפות',
-                  desc: 'מעקב לפי מיקום גיאוגרפי מדויק — עיר, מיקוד, נקודת ציון',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: 'דוחות מקצועיים',
-                  desc: 'יצוא דוחות PDF ו-Excel עם מגמות, השוואות וניתוח מתקדם',
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  ),
-                },
-              ].map((feat) => (
-                <div key={feat.title} className="bg-white rounded-2xl border border-slate-200 p-6 hover:border-blue-300 hover:shadow-lg transition-all">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center mb-4 shadow-md">
-                    {feat.icon}
-                  </div>
-                  <h4 className="text-lg font-bold text-slate-900 mb-2">{feat.title}</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed">{feat.desc}</p>
-                </div>
-              ))}
-            </div>
+          <div className="mt-16 sm:mt-20">
+            <ArticlesPromo copy={PROMO} />
           </div>
-        </div>
+        </Section>
       </main>
       <Footer />
     </div>
   )
+}
+
+const PROMO: ArticlesPromoCopy = {
+  badge: 'Go Top SEO',
+  title: ['עקבו אחר הדירוגים שלכם', 'בגוגל, מתי שתרצו'],
+  body: 'מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.',
+  signup: { label: 'התחילו ניסיון חינם', href: authHref('signup', 'he') },
+  pricing: { label: 'צפו במחירים', href: '/pricing' },
+  stats: [
+    { num: '1000+', label: 'מילות מפתח' },
+    { num: '2', label: 'מנועי דירוג (Google + Maps)' },
+    { num: '100%', label: 'בעברית' },
+    { num: '7 ימים', label: 'ניסיון חינם' },
+  ],
+  features: [
+    { title: 'גוגל אורגני', desc: 'מעקב אחר דירוגים בעמודי 1-2 בגוגל עם תוצאות מדויקות' },
+    { title: 'גוגל מפות', desc: 'מעקב לפי מיקום גיאוגרפי מדויק — עיר, מיקוד, נקודת ציון' },
+    { title: 'דוחות מקצועיים', desc: 'יצוא דוחות PDF ו-Excel עם מגמות, השוואות וניתוח מתקדם' },
+  ],
 }

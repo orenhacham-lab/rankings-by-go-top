@@ -50,11 +50,12 @@ export type SeedBusiness = {
 /**
  * The four AI-readiness checks. `pending` until a3 has run; `unavailable` when
  * the site could not be measured honestly (a password-locked storefront shows
- * its password page, not the store), which is NOT the same as failing all four.
+ * its password page, not the store; a host whose firewall refuses automated
+ * reads shows us nothing at all), which is NOT the same as failing all four.
  */
 export type SeedGeo = {
   state: 'pending' | 'measured' | 'unavailable'
-  unavailableReason: 'storefront_locked' | null
+  unavailableReason: 'storefront_locked' | 'site_firewall' | null
   passed: number
   total: number
   signals: GeoSignal[]
@@ -96,6 +97,13 @@ export type SeedSummary = {
   locale: Locale
   /** A Shopify development store behind its password page. */
   storefrontLocked: boolean
+  /**
+   * How the site was read. 'search_index' when its host refused our reads (a
+   * firewall answering 403 to data-centre addresses, say) and a1 built the
+   * research from Google's index of the site instead: its titles, snippets and
+   * URLs. Nothing that needs the site itself was measured then.
+   */
+  siteAccess: 'direct' | 'search_index'
   business: SeedBusiness | null
   audiences: string[]
   seedKeywords: string[]
@@ -115,6 +123,14 @@ export type SeedSummary = {
   sitemapUrlCount: number | null
   /** True when the count stopped at the discovery limit, i.e. "at least". */
   sitemapTruncated: boolean
+  /**
+   * The icon the home page declares (<link rel="icon">), as an https URL on the
+   * site itself; absent when a1 did not read the page or found none. Only the
+   * owner's browser ever loads it (lib/site-icon.ts).
+   */
+  siteIcon?: string
+  /** When the icon was last looked for again after the scan (lib/seed-scan/site-icon-refresh.ts). */
+  siteIconCheckedAt?: string
 }
 
 /** Stable codes a step or a run may end with. The UI maps each to copy. */
@@ -125,9 +141,13 @@ export const SEED_STEP_ERROR_CODES = [
   'site_unreachable',
   'site_not_html',
   'site_offsite_redirect',
+  // the host refuses automated reads and Google shows no page of it either
+  'site_forbidden',
   'claim_payload_missing',
   // a2: understanding the business
   'storefront_locked',
+  // a2 of a store: no product, no collection and no public storefront to read
+  'store_empty',
   'claim_without_insight',
   'model_unavailable',
   'model_failed',

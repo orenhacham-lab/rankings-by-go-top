@@ -10,6 +10,7 @@
 import type { FreeCheckFinding, GeoSignal } from '@/lib/free-check'
 import type { Locale } from '@/lib/i18n/locales'
 import type { SeedBusiness, SeedCompetitor, SeedCounters, SeedGeo, SeedSummary } from './types'
+import { safeSiteIcon } from '@/lib/site-icon'
 
 export const PENDING_GEO: SeedGeo = { state: 'pending', unavailableReason: null, passed: 0, total: 0, signals: [] }
 
@@ -22,6 +23,7 @@ export function initialSummary(args: { source: 'scan' | 'claim'; domain: string;
     scannedAt: null,
     locale: args.locale,
     storefrontLocked: false,
+    siteAccess: 'direct',
     business: null,
     audiences: [],
     seedKeywords: [],
@@ -91,7 +93,8 @@ function readGeo(v: unknown): SeedGeo {
   const state = r.state === 'measured' || r.state === 'unavailable' ? r.state : 'pending'
   return {
     state,
-    unavailableReason: state === 'unavailable' && r.unavailableReason === 'storefront_locked' ? 'storefront_locked' : null,
+    unavailableReason:
+      state === 'unavailable' && (r.unavailableReason === 'storefront_locked' || r.unavailableReason === 'site_firewall') ? r.unavailableReason : null,
     passed: nonNegInt(r.passed),
     total: nonNegInt(r.total),
     signals: readGeoSignals(r.signals),
@@ -148,6 +151,7 @@ export function readSummary(raw: unknown): SeedSummary | null {
     scannedAt: str(r.scannedAt, 40),
     locale: r.locale === 'en' ? 'en' : 'he',
     storefrontLocked: bool(r.storefrontLocked),
+    siteAccess: r.siteAccess === 'search_index' ? 'search_index' : 'direct',
     business: readBusiness(r.business),
     audiences: strList(r.audiences, 5),
     seedKeywords: strList(r.seedKeywords, 5, 160),
@@ -159,5 +163,10 @@ export function readSummary(raw: unknown): SeedSummary | null {
     counters: { keywords: 0, fixes: 0, geoPassed: 0, geoTotal: 0, articles: 0, competitors: 0 },
     sitemapUrlCount: typeof r.sitemapUrlCount === 'number' && r.sitemapUrlCount >= 0 ? Math.floor(r.sitemapUrlCount) : null,
     sitemapTruncated: bool(r.sitemapTruncated),
+    // Checked again on every read (https, on this site, bounded), never trusted because stored.
+    ...siteIconField(safeSiteIcon(r.siteIcon, domain)),
+    ...(str(r.siteIconCheckedAt, 40) ? { siteIconCheckedAt: str(r.siteIconCheckedAt, 40) as string } : {}),
   })
 }
+
+const siteIconField = (icon: string | null): { siteIcon?: string } => (icon ? { siteIcon: icon } : {})

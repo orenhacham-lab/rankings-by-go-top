@@ -19,17 +19,23 @@
  * No WordPress behavior changes; no duplicated Shopify connect form.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
-import { AlertTriangle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import Notice from '@/components/ui/Notice'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
 import ShopifyDestinationSection from './ShopifyDestinationSection'
+import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
+import { connectionAnswer } from '@/lib/connection-status/known'
+import { readKnown } from '@/lib/connection-status/useKnownRead'
+import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
 
 // `can_publish` and `default_blog_id` are already returned by
 // /api/shopify/connection (sanitizeShopifyConnection) — this card simply never
@@ -59,21 +65,29 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   const [testing, setTesting] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      const [shRes, wpRes] = await Promise.all([
-        fetch(`/api/shopify/connection?projectId=${projectId}`),
-        fetch(`/api/wordpress/connection?projectId=${projectId}`),
-      ])
-      const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
-      const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
-      setShopify(sh.connection ?? null)
-      setCounts(sh.counts ?? ZERO)
-      setWpConnected(!!wp.connection)
-    } catch { /* fall back to children */ } finally { setLoading(false) }
+  // The connections could not be READ: said as that, never drawn as "none connected".
+  const [loadFailed, setLoadFailed] = useState(false)
+  const loadedRef = useRef(false)
+  const load = useCallback(async (fresh = true) => {
+    const urls = projectConnectionUrls(projectId)
+    const [shRes, wpRes] = await Promise.all([readKnown(urls.shopify, { fresh }), readKnown(urls.wordpress, { fresh })])
+    const sh = connectionAnswer<NonNullable<Conn>>(shRes)
+    const wp = connectionAnswer(wpRes)
+    if (sh.state === 'ready' && wp.state === 'ready') {
+      setShopify(sh.value.connection)
+      setCounts((sh.value.body.counts as Counts | undefined) ?? ZERO)
+      setWpConnected(!!wp.value.connection)
+      setLoadFailed(false)
+    } else {
+      // A re-read that failed keeps what is on screen; a first read that failed says so.
+      setLoadFailed((was) => was || loadedRef.current === false)
+    }
+    loadedRef.current = loadedRef.current || (sh.state === 'ready' && wp.state === 'ready')
+    setLoading(false)
   }, [projectId])
 
-  useEffect(() => { load() }, [load])
+  // The first read joins one the screen already started; later ones ask again.
+  useEffect(() => { void load(false) }, [load])
 
   async function sync() {
     setSyncing(true); setMessage(null)
@@ -108,28 +122,29 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   //   Shopify only       → the Shopify status card below
   if (loading) {
     return (
-      <Card className="hover:translate-y-0">
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-3">
-          <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <Card>
+        <div role="status" aria-busy="true" className="space-y-3">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-56" />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-14 rounded-inset" />)}
+          </div>
         </div>
       </Card>
     )
   }
+  if (loadFailed) return <ConnectionLoadFailed onRetry={() => { setLoading(true); void load() }} />
   if (wpConnected && shopify) {
     // Unexpected dual connection — surface a conflict, delete nothing.
     return (
-      <Card className="hover:translate-y-0 border-amber-300 dark:border-amber-700">
-        <div className="flex items-start gap-2">
-          <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <div>
-            <div className="font-semibold text-amber-800 dark:text-amber-300">{cs.conflictTitle}</div>
-            <p className="text-sm text-amber-800/90 dark:text-amber-300/90">{cs.conflictBody}</p>
-            <Link href={platformSetupHref(projectId)} className="inline-block mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
-              {cs.title} →
-            </Link>
-          </div>
-        </div>
-      </Card>
+      <Notice tone="warn">
+        <p className="font-semibold">{cs.conflictTitle}</p>
+        <p className="max-w-prose text-body">{cs.conflictBody}</p>
+        <Link href={platformSetupHref(projectId)} className="mt-1 inline-flex items-center gap-1 rounded-control text-caption font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+          {cs.title}
+          <ArrowRight aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+        </Link>
+      </Notice>
     )
   }
   if (wpConnected) return <>{children}</>
@@ -137,12 +152,12 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
     // Neither connected → compact platform choice. Connection forms live in the
     // project's settings (reuse), so these navigate there instead of duplicating them.
     return (
-      <Card className="hover:translate-y-0">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">{cs.platformChoiceTitle}</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{cs.platformChoiceHint}</p>
+      <Card>
+        <h3 className="mb-1 text-section font-semibold text-ink">{cs.platformChoiceTitle}</h3>
+        <p className="text-copy text-muted mb-3">{cs.platformChoiceHint}</p>
         <div className="flex flex-wrap gap-2">
           <Link href={platformSetupHref(projectId)}><Button size="sm">{cs.connectWordPress}</Button></Link>
-          <Link href={platformSetupHref(projectId)}><Button size="sm" variant="outline">{cs.connectShopify}</Button></Link>
+          <Link href={platformSetupHref(projectId)}><Button size="sm" variant="secondary">{cs.connectShopify}</Button></Link>
         </div>
       </Card>
     )
@@ -152,31 +167,34 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
   const statusLabel = shopify.connection_status === 'connected' ? t.connected : shopify.connection_status === 'failed' ? t.failed : t.untested
 
   return (
-    <Card className="hover:translate-y-0">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+    <Card>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
         <Badge variant={variant}>{statusLabel}</Badge>
       </div>
 
-      <div className="text-sm text-slate-700 dark:text-slate-200 mb-2">
+      <div className="text-copy text-body mb-2">
         <div className="font-medium">{shopify.shop_domain}</div>
-        {shopify.storefront_domain && <div className="text-xs text-slate-500">{shopify.storefront_domain}</div>}
+        {shopify.storefront_domain && <div className="text-caption text-muted">{shopify.storefront_domain}</div>}
       </div>
 
-      <div className="grid grid-cols-5 gap-1 text-center mb-2">
+      <div className="list-enter mb-3 grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
         {(['product', 'collection', 'page', 'blog', 'article'] as const).map((k) => (
-          <div key={k} className="rounded-md bg-slate-50 dark:bg-slate-800 py-1.5">
-            <div className="text-base font-bold text-slate-800 dark:text-slate-100">{counts[k]}</div>
-            <div className="text-[10px] text-slate-500">{t.counts[k]}</div>
+          <div key={k} className="rounded-inset border border-line bg-sunk/60 px-2 py-2.5">
+            <div className="text-section font-semibold tabular-nums text-ink">{counts[k]}</div>
+            <div className="text-caption text-muted">{t.counts[k]}</div>
           </div>
         ))}
       </div>
 
-      <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-        {shopify.last_synced_at ? `${t.lastSync}: ${formatDateTime(shopify.last_synced_at)}` : t.neverSynced}
+      <div className="text-caption text-muted mb-2">
+        {shopify.last_synced_at ? `${t.lastSync}: ${formatDateTime(shopify.last_synced_at, language)}` : t.neverSynced}
       </div>
+      {/* The store's own error text is never shown (design contract §8). */}
       {shopify.last_error && (
-        <div className={`text-xs mb-2 ${shopify.connection_status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{shopify.last_error}</div>
+        <Notice tone={shopify.connection_status === 'failed' ? 'bad' : 'warn'} className="mb-3">
+          {shopify.connection_status === 'failed' ? t.testFail : t.syncFail}
+        </Notice>
       )}
 
       <ShopifyDestinationSection
@@ -188,10 +206,10 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
 
       <div className="flex flex-wrap gap-2 mt-2">
         <Button size="sm" onClick={sync} loading={syncing} disabled={syncing || testing}>{t.syncNow}</Button>
-        <Button size="sm" variant="outline" onClick={test} loading={testing} disabled={testing || syncing}>{t.testConnection}</Button>
+        <Button size="sm" variant="secondary" onClick={test} loading={testing} disabled={testing || syncing}>{t.testConnection}</Button>
       </div>
 
-      {message && <p className={`mt-2 text-xs ${message.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>}
+      {message && <Notice tone={message.ok ? 'ok' : 'bad'} className="mt-3">{message.text}</Notice>}
     </Card>
   )
 }

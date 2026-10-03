@@ -12,7 +12,8 @@
  * data), so a row never changes height and the table never changes width while
  * the data arrives.
  */
-import { ArrowUp, Swords } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
+import { CompetitorIcon } from './CompetitorIcon'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { CompetitorEntry } from '@/lib/competitors/comparison'
@@ -74,7 +75,7 @@ export default function TopCompetitorLine({ view, targetId }: { view: Competitor
 
 /** The competitors mark, the same one the "you vs. competitors" summary carries. */
 function Mark() {
-  return <Swords size={12} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
+  return <CompetitorIcon size={12} strokeWidth={2} className="shrink-0 text-muted" aria-hidden="true" />
 }
 
 function Dash({ state, why, c }: { state: string; why: string; c: Copy }) {

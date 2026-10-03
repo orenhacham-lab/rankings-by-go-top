@@ -11,13 +11,31 @@ export function formatCount(n: number, language: string): string {
   return new Intl.NumberFormat(locale(language), { maximumFractionDigits: 0 }).format(Math.round(n))
 }
 
-/** 1.2K rather than 1,234: for a line that has to fit a fixed box. */
+/**
+ * A short number for a line that has to fit a fixed box. English: 1.2K. Hebrew never shows a "K" or an "M":
+ * up to 9,999 the whole number with its separator ("1,200"), then "אלף" / "מיליון" ("12.5 אלף").
+ */
 export function formatCompact(n: number, language: string): string {
+  if (language === 'he') {
+    const v = Math.round(n)
+    if (Math.abs(v) < 10_000) return formatCount(v, language)
+    const one = (x: number) => new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(x)
+    return Math.abs(v) < 1_000_000 ? `${one(v / 1000)} אלף` : `${one(v / 1_000_000)} מיליון`
+  }
   return new Intl.NumberFormat(locale(language), { notation: 'compact', maximumFractionDigits: 1 }).format(Math.round(n))
 }
 
 export function formatPosition(n: number, language: string): string {
   return new Intl.NumberFormat(locale(language), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n)
+}
+
+/**
+ * A Search Console average position as a whole number (the Keywords tab, wave 9: the
+ * owner asked for no "11.2"). Standard rounding, half up: 11.2 → 11, 11.5 → 12. The
+ * screen says, once and in small print, that these are rounded averages.
+ */
+export function formatWholePosition(n: number, language: string): string {
+  return formatCount(Math.round(n), language)
 }
 
 /** A calendar date as Search Console reports it (YYYY-MM-DD, no time zone). */

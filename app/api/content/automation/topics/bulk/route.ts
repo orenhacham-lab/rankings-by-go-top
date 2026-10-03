@@ -20,6 +20,9 @@ import { CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache
 import { buildIdeaSelectedPlanLinks, ideaSelectedPlan } from '@/lib/content/internal-link-idea-plan'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { ArticleTopicSource } from '@/lib/supabase/types'
+import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
+import { loadOverlapIndex } from '@/lib/content/cannibalization/load'
+import { checkOverlap, overlapPayload, SITE_AND_PLAN_KINDS } from '@/lib/content/cannibalization/check'
 
 const ALLOWED_SOURCES: ArticleTopicSource[] = ['keyword', 'project_data', 'keyword_research_url']
 const ALLOWED_STATUS = ['suggested', 'approved'] as const
@@ -106,6 +109,11 @@ export async function POST(request: Request) {
   // keywords). Excludes persisted ideas so approving a pending idea isn't blocked
   // by its own row. Exact-normalized only.
   const guard = await buildKeywordGuard(auth.admin, auth.project.id)
+  // The cannibalization check (lib/content/cannibalization), read before the insert so
+  // a new topic is never its own match. This route is a MANUAL path ("add a keyword",
+  // approving an idea): it WARNS through each created topic's `overlap` and never
+  // blocks; what it refused before (covered_by_existing_content) it still refuses.
+  const overlapIndex = await loadOverlapIndex(auth.admin, { projectId: auth.project.id, userId: auth.user.id }, { gsc: isGscReadOnlyEnabled() }).catch(() => null)
 
   const nowIso = new Date().toISOString()
   const rows: Record<string, unknown>[] = []
@@ -292,9 +300,13 @@ export async function POST(request: Request) {
       topicId = createdByKw.get(res.batchKey || '') ?? resolveExistingTopicId(res.title, res.primaryKeyword)
       source = topicId ? (createdByKw.has(res.batchKey || '') ? 'created' : 'existing') : null
     }
+    const overlap = source === 'created' && overlapIndex
+      ? overlapPayload(checkOverlap(overlapIndex, { title: res.title, keyword: res.primaryKeyword }, { kinds: SITE_AND_PLAN_KINDS, excludeIdeaIds: res.ideaId ? [res.ideaId] : [] }))
+      : null
     return {
       ideaId: res.ideaId, topicId, title: res.title, primaryKeyword: res.primaryKeyword,
       source: source ?? undefined,
+      ...(overlap ? { overlap } : {}),
       linkCount: topicId ? (linkCountByTopicId.get(topicId) ?? 0) : 0,
       unresolvedReason: topicId ? undefined : (res.reason ?? 'unresolved'),
     }

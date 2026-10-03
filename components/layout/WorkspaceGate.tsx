@@ -19,6 +19,7 @@ import { FolderPlus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
+import { ScreenSkeleton } from '@/components/ui/Skeleton'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -76,12 +77,10 @@ export default function WorkspaceGate({
     )
   }
 
+  // Still resolving: the screen's shape, not a sentence in an empty card (the
+  // sentence is still there, for screen readers, in the skeleton's live region).
   if (!isResolved || status === 'loading' || !project) {
-    return (
-      <Card>
-        <p className="py-8 text-center text-sm text-muted">{t.loadingProject}</p>
-      </Card>
-    )
+    return <ScreenSkeleton label={t.loadingProject} />
   }
 
   return <>{children(project, reload)}</>

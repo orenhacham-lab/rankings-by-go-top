@@ -1,9 +1,20 @@
-import Link from 'next/link'
+import { Check, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
-import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { ButtonLink, Section } from '@/components/public/marketing'
+import { MarketingHero } from '@/components/public/landing/MarketingHero'
+import styles from '@/components/public/landing/landing.module.css'
+import {
+  PricingChecksNote, PricingClose, PricingFaq, PricingIncluded, PricingUnsure, PricingUsage, PricingValue,
+} from '@/components/public/pricing/PricingSections'
+import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
+import { pricingHe as copy } from '@/lib/i18n/public/pricing-he'
+import { cn } from '@/lib/utils'
+import { formatPlanPrice, planPriceIn } from '@/lib/billing/market'
+import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { authHref } from '@/lib/i18n/auth-href'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -21,279 +32,143 @@ const PLAN_NAME: Record<PlanCode, string> = {
 /** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
 const HIGHLIGHTED_PLAN: PlanCode = 'advanced'
 
-function formatILS(amount: number): string {
-  return `₪${amount.toLocaleString('he-IL')}`
-}
-
-const faqs = [
-  {
-    q: 'איך עובדת מכסת המאמרים?',
-    a: 'מכסת המאמרים משותפת לכל הפרויקטים בחשבון שלך ומתחדשת בכל מחזור חיוב. מאמרים שלא נוצלו לא עוברים למחזור הבא.',
-  },
-  {
-    q: 'איך נספרת "בדיקת AI"?',
-    a: 'בדיקת AI אחת היא בדיקה של שאילתה אחת במנוע AI אחד. אם אתה בודק את אותה שאילתה במספר מנועי AI (לדוגמה ChatGPT ו-Gemini), כל מנוע נספר כבדיקה נפרדת.',
-  },
-  {
-    q: 'איך נספרת "בדיקת גוגל"?',
-    a: 'בדיקת גוגל אחת היא בדיקה של מילת מפתח אחת ביעד אחד — גוגל אורגני או גוגל מפות. אם אתה בודק את אותה מילת מפתח גם באורגני וגם במפות, זה נספר כשתי בדיקות.',
-  },
-  {
-    q: 'מה ההבדל בין סריקה ידנית לסריקה אוטומטית?',
-    a: 'אפשר להריץ סריקה ידנית בכל רגע שתרצה, ואפשר גם להפעיל סריקה אוטומטית חודשית שרצה בעצמה בכל מחזור חיוב. אין כרגע אפשרות לסריקה אוטומטית יומית או שבועית — רק ידנית ואוטומטית חודשית.',
-  },
-  {
-    q: 'מה קורה כשאני יוצר מאמר חדש?',
-    a: 'יצירת מאמר חדש צורכת קרדיט אחד ממכסת המאמרים שלך. עריכה, תזמון או פרסום של מאמר קיים לא צורכים קרדיט נוסף.',
-  },
-  {
-    q: 'האם אפשר לתזמן ולפרסם מאמרים אוטומטית?',
-    a: 'כן. אפשר לתזמן מאמר לפרסום עתידי או לפרסם אותו ישירות לאתר וורדפרס או שופיפיי מחובר.',
-  },
-  {
-    q: 'האם אפשר לשדרג או להוריד תוכנית?',
-    a: 'כן, אפשר לעבור בין תוכניות בכל זמן. השינוי נכנס לתוקף והמגבלות החדשות חלות מרגע השינוי ואילך.',
-  },
-  {
-    q: 'איך עובד הניסיון החינם?',
-    a: `מקבלים ${TRIAL_CATALOG.days} ימי ניסיון חינם, ללא צורך בכרטיס אשראי, עם פרויקט אחד, עד ${TRIAL_CATALOG.maxKeywordsPerProject} מילות מפתח, עד ${TRIAL_CATALOG.maxGoogleChecksLifetime} בדיקות גוגל ועד ${TRIAL_CATALOG.maxAIChecksLifetime} בדיקות AI לכל אורך תקופת הניסיון, וכן מאמר אחד שנוצר על ידי AI כדי להתנסות בתהליך המלא.`,
-  },
-  {
-    q: 'איך אני מבטל את המנוי?',
-    a: 'הביטול פשוט ומיידי. אפשר לבטל את המנוי בכל זמן מתוך הדאשבורד שלך, ללא קנסות או דמי ביטול.',
-  },
-  {
-    q: 'האם הנתונים שלי מאובטחים?',
-    a: 'בהחלט. כל הנתונים מוצפנים, מאוחסנים בשרתים מאובטחים ולא משותפים עם צדדים שלישיים. הפרטיות שלך חשובה לנו.',
-  },
-]
-
+/**
+ * The words around the grid (hero, what every plan includes, why it pays, how
+ * usage is counted, the questions, the close) are in lib/i18n/public/pricing-he.ts
+ * and laid out by components/public/pricing/PricingSections.tsx, shared with
+ * the English page. The plan grid itself stays here.
+ */
 export default async function PricingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  // w17 — the price is in the VISITOR's currency, decided on the server from
+  // the country header (or the signed-in account's market), not the page's
+  // language: an Israeli on either page sees shekels, anyone else dollars.
+  // The page reads cookies and headers, so it renders per request.
+  const { market } = await resolveBillingMarket(supabase, user)
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav />
 
-      {/* Hero */}
-      <section className="relative pt-28 lg:pt-36 pb-12 lg:pb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.15),_transparent_50%)]" />
+      <main className="flex-1">
+        <MarketingHero
+          compact
+          eyebrow={copy.hero.eyebrow}
+          title={copy.hero.title}
+          accent={copy.hero.accent}
+          subtitle={copy.hero.subtitle}
+          trust={copy.hero.trust}
+        />
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-block text-blue-600 text-sm font-semibold mb-3">תוכניות מחירים</div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
-            תוכניות שמתאימות לכל
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
-              גודל של עסק
-            </span>
-          </h1>
-          <p className="text-lg lg:text-xl text-slate-600 leading-relaxed">
-            מחירים שקופים, ללא הפתעות. התחל בניסיון חינם וגדל בהתאם לצרכים שלך.
-          </p>
-        </div>
-      </section>
-
-      {/* Free Trial CTA */}
-      {!user && (
-        <section className="pb-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-6 sm:px-8 sm:py-7 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-right">
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
-                  רוצים לבדוק את המערכת לפני שמתחייבים?
-                </h3>
-                <p className="text-sm text-slate-600">
-                  התחילו {TRIAL_CATALOG.days} ימי ניסיון בחינם — ללא כרטיס אשראי.
-                </p>
-              </div>
-              <Link
-                href="/signup"
-                className="inline-block whitespace-nowrap px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md hover:bg-blue-700 transition-colors"
-              >
-                התחל ניסיון חינם
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Pricing Cards */}
-      <section className="pb-12 lg:pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Section className="pt-12 sm:pt-14 lg:pt-16">
           {/* ONE row of four cards on a large screen, two columns on a tablet, one
               on a phone. The audience distinction is carried by a small label on
               each card rather than by full-width stacked sections, which pushed
               Premium and Agency below the fold. Static text — no toggle, no URL
-              parameter, no cookie, no client state. */}
+              parameter, no cookie, no client state. The recommended plan is the
+              only navy card and carries the one primary button. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {PLAN_ORDER.map((code) => {
               const plan = PLAN_CATALOG[code]
               const highlighted = code === HIGHLIGHTED_PLAN
 
               // The five LIMIT lines come from the shared builder, so this card and
-              // the dashboard's billing card cannot disagree with the server.
+              // the dashboard's billing card cannot disagree with the server. What
+              // every plan shares is listed under them, from the page's copy.
               const features = [
                 ...planLimitLines(code, 'he'),
-                'מעקב Google Organic ו-Google Maps',
-                'מעקב נראות במנועי AI',
-                'יצירה, תזמון ופרסום מאמרים לוורדפרס ולשופיפיי',
-                'דוחות PDF ו-Excel',
-                'תמיכה אישית',
               ]
 
               return (
                 <div
                   key={code}
-                  className={`relative rounded-2xl ${
-                    highlighted
-                      ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
-                      : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
-                  } p-6 lg:p-7 flex flex-col`}
+                  className={cn(
+                    'relative flex flex-col rounded-card border p-6 shadow-card transition-[transform,box-shadow] duration-200 ease-snappy hover:shadow-pop motion-safe:hover:-translate-y-1',
+                    highlighted ? cn(styles.stage, 'border-contrast text-contrast-ink') : 'border-line bg-surface',
+                  )}
                 >
                   {highlighted && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
-                      הכי פופולרי
+                    <div className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center gap-1 rounded-pill bg-commit px-3 text-caption font-semibold text-commit-ink shadow-control">
+                      <Star className="size-3" fill="currentColor" aria-hidden="true" />
+                      {copy.plans.popular}
                     </div>
                   )}
 
                   <div className="mb-5">
-                    <p className={`text-xs font-semibold mb-1.5 ${highlighted ? 'text-blue-100' : 'text-slate-400'}`}>
+                    <p className={cn(
+                      'mb-3 inline-flex h-6 items-center rounded-pill px-2.5 text-caption font-semibold',
+                      highlighted ? 'bg-white/10 text-rail-tagline' : 'bg-action-soft text-action',
+                    )}>
                       {PLAN_AUDIENCE_LABEL[code]['he']}
                     </p>
-                    <h3 className={`text-xl font-bold mb-1 ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                    <h3 className={cn('text-title font-bold tracking-tight', highlighted ? 'text-contrast-ink' : 'text-ink')}>
                       {PLAN_NAME[code]}
                     </h3>
-                    <p className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                    <p className={cn('mt-1 text-copy md:min-h-12', highlighted ? 'text-contrast-ink/75' : 'text-body')}>
                       {PLAN_AUDIENCE_DESCRIPTION[code]['he']}
                     </p>
                   </div>
 
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-4xl lg:text-5xl font-extrabold ${highlighted ? 'text-white' : 'text-slate-900'}`}>
-                        {formatILS(plan.priceILS)}
-                      </span>
-                      <span className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                        לחודש
-                      </span>
-                    </div>
+                  <div className="mb-6 flex items-baseline gap-1.5">
+                    <span className={cn('text-display font-bold tracking-tight tabular-nums', highlighted ? 'text-contrast-ink' : 'text-ink')}>
+                      {formatPlanPrice(planPriceIn(plan, market), market, 'he-IL')}
+                    </span>
+                    <span className={cn('text-copy', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.perMonth}</span>
                   </div>
 
-                  <ul className="space-y-3 mb-8 flex-1">
+                  <ul className={cn('space-y-3 border-t pt-5', highlighted ? 'border-white/10' : 'border-line')}>
                     {features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm">
-                        <span
-                          className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
-                            highlighted ? 'bg-white/20' : 'bg-blue-50'
-                          }`}
-                        >
-                          <svg
-                            className={`w-3 h-3 ${highlighted ? 'text-white' : 'text-blue-600'}`}
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                        <span className={highlighted ? 'text-blue-50' : 'text-slate-700'}>
-                          {feature}
-                        </span>
+                      <li key={feature} className={cn('flex items-start gap-2.5 text-copy', highlighted ? 'text-contrast-ink/90' : 'text-body')}>
+                        <Check className={cn('mt-1 size-4 shrink-0', highlighted ? 'text-rail-tagline' : 'text-action')} strokeWidth={2.5} aria-hidden="true" />
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
 
-                  <Link
-                    href={user ? '/dashboard' : `/signup?plan=${code}`}
-                    className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
-                      highlighted
-                        ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
-                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
-                    }`}
+                  <div className={cn('mb-8 mt-5 flex-1 border-t pt-4', highlighted ? 'border-white/10' : 'border-line')}>
+                    <p className={cn('mb-2 text-caption font-semibold', highlighted ? 'text-rail-tagline' : 'text-muted')}>{copy.plans.everyPlanLabel}</p>
+                    <ul className={cn('space-y-1.5 text-caption', highlighted ? 'text-contrast-ink/70' : 'text-muted')}>
+                      {copy.plans.everyPlan.map((line) => (
+                        <li key={line} className="flex items-start gap-2">
+                          <span className={cn('mt-2 size-1 shrink-0 rounded-pill', highlighted ? 'bg-rail-tagline' : 'bg-line-strong')} aria-hidden="true" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <ButtonLink
+                    href={user ? '/dashboard' : authHref('signup', 'he', { plan: code })}
+                    variant={highlighted ? 'primary' : 'secondary'}
+                    size="lg"
+                    className="w-full"
                   >
-                    להתנסות חינם
-                  </Link>
+                    {user ? copy.plans.dashboard : copy.plans.cta}
+                  </ButtonLink>
+                  {!user && (
+                    <p className={cn('mt-2.5 text-center text-caption', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.noCard}</p>
+                  )}
                 </div>
               )
             })}
           </div>
 
-          {/* Usage clarification */}
-          <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">
-            בדיקת AI אחת היא בדיקה של שאילתה אחת במנוע AI אחד. בדיקת אותה שאילתה במספר מנועים תחושב בנפרד עבור כל מנוע. מכסת המאמרים משותפת לכל הפרויקטים בחשבון ומתחדשת בכל מחזור חיוב.
-          </div>
+          <PricingChecksNote copy={copy} />
+          <PricingUnsure copy={copy} checkHref="/free-check" />
+        </Section>
 
-          {/* Comparison note */}
-          <p className="text-center text-sm text-slate-500 mt-8">
-            כל התוכניות כוללות מעקב Google Organic, Google Maps ונראות ב-AI, וכן יצירה ופרסום מאמרים. המכסות משתנות לפי התוכנית. ביטול בכל זמן ללא קנסות.
-          </p>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="py-20 lg:py-24 bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-block text-blue-600 text-sm font-semibold mb-3">שאלות נפוצות</div>
-            <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
-              יש לך שאלה? יש לנו תשובה
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            {faqs.map((faq) => (
-              <details
-                key={faq.q}
-                className="group bg-white rounded-xl border border-slate-200 overflow-hidden transition-all hover:border-slate-300"
-              >
-                <summary className="flex items-center justify-between gap-4 px-6 py-5 cursor-pointer list-none">
-                  <h3 className="font-semibold text-slate-900 text-base">{faq.q}</h3>
-                  <svg
-                    className="shrink-0 w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </summary>
-                <div className="px-6 pb-5 text-slate-600 leading-relaxed text-sm">
-                  {faq.a}
-                </div>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 lg:py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 px-8 py-12 lg:px-16 lg:py-16 text-center shadow-2xl">
-            <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-
-            <div className="relative">
-              <h2 className="text-3xl lg:text-4xl font-extrabold text-white mb-4 tracking-tight">
-                מוכן להתחיל?
-              </h2>
-              <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
-                התחל ניסיון חינם של {TRIAL_CATALOG.days} ימים ובדוק את היכולות בעצמך
-              </p>
-              <Link
-                href={user ? '/dashboard' : '/signup'}
-                className="inline-block px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
-              >
-                {user ? 'לדאשבורד שלי' : 'התחל ניסיון חינם'}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+        <PricingIncluded copy={copy} />
+        <PricingValue copy={copy} />
+        <PricingUsage copy={copy} />
+        <PricingFaq copy={copy} />
+        <PricingClose
+          copy={copy}
+          checkHref="/free-check"
+          startHref={user ? '/dashboard' : authHref('signup', 'he')}
+          signedIn={!!user}
+        />
+      </main>
 
       <Footer />
     </div>

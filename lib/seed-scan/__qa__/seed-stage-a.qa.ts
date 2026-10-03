@@ -132,8 +132,9 @@ async function main() {
     check('social, video, encyclopedias and the site itself (and its subdomains) are never competitors',
       !s.competitors.some((c) => /facebook|wikipedia|youtube|instagram|plumber-tlv/.test(c.domain)))
     const saved = tables.ai_visibility_competitors
-    check('validated competitors are ADDED to the project, within the three-active cap',
-      saved.length === 3 && saved.map((r) => r.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il', saved.map((r) => r.domain).join(','))
+    // Wave 9: the cap is five active (was three): all four validated rivals are added.
+    check('validated competitors are ADDED to the project, within the five-active cap',
+      saved.length === 4 && saved.map((r) => r.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il', saved.map((r) => r.domain).join(','))
     check('…each row owned by this user and project, active', saved.every((r) => r.user_id === USER && r.project_id === PROJECT && r.is_active === true))
 
     const profile = tables.project_profiles[0]
@@ -283,15 +284,15 @@ async function main() {
   // ── 6. a1 refusals ────────────────────────────────────────────────────────
   console.log('\n6) Reading the site fails — the run fails, nothing downstream runs')
   {
-    const cases: { name: string; target: string; routes: Record<string, import('./_fixtures').FakeRoute>; dns?: [string, 'fail' | { address: string; family: number }[]]; code: string; budgets?: StageADepsInput['budgets'] }[] = [
+    const cases: { name: string; target: string; routes: Record<string, import('./_fixtures').FakeRoute>; dns?: [string, 'fail' | { address: string; family: number }[]]; code: string; budgets?: StageADepsInput['budgets']; searched?: number }[] = [
       { name: 'a redirect to another domain', target: 'moved-away.com', routes: { 'https://moved-away.com/': { status: 301, headers: { location: 'https://elsewhere.net/' } }, 'https://elsewhere.net/': { status: 200, headers: { 'content-type': 'text/html' }, body: '<html><title>x</title></html>' } }, code: 'site_offsite_redirect' },
       { name: 'a host resolving to a private address', target: 'intranet-site.com', routes: {}, dns: ['intranet-site.com', [{ address: '10.0.0.7', family: 4 }]], code: 'site_blocked' },
       { name: 'a host that does not resolve', target: 'no-such-host.com', routes: {}, dns: ['no-such-host.com', 'fail'], code: 'site_unreachable' },
       { name: 'an address that is not a public site', target: 'localhost', routes: {}, code: 'invalid_site_url' },
       { name: 'a PDF instead of a page', target: 'pdf-only.com', routes: { 'https://pdf-only.com/': { status: 200, headers: { 'content-type': 'application/pdf' }, body: '%PDF-1.4' } }, code: 'site_not_html' },
       { name: 'a server error', target: 'broken-site.com', routes: { 'https://broken-site.com/': { status: 500, headers: { 'content-type': 'text/html' }, body: `<h1>${SECRET}</h1>` } }, code: 'site_unreachable' },
-      { name: 'a page slower than its budget', target: 'slow-site.com', routes: { 'https://slow-site.com/': { status: 200, delayMs: 5_000, headers: { 'content-type': 'text/html' }, body: '<html></html>' } }, code: 'site_unreachable', budgets: { pageMs: 150 } },
-      { name: 'a body that never finishes', target: 'drip-site.com', routes: { 'https://drip-site.com/': { status: 200, stallBody: true, headers: { 'content-type': 'text/html' } } }, code: 'site_unreachable', budgets: { pageMs: 150 } },
+      { name: 'a page slower than its budget', target: 'slow-site.com', routes: { 'https://slow-site.com/': { status: 200, delayMs: 5_000, headers: { 'content-type': 'text/html' }, body: '<html></html>' } }, code: 'site_unreachable', budgets: { pageMs: 150 }, searched: 2 },
+      { name: 'a body that never finishes', target: 'drip-site.com', routes: { 'https://drip-site.com/': { status: 200, stallBody: true, headers: { 'content-type': 'text/html' } } }, code: 'site_unreachable', budgets: { pageMs: 150 }, searched: 2 },
     ]
     for (const c of cases) {
       if (c.dns) dnsOverrides.set(c.dns[0], c.dns[1])
@@ -312,9 +313,12 @@ async function main() {
       const ok = result.outcome === 'finished' && result.status === 'failed'
         && stepRow(tables, 'a1').error_code === c.code
         && ['a2', 'a3', 'a4'].every((st) => stepRow(tables, st).status === 'skipped' && stepRow(tables, st).error_code === 'site_unreadable')
-        && model.calls.length === 0 && search.calls.length === 0
+        && model.calls.length === 0 && search.calls.length === (c.searched ?? 0)
+        && (c.searched ? search.calls.every((q) => q.query === `site:${c.target}` || q.query === c.target) : true)
         && runRow(tables).error_code === c.code
-      check(`${c.name} → ${c.code}; a2-a4 skipped; no model, no search`, ok, `${statusLine(tables)} ${JSON.stringify(result)}`)
+      // A host that never answered in time exists (DNS resolved): a1 looks for it in Google's
+      // index first (seed-blocked-site.qa.ts), and with nothing indexed it stays unreachable.
+      check(`${c.name} → ${c.code}; a2-a4 skipped; no model, ${c.searched ? `only the ${c.searched} index searches` : 'no search'}`, ok, `${statusLine(tables)} ${JSON.stringify(result)} ${search.calls.length}`)
       if (c.code === 'site_offsite_redirect') check('…and the other domain was never requested', !net.requests.some((u) => u.includes('elsewhere.net')), net.requests.join(','))
       if (c.code === 'site_blocked' || c.code === 'invalid_site_url') check('…and nothing was requested at all', net.requests.length === 0, net.requests.join(','))
       if (c.dns || c.code === 'invalid_site_url') check('…refused at admission, before a read was even attempted', reads === 0, `${reads} read(s)`)
@@ -392,7 +396,7 @@ async function main() {
     searches = search.calls.length
     await captureConsole(() => resumeSeedRun({ admin, scope: SCOPE, runId: created.run.id, deps: { fetchImpl: net.fetch, insight: model.fn, search: search.fn, now: clk.now } }))
     check('answers saved → a4 finishes from them, nothing searched again, competitors not duplicated',
-      stepRow(tables, 'a4').status === 'done' && search.calls.length === searches && tables.ai_visibility_competitors.length === 3, `${statusLine(tables)} ${tables.ai_visibility_competitors.length}`)
+      stepRow(tables, 'a4').status === 'done' && search.calls.length === searches && tables.ai_visibility_competitors.length === 4, `${statusLine(tables)} ${tables.ai_visibility_competitors.length}`)
   }
   {
     // A worker killed while it waits on the model, or on the searches, leaves
@@ -577,8 +581,12 @@ async function main() {
     const created = await startRun(admin, { trigger: 'claim', domain: HE_WP.key, url: 'https://plumber-tlv.co.il/', claim: claimedScan() })
     await run(admin, created, { fetchImpl: new FakeNetwork(heWordPressSite()).fetch, insight: fakeModel({ ok: true, insight: HE_WP_INSIGHT }).fn, search: fakeSearch(LEAK_RESULTS).fn, now: () => NOW })
     const s = summaryOf(tables)
-    check('the same searches from a teaser: the locked competitor never checked, three findings listed and two by count',
-      s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il' && s.findings.length === 3 && s.findingsOmitted === 2,
+    // Wave 10: a domain that ranks for one of the business's searches fills the
+    // room left under five, so the firm the teaser locked now appears, but only
+    // as a search find (never as the model's), after every two-search one.
+    const leak = s.competitors.find((c) => c.domain === 'leak-finders.co.il')
+    check('the same searches from a teaser: the locked competitor is not the model\'s, only a one-search find after the rest; three findings listed and two by count',
+      s.competitors.map((c) => c.domain).join(',') === 'rival-plumber.co.il,pipes-pro.co.il,easy.co.il,zap.co.il,leak-finders.co.il' && leak?.source === 'search' && leak?.seenIn === 1 && s.findings.length === 3 && s.findingsOmitted === 2,
       s.competitors.map((c) => c.domain).join(','))
   }
   {

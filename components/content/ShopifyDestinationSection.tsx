@@ -27,6 +27,8 @@
  *                   questions: MAY we publish, and WHERE would we publish)
  */
 
+import { cn } from '@/lib/utils'
+import { FIELD_CLASSES } from '@/components/ui/Input'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -89,30 +91,30 @@ export default function ShopifyDestinationSection({
   }
 
   return (
-    <div data-testid="shopify-destination" className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
-      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.defaultBlogLabel}</label>
+    <div data-testid="shopify-destination" className="space-y-1.5 border-t border-line pt-3">
+      <label className="text-caption font-medium text-body">{t.defaultBlogLabel}</label>
 
       {!canPublish && (
-        <p className="text-[11px] text-amber-700 dark:text-amber-400">{t.defaultBlogNeedsScope}</p>
+        <p className="text-caption text-warn">{t.defaultBlogNeedsScope}</p>
       )}
 
-      {state === 'loading' && <p className="text-xs text-slate-400">{t.defaultBlogLoading}</p>}
+      {state === 'loading' && <p className="text-caption text-muted">{t.defaultBlogLoading}</p>}
 
       {state === 'error' && (
         <div className="space-y-1">
-          <p className="text-xs text-amber-700 dark:text-amber-400">{t.defaultBlogLoadError}</p>
+          <p className="text-caption text-warn">{t.defaultBlogLoadError}</p>
           <Button size="sm" variant="outline" onClick={load} data-testid="shopify-destination-retry">{t.defaultBlogRetry}</Button>
         </div>
       )}
 
       {state === 'loaded' && blogs.length === 0 && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">{t.defaultBlogNone}</p>
+        <p className="text-caption text-warn">{t.defaultBlogNone}</p>
       )}
 
       {state === 'loaded' && blogs.length === 1 && (
-        <div className="text-sm text-slate-700 dark:text-slate-200">
+        <div className="text-copy text-body">
           {blogs[0].title}
-          <span className="ms-2 text-[11px] text-emerald-700 dark:text-emerald-400">{t.defaultBlogAuto}</span>
+          <span className="ms-2 text-caption text-ok">{t.defaultBlogAuto}</span>
         </div>
       )}
 
@@ -122,12 +124,12 @@ export default function ShopifyDestinationSection({
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
             aria-label={t.defaultBlogLabel}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            className={cn(FIELD_CLASSES, 'h-10 cursor-pointer py-2')}
           >
             <option value="">{t.defaultBlogSelect}</option>
             {blogs.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
           </select>
-          {!defaultBlogId && <p className="text-[11px] text-amber-700 dark:text-amber-400">{t.defaultBlogMissing}</p>}
+          {!defaultBlogId && <p className="text-caption text-warn">{t.defaultBlogMissing}</p>}
         </>
       )}
 
@@ -137,7 +139,7 @@ export default function ShopifyDestinationSection({
         </Button>
       )}
 
-      {message && <p className={`text-[11px] ${message.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>}
+      {message && <p className={`text-caption ${message.ok ? 'text-ok' : 'text-bad'}`}>{message.text}</p>}
     </div>
   )
 }

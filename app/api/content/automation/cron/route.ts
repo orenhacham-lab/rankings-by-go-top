@@ -23,6 +23,18 @@
  * (lib/seed-scan/resume.ts). That part is isolated: its own try/catch and its
  * own deadline inside what is left of maxDuration, and it never throws, so it
  * cannot change, delay or fail the runner's result.
+ *
+ * THEN, THE MONTHLY TOPIC TOP-UP (lib/content/automation/topic-topup.ts): keeps
+ * every active, paid project supplied with unused topics for its next month, from
+ * the ideas already in its plan first, with the cannibalization check. Isolated the
+ * same way, after both; it acts only in Production and only in its daily UTC window
+ * (07:00–08:59, the Vercel cron's 07:00 run and cron-job.org's quarter hours), and
+ * outside it returns at once without a read or a line. No new cron schedule.
+ *
+ * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
+ * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
+ * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
+ * or fail anything above.
  */
 
 import { after } from 'next/server'
@@ -31,6 +43,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { runAutomation } from '@/lib/content/automation/runner'
 import { authorizeCronRequest } from '@/lib/auth/cron'
 import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/resume'
+import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topic-topup'
+import { runIsolatedReminders } from '@/lib/reminders/isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -61,6 +75,14 @@ async function handle(request: Request): Promise<Response> {
       (deadlineAt) => resumeStalledSeedRuns(createAdminClient(), { env: process.env, deadlineAt }),
       { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
     )
+    // Last, the monthly topic top-up: Production only, in its daily window, isolated.
+    await startIsolatedTopUp(
+      (deadlineAt) => runTopicTopUp(createAdminClient(), { env: process.env, deadlineAt }),
+      { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
+    )
+    // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
+    // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
+    await runIsolatedReminders()
   })
   return Response.json({ ok: true, accepted: true, startedAt }, { status: 202 })
 }

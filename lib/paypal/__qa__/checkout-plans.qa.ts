@@ -4,7 +4,7 @@
  * isolated; a missing market-specific ID fails closed. Run:
  *   npx tsx lib/paypal/__qa__/checkout-plans.qa.ts
  */
-import { resolveCheckoutPlans, billingMarketFromLocale } from '../checkout-plans'
+import { resolveCheckoutPlans, marketForPayPalPlanId } from '../checkout-plans'
 import { resolvePlanCodeFromPayPalPlanId } from '../client'
 
 let pass = 0, fail = 0
@@ -73,11 +73,20 @@ async function main() {
     check('USD premium -> premium (SAME internal code)', resolvePlanCodeFromPayPalPlanId('USD-PREM') === 'premium')
   }
 
-  console.log('\n6) billingMarketFromLocale — the durable signup-locale mapping (never derived from a UI toggle or browser locale)')
+  // w17 — billingMarketFromLocale (he -> ILS, en -> USD) is gone: the market no
+  // longer follows the language. Its pre-w17 mapping survives only as legacy
+  // data for accounts that already paid (lib/billing/__qa__/w17-billing-market.qa.ts).
+  console.log('\n6) marketForPayPalPlanId — the market PayPal really charges, from the verified plan id (w17 lock)')
   {
-    check("'he' -> ILS", billingMarketFromLocale('he') === 'ILS')
-    check("'en' -> USD", billingMarketFromLocale('en') === 'USD')
-    check('null/undefined/unknown -> null (no silent default)', billingMarketFromLocale(null) === null && billingMarketFromLocale(undefined) === null && billingMarketFromLocale('fr') === null)
+    clearAllPlanIdEnvVars()
+    process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_REGULAR = 'LEGACY-REG'
+    process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_ADVANCED = 'ILS-ADV'
+    process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_ADVANCED = 'USD-ADV'
+    check('an ILS plan id -> ILS', marketForPayPalPlanId('ILS-ADV') === 'ILS')
+    check('a USD plan id -> USD', marketForPayPalPlanId('USD-ADV') === 'USD')
+    check('a legacy bare plan id belongs to no market (never guessed)', marketForPayPalPlanId('LEGACY-REG') === null)
+    check('unknown / empty / null -> null', marketForPayPalPlanId('NOPE') === null && marketForPayPalPlanId('') === null && marketForPayPalPlanId(null) === null)
+    check('an unset env var never matches an empty-ish id', marketForPayPalPlanId(undefined) === null)
   }
 
   clearAllPlanIdEnvVars()

@@ -888,6 +888,25 @@ const APPLIANCE_STORE_SEEDS_HE: QuestionSeed[] = [
 ]
 
 // ----------------------------------------------------------------------------
+// Travel seeds (trip planning sites, tour guides, travel agencies)
+// ----------------------------------------------------------------------------
+const TRAVEL_SEEDS_HE: QuestionSeed[] = [
+  { text: () => 'איזה אתר מומלץ לתכנון טיול לחו״ל?', intent: 'recommendation', categories: ['travel'], score: 90 },
+  { text: () => 'איך מתכננים מסלול לטיול עצמאי?', intent: 'pre_purchase', categories: ['travel'], score: 88 },
+  { text: () => 'כמה עולה טיול מאורגן לחו״ל?', intent: 'commercial', categories: ['travel'], score: 87 },
+  { text: () => 'עדיף טיול מאורגן או טיול עצמאי?', intent: 'comparison', categories: ['travel'], score: 86 },
+  { text: () => 'מתי הכי משתלם להזמין טיסה לחו״ל?', intent: 'informational', categories: ['travel'], score: 84 },
+  { text: () => 'מה חשוב לבדוק לפני שמזמינים חבילת נופש?', intent: 'pre_purchase', categories: ['travel'], score: 83 },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['travel'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
 // Restaurant seeds
 // ----------------------------------------------------------------------------
 const RESTAURANT_SEEDS_HE: QuestionSeed[] = [
@@ -1308,6 +1327,7 @@ const ALL_SEEDS_HE: QuestionSeed[] = [
   ...GIFT_SHOP_SEEDS_HE,
   ...APPLIANCE_STORE_SEEDS_HE,
   ...RESTAURANT_SEEDS_HE,
+  ...TRAVEL_SEEDS_HE,
   ...BEAUTY_SEEDS_HE,
   ...LOCAL_SERVICE_SEEDS_HE,
   ...HOME_IMPROVEMENT_SERVICE_SEEDS_HE,

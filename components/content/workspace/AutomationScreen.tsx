@@ -9,11 +9,11 @@
  * queue they feed were easy to miss entirely.
  */
 
-import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
 import AutomationSchedule from '@/components/content/AutomationSchedule'
-import { Plus } from 'lucide-react'
+import { PenLine, Plus, Sparkles } from 'lucide-react'
+import Segmented from '@/components/ui/Segmented'
 import { useContentWorkspace } from './ContentWorkspaceProvider'
 
 export default function AutomationScreen({ proFirst = false }: { proFirst?: boolean }) {
@@ -23,30 +23,31 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
     automationRefresh, setAutomationRefresh, ideasSuccessSignal, linkPlanSavedHint, ctaScrollSignal,
     setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, setPlanStatus,
     handleScheduled, handleTopicsQueued, handleReviewLinks,
-    setEditingTopic, setBriefOpen,
+    setEditingTopic, setBriefOpen, data,
   } = useContentWorkspace()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* M — the ideas destination: automatic ideas (default) + a manual
           topic sub-tab. The automatic workflow below is unchanged. */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700">
-        {([['auto', t.ideasSubTabs.auto], ['manual', t.ideasSubTabs.manual]] as const).map(([key, label]) => (
-          <button key={key} type="button" onClick={() => changeIdeasSection(key)}
-            className={`text-sm px-3 py-2 -mb-px border-b-2 transition ${ideasSection === key ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-medium' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <Segmented<'auto' | 'manual'>
+        ariaLabel={t.ideasSubTabs.label}
+        value={ideasSection}
+        onChange={changeIdeasSection}
+        options={[
+          { value: 'auto', label: t.ideasSubTabs.auto, icon: Sparkles },
+          { value: 'manual', label: t.ideasSubTabs.manual, icon: PenLine },
+        ]}
+      />
 
       {ideasSection === 'manual' ? (
-        <Card className="hover:translate-y-0">
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.manualTopicTitle}</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.manualTopicHint}</p>
+        <div className="motion-safe:animate-pop-in">
+          <h3 className="text-section font-semibold text-ink">{t.manualTopicTitle}</h3>
+          <p className="mb-4 mt-1 max-w-prose text-copy text-muted">{t.manualTopicHint}</p>
           {/* Reuses the SAME ArticleBriefModal → POST /api/content/topics (source='manual');
               all duplicate/title/ownership/quota checks apply; never auto-queued. */}
-          <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
-        </Card>
+          <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus className="size-4" aria-hidden="true" /> {t.newTopicButton}</Button>
+        </div>
       ) : (
         <>
           <AutomationIdeas
@@ -75,13 +76,17 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
           automationEnabled — one component, one state, one
           scheduleSectionRef, so switching tabs neither duplicates it
           nor loses its refreshed state. */}
-      <div ref={scheduleSectionRef} className="scroll-mt-4">
-        <AutomationSchedule
-          projectId={projectId}
-          language={language}
-          refreshKey={automationRefresh}
-          onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
-        />
+      {/* One card (the strategy's "advanced" panel), its sections split by a divider. */}
+      <div className="mt-8 border-t border-line pt-8">
+        <div ref={scheduleSectionRef} className="scroll-mt-4">
+          <AutomationSchedule
+            projectId={projectId}
+            articles={data?.articles}
+            language={language}
+            refreshKey={automationRefresh}
+            onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+          />
+        </div>
       </div>
     </div>
   )

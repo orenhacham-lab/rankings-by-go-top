@@ -1,9 +1,19 @@
-import Link from 'next/link'
+import { Check, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
-import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
+import { ButtonLink, Section } from '@/components/public/marketing'
+import { MarketingHero } from '@/components/public/landing/MarketingHero'
+import styles from '@/components/public/landing/landing.module.css'
+import {
+  PricingChecksNote, PricingClose, PricingFaq, PricingIncluded, PricingUnsure, PricingUsage, PricingValue,
+} from '@/components/public/pricing/PricingSections'
+import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
+import { pricingEn as copy } from '@/lib/i18n/public/pricing-en'
+import { cn } from '@/lib/utils'
+import { formatPlanPrice, planPriceIn } from '@/lib/billing/market'
+import { resolveBillingMarket } from '@/lib/billing/server-market'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -21,279 +31,143 @@ const PLAN_NAME: Record<PlanCode, string> = {
 /** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
 const HIGHLIGHTED_PLAN: PlanCode = 'advanced'
 
-function formatUSD(amount: number): string {
-  return `$${amount.toLocaleString('en-US')}`
-}
-
-const faqs = [
-  {
-    q: 'How does the article allowance work?',
-    a: 'Your article allowance is shared across all projects in your account and resets every billing period. Unused articles don\'t roll over to the next period.',
-  },
-  {
-    q: 'How is an "AI check" counted?',
-    a: 'One AI check means running one query in one AI engine. If you check the same query across multiple AI engines (for example ChatGPT and Gemini), each engine counts as a separate check.',
-  },
-  {
-    q: 'How is a "Google check" counted?',
-    a: 'One Google check means checking one keyword in one destination — either Google Organic or Google Maps. Checking the same keyword in both counts as two checks.',
-  },
-  {
-    q: 'What\'s the difference between manual and automatic scans?',
-    a: 'You can run a manual scan whenever you like, and you can also turn on an automatic monthly scan that runs on its own each billing period. There\'s currently no daily or weekly automatic option — only manual and automatic monthly.',
-  },
-  {
-    q: 'What happens when I create a new article?',
-    a: 'Creating a new article uses one credit from your article allowance. Editing, scheduling, or publishing an existing article doesn\'t use an additional credit.',
-  },
-  {
-    q: 'Can I schedule and publish articles automatically?',
-    a: 'Yes. You can schedule an article for future publishing or publish it directly to a connected WordPress or Shopify site.',
-  },
-  {
-    q: 'Can I upgrade or downgrade my plan?',
-    a: 'Yes, you can switch between plans at any time. The change takes effect and the new limits apply from that point forward.',
-  },
-  {
-    q: 'How does the free trial work?',
-    a: `You get ${TRIAL_CATALOG.days} days of free trial, no credit card required, with 1 project, up to ${TRIAL_CATALOG.maxKeywordsPerProject} keywords, up to ${TRIAL_CATALOG.maxGoogleChecksLifetime} Google checks and up to ${TRIAL_CATALOG.maxAIChecksLifetime} AI checks for the whole trial period, plus one AI-generated article so you can try the full workflow.`,
-  },
-  {
-    q: 'How do I cancel my subscription?',
-    a: 'Cancellation is simple and immediate. You can cancel your subscription anytime from your dashboard, with no penalties or cancellation fees.',
-  },
-  {
-    q: 'Is my data secure?',
-    a: 'Absolutely. All data is encrypted, stored on secure servers and never shared with third parties. Your privacy is important to us.',
-  },
-]
-
+/**
+ * The words around the grid (hero, what every plan includes, why it pays, how
+ * usage is counted, the questions, the close) are in lib/i18n/public/pricing-en.ts
+ * and laid out by components/public/pricing/PricingSections.tsx, shared with
+ * the Hebrew page. The plan grid itself stays here.
+ */
 export default async function EnglishPricingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  // w17 — the price is in the VISITOR's currency, decided on the server from
+  // the country header (or the signed-in account's market), not the page's
+  // language: an Israeli on either page sees shekels, anyone else dollars.
+  // The page reads cookies and headers, so it renders per request.
+  const { market } = await resolveBillingMarket(supabase, user)
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav locale="en" />
 
-      {/* Hero */}
-      <section className="relative pt-28 lg:pt-36 pb-12 lg:pb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.15),_transparent_50%)]" />
+      <main className="flex-1">
+        <MarketingHero
+          compact
+          eyebrow={copy.hero.eyebrow}
+          title={copy.hero.title}
+          accent={copy.hero.accent}
+          subtitle={copy.hero.subtitle}
+          trust={copy.hero.trust}
+        />
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-block text-blue-600 text-sm font-semibold mb-3">Pricing Plans</div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
-            Plans for every
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
-              business size
-            </span>
-          </h1>
-          <p className="text-lg lg:text-xl text-slate-600 leading-relaxed">
-            Transparent pricing, no surprises. Start with our free trial and scale as your needs grow.
-          </p>
-        </div>
-      </section>
-
-      {/* Free Trial CTA */}
-      {!user && (
-        <section className="pb-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-6 sm:px-8 sm:py-7 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
-                  Want to try the platform before choosing a plan?
-                </h3>
-                <p className="text-sm text-slate-600">
-                  Start a free {TRIAL_CATALOG.days}-day trial — no credit card required.
-                </p>
-              </div>
-              <Link
-                href="/en/signup"
-                className="inline-block whitespace-nowrap px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md hover:bg-blue-700 transition-colors"
-              >
-                Start free trial
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Pricing Cards */}
-      <section className="pb-12 lg:pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Section className="pt-12 sm:pt-14 lg:pt-16">
           {/* ONE row of four cards on a large screen, two columns on a tablet, one
               on a phone. The audience distinction is carried by a small label on
               each card rather than by full-width stacked sections, which pushed
               Premium and Agency below the fold. Static text — no toggle, no URL
-              parameter, no cookie, no client state. */}
+              parameter, no cookie, no client state. The recommended plan is the
+              only navy card and carries the one primary button. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {PLAN_ORDER.map((code) => {
               const plan = PLAN_CATALOG[code]
               const highlighted = code === HIGHLIGHTED_PLAN
 
               // The five LIMIT lines come from the shared builder, so this card and
-              // the dashboard's billing card cannot disagree with the server.
+              // the dashboard's billing card cannot disagree with the server. What
+              // every plan shares is listed under them, from the page's copy.
               const features = [
                 ...planLimitLines(code, 'en'),
-                'Google Organic and Google Maps tracking',
-                'AI visibility tracking',
-                'Article creation, scheduling and publishing to WordPress and Shopify',
-                'PDF and Excel reports',
-                'Personal support',
               ]
 
               return (
                 <div
                   key={code}
-                  className={`relative rounded-2xl ${
-                    highlighted
-                      ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
-                      : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
-                  } p-6 lg:p-7 flex flex-col`}
+                  className={cn(
+                    'relative flex flex-col rounded-card border p-6 shadow-card transition-[transform,box-shadow] duration-200 ease-snappy hover:shadow-pop motion-safe:hover:-translate-y-1',
+                    highlighted ? cn(styles.stage, 'border-contrast text-contrast-ink') : 'border-line bg-surface',
+                  )}
                 >
                   {highlighted && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
-                      Most Popular
+                    <div className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center gap-1 rounded-pill bg-commit px-3 text-caption font-semibold text-commit-ink shadow-control">
+                      <Star className="size-3" fill="currentColor" aria-hidden="true" />
+                      {copy.plans.popular}
                     </div>
                   )}
 
                   <div className="mb-5">
-                    <p className={`text-xs font-semibold mb-1.5 ${highlighted ? 'text-blue-100' : 'text-slate-400'}`}>
+                    <p className={cn(
+                      'mb-3 inline-flex h-6 items-center rounded-pill px-2.5 text-caption font-semibold',
+                      highlighted ? 'bg-white/10 text-rail-tagline' : 'bg-action-soft text-action',
+                    )}>
                       {PLAN_AUDIENCE_LABEL[code]['en']}
                     </p>
-                    <h3 className={`text-xl font-bold mb-1 ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                    <h3 className={cn('text-title font-bold tracking-tight', highlighted ? 'text-contrast-ink' : 'text-ink')}>
                       {PLAN_NAME[code]}
                     </h3>
-                    <p className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                    <p className={cn('mt-1 text-copy md:min-h-12', highlighted ? 'text-contrast-ink/75' : 'text-body')}>
                       {PLAN_AUDIENCE_DESCRIPTION[code]['en']}
                     </p>
                   </div>
 
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-4xl lg:text-5xl font-extrabold ${highlighted ? 'text-white' : 'text-slate-900'}`}>
-                        {formatUSD(plan.priceUSD)}
-                      </span>
-                      <span className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                        /month
-                      </span>
-                    </div>
+                  <div className="mb-6 flex items-baseline gap-1.5">
+                    <span className={cn('text-display font-bold tracking-tight tabular-nums', highlighted ? 'text-contrast-ink' : 'text-ink')}>
+                      {formatPlanPrice(planPriceIn(plan, market), market, 'en-US')}
+                    </span>
+                    <span className={cn('text-copy', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.perMonth}</span>
                   </div>
 
-                  <ul className="space-y-3 mb-8 flex-1">
+                  <ul className={cn('space-y-3 border-t pt-5', highlighted ? 'border-white/10' : 'border-line')}>
                     {features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm">
-                        <span
-                          className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
-                            highlighted ? 'bg-white/20' : 'bg-blue-50'
-                          }`}
-                        >
-                          <svg
-                            className={`w-3 h-3 ${highlighted ? 'text-white' : 'text-blue-600'}`}
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                        <span className={highlighted ? 'text-blue-50' : 'text-slate-700'}>
-                          {feature}
-                        </span>
+                      <li key={feature} className={cn('flex items-start gap-2.5 text-copy', highlighted ? 'text-contrast-ink/90' : 'text-body')}>
+                        <Check className={cn('mt-1 size-4 shrink-0', highlighted ? 'text-rail-tagline' : 'text-action')} strokeWidth={2.5} aria-hidden="true" />
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
 
-                  <Link
+                  <div className={cn('mb-8 mt-5 flex-1 border-t pt-4', highlighted ? 'border-white/10' : 'border-line')}>
+                    <p className={cn('mb-2 text-caption font-semibold', highlighted ? 'text-rail-tagline' : 'text-muted')}>{copy.plans.everyPlanLabel}</p>
+                    <ul className={cn('space-y-1.5 text-caption', highlighted ? 'text-contrast-ink/70' : 'text-muted')}>
+                      {copy.plans.everyPlan.map((line) => (
+                        <li key={line} className="flex items-start gap-2">
+                          <span className={cn('mt-2 size-1 shrink-0 rounded-pill', highlighted ? 'bg-rail-tagline' : 'bg-line-strong')} aria-hidden="true" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <ButtonLink
                     href={user ? '/dashboard' : `/en/signup?plan=${code}`}
-                    className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
-                      highlighted
-                        ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
-                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
-                    }`}
+                    variant={highlighted ? 'primary' : 'secondary'}
+                    size="lg"
+                    className="w-full"
                   >
-                    Start free trial
-                  </Link>
+                    {user ? copy.plans.dashboard : copy.plans.cta}
+                  </ButtonLink>
+                  {!user && (
+                    <p className={cn('mt-2.5 text-center text-caption', highlighted ? 'text-contrast-ink/60' : 'text-muted')}>{copy.plans.noCard}</p>
+                  )}
                 </div>
               )
             })}
           </div>
 
-          {/* Usage clarification */}
-          <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">
-            One AI check means running one query in one AI engine. Running the same query across multiple engines consumes one check per engine. Article allowances are shared across all projects in the account and reset each billing cycle.
-          </div>
+          <PricingChecksNote copy={copy} />
+          <PricingUnsure copy={copy} checkHref="/en/free-check" />
+        </Section>
 
-          {/* Comparison note */}
-          <p className="text-center text-sm text-slate-500 mt-8">
-            All plans include Google Organic, Google Maps and AI visibility tracking, plus article creation and publishing. Allowances vary by plan. Cancel anytime with no penalties.
-          </p>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="py-20 lg:py-24 bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-block text-blue-600 text-sm font-semibold mb-3">Frequently Asked Questions</div>
-            <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Have a question? We have answers
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            {faqs.map((faq) => (
-              <details
-                key={faq.q}
-                className="group bg-white rounded-xl border border-slate-200 overflow-hidden transition-all hover:border-slate-300"
-              >
-                <summary className="flex items-center justify-between gap-4 px-6 py-5 cursor-pointer list-none">
-                  <h3 className="font-semibold text-slate-900 text-base">{faq.q}</h3>
-                  <svg
-                    className="shrink-0 w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </summary>
-                <div className="px-6 pb-5 text-slate-600 leading-relaxed text-sm">
-                  {faq.a}
-                </div>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 lg:py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 px-8 py-12 lg:px-16 lg:py-16 text-center shadow-2xl">
-            <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-
-            <div className="relative">
-              <h2 className="text-3xl lg:text-4xl font-extrabold text-white mb-4 tracking-tight">
-                Ready to get started?
-              </h2>
-              <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
-                Start your free {TRIAL_CATALOG.days}-day trial and test the platform yourself
-              </p>
-              <Link
-                href={user ? '/dashboard' : '/en/signup'}
-                className="inline-block px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
-              >
-                {user ? 'Go to Dashboard' : 'Start Free Trial'}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+        <PricingIncluded copy={copy} />
+        <PricingValue copy={copy} />
+        <PricingUsage copy={copy} />
+        <PricingFaq copy={copy} />
+        <PricingClose
+          copy={copy}
+          checkHref="/en/free-check"
+          startHref={user ? '/dashboard' : '/en/signup'}
+          signedIn={!!user}
+        />
+      </main>
 
       <Footer locale="en" />
     </div>

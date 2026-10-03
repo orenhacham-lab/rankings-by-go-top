@@ -46,7 +46,7 @@ export const exportLabels = {
     sheetSummary: 'סיכום',
     sheetCurrentRankings: 'דירוגים נוכחיים',
     sheetFullHistory: 'היסטוריה מלאה',
-    excelTitle: 'Rankings by Go Top — דוח דירוגים',
+    excelTitle: 'Go Top SEO — דוח דירוגים',
     rankingsFilename: 'דוח_דירוגים',
     // AI report
     aiQueries: 'שאילתות AI',
@@ -106,7 +106,7 @@ export const exportLabels = {
     sheetSummary: 'Summary',
     sheetCurrentRankings: 'Current rankings',
     sheetFullHistory: 'Full history',
-    excelTitle: 'Rankings by Go Top — Ranking Report',
+    excelTitle: 'Go Top SEO — Ranking Report',
     rankingsFilename: 'Ranking_Report',
     // AI report
     aiQueries: 'AI queries',

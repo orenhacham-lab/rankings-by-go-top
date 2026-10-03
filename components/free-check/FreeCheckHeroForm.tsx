@@ -11,10 +11,19 @@
  */
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { ArrowRight } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { Locale } from '@/lib/i18n/locales'
+import { cn } from '@/lib/utils'
 
-export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
+/**
+ * `inverse` is the home hero's navy variant (wave 8): a white 56px field and
+ * the action button on a frosted plate, start-aligned under the headline.
+ */
+export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Locale; tone?: 'default' | 'inverse' }) {
+  const inverse = tone === 'inverse'
   const copy = freeCheckCopy(locale)
   const router = useRouter()
   const [url, setUrl] = useState('')
@@ -22,36 +31,46 @@ export function FreeCheckHeroForm({ locale }: { locale: Locale }) {
 
   return (
     <form
-      className="mx-auto max-w-xl bg-white/90 backdrop-blur rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/60 p-3 sm:p-4"
+      className={cn('w-full', inverse ? 'max-w-2xl' : 'max-w-xl mx-auto')}
       onSubmit={(e) => {
         e.preventDefault()
         const candidate = url.trim()
         router.push(candidate ? `${target}?url=${encodeURIComponent(candidate)}` : target)
       }}
     >
-      <div className="flex flex-col sm:flex-row gap-2.5">
-        <label htmlFor="hero-free-check-url" className="sr-only">
-          {copy.form.label}
-        </label>
-        <input
-          id="hero-free-check-url"
-          type="text"
-          inputMode="url"
-          autoComplete="url"
-          dir="ltr"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={copy.form.placeholder}
-          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <button
-          type="submit"
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-lg shadow-blue-600/25 hover:from-blue-700 hover:to-indigo-700 transition-all whitespace-nowrap"
-        >
+      <label htmlFor="hero-free-check-url" className="sr-only">
+        {copy.form.label}
+      </label>
+      <div
+        className={cn(
+          'flex flex-col gap-2 rounded-card p-2 sm:flex-row',
+          inverse ? 'bg-white/15 p-2.5 ring-2 ring-white/40 shadow-[0_12px_40px_rgb(0_0_0/0.3)] backdrop-blur-sm' : 'border border-line bg-surface shadow-card',
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <Input
+            id="hero-free-check-url"
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            dir="ltr"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={copy.form.placeholder}
+            className={cn(
+              'text-start',
+              inverse
+                ? 'h-16 border-transparent bg-surface text-section focus:ring-white/40'
+                : 'h-11 border-transparent bg-sunk/60 shadow-none hover:border-line focus:bg-surface',
+            )}
+          />
+        </div>
+        <Button type="submit" size="lg" className={cn('shrink-0', inverse && 'h-16 px-8 text-section focus-visible:ring-white/50')}>
           {copy.form.submit}
-        </button>
+          <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+        </Button>
       </div>
-      <p className="mt-2.5 text-xs text-slate-500 text-center">{copy.page.badge}</p>
+      <p className={cn('mt-2.5 text-caption', inverse ? 'text-start text-copy text-contrast-ink/80' : 'text-center text-muted')}>{copy.page.badge}</p>
     </form>
   )
 }

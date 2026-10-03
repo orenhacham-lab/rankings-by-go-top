@@ -17,6 +17,7 @@
  */
 
 import type { PlanLimits, PlanType } from '@/lib/subscription'
+import { UserFacingError } from '@/lib/i18n/user-facing-error'
 
 /** Start of the current calendar month (UTC), used as the period boundary. */
 export function currentPeriodStart(): Date {
@@ -177,7 +178,7 @@ export type QuotaErrorPayload = {
 }
 
 // Phase 3 — approved display names (Basic / Advanced / Premium / Agency).
-const EN_PLAN_LABEL: Record<PlanType, string> = {
+export const EN_PLAN_LABEL: Record<PlanType, string> = {
   trial: 'Trial',
   shopify_billing_required: 'Shopify billing required',
   entitlement_unavailable: 'Entitlement temporarily unavailable',
@@ -235,8 +236,24 @@ export function buildEntitlementUnavailableError(): EntitlementUnavailablePayloa
  * changes; server code that calls an action tells a quota refusal from any
  * other failure by this class instead of by the Hebrew text.
  */
-export class KeywordQuotaError extends Error {
-  readonly code = 'QUOTA_KEYWORDS_PER_PROJECT' as const
+export class KeywordQuotaError extends UserFacingError {
+  declare readonly code: 'QUOTA_KEYWORDS_PER_PROJECT'
+  constructor(message: string) {
+    super(message, 'QUOTA_KEYWORDS_PER_PROJECT')
+  }
+}
+
+/**
+ * The entitlement could not be read, as a refusal the merchant may see in
+ * their own language. Server code tells it apart by its code, never by the
+ * text (which is now Hebrew or English).
+ */
+export class EntitlementUnavailableError extends UserFacingError {
+  declare readonly code: typeof ENTITLEMENT_UNAVAILABLE_CODE
+  constructor(locale: 'he' | 'en') {
+    const payload = buildEntitlementUnavailableError()
+    super(locale === 'en' ? payload.errorEn : payload.error, ENTITLEMENT_UNAVAILABLE_CODE)
+  }
 }
 
 export function buildQuotaError(

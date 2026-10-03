@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
 
 interface Article {
   id: string
@@ -58,7 +59,8 @@ export async function GET() {
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: 'Rankings by Go Top',
+    name: 'Go Top SEO',
+    alternateName: ['Rankings by Go Top'],
     url: baseUrl,
     logo: `${baseUrl}/gotop-primary.png`,
     description: 'Advanced location tracking system for SEO promotion - Google organic results and Google Maps rankings',
@@ -79,20 +81,15 @@ export async function GET() {
   const softwareSchema = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'Rankings by Go Top',
+    name: 'Go Top SEO',
+    alternateName: ['Rankings by Go Top'],
+    publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://gotop.co.il' },
+    brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://gotop.co.il' },
     applicationCategory: 'BusinessApplication',
     description: 'Advanced SEO rank tracking system for monitoring Google search and Google Maps rankings',
     url: baseUrl,
-    offers: {
-      '@type': 'Offer',
-      price: 'varies',
-      priceCurrency: 'ILS',
-    },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '5',
-      ratingCount: '100',
-    },
+    // No aggregateRating: only real, collected reviews may be marked up.
+    offers: SOFTWARE_OFFER,
   }
 
   // Generate article schemas
@@ -116,7 +113,8 @@ export async function GET() {
     }),
     publisher: {
       '@type': 'Organization',
-      name: 'Rankings by Go Top',
+      name: 'GO TOP',
+      url: 'https://gotop.co.il',
       logo: {
         '@type': 'ImageObject',
         url: `${baseUrl}/gotop-primary.png`,

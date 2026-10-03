@@ -165,7 +165,8 @@ async function main() {
     const en = uiStrings('app/(auth)/signup/page.tsx', 'en')
     const he = uiStrings('app/(auth)/signup/page.tsx', 'he')
     const enHtml = firstRender(SIGNUP.default, 'en', '/signup')
-    for (const key of ['heading', 'fullName', 'email', 'companyName', 'phone', 'password', 'confirmPassword', 'termsCheckbox', 'signupBtn', 'trialBadge', 'alreadyHaveAccount', 'signIn']) {
+    // w7 P1-9: sign-up asks for an email and a password only; the terms are a consent line with links.
+    for (const key of ['heading', 'intro', 'email', 'password', 'passwordHint', 'showPassword', 'terms', 'privacyPolicy', 'signupBtn', 'trialBadge', 'alreadyHaveAccount', 'signIn']) {
       check(`C1-${key}: English "${en[key]}" is in the FIRST render`, enHtml.includes(esc(en[key])), en[key])
     }
     check('C2: NOT ONE Hebrew character appears',
@@ -215,8 +216,8 @@ async function main() {
     check('D1: the shared Button contributes no language of its own while loading',
       !HEBREW.test(btn), (btn.match(/[֐-׿][^<]*/g) ?? []).slice(0, 3).join(' | '))
     check('D2: …and the Suspense fallback both pages use is text-free',
-      /fallback=\{<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" \/>\}/.test(read('app/(auth)/login/page.tsx'))
-      && /fallback=\{<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" \/>\}/.test(read('app/(auth)/signup/page.tsx')))
+      /fallback=\{<div className="min-h-screen bg-canvas" \/>\}/.test(read('app/(auth)/login/page.tsx'))
+      && /fallback=\{<div className="min-h-screen bg-canvas" \/>\}/.test(read('app/(auth)/signup/page.tsx')))
     const enHtml = firstRender(LOGIN.default, 'en', '/login')
     check('D3: the submit control renders its English label, not a Hebrew one',
       enHtml.includes(uiStrings('app/(auth)/login/page.tsx', 'en').loginBtn))

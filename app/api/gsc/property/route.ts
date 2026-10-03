@@ -8,13 +8,17 @@
  * that does not cover the project URL is NEVER assignable in Stage E1 — there is no
  * mismatch override (no admin bypass, and a browser-supplied confirmation is never trusted).
  */
+import { after } from 'next/server'
 import { authContentProject } from '@/lib/content/api-auth'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { loadUserConnection, getAccessTokenForConnection, listSites, GscServiceError } from '@/lib/gsc/service'
 import { propertyCoversProjectUrl, isUnverifiedPermission } from '@/lib/gsc/property-match'
 import { GscApiError } from '@/lib/gsc/api'
+import { startBackgroundGscSync } from '@/lib/gsc/background-sync'
 
 export const runtime = 'nodejs'
+// The first sync of a newly chosen property runs in after(), inside this duration.
+export const maxDuration = 300
 
 export async function POST(request: Request) {
   if (!isGscReadOnlyEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -55,6 +59,11 @@ export async function POST(request: Request) {
       permission_level: match.permissionLevel, selected_by: auth.user.id, selected_at: nowIso, updated_at: nowIso,
     }, { onConflict: 'project_id' })
     if (error) return Response.json({ ok: false, error: 'assign_failed' }, { status: 500 })
+    // Linked: start the same sync the manual button runs, server-side, after the response
+    // (not awaited). Skipped when one is already running or the property just synced.
+    const projectIdForSync = auth.project.id
+    const userIdForSync = auth.user.id
+    after(() => startBackgroundGscSync({ admin: auth.admin, userId: userIdForSync, projectId: projectIdForSync, autoAssign: false }))
     return Response.json({ ok: true, siteUrl, permissionLevel: match.permissionLevel })
   } catch (e) {
     if (e instanceof GscServiceError) return Response.json({ ok: false, error: e.code }, { status: e.status })

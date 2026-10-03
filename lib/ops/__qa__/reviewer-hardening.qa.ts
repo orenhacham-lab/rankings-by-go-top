@@ -119,18 +119,29 @@ async function main() {
   say('A1) the AI-check trigger — it existed; what was missing was that it looked like one')
   {
     const src = read('components/ai-visibility/AIVisibilitySection.tsx')
-    check('A1a: every query card renders one dispatch button per engine',
-      /onClick=\{\(\) => !scanning && scanEngine\(p\.id, engine\)\}/.test(src))
+    // Updated 2026-09-29 (UX review B, owner approval): the customer no longer
+    // picks an engine on the card. Each card has ONE recheck button (the monthly
+    // engines, through the same route) and every engine, one check each, in its
+    // ⋯ menu. The chips are the status of the last check.
+    const trigger = (s: string) => /onClick=\{\(\) => \{ if \(!busy && !notEnough\) void recheckQuestion\(p\.id\) \}\}/.test(s)
+      && /SUPPORTED_ENGINES\.filter\(\(e\) => engineSupportsCountry\(e, projectCountry\)\)\.map\(\(engine\) => \(\{[\s\S]{0,420}onSelect: \(\) => \{ if \(!busy\) void scanEngine\(p\.id, engine\) \}/.test(s)
+    check('A1a: every query card has one recheck button and each engine in its menu',
+      trigger(src))
+    check('A1a-MUT: a card without the recheck button fails A1a', !trigger(src.replace('void recheckQuestion(p.id)', 'void 0')))
+    check('A1a-2: the recheck posts one check per engine to the same dispatch route',
+      /const recheckQuestion = useCallback\([\s\S]{0,400}engines\.map\(async \(engine\) => \{[\s\S]{0,120}fetch\('\/api\/ai-visibility\/runs', \{[\s\S]{0,60}method: 'POST'/.test(src))
     check('A1b: which posts one check to the real dispatch route',
       /scanEngine[\s\S]{0,2400}fetch\('\/api\/ai-visibility\/runs', \{[\s\S]{0,200}method: 'POST'/.test(src))
     check('A1c: six engines, so a reviewer has a choice of which to run',
-      /SUPPORTED_ENGINES = \['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'\]/.test(src))
+      // The list lives in the shared score (lib/ai-visibility/score.ts) since the score was unified.
+      /SUPPORTED_ENGINES = SCORED_ENGINES\b/.test(src)
+      && /SCORED_ENGINES = \['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'\]/.test(read('lib/ai-visibility/score.ts')))
     // The fix: an instruction, and an accessible name that states the ACTION.
     check('A1d: the section now tells the reader the chips are the run control',
       /t\('run_a_check_hint'\)/.test(src))
-    check('A1e: the button’s accessible name names the ACTION and the engine, not a status',
-      /const actionLabel = scanning[\s\S]{0,220}run_check_on/.test(src)
-      && /aria-label=\{actionLabel\}/.test(src))
+    check('A1e: the button names the action and its cost; a chip names the engine and its status',
+      /t\(checkedBefore \? 'recheck_question_all' : 'check_question_all'\)\.replace\('\{n\}', String\(n\)\)/.test(src)
+      && /aria-label=\{statusLabel\}/.test(src) && /t\('check_on_engine_menu'\)\.replace\('\{engine\}'/.test(src))
     const i18n = read('lib/ai-visibility/i18n.ts')
     for (const key of ['run_a_check_hint', 'run_check_on', 'rerun_check_on',
       'ai_allowance', 'ai_allowance_unknown', 'ai_allowance_exhausted']) {
@@ -138,8 +149,9 @@ async function main() {
         new RegExp(`${key}: \\{ he: '[^']+', en: '[^']+' \\}`).test(i18n)
         || new RegExp(`${key}: \\{[\\s\\S]{0,180}he: '[^']+',[\\s\\S]{0,180}en: '[^']+',`).test(i18n))
     }
-    check('A1g: the in-flight button is disabled, so one click cannot become two',
-      /disabled=\{scanning\}/.test(src))
+    check('A1g: while a check runs every check control is disabled, so one click cannot become two',
+      /const busy = scanningKey !== null \|\| recheck !== null/.test(src) && /disabled=\{busy \|\| notEnough\}/.test(src)
+      && /disabled: busy \|\| \(knownLeft !== null && knownLeft < 1\)/.test(src))
   }
 
   // ── A2) the allowance is the ledger's, not a decoration ──────────────────
@@ -293,8 +305,11 @@ async function main() {
       rule.hooksFirst(aiPage), 'a hook after a conditional return is React error #310 — measured, not theorised')
     const ai = read('components/ai-visibility/AIVisibilitySection.tsx')
     check('B13: the suggestions effect is keyed by the keywords’ VALUE, not the array identity',
-      /projectKeywordsKey, manualProfile, projectId\]/.test(ai)
+      // w7-ai-profile: the effect also waits for the resolved business identity.
+      /projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId\]/.test(ai)
       && /const projectKeywordsKey = \(projectKeywords \|\| \[\]\)\.join/.test(ai))
+    check('B13b: MUT keying the effect by the array identity fails B13',
+      !/projectKeywordsKey, manualProfile, identityCategory, identityReady, projectId\]/.test(ai.replace('projectKeywordsKey, manualProfile, identityCategory', 'projectKeywords, manualProfile, identityCategory')))
     check('B10: a failed read of the row is a terminal state, not a spinner', rule.failureIsTerminal(rowHook))
 
     // Mutation controls: each rule, broken on purpose, must fail.

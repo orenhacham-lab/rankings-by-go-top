@@ -1,45 +1,61 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { useEffect, useState, useMemo } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import { Sun, Moon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
+const noop = () => () => {}
+
+/**
+ * The theme as a two-option segmented control: a sun and a moon, the chosen one
+ * lifted onto a light chip, each a button that says whether it is pressed.
+ *
+ * It was one switch labelled with the CURRENT state ("Light mode" while light
+ * was on), which read as the action to take: nobody could tell which way it
+ * pointed. Two named options cannot be misread. The same track and chip as the
+ * language control beside it.
+ *
+ * The theme is only known in the browser, so the server (and the first client
+ * render) draws the track with neither option pressed, in the same size.
+ */
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
+  const mounted = useSyncExternalStore(noop, () => true, () => false)
   const { language } = useDashboardLanguage()
   const dict = useMemo(() => getDashboardDictionary(language), [language])
+  const current = mounted ? (resolvedTheme === 'dark' ? 'dark' : 'light') : null
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div className="h-10" />
-  }
-
-  const isLight = theme === 'light'
+  const option = (active: boolean) => cn(
+    'inline-flex h-7 items-center justify-center rounded-[calc(var(--radius-control)-2px)] transition-[background-color,color,box-shadow] duration-150 ease-snappy',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus',
+    active ? 'bg-rail-ink text-rail shadow-control' : 'text-rail-muted hover:text-rail-ink'
+  )
 
   return (
-    <button
-      onClick={() => setTheme(isLight ? 'dark' : 'light')}
-      className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-      aria-label={isLight ? dict.common.switchToDarkMode : dict.common.switchToLightMode}
-    >
-      <span>{isLight ? dict.common.lightMode : dict.common.darkMode}</span>
-      <div className="flex items-center gap-1.5">
-        <Sun size={16} className={isLight ? 'text-amber-500' : 'text-slate-600 dark:text-slate-500'} />
-        <div className="w-8 h-5 rounded-full bg-slate-300 dark:bg-slate-700 relative transition-colors">
-          <div
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
-              isLight ? 'left-0.5' : 'right-0.5'
-            }`}
-          />
-        </div>
-        <Moon size={16} className={isLight ? 'text-slate-400' : 'text-blue-400'} />
-      </div>
-    </button>
+    <div role="group" aria-label={dict.sidebar.themeLabel} className="grid grid-cols-2 gap-0.5 rounded-control border border-rail-line bg-rail-hover p-0.5">
+      <button
+        type="button"
+        aria-pressed={current === 'light'}
+        aria-label={dict.common.lightMode}
+        title={dict.common.lightMode}
+        onClick={() => setTheme('light')}
+        className={option(current === 'light')}
+      >
+        <Sun size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-pressed={current === 'dark'}
+        aria-label={dict.common.darkMode}
+        title={dict.common.darkMode}
+        onClick={() => setTheme('dark')}
+        className={option(current === 'dark')}
+      >
+        <Moon size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+    </div>
   )
 }

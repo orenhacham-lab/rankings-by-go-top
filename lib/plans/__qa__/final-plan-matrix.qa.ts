@@ -194,22 +194,23 @@ async function main() {
           JSON.stringify(dict[code]) === JSON.stringify(lines), JSON.stringify(dict[code]))
         const e = EXPECTED[code]
         const numbers = lines.join(' ').match(/\d+/g)?.map(Number) ?? []
-        // A one-project plan states it in words ("1 project" / "פרויקט אחד")
-        // rather than repeating "per project" where only one can exist, so the
-        // projects line is checked as a statement, not as a digit.
+        // A one-website plan states it in words ("1 website" / "אתר אחד")
+        // rather than repeating "per website" where only one can exist, so the
+        // website line (the second line, after the article line) is checked as
+        // a statement, not as a digit.
         const projectsStated = e.projects === 1
-          ? (lines[0] === '1 project' || lines[0] === 'פרויקט אחד')
+          ? (lines[1] === '1 website' || lines[1] === 'אתר אחד')
           : numbers.includes(e.projects)
         check(`E2-${locale}-${code}: and every number in them is a matrix number`,
           projectsStated && numbers.includes(e.keywords) && numbers.includes(e.google)
           && numbers.includes(e.ai) && numbers.includes(e.articles),
-          `${JSON.stringify(lines[0])} ${JSON.stringify(numbers)}`)
+          `${JSON.stringify(lines[1])} ${JSON.stringify(numbers)}`)
       }
     }
-    // THE ARTICLE PERIOD IS STATED, NOT IMPLIED. The cards said "per billing
-    // period" while the Shopify plan descriptions said "per month" — one quota,
-    // two phrasings, which is the shape a customer dispute takes. Every plan is
-    // monthly, so every surface says so in the same words.
+    // THE ARTICLE PERIOD IS STATED, NOT IMPLIED, IN THE CUSTOMER'S WORD. The
+    // cards said "per billing period" while the Shopify plan descriptions said
+    // "per month" — one quota, two phrasings, which is the shape a customer
+    // dispute takes. Every plan is monthly, so every surface says "a month".
     //
     // THE ACCOUNT-WIDE CLAUSE IS CONDITIONAL. "Shared across your account"
     // answers "shared with what?", a question a one-project plan does not
@@ -217,16 +218,16 @@ async function main() {
     // exist, contradicting the one-website positioning. It is stated only on
     // the multi-project plans, where the sharing is real.
     const MONTHLY_EN: Record<PlanCode, string> = {
-      regular: '4 articles per monthly billing period',
-      advanced: '12 articles per monthly billing period',
-      premium: '50 articles per monthly billing period, shared across your account',
-      large_agency: '200 articles per monthly billing period, shared across your account',
+      regular: '4 articles a month, written and published to your website automatically',
+      advanced: '12 articles a month, written and published to your website automatically',
+      premium: '50 articles a month, written and published automatically, shared across all your websites',
+      large_agency: '200 articles a month, written and published automatically, shared across all your websites',
     }
     const MONTHLY_HE: Record<PlanCode, string> = {
-      regular: '4 מאמרים בכל מחזור חיוב חודשי',
-      advanced: '12 מאמרים בכל מחזור חיוב חודשי',
-      premium: '50 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
-      large_agency: '200 מאמרים בכל מחזור חיוב חודשי, משותפים לכל החשבון',
+      regular: '4 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
+      advanced: '12 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
+      premium: '50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
+      large_agency: '200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
     }
     for (const code of PLAN_CODES) {
       check(`E6-en-${code}: the article line is the exact agreed English wording`,
@@ -240,10 +241,9 @@ async function main() {
           dict[code][planArticleLineIndex(code)] === expected[code], JSON.stringify(dict[code]))
       }
     }
-    check('E8: no surface still says the ambiguous "per billing period" for articles',
+    check('E8: no plan line still says "billing period" / "מחזור חיוב"',
       PLAN_CODES.every((c) => (['en', 'he'] as const).every((l) =>
-        !/^\d+ articles per billing period/.test(planArticleLine(c, l))
-        && !/^\d+ מאמרים בכל מחזור חיוב,/.test(planArticleLine(c, l)))))
+        planLimitLines(c, l).every((line) => !/billing (period|cycle)|מחזור חיוב/i.test(line)))))
     // The wording is a SENTENCE change only: the quota period resolver and the
     // numbers behind it are untouched.
     check('E9: the article NUMBERS are unchanged by the rewording',
@@ -274,8 +274,8 @@ async function main() {
       PLAN_CODES.every((c) => (PLAN_CATALOG[c].maxProjects === 1)
         === (PLAN_AUDIENCE_LABEL[c].en === 'One website')))
     check('F3: Advanced is described as a ONE-website plan, both languages',
-      PLAN_AUDIENCE_DESCRIPTION.advanced.en === 'For one website with higher content and tracking needs'
-      && PLAN_AUDIENCE_DESCRIPTION.advanced.he === 'לאתר אחד עם צרכי תוכן ומעקב מתקדמים')
+      PLAN_AUDIENCE_DESCRIPTION.advanced.en === 'For one website that needs more articles and more tracking'
+      && PLAN_AUDIENCE_DESCRIPTION.advanced.he === 'לאתר אחד שצריך יותר מאמרים ויותר מעקב')
     check('F4: every plan has a label and a description in both languages',
       PLAN_CODES.every((c) => (['en', 'he'] as const).every((l) =>
         PLAN_AUDIENCE_LABEL[c][l].length > 0 && PLAN_AUDIENCE_DESCRIPTION[c][l].length > 0)))
@@ -410,7 +410,7 @@ async function main() {
     check('K3: restoring Premium to 25 projects breaks it',
       ({ ...PLAN_CATALOG.premium, maxProjects: 25 }).maxProjects !== EXPECTED.premium.projects)
     check('K4: a UI line that disagrees with the server is detected',
-      JSON.stringify(['Up to 10 projects']) !== JSON.stringify(planLimitLines('advanced', 'en').slice(0, 1)))
+      JSON.stringify(['Up to 10 websites']) !== JSON.stringify(planLimitLines('advanced', 'en').slice(1, 2)))
     check('K5: an unrecognised Shopify handle for the reviewer is detected as denied',
       decideShopifyRouteAccess({
         shopify_subscription_status: 'active', shopify_plan_handle: 'advanced-v2',
@@ -423,7 +423,7 @@ async function main() {
     check('K7: the REAL values satisfy every assertion the mutations break',
       PLAN_CATALOG.advanced.maxProjects === 1 && PLAN_CATALOG.advanced.maxArticlesPerPeriodAccountWide === 12
       && PLAN_CATALOG.premium.maxProjects === 10
-      && JSON.stringify(planLimitLines('advanced', 'en').slice(0, 1)) === JSON.stringify(['1 project']))
+      && JSON.stringify(planLimitLines('advanced', 'en').slice(1, 2)) === JSON.stringify(['1 website']))
   }
 
   // ── L) no stale plan copy left in the repository ──────────────────────────

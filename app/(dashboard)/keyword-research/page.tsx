@@ -1,18 +1,54 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
-import TrendModal from '@/components/keyword-research/TrendModal'
+import TrendModal, { type TrendError } from '@/components/keyword-research/TrendModal'
 import GscOpportunities from '@/components/content/GscOpportunities'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useProjectRow } from '@/lib/active-project/useProjectRow'
-import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
+import { useScanResearch } from '@/components/keyword-research/useScanResearch'
+import ScanOverview from '@/components/keyword-research/ScanOverview'
+import ResearchStart from '@/components/keyword-research/ResearchStart'
+import Header from '@/components/layout/Header'
+import { useMapping } from '@/components/mapping/useMapping'
+import { formatResearchDate } from '@/lib/keyword-research/format'
+import { ScanEmptyCard, ScanLoadingSkeleton, ScanPendingCard, ScanRunningCard } from '@/components/keyword-research/ScanCards'
+import ResearchFormBar, { ResearchFormClose } from '@/components/keyword-research/ResearchFormBar'
+import EasyWins from '@/components/keyword-research/EasyWins'
+import ResearchChips from '@/components/keyword-research/ResearchChips'
+import ScanGscNotice from '@/components/keyword-research/ScanGscNotice'
+import KeywordSourceLine from '@/components/keyword-research/KeywordSourceLine'
+import { useGscKeywordFigures } from '@/components/gsc/GscKeywordFigures'
+import { formatCount } from '@/components/gsc/format'
+import { formatMoney } from '@/lib/keyword-research/format'
+import { researchModel } from '@/lib/keyword-research/model'
+import { EASY_WINS_SHOWN } from '@/lib/keyword-research/easy-wins'
+import { keywordKey, type ScanKeyword, type TrackedKeyword } from '@/lib/keyword-research/scan-research'
+import type { ResearchChip } from '@/lib/keyword-research/chips'
+import type { ResearchRow } from '@/lib/keyword-research/rows'
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy, Loader2, Plus, Search, Sparkles, TrendingUp, X } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
+import Segmented from '@/components/ui/Segmented'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import RowMenu from '@/components/ui/RowMenu'
+import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import { LANDSCAPE_IDS, ResearchAudiences, ResearchRivals } from '@/components/keyword-research/ResearchLandscape'
+import SectionNav from '@/components/keyword-research/SectionNav'
+import SiteAvatar from '@/components/ui/SiteAvatar'
+import { useFirstEntrance } from '@/components/ui/motion'
+import { NO_LANDSCAPE } from '@/components/keyword-research/landscape'
+import CompetitiveResearch, { COMPETITIVE_ID } from '@/components/keyword-research/competitive/CompetitiveResearch'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -26,6 +62,11 @@ interface KeywordIdeaResult {
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
 type OpportunityKey = 'high' | 'medium' | 'low'
+
+/** Rows the table shows at once, and adds per "show more" (design contract §6). */
+const TABLE_PAGE = 25
+const NO_SCAN_KEYWORDS: ScanKeyword[] = []
+const NO_TRACKED: TrackedKeyword[] = []
 
 function getWordCount(keyword: string): number {
   return keyword.trim().split(/\s+/).filter(Boolean).length
@@ -79,39 +120,44 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
   return 'mediumPotential'
 }
 
+type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral'
+
 interface OpportunityBadgeInfo {
   key: OpportunityKey
   label: string
-  colorClass: string
+  variant: BadgeVariant
 }
 
-function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): OpportunityBadgeInfo {
+/** The SEO potential as a ui Badge (its words come from the dictionary). */
+function getOpportunityBadgeInfo(r: KeywordIdeaResult, labels: Record<OpportunityKey, string>): OpportunityBadgeInfo {
   const key = getSeoPotentialBadge(r)
+  const variants: Record<OpportunityKey, BadgeVariant> = { high: 'success', medium: 'warning', low: 'neutral' }
+  return { key, label: labels[key], variant: variants[key] }
+}
 
-  const labels = {
-    he: {
-      high: 'גבוה',
-      medium: 'בינוני',
-      low: 'נמוך',
-    },
-    en: {
-      high: 'High',
-      medium: 'Medium',
-      low: 'Low',
-    },
-  }
-
-  const colorClasses = {
-    high: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-    medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
-    low: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
-  }
-
+/**
+ * Google Ads' competition level in the screen's words (UX review P1-4): "בינונית",
+ * never "MEDIUM (55)", drawn as a ui Badge like the potential beside it (final review
+ * R18), not as a coloured word. The 0–100 index is the badge's tooltip.
+ */
+const COMPETITION_VARIANT: Record<'LOW' | 'MEDIUM' | 'HIGH', BadgeVariant> = { LOW: 'success', MEDIUM: 'warning', HIGH: 'danger' }
+function competitionCell(
+  r: Pick<KeywordIdeaResult, 'competition' | 'competitionIndex'>,
+  levels: Record<'LOW' | 'MEDIUM' | 'HIGH', string>,
+  indexLabel: (n: number) => string,
+): { label: string; variant: BadgeVariant | null; title: string | undefined } {
+  if (!r.competition) return { label: '—', variant: null, title: undefined }
   return {
-    key,
-    label: labels[language][key],
-    colorClass: colorClasses[key],
+    label: levels[r.competition],
+    variant: COMPETITION_VARIANT[r.competition],
+    title: typeof r.competitionIndex === 'number' ? indexLabel(r.competitionIndex) : undefined,
   }
+}
+
+/** The competition cell's content: its Badge, or a muted dash when Google gave no level. */
+function CompetitionBadge({ c }: { c: ReturnType<typeof competitionCell> }) {
+  if (!c.variant) return <span className="text-muted">{c.label}</span>
+  return <span title={c.title} data-competition=""><Badge variant={c.variant}>{c.label}</Badge></span>
 }
 
 export default function KeywordResearchPage() {
@@ -119,6 +165,7 @@ export default function KeywordResearchPage() {
   const dict = getDashboardDictionary(language)
   const t = dict.keywordResearch
   const isRTL = language === 'he'
+  const router = useRouter()
 
   const [researchType, setResearchType] = useState<'keyword' | 'url' | 'keyword_url'>('keyword')
   const [keyword, setKeyword] = useState('')
@@ -143,8 +190,9 @@ export default function KeywordResearchPage() {
   const activeProjectName = projects.find((p) => p.id === activeProjectId)?.name ?? ''
   const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.name ?? '' })), [projects])
   // What the raw Search Console opportunity browser reports back when it is on (a
-  // decision saved or undone, a topic created, or why not): it has no other place on
-  // this screen to say it.
+  // decision saved or undone, a topic created, or why not), and what tracking one
+  // keyword of the scan's research came to: neither has another place on this
+  // screen to say it.
   const gscToast = useToasts()
   const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
@@ -152,8 +200,9 @@ export default function KeywordResearchPage() {
   const [addToProjectError, setAddToProjectError] = useState('')
   const [lastAddedProjectId, setLastAddedProjectId] = useState('')
 
-  // Sorting state for results table
-  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc' | 'opportunity'
+  // Sorting state for results table. 'rank' keeps the order the active chip gives
+  // ("suggested to track" is ranked by the easy-wins score).
+  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc' | 'opportunity' | 'rank'
   const [sortBy, setSortBy] = useState<SortKey>('monthlySearches')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -179,9 +228,76 @@ export default function KeywordResearchPage() {
   const [trendModalOpen, setTrendModalOpen] = useState(false)
   const [selectedTrendKeyword, setSelectedTrendKeyword] = useState('')
   const [trendLoading, setTrendLoading] = useState(false)
-  const [trendError, setTrendError] = useState('')
+  const [trendError, setTrendError] = useState<TrendError>('')
   const [trendCache, setTrendCache] = useState<Map<string, TrendData>>(new Map())
   const [trendData, setTrendData] = useState<TrendData | undefined>()
+
+  // ── The project's research (components/keyword-research, lib/keyword-research) ──
+  // Every project opens on the same research screen (part B of the UX review): the
+  // scan's research, the project's own when it has no scan, or the screen's empty
+  // start (a keyword field, and the mapping when it can be offered). The older form
+  // is one click away, never the screen (components/keyword-research/__qa__/legacy-screen.qa.ts).
+  // Until the first answer is in (the project list, then the scan's two reads), the
+  // screen is the research screen's skeleton, never today's form: a project WITH
+  // research used to see that form, in the older look, until its research replaced
+  // it. Opening the tab only reads: the scan's run and its cached research, never
+  // Google Ads, Serper or a model.
+  const ts = dict.keywordResearchScan
+  const scan = useScanResearch(activeProjectId)
+  const scanView = scan.view
+  const scanOn = scanView.kind === 'none' || scanView.kind === 'loading' ? null : scanView
+  const scanMode = scanOn !== null
+  const firstAnswerPending = !projectsResolved || scanView.kind === 'loading'
+  const scanKeywords = scanOn?.kind === 'seeded' ? scanOn.research.keywords : NO_SCAN_KEYWORDS
+  const scanTracked = scanOn ? scanOn.tracked : NO_TRACKED
+  // What the site's pages are about (w8-relevance): the research ranks by it and sets the unrelated apart.
+  const scanSiteTopics = scanOn?.kind === 'seeded' ? scanOn.research.siteTopics ?? null : null
+  // Wave 9: the research keywords the site already covers (the shared cannibalization check).
+  const scanCovered = scanOn?.kind === 'seeded' ? scanOn.research.covered ?? null : null
+  const unseeded = scanView.kind === 'unseeded'
+  // What the scan's summary says about the market (competitors, audiences, the site's icon); absent before the scan.
+  const seedLandscape = scan.landscape ?? NO_LANDSCAPE
+  // The mapping, offered on the empty start; its end reads the research again.
+  const mapping = useMapping(activeProjectId, language, scan.retry)
+  // A research the merchant runs from the form takes the screen until they go back to the scan's.
+  const [manualActive, setManualActive] = useState(false)
+  const [chip, setChip] = useState<ResearchChip>('all')
+  const [shownRows, setShownRows] = useState(TABLE_PAGE)
+  // null: the form folds by itself once there is research on screen; true/false: the merchant chose.
+  const [formChoice, setFormChoice] = useState<boolean | null>(null)
+  const [trackingKeys, setTrackingKeys] = useState<Set<string>>(new Set())
+  // Search Console's keywords view, asked for only with the scan's research on screen
+  // (or on its way). The empty start ('unseeded': no scan and no research of the
+  // project's own) is one keyword field and the mapping, with no Search Console
+  // source: there is no research for Google's keywords to join, and its count would
+  // read 0 however many clicks Google reports.
+  const gscSource = scanMode && !unseeded
+  const trackedIdsKey = useMemo(() => scanTracked.map((k) => k.id).sort().join(','), [scanTracked])
+  const gscKeywords = useGscKeywordFigures(gscSource ? activeProjectId : null, trackedIdsKey)
+  const googleFigures = gscKeywords.data.state === 'ready' ? gscKeywords.data.data : null
+  const model = useMemo(
+    () => researchModel({
+      scanKeywords,
+      tracked: scanTracked,
+      manual: results.length > 0 && (manualActive || scanKeywords.length === 0) ? results : null,
+      google: googleFigures,
+      chip,
+      siteTopics: scanSiteTopics,
+      covered: scanCovered,
+    }),
+    [scanKeywords, scanTracked, manualActive, results, googleFigures, chip, scanSiteTopics, scanCovered],
+  )
+  // The table's rows: the active chip's, with the scan's research on screen; otherwise the results, as always.
+  const tableSource: KeywordIdeaResult[] = scanMode && model.mode ? model.chipRows : results
+  // With no research yet (the empty start), the start's own field runs the research: the form opens only when asked.
+  const formOpen = !scanMode || (formChoice ?? (unseeded ? false : (!(model.mode || scanView.kind === 'pending') || loading || !!error)))
+  const researchStartShown = unseeded && !model.mode && !formOpen
+  // Where the research on screen came from, when the project's own research is part of it.
+  const researchSources = scanOn?.kind === 'seeded' ? scanOn.research.sources : undefined
+  const ownResearchDate = researchSources?.manualAt ? formatResearchDate(researchSources.manualAt, language) : null
+  const sourceOverride = model.mode === 'scan' && researchSources && ownResearchDate
+    ? (researchSources.scan ? dict.mapping.researchSourceBoth(ownResearchDate) : dict.mapping.researchSourceManual(ownResearchDate))
+    : undefined
 
   // Parse multiple keywords from comma/semicolon/newline separated input
   const parseKeywords = (input: string): string[] => {
@@ -237,11 +353,12 @@ export default function KeywordResearchPage() {
 
     // Check keyword limit
     if (parsedKeywords.length > 20) {
-      setError(isRTL ? 'ניתן להזין עד 20 ביטויים בכל מחקר' : 'Maximum 20 keywords per research')
+      setError(t.messages.tooMany)
       return
     }
 
     setLoading(true)
+    setShownRows(TABLE_PAGE)
 
     try {
       const response = await fetch('/api/google-ads/keyword-ideas', {
@@ -270,15 +387,16 @@ export default function KeywordResearchPage() {
           setError(t.states.errorQuota)
         } else if (data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
           // Refresh token expired or revoked — user needs to re-authenticate
-          setError(isRTL ? 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש לחשבון Google Ads.' : 'Google Ads connection expired. Please re-authenticate.')
+          setError(t.states.errorReauth)
         } else if (data.stage === 'env_check') {
           // Missing configuration (CLIENT_ID, CLIENT_SECRET, etc.)
           setError(t.states.errorEnv)
         } else if (data.stage === 'oauth') {
           // Other OAuth errors
-          setError(isRTL ? 'שגיאת הרשאה ב-Google Ads. אנא נסה שוב או פנה לתמיכה.' : 'Google Ads authentication error. Please try again or contact support.')
-        } else if (data.stage === 'validation' && data.error) {
-          setError(`${t.states.errorGeneral} (${data.error})`)
+          setError(t.messages.authFailed)
+        } else if (data.stage === 'validation') {
+          // The route's own words stay in the log: the merchant reads ours.
+          setError(data.error === 'Invalid URL' ? t.form.errorInvalidUrl : data.error === 'Keyword is required' ? t.states.empty : t.messages.invalidRequest)
         } else {
           setError(t.states.errorGeneral)
         }
@@ -309,6 +427,20 @@ export default function KeywordResearchPage() {
     }
   }
 
+  // The form's submit. With the scan's research on screen, what the merchant runs
+  // takes the screen (and the form folds again once it has results); the research
+  // itself is handleSearch, unchanged.
+  const submitResearch = (e: React.FormEvent) => {
+    if (scanMode) {
+      setManualActive(true)
+      setChip('all')
+      setSortBy((current) => (current === 'rank' ? 'monthlySearches' : current))
+      setShownRows(TABLE_PAGE)
+      setFormChoice(null)
+    }
+    return handleSearch(e)
+  }
+
   const clearAddToProjectSuccess = () => {
     if (addToProjectMessage || lastAddedProjectId) {
       setAddToProjectMessage('')
@@ -334,7 +466,7 @@ export default function KeywordResearchPage() {
   const selectAll = () => {
     clearAddToProjectSuccess()
     setAIQuestionsError('')
-    setSelectedKeywords(new Set(results.map((r) => r.keyword)))
+    setSelectedKeywords(new Set(tableSource.map((r) => r.keyword)))
   }
 
   const deselectAll = () => {
@@ -346,12 +478,12 @@ export default function KeywordResearchPage() {
   const copySelected = () => {
     const keywords = Array.from(selectedKeywords).join('\n')
     navigator.clipboard.writeText(keywords).then(() => {
-      alert('Copied to clipboard!')
-    })
+      gscToast.success(t.bulk.copied(formatCount(selectedKeywords.size, language)))
+    }).catch(() => {})
   }
 
   const copyKeyword = (kw: string) => {
-    navigator.clipboard.writeText(kw)
+    navigator.clipboard.writeText(kw).then(() => gscToast.success(t.table.copied)).catch(() => {})
   }
 
   const handleOpenTrendModal = async (kw: string) => {
@@ -408,11 +540,8 @@ export default function KeywordResearchPage() {
             debug: data.debug,
           })
         }
-        if (data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
-          setTrendError(isRTL ? 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש.' : 'Google Ads connection expired. Please re-authenticate.')
-        } else {
-          setTrendError(data.error || 'Failed to fetch trend data')
-        }
+        // A code, said by the modal in its own words (never the route's error text).
+        setTrendError(data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED' ? 'reauth' : 'failed')
         setTrendData(undefined)
         return
       }
@@ -433,7 +562,7 @@ export default function KeywordResearchPage() {
       if (process.env.NODE_ENV !== 'production') {
         console.error('[trend-modal] network/runtime error', err)
       }
-      setTrendError('network_error')
+      setTrendError('failed')
       setTrendData(undefined)
     } finally {
       setTrendLoading(false)
@@ -458,7 +587,7 @@ export default function KeywordResearchPage() {
 
     try {
       // Include metrics from research result so they are stored on the new targets.
-      const resultsByKeyword = new Map(results.map((r) => [r.keyword, r]))
+      const resultsByKeyword = new Map((scanMode ? [...model.rows, ...results] : results).map((r) => [r.keyword, r]))
       const keywordsArray = Array.from(selectedKeywords).map((kw) => {
         const r = resultsByKeyword.get(kw)
         return {
@@ -486,16 +615,19 @@ export default function KeywordResearchPage() {
       const result = await response.json()
 
       if (!response.ok || !result.success) {
+        // Our own words only, never the route's text.
         if (response.status === 402) {
           setAddToProjectError(t.addToProject.errorQuota)
         } else {
-          setAddToProjectError(result.message || t.addToProject.errorGeneral)
+          setAddToProjectError(response.status === 503 ? ts.add.unavailable : t.addToProject.errorGeneral)
         }
         return
       }
 
       setAddToProjectMessage(t.addToProject.success(result.added || 0, result.skipped || 0))
       setLastAddedProjectId(projectIdUsed)
+      // "Already tracked", the suggestions and Google's figures follow the keywords just added.
+      if (scanMode) scan.reloadTracked()
       // Keep selection visible after success so the user can see what they added
       // and the "Go to project" button. The success state is cleared the next time
       // the user searches, toggles a checkbox, or dismisses the message manually.
@@ -520,11 +652,7 @@ export default function KeywordResearchPage() {
 
     // Only allow exactly one keyword for generation
     if (selectedKeywords.size > 1) {
-      setAIQuestionsError(
-        language === 'he'
-          ? 'בחרו ביטוי אחד בלבד ליצירת שאלות AI.'
-          : 'Select exactly one keyword to generate AI questions.'
-      )
+      setAIQuestionsError(t.messages.aiOnlyOne)
       return
     }
 
@@ -555,23 +683,15 @@ export default function KeywordResearchPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        setAIQuestionsError(
-          errorData.message ||
-          (language === 'he'
-            ? 'שגיאה בהפקת שאלות AI'
-            : 'Error generating AI questions')
-        )
+        // Our words for what happened, never the route's message.
+        setAIQuestionsError(response.status === 403 ? t.messages.aiNotAvailable : response.status === 503 ? t.messages.aiUnavailable : t.messages.aiFailed)
         return
       }
 
       const result = await response.json()
 
       if (!result.questions || result.questions.length === 0) {
-        const emptyMessage = result.message || (language === 'he'
-          ? 'לא נמצאו שאלות AI איכותיות לביטוי זה. נסו ביטוי אחר.'
-          : 'No high-quality AI questions found for this keyword. Try a different keyword.')
-        setAIQuestionsError(emptyMessage)
+        setAIQuestionsError(t.messages.aiNone)
         return
       }
 
@@ -582,11 +702,7 @@ export default function KeywordResearchPage() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       console.error('Error generating AI questions:', errorMsg)
-      setAIQuestionsError(
-        language === 'he'
-          ? 'שגיאה בהפקת שאלות AI. נסו שוב.'
-          : 'Error generating AI questions. Please try again.'
-      )
+      setAIQuestionsError(t.messages.aiFailed)
     } finally {
       setGeneratingAIQuestions(false)
     }
@@ -633,22 +749,15 @@ export default function KeywordResearchPage() {
       }
 
       if (added > 0) {
-        const msgKey = language === 'he'
-          ? `נוספו ${added} שאלות AI לפרויקט${skipped > 0 ? `. ${skipped} שאלות כבר היו קיימות ודולגו.` : '.'}`
-          : `${added} AI questions were added to the project${skipped > 0 ? `. ${skipped} existing questions were skipped.` : '.'}`
-        setAIQuestionsMessage(msgKey)
+        setAIQuestionsMessage(t.messages.aiAdded(added, skipped))
         setGeneratedAIQuestions([])
         setTimeout(() => setAIQuestionsOpen(false), 1500)
       } else if (skipped > 0) {
-        const msgKey = language === 'he'
-          ? `${skipped} שאלות כבר היו קיימות ודולגו.`
-          : `${skipped} questions already existed and were skipped.`
-        setAIQuestionsMessage(msgKey)
+        setAIQuestionsMessage(t.messages.aiSkipped(skipped))
         setTimeout(() => setAIQuestionsOpen(false), 1500)
       }
     } catch (err) {
-      const errMsg = language === 'he' ? 'שגיאה בהוספת השאלות' : 'Error adding questions'
-      setAIQuestionsError(errMsg)
+      setAIQuestionsError(t.messages.aiAddFailed)
       console.error('Error adding AI questions:', err)
     } finally {
       setAddingAIQuestions(false)
@@ -665,10 +774,10 @@ export default function KeywordResearchPage() {
   }
 
   const sortedResults = useMemo(() => {
-    if (results.length === 0) return results
+    if (tableSource.length === 0) return tableSource
     const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
     const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
-    const copy = [...results]
+    const copy = [...tableSource]
     const dir = sortDir === 'asc' ? 1 : -1
     copy.sort((a, b) => {
       if (sortBy === 'opportunity') {
@@ -707,14 +816,20 @@ export default function KeywordResearchPage() {
       return (aVal - bVal) * dir
     })
     return copy
-  }, [results, sortBy, sortDir])
+  }, [tableSource, sortBy, sortDir])
 
+  // Lucide sort arrows (§6), never a glyph: the column sorted, and which way.
   const sortIndicator = (key: SortKey) => {
-    if (sortBy !== key) return ' ↕'
-    return sortDir === 'asc' ? ' ▲' : ' ▼'
+    const Icon = sortBy !== key ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown
+    return <Icon aria-hidden="true" className={`size-3.5 shrink-0 ${sortBy === key ? 'text-action' : 'text-muted/70'}`} />
   }
 
   // Top opportunities computed from existing results — no extra API calls.
+  // The largest monthly searches in the table: each row's volume bar is measured against it.
+  const maxVolume = useMemo(() => Math.max(1, ...tableSource.map((r) => r.avgMonthlySearches ?? 0)), [tableSource])
+  // The rows rise in once, when the first research arrives; a chip, a sort or "show more" shows them at once.
+  const rowsEnter = useFirstEntrance(tableSource.length > 0)
+
   const topOpportunities = useMemo(() => {
     if (results.length === 0) return []
     const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
@@ -737,79 +852,215 @@ export default function KeywordResearchPage() {
     clearAddToProjectSuccess()
   }
 
-  const competitionColor = (competition: string | null) => {
-    switch (competition) {
-      case 'LOW':
-        return 'text-green-600 dark:text-green-400'
-      case 'MEDIUM':
-        return 'text-yellow-600 dark:text-yellow-400'
-      case 'HIGH':
-        return 'text-red-600 dark:text-red-400'
-      default:
-        return 'text-gray-600 dark:text-gray-400'
+  // ── With the scan's research on screen: chips, pages of rows, one-click tracking ──
+  const tableVisible = scanMode ? model.mode !== null : results.length > 0
+
+  const chooseChip = (next: ResearchChip) => {
+    setChip(next)
+    setShownRows(TABLE_PAGE)
+    setSortBy((current) => (next === 'suggested' ? 'rank' : current === 'rank' ? 'monthlySearches' : current))
+  }
+
+  const showSuggestions = () => {
+    chooseChip('suggested')
+    document.getElementById('research-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const backToScan = () => {
+    setManualActive(false)
+    setChip('all')
+    setSortBy((current) => (current === 'rank' ? 'monthlySearches' : current))
+    setShownRows(TABLE_PAGE)
+    setSelectedKeywords(new Set())
+    clearAddToProjectSuccess()
+  }
+
+  const fillSeedKeywords = () => {
+    if (!scanOn || scanOn.seedKeywords.length === 0) return
+    setResearchType('keyword')
+    setKeyword(scanOn.seedKeywords.join(', '))
+    setFormChoice(true)
+  }
+
+  // One keyword, one click: the same action and quota check as the add section, for
+  // the project the top bar names. What it came to is said in our own words only.
+  const trackKeyword = async (row: ResearchRow) => {
+    const key = keywordKey(row.keyword)
+    if (!selectedProject || trackingKeys.has(key)) return
+    setTrackingKeys((prev) => new Set(prev).add(key))
+    try {
+      const response = await fetch('/api/keyword-research/add-to-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProject,
+          engineType,
+          language,
+          keywords: [{
+            keyword: row.keyword,
+            avgMonthlySearches: row.avgMonthlySearches,
+            competition: row.competition,
+            competitionIndex: row.competitionIndex,
+            lowTopOfPageBid: row.lowTopOfPageBid,
+            highTopOfPageBid: row.highTopOfPageBid,
+            currency: row.currency || null,
+          }],
+        }),
+      })
+      const result = await response.json().catch(() => null)
+      if (response.ok && result?.success) {
+        gscToast.success(result.added > 0 ? ts.add.added(row.keyword) : ts.add.skipped(row.keyword))
+        scan.reloadTracked()
+      } else {
+        gscToast.error(response.status === 402 ? t.addToProject.errorQuota : response.status === 503 ? ts.add.unavailable : ts.add.errorGeneral)
+      }
+    } catch {
+      gscToast.error(ts.add.errorGeneral)
+    } finally {
+      setTrackingKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
     }
+  }
+
+  const sourceLineFor = (kw: string) => {
+    const row = model.byKey.get(keywordKey(kw))
+    return row ? <KeywordSourceLine row={row} /> : null
+  }
+
+  const gscState = gscSource ? gscKeywords.data.state : 'disabled'
+  const googleChip = gscState === 'disabled' ? 'hidden' : gscState === 'loading' ? 'loading' : 'counted'
+  const gscNotice = gscSource ? (
+    <ScanGscNotice projectId={activeProjectId} data={gscKeywords.data} count={model.counts.google} scope={model.mode === 'manual' ? 'search' : 'tracked'} retry={gscKeywords.retry} />
+  ) : null
+
+  // The research's own site, named with its icon under the title, once the scan's research is on screen.
+  const ownDomain = scanMode && model.mode === 'scan' ? (scanOn?.domain ?? seedLandscape.domain) : null
+  const ti = dict.researchInsights
+  const siteChip = ownDomain ? (
+    <span data-research-site="" className="inline-flex max-w-full items-center gap-2 rounded-pill border border-line bg-surface py-1 pe-3 ps-1 shadow-control">
+      <SiteAvatar domain={ownDomain} icon={seedLandscape.siteIcon} size="sm" />
+      <span dir="ltr" className="truncate text-caption font-semibold text-ink">{ownDomain}</span>
+      {seedLandscape.niche && <span className="hidden truncate border-s border-line ps-2 text-caption text-muted sm:inline">{seedLandscape.niche}</span>}
+    </span>
+  ) : undefined
+  const header = <Header title={t.title} subtitle={t.subtitle}>{siteChip}</Header>
+  const landscapeOn = scanMode && model.mode === 'scan' && scanOn?.kind === 'seeded' && !!activeProjectId
+  // THE ONE COMPETITOR SECTION, for every project. It used to mount only with the
+  // scan's research on screen: a project made by hand never saw it, and a seeded one
+  // lost it on its first manual search (review P1-2). Its reads (the tracked
+  // competitors, their rank rows, Search Console) do not depend on the research on
+  // screen, so it is always there. With the scan's research it opens with the scan's
+  // competitor cards and sits beside the rest of the scan's story; otherwise it
+  // follows the results, so a search's table stays right under its form.
+  const competitorSection = activeProjectId ? (
+    <CompetitiveResearch
+      projectId={activeProjectId}
+      siteIcon={seedLandscape.siteIcon}
+      suggested={seedLandscape.competitors.filter((c) => c.validated).map((c) => c.domain)}
+      onTracked={scan.reloadTracked}
+      rivals={landscapeOn && scanOn?.kind === 'seeded'
+        ? <ResearchRivals projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} domain={ownDomain} />
+        : undefined}
+    />
+  ) : null
+
+  // Nothing is known yet about which screen this is: its skeleton, not today's form.
+  if (firstAnswerPending) {
+    return (
+      <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`}>
+        {header}
+        <ScanLoadingSkeleton />
+      </div>
+    )
   }
 
   return (
     <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`}>
       {/* Header */}
-      <div className={`mb-8 ${isRTL ? 'text-right' : 'text-left'}`}>
-        <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>
-        <p className="text-slate-600 dark:text-slate-300">{t.subtitle}</p>
-      </div>
+      {header}
+
+      {/* The seeding scan's research opens the screen, before the form. */}
+      {scanOn?.kind === 'pending' && <ScanPendingCard />}
+      {scanOn?.kind === 'running' && <ScanRunningCard seedKeywords={scanOn.seedKeywords} steps={scanOn.steps} />}
+      {scanOn?.kind === 'empty' && model.mode !== 'manual' && (
+        <ScanEmptyCard reason={scanOn.reason} seedKeywords={scanOn.seedKeywords} onRetry={scan.retry} onUseSeeds={fillSeedKeywords} />
+      )}
+      {scanMode && model.mode && (
+        <div id="research-overview" className="scroll-mt-20">
+        <ScanOverview
+          totals={model.totals}
+          easyWins={model.wins.length}
+          mode={model.mode}
+          domain={scanOn?.domain ?? null}
+          fetchedAt={scanOn?.kind === 'seeded' ? scanOn.research.fetchedAt : null}
+          running={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.running}
+          truncated={model.mode === 'scan' && scanOn?.kind === 'seeded' && scanOn.research.truncated}
+          onBackToScan={model.mode === 'manual' && scanKeywords.length > 0 ? backToScan : undefined}
+          sourceOverride={sourceOverride}
+        />
+        </div>
+      )}
+      {landscapeOn && (
+        <SectionNav
+          label={ti.nav.label}
+          sections={[
+            { id: 'research-overview', label: ti.nav.overview },
+            { id: 'research-wins', label: ti.nav.wins },
+            { id: COMPETITIVE_ID, label: dict.researchCompetitive.nav },
+            { id: LANDSCAPE_IDS.audiences, label: ti.nav.audiences },
+            { id: 'research-table', label: ti.nav.keywords },
+          ]}
+        />
+      )}
+      {researchStartShown && (
+        <ResearchStart
+          locale={language}
+          keyword={keyword}
+          onKeyword={(value) => { setResearchType('keyword'); setKeyword(value) }}
+          onSubmit={submitResearch}
+          loading={loading}
+          onAdvanced={() => setFormChoice(true)}
+          mapping={mapping}
+        />
+      )}
 
       {/* Form */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6 mb-8">
-        <form onSubmit={handleSearch} className="space-y-4">
-          {/* Research type */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              {t.form.researchType}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  { value: 'keyword', label: t.form.researchTypeKeyword },
-                  { value: 'url', label: t.form.researchTypeUrl },
-                  { value: 'keyword_url', label: t.form.researchTypeKeywordUrl },
-                ] as const
-              ).map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                    researchType === opt.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-400'
-                      : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="researchType"
-                    value={opt.value}
-                    checked={researchType === opt.value}
-                    onChange={() => setResearchType(opt.value)}
-                    className="sr-only"
-                    disabled={loading}
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
+      {scanMode && !formOpen && !researchStartShown && <ResearchFormBar onOpen={() => setFormChoice(true)} />}
+      {scanMode && formOpen && (model.mode || unseeded) && <ResearchFormClose onClose={() => setFormChoice(false)} />}
+      <div hidden={scanMode && !formOpen ? true : undefined} className="mb-8 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+        <form onSubmit={submitResearch} className="space-y-4">
+          {/* Research type: one segmented control; the form still carries its value by name. */}
+          <div className="flex flex-col gap-1.5">
+            <span id="research-type-label" className={FIELD_LABEL_CLASSES}>{t.form.researchType}</span>
+            <input type="hidden" name="researchType" value={researchType} />
+            <Segmented
+              ariaLabel={t.form.researchType}
+              value={researchType}
+              onChange={(v) => setResearchType(v)}
+              className="max-w-full self-start overflow-x-auto"
+              options={[
+                { value: 'keyword', label: t.form.researchTypeKeyword, disabled: loading },
+                { value: 'url', label: t.form.researchTypeUrl, disabled: loading },
+                { value: 'keyword_url', label: t.form.researchTypeKeywordUrl, disabled: loading },
+              ]}
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Keyword — shown when keyword or keyword_url */}
             {(researchType === 'keyword' || researchType === 'keyword_url') && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t.form.keyword} *
-                </label>
-                <input
+                <Input
+                  id="research-keyword"
+                  label={t.form.keyword}
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder={t.form.keywordPlaceholder}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  aria-required="true"
                   disabled={loading}
                 />
               </div>
@@ -818,509 +1069,409 @@ export default function KeywordResearchPage() {
             {/* URL — shown when url or keyword_url */}
             {(researchType === 'url' || researchType === 'keyword_url') && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t.form.url} *
-                </label>
-                <input
+                <Input
+                  id="research-url"
+                  label={t.form.url}
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder={t.form.urlPlaceholder}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  aria-required="true"
                   disabled={loading}
                 />
               </div>
             )}
 
-            {/* Country */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.country}
-              </label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              >
-                {SUPPORTED_COUNTRIES.map((cc) => (
-                  <option key={cc} value={cc}>
-                    {t.countries[cc as keyof typeof t.countries]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Language */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.language}
-              </label>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              >
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {t.languages[lang as keyof typeof t.languages]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Minimum Monthly Searches */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.minMonthlySearches}
-              </label>
-              <input
-                type="number"
-                value={minMonthlySearches}
-                onChange={(e) => setMinMonthlySearches(Math.max(0, parseInt(e.target.value) || 0))}
-                min="0"
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              />
-            </div>
-
-            {/* Results Limit */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.resultsToShow}
-              </label>
-              <select
-                value={resultsLimit}
-                onChange={(e) => {
-                  const v = Number(e.target.value)
-                  if (v === 100 || v === 250) {
-                    setResultsLimit(v)
-                  }
-                }}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              >
-                <option value={100}>100</option>
-                <option value={250}>250</option>
-              </select>
-            </div>
+            <Select
+              id="research-country"
+              label={t.form.country}
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              disabled={loading}
+              options={SUPPORTED_COUNTRIES.map((cc) => ({ value: cc, label: t.countries[cc as keyof typeof t.countries] }))}
+            />
+            <Select
+              id="research-language"
+              label={t.form.language}
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              disabled={loading}
+              options={SUPPORTED_LANGUAGES.map((lang) => ({ value: lang, label: t.languages[lang as keyof typeof t.languages] }))}
+            />
+            <Input
+              id="research-min-searches"
+              label={t.form.minMonthlySearches}
+              type="number"
+              value={minMonthlySearches}
+              onChange={(e) => setMinMonthlySearches(Math.max(0, parseInt(e.target.value) || 0))}
+              min="0"
+              disabled={loading}
+            />
+            <Select
+              id="research-limit"
+              label={t.form.resultsToShow}
+              value={String(resultsLimit)}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                if (v === 100 || v === 250) {
+                  setResultsLimit(v)
+                }
+              }}
+              disabled={loading}
+              options={[{ value: '100', label: formatCount(100, language) }, { value: '250', label: formatCount(250, language) }]}
+            />
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={
-              loading ||
-              (researchType === 'keyword' && !keyword.trim()) ||
+          {/* Submit: the form's one primary action; while it cannot run, the line beside it says why. */}
+          {(() => {
+            const missing = (researchType === 'keyword' && !keyword.trim()) ||
               (researchType === 'url' && !url.trim()) ||
               (researchType === 'keyword_url' && (!keyword.trim() || !url.trim()))
-            }
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 size={18} className="animate-spin" />}
-            {loading ? t.form.searching : t.form.search}
-          </button>
+            return (
+              <div className="flex flex-col-reverse items-stretch gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-caption text-muted">{missing && !loading ? t.messages.needInput : ''}</p>
+                <Button type="submit" loading={loading} disabled={loading || missing} className="sm:min-w-44">
+                  {!loading && <Search aria-hidden="true" className="size-4" />}
+                  {loading ? t.form.searching : t.form.search}
+                </Button>
+              </div>
+            )
+          })()}
         </form>
       </div>
 
       {/* Error State */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-8">
-          <p className="text-red-800 dark:text-red-300">{error}</p>
-        </div>
-      )}
+      {error && <Notice tone="bad" className="mb-6">{error}</Notice>}
 
       {/* Few Results Warning */}
-      {fewResultsWarning && results.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-          <p className="text-amber-800 dark:text-amber-300 text-sm">{t.states.fewResults}</p>
-        </div>
-      )}
+      {fewResultsWarning && results.length > 0 && <Notice tone="warn" className="mb-4">{t.states.fewResults}</Notice>}
 
       {/* Filtered Out Warning */}
-      {filteredOutWarning && !fewResultsWarning && results.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
-          <p className="text-blue-800 dark:text-blue-300 text-sm">{t.states.filteredOut}</p>
+      {filteredOutWarning && !fewResultsWarning && results.length > 0 && <Notice tone="info" className="mb-4">{t.states.filteredOut}</Notice>}
+
+      {/* Easy battles to win: the best keywords of the research on screen. */}
+      {scanMode && model.mode && (
+        <div id="research-wins" className="scroll-mt-20">
+        <EasyWins
+          wins={model.wins.slice(0, EASY_WINS_SHOWN)}
+          total={model.wins.length}
+          adding={trackingKeys}
+          onTrack={trackKeyword}
+          onShowAll={model.mode === 'scan' ? showSuggestions : undefined}
+          lessRelated={scanSiteTopics ? model.lessRelatedWins : undefined}
+          covered={model.covered}
+        />
         </div>
       )}
 
+      {/* With the scan's research on screen: who the site competes with (one section),
+          then who searches for it. */}
+      {landscapeOn && competitorSection}
+      {landscapeOn && scanOn?.kind === 'seeded' && activeProjectId && (
+        <ResearchAudiences projectId={activeProjectId} keywords={scanOn.research.keywords} seed={seedLandscape} />
+      )}
+
+      {/* Search Console's source, where there is no table for it to sit in. */}
+      {scanMode && !tableVisible && <div className="mb-6">{gscNotice}</div>}
+
       {/* Results */}
-      {results.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
-          {/* Results Toolbar */}
-          <div className={`flex flex-col sm:flex-row gap-2 mb-4 justify-between items-start sm:items-center`}>
-            <div className={`text-sm font-medium text-slate-700 dark:text-slate-200`}>
-              {t.results.resultsCount}: <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span>
+      {tableVisible && (
+        <div id={scanMode ? 'research-table' : undefined} className={`rounded-card border border-line bg-surface p-5 shadow-card sm:p-6${scanMode ? ' scroll-mt-20' : ''}`}>
+          {/* The chips of the scan's research, and Search Console's source under them. */}
+          {scanMode && (
+            <div className="mb-4 space-y-3 scroll-mt-4">
+              <ResearchChips counts={model.counts} active={chip} onChange={chooseChip} google={googleChip} />
+              {gscNotice}
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {topOpportunities.length > 0 && (
-                <button
-                  onClick={() => setOpportunitiesOpen((v) => !v)}
-                  className="text-xs px-3 py-1 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors flex items-center gap-1"
-                  aria-expanded={opportunitiesOpen}
-                >
-                  <Sparkles size={14} />
-                  {opportunitiesOpen ? t.opportunities.hide : t.opportunities.show}
-                </button>
-              )}
-              <button
-                onClick={selectAll}
-                className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                {t.results.selectAll}
-              </button>
-              <button
-                onClick={deselectAll}
-                className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                {t.results.deselectAll}
-              </button>
-              {selectedKeywords.size > 0 && (
-                <>
-                  <button
-                    onClick={copySelected}
-                    className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
-                  >
-                    <Copy size={14} />
-                    {t.results.copySelected}
-                  </button>
-                  <button
-                    onClick={handleGenerateAIQuestions}
-                    disabled={!activeProject || generatingAIQuestions}
-                    className="text-xs px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors flex items-center gap-1"
-                    title={!selectedProject ? t.addToProject.errorSelectProject : ''}
-                  >
-                    {generatingAIQuestions ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={14} />
-                    )}
-                    {language === 'he' ? 'יצירת שאלות AI' : 'Create AI questions'}
-                  </button>
-                </>
-              )}
-            </div>
+          )}
+          {/* Results Toolbar: how many, and (for a research of its own) its suggestions. */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-caption text-muted">
+              {t.results.resultsCount}: <span className="font-semibold text-ink tabular-nums">{formatCount(tableSource.length, language)}</span>
+            </p>
+            {!scanMode && topOpportunities.length > 0 && (
+              <Button type="button" size="sm" variant="secondary" onClick={() => setOpportunitiesOpen((v) => !v)} aria-expanded={opportunitiesOpen}>
+                <Sparkles aria-hidden="true" className="size-4 text-action" />
+                {opportunitiesOpen ? t.opportunities.hide : t.opportunities.show}
+              </Button>
+            )}
           </div>
 
-          {/* AI Questions feedback — mismatch / empty state (neutral info, not error) */}
-          {aiQuestionsError && (
-            <div className={`flex items-start justify-between gap-3 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-              <span>{aiQuestionsError}</span>
-              <button
-                type="button"
-                onClick={() => setAIQuestionsError('')}
-                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                aria-label={language === 'he' ? 'סגירה' : 'Dismiss'}
-              >
-                ✕
-              </button>
+          {/* Opportunities Panel — opt-in, compact, no extra API calls */}
+          {!scanMode && opportunitiesOpen && topOpportunities.length > 0 && (
+            <section data-opportunities="" className="mb-4 rounded-inset border border-line bg-surface p-4">
+              <h3 className="text-copy font-semibold text-ink">{t.opportunities.title}</h3>
+              <p className="text-caption text-muted">{t.opportunities.subtitle}</p>
+              <ul className="mt-2 divide-y divide-line">
+                {topOpportunities.map((r, i) => {
+                  const isSelected = selectedKeywords.has(r.keyword)
+                  const badge = t.opportunities.badges[getBadgeKey(r)]
+                  const c = competitionCell(r, t.results.competitionLevel, t.results.competitionIndex)
+                  return (
+                    <li key={r.keyword} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-caption">
+                      <span className="w-5 shrink-0 text-muted tabular-nums">{formatCount(i + 1, language)}</span>
+                      <span className="min-w-0 flex-1 truncate text-copy font-medium text-ink" title={r.keyword}>{r.keyword}</span>
+                      <span className="whitespace-nowrap text-muted tabular-nums">
+                        {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined ? formatCount(r.avgMonthlySearches, language) : '—'} {t.opportunities.searches}
+                      </span>
+                      <CompetitionBadge c={c} />
+                      {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
+                        <span className="whitespace-nowrap text-muted tabular-nums">CPC {formatMoney(r.highTopOfPageBid, r.currency, language)}</span>
+                      )}
+                      <Badge variant="neutral">{badge}</Badge>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => selectKeywordFromOpportunity(r.keyword)} disabled={isSelected}>
+                        {isSelected && <Check aria-hidden="true" className="size-4" />}
+                        {isSelected ? t.opportunities.selected : t.opportunities.select}
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+
+          {/* Results Table (§6): a named checkbox per row, the difficulty in words, one
+              money format, figures end-aligned, the row's secondary actions behind "⋯". */}
+          <div className="relative -mx-5 overflow-x-auto sm:-mx-6" data-research-table-scroll="">
+            <table className="w-full text-copy">
+              <thead>
+                <tr className="h-10 border-y border-line bg-sunk/70 text-caption text-muted">
+                  <th className="w-10 ps-4 pe-1 text-start sm:ps-6 sm:pe-2">
+                    <Checkbox
+                      checked={selectedKeywords.size === tableSource.length && tableSource.length > 0}
+                      indeterminate={selectedKeywords.size > 0 && selectedKeywords.size < tableSource.length}
+                      onChange={(on) => (on ? selectAll() : deselectAll())}
+                      aria-label={t.results.selectAllRows}
+                    />
+                  </th>
+                  <th className="px-2.5 text-start font-semibold sm:px-4">
+                    {t.results.keyword}
+                  </th>
+                  {([
+                    // Below sm (a phone at 390) the table keeps the keyword, its searches and
+                    // the row's actions; potential, competition and the click prices return
+                    // from sm/md/lg, and on a phone the competition rides under the keyword.
+                    // There the keyword, its source line and these headers wrap instead of
+                    // truncating, so the three columns fit 390 without a sideways scroll.
+                    ['monthlySearches', t.results.monthlySearches, ''],
+                    ['opportunity', t.results.opportunity, 'hidden md:table-cell'],
+                    ['competition', t.results.competition, 'hidden sm:table-cell'],
+                    ['lowCpc', t.results.lowCpc, 'hidden lg:table-cell'],
+                    ['highCpc', t.results.highCpc, 'hidden sm:table-cell'],
+                  ] as const).map(([key, label, cls]) => {
+                    const numeric = key === 'monthlySearches' || key === 'lowCpc' || key === 'highCpc'
+                    return (
+                      <th key={key} className={`px-2.5 font-semibold sm:px-4 ${numeric ? 'text-end' : 'text-start'} ${cls}`} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                        <button
+                          type="button"
+                          onClick={() => handleSort(key)}
+                          title={key === 'opportunity' ? t.results.opportunityTooltip : undefined}
+                          aria-label={t.table.sortBy(label)}
+                          className={`inline-flex items-center gap-1 rounded-control text-start transition-colors sm:whitespace-nowrap duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 ${sortBy === key ? 'text-ink' : ''}`}
+                        >
+                          {label}
+                          {sortIndicator(key)}
+                        </button>
+                      </th>
+                    )
+                  })}
+                  <th className="px-2.5 pe-4 text-end font-semibold sm:px-4 sm:pe-6">
+                    <span className="sr-only">{t.results.action}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y divide-line${rowsEnter ? ' rows-enter' : ''}`}>
+                {sortedResults.slice(0, shownRows).map((result, idx) => {
+                  const badge = getOpportunityBadgeInfo(result, t.results.potentialLevel)
+                  const competition = competitionCell(result, t.results.competitionLevel, t.results.competitionIndex)
+                  const selected = selectedKeywords.has(result.keyword)
+                  return (
+                  <tr key={idx} data-selected={selected || undefined} className={`h-14 transition-[background-color,box-shadow] duration-150 ease-snappy [&>td:first-child]:transition-shadow ${selected ? 'bg-action-soft ltr:[&>td:first-child]:shadow-edge-ltr rtl:[&>td:first-child]:shadow-edge-rtl' : 'hover:bg-action-soft/40 ltr:hover:[&>td:first-child]:shadow-edge-ltr rtl:hover:[&>td:first-child]:shadow-edge-rtl'}`}>
+                    <td className="w-10 ps-4 pe-1 sm:ps-6 sm:pe-2">
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => toggleKeyword(result.keyword)}
+                        aria-label={t.results.selectKeyword(result.keyword)}
+                      />
+                    </td>
+                    <td className="max-w-72 px-2.5 py-3 text-start sm:px-4">
+                      <span className="block break-words font-medium text-ink sm:truncate" title={result.keyword}>{result.keyword}</span>
+                      {scanMode && sourceLineFor(result.keyword)}
+                      {competition.variant && (
+                        <span data-phone-meta="" className="mt-1 flex sm:hidden"><CompetitionBadge c={competition} /></span>
+                      )}
+                    </td>
+                    <td className="px-2.5 py-3 text-end tabular-nums text-body sm:px-4">
+                      {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? (
+                        <span className="inline-flex flex-col items-end gap-1">
+                          <span className="font-semibold text-ink">{formatCount(result.avgMonthlySearches, language)}</span>
+                          {/* The row's searches against the table's largest: a quiet bar under the figure. */}
+                          <span aria-hidden="true" className="hidden h-1 w-16 overflow-hidden rounded-pill bg-sunk sm:block">
+                            <span className="grow-x block h-full rounded-pill bg-action/60" style={{ width: `${Math.max(4, Math.round((result.avgMonthlySearches / maxVolume) * 100))}%` }} />
+                          </span>
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="hidden px-4 py-3 text-start md:table-cell">
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-start sm:table-cell">
+                      <CompetitionBadge c={competition} />
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-end tabular-nums text-body lg:table-cell">
+                      {result.lowTopOfPageBid ? formatMoney(result.lowTopOfPageBid, result.currency, language) : '—'}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-end tabular-nums text-body sm:table-cell">
+                      {result.highTopOfPageBid ? formatMoney(result.highTopOfPageBid, result.currency, language) : '—'}
+                    </td>
+                    <td className="px-2.5 py-3 pe-4 sm:px-4 sm:pe-6">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* One click to track this keyword: the same request and quota check as "easy wins". */}
+                        {scanMode && ((result as ResearchRow).tracked ? (
+                          <span data-row-tracked="" className="inline-flex h-8 items-center gap-1 whitespace-nowrap px-2 text-caption font-semibold text-ok sm:px-3">
+                            <Check aria-hidden="true" className="size-4" /><span className="max-sm:sr-only">{ti.tracked}</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            data-row-track=""
+                            onClick={() => trackKeyword(result as ResearchRow)}
+                            disabled={trackingKeys.has(keywordKey(result.keyword))}
+                            aria-label={ti.trackAria(result.keyword)}
+                            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-2 text-caption sm:px-3 font-semibold text-action transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 disabled:opacity-50"
+                          >
+                            {trackingKeys.has(keywordKey(result.keyword)) ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Plus aria-hidden="true" className="size-4" />}
+                            <span className="max-sm:sr-only">{trackingKeys.has(keywordKey(result.keyword)) ? ti.tracking : ti.track}</span>
+                          </button>
+                        ))}
+                        <RowMenu
+                          label={t.table.rowMenu(result.keyword)}
+                          items={[
+                            { key: 'trend', label: t.trend.title, icon: <TrendingUp aria-hidden="true" className="size-4" />, onSelect: () => handleOpenTrendModal(result.keyword) },
+                            { key: 'copy', label: t.results.copy, icon: <Copy aria-hidden="true" className="size-4" />, onSelect: () => copyKeyword(result.keyword) },
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {scanMode && sortedResults.length === 0 && (
+            <p className="py-8 text-center text-copy text-muted">{ts.chips.empty}</p>
+          )}
+          {sortedResults.length > shownRows && (
+            <div className="mt-4 flex justify-center">
+              <Button type="button" variant="secondary" onClick={() => setShownRows((n) => n + TABLE_PAGE)}>
+                {ts.table.showMore(
+                  formatCount(Math.min(TABLE_PAGE, sortedResults.length - shownRows), language),
+                  formatCount(sortedResults.length - shownRows, language),
+                )}
+              </Button>
             </div>
           )}
 
-          {/* Add to Project Section — visible whenever at least one keyword is selected,
-              OR a success/error message is still showing from the last action. */}
-          {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError) && (
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
-              <div className={`mb-3 font-semibold text-blue-900 dark:text-blue-100 flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                <span>
-                  {t.addToProject.sectionTitle} ({selectedKeywords.size})
-                </span>
-                {(addToProjectMessage || addToProjectError) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddToProjectMessage('')
-                      setAddToProjectError('')
-                      setLastAddedProjectId('')
-                    }}
-                    className="text-xs font-normal text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline"
-                  >
-                    {language === 'he' ? 'סגירה' : 'Dismiss'}
-                  </button>
-                )}
-              </div>
-
-              {selectedKeywords.size > 0 && projects.length === 0 && !projectsLoading && (
-                <div className="text-sm text-slate-700 dark:text-slate-300 p-3 bg-white dark:bg-slate-800 rounded">
-                  {t.addToProject.noProjects}
-                </div>
+          {/* The selection's actions (§6): only while something is selected (or its
+              last result is still being said), pinned to the bottom of the view, at
+              most three actions; what they came to is said right above them. */}
+          {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError || aiQuestionsError) && (
+            <div data-bulk-bar="" className="sticky bottom-4 z-20 mt-4 space-y-2">
+              {aiQuestionsError && (
+                <Notice tone="info" onDismiss={() => setAIQuestionsError('')}>{aiQuestionsError}</Notice>
               )}
-
-              {selectedKeywords.size > 0 && projectsLoading && (
-                <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin" />
-                  {t.addToProject.projectsLoading}
-                </div>
-              )}
-
-              {selectedKeywords.size > 0 && projects.length > 0 && !projectsLoading && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      {/* The project is the one the top bar names; switching it
-                          there changes where these keywords go. */}
-                      <span className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t.addToProject.projectLabel}
-                      </span>
-                      <p className="w-full truncate px-4 py-2 rounded-lg border border-line bg-sunk text-ink">
-                        {activeProjectName}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                        {t.addToProject.engineLabel}
-                      </label>
-                      <select
-                        value={engineType}
-                        onChange={(e) => setEngineType(e.target.value as 'google_search' | 'google_maps')}
-                        className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                        disabled={addingToProject}
-                      >
-                        <option value="google_search">{t.addToProject.engineGoogleOrganic}</option>
-                        <option value="google_maps">{t.addToProject.engineGoogleMaps}</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        onClick={handleAddToProject}
-                        disabled={!selectedProject || addingToProject}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                      >
-                        {addingToProject && <Loader2 size={18} className="animate-spin" />}
-                        {addingToProject
-                          ? language === 'he'
-                            ? 'מוסיף ביטויים לפרויקט...'
-                            : 'Adding keywords to project...'
-                          : t.addToProject.addButton}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
               {addToProjectError && (
-                <div className={`text-sm text-red-600 dark:text-red-400 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                  {addToProjectError}
-                </div>
+                <Notice tone="bad" onDismiss={() => setAddToProjectError('')}>{addToProjectError}</Notice>
               )}
               {addToProjectMessage && (
-                <div className={`flex flex-col sm:flex-row sm:items-center gap-3 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
-                  <div className={`text-sm text-green-700 dark:text-green-400 flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <CheckCircle size={16} />
-                    <span>{addToProjectMessage}</span>
-                  </div>
-                  {lastAddedProjectId && (
-                    <Link
-                      href={`/keywords?projectId=${encodeURIComponent(lastAddedProjectId)}`}
-                      className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                <Notice
+                  tone="ok"
+                  onDismiss={() => { setAddToProjectMessage(''); setLastAddedProjectId('') }}
+                  action={lastAddedProjectId ? { label: t.addToProject.goToProject, onClick: () => router.push(`/keywords?projectId=${encodeURIComponent(lastAddedProjectId)}`) } : null}
+                >
+                  {addToProjectMessage}
+                </Notice>
+              )}
+              {selectedKeywords.size > 0 && (
+                <div role="region" aria-label={t.bulk.label} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-inset bg-contrast px-4 py-3 text-contrast-ink shadow-pop">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={deselectAll}
+                      aria-label={t.bulk.clear}
+                      title={t.bulk.clear}
+                      className="grid size-8 shrink-0 place-items-center rounded-control text-contrast-ink/80 transition-colors duration-150 ease-snappy hover:bg-contrast-ink/10 hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/40"
                     >
-                      {t.addToProject.goToProject}
-                    </Link>
+                      <X aria-hidden="true" className="size-4" />
+                    </button>
+                    <div className="min-w-0">
+                      <p className="text-copy font-semibold tabular-nums">{t.bulk.selected(formatCount(selectedKeywords.size, language))}</p>
+                      {activeProjectName && <p className="truncate text-caption text-contrast-ink/70">{t.bulk.project(activeProjectName)}</p>}
+                    </div>
+                  </div>
+
+                  {projects.length === 0 && !projectsLoading ? (
+                    <p className="text-caption text-contrast-ink/80">{t.addToProject.noProjects}</p>
+                  ) : projectsLoading ? (
+                    <p className="inline-flex items-center gap-2 text-caption text-contrast-ink/80">
+                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                      {t.addToProject.projectsLoading}
+                    </p>
+                  ) : (
+                    <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                      <Segmented
+                        ariaLabel={t.addToProject.engineLabel}
+                        value={engineType}
+                        onChange={(v) => setEngineType(v)}
+                        options={[
+                          { value: 'google_search', label: t.addToProject.engineGoogleOrganic, disabled: addingToProject },
+                          { value: 'google_maps', label: t.addToProject.engineGoogleMaps, disabled: addingToProject },
+                        ]}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={copySelected}
+                        className="text-contrast-ink hover:bg-contrast-ink/10 hover:text-contrast-ink"
+                      >
+                        <Copy aria-hidden="true" className="size-4" />
+                        {t.bulk.copy}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleGenerateAIQuestions}
+                        disabled={!activeProject || generatingAIQuestions}
+                        title={selectedKeywords.size > 1 ? t.bulk.aiQuestionsHint : undefined}
+                        className="text-contrast-ink hover:bg-contrast-ink/10 hover:text-contrast-ink"
+                      >
+                        {generatingAIQuestions ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}
+                        {t.bulk.aiQuestions}
+                      </Button>
+                      <Button type="button" size="sm" onClick={handleAddToProject} loading={addingToProject} disabled={!selectedProject || addingToProject}>
+                        {!addingToProject && <Plus aria-hidden="true" className="size-4" />}
+                        {addingToProject ? t.bulk.adding : t.addToProject.addButton}
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
             </div>
           )}
-
-          {/* Opportunities Panel — opt-in, compact, no extra API calls */}
-          {opportunitiesOpen && topOpportunities.length > 0 && (
-            <div className="mb-4 p-3 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
-              <div className={`mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  {t.opportunities.title}
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  {t.opportunities.subtitle}
-                </p>
-              </div>
-              <ul className="divide-y divide-amber-100 dark:divide-amber-900/30">
-                {topOpportunities.map((r, i) => {
-                  const isSelected = selectedKeywords.has(r.keyword)
-                  const badge = t.opportunities.badges[getBadgeKey(r)]
-                  return (
-                    <li
-                      key={r.keyword}
-                      className={`flex items-center flex-wrap gap-x-3 gap-y-1 py-1.5 text-xs ${isRTL ? 'flex-row-reverse text-right' : ''}`}
-                    >
-                      <span className="text-slate-500 dark:text-slate-400 font-mono w-5 shrink-0">
-                        {i + 1}.
-                      </span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100 truncate min-w-0 flex-1">
-                        {r.keyword}
-                      </span>
-                      <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {r.avgMonthlySearches?.toLocaleString() ?? '—'} {t.opportunities.searches}
-                      </span>
-                      <span className={`whitespace-nowrap ${competitionColor(r.competition)}`}>
-                        {r.competition ?? '—'}
-                      </span>
-                      {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
-                        <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                          CPC {r.highTopOfPageBid.toFixed(2)} {r.currency}
-                        </span>
-                      )}
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 whitespace-nowrap text-[10px] font-medium">
-                        {badge}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => selectKeywordFromOpportunity(r.keyword)}
-                        disabled={isSelected}
-                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white text-[11px] font-medium transition-colors whitespace-nowrap"
-                      >
-                        {isSelected ? t.opportunities.selected : t.opportunities.select}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )}
-
-          {/* Results Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100 w-6">
-                    <input
-                      type="checkbox"
-                      checked={selectedKeywords.size === results.length && results.length > 0}
-                      onChange={(e) => (e.target.checked ? selectAll() : deselectAll())}
-                      className="rounded"
-                    />
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    {t.results.keyword}
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('monthlySearches')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'monthlySearches' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.monthlySearches}
-                      <span className="text-xs">{sortIndicator('monthlySearches')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100 hidden sm:table-cell`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('opportunity')}
-                      title={t.results.opportunityTooltip}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'opportunity' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.opportunity}
-                      <span className="text-xs">{sortIndicator('opportunity')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('competition')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'competition' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.competition}
-                      <span className="text-xs">{sortIndicator('competition')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('lowCpc')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'lowCpc' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.lowCpc}
-                      <span className="text-xs">{sortIndicator('lowCpc')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSort('highCpc')}
-                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'highCpc' ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {t.results.highCpc}
-                      <span className="text-xs">{sortIndicator('highCpc')}</span>
-                    </button>
-                  </th>
-                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    {t.results.action}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedResults.map((result, idx) => (
-                  <tr key={idx} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedKeywords.has(result.keyword)}
-                        onChange={() => toggleKeyword(result.keyword)}
-                        className="rounded"
-                      />
-                    </td>
-                    <td className={`px-4 py-3 text-slate-900 dark:text-slate-100 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.keyword}
-                    </td>
-                    <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.avgMonthlySearches?.toLocaleString() ?? '—'}
-                    </td>
-                    <td className={`px-4 py-3 hidden sm:table-cell ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {(() => {
-                        const badge = getOpportunityBadgeInfo(result, language as 'he' | 'en')
-                        return (
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${badge.colorClass}`}>
-                            {badge.label}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td className={`px-4 py-3 ${competitionColor(result.competition)} ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.competition ?? '—'}
-                      {result.competitionIndex && <span className="text-xs ml-1">({result.competitionIndex})</span>}
-                    </td>
-                    <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.lowTopOfPageBid ? `${result.lowTopOfPageBid.toFixed(2)} ${result.currency}` : '—'}
-                    </td>
-                    <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {result.highTopOfPageBid ? `${result.highTopOfPageBid.toFixed(2)} ${result.currency}` : '—'}
-                    </td>
-                    <td className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        <button
-                          onClick={() => copyKeyword(result.keyword)}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
-                        >
-                          <Copy size={16} />
-                          <span className="text-xs">{t.results.copy}</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenTrendModal(result.keyword)}
-                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 flex items-center gap-1 transition-colors"
-                        >
-                          <TrendingUp size={16} />
-                          <span className="text-xs">{t.trend.button}</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 
       {/* Empty State */}
-      {!loading && results.length === 0 && !error && (
-        <div className={`text-center py-12 text-slate-500 dark:text-slate-400`}>
-          <p>{t.states.empty}</p>
-        </div>
+      {!scanMode && !loading && results.length === 0 && !error && (
+        <EmptyState icon={<Search />} title={t.states.empty} />
       )}
+
+      {/* Every other screen (no scan, the empty start, a manual search): the same
+          competitor section, after the results. */}
+      {!landscapeOn && competitorSection && <div data-competitive-after="" className="mt-6">{competitorSection}</div>}
 
       {/* Internal/dev-only raw Search Console opportunity browser (Stage E2A/E2B) —
           behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. It is a diagnostic, never the
