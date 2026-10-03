@@ -51,7 +51,7 @@ import {
   type HostAdmission,
 } from '@/lib/free-check'
 import { generateProjectEnrichmentQuestions, type FallbackQuestionResponse } from '@/lib/ai-visibility/gemini-semantic-classifier'
-import { normalizeLanguage, QUESTION_GENERATION_VERSION } from '@/lib/ai-visibility/prompt-templates'
+import { normalizeLanguage, toBilingualPromptLanguage, QUESTION_GENERATION_VERSION } from '@/lib/ai-visibility/prompt-templates'
 import {
   containsBusinessNameInQuotes,
   containsDirectAddress,
@@ -938,7 +938,10 @@ async function b5(ctx: StageBContext): Promise<StepOutcome> {
     excludedTerms: base.excludedTerms,
     businessCategory: base.businessCategory,
   }
-  const language = normalizeLanguage(project.language)
+  // The seed scan's question generator and its keeper are still bilingual, so
+  // Spanish is narrowed to ENGLISH here rather than falling through their
+  // `language === 'en' ? … : …` seeds, which answer HEBREW for everything else.
+  const language = toBilingualPromptLanguage(normalizeLanguage(project.language))
   const businessName = project.business_name || ctx.summary.business?.companyName || null
   const allowedLocations = extractAllowedLocations(row)
   if (!(await ctx.save({ attempted: true }))) return ABORT

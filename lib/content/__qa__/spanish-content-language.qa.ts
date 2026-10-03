@@ -128,8 +128,11 @@ function main() {
 
   // ── 9) The layers that are NOT Spanish-aware yet fall back to ENGLISH ────
   check('9. toHebrewOrEnglish sends Spanish to English, never to Hebrew', toHebrewOrEnglish('es') === 'en')
-  check('9a. the AI-visibility templates treat a Spanish project as English (latin script)',
-    normalizeLanguage('es') === 'en' && normalizeLanguage('es-MX') === 'en')
+  // The AI-visibility templates used to answer 'en' here, because Spanish had
+  // no bank of its own. It has one now, and its own labels, reasons and
+  // quality rules — lib/ai-visibility/__qa__/spanish-questions.qa.ts owns that.
+  check('9a. the AI-visibility templates now generate Spanish in its own language',
+    normalizeLanguage('es') === 'es' && normalizeLanguage('es-MX') === 'es')
   check('9b. MUTATION CONTROL — a Hebrew project is still Hebrew there, and an unknown one still falls back',
     normalizeLanguage('he') === 'he' && normalizeLanguage('ar') === 'he')
 

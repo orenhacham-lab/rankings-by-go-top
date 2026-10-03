@@ -50,7 +50,7 @@ import { engineSupportsCountry } from '@/lib/ai-visibility/providers/scrapellm'
 import { dropOffTopicSuggestions, type ProjectVocabulary } from '@/lib/ai-visibility/question-relevance'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { UserFacingError, apiErrorText, isUserFacingError } from '@/lib/i18n/user-facing-error'
-import { generatePromptSuggestions, buildFallbackSuggestions, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile, type PromptLanguage } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
@@ -589,7 +589,7 @@ export default function AIVisibilitySection({
     })
     // project.language is the source of truth — an English project shown in a
     // Hebrew UI must still produce English questions (and vice-versa).
-    const lang: 'he' | 'en' = normalizeLanguage(projectLanguage)
+    const lang: PromptLanguage = normalizeLanguage(projectLanguage)
     // Filter vNext questions safely — ensure prompt field is valid string
     let vNextFiltered = suggestions.filter((q) => {
       const promptText = q?.prompt ?? ''
