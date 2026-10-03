@@ -231,7 +231,7 @@ async function main() {
     check('C4-MUT: a hero that is never told fails C4', !wired(section, page.replace('onAllowanceOut: setAllowanceOut', '')))
     const i18n = read('lib/ai-visibility/i18n.ts')
     check('C5: the allowance line no longer says "this billing period" (a trial has no period)',
-      /ai_allowance: \{ he: 'בדיקות AI שנוצלו', en: 'AI checks used' \}/.test(i18n) && !/במחזור החיוב הזה/.test(i18n))
+      /ai_allowance: \{ he: 'בדיקות AI שנוצלו', en: 'AI checks used'[^}]*\}/.test(i18n) && !/במחזור החיוב הזה/.test(i18n))
   }
 
   say('\nD) the tab enters like every other app screen (P2-17)')

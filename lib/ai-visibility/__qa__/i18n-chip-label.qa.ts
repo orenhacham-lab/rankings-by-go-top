@@ -53,9 +53,13 @@ function main() {
 
   // ── Source contracts ──
   const i18nSrc = read('lib/ai-visibility/i18n.ts')
-  check('SRC: starter_questions present in STRINGS with he + en', /starter_questions:\s*\{\s*he:\s*'.+',\s*en:\s*'.+'\s*\}/.test(i18nSrc))
+  check('SRC: starter_questions present in STRINGS with he + en', /starter_questions:\s*\{\s*he:\s*'.+',\s*en:\s*'[^']+'/.test(i18nSrc))
   const i18nCode = i18nSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-  check('SRC: global t() left UNGUARDED (still entry.he/.en, no missing-key swallow)', /const entry = STRINGS\[key\]\s*\n?\s*return heb \? entry\.he : entry\.en/.test(i18nCode) && !/entry\?\.|STRINGS\[key\] \?\?|if \(!entry\)/.test(i18nCode))
+  // Spanish reads `entry.es` and falls back to `entry.en`, which is the same
+  // shape: an unknown KEY still reaches `entry.he`/`entry.en` on undefined and
+  // throws, so a missing translation keeps surfacing. What must never appear is
+  // a swallow of the entry itself.
+  check('SRC: global t() left UNGUARDED (no missing-key swallow)', /const entry = STRINGS\[key\][^\n]*\n\s*if \(heb\) return entry\.he\n\s*return \(spa && entry\.es\) \|\| entry\.en/.test(i18nCode) && !/entry\?\.|STRINGS\[key\] \?\?|if \(!entry\)/.test(i18nCode))
 
   const compSrc = read('components/ai-visibility/PromptSuggestions.tsx')
   const compCode = compSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')

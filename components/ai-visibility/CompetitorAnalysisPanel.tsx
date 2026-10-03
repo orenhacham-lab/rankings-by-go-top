@@ -96,7 +96,7 @@ type AnalysisResponse = {
 }
 
 export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: { projectId: string; refreshKey?: number }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = useMemo(() => createI18n(uiLocale), [uiLocale])
 
   const [data, setData] = useState<AnalysisResponse | null>(null)
