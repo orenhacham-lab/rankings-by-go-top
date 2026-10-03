@@ -14,9 +14,9 @@
  * failure is swallowed — a visitor is not shown an error because our audit
  * trail had a bad minute, and a refusal is still honoured locally.
  */
-import type { ConsentRecord } from './categories'
+import type { ConsentLocale, ConsentRecord } from './categories'
 
-export function reportConsent(record: ConsentRecord, locale: 'he' | 'en'): void {
+export function reportConsent(record: ConsentRecord, locale: ConsentLocale): void {
   const body = JSON.stringify({
     consentId: record.id,
     policyVersion: record.policy,

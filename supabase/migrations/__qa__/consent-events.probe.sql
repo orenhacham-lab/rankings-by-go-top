@@ -136,6 +136,14 @@ BEGIN
     try_as('service_role', ins || $q$) VALUES ('c1', '2026-10-03', 'implied_by_browsing', '{"necessary":true}'::jsonb) RETURNING id::text$q$) LIKE 'denied:23514');
   PERFORM chk('limits', 'a locale we do not publish is refused',
     try_as('service_role', ins || $q$, locale) VALUES ('c2', '2026-10-03', 'accept_all', '{"necessary":true}'::jsonb, 'fr') RETURNING id::text$q$) LIKE 'denied:23514');
+  -- Every language the public site can serve must be storable, or a decision
+  -- taken in it is refused by the constraint and the proof is lost. These are
+  -- CONSENT_LOCALES in lib/consent/categories.ts; 'es' is listed before the
+  -- Spanish site is public precisely so it cannot launch into a silent gap.
+  PERFORM chk('limits', 'every language the site publishes can be recorded',
+    try_as('service_role', ins || $q$, locale) VALUES ('c2he', '2026-10-03', 'accept_all', '{"necessary":true}'::jsonb, 'he') RETURNING id::text$q$) LIKE 'ok:%'
+    AND try_as('service_role', ins || $q$, locale) VALUES ('c2en', '2026-10-03', 'accept_all', '{"necessary":true}'::jsonb, 'en') RETURNING id::text$q$) LIKE 'ok:%'
+    AND try_as('service_role', ins || $q$, locale) VALUES ('c2es', '2026-10-03', 'accept_all', '{"necessary":true}'::jsonb, 'es') RETURNING id::text$q$) LIKE 'ok:%');
   PERFORM chk('limits', 'categories must be a JSON object, not a bare string',
     try_as('service_role', ins || $q$) VALUES ('c3', '2026-10-03', 'accept_all', '"all"'::jsonb) RETURNING id::text$q$) LIKE 'denied:23514');
   PERFORM chk('limits', 'an over-long user agent is refused',

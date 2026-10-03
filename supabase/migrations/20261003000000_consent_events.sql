@@ -16,7 +16,10 @@
 --     policy_version     the cookie disclosure the visitor was actually shown
 --     action             accept_all | reject_all | custom | withdraw | gpc
 --     categories         {"necessary":true,"analytics":bool,"marketing":bool}
---     locale             which language the disclosure was read in
+--     locale             which language the disclosure was read in. Mirrors
+--                        CONSENT_LOCALES in lib/consent/categories.ts; a new
+--                        public language goes in that list first, then here,
+--                        or the decision is refused and the proof is lost
 --     page_path          where on the site the decision was made
 --     ip_hash            sha256(salt || ip). NOT the address. Data minimisation
 --                        (GDPR Art. 5(1)(c)): enough to show two decisions came
@@ -62,7 +65,7 @@ CREATE TABLE IF NOT EXISTS public.consent_events (
   CONSTRAINT consent_events_policy_version  CHECK (length(policy_version) BETWEEN 1 AND 40),
   CONSTRAINT consent_events_action          CHECK (action IN ('accept_all','reject_all','custom','withdraw','gpc')),
   CONSTRAINT consent_events_categories      CHECK (jsonb_typeof(categories) = 'object'),
-  CONSTRAINT consent_events_locale          CHECK (locale IN ('he','en')),
+  CONSTRAINT consent_events_locale          CHECK (locale IN ('he','en','es')),
   CONSTRAINT consent_events_page_path       CHECK (page_path IS NULL OR length(page_path) <= 300),
   CONSTRAINT consent_events_ip_hash         CHECK (ip_hash IS NULL OR length(ip_hash) <= 80),
   CONSTRAINT consent_events_user_agent      CHECK (user_agent IS NULL OR length(user_agent) <= 400)

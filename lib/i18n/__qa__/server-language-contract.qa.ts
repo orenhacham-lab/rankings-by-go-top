@@ -331,12 +331,17 @@ async function main() {
 
         // /signup, the other reachable auth surface.
         const signupEn = visible(await rawBody('/signup', { acceptLanguage: 'en-US,en;q=0.9' }))
+        // 'Create your' and not the full heading: the page says 'Create your free
+        // account', and pinning the exact wording made this check unpassable on
+        // main for as long as it has existed. The language contract is what is
+        // under test here, so what it asserts is English heading + no Hebrew.
+        const SIGNUP_EN_HEADING = /Create your [\w ]*account/
         check('3F-i: /signup is English for an English request',
-          signupEn.includes('Create your account') && !/[\u0590-\u05FF]/.test(signupEn),
+          SIGNUP_EN_HEADING.test(signupEn) && !/[\u0590-\u05FF]/.test(signupEn),
           (signupEn.match(/[\u0590-\u05FF][^<]{0,30}/g) ?? []).slice(0, 4).join(' | '))
         const signupHe = visible(await rawBody('/signup', { acceptLanguage: 'he-IL,he;q=0.9' }))
         check('3F-j: …and Hebrew for a Hebrew request',
-          /[\u0590-\u05FF]/.test(signupHe) && !signupHe.includes('Create your account'))
+          /[\u0590-\u05FF]/.test(signupHe) && !SIGNUP_EN_HEADING.test(signupHe))
       }
 
       console.log('\n3C) METADATA FOLLOWS THE DOCUMENT — raw <title> off the wire')

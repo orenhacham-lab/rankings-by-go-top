@@ -28,6 +28,7 @@ import { NextResponse } from 'next/server'
 import {
   isConsentAction,
   normalizeChoices,
+  normalizeConsentLocale,
   type ConsentAction,
   type ConsentChoices,
 } from '@/lib/consent/categories'
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
 
   const action: ConsentAction = payload.action
   const categories: ConsentChoices = normalizeChoices(payload.categories)
-  const locale = payload.locale === 'en' ? 'en' : 'he'
+  const locale = normalizeConsentLocale(payload.locale)
   const ipHash = hashedClient(request.headers)
 
   if (throttled(ipHash)) return done()

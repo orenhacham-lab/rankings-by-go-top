@@ -47,6 +47,31 @@ export const CONSENT_ACTIONS = ['accept_all', 'reject_all', 'custom', 'withdraw'
 export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
 
 /**
+ * The languages a disclosure can be read in, and therefore the languages a
+ * decision can be RECORDED against. Part of the proof: Art. 7(1) is about
+ * showing what this visitor was actually shown, so a decision taken on a
+ * Spanish page must not be filed as having been read in Hebrew.
+ *
+ * `es` is here before the Spanish site is public on purpose. The public site
+ * already serves /es on preview, and the log's CHECK constraint lists exactly
+ * these values — so a Spanish visitor's decision would otherwise either be
+ * mislabelled or be rejected by the database and silently lost, which is the
+ * one failure this table exists to prevent. Any new public language has to be
+ * added here AND to the constraint in
+ * supabase/migrations/20261003000000_consent_events.sql, in that order.
+ */
+export const CONSENT_LOCALES = ['he', 'en', 'es'] as const
+
+export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
+
+/** Fail-safe, not fail-closed: an unknown language still records the decision, under the default. */
+export function normalizeConsentLocale(value: unknown): ConsentLocale {
+  return typeof value === 'string' && (CONSENT_LOCALES as readonly string[]).includes(value)
+    ? (value as ConsentLocale)
+    : 'he'
+}
+
+/**
  * The version of the cookie disclosure the visitor was shown. Bump it whenever
  * the categories change or a new vendor joins one of them: a record carries the
  * version it was given against, and a visitor whose stored version is older
