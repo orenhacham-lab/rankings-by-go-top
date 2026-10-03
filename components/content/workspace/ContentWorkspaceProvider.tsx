@@ -63,8 +63,8 @@ function useWorkspaceValue() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).contentHub, [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub, [uiLocale])
   const isHebrew = language === 'he'
   const toast = useToasts()
 
@@ -332,7 +332,7 @@ function useWorkspaceValue() {
   return {
     // identity + i18n
     projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects,
-    language, t, isHebrew, toast,
+    language, uiLocale, t, isHebrew, toast,
     // overview
     data, overviewSettled, loading, counts, activePlatform, isShopify, isSite, exportedIdOf, load, patchArticle, shopifyPublishError,
     // topics

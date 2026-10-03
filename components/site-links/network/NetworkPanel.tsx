@@ -73,8 +73,8 @@ export function networkState(data: Pick<AvailableNetwork, 'membership' | 'readin
 }
 
 export default function NetworkPanel({ projectId, data, onChanged }: { projectId: string; data: AvailableNetwork; onChanged: () => void }) {
-  const { language } = useDashboardLanguage()
-  const copy = getDashboardDictionary(language).siteLinks.network
+  const { language, uiLocale } = useDashboardLanguage()
+  const copy = getDashboardDictionary(uiLocale).siteLinks.network
   const { confirm, dialog } = useConfirm()
   const { toasts, dismiss, error: toastError } = useToasts()
   const [consentOpen, setConsentOpen] = useState(false)

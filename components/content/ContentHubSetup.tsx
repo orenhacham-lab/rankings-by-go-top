@@ -44,8 +44,8 @@ export default function ContentHubSetup({
   platformFailed?: boolean
   shopifyNeedsScope?: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = useMemo(() => getDashboardDictionary(language), [language])
+  const { uiLocale } = useDashboardLanguage()
+  const dict = useMemo(() => getDashboardDictionary(uiLocale), [uiLocale])
   const s = dict.contentHub.setup
 
   const { view } = useGscStatus(projectId)

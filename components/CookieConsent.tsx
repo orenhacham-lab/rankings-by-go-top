@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Cookie } from 'lucide-react'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { publicUiLocale } from '@/lib/i18n/request-locale'
+import { getLocaleConfig } from '@/lib/i18n/locales'
 import {
   CONSENT_DENIED,
   CONSENT_GRANTED,
@@ -66,9 +68,14 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
   const [panelOpen, setPanelOpen] = useState(false)
   const [choices, setChoices] = useState<ConsentChoices>(CONSENT_DENIED)
 
-  const isEnglish = pathname === '/en' || !!pathname?.startsWith('/en/')
-  const t = getPublicDictionary(isEnglish ? 'en' : 'he').cookie
-  const privacyLink = isEnglish ? '/en/privacy' : '/privacy'
+  // Three public languages, not two: the notice has to speak the language of
+  // the page it interrupts, and the decision has to be logged under it
+  // (CONSENT_LOCALES already lists 'es'). Where the old flag was really asking
+  // about writing direction rather than about English, `ltr` now answers.
+  const locale = publicUiLocale(pathname)
+  const ltr = getLocaleConfig(locale).dir === 'ltr'
+  const t = getPublicDictionary(locale).cookie
+  const privacyLink = locale === 'he' ? '/privacy' : `/${locale}/privacy`
 
   useEffect(() => {
     setIsClient(true)
@@ -83,11 +90,11 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       // do not interrupt them with a question they have answered.
       const record = writeConsent('gpc', CONSENT_DENIED)
       setChoices(record.categories)
-      reportConsent(record, isEnglish ? 'en' : 'he')
+      reportConsent(record, locale)
       return
     }
     setIsVisible(true)
-  }, [isEnglish])
+  }, [locale])
 
   // The footer's "Cookie settings" link, and anything else on the page, opens
   // the dialog through one window event, so a visitor can withdraw from any
@@ -115,9 +122,9 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       setChoices(record.categories)
       setIsVisible(false)
       setPanelOpen(false)
-      reportConsent(record, isEnglish ? 'en' : 'he')
+      reportConsent(record, locale)
     },
-    [isEnglish]
+    [locale]
   )
 
   const handleAccept = () => decide('accept_all', CONSENT_GRANTED)
@@ -170,7 +177,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
   return (
     <>
       {isVisible ? (
-        <div dir={isEnglish ? 'ltr' : 'rtl'} role="dialog" aria-label={t.aria} data-cookie-consent>
+        <div dir={getLocaleConfig(locale).dir} role="dialog" aria-label={t.aria} data-cookie-consent>
           {/* Phone: ultra compact, 240px, no title, lifted above the contact bar */}
           <div
             data-cookie-compact
@@ -180,7 +187,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
           >
             <p className="m-0 text-center text-caption leading-tight text-contrast-ink/80">
               {t.short}
-              {isEnglish ? ' ' : ''}
+              {ltr ? ' ' : ''}
               {privacy}
               {'.'}
             </p>
@@ -197,7 +204,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
                 <h2 className="m-0 text-lead font-bold leading-tight text-contrast-ink">{t.title}</h2>
                 <p className="m-0 mt-1 text-caption leading-snug text-contrast-ink/80">
                   {t.body}
-                  {isEnglish ? ' ' : ''}
+                  {ltr ? ' ' : ''}
                   {privacy}
                   {'.'}
                 </p>
@@ -211,7 +218,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
       {panelOpen ? (
         <ConsentPreferences
           dict={t}
-          isEnglish={isEnglish}
+          ltr={ltr}
           initial={choices}
           onSave={handleSave}
           onClose={() => setPanelOpen(false)}

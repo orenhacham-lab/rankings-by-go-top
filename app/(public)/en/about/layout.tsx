@@ -11,7 +11,7 @@ export const metadata = {
   },
   alternates: {
     canonical: 'https://www.gotopseo.com/en/about',
-    languages: buildHreflangAlternates('/about', '/en/about'),
+    languages: buildHreflangAlternates('/about', '/en/about', '/es/about'),
   },
 }
 

@@ -43,8 +43,8 @@ function Cards({ copy }: { copy: ReturnType<typeof getDashboardDictionary>['site
 }
 
 export default function NetworkHow({ member }: { member: boolean }) {
-  const { language } = useDashboardLanguage()
-  const copy = getDashboardDictionary(language).siteLinks.network
+  const { uiLocale } = useDashboardLanguage()
+  const copy = getDashboardDictionary(uiLocale).siteLinks.network
   if (!member) return <div data-link-network="how" data-folded="no"><Cards copy={copy} /></div>
   return (
     <details className="group" data-link-network="how" data-folded="yes">

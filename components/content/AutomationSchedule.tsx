@@ -26,6 +26,7 @@ import Select from '@/components/ui/Select'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { presentAlert } from '@/lib/content/automation/alert-presentation'
 import { alertReasonCode, type ActiveAlert } from '@/lib/content/automation/alert-read-model'
+import { intlLocaleOf, type PublicLocale } from '@/lib/i18n/locales'
 
 type Cadence = 'daily' | 'weekly' | 'monthly' | 'custom'
 type Preset = 'weekly1' | 'weekly2' | 'custom'
@@ -64,7 +65,7 @@ interface ApprovedTopic { id: string; topic: string; status: string }
 
 export default function AutomationSchedule({
   projectId,
-  language,
+  uiLocale,
   refreshKey,
   onChanged,
   articles,
@@ -72,16 +73,16 @@ export default function AutomationSchedule({
   /** The project's articles (id + status), for "publish now", which only the first article has. */
   articles?: readonly { id: string; status: string }[]
   projectId: string
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   refreshKey: number
   onChanged?: () => void
 }) {
-  const t = getDashboardDictionary(language).contentHub.autoSchedule
-  const locale = language === 'he' ? 'he-IL' : 'en-US'
+  const t = getDashboardDictionary(uiLocale).contentHub.autoSchedule
+  const locale = intlLocaleOf(uiLocale)
   // Phase 3G.2 — map a stored failure code (e.g. gemini_quota_exceeded) to short,
   // localized prose. See reasonLabel below for why the stored string's TAIL is
   // never rendered.
-  const genErrors = getDashboardDictionary(language).contentHub.genErrors as Record<string, string>
+  const genErrors = getDashboardDictionary(uiLocale).contentHub.genErrors as Record<string, string>
   // ONE dictionary slice for the alert composer, so the card and its test read
   // the same strings through the same function.
   const alertDict = {

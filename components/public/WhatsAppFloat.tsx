@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { publicUiLocale } from '@/lib/i18n/request-locale'
 import { cn } from '@/lib/utils'
 import { whatsappHelpUrl } from './contact'
 
@@ -17,8 +18,8 @@ import { whatsappHelpUrl } from './contact'
  */
 export function WhatsAppFloat() {
   const pathname = usePathname()
-  const isEn = pathname === '/en' || !!pathname?.startsWith('/en/')
-  const t = getPublicDictionary(isEn ? 'en' : 'he').contact
+  const locale = publicUiLocale(pathname)
+  const t = getPublicDictionary(locale).contact
   return (
     <a
       href={whatsappHelpUrl(t.whatsappMessage)}

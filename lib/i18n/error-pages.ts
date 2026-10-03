@@ -5,7 +5,7 @@
  * Kept small and dependency-free because global-error ships it to the client
  * without the rest of the app.
  */
-import type { Locale } from './locales'
+import { normalizePublicLocale, type PublicLocale } from './locales'
 
 export const ERROR_PAGES_UI = {
   he: {
@@ -58,8 +58,38 @@ export const ERROR_PAGES_UI = {
       homeHref: '/en',
     },
   },
+  es: {
+    logoAlt: 'Logotipo de Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'No encontramos esta página',
+      body: 'Puede que el enlace sea incorrecto o que la página se haya movido.',
+      home: 'Ir a la página de inicio',
+      dashboard: 'Ir al panel',
+      homeHref: '/es',
+    },
+    screenError: {
+      title: 'Esta pantalla no se cargó',
+      body: 'No se borró nada. Inténtalo de nuevo y, si vuelve a ocurrir, regresa al panel.',
+      retry: 'Inténtalo de nuevo',
+      dashboard: 'Ir al panel',
+      reference: 'Referencia para soporte:',
+    },
+    globalError: {
+      title: 'Algo salió mal',
+      body: 'El sitio tuvo un problema inesperado. Prueba a recargar la página.',
+      retry: 'Recargar',
+      home: 'Ir a la página de inicio',
+      homeHref: '/es',
+    },
+  },
 } as const
 
-export function errorPagesUi(locale: Locale) {
-  return ERROR_PAGES_UI[locale === 'en' ? 'en' : 'he']
+/**
+ * A 404 on `/es/…` is answered in Spanish: an error page is still a page of the
+ * site the visitor is on, and the home link it offers has to lead back into
+ * their own language tree, not into Hebrew.
+ */
+export function errorPagesUi(locale: PublicLocale | string | null | undefined) {
+  return ERROR_PAGES_UI[normalizePublicLocale(locale) ?? 'he']
 }

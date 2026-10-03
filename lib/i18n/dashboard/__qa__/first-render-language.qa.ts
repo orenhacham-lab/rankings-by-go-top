@@ -261,8 +261,12 @@ async function main() {
     const provider = read('lib/i18n/dashboard/useDashboardLanguage.tsx')
     check('F5: isLoaded is still published by the provider (migration state kept)',
       /isLoaded: boolean/.test(provider) && /setIsLoaded\(true\)/.test(provider))
+    // The call now names the locale set it reads, because the dashboard is the
+    // one surface whose words can be Spanish. The migration itself — cookie
+    // beats storage beats the server's value, and the cookie is always written —
+    // is the same function and the same rule.
     check('F6: …and the storage migration it belongs to is untouched',
-      /migrateLocalePreference\(\{/.test(provider) && /localStorage\.setItem\(STORAGE_KEY, migration\.locale\)/.test(provider))
+      /migrateLocalePreference<PublicLocale>\(\{/.test(provider) && /localStorage\.setItem\(STORAGE_KEY, migration\.locale\)/.test(provider))
   }
 
   // ── G) the out-of-provider fallback is not silently Hebrew ────────────────
@@ -288,11 +292,24 @@ async function main() {
   console.log('\nH) the request contract is unchanged')
   {
     const rl = read('lib/i18n/request-locale.ts')
+    // The ROUTE step now asks routePublicLocale, which is the same question
+    // across every public locale (a /es route answers Spanish); the bilingual
+    // routeContentLocale is a narrowing of it. The PRECEDENCE below is what
+    // this check is about, and it is unchanged.
+    // The cookie step now reads normalizeStoredLocale, which accepts Spanish:
+    // the dashboard has no /es URL to be fixed by, so the stored choice is the
+    // only place its language can come from. The PRECEDENCE this checks — route,
+    // then ?lang=, then cookie, then seed, then Accept-Language, then English —
+    // is unchanged, and that is what the check is about.
     check('H1: route → cookie → seed → Accept-Language → English, unchanged',
-      /const fixed = routeContentLocale\(input\.pathname\)/.test(rl)
-      && /normalizeLocale\(input\.cookieValue\)\s*\n\s*\?\? normalizeLocale\(input\.seed\)\s*\n\s*\?\? localeFromAcceptLanguage\(input\.acceptLanguage\)\s*\n\s*\?\? REQUEST_FALLBACK_LOCALE/.test(rl))
+      /const fixed = routePublicLocale\(input\.pathname\)/.test(rl)
+      && /normalizeStoredLocale\(input\.cookieValue\)\s*\n\s*\?\? normalizeLocale\(input\.seed\)\s*\n\s*\?\? localeFromAcceptLanguage\(input\.acceptLanguage\)\s*\n\s*\?\? REQUEST_FALLBACK_LOCALE/.test(rl))
+    // The state it starts from is now the UI locale (the one that can be
+    // Spanish); `language` is derived from it. The guarantee this checks — the
+    // first render comes from the SERVER's value, not from a constant corrected
+    // later in an effect — is unchanged.
     check('H2: the provider still starts from the server-resolved initialLocale',
-      /useState<Locale>\(resolveDashboardLocale\(null, initialLocale\)\)/.test(read('lib/i18n/dashboard/useDashboardLanguage.tsx')))
+      /useState<PublicLocale>\(resolveDashboardUiLocale\(null, initialLocale\)\)/.test(read('lib/i18n/dashboard/useDashboardLanguage.tsx')))
   }
 
   // ── I) switching still works, and still persists ──────────────────────────

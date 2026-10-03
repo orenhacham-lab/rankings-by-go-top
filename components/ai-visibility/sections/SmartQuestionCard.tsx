@@ -10,7 +10,7 @@ import type { QuestionArticleStatus } from '@/lib/ai-visibility/question-article
 import type { I18nKey, PromptRow, T } from './types'
 import OverlapHint from '@/components/content/OverlapHint'
 import type { OverlapPayload } from '@/lib/content/cannibalization/client'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /** The article action on a suggested question (content module on); null hides it. */
 export type QuestionArticleAction = {
@@ -28,7 +28,7 @@ export type QuestionArticleAction = {
    * What "write an article" found the site already covers (the cannibalization
    * check): the card offers improving that page, or writing the article anyway.
    */
-  overlap?: { found: OverlapPayload; language: Locale; onWriteAnyway: () => void } | null
+  overlap?: { found: OverlapPayload; uiLocale: PublicLocale; onWriteAnyway: () => void } | null
 }
 
 /** Why this question, in one plain line: what ties it to the business, and what the asker is about to do. */
@@ -144,7 +144,7 @@ export function SmartQuestionCard({
         </div>
       )}
       {article?.overlap && status === 'none' && !page && (
-        <OverlapHint overlap={article.overlap.found} language={article.overlap.language} busy={article.busy} onCreateAnyway={article.overlap.onWriteAnyway} />
+        <OverlapHint overlap={article.overlap.found} uiLocale={article.overlap.uiLocale} busy={article.busy} onCreateAnyway={article.overlap.onWriteAnyway} />
       )}
     </div>
   )

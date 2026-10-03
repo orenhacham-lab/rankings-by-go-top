@@ -39,8 +39,8 @@ export default function ReadinessCard({
   scannedAt: string | null
   settingsHref: string
 }) {
-  const { language } = useDashboardLanguage()
-  const c = getDashboardDictionary(language).aiVisibilityOverview
+  const { language, uiLocale } = useDashboardLanguage()
+  const c = getDashboardDictionary(uiLocale).aiVisibilityOverview
   const label: Record<ReadinessRowStatus, string> = {
     pass: c.statusPass,
     fail: c.statusFail,

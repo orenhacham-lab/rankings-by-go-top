@@ -286,7 +286,7 @@ async function main() {
       ['improvements', (t) => createElement(RankingChanges, { t, direction: 'up', title: 'x', moves: [] })],
       ['drops', (t) => createElement(RankingChanges, { t, direction: 'down', title: 'x', moves: [] })],
       ['competitors', (t) => createElement(CompetitorsWidget, { t, model: { state: 'empty' }, manageHref: '/settings#competitors' })],
-      ['opportunities', (t) => createElement(ContentOpportunities, { t, language: 'en', projectId: 'p', items: [], canCreateTopics: true })],
+      ['opportunities', (t) => createElement(ContentOpportunities, { t, language: 'en', uiLocale: 'en', projectId: 'p', items: [], canCreateTopics: true })],
       ['board', (t) => createElement(PublishingBoard, { t, language: 'en', section: { state: 'ready', data: { upcoming: [], published: [] } }, retry: () => {} })],
       ['articles', (t) => createElement(RecentArticles, { t, language: 'en', section: { state: 'ready', data: { recent: [] } }, retry: () => {}, firstArticleHref: '/content/topics' })],
       ['ai', (t) => createElement(AiVisibilityBrief, { t, language: 'en', section: { state: 'ready', data: { score: null, mentions: 0, citations: 0, answers: 0, change: null, lastCheckAt: null } }, retry: () => {}, now: NOW })],
@@ -382,7 +382,7 @@ async function main() {
       render(createElement(RankingChanges, { t, direction: 'up', title: t.distribution.title, moves: ranked.improvements }), lang),
       render(createElement(RecentActivity, { t, model: { state: 'ready', items: mergeFeed([{ kind: 'rank_check', at: ago(60), title: null, count: 4 }], s.lines), pending: 3 }, now: NOW, language: lang, emptyHref: '/k' }), lang),
       render(createElement(HoldingBack, { t, model: holdingBack(run('seeded'), lang), scannedLabel: null, settingsHref: '/s' }), lang),
-      render(createElement(ContentOpportunities, { t, language: lang, projectId: 'p', items: ranked.pageTwo, canCreateTopics: true }), lang),
+      render(createElement(ContentOpportunities, { t, language: lang, uiLocale: lang, projectId: 'p', items: ranked.pageTwo, canCreateTopics: true }), lang),
       render(createElement(AiVisibilityBrief, { t, language: lang, section: { state: 'ready', data: { score: 60, mentions: 3, citations: 1, answers: 5, change: 10, lastCheckAt: ago(30) } }, retry: () => {}, now: NOW }), lang),
       render(createElement(AccountStatus, { t, section: { state: 'ready', data: { plan: 'regular', trialDaysLeft: null, articles: null, keywords: { used: 2, limit: 50 } } }, retry: () => {} }), lang),
     ].join('\n')

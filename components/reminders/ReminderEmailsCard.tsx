@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import { BellRing } from 'lucide-react'
 import SettingsCard from '@/components/settings/SettingsCard'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { cn } from '@/lib/utils'
 
@@ -18,8 +18,8 @@ export const REMINDER_EMAILS_SECTION = 'reminder-emails'
 
 type Load = { status: 'loading' | 'hidden' } | { status: 'ready'; on: boolean }
 
-export default function ReminderEmailsCard({ projectId, language }: { projectId: string; language: Locale }) {
-  const t = getDashboardDictionary(language).reminders
+export default function ReminderEmailsCard({ projectId, uiLocale }: { projectId: string; uiLocale: PublicLocale }) {
+  const t = getDashboardDictionary(uiLocale).reminders
   const [load, setLoad] = useState<Load>({ status: 'loading' })
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<'saved' | 'failed' | null>(null)

@@ -51,8 +51,8 @@ function Context({ text, anchor }: { text: string; anchor: string }) {
 }
 
 export default function PlacementLog({ projectId, data, onChanged }: { projectId: string; data: AvailableNetwork; onChanged: () => void }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).siteLinks
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).siteLinks
   const copy = dict.network.log
   const newTab = dict.opensNewTab
   const { confirm, dialog } = useConfirm()

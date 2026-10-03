@@ -53,8 +53,8 @@ import type { Project } from '@/lib/supabase/types'
 import { Reveal } from '@/components/ui/motion'
 
 export default function AIVisibilityPage() {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(language), [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
 
   if (process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY !== 'true') {
     return (
@@ -76,8 +76,8 @@ export default function AIVisibilityPage() {
 }
 
 function ProjectAIVisibility({ project }: { project: Project }) {
-  const { language } = useDashboardLanguage()
-  const mappingCopy = getDashboardDictionary(language).mapping
+  const { language, uiLocale } = useDashboardLanguage()
+  const mappingCopy = getDashboardDictionary(uiLocale).mapping
   const [keywords, setKeywords] = useState<string[]>([])
   // "Manage competitors" links (the keywords tab, the dashboard) open this tab
   // on the competitors. Only that value is honoured; anything else is ignored.
@@ -130,7 +130,7 @@ function ProjectAIVisibility({ project }: { project: Project }) {
     }
   }, [project.id])
   useEffect(() => { void loadMonthly() }, [loadMonthly])
-  const overviewCopy = getDashboardDictionary(language).aiVisibilityOverview
+  const overviewCopy = getDashboardDictionary(uiLocale).aiVisibilityOverview
   const runMonthlyNow = useCallback(async () => {
     setMonthlyRunning(true)
     setMonthlyError(null)

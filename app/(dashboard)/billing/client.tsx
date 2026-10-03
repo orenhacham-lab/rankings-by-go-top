@@ -5,6 +5,7 @@ import Notice, { type NoticeTone } from '@/components/ui/Notice'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { resolveCheckoutPlans, type BillingMarket } from '@/lib/paypal/checkout-plans'
+import { PAYPAL_LOCALE } from '@/lib/i18n/locales'
 
 interface PayPalButtonsOptions {
   style: {
@@ -25,10 +26,10 @@ interface PayPalWindow extends Window {
 }
 
 export default function BillingClient({ market }: { market: BillingMarket }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.billing.paypal
-  const paypalLocale = language === 'en' ? 'en_US' : 'he_IL'
+  const paypalLocale = PAYPAL_LOCALE[uiLocale]
 
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState('')

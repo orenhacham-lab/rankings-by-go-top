@@ -13,6 +13,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleImage, normalizeFeaturedImage, sanitizeImageConceptForCommercialUse, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { assertContentGenerationAllowedForProject, gateDenialCode } from '@/lib/content/entitlement-guard'
 import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
+import { DEFAULT_CONTENT_LANGUAGE, normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
 
 export const CONTENT_IMAGE_BUCKET = 'content-article-images'
 
@@ -48,13 +49,13 @@ export async function createFeaturedImageForArticle(
   if (!gate.allowed) return { error: gateDenialCode(gate) }
 
   // Language + topical context from the linked topic (best-effort).
-  let language: 'he' | 'en' = 'he'
+  let language: ContentLanguage = DEFAULT_CONTENT_LANGUAGE
   let topicText = ''
   let primaryKeyword = ''
   if (a.topic_id && typeof a.topic_id === 'string') {
     const { data: topic } = await admin.from('article_topics').select('language, topic, primary_keyword').eq('id', a.topic_id).maybeSingle()
     const t = topic as { language?: string; topic?: string; primary_keyword?: string } | null
-    language = String(t?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+    language = normalizeContentLanguage(t?.language)
     topicText = t?.topic || ''
     primaryKeyword = t?.primary_keyword || ''
   }

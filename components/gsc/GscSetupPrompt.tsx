@@ -40,8 +40,8 @@ export default function GscSetupPrompt({
   layout?: 'stack' | 'inline'
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   return (
     <div
       data-gsc-setup={state}
@@ -62,8 +62,8 @@ export default function GscSetupPrompt({
 }
 
 export function GscLoadError({ onRetry, className }: { onRetry: () => void; className?: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   return (
     <p data-gsc-error="" className={cn('text-copy text-muted', className)}>
       {t.loadError}{' '}
@@ -79,8 +79,8 @@ export function GscLoadError({ onRetry, className }: { onRetry: () => void; clas
 }
 
 export function GscLoading({ className, lines = 2 }: { className?: string; lines?: number }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   return (
     <div className={cn('flex flex-col gap-2', className)} aria-busy="true">
       {Array.from({ length: lines }, (_, i) => (

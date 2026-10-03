@@ -18,6 +18,7 @@ import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCount } from '@/components/gsc/format'
+import { intlLocaleOf, type PublicLocale } from '@/lib/i18n/locales'
 
 interface MonthlySearch {
   month: string
@@ -34,7 +35,7 @@ interface TrendModalProps {
   open: boolean
   onClose: () => void
   keyword: string
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   isRTL: boolean
   loading?: boolean
   error?: TrendError
@@ -49,11 +50,11 @@ interface TrendModalProps {
 
 const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER']
 
-/** Google's "JANUARY" of 2026 in the screen's language, long ("ינואר" / "January"), with the year when asked. */
-export function monthName(month: string, year: number, language: 'he' | 'en', withYear = false): string {
+/** Google's "JANUARY" of 2026 in the screen's language, long ("ינואר" / "January" / "enero"), with the year when asked. */
+export function monthName(month: string, year: number, uiLocale: PublicLocale, withYear = false): string {
   const i = MONTHS.indexOf(String(month).toUpperCase())
   if (i < 0) return month
-  const locale = language === 'he' ? 'he-IL' : 'en-US'
+  const locale = intlLocaleOf(uiLocale)
   return new Intl.DateTimeFormat(locale, withYear ? { month: 'long', year: 'numeric', timeZone: 'UTC' } : { month: 'long', timeZone: 'UTC' })
     .format(new Date(Date.UTC(year, i, 15)))
 }
@@ -65,37 +66,37 @@ const TREND_BADGE: Record<Trend, 'success' | 'danger' | 'info' | 'neutral'> = {
 
 interface Point { label: string; full: string; searches: number }
 
-function ChartTooltip({ active, payload, searchesLabel, language }: {
+function ChartTooltip({ active, payload, searchesLabel, uiLocale }: {
   active?: boolean
   payload?: Array<{ payload: Point }>
   searchesLabel: string
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
 }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
     <div className="rounded-inset border border-line bg-surface px-3 py-2 text-caption shadow-pop">
       <p className="font-semibold text-ink">{p.full}</p>
-      <p className="text-muted tabular-nums">{searchesLabel}: {formatCount(p.searches, language)}</p>
+      <p className="text-muted tabular-nums">{searchesLabel}: {formatCount(p.searches, uiLocale)}</p>
     </div>
   )
 }
 
-export default function TrendModal({ open, onClose, keyword, language, isRTL, loading = false, error, data }: TrendModalProps) {
+export default function TrendModal({ open, onClose, keyword, uiLocale, isRTL, loading = false, error, data }: TrendModalProps) {
   if (!open) return null
-  const dict = getDashboardDictionary(language)
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.keywordResearch.trend
 
   const trendLabel: Record<Trend, string> = {
     up: t.trendRising, down: t.trendDeclining, stable: t.trendStable, seasonal: t.trendSeasonal, unknown: t.trendUnknown,
   }
   const points: Point[] = (data?.monthlySearchVolumes ?? []).map((m) => ({
-    label: monthName(m.month, m.year, language),
-    full: monthName(m.month, m.year, language, true),
+    label: monthName(m.month, m.year, uiLocale),
+    full: monthName(m.month, m.year, uiLocale, true),
     searches: m.searches,
   }))
   const lastIndex = points.length - 1
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const tick = { fontSize: 12, fill: 'var(--color-muted)' }
 
   return (
@@ -126,11 +127,11 @@ export default function TrendModal({ open, onClose, keyword, language, isRTL, lo
             <div className="grid gap-4 sm:grid-cols-3">
               <StatTile label={t.monthlyAverage} value={data.avgMonthlySearches ? n(data.avgMonthlySearches) : '—'} source={t.searches} />
               {data.peakMonth && (
-                <StatTile label={t.peakMonth} value={monthName(data.peakMonth.month, data.peakMonth.year, language)}
+                <StatTile label={t.peakMonth} value={monthName(data.peakMonth.month, data.peakMonth.year, uiLocale)}
                   source={`${n(data.peakMonth.searches)} ${t.searches}`} />
               )}
               {data.lowestMonth && (
-                <StatTile label={t.lowestMonth} value={monthName(data.lowestMonth.month, data.lowestMonth.year, language)}
+                <StatTile label={t.lowestMonth} value={monthName(data.lowestMonth.month, data.lowestMonth.year, uiLocale)}
                   source={`${n(data.lowestMonth.searches)} ${t.searches}`} />
               )}
             </div>
@@ -146,7 +147,7 @@ export default function TrendModal({ open, onClose, keyword, language, isRTL, lo
                   <YAxis orientation={isRTL ? 'right' : 'left'} tickLine={false} axisLine={false} width={48}
                     tickFormatter={(v: number) => n(v)} tick={tick} />
                   <Tooltip cursor={{ stroke: 'var(--color-line-strong)', strokeDasharray: '4 4' }}
-                    content={<ChartTooltip searchesLabel={t.searches} language={language} />} />
+                    content={<ChartTooltip searchesLabel={t.searches} uiLocale={uiLocale} />} />
                   <Line
                     type="monotone"
                     dataKey="searches"

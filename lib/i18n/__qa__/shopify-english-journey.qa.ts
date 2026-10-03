@@ -40,10 +40,11 @@ import { join, relative } from 'path'
 import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
   resolveRequestLocale, explicitRequestLocale, routeContentLocale,
-  sanitizeNextPath, englishOnlySegments,
+  sanitizeNextPath, englishOnlySegments, localeParamToPersist,
 } from '../request-locale'
 import { resolveAuthLocale } from '../auth-locale'
 import { externalUrlWithLocale, authUrlWithLocale } from '../../shopify/handoff-url'
+import { toBilingualLocale } from '../locales'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -112,8 +113,15 @@ function main() {
     const proxySrc = read('proxy.ts')
     check('4b: the proxy actually writes the cookie for a ?lang it resolved',
       /set-cookie/.test(proxySrc) && /languageCookieString\(localeToPersist/.test(proxySrc))
+    // Still only the QUERY PARAMETER feeds it — normalizedLangParam reads
+    // nothing else, so a route-fixed locale is never remembered. What changed is
+    // that a parameter merely RESTATING a wider stored choice is now dropped
+    // (localeParamToPersist), because that is what reset a Spanish reader to
+    // English on sign-in. The two facts below are checked together: the source
+    // of the value, and that this journey's own case still persists.
     check('4c: and only for a ?lang, never for a route-fixed locale',
-      /const localeToPersist = normalizedLangParam\(langParam\)/.test(proxySrc))
+      /const localeToPersist = localeParamToPersist\(\s*request\.cookies\.get\(LANGUAGE_COOKIE\)\?\.value \?\? null,\s*normalizedLangParam\(langParam\),\s*\)/.test(proxySrc)
+      && localeParamToPersist('he', 'en') === 'en')
     check('4d: the login redirect it builds carries the language',
       /loginUrl\.searchParams\.set\(LANGUAGE_PARAM, localeToPersist\)/.test(proxySrc))
   }
@@ -223,7 +231,9 @@ function main() {
     for (const pathname of ['/login', '/signup', '/dashboard', `/projects/${SOME_PROJECT}`]) {
       for (const langParam of [null, 'en', 'he']) {
         for (const cookieValue of [null, 'en', 'he']) {
-          const server = resolveRequestLocale({ pathname, langParam, cookieValue })
+          // Every pathname here is a bilingual surface; the server's answer is
+          // narrowed to the auth pages' two languages before the comparison.
+          const server = toBilingualLocale(resolveRequestLocale({ pathname, langParam, cookieValue }))
           const client = resolveAuthLocale({ pathname, langParam, serverLocale: server })
           if (server !== client) { agree = false; disagreements.push(`${pathname} lang=${langParam} cookie=${cookieValue}: ${server} vs ${client}`) }
         }

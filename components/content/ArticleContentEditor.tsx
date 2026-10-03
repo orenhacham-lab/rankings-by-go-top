@@ -30,8 +30,8 @@ export default function ArticleContentEditor({
 }) {
   // The toolbar speaks the dashboard's language (it was English-only); the
   // article's own direction still comes from `dir`, the article's language.
-  const { language } = useDashboardLanguage()
-  const tb = getDashboardDictionary(language).articleEditorToolbar
+  const { uiLocale } = useDashboardLanguage()
+  const tb = getDashboardDictionary(uiLocale).articleEditorToolbar
   const editor = useEditor({
     immediatelyRender: false, // required for SSR (Next.js)
     extensions: [

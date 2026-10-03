@@ -134,8 +134,8 @@ export default function ResearchSummary({
   preview?: SummaryPreview
 }) {
   const router = useRouter()
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).seedOnboarding
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).seedOnboarding
   const t = dict.summary
   const p = dict.preview
   const checks = freeCheckCopy(language)

@@ -19,6 +19,7 @@ import { suggestAiQuery } from './ai-query-suggestion'
 import { sameQuestion } from '@/lib/ai-visibility/article-question'
 import { siteUrlFromDomain } from './structured-data'
 import { readProjectSameAs } from './article-style/store'
+import { normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -28,7 +29,7 @@ export const CITATION_READ_LIMIT = 2000
 export interface SchemaContext {
   publisherName: string | null
   publisherUrl: string | null
-  language: 'he' | 'en'
+  language: ContentLanguage
   /** The business's official profiles (project settings), for the publisher's sameAs. */
   sameAs: string[]
 }
@@ -63,7 +64,7 @@ export async function loadTopicFacts(admin: Admin, topicId: string | null | unde
 }
 
 export function schemaContextFrom(project: ProjectFacts | null, topicLanguage: string | null | undefined, sameAs: string[] = []): SchemaContext {
-  const lang = String(topicLanguage || project?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  const lang = normalizeContentLanguage(topicLanguage || project?.language)
   const name = String(project?.business_name || project?.name || '').trim() || null
   return { publisherName: name, publisherUrl: siteUrlFromDomain(project?.target_domain), language: lang, sameAs }
 }

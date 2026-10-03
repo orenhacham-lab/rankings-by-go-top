@@ -25,6 +25,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { ChevronDown, Link2, X } from 'lucide-react'
 import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export interface NewTopic { id: string; topic: string; primary_keyword: string | null }
 
@@ -57,10 +58,10 @@ function reasonLabel(r?: string | null): string {
 }
 
 export default function NewTopicsLinkPlanPanel({
-  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {}, initialSelected = {}, onGoToQueue,
+  projectId, uiLocale, topics, onClose, onSaved, onEnqueue, initialUnchecked = {}, initialSelected = {}, onGoToQueue,
 }: {
   projectId: string
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   topics: NewTopic[]
   onClose: () => void
   onSaved: (results: { topicId: string; summary: TopicPlanSummary }[]) => void
@@ -77,8 +78,8 @@ export default function NewTopicsLinkPlanPanel({
   // to the publishing-schedule section). Only the BUTTON navigates — no auto-scroll.
   onGoToQueue?: () => void
 }) {
-  const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
-  const isHebrew = language === 'he'
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub.newTopicsPlan, [uiLocale])
+  const isHebrew = uiLocale === 'he'
   // Locale-aware label for soft (reviewable) reasons; falls back to REASON_HE.
   const revLabel = useCallback((r?: string | null) => {
     const base = (r || '').split('(')[0]!

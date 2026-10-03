@@ -30,7 +30,7 @@ import { buttonClasses, CheckList, Eyebrow } from '@/components/public/marketing
 import { cn } from '@/lib/utils'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { FreeCheckErrorCode, FreeCheckResponse, FreeCheckResult } from '@/lib/free-check/types'
-import type { Locale } from '@/lib/i18n/locales'
+import { toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
 import { authHref } from '@/lib/i18n/auth-href'
 
 type Phase = 'form' | 'scanning' | 'results'
@@ -39,17 +39,19 @@ type Phase = 'form' | 'scanning' | 'results'
 const STEP_MS = 3_500
 
 /** A finding's tone: the start border and the badge. Never a tinted card. */
-const SEVERITY_STYLES: Record<string, { border: string; badge: 'danger' | 'warning' | 'neutral'; label: { he: string; en: string } }> = {
-  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical' } },
-  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning' } },
-  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip' } },
+const SEVERITY_STYLES: Record<string, { border: string; badge: 'danger' | 'warning' | 'neutral'; label: Record<PublicLocale, string> }> = {
+  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical', es: 'Crítico' } },
+  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning', es: 'Advertencia' } },
+  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip', es: 'Recomendación' } },
 }
 
-export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Locale; initialUrl?: string }) {
+export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: PublicLocale; initialUrl?: string }) {
   const copy = freeCheckCopy(locale)
   const dir = locale === 'he' ? 'rtl' : 'ltr'
-  const loginHref = authHref('login', locale)
-  const signupHref = authHref('signup', locale)
+  // Sign-in and sign-up exist in Hebrew and English only, so a Spanish visitor
+  // is sent to the English form rather than to a Hebrew one they cannot read.
+  const loginHref = authHref('login', toBilingualLocale(locale))
+  const signupHref = authHref('signup', toBilingualLocale(locale))
 
   const [phase, setPhase] = useState<Phase>('form')
   const [url, setUrl] = useState(initialUrl)
@@ -157,7 +159,7 @@ export function FormState({
   onSubmit,
 }: {
   copy: Copy
-  locale?: Locale
+  locale?: PublicLocale
   url: string
   onUrl: (v: string) => void
   error: FreeCheckErrorCode | null
@@ -308,7 +310,7 @@ function ResultsState({
   onRestart,
 }: {
   copy: Copy
-  locale: Locale
+  locale: PublicLocale
   result: FreeCheckResult
   signupHref: string
   loginHref: string

@@ -15,8 +15,8 @@ import { formatCompact, formatCount } from '@/components/gsc/format'
 import type { ResearchRow } from '@/lib/keyword-research/rows'
 
 export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.source
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.source
   const parts: { key: 'competitor' | 'google'; text: string; title?: string }[] = []
   if (row.competitors.length > 0) parts.push({ key: 'competitor', text: t.competitor(row.competitors[0], row.competitors.length - 1) })
   if (row.gsc) {

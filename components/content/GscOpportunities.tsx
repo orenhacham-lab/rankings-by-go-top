@@ -77,9 +77,9 @@ function mapIntent(gsc: string): string | undefined {
 export default function GscOpportunities({ projectId, projects = [], onToast, onTopicsChanged }: {
   projectId: string; projects?: ProjectOption[]; onToast?: (kind: 'success' | 'error', text: string) => void; onTopicsChanged?: () => void
 }) {
-  const { language } = useDashboardLanguage()
-  const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscOpportunities, [language])
-  const w = useMemo(() => getDashboardDictionary(language).gscWidgets.opportunities, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t: Dict = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection.gscOpportunities, [uiLocale])
+  const w = useMemo(() => getDashboardDictionary(uiLocale).gscWidgets.opportunities, [uiLocale])
   // Whether there is anything to read at all: connection, property and a sync.
   const gsc = useGscStatus(projectId)
   const gscReady = gsc.view.state === 'ready'

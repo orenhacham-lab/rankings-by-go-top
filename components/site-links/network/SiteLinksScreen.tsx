@@ -48,8 +48,8 @@ export default function SiteLinksScreen({ projectId, projectCountry = null, proj
   projectCountry?: string | null
   projectLanguage?: string | null
 }) {
-  const { language } = useDashboardLanguage()
-  const copy = getDashboardDictionary(language).siteLinks
+  const { uiLocale } = useDashboardLanguage()
+  const copy = getDashboardDictionary(uiLocale).siteLinks
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
 

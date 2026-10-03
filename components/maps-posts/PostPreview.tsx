@@ -19,8 +19,8 @@ export default function PostPreview({ businessName, summary, imageSrc, imageStyl
   imageStyle?: React.CSSProperties
   ctaType: GbpCtaType | null
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   const name = businessName || t.preview.businessFallback
   const initial = Array.from(name.trim())[0] ?? ''
   const long = Array.from(summary.trim()).length > 220

@@ -2,6 +2,7 @@ import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/type
 import { getEngineDisplayLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
+import { intlLocaleOf } from '@/lib/i18n/locales'
 
 interface ExportData {
   client: Client
@@ -40,7 +41,7 @@ function generateReportHTML(data: ExportData): string {
   const language = normalizeExportLanguage(data.language)
   const L = getExportLabels(language)
   const isRtl = language === 'he'
-  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const dateLocale = intlLocaleOf(language)
   const now = new Date().toLocaleDateString(dateLocale)
 
   const found = data.targets.filter((t) => data.latestResults[t.id]?.found).length
@@ -84,7 +85,7 @@ function generateReportHTML(data: ExportData): string {
 
   return `
     <!DOCTYPE html>
-    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'he' : 'en'}">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${language}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -399,7 +400,7 @@ function generateAIReportHTML(data: AIExportData): string {
   const language = normalizeExportLanguage(data.language)
   const L = getExportLabels(language)
   const isRtl = language === 'he'
-  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const dateLocale = intlLocaleOf(language)
   const now = new Date().toLocaleDateString(dateLocale)
 
   const engineLabels: Record<string, string> = {
@@ -456,7 +457,7 @@ function generateAIReportHTML(data: AIExportData): string {
 
   return `
     <!DOCTYPE html>
-    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'he' : 'en'}">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${language}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">

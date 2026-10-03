@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 
 interface Article {
   slug: string
@@ -213,6 +214,26 @@ export async function GET() {
     },
   ]
 
+  // The SPANISH tree, only once it exists. While the flag is off, /es/* answers
+  // 404 (app/(public)/es/layout.tsx), so listing it here would submit 404s to
+  // Google. Legal pages are not listed: there is no Spanish version of them.
+  const spanishPages = spanishSiteEnabled()
+    ? [
+        { url: `${baseUrl}/es`, lastmod: today, changefreq: 'weekly', priority: '0.9' },
+        { url: `${baseUrl}/es/free-check`, lastmod: today, changefreq: 'monthly', priority: '0.8' },
+        { url: `${baseUrl}/es/pricing`, lastmod: today, changefreq: 'monthly', priority: '0.8' },
+        { url: `${baseUrl}/es/about`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/articles`, lastmod: today, changefreq: 'weekly', priority: '0.7' },
+        { url: `${baseUrl}/es/sitemap`, lastmod: today, changefreq: 'weekly', priority: '0.6' },
+        { url: `${baseUrl}/es/features/seo-geo-content-publishing`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/features/google-organic-rank-tracking`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/features/google-maps-rank-tracking`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/features/ai-visibility-tracking`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/features/seo-geo-reports`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/features/keyword-research`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+      ]
+    : []
+
   // Build article entries
   const articleEntries = (articles || []).map((article: Article) => ({
     url: `${baseUrl}/articles/${article.slug}`,
@@ -222,7 +243,7 @@ export async function GET() {
   }))
 
   // Combine all entries
-  const allEntries = [...staticPages, ...articleEntries]
+  const allEntries = [...staticPages, ...spanishPages, ...articleEntries]
 
   // Build XML
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

@@ -62,8 +62,8 @@ function writeStore(key: string, value: string | null) {
 type ActiveRun = TourRun & { kind: 'full' } | TourRun & { kind: 'screen'; screen: ScreenKey }
 
 export default function GuideMenu({ userId, accountCreatedAt }: { userId: string; accountCreatedAt: string | null }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).guide
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).guide
   const pathname = usePathname()
   const router = useRouter()
   const { activeProjectId, projects, isResolved } = useActiveProject()

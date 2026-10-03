@@ -12,7 +12,7 @@ export const metadata = {
     type: 'website',
   },
   alternates: {
-    languages: buildHreflangAlternates('/', '/en'),
+    languages: buildHreflangAlternates('/', '/en', '/es'),
   },
 }
 

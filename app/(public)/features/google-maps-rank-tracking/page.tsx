@@ -10,10 +10,7 @@ export const metadata: Metadata = {
   description: 'עקבו אחרי המיקום שלכם בגוגל מפות. בדקו נראות מקומית לפי עיר, אזור וביטוי חיפוש. Local SEO מתקדם.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/google-maps-rank-tracking',
-    languages: buildHreflangAlternates(
-      '/features/google-maps-rank-tracking',
-      '/en/features/google-maps-rank-tracking'
-    ),
+    languages: buildHreflangAlternates('/features/google-maps-rank-tracking', '/en/features/google-maps-rank-tracking', '/es/features/google-maps-rank-tracking'),
   },
 }
 

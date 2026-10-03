@@ -91,8 +91,8 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
   /** Tracked keywords with Google's own figures for them (impressions above 0). */
   tracked?: UntrackedQuery[]
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets.untracked
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets.untracked
   const [expanded, setExpanded] = useState(false)
   const [sort, setSort] = useState<UntrackedSort>('impressions')
   const [adding, setAdding] = useState<string | null>(null)

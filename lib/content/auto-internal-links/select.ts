@@ -51,6 +51,7 @@ import type { SiteMapEntry } from '@/lib/content/existing-content/model'
 import { analyzeAnchorQuality } from '@/lib/content/anchors-check'
 import { bodyParagraphs, linkTag, plainText, type BodyParagraph } from '@/lib/link-network/anchor'
 import { isUrlAlreadyLinked } from '@/lib/content/internal-links'
+import { type ContentLanguage } from '@/lib/content/language'
 
 export const AUTO_LINK_LIMITS = { max: 5, maxAnchorWords: 6, minParagraphGap: 2, maxCandidates: 2000 } as const
 
@@ -60,7 +61,7 @@ export interface AutoLinkArticle {
   primaryKeyword: string | null
   secondaryKeywords: string[]
   html: string
-  language: 'he' | 'en'
+  language: ContentLanguage
 }
 
 export interface AutoLinkTarget { url: string; title: string }

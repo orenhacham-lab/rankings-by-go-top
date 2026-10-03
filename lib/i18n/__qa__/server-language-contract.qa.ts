@@ -26,13 +26,15 @@ import { spawn, type ChildProcess } from 'child_process'
 import {
   resolveRequestLocale, migrateLocalePreference, languageCookieString, readCookie,
   isEnglishPath, LANGUAGE_COOKIE, LOCALE_HEADER, REQUEST_FALLBACK_LOCALE,
-  routeContentLocale, publicMarketingSegments,
+  routeContentLocale, publicMarketingSegments, isSpanishPath,
 } from '../request-locale'
 import { documentLocaleAttributes } from '../document-locale'
 import { resolveDashboardLocale } from '../dashboard/locale'
 import { parseAcceptLanguage, localeFromAcceptLanguage } from '../accept-language'
 import { getSiteMetadata } from '../site-metadata'
 import { readdirSync } from 'fs'
+import { toBilingualLocale } from '../locales'
+import { counterpartPath } from '../../../components/LanguageSwitcher'
 
 let pass = 0, fail = 0, blocked = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -405,7 +407,9 @@ async function main() {
     // initialLocale is that same server value. Same input, same answer, so the
     // first client render cannot differ from the server's.
     for (const cookieValue of ['en', 'he', null, 'zz']) {
-      const serverLocale = resolveRequestLocale({ pathname: '/dashboard', cookieValue })
+      // /dashboard is a BILINGUAL route, so the server's answer is narrowed to the
+      // two languages the dashboard has before the client is compared against it.
+      const serverLocale = toBilingualLocale(resolveRequestLocale({ pathname: '/dashboard', cookieValue }))
       const clientFirstRender = resolveDashboardLocale(null, serverLocale)
       check(`5a: cookie=${JSON.stringify(cookieValue)} — client's first render matches the server (${serverLocale})`,
         clientFirstRender === serverLocale)
@@ -427,14 +431,18 @@ async function main() {
     check('5e: SOURCE — the root layout resolves the locale server-side, seed included',
       /const \{ isAuthenticated, locale \} = await getRootRequestContext\(\)/.test(rootLayout)
       && /user\?\.user_metadata\?\.locale/.test(rootReqSrc)
-      && /getServerLocale\(seed\)/.test(rootReqSrc))
+      && /getServer(?:Public)?Locale\(seed\)/.test(rootReqSrc))
     check('5g: the SEED survives — an English signup on a cookie-less device still gets English',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')
     check('5h: …while an explicit cookie still outranks it',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
     const dashLayout = require('fs').readFileSync(join(ROOT, 'app', '(dashboard)', 'layout.tsx'), 'utf8')
+    // The dashboard's WORDS can now be Spanish, so it seeds from the public
+    // resolution; its logic stays bilingual, narrowed inside the provider.
+    // Either spelling satisfies this: what matters is that it is the server's
+    // resolution and not a second mechanism.
     check('5f: SOURCE — the dashboard seeds the provider from the SAME server locale',
-      /getServerLocale\(/.test(dashLayout))
+      /getServer(?:Public)?Locale\(/.test(dashLayout))
   }
 
   console.log('\n7) ACCEPT-LANGUAGE — parsed, with q-values; never a substring test')
@@ -478,6 +486,11 @@ async function main() {
       routeContentLocale('/') === 'he' && routeContentLocale('/pricing') === 'he'
       && routeContentLocale('/about') === 'he' && routeContentLocale('/articles/x') === 'he')
     check('8b: the English tree states English', routeContentLocale('/en') === 'en' && routeContentLocale('/en/pricing') === 'en')
+    // The Spanish tree states Spanish only while it EXISTS. With the flag off
+    // those paths 404, so labelling them `es` would label an error page.
+    check('8b1: the Spanish tree states Spanish when it is on, and nothing when it is off',
+      isSpanishPath('/es/pricing', true) && !isSpanishPath('/es/pricing', false)
+      && !isSpanishPath('/espanol', true))
     check('8c: bilingual surfaces state nothing and defer to the user',
       routeContentLocale('/dashboard') === null && routeContentLocale('/login') === null
       && routeContentLocale('/content') === null)
@@ -494,7 +507,9 @@ async function main() {
     // which an earlier version of this guard did not scan at all.
     const publicDirs = ['(public)', '(legal)'].flatMap((group) =>
       readdirSync(join(ROOT, 'app', group), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && d.name !== 'en')
+        // 'en' and 'es' are the non-Hebrew trees: their own guards cover them
+        // (8b, 8b1 and lib/i18n/__qa__/spanish-public-site.qa.ts).
+        .filter((d) => d.isDirectory() && d.name !== 'en' && d.name !== 'es')
         .map((d) => d.name))
     const missing = publicDirs.filter((d) => routeContentLocale(`/${d}`) !== 'he')
     check('8e: every directory in app/(public) AND app/(legal) is covered',
@@ -503,10 +518,65 @@ async function main() {
     // The switch on a fixed-language page must NAVIGATE, not relabel.
     const switcher = require('fs').readFileSync(join(ROOT, 'components', 'LanguageSwitcher.tsx'), 'utf8')
     check('8f: the public language switch links to the counterpart URL',
-      /getCounterpartPath\(pathname, locale\)/.test(switcher) && /<Link/.test(switcher)
-      && /return `\/en\$\{pathname\.startsWith\('\/'\) \? pathname : `\/\$\{pathname\}`\}`/.test(switcher))
+      /counterpartPath\(pathname, /.test(switcher) && /<Link/.test(switcher))
+    // The counterpart is computed, not guessed: the FUNCTION itself is the
+    // subject here, so a rewrite of the component cannot quietly drop it.
+    check('8f1: …and the counterpart of a Hebrew path is the same path under the target prefix',
+      counterpartPath('/pricing', 'he', 'en') === '/en/pricing'
+      && counterpartPath('/en/pricing', 'en', 'he') === '/pricing'
+      && counterpartPath('/en', 'en', 'he') === '/'
+      && counterpartPath('/pricing', 'he', 'es') === '/es/pricing')
     check('8g: …and it does not write the language cookie (that would relabel, not navigate)',
       !/languageCookieString|document\.cookie/.test(switcher))
+  }
+
+  console.log('\n8h) THE SHARED NAV AND FOOTER TAKE THE PAGE\'S OWN LANGUAGE')
+  {
+    // The owner found /en/free-check rendering a HEBREW footer (3 October
+    // 2026): the page wrote `<Footer />` with no locale, and the default is
+    // Hebrew. A default that is a real language is the trap — the component
+    // renders happily and nobody notices until a reader does. So every public
+    // page states the locale, and the tree it lives in says which.
+    const fs = require('fs') as typeof import('fs')
+    const walk = (dir: string): string[] => fs.readdirSync(join(ROOT, dir), { withFileTypes: true })
+      .flatMap((e) => e.isDirectory() ? walk(`${dir}/${e.name}`) : (e.name === 'page.tsx' ? [`${dir}/${e.name}`] : []))
+    const treeLocale = (file: string) => /^app\/\(public\)\/en\//.test(file) ? 'en'
+      : /^app\/\(public\)\/es\//.test(file) ? 'es' : 'he'
+    const offenders: string[] = []
+    for (const file of walk('app/(public)')) {
+      const src = fs.readFileSync(join(ROOT, file), 'utf8')
+      for (const tag of ['Footer', 'PublicNav']) {
+        for (const m of src.matchAll(new RegExp(`<${tag}(\\s[^>]*)?/?>`, 'g'))) {
+          const attrs = m[1] ?? ''
+          const stated = /locale=\{?["']?([a-z]{2})/.exec(attrs)?.[1]
+            ?? (/locale=\{locale\}/.test(attrs) ? treeLocale(file) : undefined)
+          if (stated !== treeLocale(file)) offenders.push(`${file}: <${tag}${attrs}> in the ${treeLocale(file)} tree`)
+        }
+      }
+    }
+    check('8h: every public page gives the nav and the footer its own language', offenders.length === 0,
+      offenders.slice(0, 4).join(' | '))
+    // The component's default is what made the bug silent, so it is pinned:
+    // if someone changes it, this says so rather than the reader finding out.
+    const footerSrc = require('fs').readFileSync(join(ROOT, 'components', 'Footer.tsx'), 'utf8')
+    check('8h1: …and the Footer default is still Hebrew, which is why the prop is required above',
+      /locale = 'he'/.test(footerSrc))
+
+    // The other half of the same report: the words changed language on a
+    // client-side switch and the DIRECTION did not, because <html lang/dir> is
+    // rendered by the root layout, above every changing segment.
+    const sync = require('fs').readFileSync(join(ROOT, 'components', 'DocumentLocaleSync.tsx'), 'utf8')
+    const rootLayoutSrc = require('fs').readFileSync(join(ROOT, 'app', 'layout.tsx'), 'utf8')
+    check('8i: the root layout mounts the document-locale sync', /<DocumentLocaleSync \/>/.test(rootLayoutSrc))
+    check('8i1: …which re-states lang and dir on every navigation that names a language',
+      /usePathname\(\)/.test(sync) && /routePublicLocale\(pathname\)/.test(sync)
+      && /el\.lang = lang/.test(sync) && /el\.dir = dir/.test(sync))
+    check('8i2: …and says nothing on a bilingual route, where the user\'s preference decides',
+      /if \(!locale\) return/.test(sync))
+    check('MUTATION CONTROL: a layout without the sync is caught',
+      !/<DocumentLocaleSync \/>/.test(rootLayoutSrc.replace('<DocumentLocaleSync />', '')))
+    check('MUTATION CONTROL: a sync that guesses on bilingual routes is caught',
+      !/if \(!locale\) return/.test(sync.replace('if (!locale) return', "const l = locale ?? 'he'")))
   }
 
   console.log('\n9) LOCALIZED DOCUMENT METADATA')

@@ -7,6 +7,7 @@ import StatusScreen from '@/components/layout/StatusScreen'
 import Button, { buttonClasses } from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { errorPagesUi } from '@/lib/i18n/error-pages'
+import { getLocaleConfig } from '@/lib/i18n/locales'
 
 /**
  * A screen of the dashboard that threw (design contract §7). The shell (rail,
@@ -23,7 +24,7 @@ export default function DashboardError({
   retry?: () => void
   reset?: () => void
 }) {
-  const { language } = useDashboardLanguage()
+  const { language, uiLocale } = useDashboardLanguage()
   const t = errorPagesUi(language).screenError
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function DashboardError({
 
   return (
     <StatusScreen
-      dir={language === 'en' ? 'ltr' : 'rtl'}
+      dir={getLocaleConfig(uiLocale).dir}
       icon={TriangleAlert}
       title={t.title}
       body={t.body}

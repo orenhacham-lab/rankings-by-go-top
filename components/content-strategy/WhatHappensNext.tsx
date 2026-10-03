@@ -10,7 +10,7 @@ import { BarChart3, CheckCircle2, Globe, PenLine, ThumbsUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
 import type { NextArticle, StrategyColumn } from '@/lib/content/strategy/board'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { shortDate } from './format'
 
@@ -38,7 +38,7 @@ const ICON = { approve: ThumbsUp, write: PenLine, publish: Globe, measure: BarCh
 export default function WhatHappensNext({ counts, next, lang, dict }: {
   counts: Record<StrategyColumn, number>
   next: NextArticle | null
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
 }) {
   const t = dict.strategyInsights.next

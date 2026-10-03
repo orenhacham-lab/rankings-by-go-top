@@ -14,8 +14,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function SiteLinksPage() {
-  const { language } = useDashboardLanguage()
-  const copy = getDashboardDictionary(language).siteLinks
+  const { uiLocale } = useDashboardLanguage()
+  const copy = getDashboardDictionary(uiLocale).siteLinks
   return (
     <div>
       <Header title={copy.title} subtitle={copy.subtitle} />

@@ -31,6 +31,7 @@ import { getUserEntitlement } from '@/lib/subscription'
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeArticleGeneration, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
+import { normalizeContentLanguage } from '@/lib/content/language'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -154,7 +155,7 @@ export async function generateArticleForTopic(
   const { data: wpConn } = await admin.from('wordpress_connections').select('id').eq('project_id', projectId).maybeSingle()
 
   const anchors = (Array.isArray(t.anchors_json) ? t.anchors_json : []) as ArticleTopicAnchor[]
-  const language = String(t.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  const language = normalizeContentLanguage(t.language)
   const decodedNotes = decodeBriefNotes((t.brief_notes as string) ?? null)
 
   // Pre-check: a required anchor with no usable URL can never be placed.

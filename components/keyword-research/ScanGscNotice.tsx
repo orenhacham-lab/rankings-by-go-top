@@ -41,8 +41,8 @@ export default function ScanGscNotice({
   retry: () => void
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.gsc
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.gsc
   const state = data.state
   if (state === 'disabled') return null
   return (

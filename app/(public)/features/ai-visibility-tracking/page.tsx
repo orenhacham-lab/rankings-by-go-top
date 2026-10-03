@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: 'גלו האם העסק, האתר או המותג שלכם מופיעים בתשובות של ChatGPT, Gemini, Perplexity, Google AI וכלים נוספים. מעקב GEO - Generative Engine Optimization.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/ai-visibility-tracking',
-    languages: buildHreflangAlternates(
-      '/features/ai-visibility-tracking',
-      '/en/features/ai-visibility-tracking'
-    ),
+    languages: buildHreflangAlternates('/features/ai-visibility-tracking', '/en/features/ai-visibility-tracking', '/es/features/ai-visibility-tracking'),
   },
 }
 

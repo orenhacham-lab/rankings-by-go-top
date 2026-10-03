@@ -2,9 +2,7 @@
  * How the research tab writes money and dates, in the screen's language.
  * Pure: no React, no I/O.
  */
-function locale(language: string): string {
-  return language === 'he' ? 'he-IL' : 'en-US'
-}
+import { intlLocaleOf as locale } from '@/lib/i18n/locales'
 
 /** A click price in its currency ("₪4.80"); a bare figure when the currency is unknown. */
 export function formatMoney(value: number, currency: string, language: string): string {

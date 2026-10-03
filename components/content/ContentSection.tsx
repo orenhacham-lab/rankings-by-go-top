@@ -66,9 +66,9 @@ export type PlatformHint = { label: string; preferred: 'wordpress' | 'shopify' |
 
 export default function ContentSection({ projectId, platformHint }: { projectId: string; platformHint?: PlatformHint | null }) {
   const router = useRouter()
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
-  const sp = useMemo(() => getDashboardDictionary(language).sitePlatforms, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection, [uiLocale])
+  const sp = useMemo(() => getDashboardDictionary(uiLocale).sitePlatforms, [uiLocale])
 
   // K1 — a clean connection success from the project page drops the user straight
   // into the Content Hub for this project (validated internal path; no open redirect).

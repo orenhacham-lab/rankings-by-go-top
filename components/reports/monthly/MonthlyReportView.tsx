@@ -15,7 +15,7 @@ import { useState, type ReactNode } from 'react'
 import {
   ArrowRight, Bot, CalendarClock, Check, Copy, FileText, LineChart, Search, Sparkles, TrendingDown, TrendingUp,
 } from 'lucide-react'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { KeywordMove, MonthlyReportData } from '@/lib/reports/monthly/types'
 import { LinkButton, StatusPill, WidgetEmpty } from '@/components/dashboard/ui'
 import { PositionChange } from '@/components/ui/StatusBadge'
@@ -30,7 +30,7 @@ export interface MonthlyReportViewProps {
   data: MonthlyReportData
   generatedAt: string
   generatedBy: 'cron' | 'owner'
-  language: Locale
+  language: PublicLocale
   projectLabel: string
 }
 
@@ -95,7 +95,7 @@ function MoveRow({ move, t, direction }: { move: KeywordMove; t: MonthlyCopy; di
   )
 }
 
-function Moves({ data, t, l, direction }: { data: MonthlyReportData; t: MonthlyCopy; l: Locale; direction: 'up' | 'down' }) {
+function Moves({ data, t, l, direction }: { data: MonthlyReportData; t: MonthlyCopy; l: PublicLocale; direction: 'up' | 'down' }) {
   const r = data.rankings
   const moves = direction === 'up' ? r.improved : r.dropped
   const total = direction === 'up' ? r.improvedCount : r.droppedCount

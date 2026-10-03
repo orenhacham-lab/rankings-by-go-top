@@ -86,8 +86,8 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
   /** The platform the page already detected (the article viewer's top bar); the gate then does not read it again. */
   detected?: PublishPlatformState
 }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.publishGate, [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub.editor.publishGate, [uiLocale])
   const dir: 'rtl' | 'ltr' = language === 'he' ? 'rtl' : 'ltr'
 
   // Platform by connection VALIDITY (shared resolver), not row existence — a

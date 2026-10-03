@@ -110,11 +110,17 @@ async function main() {
     // asked Supabase who is signed in (an effect), so a static render cannot see
     // them; the nav's source is checked instead, then the builder it uses.
     const nav = strip(read('components/PublicNav.tsx'))
-    const navOk = (src: string) => /const signupHref = authHref\('signup', locale\)/.test(src) && /const loginHref = authHref\('login', locale\)/.test(src)
+    // The nav is on a THREE-language public site while the auth forms are still
+    // bilingual, so it narrows the page's locale at the boundary
+    // (toBilingualLocale) instead of inventing a second link builder. Both
+    // spellings satisfy this: what matters is that the link comes from authHref
+    // and from the page's own locale, not from a ternary on the path.
+    const navOk = (src: string) => /const signupHref = authHref\('signup', (?:locale|toBilingualLocale\(locale\))\)/.test(src)
+      && /const loginHref = authHref\('login', (?:locale|toBilingualLocale\(locale\))\)/.test(src)
       && (src.match(/href=\{signupHref\}/g) ?? []).length === 2 && (src.match(/href=\{loginHref\}/g) ?? []).length === 2
     check('A7: the nav (desktop and mobile) links to sign-up and sign-in through authHref in the page\'s locale', navOk(nav))
     check('MUTATION CONTROL: the old `locale === \'en\' ? \'/en/signup\' : \'/signup\'` nav is caught',
-      !navOk(nav.replace("const signupHref = authHref('signup', locale)", "const signupHref = locale === 'en' ? '/en/signup' : '/signup'")))
+      !navOk(nav.replace(/const signupHref = authHref\('signup', [^)]*\)?\)/, "const signupHref = locale === 'en' ? '/en/signup' : '/signup'")))
     check('A8: so the Hebrew nav leads to /signup?lang=he and /login?lang=he, the English nav to /en/signup and /en/login',
       authHref('signup', 'he') === '/signup?lang=he' && authHref('login', 'he') === '/login?lang=he' && authHref('signup', 'en') === '/en/signup' && authHref('login', 'en') === '/en/login')
   }

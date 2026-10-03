@@ -35,8 +35,8 @@ export default function ScanOverview({
   /** Where the research came from, when it is not the scan alone (the project's own research, with its date). */
   sourceOverride?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan
   const date = mode === 'scan' ? formatResearchDate(fetchedAt, language) : null
   const badge = mode === 'manual' ? t.overview.badgeManual : running ? t.overview.badgeRunning : t.overview.badgeDone
   const source = sourceOverride ?? (mode === 'manual'

@@ -48,8 +48,8 @@ export default function SeedNotice({
   tone?: 'warn' | 'info'
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).seedOnboarding
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).seedOnboarding
   const { title, body } = noticeCopy(notice, language)
   const isWait = WAIT_NOTICES.includes(notice.key)
 

@@ -20,8 +20,8 @@ const BADGE: Record<PostBadgeKey, 'success' | 'warning' | 'danger' | 'info' | 'n
 
 /** Every post of the project with the one status that matters: is it on Google, under review, or why not. */
 export default function PostsList({ projectId, posts, onChanged }: { projectId: string; posts: GbpPostView[]; onChanged: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   const fmt = formatDate(language)
   const { confirm, dialog } = useConfirm()
   const [error, setError] = useState<string | null>(null)

@@ -10,10 +10,7 @@ export const metadata: Metadata = {
   description: 'Discover keyword ideas with Google Ads data. Check search volume, competition, and CPC estimates. Add keywords directly to rank tracking and AI questions.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/keyword-research',
-    languages: buildHreflangAlternates(
-      '/features/keyword-research',
-      '/en/features/keyword-research'
-    ),
+    languages: buildHreflangAlternates('/features/keyword-research', '/en/features/keyword-research', '/es/features/keyword-research'),
   },
 }
 

@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: 'Track your business mentions in ChatGPT, Gemini, Perplexity, and Google AI. Monitor GEO - Generative Engine Optimization.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/ai-visibility-tracking',
-    languages: buildHreflangAlternates(
-      '/features/ai-visibility-tracking',
-      '/en/features/ai-visibility-tracking'
-    ),
+    languages: buildHreflangAlternates('/features/ai-visibility-tracking', '/en/features/ai-visibility-tracking', '/es/features/ai-visibility-tracking'),
   },
 }
 

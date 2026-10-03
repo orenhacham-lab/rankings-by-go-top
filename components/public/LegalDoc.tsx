@@ -12,7 +12,7 @@ import { ChevronRight } from 'lucide-react'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 import { CONTAINER } from './marketing'
 
@@ -34,7 +34,7 @@ export const LEGAL_PROSE = cn(
 export function LegalFrame({
   locale, breadcrumbs, children,
 }: {
-  locale: Locale
+  locale: PublicLocale
   breadcrumbs: Crumb[]
   children: React.ReactNode
 }) {
@@ -66,7 +66,7 @@ export function LegalHeader({ title, subtitle }: { title: React.ReactNode; subti
 export function LegalDoc({
   locale, breadcrumbs, title, subtitle, children,
 }: {
-  locale: Locale
+  locale: PublicLocale
   breadcrumbs: Crumb[]
   title: React.ReactNode
   subtitle?: React.ReactNode

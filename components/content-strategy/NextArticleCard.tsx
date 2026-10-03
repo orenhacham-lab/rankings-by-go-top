@@ -34,7 +34,7 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { NextArticle, StrategyOrigin } from '@/lib/content/strategy/board'
 import { STRATEGY_ANCHORS, strategyHref } from '@/lib/content/strategy/view'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { generationErrorCopy } from '@/lib/content/strategy/copy'
 import { canRejectIdea, type IdeaTarget } from '@/lib/content/strategy/ideas'
@@ -63,7 +63,7 @@ type FirstErrors = Dict['seedOnboarding']['firstArticle']['errors']
 function FirstArticlePanel({ first, date, lang, dict, hasSite, connectHref, publishing, onPublish }: {
   first: Exclude<FirstArticleView, { kind: 'none' }>
   date: string | null
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
   /** null while the connection is not read yet. */
   hasSite: boolean | null
@@ -143,7 +143,7 @@ export default function NextArticleCard({
   onPublishFirst?: () => void
   next: NextArticle | null
   hasArticles: boolean
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
   /** The board card the next article is, when it is an idea; with `act`, its actions show here. */
   idea?: IdeaTarget | null

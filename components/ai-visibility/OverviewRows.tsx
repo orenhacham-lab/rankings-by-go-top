@@ -54,8 +54,8 @@ export function formatWhen(iso: string | null, language: Locale, dateOnly = fals
 }
 
 function useCopy() {
-  const { language } = useDashboardLanguage()
-  return { c: getDashboardDictionary(language).aiVisibilityOverview, language }
+  const { language, uiLocale } = useDashboardLanguage()
+  return { c: getDashboardDictionary(uiLocale).aiVisibilityOverview, language }
 }
 
 // ── Row 1 ────────────────────────────────────────────────────────────────────

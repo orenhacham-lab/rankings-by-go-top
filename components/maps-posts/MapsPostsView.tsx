@@ -35,8 +35,8 @@ export function withAuthLost(status: GbpReadyStatus, authLost: boolean): GbpRead
 }
 
 function Screen({ projectId }: { projectId: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   const [status, setStatus] = useState<GbpStatus | null>(null)
   const [failed, setFailed] = useState(false)
   const [flash, setFlash] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
@@ -90,8 +90,8 @@ function Screen({ projectId }: { projectId: string }) {
 }
 
 export default function MapsPostsView() {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   return (
     <div>
       <Header title={t.title} subtitle={t.subtitle} />

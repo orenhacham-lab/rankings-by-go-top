@@ -45,8 +45,8 @@ export function formatShare(share: number, language: string): string {
 const OUTCOME_BADGE: Record<BattleOutcome, 'success' | 'danger' | 'warning' | 'neutral'> = { win: 'success', loss: 'danger', tie: 'warning', none: 'neutral' }
 
 function VisibilityShare({ share, domain, siteIcon }: { share: CompetitiveShare; domain: string | null; siteIcon: string | null }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).researchCompetitive
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.share
   const n = (v: number) => formatCount(v, language)
   const date = formatResearchDate(share.checkedAt, language) ?? ''
@@ -128,8 +128,8 @@ function VisibilityShare({ share, domain, siteIcon }: { share: CompetitiveShare;
 }
 
 function Battles({ model }: { model: CompetitiveModel }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).researchCompetitive
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.battles
   const n = (v: number) => formatCount(v, language)
   const [all, setAll] = useState(false)
@@ -229,8 +229,8 @@ function Battles({ model }: { model: CompetitiveModel }) {
 
 /** Competitors the scan found, offered one click each (only where they can be added from here). */
 function SuggestedCompetitors({ suggested, onAdd, adding }: { suggested: string[]; onAdd: (domain: string) => void; adding: string | null }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).researchCompetitive.competitors
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).researchCompetitive.competitors
   if (suggested.length === 0) return null
   return (
     <div data-competitive-suggested="" className="mt-4 w-full max-w-md text-start">
@@ -262,8 +262,8 @@ export default function CompetitorStanding({ model, domain, siteIcon, manageHref
   onAddCompetitor: (domain: string) => void
   addingCompetitor: string | null
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).researchCompetitive.competitors
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).researchCompetitive.competitors
   const hasTracked = model.rankingCounts.tracked > 0
 
   if (model.competitorsState === 'none') {

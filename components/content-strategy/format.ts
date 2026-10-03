@@ -3,12 +3,12 @@
  * are keyed 'YYYY-MM' in the browser's time zone (lib/content/strategy/board.ts
  * monthKey), and these turn keys and times into words.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import { intlLocaleOf, type PublicLocale } from '@/lib/i18n/locales'
 
-const intlLocale = (lang: Locale) => (lang === 'he' ? 'he-IL' : 'en-US')
+const intlLocale = intlLocaleOf
 
 /** "12 Oct" / "12 באוק׳". */
-export function shortDate(iso: string | null, lang: Locale): string | null {
+export function shortDate(iso: string | null, lang: PublicLocale): string | null {
   if (!iso) return null
   const ms = Date.parse(iso)
   if (!Number.isFinite(ms)) return null
@@ -16,7 +16,7 @@ export function shortDate(iso: string | null, lang: Locale): string | null {
 }
 
 /** The parts of the next article's date tile: weekday, day of the month, month. */
-export function dateTile(iso: string | null, lang: Locale): { weekday: string; day: string; month: string } | null {
+export function dateTile(iso: string | null, lang: PublicLocale): { weekday: string; day: string; month: string } | null {
   if (!iso) return null
   const ms = Date.parse(iso)
   if (!Number.isFinite(ms)) return null
@@ -26,7 +26,7 @@ export function dateTile(iso: string | null, lang: Locale): { weekday: string; d
 }
 
 /** A month chip's label: the month, and its year only when it is not this year. */
-export function monthLabel(key: string, lang: Locale, now: Date = new Date()): string {
+export function monthLabel(key: string, lang: PublicLocale, now: Date = new Date()): string {
   const [y, m] = key.split('-').map(Number)
   if (!y || !m) return key
   const d = new Date(Date.UTC(y, m - 1, 15))
@@ -39,7 +39,7 @@ export function fill(template: string, values: Record<string, string | number>):
 }
 
 /** "Sunday, 4 October" / "יום ראשון, 4 באוקטובר": a publish date in a sentence. */
-export function longDate(iso: string | null, lang: Locale): string | null {
+export function longDate(iso: string | null, lang: PublicLocale): string | null {
   if (!iso) return null
   const ms = Date.parse(iso)
   if (!Number.isFinite(ms)) return null

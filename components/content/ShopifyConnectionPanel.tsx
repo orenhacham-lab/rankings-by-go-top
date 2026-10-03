@@ -38,8 +38,8 @@ type Counts = { product: number; collection: number; page: number; blog: number;
 const ZERO: Counts = { product: 0, collection: 0, page: 0, blog: 0, article: 0 }
 
 export default function ShopifyConnectionPanel({ projectId, onChanged }: { projectId: string; onChanged?: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.shopify, [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection.shopify, [uiLocale])
   const dir: 'ltr' | 'rtl' = language === 'he' ? 'rtl' : 'ltr'
   const g = t.guide
 

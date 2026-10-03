@@ -11,7 +11,7 @@ export const metadata = {
   },
   alternates: {
     canonical: 'https://www.gotopseo.com/en/pricing',
-    languages: buildHreflangAlternates('/pricing', '/en/pricing'),
+    languages: buildHreflangAlternates('/pricing', '/en/pricing', '/es/pricing'),
   },
 }
 

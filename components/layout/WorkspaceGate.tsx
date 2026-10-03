@@ -35,8 +35,8 @@ export default function WorkspaceGate({
 }) {
   const { activeProjectId, isResolved, projectsError, reloadProjects } = useActiveProject()
   const { project, status, reload } = useProjectRow(isResolved ? activeProjectId : null)
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).workspace
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).workspace
 
   if (isResolved && projectsError) {
     return (

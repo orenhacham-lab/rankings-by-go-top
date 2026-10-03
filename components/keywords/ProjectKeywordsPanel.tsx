@@ -42,8 +42,8 @@ const TREND_CHECKS = 8
 
 export default function ProjectKeywordsPanel({ project }: { project: Project }) {
   const id = project.id
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const k = dict.projectDetail
   const kp = dict.keywordsPage
 

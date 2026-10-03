@@ -51,8 +51,8 @@ export default function ArticlesScreen() {
     handleCreateTopic,
   } = useContentWorkspace()
   // Wix / custom-site wording (the rest of this screen's copy is the content hub's).
-  const { language } = useDashboardLanguage()
-  const sp = getDashboardDictionary(language).sitePlatforms
+  const { language, uiLocale } = useDashboardLanguage()
+  const sp = getDashboardDictionary(uiLocale).sitePlatforms
   const siteError = (code: unknown) => (sp.errors as Record<string, string>)[String(code ?? '')] ?? sp.errors.unexpected
   // Publishing goes live, so it asks first — in the app's own dialog, not the browser's.
   const { confirm, dialog: confirmDialog } = useConfirm()
@@ -461,7 +461,7 @@ export default function ArticlesScreen() {
         // The list's shape while this project's articles are read: never
         // "no articles yet" to a merchant whose articles are on their way.
         <div className="mb-6" data-articles-loading="">
-          <TableSkeleton label={getDashboardDictionary(language).common.loading} rows={4} />
+          <TableSkeleton label={getDashboardDictionary(uiLocale).common.loading} rows={4} />
         </div>
       ) : (data?.articles?.length ?? 0) === 0 ? (
         <Card padding={false} className="mb-6">

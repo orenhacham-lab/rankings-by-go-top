@@ -130,8 +130,8 @@ export default function ArticleBriefModal({
   // project never sees another business's niche as its example.
   exampleTerm?: string | null
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).contentHub.brief
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).contentHub.brief
   const isHebrew = language === 'he'
   // Stage E2B strict reviewed-topic mode: no Gemini suggestions, one manual topic, locked project.
   const gscMode = mode === 'gsc_reviewed_topic'
@@ -624,11 +624,11 @@ export default function ArticleBriefModal({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <span id="brief-lang-label" className={FIELD_LABEL_CLASSES}>{t.language}</span>
-            <Segmented<'he' | 'en'>
+            <Segmented<SuggestionLanguage>
               ariaLabel={t.language}
               value={briefLang}
               onChange={(l) => setBriefLang(l)}
-              options={[{ value: 'he', label: t.languageHe }, { value: 'en', label: t.languageEn }]}
+              options={[{ value: 'he', label: t.languageHe }, { value: 'en', label: t.languageEn }, { value: 'es', label: t.languageEs }]}
               className="w-fit"
             />
           </div>
@@ -875,7 +875,7 @@ export default function ArticleBriefModal({
                   {overlapShown.length > 1 && <p className="text-caption font-semibold text-muted">{topic}</p>}
                   <OverlapHint
                     overlap={overlap}
-                    language={language}
+                    uiLocale={uiLocale}
                     busy={saving}
                     onCreateAnyway={i === overlapShown.length - 1 ? () => { setOverlaps(null); void handleSave(true) } : undefined}
                   />

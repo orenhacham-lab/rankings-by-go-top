@@ -14,7 +14,7 @@
  *
  * Run: npx tsx components/public/__qa__/refund-policy.qa.ts
  */
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean) {
@@ -75,9 +75,16 @@ check('MUTATION — the old name is caught', OLD_NAME.test(en.replace('GO TOP MA
 
 // Reachable: footer, both sitemaps, the XML sitemap, the Hebrew segment list.
 const footer = read('components/Footer.tsx')
-check('footer links the policy in both languages', /href=\{`\$\{prefix\}\/refund-policy`\}/.test(footer)
+// The footer names the legal pages under legalPrefix, which is now the page's
+// own prefix: each language has its own documents, Spanish included.
+check('footer links the policy in every language', /href=\{`\$\{legalPrefix\}\/refund-policy`\}/.test(footer)
+  && /const legalPrefix = prefix/.test(footer)
   && /refundPolicy: 'מדיניות ביטול והחזרים'/.test(read('lib/i18n/public/he.ts'))
-  && /refundPolicy: 'Cancellation and Refund Policy'/.test(read('lib/i18n/public/en.ts')))
+  && /refundPolicy: 'Cancellation and Refund Policy'/.test(read('lib/i18n/public/en.ts'))
+  && /refundPolicy: 'Política de cancelación y reembolso'/.test(read('lib/i18n/public/es.ts')))
+check('and the Spanish policy is a page with a text behind it',
+  existsSync('app/(public)/es/refund-policy/page.tsx')
+  && /Pol[íi]tica de cancelaci[óo]n y reembolso/.test(read('content/legal/es/refund-policy.md')))
 check('he sitemap page lists it', /href: '\/refund-policy'/.test(read('app/(public)/sitemap/page.tsx')))
 check('en sitemap page lists it', /href: '\/en\/refund-policy'/.test(read('app/(public)/en/sitemap/page.tsx')))
 const xml = read('app/sitemap.xml/route.ts')

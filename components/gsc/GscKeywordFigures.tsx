@@ -162,8 +162,8 @@ const LINE = 'mt-1 flex max-w-[22rem] flex-wrap items-center gap-x-2 gap-y-0.5 w
 
 /** The line under a keyword's name: Google's 28-day average for that search. */
 export function GscGoogleAverage({ view, targetId }: { view: GscKeywordsView; targetId: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets.googleAverage
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets.googleAverage
   const data = view.data
   if (data.state === 'disabled') return null
   if (data.state === 'loading') {
@@ -219,8 +219,8 @@ export function GscGoogleAverage({ view, targetId }: { view: GscKeywordsView; ta
 
 /** One caption above the table, once the figures are there: what the line is, and its date. */
 export function GscKeywordsLegend({ view, className }: { view: GscKeywordsView; className?: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets.googleAverage
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets.googleAverage
   const data = view.data
   // A caption for the lines, not a widget: the widget is the notice under the table,
   // which is always mounted. Without figures there is nothing to caption.
@@ -253,8 +253,8 @@ export function GscKeywordsNotice({ projectId, view, onTrack, targets, slot, cla
   slot?: 'top' | 'bottom'
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   const data = view.data
   if (data.state === 'disabled') return null
   if (isGscSetupState(data.state)) {
@@ -317,8 +317,8 @@ export function GscKeywordsNotice({ projectId, view, onTrack, targets, slot, cla
  * never the tab's main action, the keyword check is.
  */
 function GscConnectCard({ state, projectId, className }: { state: GscSetupState; projectId: string | null | undefined; className?: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   const c = t.connect
   return (
     <section

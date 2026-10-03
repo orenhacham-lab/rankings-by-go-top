@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
 import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
-  explicitRequestLocale, languageCookieString, sanitizeNextPath,
+  explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
 } from '@/lib/i18n/request-locale'
 import {
   isRestrictedPath, logRestrictedAttempt, noticeLocaleForPath,
@@ -75,9 +75,9 @@ export async function proxy(request: NextRequest) {
   // dir="rtl" for every response — including English ones — and only a client
   // effect corrected it after hydration.
   //
-  // Set ONLY when this request decides the locale on its own — an /en route, or
-  // an explicit cookie. With neither, the header is omitted so a server layout
-  // can still apply its seed (the signup language in auth metadata), which the
+  // Set ONLY when this request decides the locale on its own — an /en or /es
+  // route, or an explicit cookie. With neither, the header is omitted so a
+  // server layout can still apply its seed (the signup language in auth metadata), which the
   // proxy cannot see. Sending a default here would silently outrank that seed
   // and give an English signup a Hebrew first page on a fresh device.
   //
@@ -103,7 +103,13 @@ export async function proxy(request: NextRequest) {
    * (`/en/*`, `/privacy`, the Shopify surface) is a property of that URL and
    * must never be remembered as the account's preference.
    */
-  const localeToPersist = normalizedLangParam(langParam)
+  // …but NOT when it would narrow a wider choice the reader already made:
+  // localeParamToPersist says why, and is tested in
+  // lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts group 9.
+  const localeToPersist = localeParamToPersist(
+    request.cookies.get(LANGUAGE_COOKIE)?.value ?? null,
+    normalizedLangParam(langParam),
+  )
   const persistLocale = (res: NextResponse): NextResponse => {
     if (localeToPersist) {
       res.headers.append('set-cookie', languageCookieString(localeToPersist, request.nextUrl.protocol === 'https:'))

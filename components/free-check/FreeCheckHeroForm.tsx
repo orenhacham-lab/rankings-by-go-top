@@ -15,14 +15,14 @@ import { ArrowRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { freeCheckCopy } from '@/lib/free-check/copy'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 
 /**
  * `inverse` is the home hero's navy variant (wave 8): a white 56px field and
  * the action button on a frosted plate, start-aligned under the headline.
  */
-export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Locale; tone?: 'default' | 'inverse' }) {
+export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: PublicLocale; tone?: 'default' | 'inverse' }) {
   const inverse = tone === 'inverse'
   const copy = freeCheckCopy(locale)
   const router = useRouter()

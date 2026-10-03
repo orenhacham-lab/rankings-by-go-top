@@ -267,6 +267,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.google.com': 'the search engine whose public results are read, with no customer data attached',
     'en.wikipedia.org': 'a reference URL recognised in a site’s existing links',
     'he.wikipedia.org': 'a reference URL recognised in a site’s existing links',
+    'es.wikipedia.org': 'a reference URL recognised in a site’s existing links',
     'www.wikidata.org': 'a sameAs profile URL a customer may enter themselves',
     'www.facebook.com': 'a sameAs profile URL a customer may enter themselves; the Meta pixel is covered by its own section',
     'www.instagram.com': 'a sameAs profile URL a customer may enter themselves',
@@ -283,6 +284,8 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // Literals that are examples or test shapes even outside __qa__.
     'example.com': 'placeholder in a comment or default',
     'www.example.com': 'placeholder in a comment or default',
+    'ejemplo.com': 'the Spanish placeholder, example.com’s counterpart in the Spanish copy',
+    'www.ejemplo.com': 'the Spanish placeholder, example.com’s counterpart in the Spanish copy',
     'app.example.com': 'placeholder in a comment or default',
     'shop.com': 'placeholder in a comment or default',
     'destination.com': 'placeholder in a comment or default',

@@ -43,8 +43,8 @@ export default function ProjectForm({
   fieldNotes,
   onUpdated,
 }: ProjectFormProps) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const f = dict.projects.form
 
   const onlyClient = implicitClientId(clients)
@@ -212,6 +212,7 @@ export default function ProjectForm({
             options={withCurrentOption([
               { value: 'he', label: f.languageHe },
               { value: 'en', label: f.languageEn },
+              { value: 'es', label: f.languageEs },
               { value: 'ar', label: f.languageAr },
             ], startLanguage, (code) => languageName(code, language))}
           />

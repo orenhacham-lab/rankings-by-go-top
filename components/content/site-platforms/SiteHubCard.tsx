@@ -37,8 +37,8 @@ function useSiteConnection(projectId: string | null) {
 }
 
 export default function SiteHubCard({ projectId }: { projectId: string }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const sp = dict.sitePlatforms
   const { conn, loading } = useSiteConnection(projectId)
   if (loading || !conn) return null
@@ -63,8 +63,8 @@ export default function SiteHubCard({ projectId }: { projectId: string }) {
 }
 
 export function SitePublishCard({ projectId, articleId }: { projectId: string; articleId: string }) {
-  const { language } = useDashboardLanguage()
-  const sp = useMemo(() => getDashboardDictionary(language).sitePlatforms, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const sp = useMemo(() => getDashboardDictionary(uiLocale).sitePlatforms, [uiLocale])
   const { conn } = useSiteConnection(projectId)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string | null } | null>(null)

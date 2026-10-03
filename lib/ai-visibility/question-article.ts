@@ -9,6 +9,7 @@
  */
 import type { SearchIntent } from '@/lib/content/topic-brief'
 import type { QuestionWorth } from './question-worth'
+import type { ContentLanguage } from '@/lib/content/language'
 
 export type ContextTopic = { id: string; topic: string; status: string; article: { id: string; status: string } | null }
 
@@ -49,7 +50,7 @@ export function topicBriefForQuestion(input: {
   projectId: string
   question: string
   intent: string
-  language: 'he' | 'en'
+  language: ContentLanguage
   worth: QuestionWorth | null | undefined
   note: string
 }) {

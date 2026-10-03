@@ -32,8 +32,8 @@ import type { EmptyReason, ProgressStep } from '@/lib/keyword-research/scan-stat
  * research lands where they were. Without research, the form takes their place.
  */
 export function ScanLoadingSkeleton() {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan
   // The shared Skeleton (final review R34): one shimmer and one radius family, never a
   // raw animate-pulse. On the ink card it is the same shimmer, faded to read as ink.
   const onInk = 'opacity-15'
@@ -71,8 +71,8 @@ export function ScanLoadingSkeleton() {
 }
 
 export function ScanPendingCard() {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan
   return (
     <section data-scan-state="pending" className="mb-6" aria-busy="true">
       <HeroPanel className="p-5 sm:p-8">
@@ -86,8 +86,8 @@ export function ScanPendingCard() {
 }
 
 export function ScanRunningCard({ seedKeywords, steps }: { seedKeywords: string[]; steps: ProgressStep[] }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.running
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.running
   return (
     <section data-scan-state="running" className="mb-6">
       <HeroPanel className="p-5 sm:p-8">
@@ -140,8 +140,8 @@ export function ScanEmptyCard({
   onRetry: () => void
   onUseSeeds: () => void
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.empty
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.empty
   return (
     <section data-scan-state="empty" data-scan-reason={reason} className="mb-6">
       <Card>

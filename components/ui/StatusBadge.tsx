@@ -8,8 +8,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export function ActiveBadge({ active }: { active: boolean }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   return (
     <Badge variant={active ? 'success' : 'neutral'}>
       {active ? dict.common.active : dict.common.inactive}
@@ -18,8 +18,8 @@ export function ActiveBadge({ active }: { active: boolean }) {
 }
 
 export function ScanStatusBadge({ status }: { status: string }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
 
   const map: Record<string, { variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label: string }> = {
     completed: { variant: 'success', label: dict.scans.status.completed },
@@ -32,8 +32,8 @@ export function ScanStatusBadge({ status }: { status: string }) {
 }
 
 export function EngineBadge({ engine, device }: { engine: string; device?: string | null }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
 
   if (engine === 'google_search') {
     let label: string
@@ -80,8 +80,8 @@ export function PositionChange({ change }: { change: number | null }) {
  * has one: a coloured badge on each row was noise that competed with the positions.
  */
 export function EngineLabel({ engine, device }: { engine: string; device?: string | null }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const maps = engine === 'google_maps'
   const label = maps
     ? dict.common.engineGoogleMaps

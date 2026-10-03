@@ -17,6 +17,7 @@ import { sanitizeArticleHtml, slugify } from '@/lib/content/article-html'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { runArticleAudit, type AuditResult } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
+import { normalizeContentLanguage } from '@/lib/content/language'
 // Anchor placement is included inside runArticleAudit.
 
 const EDITABLE_STATUSES = ['draft', 'ready'] as const
@@ -41,7 +42,7 @@ async function computeAudit(admin: ReturnType<typeof createAdminClient>, article
   }
   const { data: project } = await admin.from('projects').select('business_name').eq('id', article.project_id as string).maybeSingle()
   const decoded = decodeBriefNotes((topic?.brief_notes as string) ?? null)
-  const language = String(topic?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  const language = normalizeContentLanguage(topic?.language)
 
   return runArticleAudit({
     language,

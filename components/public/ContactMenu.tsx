@@ -15,7 +15,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronDown, Mail, Phone } from 'lucide-react'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { cn } from '@/lib/utils'
 import { contactChannels, type ContactChannel } from './contact'
@@ -34,7 +34,7 @@ function ChannelIcon({ id }: { id: ContactChannel['id'] }) {
   )
 }
 
-export function ContactRows({ locale, onPick, className }: { locale: Locale; onPick?: () => void; className?: string }) {
+export function ContactRows({ locale, onPick, className }: { locale: PublicLocale; onPick?: () => void; className?: string }) {
   const t = getPublicDictionary(locale).contact
   return (
     <ul className={cn('flex flex-col gap-0.5', className)} data-contact-rows>
@@ -59,7 +59,7 @@ export function ContactRows({ locale, onPick, className }: { locale: Locale; onP
   )
 }
 
-export function ContactMenu({ locale, linkClassName }: { locale: Locale; linkClassName: string }) {
+export function ContactMenu({ locale, linkClassName }: { locale: PublicLocale; linkClassName: string }) {
   const dict = getPublicDictionary(locale)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)

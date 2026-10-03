@@ -18,6 +18,7 @@ import Badge from '@/components/ui/Badge'
 import Notice from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ChevronDown, RefreshCw } from 'lucide-react'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
 
@@ -60,8 +61,8 @@ interface IndexStatus {
   }
 }
 
-export default function InternalLinkIndexStatus({ projectId, language }: { projectId: string; language: 'he' | 'en' }) {
-  const t = useMemo(() => getDashboardDictionary(language).contentHub.internalLinkIndex, [language])
+export default function InternalLinkIndexStatus({ projectId, uiLocale }: { projectId: string; uiLocale: PublicLocale }) {
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub.internalLinkIndex, [uiLocale])
   const [status, setStatus] = useState<IndexStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -220,7 +221,7 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
                 </span>
               )}
               {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-muted">·</span>}
-              {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt)}</span>}
+              {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt, uiLocale)}</span>}
               {status?.scannerVersion && <span>{t.scannerVersion} {status.scannerVersion}</span>}
               {status?.truncated ? <span className="font-medium text-ink">{t.truncated}</span> : null}
             </div>
@@ -244,8 +245,8 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
                 {status?.siteUrl && <div className="min-w-0 sm:col-span-2">{t.siteUrl}: <span dir="ltr" title={status.siteUrl} className="inline-block max-w-64 truncate align-bottom">{status.siteUrl}</span></div>}
                 <div>{t.scannerVersion}: {status?.scannerVersion ?? '—'} · {t.currentVersion}: {status?.currentScannerVersion ?? '—'}</div>
                 <div>{t.ttlDays}: {status?.ttlDays ?? '—'}</div>
-                {status?.scanStartedAt && <div>{t.startedAt}: {formatDateTime(status.scanStartedAt)}</div>}
-                {status?.expiresAt && <div>{t.expires}: {formatDateTime(status.expiresAt)}</div>}
+                {status?.scanStartedAt && <div>{t.startedAt}: {formatDateTime(status.scanStartedAt, uiLocale)}</div>}
+                {status?.expiresAt && <div>{t.expires}: {formatDateTime(status.expiresAt, uiLocale)}</div>}
                 {typeof status?.scanDurationMs === 'number' && <div>{t.duration}: {status.scanDurationMs}ms</div>}
                 <div>{t.cStored}: {c.targetsStored ?? 0}</div>
                 {/* Phase 3I.2 — full skip-reason breakdown + type mix. */}

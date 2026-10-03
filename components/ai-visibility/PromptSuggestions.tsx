@@ -72,8 +72,8 @@ export default function PromptSuggestions({
   onAdded: () => void
 }) {
   // UI follows dashboard language; scan parameters (language/country) remain separate
-  const { language: dashboardLanguage } = useDashboardLanguage()
-  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const { language: dashboardLanguage, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(uiLocale), [uiLocale])
   const isHebrew = dashboardLanguage === 'he'
 
   const intentLabel = (intent: string): string => {

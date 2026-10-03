@@ -12,7 +12,7 @@
  * Renders nothing while the report tables are not installed.
  */
 import { CalendarRange, Plus } from 'lucide-react'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { MonthlyGetResponse } from '@/lib/reports/monthly/http'
 import Button from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -28,7 +28,7 @@ export const MONTHLY_REPORTS_ANCHOR = 'monthly-reports'
 
 export function MonthlyReportsBody({ body, language: l, projectLabel, selected, onSelect, onGenerate, generating, switching }: {
   body: MonthlyGetResponse
-  language: Locale
+  language: PublicLocale
   projectLabel: string
   selected: string | null
   onSelect: (month: string) => void
@@ -134,7 +134,7 @@ function prevMonthKey(iso: string): string {
 export default function MonthlyReports({ projectId, projectLabel, language, toasts }: {
   projectId: string | null
   projectLabel: string
-  language: Locale
+  language: PublicLocale
   /** The screen's toasts: making a report shows its progress and outcome there. */
   toasts?: ReturnType<typeof useToasts>
 }) {

@@ -57,8 +57,8 @@ function panelRead(response: GscResponse | undefined): PanelRead {
 }
 
 export default function GscPanel({ projectId, connectOrigin = 'project' }: { projectId: string; connectOrigin?: 'hub' | 'project' }) {
-  const { language } = useDashboardLanguage()
-  const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t: Dict = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection.gsc, [uiLocale])
   // In-app questions (never window.confirm): both disconnects are destructive, so danger.
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -343,7 +343,7 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
             <div className="rounded-inset border border-line p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h4 className="text-copy font-semibold text-ink">{t.selectPropertyTitle}</h4>
-                <button type="button" onClick={() => setPickerOpen(false)} aria-label={getDashboardDictionary(language).common.close} className="grid size-8 place-items-center rounded-control text-muted transition-colors duration-150 hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"><X className="size-4" aria-hidden="true" /></button>
+                <button type="button" onClick={() => setPickerOpen(false)} aria-label={getDashboardDictionary(uiLocale).common.close} className="grid size-8 place-items-center rounded-control text-muted transition-colors duration-150 hover:bg-sunk hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"><X className="size-4" aria-hidden="true" /></button>
               </div>
               {loadingProps ? (
                 <div className="py-3 text-copy text-muted">{t.loadingProperties}</div>

@@ -13,10 +13,7 @@ export const metadata: Metadata = {
     'Plan topics, get a complete AI-generated article draft, edit it, schedule it, and publish straight to WordPress or Shopify — all from one place.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/seo-geo-content-publishing',
-    languages: buildHreflangAlternates(
-      '/features/seo-geo-content-publishing',
-      '/en/features/seo-geo-content-publishing'
-    ),
+    languages: buildHreflangAlternates('/features/seo-geo-content-publishing', '/en/features/seo-geo-content-publishing', '/es/features/seo-geo-content-publishing'),
   },
 }
 

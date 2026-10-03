@@ -25,7 +25,8 @@ import type { PublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 type Props = {
   dict: PublicDictionary['cookie']
-  isEnglish: boolean
+  /** Writing direction of the page the panel opened on: Hebrew is rtl, English and Spanish ltr. */
+  ltr: boolean
   initial: ConsentChoices
   onSave: (choices: ConsentChoices) => void
   onClose: () => void
@@ -33,7 +34,7 @@ type Props = {
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function ConsentPreferences({ dict, isEnglish, initial, onSave, onClose }: Props) {
+export function ConsentPreferences({ dict, ltr, initial, onSave, onClose }: Props) {
   const [choices, setChoices] = useState<ConsentChoices>(initial)
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -72,7 +73,7 @@ export function ConsentPreferences({ dict, isEnglish, initial, onSave, onClose }
   return (
     <div
       className="fixed inset-0 z-[70] flex items-end justify-center bg-scrim p-3 sm:items-center sm:p-6"
-      dir={isEnglish ? 'ltr' : 'rtl'}
+      dir={ltr ? 'ltr' : 'rtl'}
       data-consent-veil
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import type { Locale } from '@/lib/i18n/locales'
+import { localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 interface BreadcrumbItem {
@@ -11,9 +11,9 @@ interface BreadcrumbItem {
 }
 
 /** `inverse`: light ink, for a navy hero (the About page). */
-export function Breadcrumbs({ items, locale = 'he', inverse = false }: { items: BreadcrumbItem[]; locale?: Locale; inverse?: boolean }) {
+export function Breadcrumbs({ items, locale = 'he', inverse = false }: { items: BreadcrumbItem[]; locale?: PublicLocale; inverse?: boolean }) {
   const dict = getPublicDictionary(locale)
-  const homeHref = locale === 'en' ? '/en' : '/'
+  const homeHref = localeHomeHref(locale)
   const linkClass = inverse
     ? 'rounded-control text-contrast-ink/75 transition-colors duration-150 ease-snappy hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40'
     : 'rounded-control text-muted transition-colors duration-150 ease-snappy hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'

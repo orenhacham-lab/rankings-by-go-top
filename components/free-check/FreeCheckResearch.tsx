@@ -27,7 +27,7 @@ import { NoticeBox } from '@/components/ui/Notice'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import { authHref } from '@/lib/i18n/auth-href'
 import { FixedDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import type { Locale } from '@/lib/i18n/locales'
+import { toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
 import { readSiteInput } from '@/lib/onboarding/site-input'
 import { INITIAL_STEPS, knownResearchCode, readResearchStream, researchRun, withStep } from '@/lib/presignup/client'
 import { researchScreenCopy } from '@/lib/presignup/copy'
@@ -37,7 +37,7 @@ import HeroBackdrop from '@/components/public/HeroBackdrop'
 
 type Phase = 'form' | 'progress' | 'summary' | 'fallback'
 
-export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale; initialUrl?: string }) {
+export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: PublicLocale; initialUrl?: string }) {
   const copy = freeCheckCopy(locale)
   const screen = researchScreenCopy(locale)
   const dir = locale === 'he' ? 'rtl' : 'ltr'
@@ -146,8 +146,13 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
           onSubmit={() => void start(url)}
         />
       )}
+      {/* The research SUMMARY is the dashboard's own component tree, read from the
+          dashboard dictionary, which has no Spanish yet — so this screen runs in
+          the nearest language it has. It is behind an off flag on every locale;
+          the Spanish free check renders FreeCheckExperience, whose copy is fully
+          translated. */}
       {phase !== 'form' && (
-        <FixedDashboardLanguage locale={locale}>
+        <FixedDashboardLanguage locale={toBilingualLocale(locale)}>
           <div className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 md:pt-10">
             {phase === 'progress' && <SeedProgress run={researchRun(steps)} domain={domain} projectId={null} reconnecting={false} />}
             {phase === 'summary' && view && (
@@ -162,8 +167,8 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
                 serverNow={serverNow}
                 onContinued={() => {}}
                 preview={{
-                  signupHref: authHref('signup', locale, { claim: claimToken }),
-                  loginHref: authHref('login', locale),
+                  signupHref: authHref('signup', toBilingualLocale(locale), { claim: claimToken }),
+                  loginHref: authHref('login', toBilingualLocale(locale)),
                   lockedCompetitors: view.locked.competitors,
                   lockedKeywords: view.locked.keywords,
                   after: claimToken ? <ReportRequest locale={locale} token={claimToken} /> : null,
@@ -182,7 +187,7 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: Locale;
  * starts unticked and the request is refused without it (the server refuses
  * too, and stores its own copy of these words, never the browser's).
  */
-function ReportRequest({ locale, token }: { locale: Locale; token: string }) {
+function ReportRequest({ locale, token }: { locale: PublicLocale; token: string }) {
   const t = researchScreenCopy(locale).report
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')

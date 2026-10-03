@@ -36,7 +36,7 @@
  */
 
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from './catalog'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /**
  * A plan capped at ONE website describes its allowances per account, because
@@ -62,9 +62,28 @@ function isSingleProject(code: PlanCode): boolean {
  */
 interface LimitLines { articles: string; projects: string; keywords: string; google: string; ai: string }
 
-function limitLinesFor(code: PlanCode, locale: Locale): LimitLines {
+function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
   const c = PLAN_CATALOG[code]
   const single = isSingleProject(code)
+  // Spanish, for the /es pricing page. Same five lines, same order, same
+  // numbers from the catalog: only the sentence frames are translated.
+  if (locale === 'es') {
+    return {
+      articles: single
+        ? `${c.maxArticlesPerPeriodAccountWide} artículos al mes, escritos y publicados en tu web automáticamente`
+        : `${c.maxArticlesPerPeriodAccountWide} artículos al mes, escritos y publicados automáticamente, compartidos entre todas tus webs`,
+      projects: single ? '1 web' : `Hasta ${c.maxProjects} webs`,
+      keywords: single
+        ? `Seguimiento de hasta ${c.maxKeywordsPerProject} palabras clave`
+        : `Seguimiento de hasta ${c.maxKeywordsPerProject} palabras clave por web`,
+      google: single
+        ? `Hasta ${c.maxGoogleChecksPerPeriodPerProject} comprobaciones de posición en Google al mes`
+        : `Hasta ${c.maxGoogleChecksPerPeriodPerProject} comprobaciones de posición en Google al mes por web`,
+      ai: single
+        ? `Hasta ${c.maxAIChecksPerPeriodPerProject} comprobaciones de visibilidad en IA al mes`
+        : `Hasta ${c.maxAIChecksPerPeriodPerProject} comprobaciones de visibilidad en IA al mes por web`,
+    }
+  }
   if (locale === 'en') {
     return {
       // THE MAIN VALUE, and the first line of every plan: articles written and
@@ -107,14 +126,14 @@ function limitLinesFor(code: PlanCode, locale: Locale): LimitLines {
  * Ordering lives HERE, once. A page that re-sorted the array itself would be
  * the same drift this module exists to prevent.
  */
-export function planLimitLines(code: PlanCode, locale: Locale): string[] {
+export function planLimitLines(code: PlanCode, locale: PublicLocale): string[] {
   const l = limitLinesFor(code, locale)
   return [l.articles, l.projects, l.keywords, l.google, l.ai]
 }
 
 /** The article sentence on its own, for callers that want the sentence rather
  *  than an index into the array. */
-export function planArticleLine(code: PlanCode, locale: Locale): string {
+export function planArticleLine(code: PlanCode, locale: PublicLocale): string {
   return limitLinesFor(code, locale).articles
 }
 
@@ -132,9 +151,10 @@ export function planArticleLineIndex(code: PlanCode): number {
  * as the "how usage is counted" section: a Google check is one keyword in one
  * place (Google or Google Maps), an AI check is one question to one AI engine.
  */
-export const CHECKS_EXPLAINER: Record<Locale, string> = {
+export const CHECKS_EXPLAINER: Record<PublicLocale, string> = {
   en: 'A Google ranking check looks up where one keyword appears in Google or Google Maps. An AI visibility check asks one AI engine one question, for example ChatGPT, and sees whether your business is mentioned in the answer.',
   he: 'בדיקת מיקום בגוגל בודקת איפה מילת מפתח אחת מופיעה בגוגל או בגוגל מפות. בדיקת נראות ב-AI שואלת מנוע AI אחד שאלה אחת, למשל ChatGPT, ובודקת אם העסק שלכם מוזכר בתשובה.',
+  es: 'Una comprobación de posición en Google mira en qué puesto aparece una palabra clave en Google o en Google Maps. Una comprobación de visibilidad en IA hace una pregunta a un motor de IA, por ejemplo ChatGPT, y comprueba si tu negocio se menciona en la respuesta.',
 }
 
 /**
@@ -142,8 +162,18 @@ export const CHECKS_EXPLAINER: Record<Locale, string> = {
  * plans, from TRIAL_CATALOG. The trial allowances are for the whole trial, not
  * per month, and the lines say so.
  */
-export function trialLimitLines(locale: Locale): string[] {
+export function trialLimitLines(locale: PublicLocale): string[] {
   const t = TRIAL_CATALOG
+  if (locale === 'es') {
+    return [
+      'Un artículo de prueba, desde la redacción hasta la publicación',
+      '1 web',
+      `Hasta ${t.maxKeywordsPerProject} palabras clave`,
+      `Hasta ${t.maxGoogleChecksLifetime} comprobaciones de posición en Google durante la prueba`,
+      `Hasta ${t.maxAIChecksLifetime} comprobaciones de visibilidad en IA durante la prueba`,
+      `${t.days} días de prueba`,
+    ]
+  }
   if (locale === 'en') {
     return [
       'One article to try, from writing to publishing',
@@ -178,11 +208,11 @@ export function trialLimitLines(locale: Locale): string[] {
  * visitor, so interactive state, a URL parameter or a cookie would be
  * persistence bought for nothing.
  */
-export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<Locale, string>> = {
-  regular: { en: 'One website', he: 'לאתר אחד' },
-  advanced: { en: 'One website', he: 'לאתר אחד' },
-  premium: { en: 'Multiple websites', he: 'למספר אתרים' },
-  large_agency: { en: 'Agencies', he: 'לסוכנויות' },
+export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<PublicLocale, string>> = {
+  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web' },
+  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web' },
+  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs' },
+  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias' },
 }
 
 /**
@@ -191,21 +221,25 @@ export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<Locale, string>> = {
  * Advanced is a ONE-WEBSITE plan. Every phrasing implying several sites is
  * gone, and `pricing-copy-and-layout.qa.ts` fails if one returns anywhere in the tree.
  */
-export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<Locale, string>> = {
+export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, string>> = {
   regular: {
     en: 'One website, a simple place to start',
     he: 'אתר אחד, התחלה פשוטה',
+    es: 'Una web, un punto de partida sencillo',
   },
   advanced: {
     en: 'For one website that needs more articles and more tracking',
     he: 'לאתר אחד שצריך יותר מאמרים ויותר מעקב',
+    es: 'Para una web que necesita más artículos y más seguimiento',
   },
   premium: {
     en: 'For businesses and agencies running several websites',
     he: 'לעסקים ולסוכנויות שמנהלים כמה אתרים',
+    es: 'Para empresas y agencias que gestionan varias webs',
   },
   large_agency: {
     en: 'For agencies with many clients',
     he: 'לסוכנויות עם הרבה לקוחות',
+    es: 'Para agencias con muchos clientes',
   },
 }

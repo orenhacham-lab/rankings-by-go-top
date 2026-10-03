@@ -43,7 +43,7 @@ Usted puede cancelar la renovación de su suscripción en cualquier momento desd
 
 ## 7. Reembolsos
 
-Las tarifas de suscripción no son reembolsables respecto de un período que ya haya comenzado o haya sido pagado, salvo cuando la ley exija un reembolso. Las solicitudes de cancelación conforme a la ley deben presentarse por escrito a la dirección de correo electrónico de la Empresa. Los detalles completos figuran en nuestra [Política de Cancelación y Reembolso](/en/refund-policy).
+Las tarifas de suscripción no son reembolsables respecto de un período que ya haya comenzado o haya sido pagado, salvo cuando la ley exija un reembolso. Las solicitudes de cancelación conforme a la ley deben presentarse por escrito a la dirección de correo electrónico de la Empresa. Los detalles completos figuran en nuestra [Política de Cancelación y Reembolso](/es/refund-policy).
 
 **7.1 Consumidores en la UE y el Reino Unido.** Si usted adquirió el Servicio como consumidor particular, sin fines comerciales, y reside en la Unión Europea o en el Reino Unido, tiene derecho a desistir del contrato en un plazo de 14 días desde su celebración, sin necesidad de indicar el motivo. Para ejercerlo, envíenos una notificación por escrito a la dirección de correo electrónico indicada en la sección 21 dentro de esos 14 días.
 

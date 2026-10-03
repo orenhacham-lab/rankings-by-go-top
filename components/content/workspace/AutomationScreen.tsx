@@ -18,7 +18,7 @@ import { useContentWorkspace } from './ContentWorkspaceProvider'
 
 export default function AutomationScreen({ proFirst = false }: { proFirst?: boolean }) {
   const {
-    t, language, projectId, loadTopics,
+    t, uiLocale, projectId, loadTopics,
     ideasSection, changeIdeasSection, scheduleSectionRef,
     automationRefresh, setAutomationRefresh, ideasSuccessSignal, linkPlanSavedHint, ctaScrollSignal,
     setNewTopics, setNewTopicsUnchecked, setNewTopicsSelected, setPlanStatus,
@@ -53,7 +53,7 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
           <AutomationIdeas
             proFirst={proFirst}
             projectId={projectId}
-            language={language}
+            uiLocale={uiLocale}
             onCreated={loadTopics}
             onScheduled={handleScheduled}
             onTopicsCreated={(created, unchecked, selected) => { if (created.length) { setNewTopicsUnchecked(unchecked ?? {}); setNewTopicsSelected(selected ?? {}); setNewTopics(created) } }}
@@ -82,7 +82,7 @@ export default function AutomationScreen({ proFirst = false }: { proFirst?: bool
           <AutomationSchedule
             projectId={projectId}
             articles={data?.articles}
-            language={language}
+            uiLocale={uiLocale}
             refreshKey={automationRefresh}
             onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
           />

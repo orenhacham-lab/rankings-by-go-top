@@ -49,7 +49,7 @@ export default function ArticlesPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <PublicNav />
+      <PublicNav locale="he" />
 
       <main className="flex-1">
         <PageHero
@@ -147,7 +147,7 @@ export default function ArticlesPage() {
           </div>
         </Section>
       </main>
-      <Footer />
+      <Footer locale="he" />
     </div>
   )
 }

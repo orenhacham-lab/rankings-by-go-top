@@ -143,7 +143,12 @@ function main() {
       && /decide\('accept_all', CONSENT_GRANTED\)/.test(comp)
       && /decide\('reject_all', CONSENT_DENIED\)/.test(comp)
       && /writeConsent\(action, next\)/.test(comp)
-      && /reportConsent\(record, isEnglish \? 'en' : 'he'\)/.test(comp)
+      // The decision has to be logged under the language it was READ in, so the
+      // argument must be derived from the page rather than a constant. It used to
+      // pin `isEnglish ? 'en' : 'he'` literally, which broke the moment a third
+      // public language arrived; what matters is that a language is passed and
+      // that it is not hard-coded.
+      && /reportConsent\(record, (?!['"])[A-Za-z]/.test(comp)
       && /onClick=\{handleReject\}/.test(comp)
       // the legacy flag is only ever REMOVED, never read as a grant
       && /removeItem\(LEGACY_CONSENT_KEY\)/.test(st)
@@ -154,7 +159,9 @@ function main() {
     check('MUT: dropping the reject button fails E1', !contractOk(c.replace('onClick={handleReject}', 'onClick={handleAccept}'), store))
     check('MUT: honouring the old accept-only flag as a grant fails E1',
       !contractOk(c, store.replace('window.localStorage.removeItem(LEGACY_CONSENT_KEY)', 'window.localStorage.getItem(LEGACY_CONSENT_KEY)')))
-    check('MUT: dropping the audit-log report fails E1', !contractOk(c.replace(/reportConsent\(record, isEnglish \? 'en' : 'he'\)/g, 'void 0'), store))
+    check('MUT: dropping the audit-log report fails E1', !contractOk(c.replace(/reportConsent\(record, [^)]*\)/g, 'void 0'), store))
+    check('MUT: logging every decision under one hard-coded language fails E1',
+      !contractOk(c.replace(/reportConsent\(record, [^)]*\)/g, "reportConsent(record, 'he')"), store))
     check('E2: the popup is at the left in both languages (physical left-*, no start/end)', /left-24/.test(c) && /left-3\.5/.test(c) && !/\b(?:start|end)-\d/.test(c))
   }
 

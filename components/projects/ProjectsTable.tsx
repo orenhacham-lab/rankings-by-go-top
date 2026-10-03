@@ -27,8 +27,8 @@ interface ProjectsTableProps {
 }
 
 export default function ProjectsTable({ projects, clients, showClient = true, onProjectsChange }: ProjectsTableProps) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   // The top bar's switcher lists the active projects. Every change made here
   // (a rename, deactivating, reactivating, deleting) reloads that list, or the
   // switcher would keep offering what this table just changed.

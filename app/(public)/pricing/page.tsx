@@ -49,7 +49,7 @@ export default async function PricingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <PublicNav />
+      <PublicNav locale="he" />
 
       <main className="flex-1">
         <MarketingHero
@@ -170,7 +170,7 @@ export default async function PricingPage() {
         />
       </main>
 
-      <Footer />
+      <Footer locale="he" />
     </div>
   )
 }

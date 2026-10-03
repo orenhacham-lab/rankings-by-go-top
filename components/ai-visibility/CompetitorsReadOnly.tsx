@@ -46,8 +46,8 @@ export default function CompetitorsReadOnly({
   scanDomains: string[]
   manageHref: string
 }) {
-  const { language } = useDashboardLanguage()
-  const c = getDashboardDictionary(language).aiVisibilityOverview
+  const { uiLocale } = useDashboardLanguage()
+  const c = getDashboardDictionary(uiLocale).aiVisibilityOverview
   const [state, setState] = useState<ReadState>({ status: 'loading' })
 
   const [attempt, setAttempt] = useState(0)

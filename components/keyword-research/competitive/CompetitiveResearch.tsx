@@ -69,8 +69,8 @@ export default function CompetitiveResearch({ projectId, siteIcon, suggested, on
   /** A keyword was added to the tracked set (the page re-reads its own list). */
   onTracked?: () => void
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).researchCompetitive
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const { view, reload } = useCompetitive(projectId)
   const gsc = useGscStatus(projectId)
   const screen = competitiveScreen(view, gsc.view)

@@ -17,6 +17,7 @@ import { newRunCostController } from '@/lib/content/recommendations/run-cost-con
 import { BillingExhaustedError } from '@/lib/content/recommendations/model'
 import { assertContentGenerationAllowedForUser, gateDenialHttp } from '@/lib/content/entitlement-guard'
 import { randomUUID } from 'crypto'
+import { normalizeContentLanguage } from '@/lib/content/language'
 
 export const runtime = 'nodejs'
 
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
   // Project language (default Hebrew) so the polish stays in the site's language.
   const { data: proj } = await auth.admin.from('projects').select('language').eq('id', auth.project.id).maybeSingle()
-  const language: 'he' | 'en' = String((proj as { language?: string } | null)?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  const language = normalizeContentLanguage((proj as { language?: string } | null)?.language)
 
   try {
     const controller = newRunCostController('premium', randomUUID(), 1, { maxModelCallsPerRun: 1 })

@@ -161,8 +161,8 @@ function CompetitionBadge({ c }: { c: ReturnType<typeof competitionCell> }) {
 }
 
 export default function KeywordResearchPage() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.keywordResearch
   const isRTL = language === 'he'
   const router = useRouter()
@@ -1498,7 +1498,7 @@ export default function KeywordResearchPage() {
         questions={generatedAIQuestions}
         selectedProject={selectedProject}
         projects={projects}
-        language={language as 'he' | 'en'}
+        uiLocale={uiLocale}
         isRTL={isRTL}
         onAddQuestions={handleAddAIQuestions}
         loading={addingAIQuestions}
@@ -1515,7 +1515,7 @@ export default function KeywordResearchPage() {
           setTrendError('')
         }}
         keyword={selectedTrendKeyword}
-        language={language as 'he' | 'en'}
+        uiLocale={uiLocale}
         isRTL={isRTL}
         loading={trendLoading}
         error={trendError}

@@ -70,9 +70,9 @@ const LINK_GHOST = 'inline-flex h-8 items-center gap-1.5 rounded-control px-3 te
 export default function GscRecommendations({ projectId, onToast, className }: {
   projectId: string; onToast?: (kind: 'success' | 'error', text: string) => void; className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscRecommendations, [language])
-  const w = useMemo(() => getDashboardDictionary(language).gscWidgets.recommendations, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t: Dict = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection.gscRecommendations, [uiLocale])
+  const w = useMemo(() => getDashboardDictionary(uiLocale).gscWidgets.recommendations, [uiLocale])
   // Whether there is anything to read at all: connection, property and a sync.
   const gsc = useGscStatus(projectId)
   const gscReady = gsc.view.state === 'ready'

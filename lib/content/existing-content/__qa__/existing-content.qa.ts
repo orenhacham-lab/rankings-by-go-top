@@ -298,7 +298,9 @@ async function main() {
       && v.value.search_intent === 'commercial' && v.value.primary_keyword === 'trail runner' && v.value.language === 'he' && /[א-ת]/.test(v.value.topic))
     check('D10: the topic is in the PROJECT\'s language, not the dashboard\'s',
       REAL_MODEL.topicLanguage('en-US') === 'en' && REAL_MODEL.topicLanguage('he') === 'he' && REAL_MODEL.topicLanguage(null) === 'he'
-      && /\bwriteSupport\b[\s\S]*topicLanguage\(selectedProject\?\.language\)/.test(screen) && /getDashboardDictionary\(lang\)\.existingContent\.supportTopic/.test(screen))
+      && /\bwriteSupport\b[\s\S]*topicLanguage\(selectedProject\?\.language\)/.test(screen) // The dictionary is derived from the PROJECT language; it may be narrowed on the
+      // way in, because the dashboard dictionaries have no Spanish yet.
+      && /getDashboardDictionary\((?:toHebrewOrEnglish\()?lang\)?\)\.existingContent\.supportTopic/.test(screen))
 
     // Both dictionaries carry the same keys; Hebrew is Hebrew, English is English.
     const keys = (o: unknown, p = ''): string[] => (o && typeof o === 'object')

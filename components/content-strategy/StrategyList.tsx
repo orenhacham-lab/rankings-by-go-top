@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
 import { STRATEGY_COLUMNS, type StrategyCard, type StrategyColumn } from '@/lib/content/strategy/board'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import TopicFacts from './TopicFacts'
 import { ACCENT, IdeaButtons, type BoardIdeaActions } from './StrategyBoard'
@@ -29,7 +29,7 @@ export const LIST_PREVIEW = 10
 const ROW_GRID = 'md:grid md:grid-cols-[minmax(0,1fr)_10rem_minmax(0,15rem)] md:items-start md:gap-4'
 
 function Row({ card, lang, dict, act, canSwap, insight }: {
-  card: StrategyCard; lang: Locale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean; insight?: TopicInsight
+  card: StrategyCard; lang: PublicLocale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean; insight?: TopicInsight
 }) {
   const s = dict.contentStrategy
   const date = shortDate(card.date, lang)
@@ -85,7 +85,7 @@ function Row({ card, lang, dict, act, canSwap, insight }: {
 }
 
 function Stage({ column, cards, lang, dict, act, insights }: {
-  column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; act: BoardIdeaActions | null; insights: ReadonlyMap<string, TopicInsight> | null
+  column: StrategyColumn; cards: StrategyCard[]; lang: PublicLocale; dict: Dict; act: BoardIdeaActions | null; insights: ReadonlyMap<string, TopicInsight> | null
 }) {
   const s = dict.contentStrategy
   const l = dict.strategyInsights.list
@@ -128,7 +128,7 @@ function Stage({ column, cards, lang, dict, act, insights }: {
 
 export default function StrategyList({ cards, lang, dict, act = null, insights = null }: {
   cards: readonly StrategyCard[]
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
   act?: BoardIdeaActions | null
   insights?: ReadonlyMap<string, TopicInsight> | null

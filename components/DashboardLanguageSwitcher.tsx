@@ -2,6 +2,8 @@
 
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { cn } from '@/lib/utils'
+import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /**
  * The switch renders from the FIRST render, in the server-resolved language.
@@ -13,10 +15,20 @@ import { cn } from '@/lib/utils'
  * render, and the handlers only run on click, which cannot happen earlier.
  */
 export function DashboardLanguageSwitcher() {
-  const { language, setDashboardLanguage } = useDashboardLanguage()
+  const { uiLocale, setDashboardLanguage } = useDashboardLanguage()
 
-  // A segmented control on the sidebar's ink: two options on one track, the
-  // chosen one lifted onto a light chip. Each option names itself in its own language (lang=…),
+  // The languages the dashboard HAS, in the order a reader meets them. Spanish
+  // appears only while the Spanish build is on: the flag is the one gate for the
+  // whole language, and a switcher that offers a half-translated dashboard is
+  // the thing lib/i18n/spanish-site.ts exists to prevent.
+  const options: Array<{ locale: PublicLocale; lang: string; label: string }> = [
+    { locale: 'he', lang: 'he', label: 'עברית' },
+    { locale: 'en', lang: 'en', label: 'EN' },
+    ...(spanishSiteEnabled() ? [{ locale: 'es' as PublicLocale, lang: 'es', label: 'ES' }] : []),
+  ]
+
+  // A segmented control on the sidebar's ink: one track, the chosen option
+  // lifted onto a light chip. Each option names itself in its own language (lang=…),
   // so a screen reader pronounces "עברית" in Hebrew from an English screen.
   const option = (active: boolean) => cn(
     'h-7 rounded-[calc(var(--radius-control)-2px)] px-2 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy',
@@ -25,25 +37,24 @@ export function DashboardLanguageSwitcher() {
   )
 
   return (
-    <div className="grid grid-cols-2 gap-0.5 rounded-control border border-rail-line bg-rail-hover p-0.5">
-      <button
-        type="button"
-        lang="he"
-        aria-pressed={language === 'he'}
-        onClick={() => setDashboardLanguage('he')}
-        className={option(language === 'he')}
-      >
-        עברית
-      </button>
-      <button
-        type="button"
-        lang="en"
-        aria-pressed={language === 'en'}
-        onClick={() => setDashboardLanguage('en')}
-        className={option(language === 'en')}
-      >
-        EN
-      </button>
+    <div
+      // The track holds as many options as there are languages, so adding one
+      // does not need a second class name kept in step with the array.
+      className="grid gap-0.5 rounded-control border border-rail-line bg-rail-hover p-0.5"
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map((o) => (
+        <button
+          key={o.locale}
+          type="button"
+          lang={o.lang}
+          aria-pressed={uiLocale === o.locale}
+          onClick={() => setDashboardLanguage(o.locale)}
+          className={option(uiLocale === o.locale)}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }

@@ -1383,6 +1383,7 @@ export const dashboardEn = {
       language: 'Language',
       languageHe: 'עברית',
       languageEn: 'English',
+      languageEs: 'Español',
       toneOfVoice: 'Tone of voice',
       tones: {
         professional: 'Professional',
@@ -2739,6 +2740,7 @@ export const dashboardEn = {
       languageLabel: 'Language',
       languageHe: 'Hebrew',
       languageEn: 'English',
+      languageEs: 'Spanish',
       languageAr: 'Arabic',
       cityLabel: 'City / Area',
       cityLabelUS: 'City, State *',

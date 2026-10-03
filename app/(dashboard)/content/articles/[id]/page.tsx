@@ -49,8 +49,8 @@ type Audit = { score: number; blockers: string[]; warnings: string[]; counts: Au
 
 export default function ArticleEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { language } = useDashboardLanguage()
-  const c = useMemo(() => getDashboardDictionary(language).contentHub, [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const c = useMemo(() => getDashboardDictionary(uiLocale).contentHub, [uiLocale])
   const e = c.editor
   const isHebrew = language === 'he'
   const auditLabel = (code: string) => (e.auditCodes as Record<string, string>)[code] || code
@@ -460,7 +460,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   if (!enabled) {
-    return <div className="py-20 text-center text-muted text-copy">{getDashboardDictionary(language).common.notAvailable}</div>
+    return <div className="py-20 text-center text-muted text-copy">{getDashboardDictionary(uiLocale).common.notAvailable}</div>
   }
   if (loading) {
     return (
@@ -567,11 +567,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           tone={isPublished ? 'warn' : 'bad'}
           title={isPublished ? e.auditBlockersPublished : e.auditBlockers}
           items={audit.blockers.map((b) => auditLabel(b))}
-          moreLabel={getDashboardDictionary(language).uiKit.noticeMore}
+          moreLabel={getDashboardDictionary(uiLocale).uiKit.noticeMore}
         />
       )}
       {audit.warnings.length > 0 && (
-        <AuditList tone="warn" title={e.auditWarnings} items={audit.warnings.map((w) => auditLabel(w))} moreLabel={getDashboardDictionary(language).uiKit.noticeMore} />
+        <AuditList tone="warn" title={e.auditWarnings} items={audit.warnings.map((w) => auditLabel(w))} moreLabel={getDashboardDictionary(uiLocale).uiKit.noticeMore} />
       )}
       {audit.blockers.length === 0 && audit.warnings.length === 0 && (
         <Notice tone="ok">{e.auditAllGood}</Notice>
@@ -886,7 +886,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             status={status}
             isPublished={isPublished}
             contentHtml={contentHtml}
-            language={language}
+            uiLocale={uiLocale}
             onContentReplaced={resyncContentHtml}
             applyOutcome={ilpApplyOutcome}
             rollbackAvailable={ilpRollbackAvailable}

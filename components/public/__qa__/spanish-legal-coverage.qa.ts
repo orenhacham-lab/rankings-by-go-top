@@ -145,10 +145,24 @@ for (const doc of DOCS) {
 check('the contact documents carry the company number',
   /517274346/.test(files['refund-policy']) || /517274346/.test(files.terms))
 
-// ── 5) no link to a route this branch does not have ─────────────────────────
+// ── 5) every internal link points at a route that exists ────────────────────
+// What this used to ask, and why it changed: on the legal branch the /es routes
+// did not exist, so the only safe rule was that no document could link to one.
+// The Spanish branch renders these very documents at /es/terms, /es/privacy,
+// /es/refund-policy and /es/accessibility, so the rule becomes the one it
+// always meant: an internal link has to resolve to a page that is really here,
+// and a Spanish reader is never sent to the English copy of a document that
+// exists in Spanish.
+const SPANISH_ROUTES = DOCS.filter((slug) => existsSync(`app/(public)/es/${slug}/page.tsx`))
+check(`all four Spanish legal routes exist (${SPANISH_ROUTES.length}/${DOCS.length})`, SPANISH_ROUTES.length === DOCS.length,
+  DOCS.filter((d) => !SPANISH_ROUTES.includes(d)).join(', '))
 for (const doc of DOCS) {
   const esLinks = [...files[doc].matchAll(/\]\((\/es\/[^)]*)\)/g)].map((m) => m[1])
-  check(`${doc}: no /es/... link, since those routes are not on this branch`, esLinks.length === 0, esLinks.join(', '))
+  const dangling = esLinks.filter((href) => !existsSync(`app/(public)${href}/page.tsx`))
+  check(`${doc}: every /es/... link resolves to a page on this branch`, dangling.length === 0, dangling.join(', '))
+  const enLinks = [...files[doc].matchAll(/\]\((\/en\/([^)]*))\)/g)].map((m) => m[2])
+  const crossed = enLinks.filter((slug) => (DOCS as readonly string[]).includes(slug))
+  check(`${doc}: no Spanish reader is sent to the English copy of a Spanish document`, crossed.length === 0, crossed.join(', '))
 }
 
 // ── 6) the refund rule, which is the owner's own decision ───────────────────
@@ -170,8 +184,12 @@ check('refund: Spanish invents no unconditional 14-day refund', !/14 d[ií]as/i.
     !privacy.replace(/PDFShift/g, '').includes('PDFShift') && privacy.includes('PDFShift'))
   check('MUTATION — a translated company name is caught',
     TRANSLATED_NAME.test('GO TOP MARKETING DIGITAL S.L.'))
-  check('MUTATION — an /es link is caught',
-    [...'ver los [términos](/es/terms) aquí'.matchAll(/\]\((\/es\/[^)]*)\)/g)].length === 1)
+  check('MUTATION — an /es link to a route that does not exist is caught',
+    [...'ver los [términos](/es/no-such-page) aquí'.matchAll(/\]\((\/es\/[^)]*)\)/g)]
+      .map((m) => m[1]).filter((href) => !existsSync(`app/(public)${href}/page.tsx`)).length === 1)
+  check('MUTATION — a Spanish document linking to the English copy is caught',
+    [...'los [términos](/en/terms)'.matchAll(/\]\((\/en\/([^)]*))\)/g)]
+      .map((m) => m[2]).filter((slug) => (DOCS as readonly string[]).includes(slug)).length === 1)
   check('MUTATION — a missing section is caught',
     ((privacy.replace(/^## /m, '# ').match(/^## /gm) ?? []).length) < ((privacy.match(/^## /gm) ?? []).length))
   check('MUTATION — a 14-day refund promise slipped into Spanish is caught',

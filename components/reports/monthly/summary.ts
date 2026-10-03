@@ -3,11 +3,11 @@
  * summary the "copy summary" button puts on the clipboard (to paste into an email
  * or a message to a client). Pure, from the stored report only.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { MonthlyReportData } from '@/lib/reports/monthly/types'
 import { count, dayMonth, monthName, monthlyCopy } from './copy'
 
-export function headline(data: MonthlyReportData, l: Locale): string {
+export function headline(data: MonthlyReportData, l: PublicLocale): string {
   const c = monthlyCopy(l).headlineParts
   const r = data.rankings
   const parts: string[] = []
@@ -23,7 +23,7 @@ export function headline(data: MonthlyReportData, l: Locale): string {
   return parts.join(' · ')
 }
 
-export function plainTextSummary(data: MonthlyReportData, projectLabel: string, l: Locale): string {
+export function plainTextSummary(data: MonthlyReportData, projectLabel: string, l: PublicLocale): string {
   const t = monthlyCopy(l)
   const lines: string[] = [`${projectLabel} · ${monthName(data.month, l)}`, headline(data, l), '']
   const pos = (p: number | null) => (p === null ? t.outside : String(p))

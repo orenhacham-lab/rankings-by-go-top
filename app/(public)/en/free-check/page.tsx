@@ -17,7 +17,7 @@ export const metadata = {
   },
   alternates: {
     canonical: 'https://www.gotopseo.com/en/free-check',
-    languages: buildHreflangAlternates('/free-check', '/en/free-check'),
+    languages: buildHreflangAlternates('/free-check', '/en/free-check', '/es/free-check'),
   },
 }
 
@@ -46,7 +46,7 @@ export default async function EnglishFreeCheckPage({
       <main className="flex-1 pt-16 lg:pt-[4.5rem]">
         {research ? <FreeCheckResearch locale="en" initialUrl={initialUrl} /> : <FreeCheckExperience locale="en" initialUrl={initialUrl} />}
       </main>
-      <Footer />
+      <Footer locale="en" />
     </div>
   )
 }

@@ -4,33 +4,33 @@
  * self-contained block. Written for this product; nothing is borrowed from
  * another tool's wording.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import { intlLocaleOf, type PublicLocale } from '@/lib/i18n/locales'
 
-const intlLocale = (l: Locale) => (l === 'he' ? 'he-IL' : 'en-US')
+const intlLocale = intlLocaleOf
 
-export function monthName(key: string, l: Locale): string {
+export function monthName(key: string, l: PublicLocale): string {
   const [y, m] = key.split('-').map(Number)
   if (!y || !m) return key
   return new Intl.DateTimeFormat(intlLocale(l), { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, 1)))
 }
 
-export function monthOnly(key: string, l: Locale): string {
+export function monthOnly(key: string, l: PublicLocale): string {
   const [y, m] = key.split('-').map(Number)
   if (!y || !m) return key
   return new Intl.DateTimeFormat(intlLocale(l), { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, 1)))
 }
 
-export function dayMonth(iso: string, l: Locale): string {
+export function dayMonth(iso: string, l: PublicLocale): string {
   const t = Date.parse(iso.length === 10 ? `${iso}T00:00:00Z` : iso)
   if (!Number.isFinite(t)) return iso
   return new Intl.DateTimeFormat(intlLocale(l), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(t))
 }
 
-export function count(n: number, l: Locale): string {
+export function count(n: number, l: PublicLocale): string {
   return new Intl.NumberFormat(intlLocale(l), { maximumFractionDigits: 0 }).format(Math.round(n))
 }
 
-export function decimal(n: number, l: Locale): string {
+export function decimal(n: number, l: PublicLocale): string {
   return new Intl.NumberFormat(intlLocale(l), { maximumFractionDigits: 1 }).format(n)
 }
 
@@ -248,6 +248,112 @@ const en: MonthlyCopy = {
   },
 }
 
-export function monthlyCopy(l: Locale): MonthlyCopy {
-  return l === 'en' ? en : he
+const es: MonthlyCopy = {
+  title: 'Informes mensuales',
+  subtitle: 'El día 1 de cada mes aparece aquí un resumen del mes que acaba de terminar: posiciones, contenido, visibilidad en IA y Search Console. No hay nada que configurar.',
+  monthsLabel: 'Meses',
+  loading: 'Cargando tus informes mensuales…',
+  loadError: 'No hemos podido cargar tus informes mensuales.',
+  retry: 'Volver a intentarlo',
+  firstTitle: (date) => `Tu primer informe mensual llega el ${date}`,
+  firstBody: (month) => `Se construye solo y resume ${month}: qué palabras clave han subido y cuáles han bajado, qué se ha publicado, cómo te han mencionado los motores de IA y qué hay previsto para el mes siguiente. Hasta entonces, los datos siguen llegando.`,
+  firstList: ['El movimiento de tus palabras clave y cuántas están en la primera página', 'Los artículos publicados', 'Menciones y citas en las respuestas de IA', 'Clics e impresiones de Search Console, si está conectado', 'Lo previsto para el mes que viene'],
+  missingTitle: (month) => `El informe de ${month} no se ha creado`,
+  missingBody: 'Esto pasa cuando un proyecto se abrió a mitad de mes o antes de activar los informes mensuales. Puedes crearlo ahora con los datos ya guardados; una vez creado, no cambia.',
+  missingAction: (month) => `Crear el informe de ${month}`,
+  insideTitle: 'Qué cubre cada informe',
+  insideBody: (date) => `A partir de ahí no hay que hacer nada: el siguiente informe se crea solo el ${date}.`,
+  missingFailed: 'No hemos podido crear el informe. Inténtalo dentro de un momento.',
+  generateToast: { pending: 'Creando el informe con los datos guardados. Tarda unos segundos.', done: 'El informe está listo y se muestra aquí.', failed: 'No hemos podido crear el informe. Inténtalo dentro de un momento.' },
+  nextReport: (date) => `Próximo informe: ${date}`,
+  generatedAuto: (date) => `Creado automáticamente el ${date}`,
+  generatedOwner: (date) => `Creado a petición tuya el ${date}`,
+  coversFrom: (date) => `El proyecto se abrió el ${date}, así que el informe empieza ese día.`,
+  copy: 'Copiar el resumen',
+  copied: 'Resumen copiado',
+  headlineParts: {
+    firstPage: (n) => `${n} palabras clave en la primera página de Google`,
+    improved: (n) => `${n} han subido`,
+    dropped: (n) => `${n} han bajado`,
+    published: (n) => `${n} artículos publicados`,
+    clicks: (n) => `${n} clics desde Google`,
+    quiet: 'Un mes tranquilo: sin movimiento de posiciones y sin contenido nuevo.',
+  },
+  tiles: {
+    firstPage: 'En la primera página',
+    firstPageSource: 'Nuestro seguimiento de posiciones · puestos 1-10',
+    wasAtStart: (n) => `Al empezar el mes: ${n}`,
+    improved: 'Palabras clave que han subido',
+    improvedSource: (steady) => `Sin cambios: ${steady}`,
+    published: 'Artículos publicados',
+    publishedSource: 'WordPress y Shopify, desde la aplicación',
+    clicks: 'Clics desde Google',
+    clicksSource: (from, to) => `del ${from} al ${to} · Search Console`,
+    clicksMissing: 'Sin datos',
+    noChecks: 'Sin comprobaciones este mes',
+    noKeywords: 'Sin palabras clave en seguimiento',
+  },
+  improvedTitle: 'Lo que ha subido',
+  droppedTitle: 'Lo que ha bajado',
+  movesSub: 'De la comprobación anterior al mes hasta su última comprobación',
+  outside: 'Fuera del 100',
+  mapsTag: 'Maps',
+  more: (n) => `y ${n} más`,
+  noKeywords: 'Todavía no hay palabras clave en seguimiento, así que no hay movimiento que comparar. Las que añadas estarán en el próximo informe.',
+  noKeywordsAction: 'Añadir palabras clave',
+  noChecks: 'Tus palabras clave no se han comprobado este mes. Para ver movimiento hace falta al menos una comprobación al mes.',
+  noChecksAction: 'Comprobar posiciones',
+  noneImproved: (steady) => `Ninguna palabra clave ha subido este mes. ${steady} han mantenido su posición.`,
+  noneDropped: 'Ninguna palabra clave ha bajado este mes.',
+  singleCheck: 'La mayoría de las palabras clave se han comprobado una sola vez, así que todavía no hay nada que comparar. Su movimiento aparece aquí a partir del mes que viene.',
+  publishedTitle: 'Lo que se ha publicado',
+  publishedNone: (month) => `No se publicó ningún artículo en ${month}. Cada artículo publicado desde la aplicación cuenta en el mes en que salió.`,
+  publishedAction: 'Abrir la estrategia de contenidos',
+  channel: { wordpress: 'WordPress', shopify: 'Shopify', other: 'Publicado' },
+  aiTitle: 'Visibilidad en IA',
+  aiNone: 'Este mes no se ha hecho ninguna comprobación de visibilidad en IA. Con una basta para que el próximo informe muestre cuántas veces te mencionaron y cuándo te citaron como fuente.',
+  aiAction: 'Hacer una comprobación de visibilidad',
+  aiAnswers: 'Respuestas comprobadas',
+  aiMentions: 'Te han mencionado',
+  aiCitations: 'Te han citado como fuente',
+  gscTitle: 'Search Console',
+  gscNotConnected: 'Search Console no está conectado a este proyecto, así que aquí no hay clics ni impresiones. En cuanto lo conectes, todos los informes los incluyen.',
+  gscConnect: 'Conectar Search Console',
+  gscNoData: 'Search Console está conectado, pero ninguna sincronización cubre este mes. Se sincroniza cada semana y las cifras de Google llegan con unos dos días de retraso.',
+  gscClicks: 'Clics',
+  gscImpressions: 'Impresiones',
+  gscWindow: (from, to) => `28 días, del ${from} al ${to}`,
+  gscVsPrevious: (from, to) => `frente al ${from} al ${to}`,
+  planTitle: (month) => `Previsto para ${month}`,
+  planSub: 'Tal como estaba el plan el día en que se creó este informe',
+  planScheduled: 'Programado para publicarse',
+  planQueued: (n) => `${n} artículos esperando en la cola de publicación automática`,
+  planReady: (n) => `${n} artículos escritos y listos para publicar`,
+  planApproved: 'Temas que has aprobado para escribir',
+  planIdeas: 'Ideas propuestas pendientes de tu decisión',
+  planEmpty: 'Todavía no hay plan de contenidos para el mes que viene. Tu estrategia de contenidos propone temas a partir de tus palabras clave, y lo que apruebes aparece aquí.',
+  teaser: {
+    title: 'Informe mensual',
+    open: 'Abrir el informe completo',
+    firstBody: (date) => `Tu primer informe se crea el ${date} y cubre el mes en curso.`,
+    missingBody: (month) => `El informe de ${month} todavía no se ha creado. Puedes crearlo en la pantalla de Informes.`,
+    goToReports: 'Ir a Informes',
+    firstPage: 'Primera página',
+    improved: 'Han subido',
+    published: 'Publicados',
+  },
+  email: {
+    title: 'Resumen semanal por correo',
+    description: 'Un resumen breve de las posiciones y el contenido de este proyecto, una vez por semana.',
+    label: 'Enviarme un resumen semanal',
+    notLive: 'El envío de correos todavía no está activado. Tu preferencia se guarda ahora, y los correos solo empezarán cuando el envío esté en marcha.',
+    on: 'Activado',
+    off: 'Desactivado',
+    saved: 'Guardado',
+    failed: 'No se ha guardado. Inténtalo otra vez.',
+  },
+}
+
+export function monthlyCopy(l: PublicLocale): MonthlyCopy {
+  return l === 'he' ? he : l === 'es' ? es : en
 }

@@ -53,8 +53,8 @@ type Counts = { product: number; collection: number; page: number; blog: number;
 const ZERO: Counts = { product: 0, collection: 0, page: 0, blog: 0, article: 0 }
 
 export default function ContentHubPlatformCard({ projectId, children }: { projectId: string; children: React.ReactNode }) {
-  const { language } = useDashboardLanguage()
-  const cs = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const cs = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection, [uiLocale])
   const t = cs.shopify
 
   const [loading, setLoading] = useState(true)

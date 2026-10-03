@@ -47,7 +47,7 @@ import { useContentWorkspace } from '@/components/content/workspace/ContentWorks
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { buildStrategyBoard, type StrategyCard } from '@/lib/content/strategy/board'
 import { cardInsights, planSearches, topicInsight, type TopicInsight } from '@/lib/content/strategy/insights'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import {
   STRATEGY_ADD_PARAM, STRATEGY_ANCHORS, STRATEGY_VIEW_PARAM, isStrategyAnchor, strategyViewFromParam, wantsAddKeyword,
   type StrategyView,
@@ -128,7 +128,7 @@ function StrategyListView({ proFirst, dict, cards, lang, act, insights, empty = 
   empty?: ReactNode
   dict: Dict
   cards: readonly StrategyCard[] | null
-  lang: Locale
+  lang: PublicLocale
   act: BoardIdeaActions
   insights: ReadonlyMap<string, TopicInsight> | null
 }) {
@@ -193,10 +193,10 @@ function StrategyListView({ proFirst, dict, cards, lang, act, insights, empty = 
 
 export default function ContentStrategyScreen({ proFirst = false }: { proFirst?: boolean }) {
   const {
-    language, projectId, toast, topics, data, automationRefresh, automationEnabled,
+    uiLocale, projectId, toast, topics, data, automationRefresh, automationEnabled,
     load, loadTopics, handleCreateTopic, openPrefilledBrief,
   } = useContentWorkspace()
-  const dict = useMemo(() => getDashboardDictionary(language), [language])
+  const dict = useMemo(() => getDashboardDictionary(uiLocale), [uiLocale])
   const s = dict.contentStrategy
 
   const router = useRouter()
@@ -340,7 +340,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
         <NextArticleCard
           next={board.next}
           hasArticles={board.hasArticles}
-          lang={language}
+          lang={uiLocale}
           dict={dict}
           idea={nextIdea}
           act={act}
@@ -385,16 +385,16 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           </div>
         </div>
 
-        {addOpen && <AddKeywordForm dict={dict} onAdd={actions.addKeyword} onClose={() => setAdding(false)} projectId={projectId} language={language} />}
+        {addOpen && <AddKeywordForm dict={dict} onAdd={actions.addKeyword} onClose={() => setAdding(false)} projectId={projectId} uiLocale={uiLocale} />}
         {/* What the last action did, for a screen reader (the toast says it on screen). */}
         <p role="status" aria-live="polite" className="sr-only">{actions.announcement}</p>
 
         {view === 'list' ? (
-          <StrategyListView proFirst={proFirst} dict={dict} cards={board?.cards ?? null} lang={language} act={act} insights={insights} empty={emptyState} />
+          <StrategyListView proFirst={proFirst} dict={dict} cards={board?.cards ?? null} lang={uiLocale} act={act} insights={insights} empty={emptyState} />
         ) : planEmpty ? (
           emptyState
         ) : board ? (
-          <StrategyBoard cards={board.cards} lang={language} dict={dict} ideasNote={ideasNote} act={act} insights={insights} />
+          <StrategyBoard cards={board.cards} lang={uiLocale} dict={dict} ideasNote={ideasNote} act={act} insights={insights} />
         ) : strategy.status === 'loading' ? (
           <div role="status" aria-busy="true" aria-label={s.loading} className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-card" />)}
@@ -404,9 +404,9 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
 
       {board && board.cards.length > 0 && (
         <>
-          <PlanOverview cards={board.cards} counts={board.counts} searches={searches} lang={language} dict={dict} />
-          <TopicClusters cards={board.cards} insights={insights} lang={language} dict={dict} />
-          <WhatHappensNext counts={board.counts} next={board.next} lang={language} dict={dict} />
+          <PlanOverview cards={board.cards} counts={board.counts} searches={searches} lang={uiLocale} dict={dict} />
+          <TopicClusters cards={board.cards} insights={insights} lang={uiLocale} dict={dict} />
+          <WhatHappensNext counts={board.counts} next={board.next} lang={uiLocale} dict={dict} />
         </>
       )}
     </div>

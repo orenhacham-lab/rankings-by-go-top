@@ -9,6 +9,7 @@
  */
 
 /** The reasoning + quality instructions shared by all recommendation prompts. */
+import { type ContentLanguage } from '@/lib/content/language'
 export function recommendationGuidance(langLabel: string, year: number, count: number): string {
   const he = /hebrew/i.test(langLabel)
   // DOMAIN-NEUTRAL by construction: this shared text is injected into EVERY
@@ -58,7 +59,7 @@ export function recommendationGuidance(langLabel: string, year: number, count: n
 export interface ProjectContext {
   projectName?: string | null
   domain?: string | null
-  language: 'he' | 'en'
+  language: ContentLanguage
   /** Derived best-effort central focus (multi-signal, never name-alone). */
   primaryProjectFocus?: string
   /** Other supported areas that may broaden the set. */

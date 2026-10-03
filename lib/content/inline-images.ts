@@ -18,6 +18,7 @@ import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
 import { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages, type InlineImage, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { assertContentGenerationAllowedForProject, gateDenialCode, isTransientGateDenial } from '@/lib/content/entitlement-guard'
 import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
+import { DEFAULT_CONTENT_LANGUAGE, type ContentLanguage } from '@/lib/content/language'
 
 // Re-export the pure engine (back-compat for existing server-side imports).
 export { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages }
@@ -70,7 +71,7 @@ export async function generateInlineImage(
   try {
     const { data: art } = await admin.from('generated_articles').select('title, topic_id').eq('id', row.article_id).maybeSingle()
     const title = String((art as { title?: string } | null)?.title || '')
-    let language: 'he' | 'en' = 'he'
+    let language: ContentLanguage = DEFAULT_CONTENT_LANGUAGE
     const topicId = (art as { topic_id?: string } | null)?.topic_id
     if (topicId) { const { data: t } = await admin.from('article_topics').select('language').eq('id', topicId).maybeSingle(); language = String((t as { language?: string } | null)?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he' }
     // Brand-neutral concept from the user's prompt (sanitized by the shared helper).

@@ -37,8 +37,8 @@ function pickPoints(body: Record<string, unknown>): TrendPoint[] {
 }
 
 export default function GscPerformance({ projectId, className }: { projectId: string | null | undefined; className?: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   const p = t.performance
   const status = useGscStatus(projectId)
   const trend = useGscMetrics(projectId, status.view, 'trend', pickPoints)
