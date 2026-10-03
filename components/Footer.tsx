@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
@@ -19,7 +19,13 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
   // "מבית GO TOP" / "By GO TOP": the text around the agency's name stays plain, the name is the link.
   const [creditBefore, creditAfter = ''] = dict.footer.credit.split(CREDIT_ANCHOR)
   const prefix = LOCALE_PREFIX[locale]
-  const homeHref = prefix === '/en' ? '/en' : '/'
+  const homeHref = localeHomeHref(locale)
+  // THE LEGAL PAGES ARE NOT TRANSLATED. Terms, privacy, the refund policy and
+  // the accessibility statement exist in Hebrew and English only, so the
+  // Spanish footer links the ENGLISH documents — the ones in force — rather
+  // than `/es/privacy`, which does not exist and would be a 404 in the footer
+  // of every Spanish page. It becomes `/es/...` when those pages do.
+  const legalPrefix = locale === 'he' ? '' : '/en'
   const linkClass = 'rounded-control text-copy text-contrast-ink/70 transition-colors duration-150 ease-snappy hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20'
   const headingClass = 'mb-4 text-caption font-semibold text-contrast-ink'
 
@@ -77,22 +83,22 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
             <h4 className={headingClass}>{dict.footer.legal}</h4>
             <ul className="space-y-2.5">
               <li>
-                <Link href={`${prefix}/privacy`} className={linkClass}>
+                <Link href={`${legalPrefix}/privacy`} className={linkClass}>
                   {dict.footer.privacy}
                 </Link>
               </li>
               <li>
-                <Link href={`${prefix}/terms`} className={linkClass}>
+                <Link href={`${legalPrefix}/terms`} className={linkClass}>
                   {dict.footer.terms}
                 </Link>
               </li>
               <li>
-                <Link href={`${prefix}/refund-policy`} className={linkClass}>
+                <Link href={`${legalPrefix}/refund-policy`} className={linkClass}>
                   {dict.footer.refundPolicy}
                 </Link>
               </li>
               <li>
-                <Link href={`${prefix}/accessibility`} className={linkClass}>
+                <Link href={`${legalPrefix}/accessibility`} className={linkClass}>
                   {dict.footer.accessibility}
                 </Link>
               </li>

@@ -276,6 +276,48 @@ function main() {
       counterpartPath('/es/pricing', 'es', 'he') !== '/es/pricing')
   }
 
+  // ── 6b) Every internal link in the Spanish copy goes somewhere real ─────────
+  console.log('\n6b) the links in the Spanish copy')
+  {
+    // THE LANDING PAGE PREFIXES ITS OWN FEATURE LINKS, so a dictionary that
+    // already carried `/es/...` produced `/es/es/features/...`, a 404 on four
+    // cards of the Spanish home page. A crawl of the built site caught it; this
+    // keeps it caught without a build.
+    const landingHrefs = strings(landingEs).filter((s) => s.path.endsWith('.href')).map((s) => s.text)
+    const featureHrefs = landingHrefs.filter((h) => h.includes('/features/'))
+    check('6b1: the landing feature links are PREFIX-FREE (the page adds the prefix)',
+      featureHrefs.length === 4 && featureHrefs.every((h) => h.startsWith('/features/')), featureHrefs.join(' / '))
+    check('6b2: no value in any Spanish dictionary carries a doubled locale prefix',
+      !allSpanishStrings().some((s) => /\/(es|en)\/(es|en)\//.test(s.text)),
+      allSpanishStrings().filter((s) => /\/(es|en)\/(es|en)\//.test(s.text)).map((s) => s.path).join(' / '))
+    // Every absolute internal path named in the Spanish copy must be a page
+    // that exists — in the Spanish tree, or the English one where Spanish has
+    // nothing (sign-up, and the legal documents).
+    const EXISTS = new Set<string>([
+      ...pageFiles().map((rel) => rel.replace('app/(public)', '').replace(/\/page\.tsx$/, '') || '/es'),
+      '/en', '/en/signup', '/en/login', '/en/privacy', '/en/terms', '/en/refund-policy', '/en/accessibility',
+      '/en/pricing', '/en/free-check', '/en/about', '/en/articles', '/en/sitemap', '/',
+    ])
+    const paths = allSpanishStrings()
+      // Paths, not words that happen to start with a slash ("/mes").
+      .filter((s) => /^\/[a-z-]+(\/[a-z0-9-]+)+/.test(s.text) && !s.text.includes(' '))
+      .map((s) => ({ ...s, text: s.text.split('?')[0].split('#')[0] }))
+      // A landing feature href is relative to the page's own prefix, checked above.
+      .filter((s) => !s.text.startsWith('/features/'))
+    const missing = paths.filter((s) => !EXISTS.has(s.text))
+    check('6b3: every internal path in the Spanish copy is a page that exists',
+      missing.length === 0, missing.map((s) => `${s.path}: ${s.text}`).join(' / '))
+    // The FOOTER is where this bit hardest: it names four legal pages on every
+    // single Spanish page, and none of them has a Spanish version.
+    const footer = strip(read('components/Footer.tsx'))
+    check('6b4: the footer links the legal pages under a prefix of their own, not the page\'s',
+      /const legalPrefix = locale === 'he' \? '' : '\/en'/.test(footer)
+      && ['privacy', 'terms', 'refund-policy', 'accessibility'].every((p) => footer.includes('${legalPrefix}/' + p)))
+    check('6b5: …and its home link follows the page\'s locale', /const homeHref = localeHomeHref\(locale\)/.test(footer))
+    // MUTATION CONTROL
+    check('6b-MUT: a doubled prefix would fail 6b2', /\/(es|en)\/(es|en)\//.test('/es/es/features/x'))
+  }
+
   // ── 7) Nothing bilingual was widened by accident ────────────────────────────
   console.log('\n7) the dashboard and the auth forms are untouched')
   {
@@ -299,6 +341,18 @@ function main() {
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
+}
+
+/** Every string in every Spanish dictionary, for the cross-cutting checks. */
+function allSpanishStrings(): Array<{ path: string; text: string }> {
+  return [
+    ...strings(getPublicDictionary('es'), 'publicDictionary'),
+    ...strings(landingEs, 'landing'),
+    ...strings(pricingEs, 'pricing'),
+    ...strings(freeCheckCopy('es'), 'freeCheck'),
+    ...strings(researchScreenCopy('es'), 'research'),
+    ...strings(FEATURE_COMMON.es, 'featureCommon'),
+  ]
 }
 
 /** Every page.tsx under app/(public)/es, repo-relative. */

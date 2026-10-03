@@ -67,7 +67,11 @@ check('en terms §7: refund only where the law requires, linked', /except where 
 
 // Reachable: footer, both sitemaps, the XML sitemap, the Hebrew segment list.
 const footer = read('components/Footer.tsx')
-check('footer links the policy in both languages', /href=\{`\$\{prefix\}\/refund-policy`\}/.test(footer)
+// The footer now names the legal pages under a prefix of their own
+// (legalPrefix), because they exist in Hebrew and English only: a Spanish page
+// links the English policy rather than a /es one that does not exist.
+check('footer links the policy in both languages', /href=\{`\$\{legalPrefix\}\/refund-policy`\}/.test(footer)
+  && /const legalPrefix = locale === 'he' \? '' : '\/en'/.test(footer)
   && /refundPolicy: 'מדיניות ביטול והחזרים'/.test(read('lib/i18n/public/he.ts'))
   && /refundPolicy: 'Cancellation and Refund Policy'/.test(read('lib/i18n/public/en.ts')))
 check('he sitemap page lists it', /href: '\/refund-policy'/.test(read('app/(public)/sitemap/page.tsx')))

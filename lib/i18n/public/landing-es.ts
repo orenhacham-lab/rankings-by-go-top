@@ -171,7 +171,7 @@ export const landingEs: LandingCopy = {
       title: 'Artículos escritos para que te encuentren, no para rellenar un blog',
       body: 'Cada artículo se construye alrededor de una búsqueda real: títulos salidos de lo que pregunta la gente, una sección de preguntas y respuestas, datos estructurados que leen Google y los motores de IA, y enlaces internos a las páginas que venden. Tú lo revisas, lo ajustas si hace falta, y la plataforma lo publica.',
       points: ['Una imagen destacada e imágenes en el texto', 'Un control de calidad antes de cada publicación', 'Programación y publicación directa en WordPress y Shopify'],
-      href: '/es/features/seo-geo-content-publishing',
+      href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'Esta semana en tu sitio',
         days: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
@@ -189,7 +189,7 @@ export const landingEs: LandingCopy = {
       title: 'Sabe cuándo ChatGPT te recomienda y cuándo elige a un competidor',
       body: 'Les hacemos a los motores de IA las preguntas que hacen tus clientes y comprobamos quién aparece en la respuesta. Verás en qué preguntas ganas, dónde se lleva la recomendación un competidor y qué mejorar en tu sitio.',
       points: ['ChatGPT, Gemini, Perplexity, Copilot, Grok y Google AI', 'Lado a lado con tus competidores', 'Recomendaciones sobre qué cambiar para entrar en la respuesta'],
-      href: '/es/features/ai-visibility-tracking',
+      href: '/features/ai-visibility-tracking',
       visual: {
         heading: 'Quién aparece en la respuesta',
         engines: ['ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'Google AI'],
@@ -207,7 +207,7 @@ export const landingEs: LandingCopy = {
       title: 'Ve cada subida, en Google y en Google Maps',
       body: 'Sigue cada término que te importa, en la búsqueda normal y en Maps por ciudad o zona, con un historial que muestra si los artículos están haciendo su trabajo.',
       points: ['Google orgánico por país, idioma y dispositivo', 'Google Maps por ciudad o zona', 'Investigación de palabras clave con volumen de búsqueda y competencia'],
-      href: '/es/features/google-organic-rank-tracking',
+      href: '/features/google-organic-rank-tracking',
       visual: {
         heading: 'Tus palabras clave',
         columns: ['Palabra clave', 'Posición', 'Cambio'],
@@ -225,7 +225,7 @@ export const landingEs: LandingCopy = {
       title: 'Un informe que puedes enviar a un cliente o a tu jefe, en un clic',
       body: 'Exporta posiciones, tendencias y visibilidad en IA a PDF y Excel. Las agencias llevan varios sitios de clientes desde una sola cuenta, cada uno en su propio proyecto.',
       points: ['PDF y Excel en un clic', 'Varios sitios en una cuenta', 'Todos los datos en un lugar, sin montar informes a mano'],
-      href: '/es/features/seo-geo-reports',
+      href: '/features/seo-geo-reports',
       visual: {
         heading: 'Informe de rendimiento',
         period: 'Septiembre',
