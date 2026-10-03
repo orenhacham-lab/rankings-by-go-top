@@ -12,7 +12,7 @@
  * saw before.
  */
 
-import type { Locale } from './locales'
+import type { PublicLocale } from './locales'
 
 export interface SiteMetadataStrings {
   title: string
@@ -23,7 +23,7 @@ export interface SiteMetadataStrings {
   ogLocale: string
 }
 
-const SITE_METADATA: Record<Locale, SiteMetadataStrings> = {
+const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
   he: {
     title: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top SEO',
     description: 'Go Top SEO - יצירה, תזמון ופרסום תוכן SEO ו-GEO ממקום אחד, לצד מעקב מיקומים בגוגל ונראות ב-AI (ChatGPT, Gemini, Perplexity). להרשמה בחינם כנסו עכשיו',
@@ -40,8 +40,16 @@ const SITE_METADATA: Record<Locale, SiteMetadataStrings> = {
     ogDescription: 'Create, schedule and publish SEO and GEO content from one place, alongside Google rank tracking and visibility in AI answers (ChatGPT, Gemini, Perplexity)',
     ogLocale: 'en_US',
   },
+  es: {
+    title: 'Crea, programa y publica contenido SEO y GEO | Go Top SEO',
+    description: 'Go Top SEO: crea, programa y publica contenido SEO y GEO desde un solo lugar, con seguimiento de posiciones en Google y visibilidad en las respuestas de la IA (ChatGPT, Gemini, Perplexity). Empieza gratis.',
+    keywords: 'creación de contenido SEO, programación de contenido, publicación de contenido, GEO, seguimiento de posiciones, SEO, Google, posicionamiento, Google Maps, visibilidad en IA, ChatGPT, Gemini',
+    ogTitle: 'Crea, programa y publica contenido SEO y GEO — Go Top SEO',
+    ogDescription: 'Crea, programa y publica contenido SEO y GEO desde un solo lugar, con seguimiento de posiciones en Google y visibilidad en las respuestas de la IA (ChatGPT, Gemini, Perplexity)',
+    ogLocale: 'es_ES',
+  },
 }
 
-export function getSiteMetadata(locale: Locale): SiteMetadataStrings {
+export function getSiteMetadata(locale: PublicLocale): SiteMetadataStrings {
   return SITE_METADATA[locale] ?? SITE_METADATA.he
 }

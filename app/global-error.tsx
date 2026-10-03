@@ -10,18 +10,19 @@ import { LANGUAGE_COOKIE, readCookie, resolveRequestLocale } from '@/lib/i18n/re
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { errorPagesUi } from '@/lib/i18n/error-pages'
 import type { Locale } from '@/lib/i18n/locales'
+import { toBilingualLocale } from '@/lib/i18n/locales'
 
 // The document never changes language while this page is up: nothing to subscribe to.
 const noSubscription = () => () => {}
 
 /** The same contract the server uses, from what the browser can see: route, ?lang, cookie, languages. */
 function browserLocale(): Locale {
-  return resolveRequestLocale({
+  return toBilingualLocale(resolveRequestLocale({
     pathname: window.location.pathname,
     langParam: new URLSearchParams(window.location.search).get('lang'),
     cookieValue: readCookie(document.cookie, LANGUAGE_COOKIE),
     acceptLanguage: navigator.languages?.join(',') ?? navigator.language,
-  })
+  }))
 }
 
 /**

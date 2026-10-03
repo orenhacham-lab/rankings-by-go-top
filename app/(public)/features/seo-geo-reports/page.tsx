@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: 'הפיקו דוחות PDF ו-Excel פרופסיונליים עם דירוגים, מגמות, תחרות ונראות AI. דוחות ללקוחות ודירוגים בלחיצת כפתור.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/seo-geo-reports',
-    languages: buildHreflangAlternates(
-      '/features/seo-geo-reports',
-      '/en/features/seo-geo-reports'
-    ),
+    languages: buildHreflangAlternates('/features/seo-geo-reports', '/en/features/seo-geo-reports', '/es/features/seo-geo-reports'),
   },
 }
 

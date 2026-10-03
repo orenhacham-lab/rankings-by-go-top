@@ -20,7 +20,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { cn } from '@/lib/utils'
@@ -45,7 +45,7 @@ export type AboutCopy = {
   cta: { title: string; body: string; contact: string; updated: string }
 }
 
-export function AboutPage({ locale, copy }: { locale: Locale; copy: AboutCopy }) {
+export function AboutPage({ locale, copy }: { locale: PublicLocale; copy: AboutCopy }) {
   const c = FEATURE_COMMON[locale]
   const t = getPublicDictionary(locale).contact
   // The close's three buttons: WhatsApp, call, email (UX decision C).

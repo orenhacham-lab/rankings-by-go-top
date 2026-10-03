@@ -18,7 +18,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 import {
   ButtonLink, Callout, CheckList, CONTAINER, CtaBand, FaqList, FeatureCard, Section, SectionIntro, StepCard,
@@ -57,9 +57,10 @@ export type FeaturePageContent = {
 }
 
 /** Under every product picture: it is an illustration, and says so. */
-const VISUAL_CAPTION: Record<Locale, string> = {
+const VISUAL_CAPTION: Record<PublicLocale, string> = {
   he: 'המחשה של המוצר. שמות ונתונים לדוגמה.',
   en: 'Product illustration. Names and figures are examples.',
+  es: 'Ilustración del producto. Los nombres y las cifras son ejemplos.',
 }
 
 const GRID_3 = 'grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3'
@@ -164,7 +165,7 @@ function SectionBody({ section }: { section: FeatureSection }) {
   }
 }
 
-export function FeaturePage({ locale, content }: { locale: Locale; content: FeaturePageContent }) {
+export function FeaturePage({ locale, content }: { locale: PublicLocale; content: FeaturePageContent }) {
   const { hero, sections, cta } = content
   return (
     <div className="flex min-h-screen flex-col bg-canvas">

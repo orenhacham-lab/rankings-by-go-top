@@ -75,7 +75,7 @@ function main() {
   check('and the root document applies the SAME seed, so the two agree',
     /getRootRequestContext\(\)/.test(rootLayout)
     && /user\?\.user_metadata\?\.locale/.test(rootRequest)
-    && /getServerLocale\(seed\)/.test(rootRequest))
+    && /getServer(?:Public)?Locale\(seed\)/.test(rootRequest))
   {
     check('a signup-EN seed still wins on a device with no cookie',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')

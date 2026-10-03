@@ -56,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     alternates: {
       canonical: 'https://www.gotopseo.com',
-      languages: buildHreflangAlternates('/', '/en'),
+      languages: buildHreflangAlternates('/', '/en', '/es'),
     },
     robots: 'index, follow',
     authors: [{ name: 'Go Top' }],

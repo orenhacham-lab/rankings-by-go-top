@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import type { Locale } from '@/lib/i18n/locales'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import type { PublicLocale } from '@/lib/i18n/locales'
+import { sharedUiCopy } from '@/lib/i18n/public/shared-ui'
 
 export type NoticeTone = 'info' | 'wait' | 'ok' | 'warn' | 'bad'
 
@@ -51,8 +53,11 @@ export default function Notice(props: NoticeProps) {
   return <NoticeBox {...props} language={language} />
 }
 
-export function NoticeBox({ tone, children, action, onDismiss, className, items, language }: NoticeProps & { language: Locale }) {
-  const t = getDashboardDictionary(language)
+export function NoticeBox({ tone, children, action, onDismiss, className, items, language }: NoticeProps & { language: PublicLocale }) {
+  // Only two words here come from a dictionary, and the public site reaches this
+  // component in Spanish too — so they come from the small shared-UI table
+  // rather than from the dashboard dictionaries, which have no Spanish.
+  const t = sharedUiCopy(language)
   const [open, setOpen] = useState(false)
   const Icon = TONE_ICON[tone]
   const list = items ?? []
@@ -85,7 +90,7 @@ export function NoticeBox({ tone, children, action, onDismiss, className, items,
               onClick={() => setOpen(true)}
               className="rounded-control text-caption font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
             >
-              {t.uiKit.noticeMore.replace('{n}', String(hidden))}
+              {t.noticeMore.replace('{n}', String(hidden))}
             </button>
           )}
         </div>
@@ -102,7 +107,7 @@ export function NoticeBox({ tone, children, action, onDismiss, className, items,
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-control transition-colors duration-150 ease-snappy hover:bg-surface/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
         >
           <X aria-hidden="true" className="size-4" />
-          <span className="sr-only">{t.common.close}</span>
+          <span className="sr-only">{t.close}</span>
         </button>
       )}
     </div>

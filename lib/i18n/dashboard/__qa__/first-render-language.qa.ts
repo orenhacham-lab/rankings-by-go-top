@@ -288,8 +288,12 @@ async function main() {
   console.log('\nH) the request contract is unchanged')
   {
     const rl = read('lib/i18n/request-locale.ts')
+    // The ROUTE step now asks routePublicLocale, which is the same question
+    // across every public locale (a /es route answers Spanish); the bilingual
+    // routeContentLocale is a narrowing of it. The PRECEDENCE below is what
+    // this check is about, and it is unchanged.
     check('H1: route → cookie → seed → Accept-Language → English, unchanged',
-      /const fixed = routeContentLocale\(input\.pathname\)/.test(rl)
+      /const fixed = routePublicLocale\(input\.pathname\)/.test(rl)
       && /normalizeLocale\(input\.cookieValue\)\s*\n\s*\?\? normalizeLocale\(input\.seed\)\s*\n\s*\?\? localeFromAcceptLanguage\(input\.acceptLanguage\)\s*\n\s*\?\? REQUEST_FALLBACK_LOCALE/.test(rl))
     check('H2: the provider still starts from the server-resolved initialLocale',
       /useState<Locale>\(resolveDashboardLocale\(null, initialLocale\)\)/.test(read('lib/i18n/dashboard/useDashboardLanguage.tsx')))

@@ -8,20 +8,34 @@
  * Privacy Protection Law require proof of explicit consent): the screen shows
  * reportConsentText(locale) and the API stores the same string, never text
  * sent by the browser. Changing it changes what future consents record, so
- * give it a new version rather than editing it in place.
+ * give it a new version rather than editing it in place. For the same reason the
+ * version is PER LOCALE: the Spanish sentence is its own consent text with its
+ * own id, so a Spanish consent record can never be read as agreement to the
+ * Hebrew or English wording. The Spanish wording is pending the legal review
+ * that owns the Spanish legal pages, and the Spanish site is off until then.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ResearchErrorCode } from './types'
 
 export const REPORT_CONSENT_VERSION = 'report-email-v1'
 
-const CONSENT: Record<Locale, string> = {
+/** Spanish has its own id: a Spanish record must not be read as the other wording. */
+export const REPORT_CONSENT_VERSION_ES = 'report-email-es-v1'
+
+const CONSENT: Record<PublicLocale, string> = {
   he: 'אני מסכים/ה לקבל מ-Go Top בדוא״ל את דוח המחקר של האתר, וגם עדכונים ותוכן שיווקי. אפשר להסיר את ההסכמה בכל עת בקישור שבכל הודעה.',
   en: 'I agree to receive this site research report from Go Top by email, as well as updates and marketing content. I can withdraw consent at any time using the link in every email.',
+  es: 'Acepto recibir de Go Top por correo electrónico el informe de investigación de este sitio, así como novedades y contenido comercial. Puedo retirar mi consentimiento en cualquier momento con el enlace que incluye cada correo.',
 }
 
-export function reportConsentText(locale: Locale): string {
-  return `${CONSENT[locale]} [${REPORT_CONSENT_VERSION}]`
+const CONSENT_VERSION: Record<PublicLocale, string> = {
+  he: REPORT_CONSENT_VERSION,
+  en: REPORT_CONSENT_VERSION,
+  es: REPORT_CONSENT_VERSION_ES,
+}
+
+export function reportConsentText(locale: PublicLocale): string {
+  return `${CONSENT[locale]} [${CONSENT_VERSION[locale]}]`
 }
 
 export type ResearchScreenCopy = {
@@ -117,6 +131,45 @@ const en: ResearchScreenCopy = {
   },
 }
 
-export function researchScreenCopy(locale: Locale): ResearchScreenCopy {
-  return locale === 'en' ? en : he
+const es: ResearchScreenCopy = {
+  errors: {
+    not_found: 'La investigación completa no está disponible aquí.',
+    invalid_url: 'Esa dirección no parece correcta. Inténtalo de nuevo, por ejemplo ejemplo.com',
+    blocked_url: 'Solo se pueden investigar sitios web públicos. Las direcciones internas, las IP y las redirecciones a otro sitio no están admitidas.',
+    unreachable: 'No pudimos acceder al sitio. Revisa la dirección e inténtalo de nuevo.',
+    not_html: 'Esta dirección no devuelve una página web que podamos leer.',
+    forbidden: 'El sitio bloquea a los lectores automáticos, y Google tampoco muestra ninguna de sus páginas. Prueba con otra dirección del sitio.',
+    rate_limited: 'Has lanzado varias investigaciones seguidas. Inténtalo de nuevo en unos minutos.',
+    daily_cap: 'La investigación gratuita está saturada hoy. Inténtalo más tarde, o abre una cuenta y la investigación se ejecuta en tu proyecto.',
+    unavailable: 'La investigación completa no está disponible ahora mismo.',
+    internal: 'Algo se atascó por nuestra parte. Inténtalo de nuevo en un momento.',
+  },
+  unavailableTitle: 'La investigación completa no está disponible ahora mismo',
+  unavailableBody: 'Mientras tanto, hemos hecho el análisis rápido de tu sitio.',
+  report: {
+    link: 'Enviadme el informe por correo',
+    title: 'Recibir el informe por correo',
+    body: 'Déjanos una dirección y te enviamos el informe de investigación del sitio.',
+    emailLabel: 'Dirección de correo',
+    emailPlaceholder: 'tu@ejemplo.com',
+    consent: CONSENT.es,
+    privacy: 'Política de privacidad',
+    submit: 'Guardar mi solicitud',
+    sending: 'Guardando…',
+    saved: 'Recibido. El informe de investigación se enviará a esta dirección.',
+    errors: {
+      consent_required: 'Para enviarte el informe, marca la casilla de consentimiento.',
+      invalid_email: 'Esa dirección de correo no parece correcta.',
+      invalid_claim: 'Esta investigación ya no se puede enviar. Vuelve a ejecutarla.',
+      rate_limited: 'Has enviado varias solicitudes seguidas. Inténtalo de nuevo más tarde.',
+      unavailable: 'No pudimos guardar tu solicitud ahora mismo. Inténtalo de nuevo más tarde.',
+      internal: 'Algo se atascó por nuestra parte. Inténtalo de nuevo en un momento.',
+    },
+  },
+}
+
+const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es }
+
+export function researchScreenCopy(locale: PublicLocale): ResearchScreenCopy {
+  return SCREEN[locale] ?? he
 }

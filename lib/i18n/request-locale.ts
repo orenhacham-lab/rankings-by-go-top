@@ -48,9 +48,10 @@
  * layouts and the client provider all decide identically and cannot drift.
  */
 
-import type { Locale } from './locales'
+import { toBilingualLocale, type Locale, type PublicLocale } from './locales'
 import { normalizeLocale } from './dashboard/locale'
 import { localeFromAcceptLanguage } from './accept-language'
+import { spanishSiteEnabled } from './spanish-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -72,6 +73,17 @@ export const REQUEST_FALLBACK_LOCALE: Locale = 'en'
 export function isEnglishPath(pathname: string | null | undefined): boolean {
   const p = pathname || ''
   return p === '/en' || p.startsWith('/en/')
+}
+
+/**
+ * True when a path is served by the SPANISH public tree — and only while the
+ * Spanish site is on. With the flag off those URLs are not a locale at all:
+ * they 404, so claiming them as Spanish here would label an error page `es`.
+ */
+export function isSpanishPath(pathname: string | null | undefined, enabled = spanishSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/es' || p.startsWith('/es/')
 }
 
 /**
@@ -107,16 +119,35 @@ export function englishOnlySegments(): string[] {
 }
 
 /**
- * The language THE ROUTE ITSELF serves, or null when the route is bilingual and
- * the user's preference decides.
+ * The language THE ROUTE ITSELF serves, across every public locale, or null
+ * when the route is bilingual and the user's preference decides.
+ *
+ * This is the answer a DOCUMENT needs: `/es/*` is a Spanish document, and
+ * <html lang/dir> and the page metadata have to say so.
  */
-export function routeContentLocale(pathname: string | null | undefined): Locale | null {
+export function routePublicLocale(pathname: string | null | undefined): PublicLocale | null {
   const p = pathname || ''
   if (isEnglishPath(p)) return 'en'
+  if (isSpanishPath(p)) return 'es'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'
   return PUBLIC_MARKETING_SEGMENTS.has(segment) ? 'he' : null
+}
+
+/**
+ * The same question asked by a BILINGUAL surface, which has Hebrew and English
+ * strings and nothing else: the dashboard, the auth pages, the embedded Shopify
+ * app. A Spanish route answers ENGLISH here, not Hebrew — the two share a
+ * script and a direction, so it is the variant a Spanish speaker can read.
+ *
+ * Kept under its original name and its original `Locale` return type on
+ * purpose: every existing caller is one of those bilingual surfaces, so adding
+ * a language changed none of them.
+ */
+export function routeContentLocale(pathname: string | null | undefined): Locale | null {
+  const locale = routePublicLocale(pathname)
+  return locale === null ? null : toBilingualLocale(locale)
 }
 
 /** Exposed so the QA can prove the list covers the real route group. */
@@ -144,10 +175,10 @@ export function resolveRequestLocale(input: {
   seed?: string | null
   /** The raw Accept-Language header, parsed with q-values (never substring-matched). */
   acceptLanguage?: string | null
-}): Locale {
+}): PublicLocale {
   // The route decides FIRST and alone where it has a language of its own; no
   // cookie, seed, parameter or header may relabel content it did not write.
-  const fixed = routeContentLocale(input.pathname)
+  const fixed = routePublicLocale(input.pathname)
   if (fixed) return fixed
   return normalizeLocale(input.langParam)
     ?? normalizeLocale(input.cookieValue)
@@ -167,8 +198,8 @@ export function explicitRequestLocale(input: {
   pathname?: string | null
   langParam?: string | null
   cookieValue?: string | null
-}): Locale | null {
-  return routeContentLocale(input.pathname)
+}): PublicLocale | null {
+  return routePublicLocale(input.pathname)
     ?? normalizeLocale(input.langParam)
     ?? normalizeLocale(input.cookieValue)
 }

@@ -145,9 +145,12 @@ export const en = {
     aria: 'Breadcrumb',
   },
   languageSwitcher: {
+    // Each language names ITSELF, in its own script: a reader looking for their
+    // language scans for the word they would recognize, not for its translation.
     he: 'עברית',
     en: 'English',
-    aria: 'Switch to Hebrew',
+    es: 'Español',
+    aria: 'Change the site language',
   },
   cookie: {
     aria: 'Privacy notice',

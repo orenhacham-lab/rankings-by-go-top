@@ -42,9 +42,9 @@ export async function proxy(request: NextRequest) {
   // dir="rtl" for every response — including English ones — and only a client
   // effect corrected it after hydration.
   //
-  // Set ONLY when this request decides the locale on its own — an /en route, or
-  // an explicit cookie. With neither, the header is omitted so a server layout
-  // can still apply its seed (the signup language in auth metadata), which the
+  // Set ONLY when this request decides the locale on its own — an /en or /es
+  // route, or an explicit cookie. With neither, the header is omitted so a
+  // server layout can still apply its seed (the signup language in auth metadata), which the
   // proxy cannot see. Sending a default here would silently outrank that seed
   // and give an English signup a Hebrew first page on a fresh device.
   //

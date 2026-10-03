@@ -44,6 +44,7 @@ import {
 } from '../request-locale'
 import { resolveAuthLocale } from '../auth-locale'
 import { externalUrlWithLocale, authUrlWithLocale } from '../../shopify/handoff-url'
+import { toBilingualLocale } from '../locales'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -223,7 +224,9 @@ function main() {
     for (const pathname of ['/login', '/signup', '/dashboard', `/projects/${SOME_PROJECT}`]) {
       for (const langParam of [null, 'en', 'he']) {
         for (const cookieValue of [null, 'en', 'he']) {
-          const server = resolveRequestLocale({ pathname, langParam, cookieValue })
+          // Every pathname here is a bilingual surface; the server's answer is
+          // narrowed to the auth pages' two languages before the comparison.
+          const server = toBilingualLocale(resolveRequestLocale({ pathname, langParam, cookieValue }))
           const client = resolveAuthLocale({ pathname, langParam, serverLocale: server })
           if (server !== client) { agree = false; disagreements.push(`${pathname} lang=${langParam} cookie=${cookieValue}: ${server} vs ${client}`) }
         }

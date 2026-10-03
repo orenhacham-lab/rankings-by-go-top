@@ -13,10 +13,7 @@ export const metadata: Metadata = {
     'תכננו נושאים, קבלו טיוטת מאמר מוכנה מ-AI, ערכו אותה, תזמנו אותה ופרסמו ישירות ל-WordPress או Shopify - הכול מתוך מקום אחד.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/seo-geo-content-publishing',
-    languages: buildHreflangAlternates(
-      '/features/seo-geo-content-publishing',
-      '/en/features/seo-geo-content-publishing'
-    ),
+    languages: buildHreflangAlternates('/features/seo-geo-content-publishing', '/en/features/seo-geo-content-publishing', '/es/features/seo-geo-content-publishing'),
   },
 }
 

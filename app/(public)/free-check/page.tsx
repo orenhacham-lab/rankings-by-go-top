@@ -17,7 +17,7 @@ export const metadata = {
   },
   alternates: {
     canonical: 'https://www.gotopseo.com/free-check',
-    languages: buildHreflangAlternates('/free-check', '/en/free-check'),
+    languages: buildHreflangAlternates('/free-check', '/en/free-check', '/es/free-check'),
   },
 }
 

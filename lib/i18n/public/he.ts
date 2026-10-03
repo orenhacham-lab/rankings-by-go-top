@@ -143,9 +143,12 @@ export const he = {
     aria: 'נתיב ניווט',
   },
   languageSwitcher: {
+    // Each language names ITSELF, in its own script: a reader looking for their
+    // language scans for the word they would recognize, not for its translation.
     he: 'עברית',
     en: 'English',
-    aria: 'מעבר לאתר באנגלית',
+    es: 'Español',
+    aria: 'שינוי שפת האתר',
   },
   cookie: {
     aria: 'הודעת פרטיות',

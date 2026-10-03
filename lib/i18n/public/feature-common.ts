@@ -5,7 +5,7 @@
  */
 import { TRIAL_CATALOG } from '@/lib/plans/catalog'
 import { authHref } from '@/lib/i18n/auth-href'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 const DAYS = TRIAL_CATALOG.days
 
@@ -18,7 +18,7 @@ export type FeatureCommon = {
   closeBody: string
 }
 
-export const FEATURE_COMMON: Record<Locale, FeatureCommon> = {
+export const FEATURE_COMMON: Record<PublicLocale, FeatureCommon> = {
   he: {
     check: { label: 'בדקו את האתר בחינם', href: '/free-check' },
     trial: { label: `${DAYS} ימי ניסיון חינם`, href: authHref('signup', 'he') },
@@ -32,5 +32,14 @@ export const FEATURE_COMMON: Record<Locale, FeatureCommon> = {
     pricing: { label: 'See pricing', href: '/en/pricing' },
     trust: [`${DAYS}-day free trial`, 'No credit card', 'Cancel anytime'],
     closeBody: `The free check shows where your site stands, no signup needed. Or open a ${DAYS}-day trial, no credit card.`,
+  },
+  es: {
+    check: { label: 'Analiza tu sitio gratis', href: '/es/free-check' },
+    // Sign-up is a BILINGUAL surface: a Spanish reader is sent to its English
+    // form, which is the one they can read, until the dashboard is translated.
+    trial: { label: `Prueba gratis ${DAYS} días`, href: '/en/signup' },
+    pricing: { label: 'Ver precios', href: '/es/pricing' },
+    trust: [`${DAYS} días de prueba gratis`, 'Sin tarjeta de crédito', 'Cancela cuando quieras'],
+    closeBody: `El análisis gratuito muestra cómo está tu sitio, sin registrarte. O abre una prueba de ${DAYS} días, sin tarjeta de crédito.`,
   },
 }

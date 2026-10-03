@@ -22,7 +22,7 @@ import {
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
-import type { Locale } from '@/lib/i18n/locales'
+import { getLocaleConfig, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 import { ButtonLink, CONTAINER, CONTAINER_WIDE, Eyebrow, FaqList, IconSquircle, Section, SectionIntro } from './marketing'
 import { HeroDemo, type HeroDemoCopy } from './landing/HeroDemo'
@@ -92,14 +92,15 @@ const FEATURE_ICONS: LucideIcon[] = [FileText, Sparkles, Search, ChartColumn]
 export function LandingPage({
   locale, copy, signedIn, signupHref, pricingHref,
 }: {
-  locale: Locale
+  locale: PublicLocale
   copy: LandingCopy
   signedIn: boolean
   signupHref: string
   pricingHref: string
 }) {
-  const rtl = locale === 'he'
-  const prefix = locale === 'en' ? '/en' : ''
+  const rtl = getLocaleConfig(locale).dir === 'rtl'
+  // Every locale but Hebrew lives under its own prefix; Hebrew is the bare root.
+  const prefix = LOCALE_PREFIX[locale]
   const checkHref = `${prefix}/free-check`
   const startHref = signedIn ? '/dashboard' : signupHref
   const f = copy.features

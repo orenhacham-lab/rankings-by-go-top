@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: 'עקבו אחרי דירוגים אורגניים בגוגל לפי ביטוי חיפוש, מדינה, שפה ומכשיר. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ומעקב מתחרים.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/google-organic-rank-tracking',
-    languages: buildHreflangAlternates(
-      '/features/google-organic-rank-tracking',
-      '/en/features/google-organic-rank-tracking'
-    ),
+    languages: buildHreflangAlternates('/features/google-organic-rank-tracking', '/en/features/google-organic-rank-tracking', '/es/features/google-organic-rank-tracking'),
   },
 }
 

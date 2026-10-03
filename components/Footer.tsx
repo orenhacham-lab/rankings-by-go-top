@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { Locale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
@@ -14,11 +14,11 @@ import { whatsappHelpUrl } from '@/components/public/contact'
 /** The only words of the credit line that are the link. */
 const CREDIT_ANCHOR = 'GO TOP'
 
-export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
+export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
   const dict = getPublicDictionary(locale)
   // "מבית GO TOP" / "By GO TOP": the text around the agency's name stays plain, the name is the link.
   const [creditBefore, creditAfter = ''] = dict.footer.credit.split(CREDIT_ANCHOR)
-  const prefix = locale === 'en' ? '/en' : ''
+  const prefix = LOCALE_PREFIX[locale]
   const homeHref = prefix === '/en' ? '/en' : '/'
   const linkClass = 'rounded-control text-copy text-contrast-ink/70 transition-colors duration-150 ease-snappy hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20'
   const headingClass = 'mb-4 text-caption font-semibold text-contrast-ink'

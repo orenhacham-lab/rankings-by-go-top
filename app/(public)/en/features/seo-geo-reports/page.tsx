@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: 'Professional PDF and Excel reports with rankings, trends, and competitive analysis. Client-ready reports in seconds.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/seo-geo-reports',
-    languages: buildHreflangAlternates(
-      '/features/seo-geo-reports',
-      '/en/features/seo-geo-reports'
-    ),
+    languages: buildHreflangAlternates('/features/seo-geo-reports', '/en/features/seo-geo-reports', '/es/features/seo-geo-reports'),
   },
 }
 

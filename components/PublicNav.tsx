@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { BarChart3, ChevronDown, FileText, MapPin, Menu, Search, Sparkles, Telescope, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Locale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
 import { buttonClasses } from '@/components/public/marketing'
@@ -25,7 +25,7 @@ import { ContactMenu, ContactRows } from '@/components/public/ContactMenu'
  * with a blur once the page has scrolled 80px. The last text item, "צרו קשר",
  * opens the contact menu (UX decision C).
  */
-export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale; tone?: 'default' | 'inverse' } = {}) {
+export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: PublicLocale; tone?: 'default' | 'inverse' } = {}) {
   const pathname = usePathname() ?? '/'
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -34,10 +34,12 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Locale
   const [featuresOpen, setFeaturesOpen] = useState(false)
 
   const dict = getPublicDictionary(locale)
-  const prefix = locale === 'en' ? '/en' : ''
-  // The auth pages in THIS page's language (lib/i18n/auth-href.ts).
-  const signupHref = authHref('signup', locale)
-  const loginHref = authHref('login', locale)
+  const prefix = LOCALE_PREFIX[locale]
+  // The auth pages in THIS page's language (lib/i18n/auth-href.ts). They exist in
+  // Hebrew and English only, so a Spanish visitor is sent to the English form —
+  // the one they can read — until the dashboard is translated.
+  const signupHref = authHref('signup', toBilingualLocale(locale))
+  const loginHref = authHref('login', toBilingualLocale(locale))
 
   const scrollThreshold = tone === 'inverse' ? 80 : 8
   useEffect(() => {

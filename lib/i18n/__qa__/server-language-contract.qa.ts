@@ -26,13 +26,15 @@ import { spawn, type ChildProcess } from 'child_process'
 import {
   resolveRequestLocale, migrateLocalePreference, languageCookieString, readCookie,
   isEnglishPath, LANGUAGE_COOKIE, LOCALE_HEADER, REQUEST_FALLBACK_LOCALE,
-  routeContentLocale, publicMarketingSegments,
+  routeContentLocale, publicMarketingSegments, isSpanishPath,
 } from '../request-locale'
 import { documentLocaleAttributes } from '../document-locale'
 import { resolveDashboardLocale } from '../dashboard/locale'
 import { parseAcceptLanguage, localeFromAcceptLanguage } from '../accept-language'
 import { getSiteMetadata } from '../site-metadata'
 import { readdirSync } from 'fs'
+import { toBilingualLocale } from '../locales'
+import { counterpartPath } from '../../../components/LanguageSwitcher'
 
 let pass = 0, fail = 0, blocked = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -400,7 +402,9 @@ async function main() {
     // initialLocale is that same server value. Same input, same answer, so the
     // first client render cannot differ from the server's.
     for (const cookieValue of ['en', 'he', null, 'zz']) {
-      const serverLocale = resolveRequestLocale({ pathname: '/dashboard', cookieValue })
+      // /dashboard is a BILINGUAL route, so the server's answer is narrowed to the
+      // two languages the dashboard has before the client is compared against it.
+      const serverLocale = toBilingualLocale(resolveRequestLocale({ pathname: '/dashboard', cookieValue }))
       const clientFirstRender = resolveDashboardLocale(null, serverLocale)
       check(`5a: cookie=${JSON.stringify(cookieValue)} — client's first render matches the server (${serverLocale})`,
         clientFirstRender === serverLocale)
@@ -422,14 +426,18 @@ async function main() {
     check('5e: SOURCE — the root layout resolves the locale server-side, seed included',
       /const \{ isAuthenticated, locale \} = await getRootRequestContext\(\)/.test(rootLayout)
       && /user\?\.user_metadata\?\.locale/.test(rootReqSrc)
-      && /getServerLocale\(seed\)/.test(rootReqSrc))
+      && /getServer(?:Public)?Locale\(seed\)/.test(rootReqSrc))
     check('5g: the SEED survives — an English signup on a cookie-less device still gets English',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')
     check('5h: …while an explicit cookie still outranks it',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
     const dashLayout = require('fs').readFileSync(join(ROOT, 'app', '(dashboard)', 'layout.tsx'), 'utf8')
+    // The dashboard is BILINGUAL (he/en), so it reads the same server locale
+    // through the documented narrowing wrapper rather than the public one,
+    // which can also answer 'es'. Either spelling satisfies this: what matters
+    // is that it is the server's resolution and not a second mechanism.
     check('5f: SOURCE — the dashboard seeds the provider from the SAME server locale',
-      /getServerLocale\(/.test(dashLayout))
+      /getServerLocale\(|getServerBilingualLocale\(/.test(dashLayout))
   }
 
   console.log('\n7) ACCEPT-LANGUAGE — parsed, with q-values; never a substring test')
@@ -473,6 +481,11 @@ async function main() {
       routeContentLocale('/') === 'he' && routeContentLocale('/pricing') === 'he'
       && routeContentLocale('/about') === 'he' && routeContentLocale('/articles/x') === 'he')
     check('8b: the English tree states English', routeContentLocale('/en') === 'en' && routeContentLocale('/en/pricing') === 'en')
+    // The Spanish tree states Spanish only while it EXISTS. With the flag off
+    // those paths 404, so labelling them `es` would label an error page.
+    check('8b1: the Spanish tree states Spanish when it is on, and nothing when it is off',
+      isSpanishPath('/es/pricing', true) && !isSpanishPath('/es/pricing', false)
+      && !isSpanishPath('/espanol', true))
     check('8c: bilingual surfaces state nothing and defer to the user',
       routeContentLocale('/dashboard') === null && routeContentLocale('/login') === null
       && routeContentLocale('/content') === null)
@@ -489,7 +502,9 @@ async function main() {
     // which an earlier version of this guard did not scan at all.
     const publicDirs = ['(public)', '(legal)'].flatMap((group) =>
       readdirSync(join(ROOT, 'app', group), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && d.name !== 'en')
+        // 'en' and 'es' are the non-Hebrew trees: their own guards cover them
+        // (8b, 8b1 and lib/i18n/__qa__/spanish-public-site.qa.ts).
+        .filter((d) => d.isDirectory() && d.name !== 'en' && d.name !== 'es')
         .map((d) => d.name))
     const missing = publicDirs.filter((d) => routeContentLocale(`/${d}`) !== 'he')
     check('8e: every directory in app/(public) AND app/(legal) is covered',
@@ -498,8 +513,14 @@ async function main() {
     // The switch on a fixed-language page must NAVIGATE, not relabel.
     const switcher = require('fs').readFileSync(join(ROOT, 'components', 'LanguageSwitcher.tsx'), 'utf8')
     check('8f: the public language switch links to the counterpart URL',
-      /getCounterpartPath\(pathname, locale\)/.test(switcher) && /<Link/.test(switcher)
-      && /return `\/en\$\{pathname\.startsWith\('\/'\) \? pathname : `\/\$\{pathname\}`\}`/.test(switcher))
+      /counterpartPath\(pathname, /.test(switcher) && /<Link/.test(switcher))
+    // The counterpart is computed, not guessed: the FUNCTION itself is the
+    // subject here, so a rewrite of the component cannot quietly drop it.
+    check('8f1: …and the counterpart of a Hebrew path is the same path under the target prefix',
+      counterpartPath('/pricing', 'he', 'en') === '/en/pricing'
+      && counterpartPath('/en/pricing', 'en', 'he') === '/pricing'
+      && counterpartPath('/en', 'en', 'he') === '/'
+      && counterpartPath('/pricing', 'he', 'es') === '/es/pricing')
     check('8g: …and it does not write the language cookie (that would relabel, not navigate)',
       !/languageCookieString|document\.cookie/.test(switcher))
   }

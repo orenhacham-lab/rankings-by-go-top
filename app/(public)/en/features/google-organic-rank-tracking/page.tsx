@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: 'Monitor your Google search rankings by keyword, location, language, and device. Scan on demand whenever you need, or automatically once a month, and get detailed trend and competitor reports.',
   alternates: {
     canonical: 'https://www.gotopseo.com/en/features/google-organic-rank-tracking',
-    languages: buildHreflangAlternates(
-      '/features/google-organic-rank-tracking',
-      '/en/features/google-organic-rank-tracking'
-    ),
+    languages: buildHreflangAlternates('/features/google-organic-rank-tracking', '/en/features/google-organic-rank-tracking', '/es/features/google-organic-rank-tracking'),
   },
 }
 

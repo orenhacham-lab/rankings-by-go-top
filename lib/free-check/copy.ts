@@ -1,13 +1,13 @@
 /**
- * All merchant-facing copy for the free site check, in both locales.
+ * All merchant-facing copy for the free site check, in every public locale.
  *
  * It lives in one file rather than in lib/i18n/public because the whole
  * feature is self-contained and because the findings engine needs the strings
  * server-side, where the public dictionary's React-oriented shape does not
- * help. `FreeCheckCopy` is structural, so `he` and `en` cannot drift apart
+ * help. `FreeCheckCopy` is structural, so the locales cannot drift apart
  * without a compile error.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export type FreeCheckCopy = {
   page: {
@@ -282,8 +282,121 @@ const en: FreeCheckCopy = {
   },
 }
 
-const COPY: Record<Locale, FreeCheckCopy> = { he, en }
+const es: FreeCheckCopy = {
+  page: {
+    badge: 'Análisis gratuito, sin compromiso',
+    title: 'Un análisis SEO y de IA de tu sitio,',
+    titleAccent: 'en menos de un minuto',
+    subtitle: 'Escribe la dirección de tu sitio. Lo leemos de verdad, deducimos a qué se dedica el negocio y te mostramos qué te está frenando en Google y en las respuestas de la IA.',
+    trust: ['Gratis, sin tarjeta de crédito', 'Nada que instalar', 'Sin registro'],
+    expect: [
+      { title: 'Qué entendimos', body: 'A qué se dedica el negocio y quiénes son sus clientes, tal como lo cuenta el propio sitio.' },
+      { title: 'Qué te frena', body: 'Qué hay en la página que impide a Google y a los motores de IA entenderte, lo más importante primero.' },
+      { title: 'Cuánto estás listo para la IA', body: 'Si ChatGPT y Gemini pueden leer tu sitio y citarlo.' },
+    ],
+  },
+  form: {
+    label: 'Dirección del sitio',
+    placeholder: 'ejemplo.com',
+    submit: 'Analizar mi sitio',
+    hint: 'Un solo campo. Es todo lo que tienes que rellenar.',
+    errors: {
+      invalid_url: 'Esa dirección no parece correcta. Inténtalo de nuevo, por ejemplo ejemplo.com',
+      blocked_url: 'Solo se pueden analizar sitios web públicos. Las direcciones internas y las IP no están admitidas.',
+      unreachable: 'No pudimos acceder al sitio. Revisa la dirección e inténtalo de nuevo.',
+      not_html: 'Esa dirección no devuelve una página web que podamos leer.',
+      rate_limited: 'Fueron varios análisis seguidos. Inténtalo de nuevo en un minuto.',
+      daily_cap: 'El análisis gratuito está saturado ahora mismo. Inténtalo más tarde o abre una cuenta para el análisis completo.',
+      internal: 'Algo falló por nuestra parte. Inténtalo de nuevo en un momento.',
+    },
+  },
+  loading: {
+    title: 'Leyendo el sitio y la estructura de sus páginas',
+    sub: 'Tarda menos de un minuto. Leemos el sitio de verdad, no lo adivinamos.',
+    footer: 'Procesando, tu resumen está casi listo',
+    steps: [
+      'Leyendo el sitio y la estructura de sus páginas',
+      'Deduciendo a qué se dedica el negocio y quiénes son sus clientes',
+      'Comprobando qué te está frenando en Google',
+      'Buscando a tus competidores',
+    ],
+  },
+  results: {
+    heading: 'Tu primer resumen de investigación',
+    scanned: 'Analizamos',
+    countersTitle: 'Qué encontramos',
+    counters: { keywords: 'Palabras clave que trabajar', fixes: 'Cosas que arreglar en el sitio', geo: 'Preparación para respuestas de IA', articles: 'Artículos listos para escribir' },
+    businessTitle: 'Qué entendimos del negocio',
+    audienceTitle: 'Quiénes son tus clientes',
+    competitorsTitle: 'Quiénes son tus competidores',
+    competitorsLocked: 'Para ver más competidores y el mapa completo, abre una cuenta gratuita',
+    findingsTitle: 'Qué te está frenando ahora mismo',
+    findingsEmpty: 'El sitio está limpio en todo lo que comprobamos. Bien hecho.',
+    findingsLocked: 'Hay más hallazgos esperándote en tu cuenta',
+    geoTitle: 'Cuánto estás listo para las respuestas de la IA',
+    geoIntro: 'Los motores de IA como ChatGPT y Perplexity no posicionan sitios, los citan. Comprobamos lo fácil que es citarte.',
+    geoScore: 'señales en buen estado',
+    articlesTitle: 'Los artículos que escribiríamos para ti',
+    articlesNote: 'Los artículos se construyen a partir de una estrategia de contenido basada en las mejores oportunidades de tus palabras clave.',
+    gateTitle: 'Eso era el adelanto. La investigación de verdad empieza cuando entras',
+    gateBody: 'Abre una cuenta gratuita y el sistema se pone a trabajar en tu sitio.',
+    gateBullets: [
+      'La investigación completa, con volúmenes de búsqueda reales',
+      'Un plan de contenido para todo un trimestre, hecho para tu sector',
+      'El primer artículo, escrito para ti',
+      'Un mapa completo de competidores y seguimiento de citas en IA',
+    ],
+    gateCta: 'Abre una cuenta gratuita',
+    gateSecondary: '¿Ya tienes cuenta? Inicia sesión',
+    gateTerms: 'Al continuar aceptas los términos de uso y la política de privacidad.',
+    again: 'Analizar otro sitio',
+    aiUnavailable: 'El análisis técnico está completo. El resumen del negocio y las palabras clave te esperarán en tu cuenta.',
+  },
+  findings: {
+    title_missing: { title: 'La página no tiene título', detail: 'El título es lo que Google muestra en los resultados. Sin él, Google se inventa uno por ti.' },
+    title_short: { title: 'El título de la página es demasiado corto', detail: 'Por debajo de 30 caracteres desperdicias el espacio que te da Google y suele faltar el término de búsqueda.' },
+    title_long: { title: 'El título de la página es demasiado largo', detail: 'Por encima de 65 caracteres, Google corta el título a mitad de frase.' },
+    description_missing: { title: 'Sin meta descripción', detail: 'La descripción es tu frase comercial en los resultados de búsqueda. Sin ella, Google toma una frase cualquiera de la página.' },
+    description_length: { title: 'La meta descripción tiene una longitud incorrecta', detail: 'Por debajo de 70 caracteres o por encima de 165 aparece cortada o aprovechada a medias.' },
+    h1_missing: { title: 'La página no tiene H1', detail: 'El H1 le dice a Google y a los motores de IA de qué trata la página. Sin él, lo deducen del texto.' },
+    h1_multiple: { title: 'Hay más de un H1 en la página', detail: 'Varios H1 dividen el significado de la página y debilitan a cada uno de ellos.' },
+    images_alt: { title: 'A las imágenes les falta el texto alternativo', detail: 'Google no ve las imágenes, lee su texto alternativo. Sin él tus imágenes no traen visitas, y la accesibilidad se resiente.' },
+    thin_content: { title: 'Hay muy poco texto en la página', detail: 'Una página escasa da poco a Google y a los motores de IA para posicionar o citar.' },
+    no_schema: { title: 'Sin datos estructurados (Schema)', detail: 'Sin Schema, Google y los motores de IA no pueden tener claro quién eres y a qué te dedicas.' },
+    no_canonical: { title: 'Sin etiqueta canónica', detail: 'Sin canónica, la misma página puede contarse varias veces y competir consigo misma.' },
+    no_viewport: { title: 'Sin viewport para móvil', detail: 'Google posiciona la versión móvil. Sin viewport, la página se ve rota en el teléfono.' },
+    no_open_graph: { title: 'Sin etiquetas para compartir (Open Graph)', detail: 'Al compartir en WhatsApp y Facebook no se verá ninguna imagen ni un título correcto.' },
+    robots_blocks_all: { title: 'robots.txt bloquea a todos los rastreadores', detail: 'El archivo les dice a todos los bots que no rastreen el sitio, lo que te deja fuera de Google.' },
+    robots_blocks_ai: { title: 'robots.txt bloquea a los bots de los motores de IA', detail: 'Un bot bloqueado no puede citarte en respuestas del estilo de ChatGPT.' },
+    no_faq: { title: 'Sin sección de preguntas y respuestas', detail: 'Los motores de IA responden preguntas, así que citan páginas que responden preguntas.' },
+  },
+  geo: {
+    schema: {
+      pass: { title: 'Los datos estructurados identifican el negocio', detail: 'Los motores de IA saben quién eres y a qué te dedicas.' },
+      fail: { title: 'Sin datos estructurados que identifiquen el negocio', detail: 'Sin Schema de negocio, los motores de IA no tienen claro quién eres.' },
+    },
+    faq: {
+      pass: { title: 'Hay una sección de preguntas y respuestas', detail: 'Una página que responde preguntas se cita mucho más.' },
+      fail: { title: 'Sin sección de preguntas y respuestas', detail: 'Los motores de IA responden preguntas, así que citan páginas que responden preguntas. Una página sin preguntas se cita pocas veces.' },
+    },
+    robots: {
+      pass: { title: 'Los motores de IA pueden leer el sitio', detail: 'robots.txt no bloquea a ningún bot de motores de IA.' },
+      fail: { title: 'robots.txt bloquea a los bots de los motores de IA', detail: 'Los bots bloqueados no podrán citarte.' },
+    },
+    llms: {
+      pass: { title: 'Existe un archivo llms.txt', detail: 'El sitio les entrega a los motores de IA un mapa ordenado de sí mismo, un paso por delante de casi todo el mercado.' },
+      fail: { title: 'Sin archivo llms.txt', detail: 'Un archivo llms.txt les entrega a los motores de IA un mapa ordenado del sitio. Casi todo el mercado todavía no lo ha hecho.' },
+    },
+  },
+  evidence: {
+    images: (missing, total) => `${missing} de ${total} imágenes`,
+    words: (n) => `${n} palabras en la página`,
+    h1: (n) => `${n} títulos H1`,
+  },
+}
 
-export function freeCheckCopy(locale: Locale): FreeCheckCopy {
+const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es }
+
+export function freeCheckCopy(locale: PublicLocale): FreeCheckCopy {
   return COPY[locale] ?? COPY.he
 }
