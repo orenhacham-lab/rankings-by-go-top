@@ -49,8 +49,8 @@ export default function EasyWins({
    */
   covered?: { row: ResearchRow; covered: OverlapPayload }[]
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.easyWins
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.easyWins
   const row = (w: Win, i: number) => <WinRow key={keywordKey(w.row.keyword)} w={w} i={i} adding={adding} onTrack={onTrack} />
   const apart = (w: Win, i: number) => <WinRow key={keywordKey(w.row.keyword)} w={w} i={i} adding={adding} onTrack={onTrack} apart />
   const header = (
@@ -151,8 +151,8 @@ function WinRow({ w: { row, win }, i, adding, onTrack, apart = false }: {
   /** In the "less related" group: plain numbering, its own marker. */
   apart?: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.easyWins
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.easyWins
   const key = keywordKey(row.keyword)
   const why = t.why({
     volume: formatCount(win.volume, language),

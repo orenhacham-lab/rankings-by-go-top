@@ -4,9 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { AlertCircle, CheckCircle2, Clock, Info, TriangleAlert, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import type { Locale } from '@/lib/i18n/locales'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import { sharedUiCopy } from '@/lib/i18n/public/shared-ui'
 
@@ -49,14 +47,15 @@ const TONE_ICON = { ok: CheckCircle2, bad: AlertCircle, warn: TriangleAlert, wai
  * (sign-in pages, the public site) use `NoticeBox` and pass `language`.
  */
 export default function Notice(props: NoticeProps) {
-  const { language } = useDashboardLanguage()
-  return <NoticeBox {...props} language={language} />
+  const { uiLocale } = useDashboardLanguage()
+  return <NoticeBox {...props} language={uiLocale} />
 }
 
 export function NoticeBox({ tone, children, action, onDismiss, className, items, language }: NoticeProps & { language: PublicLocale }) {
-  // Only two words here come from a dictionary, and the public site reaches this
-  // component in Spanish too — so they come from the small shared-UI table
-  // rather than from the dashboard dictionaries, which have no Spanish.
+  // Only two words here come from a dictionary, and this component is reached
+  // from the PUBLIC site as well as the dashboard — so they come from the small
+  // shared-UI table, which both sides can read, rather than from the dashboard
+  // dictionaries, which the public pages do not load.
   const t = sharedUiCopy(language)
   const [open, setOpen] = useState(false)
   const Icon = TONE_ICON[tone]

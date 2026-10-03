@@ -40,8 +40,8 @@ const ICON_BUTTON = cn(
 )
 
 export default function TopBarActions() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.topBarActions
   const { activeProjectId } = useActiveProject()
   const pathname = usePathname() ?? ''

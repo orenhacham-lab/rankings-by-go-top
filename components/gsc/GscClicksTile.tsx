@@ -26,8 +26,8 @@ import { formatCount } from './format'
  * Search Console is the setup checklist's job, not one more button among the numbers.
  */
 export default function GscClicksTile({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   const { view, reload } = useGscStatus(projectId)
   if (view.state === 'disabled') return null
   if (onlyWithData && !(view.state === 'ready' && view.summary) && view.state !== 'error') return null

@@ -27,8 +27,8 @@ export function dashboardTitleRoutes(dict: ReturnType<typeof getDashboardDiction
 
 export default function DocumentTitle() {
   const pathname = usePathname() ?? ''
-  const { language } = useDashboardLanguage()
-  const title = pageTitle(pathname, dashboardTitleRoutes(getDashboardDictionary(language)))
+  const { uiLocale } = useDashboardLanguage()
+  const title = pageTitle(pathname, dashboardTitleRoutes(getDashboardDictionary(uiLocale)))
   useEffect(() => {
     const apply = () => { if (document.title !== title) document.title = title }
     apply()

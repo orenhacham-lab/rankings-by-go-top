@@ -22,8 +22,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { cn } from '@/lib/utils'
 
 export default function ContactMenu() {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).contact
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).contact
   const { activeProjectId, projects } = useActiveProject()
   const domain = projects.find((p) => p.id === activeProjectId)?.target_domain?.trim() ?? ''
   const [open, setOpen] = useState(false)

@@ -123,8 +123,8 @@ function EmptyCard({ copy, domain, icon, onScan }: { copy: Copy; domain: string;
 }
 
 export default function SiteHealthScreen({ project }: { project: Project & { site_icon?: string | null } }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const copy = dict.siteHealth
   const dir = language === 'he' ? 'rtl' : 'ltr'
   const toasts = useToasts()

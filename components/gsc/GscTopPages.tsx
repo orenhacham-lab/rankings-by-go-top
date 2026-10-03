@@ -38,8 +38,8 @@ function describePage(url: string, homePage: string): { label: string; isPath: b
 
 /** `onlyWithData`: render only pages that were found (or a failed read's retry): no setup prompt, no loading card. */
 export default function GscTopPages({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).gscWidgets
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).gscWidgets
   const status = useGscStatus(projectId)
   const pages = useGscMetrics(projectId, status.view, 'pages', pickPages)
   const data = pages.data

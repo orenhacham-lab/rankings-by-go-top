@@ -64,8 +64,8 @@ import type { Project, Client } from '@/lib/supabase/types'
 const CONNECTIONS_WAIT_MS = 3000
 
 export default function ProjectSettingsPage() {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).projectSettings
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).projectSettings
 
   return (
     <div>
@@ -78,8 +78,8 @@ export default function ProjectSettingsPage() {
 }
 
 function ProjectSettings({ project, reload }: { project: Project; reload: () => void }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.projectSettings
   const [redetectChain, setRedetectChain] = useState<{ step: number; n: number } | null>(null)
   const [clients, setClients] = useState<Client[]>([])

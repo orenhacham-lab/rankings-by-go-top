@@ -18,7 +18,8 @@ import type { Tone } from '@/lib/onboarding/summary-view'
  * and spacing its letters apart breaks the word into single letters.
  */
 export function capsLabel(language: Locale): string {
-  return language === 'en' ? 'uppercase tracking-[0.14em]' : ''
+  // Latin script gets the tracked small caps; Hebrew has no case, so it does not.
+  return language === 'he' ? '' : 'uppercase tracking-[0.14em]'
 }
 
 /**

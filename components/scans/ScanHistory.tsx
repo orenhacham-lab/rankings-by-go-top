@@ -41,8 +41,8 @@ function runTime(run: Run): string {
 }
 
 export function EngineChip({ engine }: { engine: EngineType | string }) {
-  const { language } = useDashboardLanguage()
-  const c = getDashboardDictionary(language).common
+  const { uiLocale } = useDashboardLanguage()
+  const c = getDashboardDictionary(uiLocale).common
   return engine === 'google_maps'
     ? <Badge variant="success">{c.engineGoogleMaps}</Badge>
     : <Badge variant="info">{c.engineGoogleSearch}</Badge>
@@ -58,8 +58,8 @@ export default function ScanHistory({
   defaultOpen?: boolean
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).scans
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).scans
   const [open, setOpen] = useState(defaultOpen)
   const [runs, setRuns] = useState<Run[] | null>(null)
   const [error, setError] = useState(false)
@@ -150,8 +150,8 @@ export default function ScanHistory({
 
 /** One run: when, how it started, how many keywords, and its keywords on demand. */
 function RunRow({ run }: { run: Run }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).scans
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).scans
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<Row[] | null>(null)
   const [error, setError] = useState(false)

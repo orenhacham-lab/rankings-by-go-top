@@ -22,8 +22,8 @@ import type { UnavailableReason } from '@/lib/link-network/http'
 import { NetworkPromises } from './NetworkPanel'
 
 export default function NetworkUnavailable({ reason, onRetry }: { reason: UnavailableReason; onRetry: () => void }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).siteLinks
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).siteLinks
   const copy = dict.network
   const h = copy.hero
   const u = h.unavailable

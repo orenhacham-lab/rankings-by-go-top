@@ -85,7 +85,11 @@ console.log('A) P2-1 the switcher while its list loads')
 console.log('\nB) P2-13 billing cards (display only)')
 {
   const src = strip(read('app/(dashboard)/billing/BillingView.tsx'))
-  const grouped = (s: string) => /\{currencySymbol\}\{price\.toLocaleString\(numberLocale\)\}/.test(s) && /const numberLocale = language === 'en' \? 'en-US' : 'he-IL'/.test(s)
+  // The locale now comes from the INTL_LOCALE table rather than a test for
+  // English, because that test answered he-IL for every other language and would
+  // have printed a Spanish price with Hebrew grouping. The display contract this
+  // checks — the figure is grouped, and this screen only shows it — is the same.
+  const grouped = (s: string) => /\{currencySymbol\}\{price\.toLocaleString\(numberLocale\)\}/.test(s) && /const numberLocale = INTL_LOCALE\[uiLocale\]/.test(s)
   check('B1: the price is grouped for the locale (₪1,999)', grouped(src))
   check('MUT: the old raw {price} fails B1', !grouped(src.replace('{price.toLocaleString(numberLocale)}', '{price}')))
   check('B1b: …and he-IL grouping really prints ₪1,999', `₪${(1999).toLocaleString('he-IL')}` === '₪1,999' && `$${(1999).toLocaleString('en-US')}` === '$1,999')

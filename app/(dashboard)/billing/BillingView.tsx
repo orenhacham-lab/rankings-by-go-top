@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
+import { INTL_LOCALE } from '@/lib/i18n/locales'
 
 /** The 5 plans this view actually has cards/labels for. */
 type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium' | 'large_agency'
@@ -67,15 +68,15 @@ export default function BillingView({
   marketLocked,
   planPrices,
 }: BillingViewProps) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.billing
-  const dateLocale = language === 'en' ? 'en-US' : 'he-IL'
+  const dateLocale = INTL_LOCALE[uiLocale]
 
   // w17 — the currency is the server's; this view only shows it.
   const currencySymbol = BILLING_MARKETS[market].symbol
   // DISPLAY ONLY (w7 P2-13): the same grouping the public pricing page shows (₪1,999, not ₪1999).
-  const numberLocale = language === 'en' ? 'en-US' : 'he-IL'
+  const numberLocale = INTL_LOCALE[uiLocale]
 
   const [cancelling, setCancelling] = useState(false)
   // Shown in the page in our words; the route's own error text never reaches the merchant.

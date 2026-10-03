@@ -38,8 +38,8 @@ const SEARCH_THRESHOLD = 8
 
 export default function WorkspaceSwitcher() {
   const { activeProjectId, projects, isResolved, projectsError, reloadProjects, setActiveProject } = useActiveProject()
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).workspace
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).workspace
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   // The option that holds focus (roving tabindex), as an index into `filtered`.

@@ -102,13 +102,13 @@ export default function TrialBar({ state, dismissed = false }: {
   /** The server's reading of the dismissal cookie: the first paint agrees with it. */
   dismissed?: boolean
 }) {
-  const { language } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const pathname = usePathname()
   const hidden = useSyncExternalStore(subscribeHidden, readHidden, () => dismissed)
   if (state.kind === 'hidden') return null
   const canHide = state.kind !== 'expired'
   if (canHide && hidden) return null
-  const t = getDashboardDictionary(language).trialBar
+  const t = getDashboardDictionary(uiLocale).trialBar
   const urgent = state.kind !== 'active' || state.daysLeft <= URGENT_DAYS
   const onBilling = pathname === BILLING_HREF || pathname?.startsWith(`${BILLING_HREF}/`)
   let sentence: React.ReactNode

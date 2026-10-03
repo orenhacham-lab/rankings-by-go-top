@@ -48,8 +48,8 @@ function Note({ children }: { children: React.ReactNode }) {
 }
 
 export default function GscMetricsTable({ projectId, refreshKey = 0 }: { projectId: string; refreshKey?: number }) {
-  const { language } = useDashboardLanguage()
-  const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t: Dict = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection.gsc, [uiLocale])
 
   // The status, read through the shared Search Console request (the panel above has
   // usually just read it): drawn from the first render when it is in hand, and a

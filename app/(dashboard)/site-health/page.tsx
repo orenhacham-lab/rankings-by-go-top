@@ -13,8 +13,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function SiteHealthPage() {
-  const { language } = useDashboardLanguage()
-  const copy = getDashboardDictionary(language).siteHealth
+  const { uiLocale } = useDashboardLanguage()
+  const copy = getDashboardDictionary(uiLocale).siteHealth
   return (
     <div>
       <Header title={copy.title} subtitle={copy.subtitle} />

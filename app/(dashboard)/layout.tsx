@@ -12,10 +12,7 @@ import { loadTrialBar } from '@/lib/billing/trial-bar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
 import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { getServerLocale } from '@/lib/i18n/server-locale'
-// normalizeLocale comes from the PURE (non-'use client') module: this layout is a server
-// component, and calling a function exported by a client module throws at runtime.
-import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
+import { getServerPublicLocale } from '@/lib/i18n/server-locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
 import { GscFeatureProvider } from '@/components/gsc/GscFeature'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
@@ -82,7 +79,11 @@ export default async function DashboardLayout({
   // The SERVER-resolved locale (cookie first, auth metadata as the first-visit
   // seed) — the same value the root layout rendered <html lang/dir> from, so the
   // provider's first client render cannot disagree with the server's.
-  const initialLocale = await getServerLocale(user.user_metadata?.locale as string | null | undefined)
+  // getServerPublicLocale, not getServerLocale: the dashboard's WORDS can be
+  // Spanish, so the value the provider starts from has to be able to say so.
+  // normalizeDashboardUiLocale inside the provider still refuses 'es' while the
+  // Spanish build is off, so this cannot open a half-translated dashboard.
+  const initialLocale = await getServerPublicLocale(user.user_metadata?.locale as string | null | undefined)
 
   // Area G — the language provider is seeded from the signup-origin locale.
   return (

@@ -59,8 +59,8 @@ export default function NewProjectFlow({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).seedOnboarding
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).seedOnboarding
   const Arrow = language === 'he' ? ArrowLeft : ArrowRight
 
   const [value, setValue] = useState(claimedDomain ?? '')

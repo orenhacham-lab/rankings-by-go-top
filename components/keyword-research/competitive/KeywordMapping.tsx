@@ -26,8 +26,8 @@ export const MAPPING_SHOWN = 25
 const FLAG_BADGE = { ok: 'success', no_page: 'warning', no_page_top20: 'warning', competing: 'danger', unknown: 'neutral' } as const
 
 function PageCell({ row }: { row: MappingRow }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).researchCompetitive.mapping
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).researchCompetitive.mapping
   if (row.pages.length === 0) return <span className="text-muted">—</span>
   const shown = row.flag === 'competing' ? row.pages.filter((p) => p.share >= COMPETING_MIN_SHARE).slice(0, 3) : row.pages.slice(0, 1)
   return (
@@ -60,8 +60,8 @@ export default function KeywordMapping({ model, heading = true }: {
   /** False inside a Fold, whose button already is the title. */
   heading?: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).researchCompetitive
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.mapping
   const n = (v: number) => formatCount(v, language)
   const [filter, setFilter] = useState<MappingFilter>('all')

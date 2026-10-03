@@ -48,7 +48,7 @@
  * layouts and the client provider all decide identically and cannot drift.
  */
 
-import { toBilingualLocale, type Locale, type PublicLocale } from './locales'
+import { normalizeStoredLocale, toBilingualLocale, type Locale, type PublicLocale } from './locales'
 import { normalizeLocale } from './dashboard/locale'
 import { localeFromAcceptLanguage } from './accept-language'
 import { spanishSiteEnabled } from './spanish-site'
@@ -196,8 +196,13 @@ export function resolveRequestLocale(input: {
   // cookie, seed, parameter or header may relabel content it did not write.
   const fixed = routePublicLocale(input.pathname)
   if (fixed) return fixed
+  // The COOKIE is read with normalizeStoredLocale, which accepts Spanish; every
+  // other step stays bilingual. The cookie is the reader's own stored choice and
+  // the only way a dashboard — which has no /es URL to be fixed by — can be
+  // Spanish. `?lang=` stays bilingual because it is a hand-off between
+  // surfaces, and the seed is the signup language, which has no Spanish form yet.
   return normalizeLocale(input.langParam)
-    ?? normalizeLocale(input.cookieValue)
+    ?? normalizeStoredLocale(input.cookieValue)
     ?? normalizeLocale(input.seed)
     ?? localeFromAcceptLanguage(input.acceptLanguage)
     ?? REQUEST_FALLBACK_LOCALE
@@ -217,7 +222,30 @@ export function explicitRequestLocale(input: {
 }): PublicLocale | null {
   return routePublicLocale(input.pathname)
     ?? normalizeLocale(input.langParam)
-    ?? normalizeLocale(input.cookieValue)
+    ?? normalizeStoredLocale(input.cookieValue)
+}
+
+/**
+ * Whether a `?lang=` should be REMEMBERED as the account's preference, given
+ * what is already stored. Returns the value to write, or null to leave the
+ * stored choice alone.
+ *
+ * THE BUG THIS FIXES, found by screenshotting the dashboard in Spanish. The auth
+ * pages are bilingual, so signing in stamps `?lang=he|en` on the destination
+ * (withLocaleParam) and the proxy persisted it. For a reader whose stored choice
+ * was SPANISH, the auth surface resolved the nearest language it has — English —
+ * and the stamp overwrote the cookie: logging in silently reset a Spanish
+ * dashboard to English, and the Spanish dictionary was never read.
+ *
+ * So a parameter that merely RESTATES the stored choice, once narrowed to the
+ * two languages the auth pages have, is not a choice and is not written. One
+ * that genuinely differs still is, because then something asked for it: an
+ * `/en/*` route, the OAuth callback, a link from the English sitemap.
+ */
+export function localeParamToPersist(storedValue: string | null | undefined, langParam: Locale | null): Locale | null {
+  if (!langParam) return null
+  const stored = normalizeStoredLocale(storedValue)
+  return stored && toBilingualLocale(stored) === langParam ? null : langParam
 }
 
 /** The query parameter that carries an explicit locale across a navigation. */
@@ -255,7 +283,7 @@ export function sanitizeNextPath(raw: string | null | undefined, fallback = '/da
  */
 export const LANGUAGE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
-export function languageCookieString(locale: Locale, secure: boolean): string {
+export function languageCookieString(locale: PublicLocale, secure: boolean): string {
   const parts = [
     `${LANGUAGE_COOKIE}=${locale}`,
     'Path=/',
@@ -289,9 +317,9 @@ export function readCookie(cookieHeader: string | null | undefined, name: string
  *   neither                   → keep the server's locale and write it, so the
  *                               next request is already decided server-side
  */
-export interface LocaleMigration {
+export interface LocaleMigration<L extends PublicLocale = Locale> {
   /** The locale the client should hold after migration. */
-  locale: Locale
+  locale: L
   /** Write this to the cookie (always set — the point is to become server-readable). */
   writeCookie: true
   /** Mirror into localStorage when it disagrees, so the two stay in step. */
@@ -299,16 +327,28 @@ export interface LocaleMigration {
   reason: 'cookie' | 'migrated_from_storage' | 'server_default'
 }
 
-export function migrateLocalePreference(input: {
+/**
+ * `normalize` is a parameter rather than a hard-coded `normalizeLocale` because
+ * ONE surface reads a wider set than the rest: the dashboard's words can be
+ * Spanish while everything around them is still Hebrew or English, so its
+ * provider passes a normalizer that accepts 'es'. The rule the function
+ * implements — cookie beats storage beats the server's value — is the same
+ * whichever set it is given, and duplicating it per set is how the two would
+ * drift. It defaults to the bilingual normalizer, so every existing caller reads
+ * and behaves exactly as before.
+ */
+export function migrateLocalePreference<L extends PublicLocale = Locale>(input: {
   cookieValue?: string | null
   storedValue?: string | null
-  serverLocale: Locale
-}): LocaleMigration {
-  const cookie = normalizeLocale(input.cookieValue)
+  serverLocale: NoInfer<L>
+  normalize?: (value: unknown) => L | null
+}): LocaleMigration<L> {
+  const normalize = input.normalize ?? (normalizeLocale as unknown as (value: unknown) => L | null)
+  const cookie = normalize(input.cookieValue)
   if (cookie) {
-    return { locale: cookie, writeCookie: true, writeStorage: normalizeLocale(input.storedValue) !== cookie, reason: 'cookie' }
+    return { locale: cookie, writeCookie: true, writeStorage: normalize(input.storedValue) !== cookie, reason: 'cookie' }
   }
-  const stored = normalizeLocale(input.storedValue)
+  const stored = normalize(input.storedValue)
   if (stored) return { locale: stored, writeCookie: true, writeStorage: false, reason: 'migrated_from_storage' }
   return { locale: input.serverLocale, writeCookie: true, writeStorage: true, reason: 'server_default' }
 }

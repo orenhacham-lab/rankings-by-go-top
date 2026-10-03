@@ -42,8 +42,8 @@ export default function FirstArticleButton({
   topic: string
   primaryKeyword: string | null
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).seedOnboarding.firstArticle
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).seedOnboarding.firstArticle
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [topicId, setTopicId] = useState<string | null>(null)
@@ -120,7 +120,7 @@ export default function FirstArticleButton({
           )}
           {needsPlan && (
             <ActionLink href={BILLING_HREF} className="shrink-0">
-              {getDashboardDictionary(language).seedOnboarding.actions.billing}
+              {getDashboardDictionary(uiLocale).seedOnboarding.actions.billing}
             </ActionLink>
           )}
         </div>

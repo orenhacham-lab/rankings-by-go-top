@@ -91,8 +91,8 @@ export default function TrackingTargetsTable({
   competitorView,
   emptyAction,
 }: TrackingTargetsTableProps) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const k = dict.projectDetail.table
   const kp = dict.keywordsPage
 

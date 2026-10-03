@@ -42,8 +42,8 @@ export default function ExistingRankings({ model, gsc, gscRun, projectId, onTrac
   /** False inside a Fold, whose button already is the title. */
   heading?: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).researchCompetitive
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.rankings
   const n = (v: number) => formatCount(v, language)
   const [filter, setFilter] = useState<RankingsFilter>('all')

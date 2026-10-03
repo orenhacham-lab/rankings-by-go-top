@@ -334,7 +334,10 @@ async function main() {
     check('4f: SOURCE — the effect sets document.documentElement lang AND dir', /html\.lang = lang/.test(effectSrc) && /html\.dir = dir/.test(effectSrc))
     check('4g: SOURCE — it re-runs when the locale changes', /\}, \[locale, restoreOnUnmount\]\)/.test(effectSrc))
     const providerSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'i18n', 'dashboard', 'useDashboardLanguage.tsx'), 'utf8')
-    check('4h: SOURCE — the dashboard language provider drives it', /<DocumentLocaleEffect locale=\{language\} \/>/.test(providerSrc))
+    // It follows the UI locale, which is the one the document must agree with:
+    // a Spanish dashboard has to declare lang="es" dir="ltr", and `language` is
+    // the narrowed value that cannot say so.
+    check('4h: SOURCE — the dashboard language provider drives it', /<DocumentLocaleEffect locale=\{uiLocale\} \/>/.test(providerSrc))
     const enLayout = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'app', '(public)', 'en', 'layout.tsx'), 'utf8')
     check('4i: SOURCE — the public /en layout reuses the SAME component', /<DocumentLocaleEffect locale="en" restoreOnUnmount \/>/.test(enLayout))
     check('4j: SOURCE — the old single-purpose EnglishLocaleEffect is gone',

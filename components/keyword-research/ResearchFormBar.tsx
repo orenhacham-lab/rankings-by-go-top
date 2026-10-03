@@ -9,8 +9,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ResearchFormBar({ onOpen }: { onOpen: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.form
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.form
   return (
     <div data-research-form="collapsed" className="mb-8 flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5 shadow-card transition-colors hover:border-line-strong sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
@@ -37,8 +37,8 @@ export default function ResearchFormBar({ onOpen }: { onOpen: () => void }) {
 
 /** The line above the open form, to fold it again. */
 export function ResearchFormClose({ onClose }: { onClose: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.form
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.form
   return (
     <div data-research-form="open" className="mb-2 flex justify-end">
       <button

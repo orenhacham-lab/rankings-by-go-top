@@ -32,8 +32,8 @@ export default function ArticlesHero({ standing, connection }: {
    *  not a line floating above it (review P2-11). */
   connection?: ReactNode
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const h = dict.contentHub.articlesHero
   const status = dict.contentHub.status
   const count = (n: number) => formatCount(n, language)

@@ -21,8 +21,8 @@ export default function SourceTag({ source, date, short = false, className }: {
   short?: boolean
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).researchCompetitive.source
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).researchCompetitive.source
   const text = source === 'scan'
     ? (date && !short ? t.scan(date) : t.scanShort)
     : (short ? t.gscShort : t.gsc)

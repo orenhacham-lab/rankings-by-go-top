@@ -340,11 +340,15 @@ function main() {
     }
     check('7b: the Spanish home page links to the English sign-up explicitly',
       /authHref\('signup', 'en'\)/.test(strip(read('app/(public)/es/page.tsx'))))
-    // The dashboard dictionaries are he/en only, on purpose: Spanish there is
-    // the next wave, and the narrowing wrapper is its to-do list.
+    // The dashboard now has a Spanish dictionary too, and it is PARTIAL by
+    // design: what it has not translated answers in English. The guard that
+    // owns that wave is lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts,
+    // which also prints the coverage; this one only holds the file set, so a
+    // fourth language cannot appear in the dashboard without a decision.
     const dashDir = join(ROOT, 'lib', 'i18n', 'dashboard')
     const dicts = readdirSync(dashDir).filter((f) => /^[a-z]{2}\.ts$/.test(f)).sort()
-    check('7c: the dashboard still has exactly two dictionaries', JSON.stringify(dicts) === JSON.stringify(['en.ts', 'he.ts']), dicts.join(','))
+    check('7c: the dashboard has exactly the three dictionaries we have decided on',
+      JSON.stringify(dicts) === JSON.stringify(['en.ts', 'es.ts', 'he.ts']), dicts.join(','))
     // MUTATION CONTROL
     check('7-MUT: a Hebrew auth link would fail 7a', /href="\/(signup|login)(\?|")/.test('<a href="/signup?x">'))
   }

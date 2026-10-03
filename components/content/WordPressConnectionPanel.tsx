@@ -52,8 +52,8 @@ export default function WordPressConnectionPanel({
   onConnected?: () => void
   startWithForm?: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection, [uiLocale])
 
   // Known or not (lib/connection-status): the section above usually read this very
   // URL a moment ago, so the first render has the answer and draws it directly.

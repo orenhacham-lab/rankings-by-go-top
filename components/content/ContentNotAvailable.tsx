@@ -5,10 +5,10 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 
 /** The content workspace's "not available" state, in the dashboard's language. */
 export default function ContentNotAvailable() {
-  const { language } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   return (
     <div className="py-20 text-center text-muted text-copy">
-      {getDashboardDictionary(language).common.notAvailable}
+      {getDashboardDictionary(uiLocale).common.notAvailable}
     </div>
   )
 }

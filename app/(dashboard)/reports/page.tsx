@@ -57,8 +57,8 @@ interface AIScanRun {
 }
 
 function ReportsContent() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.reports
   // Creating a PDF takes a while: a progress toast, then its outcome (components/ui/Toast.tsx).
   const toasts = useToasts()
@@ -791,8 +791,8 @@ function AIVisibilityReport({
 }
 
 export default function ReportsPage() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   return (
     <Suspense fallback={<div>{dict.reports.loading}</div>}>
       <ReportsContent />

@@ -24,8 +24,8 @@ const noop = () => () => {}
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
   const mounted = useSyncExternalStore(noop, () => true, () => false)
-  const { language } = useDashboardLanguage()
-  const dict = useMemo(() => getDashboardDictionary(language), [language])
+  const { uiLocale } = useDashboardLanguage()
+  const dict = useMemo(() => getDashboardDictionary(uiLocale), [uiLocale])
   const current = mounted ? (resolvedTheme === 'dark' ? 'dark' : 'light') : null
 
   const option = (active: boolean) => cn(

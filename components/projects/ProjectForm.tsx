@@ -43,8 +43,8 @@ export default function ProjectForm({
   fieldNotes,
   onUpdated,
 }: ProjectFormProps) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const f = dict.projects.form
 
   const onlyClient = implicitClientId(clients)

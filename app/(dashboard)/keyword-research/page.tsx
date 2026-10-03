@@ -161,8 +161,8 @@ function CompetitionBadge({ c }: { c: ReturnType<typeof competitionCell> }) {
 }
 
 export default function KeywordResearchPage() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.keywordResearch
   const isRTL = language === 'he'
   const router = useRouter()

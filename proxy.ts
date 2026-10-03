@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
 import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
-  explicitRequestLocale, languageCookieString, sanitizeNextPath,
+  explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
 } from '@/lib/i18n/request-locale'
 
 export async function proxy(request: NextRequest) {
@@ -70,7 +70,13 @@ export async function proxy(request: NextRequest) {
    * (`/en/*`, `/privacy`, the Shopify surface) is a property of that URL and
    * must never be remembered as the account's preference.
    */
-  const localeToPersist = normalizedLangParam(langParam)
+  // …but NOT when it would narrow a wider choice the reader already made:
+  // localeParamToPersist says why, and is tested in
+  // lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts group 9.
+  const localeToPersist = localeParamToPersist(
+    request.cookies.get(LANGUAGE_COOKIE)?.value ?? null,
+    normalizedLangParam(langParam),
+  )
   const persistLocale = (res: NextResponse): NextResponse => {
     if (localeToPersist) {
       res.headers.append('set-cookie', languageCookieString(localeToPersist, request.nextUrl.protocol === 'https:'))

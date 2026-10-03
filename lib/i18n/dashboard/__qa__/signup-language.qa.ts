@@ -66,8 +66,12 @@ function main() {
   // 3 — the layout still seeds from auth metadata, now THROUGH the server locale
   // resolver (cookie first, metadata as the fresh-device seed). The shape changed
   // with the server language contract; the guarantee did not.
+  // Either spelling satisfies this. The dashboard now seeds from
+  // getServerPublicLocale because its WORDS can be Spanish; what this checks is
+  // that the seed is the server's own resolution of the signup locale and not a
+  // second mechanism.
   check('dashboard layout seeds the provider from the server-resolved locale',
-    /getServerLocale\(user\.user_metadata\?\.locale/.test(layout))
+    /getServer(?:Public)?Locale\(user\.user_metadata\?\.locale/.test(layout))
   // The root document's seed read moved into the request-cached context module so
   // <html> and the page <title> resolve ONCE and cannot disagree. Same seed, same
   // resolver — asserted where it now lives.

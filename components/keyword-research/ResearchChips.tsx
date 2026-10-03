@@ -27,8 +27,8 @@ export default function ResearchChips({
   onChange: (chip: ResearchChip) => void
   google: GoogleChip
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).keywordResearchScan.chips
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).keywordResearchScan.chips
   const chips = RESEARCH_CHIPS.filter((c) => c !== 'google' || google !== 'hidden')
   const { containerRef, thumbRef } = useSlidingThumb('[aria-checked="true"]', [active, chips.length])
   // The one segmented control's look (design contract §5: a sunk pill, the chosen

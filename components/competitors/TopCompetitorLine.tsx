@@ -24,8 +24,8 @@ type Copy = ReturnType<typeof getDashboardDictionary>['competitors']
 const BOX = 'inline-flex h-5 w-32 items-center gap-1 whitespace-nowrap text-caption'
 
 export default function TopCompetitorLine({ view, targetId }: { view: CompetitorView; targetId: string }) {
-  const { language } = useDashboardLanguage()
-  const c = getDashboardDictionary(language).competitors
+  const { uiLocale } = useDashboardLanguage()
+  const c = getDashboardDictionary(uiLocale).competitors
 
   if (view.status === 'no_competitors') return <Dash state="no_competitors" why={c.cellNoCompetitors} c={c} />
   if (view.status === 'error') return <Dash state="error" why={c.cellLoadFailed} c={c} />

@@ -26,8 +26,8 @@ export default function CompetitorSummary({ view, variant, className }: {
   variant: 'full' | 'compact'
   className?: string
 }) {
-  const { language } = useDashboardLanguage()
-  const c = getDashboardDictionary(language).competitors
+  const { uiLocale } = useDashboardLanguage()
+  const c = getDashboardDictionary(uiLocale).competitors
   const compact = variant === 'compact'
   const titleId = compact ? 'competitor-summary-compact-title' : 'competitor-summary-title'
 

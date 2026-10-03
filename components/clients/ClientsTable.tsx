@@ -23,8 +23,8 @@ interface ClientsTableProps {
 }
 
 export default function ClientsTable({ clients, onClientsChange }: ClientsTableProps) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [deletingClient, setDeletingClient] = useState<Client | null>(null)

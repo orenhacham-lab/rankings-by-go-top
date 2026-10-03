@@ -19,8 +19,8 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
   // English dashboard announced a Hebrew word to a screen reader — the same
   // defect as a Hebrew label, just only audible. Every Modal call site is inside
   // the dashboard provider, so the resolved language is available here.
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {

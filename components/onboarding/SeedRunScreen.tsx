@@ -46,8 +46,8 @@ export default function SeedRunScreen({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).seedOnboarding
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).seedOnboarding
   const { run, readError, reconnecting, awaitingStart, refresh, expectNewRun } = useSeedRun(projectId, initialRun)
   const [startRefusal, setStartRefusal] = useState<Notice | null>(initialNotice)
   const [starting, setStarting] = useState(false)

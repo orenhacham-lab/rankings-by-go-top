@@ -436,12 +436,12 @@ async function main() {
     check('5h: …while an explicit cookie still outranks it',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'he', seed: 'en' }) === 'he')
     const dashLayout = require('fs').readFileSync(join(ROOT, 'app', '(dashboard)', 'layout.tsx'), 'utf8')
-    // The dashboard is BILINGUAL (he/en), so it reads the same server locale
-    // through the documented narrowing wrapper rather than the public one,
-    // which can also answer 'es'. Either spelling satisfies this: what matters
-    // is that it is the server's resolution and not a second mechanism.
+    // The dashboard's WORDS can now be Spanish, so it seeds from the public
+    // resolution; its logic stays bilingual, narrowed inside the provider.
+    // Either spelling satisfies this: what matters is that it is the server's
+    // resolution and not a second mechanism.
     check('5f: SOURCE — the dashboard seeds the provider from the SAME server locale',
-      /getServerLocale\(|getServerBilingualLocale\(/.test(dashLayout))
+      /getServer(?:Public)?Locale\(/.test(dashLayout))
   }
 
   console.log('\n7) ACCEPT-LANGUAGE — parsed, with q-values; never a substring test')

@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
+import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -348,7 +349,13 @@ function RailFoot({ dict, isAdmin }: { dict: ReturnType<typeof getDashboardDicti
           <span>{dict.sidebar.support}</span>
         </a>
       )}
-      <div className="grid grid-cols-2 gap-2 px-1">
+      {/* Two controls side by side fit while there are two languages. A third
+          chip does not: half the rail's width cannot hold "עברית" beside EN and
+          ES, and the measured result was the Hebrew label spilling out of its
+          track. With the Spanish build on, the switcher takes a row of its own
+          and the theme toggle sits under it; with it off this is the same markup
+          as before, so the Hebrew and English rail is untouched. */}
+      <div className={cn('grid gap-2 px-1', spanishSiteEnabled() ? 'grid-cols-1' : 'grid-cols-2')}>
         <DashboardLanguageSwitcher />
         <ThemeToggle />
       </div>
@@ -366,8 +373,8 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname() ?? ''
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const activeHref = activeNavHref(pathname, isAdmin ? [...navItemKeys, ...adminItemKeys] : navItemKeys)
 
   // Count pills: what waits for the owner of the active project (the dashboard card's own

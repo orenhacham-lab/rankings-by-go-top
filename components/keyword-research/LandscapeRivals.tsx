@@ -35,8 +35,8 @@ function Bar({ share, className }: { share: number; className: string }) {
 }
 
 function RivalCard({ c, max, index, phoneHidden = false }: { c: CompetitorInsight; max: number; index: number; phoneHidden?: boolean }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).researchInsights.rivals
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).researchInsights.rivals
   const n = (v: number) => formatCount(v, language)
   const sharedPct = c.found > 0 ? (c.shared / c.found) * 100 : 0
   return (
@@ -160,15 +160,15 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
   /** The demand only competitors reach, each keyword once. */
   gapSearches: number
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).researchInsights
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).researchInsights
   const t = dict.rivals
   const n = (v: number) => formatCount(v, language)
   const [all, setAll] = useState(false)
   const list = all ? landscape.competitors : landscape.competitors.slice(0, RIVALS_SHOWN)
   const hidden = landscape.competitors.length - list.length
   const phoneHidden = all ? 0 : landscape.competitors.length - RIVALS_SHOWN_PHONE
-  const strategy = getDashboardDictionary(language).contentStrategy
+  const strategy = getDashboardDictionary(uiLocale).contentStrategy
   const toggleClass = 'inline-flex h-9 items-center rounded-control border border-line bg-surface px-4 text-copy font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:border-line-strong hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20'
 
   return (

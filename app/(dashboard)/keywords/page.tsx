@@ -21,8 +21,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function KeywordsPage() {
-  const { language } = useDashboardLanguage()
-  const kp = getDashboardDictionary(language).keywordsPage
+  const { uiLocale } = useDashboardLanguage()
+  const kp = getDashboardDictionary(uiLocale).keywordsPage
   const historyOpen = useSearchParams().get('history') === '1'
 
   return (

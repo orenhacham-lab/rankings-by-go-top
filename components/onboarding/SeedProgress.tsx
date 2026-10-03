@@ -72,9 +72,9 @@ export default function SeedProgress({
   projectId: string | null
   reconnecting: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).seedOnboarding.progress
-  const actions = getDashboardDictionary(language).seedOnboarding.actions
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).seedOnboarding.progress
+  const actions = getDashboardDictionary(uiLocale).seedOnboarding.actions
 
   const claim = run?.trigger === 'claim'
   const active = activeStep(run)
@@ -147,7 +147,7 @@ export default function SeedProgress({
                   <Icon className="relative h-6 w-6" aria-hidden />
                 </span>
                 <div className="min-w-0">
-                  <p className={cn('text-caption text-contrast-ink/55', language === 'en' ? '' : 'font-medium', capsLabel(language))}>{t.stepOf(position, total)}</p>
+                  <p className={cn('text-caption text-contrast-ink/55', language === 'he' ? 'font-medium' : '', capsLabel(language))}>{t.stepOf(position, total)}</p>
                   <h2 className="mt-1 text-section font-semibold tracking-tight sm:text-title">{title}</h2>
                 </div>
               </div>

@@ -34,8 +34,8 @@ export default function ShopifyPublishSettings({
   initialStatus: string | null
   initialLastError: string | null
 }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.shopifyPublish, [language])
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub.editor.shopifyPublish, [uiLocale])
   const dir: 'rtl' | 'ltr' = language === 'he' ? 'rtl' : 'ltr'
 
   const [conn, setConn] = useState<Conn>(null)

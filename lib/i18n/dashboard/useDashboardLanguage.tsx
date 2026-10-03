@@ -6,8 +6,8 @@ import {
   LANGUAGE_COOKIE, languageCookieString, readCookie, migrateLocalePreference,
   REQUEST_FALLBACK_LOCALE,
 } from '@/lib/i18n/request-locale'
-import type { Locale } from '../locales'
-import { resolveDashboardLocale } from './locale'
+import { toBilingualLocale, type Locale, type PublicLocale } from '../locales'
+import { normalizeDashboardUiLocale, resolveDashboardUiLocale } from './locale'
 
 /** The single, existing dashboard-language store key (localStorage). Exported so the
  *  signup flow can seed it without a second competing key. */
@@ -16,30 +16,52 @@ const STORAGE_KEY = DASHBOARD_LANGUAGE_STORAGE_KEY
 
 // The pure locale helpers live in ./locale (NOT a client module) so the SERVER dashboard
 // layout can call them. Re-exported here for existing client-side importers.
-export { normalizeLocale, resolveDashboardLocale } from './locale'
+export { normalizeLocale, resolveDashboardLocale, normalizeDashboardUiLocale, resolveDashboardUiLocale } from './locale'
 
+/**
+ * TWO VALUES, BECAUSE THERE ARE TWO QUESTIONS, and they are the same two the
+ * public site answers with getServerLocale / getServerPublicLocale.
+ *
+ * `uiLocale` is the language of the WORDS: it is what getDashboardDictionary
+ * takes, what <html lang/dir> follows, and the only one of the two that can be
+ * 'es'. `language` is the BILINGUAL value the rest of the dashboard runs on —
+ * the ~300 `language === 'he' ? … : …` conditionals, the server actions whose
+ * refusals these screens display, the exports. It is `toBilingualLocale(uiLocale)`,
+ * so a Spanish reader gets each of those in English.
+ *
+ * Keeping them apart is what lets the Spanish translation land section by
+ * section: a screen moves to `uiLocale` on the commit that translates its words,
+ * and every screen that has not moved yet keeps compiling and behaving exactly
+ * as it did. Widening `language` itself instead would have put 'es' into all
+ * ~300 of those conditionals at once — 229 of them type errors, and the inverted
+ * ones (`language === 'en' ? ltr : rtl`) silently serving Spanish a Hebrew
+ * right-to-left layout.
+ */
 type DashboardLanguageContextValue = {
+  /** The language of the dashboard's words. Can be Spanish. */
+  uiLocale: PublicLocale
+  /** The bilingual language everything else runs on. Never Spanish. */
   language: Locale
-  setDashboardLanguage: (lang: Locale) => void
+  setDashboardLanguage: (lang: PublicLocale) => void
   isLoaded: boolean
 }
 
 const DashboardLanguageContext = createContext<DashboardLanguageContextValue | null>(null)
 
 /** Write the preference where the SERVER can read it on the next request. */
-function writeLanguageCookie(lang: Locale) {
+function writeLanguageCookie(lang: PublicLocale) {
   try {
     document.cookie = languageCookieString(lang, window.location.protocol === 'https:')
   } catch { /* non-browser or blocked — the UI still works, the server just keeps its value */ }
 }
 
-export function DashboardLanguageProvider({ children, initialLocale }: { children: ReactNode; initialLocale?: Locale | null }) {
+export function DashboardLanguageProvider({ children, initialLocale }: { children: ReactNode; initialLocale?: PublicLocale | null }) {
   // `initialLocale` is now the SERVER-RESOLVED locale (the same cookie the root
   // layout rendered from), not just an auth-metadata seed. Starting from it is
   // what makes the client's FIRST render identical to the server's — the
   // previous version started from the seed and then corrected itself in an
   // effect, which is precisely the disagreement this contract removes.
-  const [language, setLanguage] = useState<Locale>(resolveDashboardLocale(null, initialLocale))
+  const [uiLocale, setUiLocale] = useState<PublicLocale>(resolveDashboardUiLocale(null, initialLocale))
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
@@ -51,12 +73,15 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
     let stored: string | null = null
     try { stored = localStorage.getItem(STORAGE_KEY) } catch { /* private mode */ }
     const cookieValue = readCookie(typeof document === 'undefined' ? null : document.cookie, LANGUAGE_COOKIE)
-    const migration = migrateLocalePreference({
+    const migration = migrateLocalePreference<PublicLocale>({
       cookieValue,
       storedValue: stored,
-      serverLocale: resolveDashboardLocale(null, initialLocale),
+      serverLocale: resolveDashboardUiLocale(null, initialLocale),
+      // The dashboard is the one surface that reads 'es' out of the cookie, and
+      // only while the Spanish build is on.
+      normalize: normalizeDashboardUiLocale,
     })
-    if (migration.locale !== language) setLanguage(migration.locale)
+    if (migration.locale !== uiLocale) setUiLocale(migration.locale)
     writeLanguageCookie(migration.locale)
     if (migration.writeStorage) {
       try { localStorage.setItem(STORAGE_KEY, migration.locale) } catch { /* ignore */ }
@@ -65,8 +90,8 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const setDashboardLanguage = (lang: Locale) => {
-    setLanguage(lang)
+  const setDashboardLanguage = (lang: PublicLocale) => {
+    setUiLocale(lang)
     // BOTH stores, always together — a cookie the server reads and the existing
     // localStorage key, so nothing can silently disagree with the next response.
     writeLanguageCookie(lang)
@@ -78,12 +103,12 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
   }
 
   return (
-    <DashboardLanguageContext.Provider value={{ language, setDashboardLanguage, isLoaded }}>
+    <DashboardLanguageContext.Provider value={{ uiLocale, language: toBilingualLocale(uiLocale), setDashboardLanguage, isLoaded }}>
       {/* The DOCUMENT's own lang/dir follow the switcher. Without this the page
           rendered English text inside a document still declaring lang="he"
           dir="rtl" — a scoped wrapper div cannot change what the document
           declares. */}
-      <DocumentLocaleEffect locale={language} />
+      <DocumentLocaleEffect locale={uiLocale} />
       {children}
     </DashboardLanguageContext.Provider>
   )
@@ -119,7 +144,8 @@ function assertProviderPresent(): Locale {
 export function useDashboardLanguage(): DashboardLanguageContextValue {
   const ctx = useContext(DashboardLanguageContext)
   if (ctx) return ctx
-  return { language: assertProviderPresent(), setDashboardLanguage: () => {}, isLoaded: true }
+  const fallback = assertProviderPresent()
+  return { uiLocale: fallback, language: fallback, setDashboardLanguage: () => {}, isLoaded: true }
 }
 
 /**
@@ -131,9 +157,9 @@ export function useDashboardLanguage(): DashboardLanguageContextValue {
  * remembered language, and the server's first render and the client's agree
  * by construction. The document's own lang/dir stay the public layout's.
  */
-export function FixedDashboardLanguage({ locale, children }: { locale: Locale; children: ReactNode }) {
+export function FixedDashboardLanguage({ locale, children }: { locale: PublicLocale; children: ReactNode }) {
   return (
-    <DashboardLanguageContext.Provider value={{ language: locale, setDashboardLanguage: () => {}, isLoaded: true }}>
+    <DashboardLanguageContext.Provider value={{ uiLocale: locale, language: toBilingualLocale(locale), setDashboardLanguage: () => {}, isLoaded: true }}>
       {children}
     </DashboardLanguageContext.Provider>
   )

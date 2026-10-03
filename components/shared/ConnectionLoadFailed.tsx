@@ -11,8 +11,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
 export default function ConnectionLoadFailed({ onRetry, className }: { onRetry: () => void; className?: string }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).connectionStatus
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).connectionStatus
   return (
     <Notice tone="warn" className={className} action={{ label: t.retry, onClick: onRetry }}>
       <span data-connection-load-failed="">{t.loadFailed}</span>

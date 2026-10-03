@@ -80,8 +80,8 @@ export function DashboardOnboardingTour({ run, onEnd }: { run: TourRun | null; o
 }
 
 function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => void }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language).guide
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale).guide
   const t = dict.tour
   const dir = language === 'he' ? 'rtl' : 'ltr'
   const steps = run.steps

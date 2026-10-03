@@ -41,8 +41,8 @@ function defaultLater(): { date: string; time: string } {
 }
 
 export default function PostComposer({ projectId, status, onPosted }: { projectId: string; status: GbpReadyStatus; onPosted: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   const c = t.composer
   const canPublish = status.connection?.status === 'connected' && !!status.location
 

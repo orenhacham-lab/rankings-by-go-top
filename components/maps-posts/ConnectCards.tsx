@@ -31,8 +31,8 @@ function StepHead({ icon: Icon, overline, title, aside }: { icon: typeof MapPin;
 
 /** Step 1: connect the Google account that manages the business profile (business.manage only). */
 export function ConnectCard({ projectId, status, onChanged }: { projectId: string; status: GbpReadyStatus; onChanged: () => void }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   const { confirm, dialog } = useConfirm()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -141,8 +141,8 @@ export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
   /** The grant turned out to be gone: step 1 says so (one status per step). */
   onAuthLost?: () => void
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).mapsPosts
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
   const connected = status.connection?.status === 'connected'
   const [picking, setPicking] = useState(false)
   const [options, setOptions] = useState<LocationOption[] | null>(null)

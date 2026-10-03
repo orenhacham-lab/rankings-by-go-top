@@ -77,8 +77,8 @@ export default function KeywordsHero({ project, standing, marketLine, frequency,
   onScanAll: () => void
   canScan: boolean
 }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const h = dict.keywordsPage.hero
   const k = dict.projectDetail
   const count = (n: number) => formatCount(n, language)

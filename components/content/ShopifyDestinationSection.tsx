@@ -48,8 +48,8 @@ export default function ShopifyDestinationSection({
   /** Called after a successful save so the parent can refresh the connection. */
   onSaved?: () => void
 }) {
-  const { language } = useDashboardLanguage()
-  const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.shopify, [language])
+  const { uiLocale } = useDashboardLanguage()
+  const t = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection.shopify, [uiLocale])
 
   const [state, setState] = useState<LoadState>('loading')
   const [blogs, setBlogs] = useState<Blog[]>([])

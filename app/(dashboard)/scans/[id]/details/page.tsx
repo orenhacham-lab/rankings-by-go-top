@@ -33,8 +33,8 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams()
   const resultId = searchParams.get('resultId')
   const targetId = searchParams.get('targetId')
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.scans.details
 
   const [results, setResults] = useState<ScanResult[]>([])

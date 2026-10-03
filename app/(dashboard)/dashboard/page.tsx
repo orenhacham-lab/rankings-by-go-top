@@ -121,8 +121,8 @@ async function loadRankings(projectId: string): Promise<RankingsView | null> {
 }
 
 export default function DashboardPage() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const home = dict.home
 
   // A new project opens on "Start here" alone: the header's shortcuts would be
@@ -166,8 +166,8 @@ function nextStep(input: {
 }
 
 function ProjectDashboard({ project, onStartMode }: { project: Project; onStartMode: (on: boolean) => void }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { language, uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const home = dict.home
   const t = dict.dashboardHome
   // The site icon its scan found, for the hero; the switcher's list carries it too.

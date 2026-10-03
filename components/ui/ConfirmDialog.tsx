@@ -29,8 +29,8 @@ export interface ConfirmOptions {
 }
 
 export function useConfirm() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
   const resolver = useRef<((ok: boolean) => void) | null>(null)
 

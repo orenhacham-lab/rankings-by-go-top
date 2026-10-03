@@ -10,8 +10,8 @@ import { MAIN_CONTENT_ID } from './main-content'
  * logo, then through every sidebar entry, before the screen itself.
  */
 export default function SkipLink() {
-  const { language } = useDashboardLanguage()
-  const label = getDashboardDictionary(language).sidebar.skipToContent
+  const { uiLocale } = useDashboardLanguage()
+  const label = getDashboardDictionary(uiLocale).sidebar.skipToContent
   return (
     <a
       href={`#${MAIN_CONTENT_ID}`}

@@ -130,8 +130,8 @@ export default function ArticleBriefModal({
   // project never sees another business's niche as its example.
   exampleTerm?: string | null
 }) {
-  const { language } = useDashboardLanguage()
-  const t = getDashboardDictionary(language).contentHub.brief
+  const { language, uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).contentHub.brief
   const isHebrew = language === 'he'
   // Stage E2B strict reviewed-topic mode: no Gemini suggestions, one manual topic, locked project.
   const gscMode = mode === 'gsc_reviewed_topic'
