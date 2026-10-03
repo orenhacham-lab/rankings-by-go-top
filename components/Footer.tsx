@@ -101,6 +101,23 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                   {dict.footer.accessibility}
                 </Link>
               </li>
+              {/*
+                GDPR Art. 7(3): withdrawing consent has to be as easy as giving
+                it. This is the standing way back into the preferences dialog,
+                on every public page, long after the banner is gone — a button
+                rather than a link because it opens the dialog in place instead
+                of navigating away from whatever the visitor was reading.
+              */}
+              <li>
+                <button
+                  type="button"
+                  data-cookie-settings-link
+                  onClick={() => window.dispatchEvent(new Event('gotop:open-consent-settings'))}
+                  className={`${linkClass} text-start`}
+                >
+                  {dict.cookie.settings}
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -145,7 +162,7 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
           <p className="text-caption font-semibold text-contrast-ink/80" data-footer-credit-line>
             {creditBefore}
             <a
-              href="https://gotop.co.il"
+              href="https://www.gotop.co.il"
               className="rounded-control underline decoration-white/30 underline-offset-4 transition-colors duration-150 ease-snappy hover:text-contrast-ink hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
               data-footer-credit
             >

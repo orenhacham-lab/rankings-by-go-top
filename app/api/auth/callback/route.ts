@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
+import { logRestrictedAttempt, restrictionForRequest, sanctionsNotice } from '@/lib/sanctions/guard'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
@@ -39,6 +40,26 @@ import { googleSignInFailureUrl } from '@/lib/auth/google-signin'
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
+
+  // Creating an account is the other dealing we are not allowed to have with
+  // a restricted country, and this is the funnel every Google and
+  // email-confirmation landing comes through. Checked BEFORE the code
+  // exchange on purpose: exchanging is what makes Supabase create the user,
+  // so refusing first means no account comes into existence at all.
+  //
+  // It does not cover email+password signup, which calls supabase.auth.signUp
+  // from the browser straight to Supabase with no server hop of ours — that
+  // one is refused at the /signup page in proxy.ts, which is the only place
+  // it can be. Both layers are geo-based and so both fail open without the
+  // CDN header; lib/sanctions/guard.ts says why that is the right trade.
+  const restricted = restrictionForRequest(request.headers)
+  if (restricted) {
+    logRestrictedAttempt('auth-callback', restricted)
+    return new NextResponse(sanctionsNotice(searchParams.get('lang')), {
+      status: 451,
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
   const code = searchParams.get('code')
   const next = sanitizeNextPath(searchParams.get('next'))
 

@@ -155,10 +155,38 @@ export const en = {
   cookie: {
     aria: 'Privacy notice',
     title: 'We value your privacy',
-    body: 'We use cookies to improve your browsing experience. By continuing to use this site, you agree to our',
-    short: 'We use cookies. By using this site, you agree to our',
+    // The notice no longer says that continued browsing is agreement: it is not.
+    // Non-essential storage needs a prior, affirmative choice, so the text says
+    // what is off until the visitor decides, and the two buttons are equals.
+    body: 'We use the cookies the site needs to work. Measurement and marketing cookies do not load until you allow them. Details in our',
+    short: 'We load optional cookies only if you allow them. See our',
     privacy: 'Privacy Policy',
-    accept: 'Accept',
+    accept: 'Accept all',
+    rejectAll: 'Reject all',
+    customize: 'Customise',
+    save: 'Save my choice',
+    back: 'Back',
+    settings: 'Cookie settings',
+    settingsTitle: 'Choose your cookies',
+    settingsIntro: 'Allow or refuse each kind separately, and change your mind at any time.',
+    always: 'Always on',
+    withdrawHint: 'To change or withdraw your consent at any time, use the "Cookie settings" link at the bottom of every page.',
+    gpcTitle: 'Consent refused automatically',
+    gpcBody: 'Your browser sends a Global Privacy Control signal, so no measurement or marketing cookies were loaded. Your choice has been recorded.',
+    categories: {
+      necessary: {
+        title: 'Strictly necessary',
+        desc: 'Signing in, remembering your interface language, security and abuse prevention. The service cannot run without them, so they need no consent.',
+      },
+      analytics: {
+        title: 'Measurement',
+        desc: 'How many people visited, which pages they read and what did not work. We use it to improve the site, never for advertising.',
+      },
+      marketing: {
+        title: 'Marketing',
+        desc: 'Measuring how our ads perform and showing relevant ads on the Google and Meta networks. Refusing costs you nothing in the service.',
+      },
+    },
   },
   contact: {
     region: 'Contact area',

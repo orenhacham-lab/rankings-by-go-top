@@ -95,8 +95,8 @@ function main() {
     check('MUT: a two-line "Rankings / by Go Top" lockup back is caught', !lockOk([...lockups, '<span>Rankings</span><span>by Go Top</span>']))
     const schema = strip(read('app/api/schema/route.ts')), layout = strip(read('app/layout.tsx')), llms = read('app/llms.txt/route.ts')
     const schemaOk = (s: string) => /name: 'Go Top SEO',\s*alternateName: \['Rankings by Go Top'\]/.test(s)
-      && /publisher: \{ '@type': 'Organization', name: 'GO TOP', url: 'https:\/\/gotop\.co\.il' \}/.test(s)
-    check('C3: schema — Go Top SEO with alternateName, publisher GO TOP (gotop.co.il)', schemaOk(schema) && schemaOk(layout))
+      && /publisher: \{ '@type': 'Organization', name: 'GO TOP', url: 'https:\/\/www\.gotop\.co\.il' \}/.test(s)
+    check('C3: schema — Go Top SEO with alternateName, publisher GO TOP (www.gotop.co.il)', schemaOk(schema) && schemaOk(layout))
     check('MUT: the old name as the schema name fails C3', !schemaOk(schema.replace(/name: 'Go Top SEO',(\s*)alternateName/g, "name: 'Rankings by Go Top',$1alternateName")))
     check('C4: llms.txt says "Go Top SEO (previously Rankings by Go Top)"', llms.includes('Name: Go Top SEO (previously Rankings by Go Top)'))
     const shopify = [read('app/shopify/app/ConnectorHomeClient.tsx'), read('app/shopify/link/page.tsx')]
@@ -124,12 +124,44 @@ function main() {
     check('MUT: a key missing from one language fails D4', !['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid'].every((k) => (dict.replace("phone: 'טלפון',", '').match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === 2))
   }
 
-  console.log('\nE) the cookie notice keeps its consent logic and storage')
+  console.log('\nE) the cookie notice: the w9 shape, and the consent contract that replaced the accept-only flag')
   {
     const c = strip(read('components/CookieConsent.tsx'))
-    const logicOk = (s: string) => /localStorage\.getItem\('cookie-consent-accepted'\)/.test(s) && /localStorage\.setItem\('cookie-consent-accepted', 'true'\)/.test(s) && /catch \{ \/\* storage blocked: ask again \*\/ \}/.test(s)
-    check('E1: the same key, read and written exactly as before (and asked again when storage is blocked)', logicOk(read('components/CookieConsent.tsx')))
-    check('MUT: another storage key fails E1', !logicOk(read('components/CookieConsent.tsx').replace("localStorage.setItem('cookie-consent-accepted'", "localStorage.setItem('cookies'")))
+    // E1 USED TO PIN the single-button flag `cookie-consent-accepted`, read and
+    // written in this component. That flag was the whole of the old consent
+    // logic, and it was replaced on purpose: the notice offered no way to
+    // refuse, so the click it stored is not consent under GDPR Art. 4(11) and
+    // Google Tag Manager loaded regardless of it. What the guard protects now
+    // is the contract that replaced it, in lib/consent/:
+    //   - the decision is read from, and written to, the consent store, never
+    //     to the legacy flag, which is cleared instead of honoured;
+    //   - refusing is a button next to accepting, not a link or a second step;
+    //   - every decision is reported to the audit log (Art. 7(1) proof).
+    const store = strip(read('lib/consent/client-store.ts'))
+    const contractOk = (comp: string, st: string) =>
+      /clearLegacyConsent\(\)/.test(comp)
+      && /decide\('accept_all', CONSENT_GRANTED\)/.test(comp)
+      && /decide\('reject_all', CONSENT_DENIED\)/.test(comp)
+      && /writeConsent\(action, next\)/.test(comp)
+      // The decision has to be logged under the language it was READ in, so the
+      // argument must be derived from the page rather than a constant. It used to
+      // pin `isEnglish ? 'en' : 'he'` literally, which broke the moment a third
+      // public language arrived; what matters is that a language is passed and
+      // that it is not hard-coded.
+      && /reportConsent\(record, (?!['"])[A-Za-z]/.test(comp)
+      && /onClick=\{handleReject\}/.test(comp)
+      // the legacy flag is only ever REMOVED, never read as a grant
+      && /removeItem\(LEGACY_CONSENT_KEY\)/.test(st)
+      && !/getItem\(LEGACY_CONSENT_KEY\)/.test(st)
+      // storage that throws must read as "no decision", so the visitor is asked
+      && /catch \{\n?\s*return null \/\/ storage blocked: no decision on record, so ask/.test(read('lib/consent/client-store.ts'))
+    check('E1: the decision goes through the consent store, refusing is its own button, and every decision is logged', contractOk(c, store))
+    check('MUT: dropping the reject button fails E1', !contractOk(c.replace('onClick={handleReject}', 'onClick={handleAccept}'), store))
+    check('MUT: honouring the old accept-only flag as a grant fails E1',
+      !contractOk(c, store.replace('window.localStorage.removeItem(LEGACY_CONSENT_KEY)', 'window.localStorage.getItem(LEGACY_CONSENT_KEY)')))
+    check('MUT: dropping the audit-log report fails E1', !contractOk(c.replace(/reportConsent\(record, [^)]*\)/g, 'void 0'), store))
+    check('MUT: logging every decision under one hard-coded language fails E1',
+      !contractOk(c.replace(/reportConsent\(record, [^)]*\)/g, "reportConsent(record, 'he')"), store))
     check('E2: the popup is at the left in both languages (physical left-*, no start/end)', /left-24/.test(c) && /left-3\.5/.test(c) && !/\b(?:start|end)-\d/.test(c))
   }
 

@@ -163,10 +163,38 @@ export const es = {
   cookie: {
     aria: 'Aviso de privacidad',
     title: 'Tu privacidad nos importa',
-    body: 'Usamos cookies para mejorar tu experiencia de navegación. Si sigues usando este sitio, aceptas nuestra',
-    short: 'Usamos cookies. Al usar este sitio, aceptas nuestra',
+    // The notice no longer says that continued browsing is agreement: it is not.
+    // Non-essential storage needs a prior, affirmative choice, so the text says
+    // what is off until the visitor decides, and the two buttons are equals.
+    body: 'Usamos las cookies que el sitio necesita para funcionar. Las de medición y marketing no se cargan hasta que las aceptes. Más detalles en nuestra',
+    short: 'Solo cargamos cookies opcionales si las aceptas. Consulta la',
     privacy: 'Política de privacidad',
-    accept: 'Aceptar',
+    accept: 'Aceptar todas',
+    rejectAll: 'Rechazar todas',
+    customize: 'Personalizar',
+    save: 'Guardar mi elección',
+    back: 'Volver',
+    settings: 'Configuración de cookies',
+    settingsTitle: 'Elige tus cookies',
+    settingsIntro: 'Puedes aceptar o rechazar cada tipo por separado, y cambiar de opinión cuando quieras.',
+    always: 'Siempre activas',
+    withdrawHint: 'Para cambiar o retirar tu consentimiento en cualquier momento, usa el enlace «Configuración de cookies» al final de cada página.',
+    gpcTitle: 'Consentimiento rechazado automáticamente',
+    gpcBody: 'Tu navegador envía la señal Global Privacy Control, así que no se cargó ninguna cookie de medición ni de marketing. Tu elección quedó registrada.',
+    categories: {
+      necessary: {
+        title: 'Estrictamente necesarias',
+        desc: 'Inicio de sesión, memoria del idioma de la interfaz, seguridad y prevención de abusos. El servicio no funciona sin ellas, así que no requieren consentimiento.',
+      },
+      analytics: {
+        title: 'Medición',
+        desc: 'Cuántas personas visitaron el sitio, qué páginas leyeron y qué no funcionó. Lo usamos para mejorar el sitio, nunca para publicidad.',
+      },
+      marketing: {
+        title: 'Marketing',
+        desc: 'Medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Rechazarlas no te cuesta nada en el servicio.',
+      },
+    },
   },
   contact: {
     region: 'Zona de contacto',

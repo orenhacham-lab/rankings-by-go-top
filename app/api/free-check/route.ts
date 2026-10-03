@@ -29,6 +29,7 @@ import { LOCALES, type Locale } from '@/lib/i18n/locales'
 import { runAfterResponse } from '@/lib/notifications/after-response'
 import { notifyFreeCheckCompleted } from '@/lib/notifications/operator-alerts'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,11 @@ function fail(code: FreeCheckErrorCode, status: number) {
 }
 
 export async function POST(request: Request) {
+  const restricted = restrictionForRequest(request.headers)
+  if (restricted) {
+    logRestrictedAttempt('free-check', restricted)
+    return fail('blocked_url', 451)
+  }
   let body: unknown
   try {
     body = await request.json()

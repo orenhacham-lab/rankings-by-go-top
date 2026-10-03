@@ -7,9 +7,42 @@ import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
   explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
 } from '@/lib/i18n/request-locale'
+import {
+  isRestrictedPath, logRestrictedAttempt, noticeLocaleForPath,
+  restrictionForRequest, sanctionsNotice,
+} from '@/lib/sanctions/guard'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // ── Restricted countries ────────────────────────────────────────
+  // Before anything else, including the Supabase client below: a request we
+  // are not allowed to deal with should cost us nothing and should never
+  // reach a sign-up form or a payment button. Only the pages where a dealing
+  // STARTS are refused (signup, the free check, billing) — not the public
+  // site and not /login. lib/sanctions/guard.ts has the whole reasoning, and
+  // lib/sanctions/countries.ts the law behind each country.
+  //
+  // This fails OPEN when the geo header is absent (local development, any
+  // non-CDN path), so it cannot take the site down; the route-handler checks
+  // on the payment and account-creation paths are the second layer.
+  if (isRestrictedPath(pathname)) {
+    const restriction = restrictionForRequest(request.headers)
+    if (restriction) {
+      logRestrictedAttempt(`page:${pathname}`, restriction)
+      // 451: the status that exists for exactly this, and it tells a crawler
+      // not to treat the page as merely missing. noindex because a refusal is
+      // not content we want indexed in place of the real page.
+      return new NextResponse(sanctionsNotice(noticeLocaleForPath(pathname)), {
+        status: 451,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-robots-tag': 'noindex, nofollow',
+        },
+      })
+    }
+  }
 
   // ── Setup mode guard ────────────────────────────────────────────
   // If Supabase isn't configured yet, the createServerClient call below

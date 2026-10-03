@@ -84,7 +84,9 @@ export default function EnglishRefundPolicyPage() {
       <section>
         <h2>7. Contact</h2>
         <p>
-          <strong>Go Top Digital Marketing &amp; Advertising Ltd.</strong>
+          <strong>GO TOP MARKETING GRUO LTD</strong>
+          <br />
+          Company number: 517274346
           <br />
           Email: <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>
         </p>

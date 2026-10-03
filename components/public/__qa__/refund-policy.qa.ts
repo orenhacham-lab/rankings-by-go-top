@@ -38,12 +38,12 @@ const REQUIRED: Array<[string, string, RegExp]> = [
   ['he', 'the only exception is the law', /החריג היחיד הוא מקרה שבו הדין מחייב החזר/],
   ['he', 'cancel any time', /אפשר לבטל את חידוש המנוי בכל עת/],
   ['he', 'access to the end of the paid period', /הגישה לתוכנית נשמרת עד סוף תקופת החיוב ששולמה/],
-  ['he', 'names the company', /Go Top Digital Marketing &amp; Advertising Ltd\./],
+  ['he', 'names the registered company and number', /גו טופ שיווק ופרסום דיגיטלי בע״מ<\/strong> <br \/> ח\.פ\. 517274346/],
   ['en', 'no refund for a paid period', /Subscription payments are not refunded/],
   ['en', 'the only exception is the law', /The only exception is where the law requires a refund/],
   ['en', 'cancel any time', /You can cancel renewal at any time/],
   ['en', 'access to the end of the paid period', /You keep access to your plan until the end of the period you have already paid for/],
-  ['en', 'names the company', /Go Top Digital Marketing &amp; Advertising Ltd\./],
+  ['en', 'names the registered company and number', /GO TOP MARKETING GRUO LTD<\/strong> <br \/> Company number: 517274346/],
 ]
 for (const [lang, name, re] of REQUIRED) {
   const text = lang === 'he' ? he : en
@@ -64,6 +64,14 @@ check('MUTATION — a Hebrew discretionary refund is caught', FORBIDDEN_HE.test(
 // The terms' refunds section agrees and links the policy.
 check('he terms §7: refund only where the law requires, linked', /למעט מקרים שבהם הדין מחייב החזר/.test(refundsHe) && /href="\/refund-policy"/.test(refundsHe))
 check('en terms §7: refund only where the law requires, linked', /except where the law requires a refund/.test(refundsEn) && /href="\/en\/refund-policy"/.test(refundsEn))
+
+// One legal entity everywhere: the name on the certificate of incorporation, never the old unregistered one.
+const LEGAL = ['app/(legal)/privacy/page.tsx', 'app/(public)/en/privacy/page.tsx', 'app/(public)/terms/page.tsx', 'app/(public)/en/terms/page.tsx']
+  .map((p) => flat(read(p))).concat(he, en)
+const OLD_NAME = /Digital Marketing &amp; Advertising/
+check('no legal page names the old company name', LEGAL.every((t) => !OLD_NAME.test(t)))
+check('every legal page carries the company number', LEGAL.every((t) => /517274346/.test(t)))
+check('MUTATION — the old name is caught', OLD_NAME.test(en.replace('GO TOP MARKETING GRUO LTD', 'Go Top Digital Marketing &amp; Advertising Ltd.')))
 
 // Reachable: footer, both sitemaps, the XML sitemap, the Hebrew segment list.
 const footer = read('components/Footer.tsx')
