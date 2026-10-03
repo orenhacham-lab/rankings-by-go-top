@@ -45,6 +45,14 @@ export default function EnglishPrivacyPage() {
           <li><strong>WordPress connection:</strong> the site address, a username and Application Password and the
           plugin&rsquo;s signing key (both stored encrypted), and the log of fixes on the site — see &ldquo;WordPress
           Connection&rdquo; below</li>
+          <li><strong>Shopify connection:</strong> the store address, the store identifier, the permissions you
+          approved at installation, and the access token the store issues (stored encrypted) — see
+          &ldquo;Connecting a Site on Another Platform&rdquo; below</li>
+          <li><strong>Wix or webhook connection:</strong> the site address or the endpoint you configured, and
+          the Wix API key or the signing secret (stored encrypted and never shown again after saving) — see
+          &ldquo;Connecting a Site on Another Platform&rdquo; below</li>
+          <li><strong>An address for local rank tracking:</strong> if you typed an exact address, it is stored
+          together with the coordinates returned — see &ldquo;Turning an Address into Coordinates&rdquo; below</li>
           <li><strong>Link network:</strong> your joining consent (who accepted, when, the wording and the link
           type) and the placement log — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Results and content:</strong> AI visibility check results, and content generated for you:
@@ -83,7 +91,11 @@ export default function EnglishPrivacyPage() {
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>
           <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
           <li><strong>Vercel:</strong> for hosting the site and the Service</li>
-          <li><strong>Google (Gemini API, Search Console, Business Profile):</strong> our AI provider for generating text and images, and the connections you choose to make — see &ldquo;AI Providers&rdquo; and &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Google (Gemini API, Search Console, Business Profile, Google Ads API):</strong> our AI provider for generating text and images, the connections you choose to make, and the Google Ads API, to which we send keywords to get search volumes and further keyword ideas. That interface is a Company account and not an advertising account of yours; we do not run campaigns for you — see &ldquo;AI Providers&rdquo; and &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Wix:</strong> only if you connected a Wix site — to read the site&rsquo;s content and publish articles to its blog</li>
+          <li><strong>The endpoint you configured yourself (webhook):</strong> only if you connected a site on another platform — the article is sent to the address you gave, in a signed request</li>
+          <li><strong>PDFShift:</strong> to convert a report to PDF, and only when you asked to download one. We send the report&rsquo;s content as displayed in order to get the PDF file back</li>
+          <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
           <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below.
@@ -232,6 +244,54 @@ export default function EnglishPrivacyPage() {
           <li><strong>What we do not do:</strong> we do not delete content, and we do not touch your site&rsquo;s
           prices, products, theme, other plugins, settings or users.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Connecting a Site on Another Platform</h2>
+        <p>
+          Besides WordPress, you can connect a Shopify store, a Wix site, or a site on any other platform
+          through an endpoint you configure. Each connection is optional and is made by you.
+        </p>
+        <ul>
+          <li><strong>Shopify:</strong> installing the app in your store lets us read the store&rsquo;s content,
+          products and pages, and publish articles to the store blog, within the permissions you approved at
+          installation. The store&rsquo;s access token is stored encrypted. Removing the app from the store
+          revokes the access.</li>
+          <li><strong>Wix:</strong> the connection uses an API key you issue in your own account, and is used
+          to read the site&rsquo;s content and publish articles to its blog. We send Wix the article&rsquo;s
+          content and its publishing details, and no other account data. The key is stored encrypted, is never
+          shown again after saving, and is deleted when you disconnect. You can revoke it on the Wix side at
+          any time.</li>
+          <li><strong>Webhook:</strong> the Service sends the article to the endpoint you configured, in a
+          signed request. The endpoint is yours, so what happens to the article once it arrives is under your
+          control. The signing secret is stored encrypted, is never shown again after saving, and is deleted
+          when you disconnect.</li>
+          <li><strong>Errors:</strong> if publishing fails we store an internal error code only. We do not
+          store or display the provider&rsquo;s or your server&rsquo;s own error text.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Turning an Address into Coordinates</h2>
+        <p>
+          To track rankings from an exact point you can type an address instead of coordinates. When you do, we
+          send the address you typed and the project&rsquo;s country name to OpenStreetMap&rsquo;s
+          <strong> Nominatim</strong> service to get coordinates back. We do not send your name, your email
+          address or any other account details. The address and the coordinates returned are stored with us as
+          the tracking target&rsquo;s definition, and you can change or delete them in the target&rsquo;s
+          settings. OpenStreetMap is operated by the OpenStreetMap Foundation, and the Nominatim service has
+          its own usage and privacy policy.
+        </p>
+      </section>
+
+      <section>
+        <h2>Converting a Report to PDF</h2>
+        <p>
+          When you ask to download a report as a PDF, we send the report&rsquo;s content as displayed to the
+          <strong> PDFShift</strong> service, which returns the file to us. This happens only when you pressed
+          to download a report, never on a regular or scheduled basis, and the content is sent for the
+          conversion alone. Retention at PDFShift is governed by their own privacy policy and terms.
+        </p>
       </section>
 
       <section>
@@ -478,8 +538,9 @@ export default function EnglishPrivacyPage() {
         <p>
           The service runs on international cloud and infrastructure providers, so data may be stored
           or processed outside your country of residence. The main providers: Vercel (application
-          hosting), Supabase (the database, in the Mumbai region in India), and the AI and search
-          providers listed above.
+          hosting), Supabase (the database, in the Mumbai region in India), and every other provider listed
+          under &ldquo;Information Sharing&rdquo; above, among them the AI and search providers, the PDF
+          conversion provider and the address lookup service.
         </p>
         <p className="mt-4">
           For data about residents of the European Economic Area, Switzerland or the United Kingdom:

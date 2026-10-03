@@ -603,18 +603,35 @@ function partG() {
   const log = strip(read('components/site-links/network/PlacementLog.tsx'))
   check('server text never reaches the screen (status codes → dictionary words only)', !/\.json\(\)/.test(log) && !/body\.error|\.message/.test(log + panel))
   const terms = read('app/(public)/terms/page.tsx'), termsEn = read('app/(public)/en/terms/page.tsx')
-  // THIS USED TO REQUIRE the heading to be marked "נוסח טיוטה לבדיקה" / "draft
-  // wording, under review". That marker was removed on purpose: the terms are a
-  // live, binding document, and a clause that tells a customer the company has
-  // not settled its own wording leaves neither side able to say what was agreed.
-  // What replaced it says the same true thing in a way that binds: the network
-  // is not active, so the clause applies only once we enable it and the customer
-  // opts in. The anchor and the not-active statement are what the guard pins now.
-  check('the terms carry the network section, in both languages, stating it is not active yet',
-    /id="link-network"/.test(terms) && /השירות אינו פעיל כיום/.test(terms)
-    && /id="link-network"/.test(termsEn) && /The service is not active today/.test(termsEn))
-  check('MUT: dropping the not-active statement is caught',
-    !(/השירות אינו פעיל כיום/.test(terms.replace('השירות אינו פעיל כיום', 'x'))))
+  // THIS GUARD HAS BEEN WRONG TWICE, in opposite directions, so the reasoning
+  // is written out rather than left to the next reader.
+  //
+  // First it required the heading to be marked "draft wording, under review".
+  // That was removed because the terms are a live, binding document, and a
+  // clause telling a customer the company has not settled its own wording
+  // leaves neither side able to say what was agreed.
+  //
+  // Then it required the terms to state the network "is not active today". That
+  // was false, and the guard was pinning the falsehood in place: the three
+  // link_network tables exist in production, a project is already an active
+  // member, placeNetworkLink is called from lib/content/article-generation.ts
+  // through step.ts, and no LINK_NETWORK_DISABLED kill switch is set. Nothing
+  // but a per-project opt-in stands between a member and a placed link. A
+  // clause that disclaims its own application would have left a link we placed
+  // with no contractual basis at all — the opposite of what the clause is for.
+  //
+  // So what is pinned now is the true and binding statement: the clause applies
+  // from the moment a project opts in. The old sentence is asserted GONE, in
+  // both languages, so it cannot come back by a revert.
+  check('the terms carry the network section, in both languages, applying from the moment a project joins',
+    /id="link-network"/.test(terms) && /חל מהרגע שבחרתם להצטרף/.test(terms)
+    && /id="link-network"/.test(termsEn) && /applies from the moment you choose to join/.test(termsEn))
+  check('the terms no longer claim the network is inactive, because it is not',
+    !/השירות אינו פעיל כיום/.test(terms) && !/service is not active today/i.test(termsEn))
+  check('MUT: dropping the "applies on joining" statement is caught',
+    !(/חל מהרגע שבחרתם להצטרף/.test(terms.replace('חל מהרגע שבחרתם להצטרף', 'x'))))
+  check('MUT: the old not-active sentence coming back is caught',
+    /service is not active today/i.test(`${termsEn} The service is not active today`))
 }
 
 // ── H. domain control, from the stored connections ─────────────────────────

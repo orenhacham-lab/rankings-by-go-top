@@ -215,7 +215,16 @@ export default function HebrewTermsPage() {
         </p>
       </section>
 
-      {/* DRAFT, NEW SECTION (link network, lib/link-network) — wording for the owner's review before publishing. */}
+      {/*
+        The link network (lib/link-network). This clause applies from the moment a
+        project joins, because the feature IS live: the tables exist, the placement
+        step runs from lib/content/article-generation.ts, and nothing but a
+        per-project opt-in stands between a member and a placed link. An earlier
+        draft of this section said the service was not active yet — it was, so the
+        sentence was removed. If the service is ever switched off (the
+        LINK_NETWORK_DISABLED kill switch, or the tables going away), say so here
+        in the same breath as switching it off, never the other way round.
+      */}
       <section id="link-network">
         <h2>15א. רשת הקישורים</h2>
         <p>
@@ -223,8 +232,10 @@ export default function HebrewTermsPage() {
           אליה, בתוך מאמרים שהמערכת כותבת עבורם. השירות כבוי כברירת מחדל, ואינו זמין לחנויות Shopify.
         </p>
         <p className="mt-4">
-          <strong>השירות אינו פעיל כיום</strong> ואינו נכלל באף תוכנית. הסעיף הזה יחול מהרגע
-          שנפעיל אותו ותבחר להצטרף, ולא לפני כן. עד אז אין בו חובה או זכות כלשהי כלפי מי מהצדדים.
+          <strong>הסעיף הזה חל מהרגע שבחרתם להצטרף לרשת בפרויקט מסוים, ולא לפני כן.</strong> כל עוד לא
+          הצטרפתם, המערכת אינה משבצת קישור מהמאמרים שלכם ואינה משבצת קישורים לאתר שלכם במאמרים של
+          לקוחות אחרים, ואין בסעיף חובה או זכות כלשהי כלפי מי מהצדדים. הרשת אינה חלק מהתמורה שאתם משלמים
+          עליה ואינה נכללת בתוכנית כהתחייבות, והחברה רשאית להשהות או להפסיק אותה כאמור בסוף הסעיף.
         </p>
         <ul>
           <li>
@@ -298,7 +309,28 @@ export default function HebrewTermsPage() {
             <strong>וורדפרס.</strong> חיבור אתר וורדפרס משמש לקריאת תוכן האתר, לפרסום מאמרים ולתיקוני האתר
             שבסעיף 15ג.
           </li>
+          <li>
+            <strong>Shopify.</strong> התקנת האפליקציה בחנות שלכם מאפשרת לקרוא את תוכן החנות, את המוצרים
+            והעמודים, ולפרסם מאמרים לבלוג החנות. ההיקף נקבע על ידי ההרשאות שאישרתם בעת ההתקנה, ואפשר
+            להסיר את האפליקציה מהחנות בכל עת. אם החיוב שלכם נעשה דרך Shopify, חלים גם סעיפי החיוב
+            שבתנאים אלה. רשת הקישורים שבסעיף 15א אינה זמינה לחנויות Shopify.
+          </li>
+          <li>
+            <strong>Wix.</strong> חיבור אתר Wix נעשה באמצעות מפתח API שאתם מנפיקים בחשבון שלכם, ומשמש
+            לקריאת תוכן האתר ולפרסום מאמרים בבלוג שלו. המפתח נשמר מוצפן, אינו מוצג שוב במסך לאחר השמירה,
+            ונמחק כשאתם מנתקים את החיבור. אפשר גם לבטל אותו בצד של Wix בכל עת.
+          </li>
+          <li>
+            <strong>אתר בפלטפורמה אחרת, דרך webhook.</strong> לאתר שאינו וורדפרס, Shopify או Wix אפשר
+            לחבר כתובת שאתם מגדירים אצלכם, והמערכת שולחת אליה את המאמר בבקשה חתומה. סוד החתימה נשמר
+            מוצפן, אינו מוצג שוב לאחר השמירה, ונמחק עם ניתוק החיבור. מה שנעשה במאמר אחרי שהגיע לכתובת
+            הזאת, ועמידת הקוד שבצד שלכם בכל דין, הם באחריותכם.
+          </li>
         </ul>
+        <p className="mt-4">
+          הרשימה הזאת היא כל סוגי החיבורים שהשירות מציע. חיבור שיתווסף בעתיד יופיע כאן ובמדיניות הפרטיות
+          לפני שיהיה אפשר להשתמש בו.
+        </p>
       </section>
 
       <section id="site-fixes">

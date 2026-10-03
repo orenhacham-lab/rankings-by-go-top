@@ -234,7 +234,16 @@ export default function EnglishTermsPage() {
         </p>
       </section>
 
-      {/* DRAFT, NEW SECTION (link network, lib/link-network) — wording for the owner's review before publishing. */}
+      {/*
+        The link network (lib/link-network). This clause applies from the moment a
+        project joins, because the feature IS live: the tables exist, the placement
+        step runs from lib/content/article-generation.ts, and nothing but a
+        per-project opt-in stands between a member and a placed link. An earlier
+        draft of this section said the service was not active yet — it was, so the
+        sentence was removed. If the service is ever switched off (the
+        LINK_NETWORK_DISABLED kill switch, or the tables going away), say so here
+        in the same breath as switching it off, never the other way round.
+      */}
       <section id="link-network">
         <h2>15A. Link Network</h2>
         <p>
@@ -243,9 +252,12 @@ export default function EnglishTermsPage() {
           default and is not available for Shopify stores.
         </p>
         <p className="mt-4">
-          <strong>The service is not active today</strong> and is not part of any plan. This section
-          applies from the moment we enable it and you choose to join, and not before. Until then it
-          creates no obligation or right for either party.
+          <strong>This section applies from the moment you choose to join the network for a given
+          project, and not before.</strong> Until you join, the Service places no link from your
+          articles and places no links to your site in other customers&rsquo; articles, and this section
+          creates no obligation or right for either party. The network is not part of what you pay for
+          and is not included in a plan as a commitment, and the Company may suspend or discontinue it
+          as stated at the end of this section.
         </p>
         <ul>
           <li>
@@ -329,7 +341,31 @@ export default function EnglishTermsPage() {
             <strong>WordPress.</strong> Connecting a WordPress site is used to read the site&rsquo;s content, to
             publish articles and for the site fixes in section 15C.
           </li>
+          <li>
+            <strong>Shopify.</strong> Installing the app in your store lets the Service read the store&rsquo;s
+            content, products and pages, and publish articles to the store blog. The scope is set by the
+            permissions you approved at installation, and you can remove the app from the store at any time.
+            If you are billed through Shopify, the billing sections of these Terms apply as well. The link
+            network in section 15A is not available for Shopify stores.
+          </li>
+          <li>
+            <strong>Wix.</strong> Connecting a Wix site uses an API key you issue in your own account, and is
+            used to read the site&rsquo;s content and to publish articles to its blog. The key is stored
+            encrypted, is never shown again on screen after it is saved, and is deleted when you disconnect.
+            You can also revoke it on the Wix side at any time.
+          </li>
+          <li>
+            <strong>A site on another platform, through a webhook.</strong> For a site that is not WordPress,
+            Shopify or Wix, you can connect an endpoint you control, and the Service sends the article to it
+            in a signed request. The signing secret is stored encrypted, is never shown again after it is
+            saved, and is deleted when you disconnect. What happens to the article once it reaches that
+            endpoint, and your own code&rsquo;s compliance with any law, are your responsibility.
+          </li>
         </ul>
+        <p className="mt-4">
+          This list is every kind of connection the Service offers. A connection added in the future will
+          appear here and in the Privacy Policy before it can be used.
+        </p>
       </section>
 
       <section id="site-fixes">
