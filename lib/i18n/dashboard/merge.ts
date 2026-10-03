@@ -14,7 +14,10 @@
  * The merge is structural and runs ONCE at module load, so no screen pays for it
  * per render. It only walks plain objects: a function (a dictionary entry that
  * takes a plan code or a count) and an array are values, replaced whole, because
- * merging either one key-by-key would produce something that is neither.
+ * merging either one key-by-key would produce something that is neither. An
+ * array's ELEMENTS are still widened, because `as const` makes a list of
+ * weekday names a tuple of the Hebrew literals; a Spanish list of the same
+ * shape would otherwise be seven type errors.
  */
 
 /**
@@ -31,8 +34,8 @@
  */
 export type DeepPartial<T> = T extends (...args: never[]) => unknown
   ? T
-  : T extends readonly unknown[]
-    ? T
+  : T extends readonly (infer U)[]
+    ? DeepPartial<U>[]
     : T extends object
       ? { [K in keyof T]?: DeepPartial<T[K]> }
       : T extends string
