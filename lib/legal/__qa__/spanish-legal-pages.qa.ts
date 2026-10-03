@@ -149,11 +149,13 @@ console.log('\nC) the routes, the gate and the links')
     const src = existsSync(join(ROOT, page)) ? strip(read(page)) : ''
     check(`C1: /es/${slug} is a route`, !!src)
     check(`C2: …rendered by the shared frame`, /SpanishLegalPage slug="/.test(src))
-    // A dynamic legal page would read the Markdown from disk inside a
-    // serverless function, where the file may not be traced — a 404 on a page
-    // that must never 404.
-    check(`C3: …and static, so the read happens at build time`,
-      /export const dynamic = 'force-static'/.test(src))
+    // NOT prerendered, and the reason is the opposite of what this used to
+    // assert. The root layout decides <html lang/dir> from the request, so a
+    // force-static legal page came out as lang="en" on a Spanish URL. The
+    // read it was protecting is handled instead by the per-process cache in
+    // lib/legal/markdown.ts and by tracing the files into the server bundle.
+    check(`C3: …rendered per request, so the document declares Spanish`,
+      !/export const dynamic = 'force-static'/.test(src))
   }
 
   // The /es tree has ONE gate, in its layout: the pages carry no flag check,
@@ -163,6 +165,20 @@ console.log('\nC) the routes, the gate and the links')
     /if \(!spanishSiteEnabled\(\)\) notFound\(\)/.test(layout))
   check('C5: and no legal page carries a gate of its own',
     LEGAL_SLUGS.every((s) => !/spanishSiteEnabled/.test(strip(read(`app/(public)/es/${s}/page.tsx`)))))
+
+  // The two things that replace force-static. Either one missing is a page
+  // that either re-reads the disk on every request or cannot find the file at
+  // all once deployed.
+  const md = strip(read('lib/legal/markdown.ts'))
+  check('C3a: the parse is cached per process', /const cache = new Map<LegalSlug, LegalDocument>\(\)/.test(md)
+    && /cache\.set\(slug, doc\)/.test(md))
+  // Read RAW, not stripped: the glob itself contains `/**/`, which the
+  // comment-stripping regex reads as the start of a block comment and swallows.
+  const conf = read('next.config.ts')
+  check('C3b: and the Markdown ships with the server trace',
+    /outputFileTracingIncludes/.test(conf) && /content\/legal\/es\/\*\*\/\*/.test(conf))
+  check('MUTATION — a config without the trace include is caught',
+    !/content\/legal\/es\/\*\*\/\*/.test(conf.replace(/'\.\/content\/legal\/es\/\*\*\/\*'/, "'./other/**/*'")))
 
   const footer = strip(read('components/Footer.tsx'))
   check('C6: the footer sends each language to its own documents', /const legalPrefix = prefix/.test(footer))

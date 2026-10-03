@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The Spanish legal pages read their text from content/legal/es/*.md at
+  // request time, by a path built with join(), which file tracing cannot see.
+  // Without this the files are absent from the server bundle and the four
+  // pages throw ENOENT in production while working perfectly in dev.
+  outputFileTracingIncludes: {
+    '/es/*': ['./content/legal/es/**/*'],
+  },
   images: {
     remotePatterns: [
       {
