@@ -334,11 +334,15 @@ async function main() {
         // /signup, the other reachable auth surface.
         const signupEn = visible(await rawBody('/signup', { acceptLanguage: 'en-US,en;q=0.9' }))
         check('3F-i: /signup is English for an English request',
-          signupEn.includes('Create your account') && !/[\u0590-\u05FF]/.test(signupEn),
+          // The heading itself: "Create your free account". This check ran
+          // only when a production build was present, so an earlier copy
+          // change ("account" → "free account") left it asserting a string the
+          // page no longer had.
+          signupEn.includes('Create your free account') && !/[\u0590-\u05FF]/.test(signupEn),
           (signupEn.match(/[\u0590-\u05FF][^<]{0,30}/g) ?? []).slice(0, 4).join(' | '))
         const signupHe = visible(await rawBody('/signup', { acceptLanguage: 'he-IL,he;q=0.9' }))
         check('3F-j: …and Hebrew for a Hebrew request',
-          /[\u0590-\u05FF]/.test(signupHe) && !signupHe.includes('Create your account'))
+          /[\u0590-\u05FF]/.test(signupHe) && !signupHe.includes('Create your free account'))
       }
 
       console.log('\n3C) METADATA FOLLOWS THE DOCUMENT — raw <title> off the wire')

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Phone } from 'lucide-react'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { publicUiLocale } from '@/lib/i18n/request-locale'
 import { buttonClasses } from './marketing'
 import { whatsappHelpUrl, PHONE_TEL } from './contact'
 
@@ -21,8 +22,8 @@ import { whatsappHelpUrl, PHONE_TEL } from './contact'
  */
 export function MobileContactBar() {
   const pathname = usePathname()
-  const isEn = pathname === '/en' || !!pathname?.startsWith('/en/')
-  const t = getPublicDictionary(isEn ? 'en' : 'he').contact
+  const locale = publicUiLocale(pathname)
+  const t = getPublicDictionary(locale).contact
 
   return (
     <div

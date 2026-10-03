@@ -9,6 +9,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { publicUiLocale } from '@/lib/i18n/request-locale'
+import { getLocaleConfig } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'a11y-settings-v2'
@@ -248,8 +250,8 @@ function applyState(s: A11yState) {
  */
 export function AccessibilityWidget() {
   const pathname = usePathname()
-  const isEn = pathname === '/en' || !!pathname?.startsWith('/en/')
-  const t = getPublicDictionary(isEn ? 'en' : 'he').a11y
+  const locale = publicUiLocale(pathname)
+  const t = getPublicDictionary(locale).a11y
   const [open, setOpen]   = useState(false)
   const [state, setState] = useState<A11yState>(DEFAULT_STATE)
   const panelRef  = useRef<HTMLDivElement>(null)
@@ -397,7 +399,7 @@ export function AccessibilityWidget() {
           ref={panelRef}
           role="dialog"
           aria-label={t.title}
-          dir={isEn ? 'ltr' : 'rtl'}
+          dir={getLocaleConfig(locale).dir}
           className={cn(
             'fixed start-4 z-[61] max-h-[calc(100dvh-8rem)] w-80 max-w-[calc(100vw-2rem)] animate-pop-in overflow-y-auto',
             'rounded-card border border-line bg-surface p-4 shadow-pop',
@@ -427,7 +429,7 @@ export function AccessibilityWidget() {
 
           {/* Accessibility statement link */}
           <Link
-            href={isEn ? '/en/accessibility' : '/accessibility'}
+            href={locale === 'he' ? '/accessibility' : '/en/accessibility'}
             className="mt-3 flex h-10 items-center justify-center gap-2 rounded-control border border-line bg-surface text-copy font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:border-line-strong hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
           >
             {t.statement}

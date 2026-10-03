@@ -150,6 +150,22 @@ export function routeContentLocale(pathname: string | null | undefined): Locale 
   return locale === null ? null : toBilingualLocale(locale)
 }
 
+/**
+ * The locale a CLIENT widget that floats over the whole public site should
+ * speak: the cookie notice, the WhatsApp button, the mobile contact bar and the
+ * accessibility panel. They are mounted once in the root layout and know only
+ * the pathname, so each one used to carry its own
+ * `pathname.startsWith('/en') ? 'en' : 'he'` — which answered HEBREW on a
+ * Spanish page, putting a Hebrew cookie notice over a Spanish document.
+ *
+ * Hebrew is the fallback because that is what these widgets have always shown
+ * on a route that states no language of its own (the auth screens, where they
+ * are mostly suppressed anyway).
+ */
+export function publicUiLocale(pathname: string | null | undefined): PublicLocale {
+  return routePublicLocale(pathname) ?? 'he'
+}
+
 /** Exposed so the QA can prove the list covers the real route group. */
 export function publicMarketingSegments(): string[] {
   return Array.from(PUBLIC_MARKETING_SEGMENTS).sort()
