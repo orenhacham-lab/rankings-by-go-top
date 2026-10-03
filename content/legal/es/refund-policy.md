@@ -4,6 +4,7 @@ description: Cómo cancelar una suscripción a Go Top SEO y en qué casos se con
 locale: es
 source: app/(public)/en/refund-policy/page.tsx
 lastUpdated: 2026-10-03
+register: usted
 ---
 
 ## 1. Suscripción mensual y renovación

@@ -66,7 +66,34 @@ for (const doc of DOCS) {
   check(`${doc}: front matter says locale es`, fm.locale === 'es')
   check(`${doc}: front matter names its English source`, !!fm.source && existsSync(fm.source), fm.source)
   check(`${doc}: front matter carries the revision date`, fm.lastUpdated === '2026-10-03')
+  check(`${doc}: front matter records the register`, fm.register === 'usted')
 }
+
+/*
+ * THE REGISTER IS "USTED", DELIBERATELY, AND IT DIFFERS FROM THE REST OF THE SITE.
+ *
+ * The Spanish marketing and dashboard copy uses "tú". These four documents do
+ * not, and that is not an oversight to be tidied up later. A contract, a
+ * privacy policy and a refund policy are read as statements of what each side
+ * owes; the formal second person is the register Spanish-language consumer law
+ * and every comparable policy use, and it reads as binding where "tú" reads as
+ * marketing. Mixing the two inside one document is the real mistake, so the
+ * check below is for consistency rather than for a particular pronoun: no
+ * tuteo verb form or possessive may appear in a document written in "usted".
+ *
+ * If the decision is ever reversed, reverse it in all four documents at once
+ * and change `register` in their front matter; this check follows that field.
+ */
+const TUTEO = [/\btú\b/, /\btu(s)? (cuenta|sitio|plan|proyecto|informaci[óo]n|datos)\b/, /\btienes\b/, /\bpuedes\b/, /\bdebes\b/, /\btu propia\b/]
+for (const doc of DOCS) {
+  const fm = frontMatter(files[doc])
+  if (fm.register !== 'usted') continue
+  for (const re of TUTEO) {
+    check(`${doc}: no tuteo in a document written in usted (${re.source})`, !re.test(files[doc]))
+  }
+}
+check('MUTATION — tuteo slipped into an usted document is caught',
+  TUTEO.some((re) => re.test('Puedes cancelar tu cuenta cuando tú quieras.')))
 
 // ── 2) the section count follows the English page ───────────────────────────
 // Headings are compared, not words: a translation legitimately differs in

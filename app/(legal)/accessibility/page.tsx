@@ -55,8 +55,18 @@ export default function AccessibilityPage() {
           <li>סימון פוקוס ברור בניווט במקלדת, ותפריט נגישות באתר להתאמת גודל הטקסט, הניגודיות ועוד</li>
           <li>תמיכה בהעדפת &ldquo;הפחתת תנועה&rdquo; (prefers-reduced-motion) של מערכת ההפעלה: אנימציות ומעברים
           מופחתים או מבוטלים למי שביקש זאת</li>
-          <li>תמיכה מלאה בעברית (כיוון מימין לשמאל, RTL) ובאנגלית (משמאל לימין, LTR), כולל כיוון הטקסט, הפריסה
-          והניווט</li>
+          {/*
+            The languages are described by how each is HANDLED, not as a list of
+            the languages the product happens to offer today. A list dates: the
+            Spanish site and dashboard exist on preview, so "Hebrew and English"
+            was already on its way to being untrue, and an accessibility
+            statement that overstates what it covers is exactly the kind of
+            claim that costs more than it buys. This wording stays true before
+            and after any language is added, and each language version of the
+            statement names the language it is written in.
+          */}
+          <li>כיוון הטקסט, הפריסה והניווט מותאמים לכל שפה שהאתר מתפרסם בה: עברית מימין לשמאל (RTL), אנגלית
+          וכל שפה נוספת משמאל לימין (LTR). ההצהרה הזאת חלה על כל גרסאות השפה של האתר</li>
         </ul>
       </section>
 

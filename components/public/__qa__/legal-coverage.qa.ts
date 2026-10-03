@@ -120,8 +120,14 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { terms: [/חל מהרגע שבחרתם להצטרף/] },
   },
   '9 accessibility measures': {
-    en: { a11y: [/contrast/i, /Level AA/, /Keyboard-only navigation/, /prefers-reduced-motion/, /reduce motion/, /right-to-left, RTL/, /left-to-right, LTR/, /oren@gotop\.co\.il/, /054-9489377/] },
-    he: { a11y: [/ניגודיות/, /דרגה AA/, /לוח המקלדת בלבד/, /prefers-reduced-motion/, /הפחתת תנועה/, /RTL/, /LTR/, /oren@gotop\.co\.il/, /054-9489377/] },
+    // The direction bullet is pinned by its two direction markers plus the
+    // sentence that makes the statement cover every language version. The exact
+    // phrase "right-to-left, RTL" used to be pinned here; it was replaced when
+    // the bullet stopped listing the languages the product offers (a list that
+    // Spanish was about to make untrue) and started describing how each
+    // direction is handled instead.
+    en: { a11y: [/contrast/i, /Level AA/, /Keyboard-only navigation/, /prefers-reduced-motion/, /reduce motion/, /right-to-left \(RTL\)/, /left-to-right \(LTR\)/, /applies to all language versions/, /oren@gotop\.co\.il/, /054-9489377/] },
+    he: { a11y: [/ניגודיות/, /דרגה AA/, /לוח המקלדת בלבד/, /prefers-reduced-motion/, /הפחתת תנועה/, /RTL/, /LTR/, /חלה על כל גרסאות השפה/, /oren@gotop\.co\.il/, /054-9489377/] },
   },
 }
 

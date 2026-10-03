@@ -67,8 +67,19 @@ export default function EnglishAccessibilityPage() {
           <li>Clear focus indication for keyboard navigation, and an accessibility menu on the site for adjusting text size, contrast and more</li>
           <li>Support for the operating system&rsquo;s &ldquo;reduce motion&rdquo; preference (prefers-reduced-motion): animations and
           transitions are reduced or removed for people who ask for it</li>
-          <li>Full support for Hebrew (right-to-left, RTL) and English (left-to-right, LTR), including text
-          direction, layout and navigation</li>
+          {/*
+            The languages are described by how each is HANDLED, not as a list of
+            the languages the product happens to offer today. A list dates: the
+            Spanish site and dashboard exist on preview, so "Hebrew and English"
+            was already on its way to being untrue, and an accessibility
+            statement that overstates what it covers is exactly the kind of
+            claim that costs more than it buys. This wording stays true before
+            and after any language is added, and each language version of the
+            statement names the language it is written in.
+          */}
+          <li>Text direction, layout and navigation are handled for every language the site is published in:
+          Hebrew right-to-left (RTL), English and any further language left-to-right (LTR). This statement
+          applies to all language versions of the site</li>
         </ul>
       </section>
 

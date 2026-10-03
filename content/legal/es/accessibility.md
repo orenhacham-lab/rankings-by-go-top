@@ -4,6 +4,7 @@ description: Declaración de accesibilidad de Go Top SEO.
 locale: es
 source: app/(public)/en/accessibility/page.tsx
 lastUpdated: 2026-10-03
+register: usted
 ---
 
 ## Nuestro compromiso con la accesibilidad
@@ -29,7 +30,7 @@ En Israel, los servicios web están sujetos a la Norma Israelí SI 5568, que se 
 - Tamaños de texto grandes y tiempo suficiente para orientarse
 - Indicación clara del foco para la navegación con el teclado, y un menú de accesibilidad en el sitio para ajustar el tamaño del texto, el contraste y más opciones
 - Compatibilidad con la preferencia del sistema operativo de «reducir movimiento» (prefers-reduced-motion): las animaciones y transiciones se reducen o se eliminan para las personas que lo soliciten
-- Compatibilidad total con el hebreo (de derecha a izquierda, RTL) y el inglés (de izquierda a derecha, LTR), incluidos la dirección del texto, el diseño y la navegación
+- La dirección del texto, el diseño y la navegación se adaptan a cada idioma en el que se publica el sitio: el hebreo de derecha a izquierda (RTL), y el inglés, el español y cualquier otro idioma de izquierda a derecha (LTR). Esta declaración se aplica a todas las versiones lingüísticas del sitio, incluida la versión en español
 
 ## Navegadores compatibles
 

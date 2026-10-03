@@ -4,6 +4,7 @@ description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamo
 locale: es
 source: app/(public)/en/privacy/page.tsx
 lastUpdated: 2026-10-03
+register: usted
 ---
 
 # Política de privacidad
