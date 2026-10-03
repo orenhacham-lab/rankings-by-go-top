@@ -96,6 +96,23 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
                   {dict.footer.accessibility}
                 </Link>
               </li>
+              {/*
+                GDPR Art. 7(3): withdrawing consent has to be as easy as giving
+                it. This is the standing way back into the preferences dialog,
+                on every public page, long after the banner is gone — a button
+                rather than a link because it opens the dialog in place instead
+                of navigating away from whatever the visitor was reading.
+              */}
+              <li>
+                <button
+                  type="button"
+                  data-cookie-settings-link
+                  onClick={() => window.dispatchEvent(new Event('gotop:open-consent-settings'))}
+                  className={`${linkClass} text-start`}
+                >
+                  {dict.cookie.settings}
+                </button>
+              </li>
             </ul>
           </div>
 

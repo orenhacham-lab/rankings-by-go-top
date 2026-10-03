@@ -111,6 +111,31 @@ export default function EnglishTermsPage() {
           submitted in writing to the Company&rsquo;s email address. Full details are in our{' '}
           <Link href="/en/refund-policy">Cancellation and Refund Policy</Link>.
         </p>
+        <p className="mt-4">
+          <strong>7.1 Consumers in the EU and the UK.</strong> If you bought the Service as a private
+          consumer, not for business purposes, and you reside in the European Union or the United
+          Kingdom, you have the right to withdraw from the contract within 14 days of entering into
+          it, without giving a reason. To exercise it, send us written notice at the email address in
+          section 21 within those 14 days.
+        </p>
+        <p className="mt-4">
+          <strong>7.2 Waiver of the withdrawal right once the service starts.</strong> The Service is
+          a digital service that begins operating immediately. By opening an account you expressly
+          request that we begin supplying it at once, and you acknowledge that if we fully supply the
+          Service within those 14 days you will lose the right of withdrawal. If you withdraw while
+          the Service has been supplied in part, we will refund the price less a proportionate amount
+          for what was already supplied.
+        </p>
+        <p className="mt-4">
+          <strong>7.3 Consumers in Israel.</strong> The Israeli Consumer Protection Law, 5741-1981,
+          and the regulations under it give a consumer — someone buying other than for business
+          purposes — cancellation rights in a distance sale and in a continuing transaction. Nothing
+          in these terms derogates from those rights.
+        </p>
+        <p className="mt-4">
+          <strong>7.4</strong> Sections 7.1 to 7.3 apply to private consumers only. For business
+          customers, the refund policy in section 7 applies unchanged.
+        </p>
       </section>
 
       <section>
@@ -211,11 +236,16 @@ export default function EnglishTermsPage() {
 
       {/* DRAFT, NEW SECTION (link network, lib/link-network) — wording for the owner's review before publishing. */}
       <section id="link-network">
-        <h2>15A. Link Network (draft wording, under review)</h2>
+        <h2>15A. Link Network</h2>
         <p>
           The link network is an optional service in which the Service may place a link between the
           sites of customers who joined it, inside articles the Service writes for them. It is off by
           default and is not available for Shopify stores.
+        </p>
+        <p className="mt-4">
+          <strong>The service is not active today</strong> and is not part of any plan. This section
+          applies from the moment we enable it and you choose to join, and not before. Until then it
+          creates no obligation or right for either party.
         </p>
         <ul>
           <li>
@@ -440,9 +470,22 @@ export default function EnglishTermsPage() {
       <section>
         <h2>19. Changes to the Terms</h2>
         <p>
-          The Company may update these terms from time to time. The updated version will be published
-          on the website and will take effect upon publication. Continued use of the Service after
-          the terms are updated constitutes acceptance of the updated terms.
+          The Company may update these terms from time to time. A technical change or a clarification
+          takes effect when the updated version is published on the website.
+        </p>
+        <p className="mt-4">
+          <strong>19.1 Material changes.</strong> A change that reduces your rights or widens your
+          obligations — including a change in price, a reduction in the scope of the Service, or a
+          change to the cancellation policy — will be notified to you by email to the address on your
+          account at least 14 days before it takes effect. If you do not agree to it, you may cancel
+          the subscription before that date; in that case you may keep using the Service to the end
+          of the period you paid for, on the terms in force when you paid.
+        </p>
+        <p className="mt-4">
+          <strong>19.2</strong> Continued use after the notice period has ended, or after a
+          non-material change is published, constitutes acceptance of the updated version. This does
+          not derogate from the mandatory protections that the law of a private consumer&rsquo;s
+          country of residence gives them.
         </p>
       </section>
 
@@ -452,6 +495,18 @@ export default function EnglishTermsPage() {
           These terms are governed by the laws of the State of Israel. Exclusive jurisdiction over
           any dispute arising from or related to these terms or the use of the Service lies with the
           competent courts in Israel.
+        </p>
+        <p className="mt-4">
+          <strong>20.1 Consumers.</strong> If you are a private consumer, the choice of law and
+          jurisdiction above does not deprive you of the mandatory protections of the law of your
+          country of residence, nor of the right to bring proceedings in a court there where that law
+          gives you one.
+        </p>
+        <p className="mt-4">
+          <strong>20.2 Sanctions and restricted countries.</strong> We do not provide the Service to
+          anyone located in a country or territory subject to sanctions by Israel, the United States
+          or the European Union, nor to anyone on a restricted-party list of those authorities. By
+          using the Service you confirm that you fall into neither category.
         </p>
       </section>
 

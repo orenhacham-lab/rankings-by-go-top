@@ -321,23 +321,56 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <h2>Cookies</h2>
-        <p>We use cookies for essential purposes:</p>
+        <p>We sort cookies into three categories, and we ask you about two of them before they load:</p>
         <ul>
-          <li><strong>Session cookies:</strong> for secure server communication and session management</li>
-          <li><strong>Analytics cookies:</strong> for site usage analysis via Google Analytics and Google Tag Manager</li>
+          <li><strong>Strictly necessary:</strong> signing in, remembering your interface language,
+          security and abuse prevention. The service cannot run without them, so they need no consent.</li>
+          <li><strong>Measurement:</strong> how many people visited, which pages they read and what
+          did not work. Loaded only if you allow it.</li>
+          <li><strong>Marketing:</strong> measuring how our ads perform and showing relevant ads on
+          the Google and Meta networks. Loaded only if you allow it.</li>
         </ul>
-        <p className="mt-4">By continuing to use the site, you agree to the use of cookies as described above.</p>
+        <p className="mt-4">
+          <strong>Before you choose, no measurement or marketing cookie is set and no request is
+          made to Google&rsquo;s servers.</strong>{' '}
+          Accepting and refusing are two equal buttons on the notice, and each category can be
+          allowed on its own.
+        </p>
+        <p className="mt-4">
+          <strong>Changing or withdrawing your consent:</strong> at any time, through the
+          &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
+          easy as giving consent, and costs you nothing in the service.
+        </p>
+        <p className="mt-4">
+          If your browser sends a Global Privacy Control signal, we treat it as a refusal: no
+          measurement or marketing cookies are loaded, and we do not show you the notice.
+        </p>
+        <p className="mt-4">
+          So that we can demonstrate what you chose, we record every decision: what you were shown,
+          what you chose, when, in which language, on which page, and a one-way hash of your IP
+          address. <strong>The IP address itself is not stored in that log.</strong> The log is
+          append-only and cannot be edited or deleted from within the system.
+        </p>
       </section>
 
       <section>
         <h2>Analytics &amp; Marketing Services</h2>
-        <p>We use the following services for user behavior analysis and marketing channel management:</p>
+        <p>
+          Our measurement and marketing tools are managed through Google Tag Manager, which loads
+          only after you have allowed measurement or marketing. The tools that may run through it:
+        </p>
         <ul>
-          <li><strong>Google Analytics:</strong> to analyze traffic and acquisition channels</li>
-          <li><strong>Google Tag Manager:</strong> to manage tags and analyze user composition</li>
+          <li><strong>Google Analytics:</strong> traffic and acquisition analysis (subject to measurement consent)</li>
+          <li><strong>Google Ads:</strong> conversion measurement and personalised advertising (subject to marketing consent)</li>
+          <li><strong>Meta Pixel:</strong> conversion measurement and advertising on Facebook and Instagram (subject to marketing consent)</li>
         </ul>
         <p className="mt-4">
-          These cookies do not personally identify you and are used to improve user experience and the service.
+          Which tools are active changes from time to time. What does not change: none of them loads
+          before you have allowed its category, and withdrawing your consent stops the collection.
+        </p>
+        <p className="mt-4">
+          We declare your consent state to Google through the Consent Mode v2 protocol, so the tools
+          are bound by your choice even if we add a new tag in the future.
         </p>
       </section>
 
@@ -394,6 +427,167 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Legal Basis for Processing</h2>
+        <p>
+          We process personal data only where we have a legal basis for it. Each purpose has its own
+          basis, which is why your options differ from one purpose to the next:
+        </p>
+        <ul>
+          <li><strong>Performance of a contract</strong> (GDPR Art. 6(1)(b)): opening an account,
+          running the subscription, performing scans and checks, generating content and publishing it
+          to the site you connected. Without this there is no service.</li>
+          <li><strong>Consent</strong> (Art. 6(1)(a) and the ePrivacy rules): measurement and
+          marketing cookies, marketing email, and joining the link network. Each is separate, and
+          each can be withdrawn at any time.</li>
+          <li><strong>Legitimate interests</strong> (Art. 6(1)(f)): securing the system, preventing
+          abuse, operational reminders about your own account, and improving the service from
+          aggregate data. You may object to processing on this basis.</li>
+          <li><strong>Legal obligation</strong> (Art. 6(1)(c)): keeping billing records and
+          reporting to the tax authorities.</li>
+        </ul>
+        <p className="mt-4">
+          In Israel we are subject to the Protection of Privacy Law, 5741-1981, including Amendment
+          13, which took effect on 14 August 2025. We are not required to appoint a data protection
+          officer under that amendment, and we are not a data broker: we do not sell personal data to
+          anyone, for any consideration.
+        </p>
+      </section>
+
+      <section>
+        <h2>How Long We Keep Data</h2>
+        <p>We keep data only as long as it is needed for the purpose it was collected for:</p>
+        <ul>
+          <li><strong>Account and the content generated for you:</strong> for the life of the
+          account, and up to 90 days after it is deleted so an accidental deletion can be undone.
+          Then erased.</li>
+          <li><strong>Billing records and invoices:</strong> seven years, as Israeli tax law
+          requires. We have no discretion here, even if you ask for erasure.</li>
+          <li><strong>Connection credentials</strong> (WordPress, Shopify, Search Console): until you
+          disconnect or delete the account, and then erased immediately.</li>
+          <li><strong>Free site check:</strong> cached for up to 24 hours, then erased if no account
+          was opened from it.</li>
+          <li><strong>Cookie decision log:</strong> up to three years from the decision, so that we
+          can demonstrate what you chose. That is the legal basis for keeping it, which is why it is
+          not erased together with the account.</li>
+          <li><strong>Security and server logs:</strong> up to 90 days.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>International Transfers</h2>
+        <p>
+          The service runs on international cloud and infrastructure providers, so data may be stored
+          or processed outside your country of residence. The main providers: Vercel (application
+          hosting), Supabase (the database, in the Mumbai region in India), and the AI and search
+          providers listed above.
+        </p>
+        <p className="mt-4">
+          For data about residents of the European Economic Area, Switzerland or the United Kingdom:
+          Israel has been recognised by the European Commission as providing an adequate level of
+          protection, so a transfer to us requires no further instrument. For transfers to providers
+          outside the EU in countries without an adequacy decision we rely on the European
+          Commission&rsquo;s Standard Contractual Clauses, within those providers&rsquo; own terms.
+        </p>
+        <p className="mt-4">
+          You may ask us which instrument we rely on for a particular transfer, and we will answer in
+          writing.
+        </p>
+      </section>
+
+      <section>
+        <h2>Rights of Residents of the EEA, Switzerland and the UK</h2>
+        <p>
+          If you are in the European Economic Area, Switzerland or the United Kingdom, you also have
+          the following rights under the GDPR and the UK GDPR:
+        </p>
+        <ul>
+          <li><strong>Access</strong> (Art. 15): a copy of the data we hold about you.</li>
+          <li><strong>Rectification</strong> (Art. 16) and <strong>erasure</strong> (Art. 17).</li>
+          <li><strong>Restriction of processing</strong> (Art. 18).</li>
+          <li><strong>Portability</strong> (Art. 20): your data in a structured, machine-readable format.</li>
+          <li><strong>Objection</strong> (Art. 21), including an absolute right to object to marketing.</li>
+          <li><strong>Withdrawal of consent</strong> (Art. 7(3)) at any time, without affecting the
+          lawfulness of processing carried out before it.</li>
+        </ul>
+        <p className="mt-4">
+          We answer within 30 days. We will not charge you and will not degrade your service because
+          you exercised a right.
+        </p>
+        <p className="mt-4">
+          <strong>Right to complain:</strong> if you are not satisfied with our answer, you may
+          complain to the supervisory authority in your country of residence, or to the Israeli
+          Privacy Protection Authority
+          (<a href="https://www.gov.il/en/departments/the_privacy_protection_authority" target="_blank" rel="noopener noreferrer">
+            Privacy Protection Authority
+          </a>). Contacting us first is not a condition of complaining, though we would welcome the
+          chance to put it right.
+        </p>
+      </section>
+
+      <section>
+        <h2>Rights of United States Residents</h2>
+        <p>
+          If you are a resident of California, or of another state that has enacted a state privacy
+          law, you have the right to know which categories of data were collected about you, to
+          obtain a copy, to request deletion, to correct inaccurate data, and not to be discriminated
+          against for exercising a right.
+        </p>
+        <p className="mt-4">
+          <strong>We do not sell personal information and we do not transfer it for
+          consideration.</strong> We do share identifiers and usage events with the Google and Meta
+          advertising networks for targeted advertising, which may count as &ldquo;sharing&rdquo;
+          under California law. That sharing happens <strong>only</strong> if you allowed the
+          marketing category, and it stops the moment you withdraw.
+        </p>
+        <p className="mt-4">
+          We honour the browser&rsquo;s Global Privacy Control signal as a &ldquo;do not sell or
+          share my personal information&rdquo; request, and we record it. No form is needed: the
+          signal itself is enough.
+        </p>
+      </section>
+
+      <section>
+        <h2>Automated Decisions</h2>
+        <p>
+          The service produces recommendations and content with AI models, but it makes no automated
+          decision with a legal or similarly significant effect on you: no credit scoring, no
+          candidate screening, and no eligibility decision made without a person. Content is
+          published to the site you connected according to the schedule and the approvals you set.
+        </p>
+      </section>
+
+      <section>
+        <h2>Minimum Age</h2>
+        <p>
+          The service is intended for businesses and site owners, not for children. We do not
+          knowingly collect data from anyone under 18, and the service may not be used below that
+          age. If such data has reached us, write to us and we will erase it.
+        </p>
+      </section>
+
+      <section>
+        <h2>Privacy Contact and Representatives</h2>
+        <p>For any privacy matter, including exercising the rights above:</p>
+        <p className="mt-2">
+          <strong>Email:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>Phone:</strong>{' '}
+          <a href="tel:0549489377" dir="ltr">
+            +972-54-948-9377
+          </a>
+        </p>
+        <p className="mt-4">
+          We are not required to appoint a data protection officer under Amendment 13 to the Israeli
+          Protection of Privacy Law, and we have not appointed one. Requests are handled by the
+          contact above.
+        </p>
+      </section>
+
+      <section>
         <h2>Updates to This Policy</h2>
         <p>
           We may update this policy from time to time. Changes take effect immediately upon publication. We encourage you
@@ -420,7 +614,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on September 29, 2026
+          This policy was last updated on October 3, 2026
         </p>
       </section>
     </LegalDoc>

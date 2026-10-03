@@ -603,7 +603,18 @@ function partG() {
   const log = strip(read('components/site-links/network/PlacementLog.tsx'))
   check('server text never reaches the screen (status codes → dictionary words only)', !/\.json\(\)/.test(log) && !/body\.error|\.message/.test(log + panel))
   const terms = read('app/(public)/terms/page.tsx'), termsEn = read('app/(public)/en/terms/page.tsx')
-  check('the terms carry a marked draft section for the network, in both languages', /id="link-network"/.test(terms) && /טיוטה/.test(terms) && /id="link-network"/.test(termsEn) && /draft/i.test(termsEn))
+  // THIS USED TO REQUIRE the heading to be marked "נוסח טיוטה לבדיקה" / "draft
+  // wording, under review". That marker was removed on purpose: the terms are a
+  // live, binding document, and a clause that tells a customer the company has
+  // not settled its own wording leaves neither side able to say what was agreed.
+  // What replaced it says the same true thing in a way that binds: the network
+  // is not active, so the clause applies only once we enable it and the customer
+  // opts in. The anchor and the not-active statement are what the guard pins now.
+  check('the terms carry the network section, in both languages, stating it is not active yet',
+    /id="link-network"/.test(terms) && /השירות אינו פעיל כיום/.test(terms)
+    && /id="link-network"/.test(termsEn) && /The service is not active today/.test(termsEn))
+  check('MUT: dropping the not-active statement is caught',
+    !(/השירות אינו פעיל כיום/.test(terms.replace('השירות אינו פעיל כיום', 'x'))))
 }
 
 // ── H. domain control, from the stored connections ─────────────────────────
