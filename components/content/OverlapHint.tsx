@@ -12,19 +12,19 @@ import { NoticeBox } from '@/components/ui/Notice'
 import Button, { buttonClasses } from '@/components/ui/Button'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { overlapMessage, type OverlapPayload } from '@/lib/content/cannibalization/client'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
-export default function OverlapHint({ overlap, language, onCreateAnyway, busy = false, className }: {
+export default function OverlapHint({ overlap, uiLocale, onCreateAnyway, busy = false, className }: {
   overlap: OverlapPayload
-  language: Locale
+  uiLocale: PublicLocale
   onCreateAnyway?: () => void
   busy?: boolean
   className?: string
 }) {
-  const c = getDashboardDictionary(language).topicOverlap
+  const c = getDashboardDictionary(uiLocale).topicOverlap
   const planned = overlap.kind === 'topic' || overlap.kind === 'idea'
   return (
-    <NoticeBox tone="warn" language={language} className={className}>
+    <NoticeBox tone="warn" language={uiLocale} className={className}>
       <div data-overlap={overlap.kind} className="space-y-2">
         <p className="font-semibold text-ink">{overlapMessage(c, overlap)}</p>
         {!planned && <p className="max-w-prose text-caption text-body">{c.why}</p>}

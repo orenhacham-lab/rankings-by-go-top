@@ -26,13 +26,15 @@ import { cn } from '@/lib/utils'
 import { HeaderLink, LinkButton, linkButtonClass, Widget, WidgetEmpty } from './ui'
 import OverlapHint from '@/components/content/OverlapHint'
 import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 type Copy = DashboardDictionary['dashboardHome']
 type CreateState = 'idle' | 'saving' | 'created' | 'failed'
 
-export default function ContentOpportunities({ t, language, projectId, items, canCreateTopics }: {
+export default function ContentOpportunities({ t, language, uiLocale, projectId, items, canCreateTopics }: {
   t: Copy
   language: 'he' | 'en'
+  uiLocale: PublicLocale
   projectId: string
   items: PageTwoKeyword[]
   canCreateTopics: boolean
@@ -86,13 +88,13 @@ export default function ContentOpportunities({ t, language, projectId, items, ca
                     <Link href={`/keywords/${encodeURIComponent(item.targetId)}/history`} className="hover:underline">{item.keyword}</Link>
                     <span className="text-caption font-normal tabular-nums text-muted">#{item.position}</span>
                     {item.volume != null && item.volume > 0 && (
-                      <span className="text-caption font-normal text-muted">{o.volume(formatCompact(item.volume, language))}</span>
+                      <span className="text-caption font-normal text-muted">{o.volume(formatCompact(item.volume, uiLocale))}</span>
                     )}
                   </p>
                   <p className="mt-0.5 text-caption text-muted">{o.why(item.position)}</p>
                   {state === 'failed' && <p role="alert" className="mt-1 text-caption text-bad">{o.failed}</p>}
                   {canCreateTopics && state !== 'created' && overlapFor[item.targetId] && (
-                    <OverlapHint className="mt-2" overlap={overlapFor[item.targetId]} language={language} busy={state === 'saving'}
+                    <OverlapHint className="mt-2" overlap={overlapFor[item.targetId]} uiLocale={uiLocale} busy={state === 'saving'}
                       onCreateAnyway={() => void createTopic(item, true)} />
                   )}
                 </div>

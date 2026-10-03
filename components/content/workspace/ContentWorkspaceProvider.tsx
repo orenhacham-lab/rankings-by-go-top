@@ -332,7 +332,7 @@ function useWorkspaceValue() {
   return {
     // identity + i18n
     projectId, projects, selectedProject, projectsResolved, projectsError, reloadProjects,
-    language, t, isHebrew, toast,
+    language, uiLocale, t, isHebrew, toast,
     // overview
     data, overviewSettled, loading, counts, activePlatform, isShopify, isSite, exportedIdOf, load, patchArticle, shopifyPublishError,
     // topics

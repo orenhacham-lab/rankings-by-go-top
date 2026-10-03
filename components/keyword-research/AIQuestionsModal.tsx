@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatCount } from '@/components/gsc/format'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 interface AIQuestionsModalProps {
   open: boolean
@@ -28,7 +29,7 @@ interface AIQuestionsModalProps {
   questions: GeneratedQuestion[]
   selectedProject: string
   projects: Array<{ id: string; name?: string | null }>
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   isRTL: boolean
   onAddQuestions: (questions: GeneratedQuestion[]) => Promise<void>
   loading?: boolean
@@ -41,7 +42,7 @@ export default function AIQuestionsModal({
   questions,
   selectedProject,
   projects,
-  language,
+  uiLocale,
   isRTL,
   onAddQuestions,
   loading = false,
@@ -49,8 +50,8 @@ export default function AIQuestionsModal({
 }: AIQuestionsModalProps) {
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set())
   const [editedQuestions, setEditedQuestions] = useState<Map<string, string>>(new Map())
-  const t = getDashboardDictionary(language).keywordResearch.aiQuestions
-  const n = (v: number) => formatCount(v, language)
+  const t = getDashboardDictionary(uiLocale).keywordResearch.aiQuestions
+  const n = (v: number) => formatCount(v, uiLocale)
 
   const toggleQuestion = (id: string) => {
     const next = new Set(selectedQuestions)

@@ -60,6 +60,7 @@ import ContentTable from './existing/ContentTable'
 import ExistingSkeleton from './existing/ExistingSkeleton'
 import { fill } from './existing/format'
 import { toHebrewOrEnglish } from '@/lib/content/language'
+import { intlLocaleOf } from '@/lib/i18n/locales'
 
 const PAGE_SIZE = PAGE_LIMIT_DEFAULT
 const POLL_MS = 2500
@@ -88,12 +89,12 @@ function mapDue(m: SiteMapStatus, now: number): boolean {
 }
 
 export default function ExistingContentScreen() {
-  const { projectId, selectedProject, language, isHebrew, toast, loadTopics, data: overview, overviewSettled } = useContentWorkspace()
-  const x = useMemo(() => getDashboardDictionary(language).existingContent, [language])
-  const locale = isHebrew ? 'he-IL' : 'en-US'
+  const { projectId, selectedProject, uiLocale, toast, loadTopics, data: overview, overviewSettled } = useContentWorkspace()
+  const x = useMemo(() => getDashboardDictionary(uiLocale).existingContent, [uiLocale])
+  const locale = intlLocaleOf(uiLocale)
   const num = useMemo(() => new Intl.NumberFormat(locale), [locale])
   const pos = useMemo(() => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }), [locale])
-  const day = useCallback((iso: string | null) => (iso ? formatDate(iso, language) : null), [language])
+  const day = useCallback((iso: string | null) => (iso ? formatDate(iso, uiLocale) : null), [uiLocale])
   // The toast object is new on every render of the workspace; its functions are
   // stable. Depending on the object would refetch (and flash the skeleton) each time.
   const toastError = toast.error

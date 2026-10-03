@@ -28,6 +28,7 @@ import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Notice from '@/components/ui/Notice'
 import { Check, ChevronDown, Circle, CircleDot, ExternalLink, Link2, Minus } from 'lucide-react'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 interface PreviewItem {
   linkId: string
@@ -82,7 +83,7 @@ export default function ArticleInternalLinkApplyPanel({
   status,
   isPublished,
   contentHtml,
-  language,
+  uiLocale,
   onContentReplaced,
   // Session outcome is LIFTED to the parent so it survives the re-render/remount
   // caused by resyncContentHtml after a successful apply — the rollback button
@@ -102,7 +103,7 @@ export default function ArticleInternalLinkApplyPanel({
   status: 'draft' | 'ready'
   isPublished: boolean
   contentHtml: string
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   onContentReplaced: () => void | Promise<void>
   applyOutcome: ApplyOutcome | null
   rollbackAvailable: boolean
@@ -112,10 +113,10 @@ export default function ArticleInternalLinkApplyPanel({
   onNoticeChange: (s: string | null) => void
   onPreviewSummaryChange?: (s: PreviewSummary | null) => void
 }) {
-  const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.linkApply, [language])
-  const cf = useMemo(() => getDashboardDictionary(language).contentHub.confirms, [language])
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub.editor.linkApply, [uiLocale])
+  const cf = useMemo(() => getDashboardDictionary(uiLocale).contentHub.confirms, [uiLocale])
   const { confirm, dialog: confirmDialog } = useConfirm()
-  const isHebrew = language === 'he'
+  const isHebrew = uiLocale === 'he'
   const isDraft = status === 'draft' && !isPublished
 
   const [collapsed, setCollapsed] = useState(true)

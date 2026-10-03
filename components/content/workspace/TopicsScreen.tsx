@@ -29,7 +29,7 @@ import { BATCH_LIMIT } from './types'
 
 export default function TopicsScreen() {
   const {
-    t, language, projectId, toast, selectedProject, load, loadTopics,
+    t, uiLocale, projectId, toast, selectedProject, load, loadTopics,
     selectableTopics, articleByTopic, topicsLoading,
     planStatus, setPlanStatus, highlightTopicIds,
     newTopics, setNewTopics, newTopicsUnchecked, newTopicsSelected,
@@ -183,7 +183,7 @@ export default function TopicsScreen() {
           screen are built from, so this is where it belongs. */}
       {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && (
         <div>
-          <InternalLinkIndexStatus projectId={projectId} language={language} />
+          <InternalLinkIndexStatus projectId={projectId} uiLocale={uiLocale} />
         </div>
       )}
 
@@ -211,7 +211,7 @@ export default function TopicsScreen() {
         <NewTopicsLinkPlanPanel
           key={newTopics.map((tp) => tp.id).join(',')}
           projectId={projectId}
-          language={language}
+          uiLocale={uiLocale}
           topics={newTopics}
           initialUnchecked={newTopicsUnchecked}
           initialSelected={newTopicsSelected}

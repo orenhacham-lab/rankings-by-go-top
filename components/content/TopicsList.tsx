@@ -79,7 +79,7 @@ export default function TopicsList({
   /** `expectsLinks` is decided by the drawer and passed straight through. */
   onSaveAndQueue?: (topicId: string, expectsLinks: boolean) => Promise<boolean>
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const c = getDashboardDictionary(uiLocale).contentHub
   const router = useRouter()
   const { confirm, dialog: confirmDialog } = useConfirm()
@@ -363,7 +363,7 @@ export default function TopicsList({
           onClose={() => setPlanTopic(null)}
           projectId={projectId}
           topic={planTopic}
-          language={language}
+          uiLocale={uiLocale}
           onStatusChange={handlePlanStatus}
           onReturnToQueue={onReturnToQueue}
           onPlanSaved={onPlanSaved}

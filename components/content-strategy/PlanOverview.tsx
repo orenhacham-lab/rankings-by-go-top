@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
 import { monthPlan, type StrategyCard, type StrategyColumn } from '@/lib/content/strategy/board'
 import { planIntentMix } from '@/lib/content/strategy/insights'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { monthLabel } from './format'
 
@@ -46,7 +46,7 @@ export default function PlanOverview({ cards, counts, searches, lang, dict }: {
   counts: Record<StrategyColumn, number>
   /** The plan's keywords' monthly searches (planSearches), or null when the research has none of them. */
   searches: number | null
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
 }) {
   const t = dict.strategyInsights.overview

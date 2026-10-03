@@ -146,7 +146,7 @@ export default function AIVisibilitySection({
   /** Bumped when checks ran outside the tool (the monthly check's "run now"): reload results and the allowance. */
   resultsRefreshKey?: number
 }) {
-  const { language: dashboardLanguage } = useDashboardLanguage()
+  const { language: dashboardLanguage, uiLocale } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const isHebrew = dashboardLanguage === 'he'
 
@@ -2569,7 +2569,7 @@ export default function AIVisibilitySection({
                               articleHref: topic?.article ? `/content/articles/${encodeURIComponent(topic.article.id)}` : null,
                               existingHref: '/content/existing',
                               overlap: articleOverlapFor[q.id]
-                                ? { found: articleOverlapFor[q.id], language: dashboardLanguage, onWriteAnyway: () => { void writeArticleFor(q, true) } }
+                                ? { found: articleOverlapFor[q.id], uiLocale, onWriteAnyway: () => { void writeArticleFor(q, true) } }
                                 : null,
                             }
                           })() : null}

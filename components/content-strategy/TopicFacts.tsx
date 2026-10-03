@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
@@ -22,7 +22,7 @@ export const TOPIC_FACTS_MAX = 3
 
 export default function TopicFacts({ insight, lang, dict, tone = 'light', className, max = TOPIC_FACTS_MAX }: {
   insight: TopicInsight
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
   /** `ink`: on the dark next-article card. */
   tone?: 'light' | 'ink'

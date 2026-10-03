@@ -22,6 +22,7 @@ import { ChevronDown, Sparkles, WandSparkles, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
 import { buildEngineRejectionLines } from '@/lib/content/recommendations/engine-rejection-line'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
@@ -85,7 +86,7 @@ interface Suggestion {
 export default function AutomationIdeas({
   proFirst = false,
   projectId,
-  language,
+  uiLocale,
   onCreated,
   onScheduled,
   onTopicsCreated,
@@ -97,7 +98,7 @@ export default function AutomationIdeas({
   onGoToQueue,
 }: {
   projectId: string
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   onCreated: () => void
   onScheduled?: () => void
   // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
@@ -126,11 +127,11 @@ export default function AutomationIdeas({
    *  The SINGLE authoritative flag; when true the selector is hidden and no tier is sent. */
   proFirst?: boolean
 }) {
-  const t = getDashboardDictionary(language).contentHub.autoIdeas
+  const t = getDashboardDictionary(uiLocale).contentHub.autoIdeas
   // The intent is stored as a code ('informational'); the card says it in words.
-  const intents = getDashboardDictionary(language).contentHub.brief.intents as Record<string, string>
+  const intents = getDashboardDictionary(uiLocale).contentHub.brief.intents as Record<string, string>
   const intentText = (code: string) => (intents[code] ?? code).split(' — ')[0]
-  const isHebrew = language === 'he'
+  const isHebrew = uiLocale === 'he'
   const { confirm, dialog: confirmDialog } = useConfirm()
   // The exact per-topic queue payload to RETRY (links already saved; only the enqueue
   // step failed) — re-sent to the authoritative approve-and-queue route.

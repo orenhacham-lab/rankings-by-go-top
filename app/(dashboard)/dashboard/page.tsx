@@ -442,7 +442,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
           )}
           {show.opportunities && (
             <Reveal index={3} className={`order-7 min-w-0 ${fold}`}>
-              <ContentOpportunities t={t} language={language} projectId={project.id} items={rankings.pageTwo} canCreateTopics={showContent} />
+              <ContentOpportunities t={t} language={language} uiLocale={uiLocale} projectId={project.id} items={rankings.pageTwo} canCreateTopics={showContent} />
             </Reveal>
           )}
           {(show.board || show.articles) && (

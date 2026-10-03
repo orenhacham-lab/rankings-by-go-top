@@ -33,7 +33,7 @@ import { formatCount } from '@/components/gsc/format'
 import TopicFacts from './TopicFacts'
 import { canRejectIdea, ideaTargetFromCard } from '@/lib/content/strategy/ideas'
 import type { IdeaActions } from './useIdeaActions'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { fill, monthLabel, shortDate } from './format'
 
@@ -86,7 +86,7 @@ export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card
   )
 }
 
-function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: StrategyCard; lang: Locale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean; insight?: TopicInsight }) {
+function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: StrategyCard; lang: PublicLocale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean; insight?: TopicInsight }) {
   const s = dict.contentStrategy
   const date = shortDate(card.date, lang)
   const approvedNow = card.column === 'planned' && !!act && act.actions.approvedNow.has(sameTopicKey(card.title))
@@ -145,7 +145,7 @@ function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: Strategy
   return <div data-strategy-card={card.key} className={cn(frame, approvedNow && 'border-ok/40')}>{body}</div>
 }
 
-function Column({ column, cards: raw, lang, dict, note, act, insights }: { column: StrategyColumn; cards: StrategyCard[]; lang: Locale; dict: Dict; note?: string | null; act: BoardIdeaActions | null; insights?: ReadonlyMap<string, TopicInsight> | null }) {
+function Column({ column, cards: raw, lang, dict, note, act, insights }: { column: StrategyColumn; cards: StrategyCard[]; lang: PublicLocale; dict: Dict; note?: string | null; act: BoardIdeaActions | null; insights?: ReadonlyMap<string, TopicInsight> | null }) {
   const s = dict.contentStrategy
   const [open, setOpen] = useState(false)
   // Ideas: our own first, then the suggestions from the rankings, then the scan's (stable within a group).
@@ -216,7 +216,7 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
 
 export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act = null, insights = null }: {
   cards: StrategyCard[]
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
   /** One line under the ideas column's header (a project with no scan: the mapping will add more). */
   ideasNote?: string | null

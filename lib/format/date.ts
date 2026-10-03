@@ -14,7 +14,7 @@
  *
  * Pure, no React. An unreadable or missing value is '—'.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import { intlLocaleOf, type PublicLocale } from '@/lib/i18n/locales'
 
 export type DateStyle = 'full' | 'dateTime' | 'relative'
 
@@ -23,8 +23,8 @@ const LRI = '⁦'
 const PDI = '⁩'
 export const EMPTY_DATE = '—'
 
-function intlLocale(lang: Locale): string {
-  return lang === 'he' ? 'he-IL' : 'en-US'
+function intlLocale(lang: PublicLocale): string {
+  return intlLocaleOf(lang)
 }
 
 function toDate(value: string | number | Date | null | undefined): Date | null {
@@ -33,24 +33,27 @@ function toDate(value: string | number | Date | null | undefined): Date | null {
   return Number.isFinite(d.getTime()) ? d : null
 }
 
-function isolate(text: string, lang: Locale): string {
+function isolate(text: string, lang: PublicLocale): string {
   return lang === 'he' ? `${LRI}${text}${PDI}` : text
 }
 
-function dayPart(d: Date, lang: Locale): string {
+function dayPart(d: Date, lang: PublicLocale): string {
+  // Hebrew writes the numeric day Israelis read on every form (27.09.2026);
+  // every other language gets its own month name from `Intl`, so Spanish reads
+  // "27 sept 2026" rather than an English month or a Hebrew numeral order.
   return lang === 'he'
     ? new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
-    : new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+    : new Intl.DateTimeFormat(intlLocale(lang), { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
 }
 
-function timePart(d: Date, lang: Locale): string {
+function timePart(d: Date, lang: PublicLocale): string {
   return new Intl.DateTimeFormat(intlLocale(lang), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d)
 }
 
 /** "3 days ago" / "in 2 days": the largest unit that reads naturally. */
-function relativePart(d: Date, now: Date, lang: Locale): string {
+function relativePart(d: Date, now: Date, lang: PublicLocale): string {
   const diffSec = Math.round((d.getTime() - now.getTime()) / 1000)
-  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' })
+  const rtf = new Intl.RelativeTimeFormat(intlLocale(lang), { numeric: 'auto' })
   const abs = Math.abs(diffSec)
   if (abs < 45) return rtf.format(0, 'second')
   if (abs < 45 * 60) return rtf.format(Math.round(diffSec / 60), 'minute')
@@ -62,7 +65,7 @@ function relativePart(d: Date, now: Date, lang: Locale): string {
 
 export function formatDate(
   value: string | number | Date | null | undefined,
-  lang: Locale,
+  lang: PublicLocale,
   style: DateStyle = 'full',
   now: Date = new Date(),
 ): string {

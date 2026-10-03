@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
 import type { StrategyCard } from '@/lib/content/strategy/board'
 import { cardKeyword, clustersWorthShowing, topicClusters, type TopicInsight } from '@/lib/content/strategy/insights'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { ACCENT } from './StrategyBoard'
 
@@ -27,7 +27,7 @@ export const CLUSTERS_SHOWN = 6
 export default function TopicClusters({ cards, insights, lang, dict }: {
   cards: readonly StrategyCard[]
   insights: ReadonlyMap<string, TopicInsight> | null
-  lang: Locale
+  lang: PublicLocale
   dict: Dict
 }) {
   const t = dict.strategyInsights.clusters

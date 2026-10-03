@@ -27,6 +27,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import { resolveQueueLinkExpectation } from '@/lib/content/queue-link-expectation'
 import { LatestRequest, isAbortError } from '@/lib/content/latest-request'
+import { getLocaleConfig, type PublicLocale } from '@/lib/i18n/locales'
 
 const REASON_HE: Record<string, string> = {
   low_relevance: 'רלוונטיות נמוכה',
@@ -76,13 +77,13 @@ const dmkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targ
 export interface DrawerTopic { id: string; topic: string; primary_keyword: string | null }
 
 export default function TopicPlanDrawer({
-  open, onClose, projectId, topic, language, onStatusChange, onReturnToQueue, onPlanSaved, onSaveAndQueue,
+  open, onClose, projectId, topic, uiLocale, onStatusChange, onReturnToQueue, onPlanSaved, onSaveAndQueue,
 }: {
   open: boolean
   onClose: () => void
   projectId: string
   topic: DrawerTopic | null
-  language: 'he' | 'en'
+  uiLocale: PublicLocale
   onStatusChange?: (topicId: string, summary: TopicPlanSummary) => void
   // Phase 3F.3.3e — completion actions that guide the user back to the queue.
   onReturnToQueue?: () => void
@@ -95,7 +96,7 @@ export default function TopicPlanDrawer({
   // approve-and-queue verifies a saved plan only when it is true.
   onSaveAndQueue?: (topicId: string, expectsLinks: boolean) => Promise<boolean>
 }) {
-  const t = useMemo(() => getDashboardDictionary(language).contentHub.topicPlan, [language])
+  const t = useMemo(() => getDashboardDictionary(uiLocale).contentHub.topicPlan, [uiLocale])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ exists: boolean; batch: SavedBatch | null; links: SavedLink[]; stale: boolean; staleReasons: string[] } | null>(null)
@@ -431,7 +432,7 @@ export default function TopicPlanDrawer({
   }, [projectId, busyLink, emitStatus])
 
   if (!topic) return null
-  const closeLabel = getDashboardDictionary(language).common.close
+  const closeLabel = getDashboardDictionary(uiLocale).common.close
 
   const statusHe = (s: string) => (t.linkStatus as Record<string, string>)[s] ?? s
   const linkRow = (l: SavedLink) => (
@@ -535,7 +536,7 @@ export default function TopicPlanDrawer({
     <PlanSheet
       open={open}
       onClose={onClose}
-      dir={language === 'he' ? 'rtl' : 'ltr'}
+      dir={getLocaleConfig(uiLocale).dir}
       overline={t.drawerTitle}
       title={topic.topic}
       subtitle={topic.primary_keyword ? `${t.primaryKeyword}: ${topic.primary_keyword}` : null}

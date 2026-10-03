@@ -1498,7 +1498,7 @@ export default function KeywordResearchPage() {
         questions={generatedAIQuestions}
         selectedProject={selectedProject}
         projects={projects}
-        language={language as 'he' | 'en'}
+        uiLocale={uiLocale}
         isRTL={isRTL}
         onAddQuestions={handleAddAIQuestions}
         loading={addingAIQuestions}
@@ -1515,7 +1515,7 @@ export default function KeywordResearchPage() {
           setTrendError('')
         }}
         keyword={selectedTrendKeyword}
-        language={language as 'he' | 'en'}
+        uiLocale={uiLocale}
         isRTL={isRTL}
         loading={trendLoading}
         error={trendError}

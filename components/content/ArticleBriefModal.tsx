@@ -875,7 +875,7 @@ export default function ArticleBriefModal({
                   {overlapShown.length > 1 && <p className="text-caption font-semibold text-muted">{topic}</p>}
                   <OverlapHint
                     overlap={overlap}
-                    language={language}
+                    uiLocale={uiLocale}
                     busy={saving}
                     onCreateAnyway={i === overlapShown.length - 1 ? () => { setOverlaps(null); void handleSave(true) } : undefined}
                   />

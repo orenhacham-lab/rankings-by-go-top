@@ -20,7 +20,7 @@ import { KEYWORD_MAX } from '@/lib/content/strategy/ideas'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import OverlapHint from '@/components/content/OverlapHint'
 import { fetchOverlap, type OverlapPayload } from '@/lib/content/cannibalization/client'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
 
@@ -32,13 +32,13 @@ export function AddKeywordButton({ dict, open, onOpen }: { dict: Dict; open: boo
   )
 }
 
-export default function AddKeywordForm({ dict, onAdd, onClose, projectId = null, language = 'he' }: {
+export default function AddKeywordForm({ dict, onAdd, onClose, projectId = null, uiLocale = 'he' }: {
   dict: Dict
   onAdd: (keyword: string) => Promise<{ ok: boolean; error?: string }>
   onClose: () => void
   /** The project the cannibalization check runs for; without it, no check. */
   projectId?: string | null
-  language?: Locale
+  uiLocale?: PublicLocale
 }) {
   const a = dict.contentStrategy.ideaActions
   const id = useId()
@@ -96,7 +96,7 @@ export default function AddKeywordForm({ dict, onAdd, onClose, projectId = null,
           <Button type="button" variant="ghost" onClick={onClose}>{a.keywordCancel}</Button>
         </div>
       </div>
-      {shownOverlap && <OverlapHint className="mt-3" overlap={shownOverlap} language={language} busy={saving} onCreateAnyway={() => void add(true)} />}
+      {shownOverlap && <OverlapHint className="mt-3" overlap={shownOverlap} uiLocale={uiLocale} busy={saving} onCreateAnyway={() => void add(true)} />}
     </form>
   )
 }

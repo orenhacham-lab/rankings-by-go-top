@@ -3,9 +3,7 @@
  * the same way on every widget. Search Console figures are whole clicks and
  * impressions; a position keeps one decimal.
  */
-function locale(language: string): string {
-  return language === 'he' ? 'he-IL' : 'en-US'
-}
+import { intlLocaleOf as locale } from '@/lib/i18n/locales'
 
 export function formatCount(n: number, language: string): string {
   return new Intl.NumberFormat(locale(language), { maximumFractionDigits: 0 }).format(Math.round(n))

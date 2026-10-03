@@ -327,7 +327,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
 
             {/* Monthly report: the weekly-email switch (off by default; nothing sends yet). */}
             <WeeklyEmailCard projectId={project.id} language={language} />
-            <ReminderEmailsCard projectId={project.id} language={language} />
+            <ReminderEmailsCard projectId={project.id} uiLocale={uiLocale} />
 
             <DangerZone project={project} deleteLabels={dict.projects.deleteDialog} t={t} />
           </div>

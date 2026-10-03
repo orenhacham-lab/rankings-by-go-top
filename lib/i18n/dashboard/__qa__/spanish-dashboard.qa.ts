@@ -310,24 +310,16 @@ check('7a: the chrome every screen shows is translated',
   ['sidebar', 'workspace', 'common', 'waitingCard', 'topBarActions'].every((s) => sections.includes(s)))
 check('7b: coverage is reported, not asserted at a number that would need editing per commit', pct > 0 && pct <= 100)
 
-// The twelve screens that still take `language` as a prop rather than reading
-// the provider: they show English words on a Spanish dashboard until the wave
-// that threads uiLocale through their parents. Named here so the gap is a list,
-// not a surprise.
+// ONE file is still allowed to read the dictionary with the bilingual
+// language, and it is not a gap: `projects/new/page.tsx` is FROZEN, because
+// lib/onboarding/__qa__/onboarding-surfaces.qa.ts pins its sha256 — it is what
+// the flag-off route renders. The twelve prop-driven screens this list used to
+// name now take `uiLocale`, so a screen that reappears here is a regression.
 const propDriven = [
-  'components/reminders/ReminderEmailsCard.tsx', 'components/content/TopicPlanDrawer.tsx',
-  'components/content/OverlapHint.tsx', 'components/content/AutomationSchedule.tsx',
-  'components/content/InternalLinkIndexStatus.tsx', 'components/content/ArticleInternalLinkApplyPanel.tsx',
-  'components/content/AutomationIdeas.tsx', 'components/content/NewTopicsLinkPlanPanel.tsx',
-  'components/content/workspace/ExistingContentScreen.tsx', 'components/content-strategy/ContentStrategyScreen.tsx',
-  'components/keyword-research/TrendModal.tsx', 'components/keyword-research/AIQuestionsModal.tsx',
-  // Not prop-driven — FROZEN. lib/onboarding/__qa__/onboarding-surfaces.qa.ts
-  // pins this page's sha256, because it is what the flag-off route renders, so
-  // it keeps reading the bilingual language on purpose.
   'app/(dashboard)/projects/new/page.tsx',
 ]
 const stillPropDriven = propDriven.filter((f) => /getDashboardDictionary\(language\)/.test(src(f)))
-console.log(`  → ${stillPropDriven.length} screens are English on a Spanish dashboard (the language arrives as a prop, or the page is frozen)`)
+console.log(`  → ${stillPropDriven.length} screens are English on a Spanish dashboard (the frozen sign-up page)`)
 check('7c: no OTHER screen reads the dictionary with the bilingual language',
   (() => {
     const hits = execSync(

@@ -886,7 +886,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             status={status}
             isPublished={isPublished}
             contentHtml={contentHtml}
-            language={language}
+            uiLocale={uiLocale}
             onContentReplaced={resyncContentHtml}
             applyOutcome={ilpApplyOutcome}
             rollbackAvailable={ilpRollbackAvailable}

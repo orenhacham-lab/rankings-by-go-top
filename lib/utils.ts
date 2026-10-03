@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx'
 import { extendTailwindMerge } from 'tailwind-merge'
 import { formatDate as formatDateIn } from '@/lib/format/date'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /**
  * tailwind-merge only knows Tailwind's own scale, so it read the design tokens'
@@ -32,12 +32,12 @@ export function cn(...inputs: ClassValue[]) {
  * (lib/format/date.ts); a caller that does not pass the language gets Hebrew,
  * as every caller did before the language was a parameter.
  */
-export function formatDate(date: string | Date | null, lang: Locale = 'he'): string {
+export function formatDate(date: string | Date | null, lang: PublicLocale = 'he'): string {
   return formatDateIn(date, lang, 'full')
 }
 
 /** A day and its time, in the screen's language (lib/format/date.ts). */
-export function formatDateTime(date: string | Date | null, lang: Locale = 'he'): string {
+export function formatDateTime(date: string | Date | null, lang: PublicLocale = 'he'): string {
   return formatDateIn(date, lang, 'dateTime')
 }
 

@@ -55,6 +55,16 @@ export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-
 /** PayPal's own locale spelling, which uses an underscore and no others. */
 export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES' }
 
+/**
+ * The `Intl` tag of a language that reached us as a plain string — a prop typed
+ * `string`, a column, a cookie. The formatters used to answer `he-IL` for every
+ * value that was not English, which printed Spanish numbers and dates in Hebrew;
+ * this answers the table, and English for anything it does not know.
+ */
+export function intlLocaleOf(language: string): string {
+  return INTL_LOCALE[normalizePublicLocale(language) ?? 'en']
+}
+
 export function getLocaleConfig(locale: PublicLocale) {
   return LOCALE_CONFIG[locale]
 }
