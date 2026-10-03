@@ -286,7 +286,9 @@ export default function AIBusinessProfilePanel({
             ) : (
               <div className="mt-1 space-y-0.5" data-ai-profile-detected="">
                 <p className="text-copy text-body">
-                  <span className="text-muted">{t('profile_identified_as')}</span>
+                  {/* Hebrew's label ends in a maqaf, which joins the value; every
+                      other language needs the space between them. */}
+                  <span className="text-muted">{t('profile_identified_as')}</span>{isHebrew ? '' : ' '}
                   <span className="font-semibold text-ink">{identifiedLabel}</span>
                 </p>
                 <p className="text-caption text-muted">{t(sourceKey)}</p>
