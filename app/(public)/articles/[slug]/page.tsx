@@ -81,7 +81,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-canvas">
-        <PublicNav />
+        <PublicNav locale="he" />
         <div className={`${CONTAINER} max-w-4xl flex-1 pt-28 pb-20 lg:pt-32`}>
           <div role="status" aria-busy="true" className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-10">
             <span className="sr-only">טוען...</span>
@@ -104,7 +104,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   if (notFound || !article) {
     return (
       <div className="flex min-h-screen flex-col bg-canvas">
-        <PublicNav />
+        <PublicNav locale="he" />
         <main className="flex-1">
           <div className={`${CONTAINER} max-w-3xl pt-28 pb-16 lg:pt-32`}>
             <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: 'מאמר לא נמצא', href: '#' }]} />
@@ -121,7 +121,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
             </div>
           </div>
         </main>
-        <Footer />
+        <Footer locale="he" />
       </div>
     )
   }
@@ -156,7 +156,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <PublicNav />
+      <PublicNav locale="he" />
       <main className="flex-1">
         <div className={`${CONTAINER} max-w-4xl pt-28 pb-16 lg:pt-32 lg:pb-20`}>
           <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: article.title, href: '#' }]} />
@@ -246,7 +246,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
           </div>
         </div>
       </main>
-      <Footer />
+      <Footer locale="he" />
     </div>
   )
 }

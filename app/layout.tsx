@@ -10,6 +10,7 @@ import { getSiteMetadata } from '@/lib/i18n/site-metadata'
 import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
 import { GoogleTags } from '@/components/consent/GoogleTags'
+import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
 
 /**
  * The two faces of the type system (see --font-sans in globals.css): Inter for
@@ -159,6 +160,9 @@ export default async function RootLayout({
           who can neither be asked for consent nor withdraw it.
         */}
         <GoogleTags />
+        {/* <html lang/dir> is rendered once, above every changing segment; this
+            re-states it after a client-side navigation into another language. */}
+        <DocumentLocaleSync />
         <RootThemeProvider>
           {children}
           <PublicSiteWidgets isAuthenticated={isAuthenticated} />

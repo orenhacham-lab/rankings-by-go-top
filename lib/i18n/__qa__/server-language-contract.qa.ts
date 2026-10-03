@@ -530,6 +530,55 @@ async function main() {
       !/languageCookieString|document\.cookie/.test(switcher))
   }
 
+  console.log('\n8h) THE SHARED NAV AND FOOTER TAKE THE PAGE\'S OWN LANGUAGE')
+  {
+    // The owner found /en/free-check rendering a HEBREW footer (3 October
+    // 2026): the page wrote `<Footer />` with no locale, and the default is
+    // Hebrew. A default that is a real language is the trap — the component
+    // renders happily and nobody notices until a reader does. So every public
+    // page states the locale, and the tree it lives in says which.
+    const fs = require('fs') as typeof import('fs')
+    const walk = (dir: string): string[] => fs.readdirSync(join(ROOT, dir), { withFileTypes: true })
+      .flatMap((e) => e.isDirectory() ? walk(`${dir}/${e.name}`) : (e.name === 'page.tsx' ? [`${dir}/${e.name}`] : []))
+    const treeLocale = (file: string) => /^app\/\(public\)\/en\//.test(file) ? 'en'
+      : /^app\/\(public\)\/es\//.test(file) ? 'es' : 'he'
+    const offenders: string[] = []
+    for (const file of walk('app/(public)')) {
+      const src = fs.readFileSync(join(ROOT, file), 'utf8')
+      for (const tag of ['Footer', 'PublicNav']) {
+        for (const m of src.matchAll(new RegExp(`<${tag}(\\s[^>]*)?/?>`, 'g'))) {
+          const attrs = m[1] ?? ''
+          const stated = /locale=\{?["']?([a-z]{2})/.exec(attrs)?.[1]
+            ?? (/locale=\{locale\}/.test(attrs) ? treeLocale(file) : undefined)
+          if (stated !== treeLocale(file)) offenders.push(`${file}: <${tag}${attrs}> in the ${treeLocale(file)} tree`)
+        }
+      }
+    }
+    check('8h: every public page gives the nav and the footer its own language', offenders.length === 0,
+      offenders.slice(0, 4).join(' | '))
+    // The component's default is what made the bug silent, so it is pinned:
+    // if someone changes it, this says so rather than the reader finding out.
+    const footerSrc = require('fs').readFileSync(join(ROOT, 'components', 'Footer.tsx'), 'utf8')
+    check('8h1: …and the Footer default is still Hebrew, which is why the prop is required above',
+      /locale = 'he'/.test(footerSrc))
+
+    // The other half of the same report: the words changed language on a
+    // client-side switch and the DIRECTION did not, because <html lang/dir> is
+    // rendered by the root layout, above every changing segment.
+    const sync = require('fs').readFileSync(join(ROOT, 'components', 'DocumentLocaleSync.tsx'), 'utf8')
+    const rootLayoutSrc = require('fs').readFileSync(join(ROOT, 'app', 'layout.tsx'), 'utf8')
+    check('8i: the root layout mounts the document-locale sync', /<DocumentLocaleSync \/>/.test(rootLayoutSrc))
+    check('8i1: …which re-states lang and dir on every navigation that names a language',
+      /usePathname\(\)/.test(sync) && /routePublicLocale\(pathname\)/.test(sync)
+      && /el\.lang = lang/.test(sync) && /el\.dir = dir/.test(sync))
+    check('8i2: …and says nothing on a bilingual route, where the user\'s preference decides',
+      /if \(!locale\) return/.test(sync))
+    check('MUTATION CONTROL: a layout without the sync is caught',
+      !/<DocumentLocaleSync \/>/.test(rootLayoutSrc.replace('<DocumentLocaleSync />', '')))
+    check('MUTATION CONTROL: a sync that guesses on bilingual routes is caught',
+      !/if \(!locale\) return/.test(sync.replace('if (!locale) return', "const l = locale ?? 'he'")))
+  }
+
   console.log('\n9) LOCALIZED DOCUMENT METADATA')
   {
     const he = getSiteMetadata('he')
