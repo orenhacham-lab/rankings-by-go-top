@@ -63,6 +63,7 @@ export default function SitemapPage() {
         { label: 'התחילו ניסיון חינם', href: authHref('signup', 'he') },
         { label: 'מדיניות פרטיות', href: '/privacy' },
         { label: 'תקנון ותנאי שימוש', href: '/terms' },
+        { label: 'מדיניות ביטול והחזרים', href: '/refund-policy' },
       ],
     },
   ]

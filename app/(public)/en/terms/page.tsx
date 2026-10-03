@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
@@ -105,10 +106,10 @@ export default function EnglishTermsPage() {
       <section>
         <h2>7. Refunds</h2>
         <p>
-          As a rule, subscription fees are non-refundable for a period that has already begun or been
-          paid. The Company may, at its sole discretion or as required by law, grant a refund in
-          exceptional circumstances. Refund requests should be submitted in writing to the
-          Company&rsquo;s email address.
+          Subscription fees are non-refundable for a period that has already begun or been paid,
+          except where the law requires a refund. Requests to cancel under the law should be
+          submitted in writing to the Company&rsquo;s email address. Full details are in our{' '}
+          <Link href="/en/refund-policy">Cancellation and Refund Policy</Link>.
         </p>
       </section>
 
@@ -469,10 +470,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This document is a business draft. We recommend having it reviewed by legal counsel before
-          final use.
-          <br />
-          Last updated: September 29, 2026
+          Last updated: October 3, 2026
         </p>
       </section>
     </LegalDoc>

@@ -14,7 +14,8 @@
  *
  * Also: the product name is "Go Top SEO" (never the old name) in the six pages'
  * text and metadata, source comments stripped; the last-updated line is
- * 29 September 2026; Hebrew and English carry the same number of sections.
+ * 3 October 2026 on the terms (refunds aligned with the refund policy) and
+ * 29 September 2026 on the others; Hebrew and English carry the same number of sections.
  *
  * MUTATION CONTROL. Every single pattern below is re-run against a copy of the
  * real text with that pattern's matches removed, and must then fail.
@@ -117,15 +118,17 @@ const OLD_NAME = /Rankings by Go Top/i
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  const dated = lang === 'he' ? /29 בספטמבר 2026/ : /September 29, 2026/
+  const dated = doc === 'terms'
+    ? (lang === 'he' ? /3 באוקטובר 2026/ : /October 3, 2026/)
+    : (lang === 'he' ? /29 בספטמבר 2026/ : /September 29, 2026/)
   const hit = dated.exec(p.body)
   const body = hit ? p.body.slice(0, hit.index + hit[0].length) : p.body
   check(`${lang} ${doc}: the old product name is gone from the text, metadata and code`, !OLD_NAME.test(body) && !OLD_NAME.test(p.meta) && !OLD_NAME.test(p.src))
   check(`${lang} ${doc}: the page names GO TOP`, /Go Top SEO/.test(p.text) && /Go Top SEO/.test(p.meta))
-  check(`${lang} ${doc}: last updated 29 September 2026`, dated.test(p.text))
+  check(`${lang} ${doc}: last updated ${doc === 'terms' ? '3 October' : '29 September'} 2026`, dated.test(p.text))
 }
 check('MUTATION — the old name put back into a page is caught', OLD_NAME.test(pages.en.terms.src + ' Rankings by Go Top') && !OLD_NAME.test(pages.en.terms.src))
-check('MUTATION — an old last-updated date is caught', !/September 29, 2026/.test(pages.en.terms.text.replace('September 29, 2026', 'May 2026')))
+check('MUTATION — an old last-updated date is caught', !/October 3, 2026/.test(pages.en.terms.text.replace('October 3, 2026', 'September 29, 2026')))
 
 // Hebrew and English stay in step.
 for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
