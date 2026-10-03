@@ -18,6 +18,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { readSiteMap } from '@/lib/content/existing-content/site-map-store'
 import { autoLinkCandidates, autoLinkHost, selectAutoLinks } from './select'
 import { AUTO_SOURCE, type AutoLinkEntry } from './entries'
+import { DEFAULT_CONTENT_LANGUAGE, normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -71,13 +72,13 @@ async function run(admin: Admin, input: AutoLinkStepInput, env: Record<string, s
 
   let primaryKeyword: string | null = null
   let secondaryKeywords: string[] = []
-  let language: 'he' | 'en' = 'he'
+  let language: ContentLanguage = DEFAULT_CONTENT_LANGUAGE
   if (article.topic_id) {
     const { data: topic } = await admin.from('article_topics').select('primary_keyword, secondary_keywords, language').eq('id', article.topic_id).eq('project_id', projectId).maybeSingle()
     const tp = topic as { primary_keyword?: string | null; secondary_keywords?: unknown; language?: string | null } | null
     primaryKeyword = tp?.primary_keyword ?? null
     secondaryKeywords = Array.isArray(tp?.secondary_keywords) ? (tp!.secondary_keywords as unknown[]).filter((s): s is string => typeof s === 'string') : []
-    language = String(tp?.language ?? '').toLowerCase().startsWith('en') ? 'en' : 'he'
+    language = normalizeContentLanguage(tp?.language)
   }
 
   const articleIn = { title: String(article.title ?? ''), slug: article.slug, primaryKeyword, secondaryKeywords, html: article.content_html, language }

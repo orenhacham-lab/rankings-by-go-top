@@ -212,6 +212,7 @@ export default function ProjectForm({
             options={withCurrentOption([
               { value: 'he', label: f.languageHe },
               { value: 'en', label: f.languageEn },
+              { value: 'es', label: f.languageEs },
               { value: 'ar', label: f.languageAr },
             ], startLanguage, (code) => languageName(code, language))}
           />

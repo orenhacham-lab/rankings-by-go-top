@@ -6,7 +6,10 @@
  * future AI-backed generator can replace the body without changing callers.
  */
 
-export type SuggestionLanguage = 'he' | 'en'
+import type { ContentLanguage } from './language'
+
+/** Alias kept for the existing importers; the content language is one type. */
+export type SuggestionLanguage = ContentLanguage
 export type SuggestionIntent =
   | 'informational'
   | 'commercial'
@@ -34,6 +37,15 @@ const EN_BASE = (kw: string): string[] => [
   `Best ${kw}: what should you compare?`,
 ]
 
+const ES_BASE = (kw: string): string[] => [
+  `¿Cómo elegir ${kw}?`,
+  `${kw}: qué revisar antes de comprar`,
+  `${kw}: guía completa para principiantes`,
+  `¿Cuánto cuesta ${kw}?`,
+  `Errores comunes al elegir ${kw}`,
+  `Mejor ${kw}: ¿qué conviene comparar?`,
+]
+
 /** A couple of intent-flavoured extras so the list feels tailored. */
 const HE_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   comparison: (kw) => [`${kw}: השוואה בין האפשרויות הפופולריות`, `מה ההבדל בין סוגי ${kw}?`],
@@ -51,6 +63,18 @@ const EN_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`Everything you need to know about ${kw}`],
 }
 
+const ES_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}: comparación de las opciones más populares`, `¿Qué diferencia hay entre los tipos de ${kw}?`],
+  commercial: (kw) => [`${kw} — cómo elegir bien y no arrepentirse`, `¿En qué fijarse al comprar ${kw}?`],
+  local: (kw) => [`${kw}: cómo elegir un proveedor local de confianza`],
+  transactional: (kw) => [`¿Cuándo conviene pedir ${kw} — y a quién?`],
+  informational: (kw) => [`Todo lo que hay que saber sobre ${kw}`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE }
+const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT }
+
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.
  * Returns [] for an empty keyword.
@@ -64,8 +88,8 @@ export function suggestTopics(
   const kw = keyword.trim()
   if (!kw) return []
 
-  const base = language === 'he' ? HE_BASE(kw) : EN_BASE(kw)
-  const intentExtra = (language === 'he' ? HE_INTENT : EN_INTENT)[intent]?.(kw) ?? []
+  const base = BASE[language](kw)
+  const intentExtra = INTENT[language][intent]?.(kw) ?? []
 
   // Intent-flavoured topics first so the list feels tailored, then the base set.
   const seen = new Set<string>()

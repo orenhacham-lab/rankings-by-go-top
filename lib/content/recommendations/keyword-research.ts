@@ -22,6 +22,8 @@ import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/
 import { tokens, slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
 import type { TopicSuggestion } from './types'
+import { languageNameInEnglish } from '@/lib/content/language'
+import { REASON_TEXT } from './reason-text'
 
 // Phase 3F.3.1 — broadened (but still bounded) so the source doesn't exhaust
 // after ~2 runs: more URL seeds, an extra keyword-seed pass, a larger raw pool.
@@ -314,7 +316,7 @@ export interface ClustersToTopicsResult { topics: GeminiClusterTopic[]; rejected
 /** Pure prompt builder (exported for snapshot tests — proves the instructions
  *  are actually present in the request). */
 export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): string {
-  const langLabel = language === 'he' ? 'Hebrew' : 'English'
+  const langLabel = languageNameInEnglish(language)
   const year = new Date().getFullYear()
   return [
     `You are an SEO editor turning RAW Google keyword data into a small set of high-quality article topics for a website. Today's year is ${year}.`,
@@ -539,9 +541,8 @@ export async function recommendFromKeywordResearch(
       ...(Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : []),
       ...merged.map((c) => c.primaryKeyword),
     ])).slice(0, 4)
-    const reasonBase = language === 'he'
-      ? `נמצא בנתוני חיפוש עם כ-${volume.toLocaleString('he-IL')} חיפושים חודשיים`
-      : `Found in search data with ~${volume.toLocaleString('en-US')} monthly searches`
+    const reasonText = REASON_TEXT[language]
+    const reasonBase = reasonText.foundInSearchData(volume.toLocaleString(reasonText.numberLocale))
     const editorial = (g.evidenceSummary && g.evidenceSummary.trim()) || (g.reason && g.reason.trim()) || ''
     suggestions.push({
       id: `keyword_research_url:${slugKey(cluster.primaryKeyword)}`,

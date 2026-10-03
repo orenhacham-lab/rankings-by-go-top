@@ -16,6 +16,8 @@ import sharp from 'sharp'
 import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { imageStylePrompt } from '@/lib/content/article-style/image-prompt'
 import type { HeroRatio, ImageStyle } from '@/lib/content/article-style/types'
+import { type ContentLanguage } from '@/lib/content/language'
+import { languageNameInEnglish, normalizeContentLanguage } from '@/lib/content/language'
 
 export interface GeneratedImage {
   data: Buffer
@@ -108,7 +110,7 @@ export function buildImagePrompt(input: {
   title: string
   topic?: string | null
   imagePrompt?: string | null
-  language?: 'he' | 'en'
+  language?: ContentLanguage
   /** The project's image style (lib/content/article-style); absent is the realistic photo it always was. */
   style?: ImageStyle | null
   /** Brand colours an illustrated style builds its palette around. */
@@ -153,25 +155,30 @@ export function buildImagePrompt(input: {
  * On any failure it returns a safe deterministic fallback. This is what gets
  * stored as featured_image_prompt and fed (sanitized) to the image model.
  */
+/** The concept used when no model call is possible, in the content language. */
+const CONCEPT_FALLBACK: Record<ContentLanguage, (subject: string) => string> = {
+  he: (s) => `סצנה עריכתית פרימיום, נקייה ופוטוריאליסטית בנושא ${s || 'התוכן'}, גנרית ולא ממותגת, ללא לוגו, ללא טקסט וללא אריזות רשמיות.`,
+  en: (s) => `A premium, clean, photorealistic editorial scene about ${s || 'the topic'}, generic and unbranded, no logo, no text, no official packaging.`,
+  es: (s) => `Una escena editorial premium, limpia y fotorrealista sobre ${s || 'el tema'}, genérica y sin marca, sin logotipos, sin texto y sin envases oficiales.`,
+}
+
 export async function writeCommercialSafeConcept(input: {
   title: string
   excerpt?: string | null
   topic?: string | null
   primaryKeyword?: string | null
-  language?: 'he' | 'en'
+  language?: ContentLanguage
 }): Promise<string> {
-  const lang: 'he' | 'en' = input.language === 'en' ? 'en' : 'he'
+  const lang = normalizeContentLanguage(input.language)
   const fallback = (): string => {
     const base = sanitizeImageConceptForCommercialUse(input.title || input.topic || '')
-    return lang === 'he'
-      ? `סצנה עריכתית פרימיום, נקייה ופוטוריאליסטית בנושא ${base || 'התוכן'}, גנרית ולא ממותגת, ללא לוגו, ללא טקסט וללא אריזות רשמיות.`
-      : `A premium, clean, photorealistic editorial scene about ${base || 'the topic'}, generic and unbranded, no logo, no text, no official packaging.`
+    return CONCEPT_FALLBACK[lang](base)
   }
 
   const client = getGeminiClient()
   if (!client) return fallback()
   const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
-  const outLang = lang === 'he' ? 'Hebrew' : 'English'
+  const outLang = languageNameInEnglish(lang)
   const ctx = [input.excerpt, input.topic, input.primaryKeyword].map((x) => (x || '').trim()).filter(Boolean).join(' | ')
   const prompt = [
     `Write ONE concise ${outLang} visual concept (1-2 sentences) for a PREMIUM EDITORIAL blog hero image about the article below.`,
@@ -209,7 +216,7 @@ export async function generateArticleImage(input: {
   title: string
   topic?: string | null
   imagePrompt?: string | null
-  language?: 'he' | 'en'
+  language?: ContentLanguage
   style?: ImageStyle | null
   brandColors?: readonly string[]
   aspectRatio?: HeroRatio

@@ -45,6 +45,7 @@ export type PromptIntent =
   | 'gift'
 
 import type { QuestionWorth } from './question-worth'
+import { normalizeContentLanguage } from '@/lib/content/language'
 
 export type BusinessCategory =
   | 'agency'
@@ -2905,6 +2906,12 @@ export function normalizeLanguage(
   if (v === 'en' || v === 'eng' || v.startsWith('english') || v.startsWith('en-') || v.startsWith('en_')) return 'en'
   // 'iw' is the legacy ISO code for Hebrew.
   if (v === 'he' || v === 'iw' || v.startsWith('hebrew') || v.startsWith('he-') || v.startsWith('he_')) return 'he'
+  // A latin-script content language this layer has no templates for yet (Spanish)
+  // behaves far better as English than as Hebrew: the question openings, the
+  // capitalization and the latin-token heuristics below are all script-sensitive,
+  // and Hebrew regexes match nothing in Spanish prose. Spanish question templates
+  // are still to be written — see toHebrewOrEnglish in lib/content/language.ts.
+  if (normalizeContentLanguage(v) === 'es') return 'en'
   // Anything else (e.g. 'ar') — default to the safe fallback. Fallback questions
   // only support he/en, so we keep the experience coherent.
   return fallback

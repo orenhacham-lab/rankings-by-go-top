@@ -20,6 +20,8 @@ import { normalizePhrase } from './keyword-guard'
 import { subjectTokens, type EntityPageType } from './link-role-mapper'
 import { constructStateVariants } from './semantic-dup'
 import type { SearchIntent } from './opportunity'
+import { type ContentLanguage } from '@/lib/content/language'
+import { REASON_TEXT, demandSentence } from './reason-text'
 
 const toks = (s: string) => subjectTokens(s)
 
@@ -279,22 +281,20 @@ const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:(?:ביקוש|נפח)\s+(?:חי
 export function sanitizeDemandLanguage(
   reason: string,
   demand: DemandEvidence,
-  language: 'he' | 'en',
+  language: ContentLanguage,
 ): string {
   let base = (reason || '').replace(DEMAND_CLAIM_RE, ' ').replace(/\s{2,}/g, ' ').replace(/\s+([.,;])/g, '$1').trim()
   if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) {
     const v = demand.avgMonthlySearches as number
-    const factual = language === 'he'
-      ? `לפי מחקר מילות מפתח, ל"${demand.demandQuery}" יש כ־${v} חיפושים חודשיים.`
-      : `Keyword research shows ~${v} monthly searches for "${demand.demandQuery}".`
-    base = base ? `${base} ${factual}` : factual
+    const factual = demandSentence(language, demand.demandQuery, v)
+    if (factual) base = base ? `${base} ${factual}` : factual
   }
   return base
 }
 
 // Malformed markers: a dangling connective at the end, or a broken comparison
 // fragment (a connective immediately followed by another connective, e.g. "בעל לבין").
-const DANGLING_END_RE = /(?:^|\s)(?:בין|לבין|בעל|בעלת|של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|the|with|to|vs)\s*$/i
+const DANGLING_END_RE = /(?:^|\s)(?:בין|לבין|בעל|בעלת|של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|the|with|to|vs|y|o|de|del|para|con|entre|por|seg[úu]n|sobre|en|el|la|los|las|un|una|que)\s*$/i
 // No \b — JS word boundaries do not apply around Hebrew letters.
 const BROKEN_FRAGMENT_RE = /(?:^|\s)(?:בעל|בין)\s+(?:לבין|בין|בעל|של)(?:\s|$)|(?:^|\s)בין\s+\S{1,3}\s+לבין(?:\s|$)/
 // Broken Hebrew preposition chains (GENERAL, not a literal blacklist): a standalone
@@ -317,10 +317,8 @@ export function isMalformedReason(reason: string): boolean {
   return DANGLING_END_RE.test(t) || BROKEN_FRAGMENT_RE.test(t) || ADJ_PREPOSITION_RE.test(t)
 }
 
-function neutralReason(language: 'he' | 'en'): string {
-  return language === 'he'
-    ? 'הנושא רלוונטי לתחום הפעילות של העסק ולביטויי החיפוש שנמצאו במחקר.'
-    : 'The topic is relevant to the business and to the search terms found in research.'
+function neutralReason(language: ContentLanguage): string {
+  return REASON_TEXT[language].neutral
 }
 
 /**
@@ -331,16 +329,14 @@ function neutralReason(language: 'he' | 'en'): string {
 export function finalizeReason(
   modelReason: string,
   demand: DemandEvidence,
-  language: 'he' | 'en',
+  language: ContentLanguage,
 ): string {
   const stripped = (modelReason || '').replace(DEMAND_CLAIM_RE, ' ').replace(/\s{2,}/g, ' ').replace(/\s+([.,;])/g, '$1').trim()
   const base = isMalformedReason(stripped) ? neutralReason(language) : stripped
   if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) {
     const v = demand.avgMonthlySearches as number
-    const factual = language === 'he'
-      ? `לפי מחקר מילות מפתח, ל"${demand.demandQuery}" יש כ־${v} חיפושים חודשיים.`
-      : `Keyword research shows ~${v} monthly searches for "${demand.demandQuery}".`
-    return `${base} ${factual}`
+    const factual = demandSentence(language, demand.demandQuery, v)
+    if (factual) return `${base} ${factual}`
   }
   return base
 }

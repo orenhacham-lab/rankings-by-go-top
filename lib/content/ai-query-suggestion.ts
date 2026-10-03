@@ -12,7 +12,10 @@
  * they cite the article to someone who does not know it yet.
  */
 
-export type SuggestionLanguage = 'he' | 'en'
+import { normalizeContentLanguage, type ContentLanguage } from './language'
+
+/** Alias kept for the existing importers; the content language is one type. */
+export type SuggestionLanguage = ContentLanguage
 
 export interface AiQuerySuggestionInput {
   /** The topic's primary keyword. The title is used only when there is none. */
@@ -26,18 +29,21 @@ export interface AiQuerySuggestionInput {
 const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   he: /^(?:מה|מהו|מהי|מהם|מהן|איך|כיצד|למה|מדוע|כמה|איפה|היכן|מתי|האם|איזה|איזו|אילו|מי)(?:\s|$)/,
   en: /^(?:what|how|why|which|where|when|who|is|are|can|should|do|does)\b/i,
+  es: /^(?:qu[ée]|c[oó]mo|por\s+qu[ée]|cu[áa]l|cu[áa]les|d[oó]nde|cu[áa]ndo|qui[ée]n|cu[áa]nto|cu[áa]nta|cu[áa]ntos|cu[áa]ntas|es|son|puedo|debo|hay|conviene|sirve|vale)\b/i,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
 const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   he: /(?:^|\s)(?:הכי\s+טוב\S*|מומלצ\S*|הטוב\S*\s+ביותר|טופ)(?:\s|$)/,
   en: /\b(?:best|top|recommended)\b/i,
+  es: /\b(?:mejor|mejores|recomendad\w*|top)\b/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
 const BUY: Record<SuggestionLanguage, RegExp> = {
   he: /^(?:קניית|קנייה של|רכישת|הזמנת)\s/,
   en: /^(?:buy|buying|order|ordering)\s/i,
+  es: /^(?:comprar|compra de|comprando|pedir|encargar|contratar)\s/i,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -51,6 +57,11 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     buy: (k) => `What should I check before ${k.replace(/^buy\s/i, 'buying ').replace(/^order\s/i, 'ordering ')}?`,
     general: (k) => `What should I know about ${k}?`,
   },
+  es: {
+    recommend: (k) => `Busco ${k.replace(/^el\s+|^la\s+|^los\s+|^las\s+/i, '')}. ¿Qué me recomiendas?`,
+    buy: (k) => `¿Qué debo revisar antes de ${k.replace(/^compra de\s/i, 'comprar ')}?`,
+    general: (k) => `¿Qué debo saber sobre ${k}?`,
+  },
 }
 
 const MIN_LEN = 3
@@ -59,7 +70,7 @@ const MAX_LEN = 160
 const collapse = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim()
 
 export function suggestionLanguage(l: string | null | undefined): SuggestionLanguage {
-  return String(l ?? '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  return normalizeContentLanguage(l)
 }
 
 /** Second-level suffixes and platform hosts that are never the brand part of a domain. */
@@ -109,7 +120,7 @@ export function suggestAiQuery(input: AiQuerySuggestionInput): string | null {
   else question = TEMPLATES[lang].general(keyword)
 
   question = collapse(question)
-  if (lang === 'en') question = question.charAt(0).toUpperCase() + question.slice(1)
+  if (lang !== 'he') question = question.replace(/\p{L}/u, (c) => c.toUpperCase())
   if (question.length > MAX_LEN) return null
   if (mentionsBrand(question, input.brandTerms)) return null
   return question

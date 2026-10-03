@@ -16,6 +16,7 @@
 import { normalizePhrase } from './keyword-guard'
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
+import { contentScript, normalizeContentLanguage } from '@/lib/content/language'
 
 export type KeywordEntityType = 'generic_query' | 'own_brand' | 'suspected_external_business'
 
@@ -165,7 +166,7 @@ export type ContentScript = 'hebrew' | 'latin'
 /** Map a project's language code to the script its content is written in. Mirrors
  *  the engine's own `language` derivation (anything starting 'en' is English). */
 export function scriptOfContentLanguage(language: string | null | undefined): ContentScript {
-  return String(language || '').toLowerCase().startsWith('en') ? 'latin' : 'hebrew'
+  return contentScript(normalizeContentLanguage(language))
 }
 
 /**

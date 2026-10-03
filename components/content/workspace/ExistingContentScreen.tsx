@@ -59,6 +59,7 @@ import KindTabs from './existing/KindTabs'
 import ContentTable from './existing/ContentTable'
 import ExistingSkeleton from './existing/ExistingSkeleton'
 import { fill } from './existing/format'
+import { toHebrewOrEnglish } from '@/lib/content/language'
 
 const PAGE_SIZE = PAGE_LIMIT_DEFAULT
 const POLL_MS = 2500
@@ -257,7 +258,9 @@ export default function ExistingContentScreen() {
     setCreating(item.key)
     try {
       const lang = topicLanguage(selectedProject?.language)
-      const copy = getDashboardDictionary(lang).existingContent.supportTopic
+      // The topic itself carries the CONTENT language; the copy comes from the
+      // dashboard dictionary, which has no Spanish yet (see toHebrewOrEnglish).
+      const copy = getDashboardDictionary(toHebrewOrEnglish(lang)).existingContent.supportTopic
       const res = await fetch('/api/content/topics', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(supportTopicBody({ ...item, title: item.isHome ? x.homePage : item.title }, projectId, lang, copy)),

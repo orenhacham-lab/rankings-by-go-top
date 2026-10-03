@@ -624,11 +624,11 @@ export default function ArticleBriefModal({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <span id="brief-lang-label" className={FIELD_LABEL_CLASSES}>{t.language}</span>
-            <Segmented<'he' | 'en'>
+            <Segmented<SuggestionLanguage>
               ariaLabel={t.language}
               value={briefLang}
               onChange={(l) => setBriefLang(l)}
-              options={[{ value: 'he', label: t.languageHe }, { value: 'en', label: t.languageEn }]}
+              options={[{ value: 'he', label: t.languageHe }, { value: 'en', label: t.languageEn }, { value: 'es', label: t.languageEs }]}
               className="w-fit"
             />
           </div>

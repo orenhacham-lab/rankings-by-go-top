@@ -35,6 +35,8 @@ import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
 import { isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { RecommendationSource, RecommendationResult, TopicSuggestion, SuggestedInternalLink } from './types'
+import { languageNameInEnglish, normalizeContentLanguage } from '@/lib/content/language'
+import { REASON_TEXT } from './reason-text'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -345,8 +347,8 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     .eq('id', input.projectId)
     .maybeSingle()
   const project = (projRow as ProjectRow | null) ?? { id: input.projectId, business_name: null, target_domain: null, country: null, language: null }
-  const language: 'he' | 'en' = String(project.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
-  const langLabel = language === 'he' ? 'Hebrew' : 'English'
+  const language = normalizeContentLanguage(project.language)
+  const langLabel = languageNameInEnglish(language)
   const country = (project.country || 'IL').toUpperCase()
   const businessCtx = [project.business_name, project.target_domain].filter(Boolean).join(' — ')
 
@@ -552,7 +554,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
           if (!s) return null
           const fit = assessProjectKeywordFit(s.primaryKeyword, { businessName: project.business_name, category: null })
           s.suggestionScore = Number(Math.min(1, 0.6 + (fit === 'aligned' ? 0.2 : fit === 'weak' ? 0.1 : 0)).toFixed(2))
-          if (!s.suggestionReason) s.suggestionReason = language === 'he' ? 'נושא משלים לפי נתוני האתר' : 'A supporting topic based on the site data'
+          if (!s.suggestionReason) s.suggestionReason = REASON_TEXT[language].supportingTopic
           return s
         }).filter((x): x is TopicSuggestion => !!x)
         return { items, ok, retryable, errorType }

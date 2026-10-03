@@ -40,7 +40,7 @@
  * limited here.
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { suggestAiQuery, suggestionLanguage } from '@/lib/content/ai-query-suggestion'
+import { suggestAiQuery, suggestionLanguage, type SuggestionLanguage } from '@/lib/content/ai-query-suggestion'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -88,7 +88,7 @@ export function articleQuestion(
   project: Pick<ProjectRow, 'name' | 'business_name' | 'target_domain' | 'language'> | null,
   topic: { primary_keyword?: string | null; language?: string | null } | null,
   title: string | null,
-): { prompt: string; language: 'he' | 'en' } | null {
+): { prompt: string; language: SuggestionLanguage } | null {
   const language = suggestionLanguage(topic?.language || project?.language || '')
   const prompt = suggestAiQuery({
     keyword: topic?.primary_keyword,

@@ -19,6 +19,7 @@ import {
 import { runArticleAudit, thresholdsFor, auditSummary, includesKw, type AuditResult, type AuditSummary } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
+import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -128,8 +129,76 @@ const FAILURE_HINT: Record<string, string> = {
   anchor_inserted_mechanically: 'integrate each link into a genuinely relevant sentence — no "read more", "click here", "אתר כמו", "למידע נוסף"',
 }
 
+/**
+ * Every language-dependent string this file EMITS into the article (as opposed to
+ * instructs the model about). Keyed by content language so adding a language is a
+ * compile error here rather than a silent fall-through to English — which is how
+ * Spanish would otherwise have been written.
+ */
+const ARTICLE_TEXT: Record<SuggestionLanguage, {
+  toc: string
+  faqHeading: string
+  /** "In this context, <link> is a key option worth knowing." */
+  anchorSentence: (link: string) => string
+  /** The same sentence for a phrase that carries no link. */
+  phraseSentence: (phrase: string) => string
+}> = {
+  he: {
+    toc: 'תוכן העניינים',
+    faqHeading: 'שאלות נפוצות',
+    anchorSentence: (link) => ` בהקשר זה, ${link} הוא אחד הגורמים המרכזיים שכדאי להכיר.`,
+    phraseSentence: (phrase) => ` בהקשר זה, כדאי להכיר מקרוב גם ${phrase}.`,
+  },
+  en: {
+    toc: 'Table of contents',
+    faqHeading: 'Frequently Asked Questions',
+    anchorSentence: (link) => ` In this context, ${link} is a key option worth knowing.`,
+    phraseSentence: (phrase) => ` In this context, it is also worth exploring ${phrase}.`,
+  },
+  es: {
+    toc: 'Tabla de contenidos',
+    faqHeading: 'Preguntas frecuentes',
+    anchorSentence: (link) => ` En este contexto, ${link} es una de las opciones clave que conviene conocer.`,
+    phraseSentence: (phrase) => ` En este contexto, también conviene conocer de cerca ${phrase}.`,
+  },
+}
+
+/** Natural transition words to hand the model, in the language it writes in. */
+const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
+  he: 'בנוסף, לכן, עם זאת, למשל, לסיכום',
+  en: 'additionally, therefore, however, for example, in summary',
+  es: 'además, por lo tanto, sin embargo, por ejemplo, en resumen',
+}
+
+/** The filler opening to warn the model off, written in the language it writes in. */
+const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
+  he: 'e.g. "בעולם שבו כולם מחפשים…"',
+  en: 'e.g. "In a world where everyone is looking for…"',
+  es: 'e.g. "En un mundo donde todos buscan…"',
+}
+
+/** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
+const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
+  he: 'In Hebrew, write naturally for Israeli readers.',
+  en: 'Write naturally for a general English-speaking audience.',
+  es: 'Write naturally for Spanish-speaking readers in neutral Spanish that reads well in Spain and in Latin America alike.',
+}
+
+/** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
+const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
+  he: [
+    `- Hebrew writing quality: VARY sentence and paragraph openings — do not start many consecutive sentences/paragraphs with the same word (avoid over-using "בנוסף", "אחד", "היתרון", "המשמעות", "כדי", "כאשר"). Mix openings like "מעבר לכך", "בפועל", "לכן", "מצד שני", "במקרים רבים", "בשלב הבא", "חשוב לזכור", "בשורה התחתונה", "לצד זאת", "מבחינה פרקטית", "עבור משתמשים ביתיים", "בהשוואה לדגמים רגילים" — but naturally, NOT a transition word in every sentence. Prefer clear, practical, promotional SEO writing over poetic language; avoid repetitive paragraph structure.`,
+    `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".`,
+  ],
+  en: [],
+  es: [
+    `- Spanish writing quality: use NEUTRAL Latin-American-and-Spain Spanish and address the reader as "tú" consistently (never mix "tú" and "usted", never "vos"). Avoid regional slang and country-specific terms where a neutral word exists (prefer "teléfono" over "móvil"/"celular", "coche/auto" only when the topic requires it). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Además", "Por otro lado", "Es importante"); mix openings like "En la práctica", "Por eso", "En muchos casos", "Conviene recordar", "A la hora de decidir", "En resumen". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Spanish typography: always use the opening marks "¿" and "¡" in questions and exclamations, keep accents and "ñ" correct (never write Spanish without accents), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+}
+
 function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
-  const lang = brief.language === 'he' ? 'Hebrew' : 'English'
+  const lang = languageNameInEnglish(brief.language)
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
   // Phase 3D — target range drives length; midpoint drives structural thresholds.
   const wMin = brief.targetWordMin ?? (brief.desiredWordCount || 1000)
@@ -187,7 +256,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- directAnswer: a direct 2-3 sentence answer to the main question (will appear at the very top).`,
     `- Each major section starts with "answerFirst": one short sentence answering that section's question.`,
     `- Short paragraphs (2-4 sentences). Short-ish sentences. Mostly ACTIVE voice; avoid passive.`,
-    `- Use natural transition words (${brief.language === 'he' ? 'בנוסף, לכן, עם זאת, למשל, לסיכום' : 'additionally, therefore, however, for example, in summary'}).`,
+    `- Use natural transition words (${TRANSITION_HINT[brief.language]}).`,
     `- Do not start many sentences with the same word.`,
     `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
     `- For any list-worthy section (tips, common mistakes, a checklist, steps, how-to-choose, what-to-check, pros/cons), put the items in the section's "bullets" array — NOT as dash lines inside a paragraph. At least one real list in the article.`,
@@ -196,9 +265,8 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
     `- Never add a year (e.g. 2024/2025/2026) to the title, metaTitle, slug, headings, or content UNLESS that exact year appears in the topic, keyword, or brief above. If the topic is evergreen, keep it evergreen; never use outdated years.`,
     `- SEO/GEO depth: be practical, specific and useful — never generic. Include concrete criteria, examples, checks, warning signs and decision-making guidance; add related subtopics naturally when relevant. For commercial/comparison/price/cost/choice topics include a useful comparison TABLE.`,
-    `- Avoid generic filler openings (e.g. "בעולם שבו כולם מחפשים…"). Open directly and match search intent — the FIRST paragraph answers the query. Each <h2> should answer a real user question, comparison point, or decision factor. In Hebrew, write naturally for Israeli readers.`,
-    brief.language === 'he' ? `- Hebrew writing quality: VARY sentence and paragraph openings — do not start many consecutive sentences/paragraphs with the same word (avoid over-using "בנוסף", "אחד", "היתרון", "המשמעות", "כדי", "כאשר"). Mix openings like "מעבר לכך", "בפועל", "לכן", "מצד שני", "במקרים רבים", "בשלב הבא", "חשוב לזכור", "בשורה התחתונה", "לצד זאת", "מבחינה פרקטית", "עבור משתמשים ביתיים", "בהשוואה לדגמים רגילים" — but naturally, NOT a transition word in every sentence. Prefer clear, practical, promotional SEO writing over poetic language; avoid repetitive paragraph structure.` : '',
-    brief.language === 'he' ? `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".` : '',
+    `- Avoid generic filler openings (${FILLER_EXAMPLE[brief.language]}). Open directly and match search intent — the FIRST paragraph answers the query. Each <h2> should answer a real user question, comparison point, or decision factor. ${AUDIENCE_NOTE[brief.language]}`,
+    ...WRITING_QUALITY_LINES[brief.language],
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
@@ -287,7 +355,7 @@ function tableHtml(t: ArticleTable | null, language: SuggestionLanguage): string
   const body = `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>`
   // Hebrew tables render RTL so the first (attribute) column sits on the RIGHT;
   // English tables stay LTR. dir travels with the HTML to WordPress.
-  const dir = language === 'he' ? ' dir="rtl"' : ''
+  const dir = contentDirection(language) === 'rtl' ? ' dir="rtl"' : ''
   // The table TITLE is a sibling <p> ABOVE the table — NOT a <caption> (TipTap's
   // table schema has no caption and would push it into a stray first row).
   const titleText = (t.caption || '').trim()
@@ -312,7 +380,7 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
   const sectionIds = sections.map((s, i) => makeId(s.heading, 'section', i))
   if (includeManualToc) {
     const toc = sections.map((s, i) => s.heading?.trim() ? `<li><a href="#${sectionIds[i]}">${esc(s.heading.trim())}</a></li>` : '').filter(Boolean).join('')
-    if (toc) out.push(`<nav class="toc" aria-label="${language === 'he' ? 'תוכן העניינים' : 'Table of contents'}"><ul>${toc}</ul></nav>`)
+    if (toc) out.push(`<nav class="toc" aria-label="${ARTICLE_TEXT[language].toc}"><ul>${toc}</ul></nav>`)
   }
 
   sections.forEach((s, i) => {
@@ -332,7 +400,7 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
   for (const t of a.comparisonTables || []) { const h = tableHtml(t, language); if (h) out.push(h) }
 
   if ((a.faq || []).length) {
-    out.push(`<h2 id="${makeId('faq', 'faq', 0)}">${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}</h2>`)
+    out.push(`<h2 id="${makeId('faq', 'faq', 0)}">${ARTICLE_TEXT[language].faqHeading}</h2>`)
     a.faq.forEach((f, k) => {
       if (f.question?.trim() && f.answer?.trim()) {
         out.push(`<h3 id="${makeId(f.question, 'faq-q', k)}">${esc(f.question.trim())}</h3>`)
@@ -361,7 +429,7 @@ function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): stri
     }
   }
   if ((a.faq || []).length) {
-    out.push(`## ${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}`)
+    out.push(`## ${ARTICLE_TEXT[language].faqHeading}`)
     for (const f of a.faq) if (f.question?.trim() && f.answer?.trim()) { out.push(`### ${f.question.trim()}`); out.push(f.answer.trim()) }
   }
   return out.join('\n\n')
@@ -538,9 +606,7 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
 
     // 2) Append the anchor as a natural sentence into an eligible paragraph.
     const link = `<a href="${escAttr(url)}">${escAttr(text)}</a>`
-    const sentence = language === 'he'
-      ? ` בהקשר זה, ${link} הוא אחד הגורמים המרכזיים שכדאי להכיר.`
-      : ` In this context, ${link} is a key option worth knowing.`
+    const sentence = ARTICLE_TEXT[language].anchorSentence(link)
     const target = paras.find((p) => farEnough(p.wordStart)) || paras[0]
     if (target) {
       out = out.slice(0, target.start) + `<p>${target.inner}${sentence}</p>` + out.slice(target.end)
@@ -548,7 +614,7 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
       continue
     }
     // 3) Last resort (tiny article): a standalone natural sentence, not a footer link.
-    out = `${out}\n<p>${language === 'he' ? 'בהקשר זה, ' : 'In this context, '}${link}${language === 'he' ? ' הוא גורם מרכזי שכדאי להכיר.' : ' is a key option worth knowing.'}</p>`
+    out = `${out}\n<p>${ARTICLE_TEXT[language].anchorSentence(link).trim()}</p>`
     used.push(countWords(out))
   }
   return out
@@ -628,9 +694,7 @@ export function ensurePlannedPhrases(html: string, phrases: string[], language: 
       (firstH2 < 0 || p.start > firstH2))
     const pool = eligible.length ? eligible : paras.filter((p) => !p.hasLink && p.index >= 1)
     const target = pool.find((p) => farEnough(p.wordStart)) || pool[pool.length - 1]
-    const sentence = language === 'he'
-      ? ` בהקשר זה, כדאי להכיר מקרוב גם ${esc(phrase)}.`
-      : ` In this context, it is also worth exploring ${esc(phrase)}.`
+    const sentence = ARTICLE_TEXT[language].phraseSentence(esc(phrase))
     if (target) {
       out = out.slice(0, target.start) + `<p>${target.inner}${sentence}</p>` + out.slice(target.end)
       used.push(target.wordStart)

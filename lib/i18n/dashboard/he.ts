@@ -1389,6 +1389,7 @@ export const dashboardHe = {
       language: 'שפה',
       languageHe: 'עברית',
       languageEn: 'English',
+      languageEs: 'Español',
       toneOfVoice: 'טון כתיבה',
       tones: {
         professional: 'מקצועי',
@@ -2746,6 +2747,7 @@ export const dashboardHe = {
       languageLabel: 'שפה',
       languageHe: 'עברית',
       languageEn: 'אנגלית',
+      languageEs: 'ספרדית',
       languageAr: 'ערבית',
       cityLabel: 'עיר / מיקום',
       cityLabelUS: 'עיר, קוד מדינה *',

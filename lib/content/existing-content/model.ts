@@ -28,6 +28,7 @@
 import { urlMatchKeys } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { isContentUrl, resolveKind, titleFromUrl, type KindEvidence, type SiteKind } from './classify'
+import { normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
 
 export type { SiteKind } from './classify'
 export type ExistingContentGroup = 'content' | 'commerce'
@@ -612,8 +613,8 @@ export function toPayload(index: ExistingContentIndex, view: ExistingContentView
 }
 
 /** The language a new topic is written in: the project's, never the dashboard's. */
-export function topicLanguage(projectLanguage: string | null | undefined): 'he' | 'en' {
-  return (projectLanguage || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+export function topicLanguage(projectLanguage: string | null | undefined): ContentLanguage {
+  return normalizeContentLanguage(projectLanguage)
 }
 
 /**
@@ -625,7 +626,7 @@ export function topicLanguage(projectLanguage: string | null | undefined): 'he' 
 export function supportTopicBody(
   item: Pick<ExistingContentItem, 'title' | 'url' | 'metrics'>,
   projectId: string,
-  lang: 'he' | 'en',
+  lang: ContentLanguage,
   copy: { topic: string; notes: string },
 ): Record<string, unknown> {
   const fill = (s: string) => s.replace('{title}', item.title).replace('{url}', item.url)

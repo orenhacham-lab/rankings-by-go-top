@@ -25,9 +25,10 @@ import { distinctiveTokensOf, topicSignature, isHighConfidenceDuplicate, type To
 import { containsExternalBusiness, type BrandSafety } from './brand-safety'
 import type { OpportunityBrief } from './opportunity-brief'
 import { projectContextBlock, type ProjectContext } from './prompt-guidance'
+import { languageNameInEnglish, type ContentLanguage } from '@/lib/content/language'
 
 export interface DiscoveryInput {
-  language: 'he' | 'en'
+  language: ContentLanguage
   ctx: ProjectContext
   year: number
   deficit: number
@@ -63,7 +64,7 @@ export function discoveryResponseSchema(anchors: string[]): Record<string, unkno
 }
 
 export function buildDiscoveryPrompt(input: DiscoveryInput): string {
-  const langLabel = input.language === 'he' ? 'Hebrew' : 'English'
+  const langLabel = languageNameInEnglish(input.language)
   return [
     `You are an SEO strategist doing CONSTRAINED opportunity discovery. Today's year is ${input.year}. Return ALL text in ${langLabel}.`,
     projectContextBlock(input.ctx),

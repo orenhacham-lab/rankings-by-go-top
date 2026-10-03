@@ -24,6 +24,7 @@ import { recommendationGuidance, structuredOutputContract } from './prompt-guida
 import { validateIdea } from './validate'
 import { domainFlags, fingerprint, type DomainFlags } from './domain-flags'
 import type { TopicSuggestion } from './types'
+import { type ContentLanguage } from '@/lib/content/language'
 
 const currentYear = (): number => new Date().getFullYear()
 
@@ -31,7 +32,7 @@ type Admin = ReturnType<typeof createAdminClient>
 
 export interface SiteScanRecoInput {
   projectId: string
-  language: 'he' | 'en'
+  language: ContentLanguage
   langLabel: string
   /** Phase 3H.4 — titles/keywords already existing or already SUGGESTED (pending
    *  ideas). Without this the source had NO MEMORY between runs: a second click

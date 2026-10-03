@@ -9,6 +9,7 @@
  */
 
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
+import { contentScript } from '@/lib/content/language'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import { validateAnchorPlacement, analyzeAnchorQuality, brandMentionedOutsideAnchors, type AnchorQuality } from '@/lib/content/anchors-check'
 import type { CtaDetails } from '@/lib/content/brief-notes'
@@ -81,13 +82,19 @@ export function thresholdsFor(desired: number): Thresholds {
 const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'יחד עם זאת', 'מצד שני', 'מנגד', 'למשל', 'לדוגמה', 'בפועל', 'לסיכום', 'חשוב לדעת', 'חשוב לזכור', 'מעבר לכך', 'מעבר לזה', 'כלומר', 'במילים אחרות', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף', 'לאחר מכן', 'במקרים רבים', 'במקרים אלה', 'בשורה התחתונה', 'לצד זאת', 'מבחינה פרקטית', 'כתוצאה מכך', 'בשלב הבא', 'בהשוואה', 'בהשוואה לכך', 'באופן דומה']
 // Common, natural Hebrew sentence-openers we should NOT penalize for repetition.
 const START_STOPWORDS_HE = new Set(['כדי', 'אם', 'כאשר', 'בנוסף', 'עם', 'מעבר', 'לאחר', 'במקרים', 'חשוב', 'לכן', 'אחד', 'עבור', 'זה', 'זו', 'יש', 'כך'])
+const TRANSITIONS_ES = ['además', 'por lo tanto', 'sin embargo', 'por otro lado', 'en cambio', 'por ejemplo', 'en la práctica', 'en resumen', 'es importante', 'conviene recordar', 'en otras palabras', 'finalmente', 'en primer lugar', 'en segundo lugar', 'por eso', 'como resultado', 'en muchos casos', 'a la hora de decidir', 'en conclusión', 'de forma similar', 'en comparación']
+/** Spanish function words that start a sentence without carrying meaning — the
+ *  repetitive-opening check ignores them, as START_STOPWORDS_HE does in Hebrew. */
+const START_STOPWORDS_ES = new Set(['el', 'la', 'los', 'las', 'un', 'una', 'si', 'cuando', 'para', 'por', 'con', 'esto', 'esta', 'este', 'hay', 'es', 'son', 'además'])
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
 // Unambiguous, standalone CTA phrases (imperative action + intent). Natural
 // service words like "הזמנה"/"משלוח"/"שירות" are deliberately NOT here.
 const CTA_STRONG_HE = ['צרו קשר', 'צור קשר', 'צרו איתנו קשר', 'דברו איתנו', 'השאירו פרטים', 'לחצו כאן', 'להזמנה עכשיו', 'הזמינו עכשיו', 'לקבלת הצעת מחיר', 'שלחו הודעת וואטסאפ', 'שלחו לנו הודעה', 'חייגו עכשיו', 'התקשרו עכשיו', 'הזמינו כעת']
+const CTA_STRONG_ES = ['contáctanos', 'contacta con nosotros', 'llama ahora', 'haz clic aquí', 'pide ahora', 'solicita ahora', 'reserva ahora', 'escríbenos', 'déjanos tus datos', 'pide presupuesto', 'solicita presupuesto', 'escríbenos por whatsapp', 'llámanos ahora', 'compra ahora']
 const CTA_STRONG_EN = ['contact us', 'call now', 'click here', 'order now', 'get in touch', 'sign up now', 'book now', 'reach out to us', 'send us a message', 'leave your details', 'get a quote', 'whatsapp us', 'call us now', 'buy now']
 // Action imperatives that only count as a CTA when a contact CHANNEL is nearby.
 const CTA_ACTION_HE = ['התקשרו', 'חייגו', 'שלחו', 'פנו אלינו', 'לחצו', 'דברו', 'השאירו', 'כתבו לנו']
+const CTA_ACTION_ES = ['llama', 'llámanos', 'escribe', 'escríbenos', 'contacta', 'haz clic', 'pide', 'solicita', 'reserva', 'déjanos']
 const CTA_ACTION_EN = ['call', 'text', 'message', 'click', 'contact', 'reach out', 'book']
 // A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
 const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|https?:\/\/|www\.)/i
@@ -98,10 +105,16 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * next to a contact channel (number/WhatsApp/phone/URL). This avoids treating
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
+/** The word lists, keyed by content language: adding a language stops compiling here. */
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES }
+
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
-  const strong = lang === 'he' ? CTA_STRONG_HE : CTA_STRONG_EN
-  const actions = lang === 'he' ? CTA_ACTION_HE : CTA_ACTION_EN
+  const strong = CTA_STRONG[lang]
+  const actions = CTA_ACTION[lang]
   let earliest = -1
   const mark = (idx: number) => {
     if (idx < 0) return
@@ -273,21 +286,25 @@ function isRealTable(t: TableShape): boolean { return t.cols >= 2 && t.rows >= 2
 
 // Topics that genuinely call for a comparison/data table.
 const TABLE_WORDS_HE = ['השווא', 'להשוו', 'מחיר', 'עלות', 'עלויות', 'כמה עולה', 'הכי טוב', 'סוגי', 'לבחור', 'בחירת', 'יתרונות', 'חסרונות', 'מדריך קנייה', 'טבלה']
+const TABLE_WORDS_ES = ['compar', 'precio', 'coste', 'costo', 'cuánto cuesta', 'cuanto cuesta', 'mejor', 'mejores', 'tipos de', 'elegir', 'cómo elegir', 'ventajas', 'desventajas', 'guía de compra', 'tabla', ' vs ', 'más barato']
 const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'types', 'choose', 'choosing', 'buying guide', 'pros and cons', 'pros/cons', 'cheapest']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
-  const words = lang === 'he' ? TABLE_WORDS_HE : TABLE_WORDS_EN
+  const words = TABLE_WORDS[lang]
   return words.some((w) => t.includes(w))
 }
 
 // Question-style heading detection (so important questions live in the body too).
 const QUESTION_WORDS_HE = ['מה ', 'מהו', 'מהי', 'איך', 'כיצד', 'כמה', 'למה', 'מדוע', 'האם', 'מתי', 'איפה', 'היכן', 'מי ']
+const QUESTION_WORDS_ES = ['qué ', 'que ', 'cómo ', 'como ', 'cuánto', 'cuanto', 'por qué', 'por que', 'cuál', 'cual', 'cuándo', 'cuando', 'dónde', 'donde', 'quién', 'quien', 'es ', 'son ', 'conviene', 'debo ', 'hay que', '¿']
 const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES }
 function looksLikeQuestion(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').trim().toLowerCase()
   if (!t) return false
   if (t.includes('?')) return true
-  const words = lang === 'he' ? QUESTION_WORDS_HE : QUESTION_WORDS_EN
+  const words = QUESTION_WORDS[lang]
   return words.some((w) => t.startsWith(w))
 }
 function headingTexts(html: string, tag: 'h2' | 'h3'): string[] {
@@ -321,8 +338,8 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const faqCount = faqItems.length
 
   // Readability metrics.
-  const transitions = lang === 'he' ? TRANSITIONS_HE : TRANSITIONS_EN
-  const startStop = lang === 'he' ? START_STOPWORDS_HE : new Set<string>()
+  const transitions = TRANSITIONS[lang]
+  const startStop = START_STOPWORDS[lang]
   // Count TOTAL transition phrases across the whole body (anywhere in a sentence/
   // paragraph), including multi-word phrases — not just per-paragraph.
   const bodyLower = bodyText.toLowerCase()
@@ -451,10 +468,15 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   add('not_generic', 'geo', 'info', tables >= 1 || lists >= 1 || faqCount >= 2 || h3 >= 1)
 
   // --- language ---
-  if (lang === 'he') {
+  // The article must actually be written in its own script. Hebrew content is
+  // mostly Hebrew letters; a latin-script language (English, Spanish) is mostly
+  // latin letters — an article returned in the wrong language fails here instead
+  // of saving, which is what used to happen to any language that was not Hebrew.
+  {
     const hebrew = (bodyText.match(/[֐-׿]/g) || []).length
     const latin = (bodyText.match(/[A-Za-z]/g) || []).length
-    add('language_matches', 'technical', 'blocker', hebrew >= latin)
+    add('language_matches', 'technical', 'blocker',
+      contentScript(lang) === 'hebrew' ? hebrew >= latin : latin >= hebrew)
   }
 
   // --- brand / CTA rules ---

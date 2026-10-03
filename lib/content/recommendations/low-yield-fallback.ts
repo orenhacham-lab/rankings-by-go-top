@@ -39,6 +39,7 @@ import { hasNamedExternalBusiness, type BrandSafety } from './brand-safety'
 import type { OpportunityBrief } from './opportunity-brief'
 import type { PolishedTopic } from './brief-synthesis'
 import { projectContextBlock, type ProjectContext } from './prompt-guidance'
+import { languageNameInEnglish, type ContentLanguage } from '@/lib/content/language'
 
 // ── Tunables (all deterministic; the engine imports the trigger thresholds) ──────
 /**
@@ -325,7 +326,7 @@ export function buildBlockerContext(input: {
 }
 
 export interface FallbackPromptInput {
-  language: 'he' | 'en'
+  language: ContentLanguage
   ctx: ProjectContext
   year: number
   seeds: FallbackSeed[]
@@ -334,7 +335,7 @@ export interface FallbackPromptInput {
 }
 
 export function buildFallbackPrompt(input: FallbackPromptInput): string {
-  const langLabel = input.language === 'he' ? 'Hebrew' : 'English'
+  const langLabel = languageNameInEnglish(input.language)
   const seedPayload = input.seeds.map((s) => ({ id: s.seedId, seed: s.phrase }))
   return [
     `You are an SEO strategist doing CONSTRAINED discovery-and-synthesis. Today's year is ${input.year}. Return ALL text in ${langLabel}.`,
