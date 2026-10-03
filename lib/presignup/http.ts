@@ -28,7 +28,7 @@
  * Logs carry ids and stable codes only: no address, no site, no provider text.
  */
 import { hashClaimToken, isWellFormedClaimToken, normalizeCheckUrl, domainKey, type FreeCheckResult } from '@/lib/free-check'
-import type { Locale } from '@/lib/i18n/locales'
+import { toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/locales'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { admitResearch, finishResearchRun } from './gate'
 import type { AnonymousResearch } from './run'
@@ -76,7 +76,28 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
-const readLocale = (v: unknown): Locale => (v === 'en' ? 'en' : 'he')
+/**
+ * The language of the PAGE the visitor is on.
+ *
+ * This used to answer `he` to everything that was not the string 'en', which
+ * was right while the public site had two languages. Once /es went live a
+ * Spanish visitor's free check was researched in HEBREW and their consent was
+ * stored as the Hebrew sentence under the Hebrew version id — a record of
+ * words they were never shown. Found 3 October 2026, the evening /es was
+ * published.
+ */
+const readPublicLocale = (v: unknown): PublicLocale => (v === 'en' || v === 'es' ? v : 'he')
+
+/**
+ * The language the research itself is written in, and the one the ledger row
+ * records. It is still bilingual: the research summary is built from the
+ * dashboard's own `Locale` copy, and the Spanish screen already renders that
+ * preview in ENGLISH (`FixedDashboardLanguage locale={toBilingualLocale(…)}`
+ * in FreeCheckResearch), so English is what the Spanish visitor sees around
+ * it. Spanish research of its own needs the ledger's `locale` CHECK widened to
+ * 'es' on both free_check tables, which is a production database change.
+ */
+const readLocale = (v: unknown): Locale => toBilingualLocale(readPublicLocale(v))
 
 /** What a failed a1 means to the visitor, in the free check's own words. */
 export function researchFailureCode(a1Code: string | null): ResearchErrorCode {
@@ -247,7 +268,8 @@ export async function handleReportRequest(request: Request, deps: ReportDeps): P
     if (email.length > 254 || !EMAIL.test(email)) return answer(400, { ok: false, code: 'invalid_email' })
     const token = typeof body.token === 'string' ? body.token : ''
     if (!isWellFormedClaimToken(token)) return answer(400, { ok: false, code: 'invalid_claim' })
-    const locale = readLocale(body.locale)
+    const publicLocale = readPublicLocale(body.locale)
+    const locale = toBilingualLocale(publicLocale)
 
     let admin: ServiceRoleClient
     try {
@@ -283,7 +305,11 @@ export async function handleReportRequest(request: Request, deps: ReportDeps): P
       consent: true,
       consented_at: now.toISOString(),
       // The words the visitor agreed to, in their language, from our copy: never from the request.
-      consent_text: reportConsentText(locale),
+      // The words the visitor READ, in the page's own language — so a Spanish
+      // visitor's record is the Spanish sentence with its own version id, never
+      // the Hebrew or English one. `locale` beside it is the bilingual language
+      // of the research and of any email we send, which is not the same thing.
+      consent_text: reportConsentText(publicLocale),
       locale,
       client_hash: clientHash,
       created_at: now.toISOString(),

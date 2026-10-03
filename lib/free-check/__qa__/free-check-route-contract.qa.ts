@@ -250,6 +250,19 @@ async function main() {
   check('CONTROL: a locale-blind cache would hit for the English visitor', !!localeBlindHit)
   check('CONTROL: the real gate misses, so English copy is generated', otherLocale.allowed && !otherLocale.cached)
 
+  // ── The page's language, since the Spanish site went live ───────────────
+  // The route read the posted language as he|en, so /es/free-check — which
+  // posts locale 'es' — fell through to HEBREW and a Spanish visitor was
+  // handed a Hebrew check. The findings are built from bilingual copy, so
+  // Spanish is checked in English, which is what the Spanish screen already
+  // renders around the result.
+  const routeSrc = read('../../../app/api/free-check/route.ts').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+  const localeGuard = (c: string) => /\(PUBLIC_LOCALES as string\[\]\)\.includes\(payload\.locale\)/.test(c)
+    && /const locale: Locale = toBilingualLocale\(publicLocale\)/.test(c)
+  check('the route reads the page\'s language as a public locale and narrows it for the check', localeGuard(routeSrc))
+  check('CONTROL: the old he|en read fails the guard',
+    !localeGuard(routeSrc.replace('(PUBLIC_LOCALES as string[]).includes(payload.locale)', '(LOCALES as string[]).includes(payload.locale)')))
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }
