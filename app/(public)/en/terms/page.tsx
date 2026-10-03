@@ -470,9 +470,6 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This document is a business draft. We recommend having it reviewed by legal counsel before
-          final use.
-          <br />
           Last updated: October 3, 2026
         </p>
       </section>

@@ -431,8 +431,6 @@ export default function HebrewTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          מסמך זה הוא טיוטה עסקית. מומלץ להעבירו לבדיקת עורך דין לפני שימוש סופי.
-          <br />
           עדכון אחרון: 3 באוקטובר 2026
         </p>
       </section>
