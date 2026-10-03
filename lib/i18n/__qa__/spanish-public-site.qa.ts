@@ -154,15 +154,23 @@ function main() {
     for (const rel of expected) {
       check(`3a: /es has ${rel}`, existsSync(join(ES_DIR, rel)))
     }
-    // The legal pages belong to a separate piece of work and have no Spanish
-    // version. A Spanish terms page that was a translation nobody reviewed
-    // would be worse than an English one.
+    // The legal pages exist in Spanish now. The legal thread wrote the text as
+    // Markdown under content/legal/es/ and this tree renders it; the route is
+    // what makes it reachable, and the front matter names the English page it
+    // was translated from.
     for (const legal of ['privacy', 'terms', 'refund-policy', 'accessibility']) {
-      check(`3b: /es has NO ${legal} page — the legal texts are not translated yet`, !existsSync(join(ES_DIR, legal)))
+      check(`3b: /es has a ${legal} page`, existsSync(join(ES_DIR, legal, 'page.tsx')))
+      check(`3b2: …and the ${legal} text it renders`,
+        existsSync(join(ROOT, 'content', 'legal', 'es', `${legal}.md`)))
     }
+    // A legal page says `slug="…"` and the locale lives once, in
+    // SpanishLegalPage; every other page carries `locale="es"` itself.
+    const sharedFrame = (rel: string) =>
+      /locale="es"/.test(strip(read(rel))) || /SpanishLegalPage slug="/.test(strip(read(rel)))
     check('3c: every /es page renders through the SHARED components, not a second design',
-      pageFiles().every((rel) => /locale="es"|locale="es"/.test(strip(read(rel))) || /locale="es"/.test(strip(read(rel)))),
-      pageFiles().filter((rel) => !/locale="es"/.test(strip(read(rel)))).join(', '))
+      pageFiles().every(sharedFrame), pageFiles().filter((rel) => !sharedFrame(rel)).join(', '))
+    check('3c2: and the legal frame itself renders as Spanish',
+      /locale="es"/.test(strip(read('components/public/SpanishLegalPage.tsx'))))
     // MUTATION CONTROL
     check('3-MUT: a page list missing a file fails 3a', !existsSync(join(ES_DIR, 'pricing/nope.tsx')))
   }
@@ -310,8 +318,11 @@ function main() {
     // The FOOTER is where this bit hardest: it names four legal pages on every
     // single Spanish page, and none of them has a Spanish version.
     const footer = strip(read('components/Footer.tsx'))
-    check('6b4: the footer links the legal pages under a prefix of their own, not the page\'s',
-      /const legalPrefix = locale === 'he' \? '' : '\/en'/.test(footer)
+    // The legal links used to need a prefix of their own, pointing at /en for
+    // every language, because only Hebrew and English had documents. Each
+    // language has its own now, so they follow the page's own prefix.
+    check('6b4: the footer links each language\'s own legal pages',
+      /const legalPrefix = prefix/.test(footer)
       && ['privacy', 'terms', 'refund-policy', 'accessibility'].every((p) => footer.includes('${legalPrefix}/' + p)))
     check('6b5: …and its home link follows the page\'s locale', /const homeHref = localeHomeHref\(locale\)/.test(footer))
     // THE COMPANY'S LEGAL NAME IS NEVER TRANSLATED (Oren, 2026-10-03): the

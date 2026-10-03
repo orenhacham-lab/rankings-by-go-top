@@ -20,12 +20,11 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
   const [creditBefore, creditAfter = ''] = dict.footer.credit.split(CREDIT_ANCHOR)
   const prefix = LOCALE_PREFIX[locale]
   const homeHref = localeHomeHref(locale)
-  // THE LEGAL PAGES ARE NOT TRANSLATED. Terms, privacy, the refund policy and
-  // the accessibility statement exist in Hebrew and English only, so the
-  // Spanish footer links the ENGLISH documents — the ones in force — rather
-  // than `/es/privacy`, which does not exist and would be a 404 in the footer
-  // of every Spanish page. It becomes `/es/...` when those pages do.
-  const legalPrefix = locale === 'he' ? '' : '/en'
+  // Each language links its own legal documents, so the legal links now take
+  // the same prefix as every other link in this footer. The Spanish ones used
+  // to point at the ENGLISH pages, because no Spanish document existed; they
+  // live under content/legal/es now, rendered by SpanishLegalPage.
+  const legalPrefix = prefix
   const linkClass = 'rounded-control text-copy text-contrast-ink/70 transition-colors duration-150 ease-snappy hover:text-contrast-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20'
   const headingClass = 'mb-4 text-caption font-semibold text-contrast-ink'
 

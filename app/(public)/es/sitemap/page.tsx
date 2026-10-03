@@ -47,17 +47,12 @@ export default function SpanishSitemapPage() {
       ],
     },
     {
-      // The legal documents are owned by a separate piece of work and have no
-      // Spanish version yet. The links go to the English ones, which are the
-      // documents in force, and the description states the language instead of
-      // implying a Spanish text exists.
       title: 'Legal',
-      description: 'Estos documentos están disponibles por ahora en inglés.',
       links: [
-        { label: 'Política de privacidad', href: '/en/privacy' },
-        { label: 'Términos de uso', href: '/en/terms' },
-        { label: 'Política de cancelación y reembolso', href: '/en/refund-policy' },
-        { label: 'Accesibilidad', href: '/en/accessibility' },
+        { label: 'Política de privacidad', href: '/es/privacy' },
+        { label: 'Términos de uso', href: '/es/terms' },
+        { label: 'Política de cancelación y reembolso', href: '/es/refund-policy' },
+        { label: 'Accesibilidad', href: '/es/accessibility' },
       ],
     },
   ]
