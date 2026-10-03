@@ -350,11 +350,41 @@ async function main() {
     const limited = await call(handleReportRequest(reportReq({ token, email: 'x@y.co', consent: true }), s2.deps))
     check('five requests this hour → 429 rate_limited', limited.status === 429 && limited.json.code === 'rate_limited')
 
+    // ── A Spanish visitor, since /es went live on 3 October 2026 ───────────
+    // Before the fix the page's 'es' fell through to 'he': the research was
+    // written in HEBREW and the consent was stored as the Hebrew sentence
+    // under report-email-v1 — a record of words the visitor never saw.
+    const es = setup()
+    const esToken = resultOf(await call(handleResearchPost(researchReq({ url: HE_WP.target, locale: 'es' }, 'client-es'), es.deps)))?.claimToken ?? ''
+    check('a Spanish research is recorded as English, never Hebrew',
+      es.tables[RESEARCH_RUNS_TABLE]?.[0]?.locale === 'en', String(es.tables[RESEARCH_RUNS_TABLE]?.[0]?.locale))
+    if (esToken) {
+      await call(handleReportRequest(reportReq({ token: esToken, email: 'dueno@sitio.example', consent: true, locale: 'es' }), es.deps))
+      const esRow = (es.tables[REPORT_REQUESTS_TABLE] ?? [])[0] ?? {}
+      check('…and the consent stored is the SPANISH sentence with its own version id',
+        esRow.consent_text === reportConsentText('es') && /\[report-email-es-v1\]$/.test(String(esRow.consent_text)),
+        String(esRow.consent_text).slice(0, 60))
+      check('…never the Hebrew sentence', esRow.consent_text !== reportConsentText('he'))
+      // The column still only admits he|en (the CHECK in
+      // 20260928000200_free_check_research.sql), so it carries the bilingual
+      // language of the research and of any email, not the page's language.
+      check('…stored under a language the ledger\'s CHECK admits', esRow.locale === 'en', String(esRow.locale))
+    } else {
+      check('a Spanish research hands back a claim token', false, 'no token')
+    }
+
+    const httpSrc = code(read('lib/presignup/http.ts'))
+    const esGuard = (c: string) => /const readPublicLocale = \(v: unknown\): PublicLocale => \(v === 'en' \|\| v === 'es' \? v : 'he'\)/.test(c)
+      && /const readLocale = \(v: unknown\): Locale => toBilingualLocale\(readPublicLocale\(v\)\)/.test(c)
+    check('source: the page\'s language is read as a PUBLIC locale and narrowed for the ledger', esGuard(httpSrc))
+    check('mutation control: the old two-language read fails the guard',
+      !esGuard(httpSrc.replace("v === 'en' || v === 'es' ? v : 'he'", "v === 'en' ? 'en' : 'he'")))
+
     const src = code(read('lib/presignup/http.ts'))
-    const consentGuard = (c: string) => /if \(body\.consent !== true\) return answer\(400, \{ ok: false, code: 'consent_required' \}\)/.test(c) && /consent_text: reportConsentText\(locale\)/.test(c)
+    const consentGuard = (c: string) => /if \(body\.consent !== true\) return answer\(400, \{ ok: false, code: 'consent_required' \}\)/.test(c) && /consent_text: reportConsentText\(publicLocale\)/.test(c)
     check('source: consent must be exactly true, and the stored words come from reportConsentText', consentGuard(src))
     check('mutation control: a truthiness check fails the guard', !consentGuard(src.replace('body.consent !== true', '!body.consent')))
-    check('mutation control: storing the request\'s words fails the guard', !consentGuard(src.replace('consent_text: reportConsentText(locale)', 'consent_text: String(body.consentText)')))
+    check('mutation control: storing the request\'s words fails the guard', !consentGuard(src.replace('consent_text: reportConsentText(publicLocale)', 'consent_text: String(body.consentText)')))
     const screen = code(read('components/free-check/FreeCheckResearch.tsx'))
     const uncheckedGuard = (c: string) => /const \[consent, setConsent\] = useState\(false\)/.test(c) && /checked=\{consent\}/.test(c)
     check('the screen\'s consent box starts unticked', uncheckedGuard(screen))
