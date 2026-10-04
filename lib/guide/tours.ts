@@ -14,7 +14,7 @@
  * whose target cannot be seen at all is skipped, so the bubble never points at
  * nothing, and a screen switched off in this build is never described.
  */
-import { CONTENT_STRATEGY_PATH } from '@/lib/content/content-workspace-nav'
+import { CONTENT_ROOT_PATH, CONTENT_STRATEGY_PATH } from '@/lib/content/content-workspace-nav'
 
 export type TourStepKey =
   // The full tour (the UX review's eight steps, in its order).
@@ -29,6 +29,13 @@ export type TourStepKey =
   | 'aiHeader'
   | 'settingsHeader' | 'settingsConnections'
   | 'reportsHeader'
+  // Every other screen the sidebar leads to has a tour of its own too (owner,
+  // 4 October 2026: "not every page has a screen tour, it should").
+  | 'contentHeader'
+  | 'siteHealthHeader' | 'siteHealthFixes'
+  | 'siteLinksHeader' | 'siteLinksOptIn'
+  | 'mapsPostsHeader'
+  | 'billingHeader' | 'billingPlan'
   | 'projectScope'
 
 export interface TourStep {
@@ -79,9 +86,15 @@ export const FULL_TOUR: readonly TourStep[] = [
 /** Where the full tour runs: its second stop is the dashboard's opening card. */
 export const FULL_TOUR_HOME = '/dashboard'
 
-export type ScreenKey = 'dashboard' | 'keywordResearch' | 'keywords' | 'strategy' | 'aiVisibility' | 'settings' | 'reports'
+export type ScreenKey = 'dashboard' | 'keywordResearch' | 'keywords' | 'content' | 'strategy' | 'aiVisibility'
+  | 'siteHealth' | 'siteLinks' | 'mapsPosts' | 'settings' | 'reports' | 'billing'
 
-/** The per-screen tours: a short one for each screen the full tour names, plus reports. */
+/**
+ * The per-screen tours: one for EVERY screen the sidebar leads to, not only the
+ * ones the full tour names. A screen whose build flag is off is never reached,
+ * and a step whose target is not on the page is skipped, so a tour listed here
+ * can never point at nothing.
+ */
 export const SCREEN_TOURS: Readonly<Record<ScreenKey, { path: string; steps: readonly TourStep[] }>> = {
   dashboard: {
     path: '/dashboard',
@@ -104,6 +117,13 @@ export const SCREEN_TOURS: Readonly<Record<ScreenKey, { path: string; steps: rea
       { key: 'projectScope', target: SWITCHER_TARGET, needsProject: true },
     ],
   },
+  content: {
+    path: CONTENT_ROOT_PATH,
+    steps: [
+      { key: 'contentHeader', target: SCREEN_HEADER_TARGET },
+      { key: 'projectScope', target: SWITCHER_TARGET, needsProject: true },
+    ],
+  },
   strategy: {
     path: CONTENT_STRATEGY_PATH,
     steps: [
@@ -115,6 +135,27 @@ export const SCREEN_TOURS: Readonly<Record<ScreenKey, { path: string; steps: rea
     path: '/ai-visibility',
     steps: [
       { key: 'aiHeader', target: SCREEN_HEADER_TARGET },
+      { key: 'projectScope', target: SWITCHER_TARGET, needsProject: true },
+    ],
+  },
+  siteHealth: {
+    path: '/site-health',
+    steps: [
+      { key: 'siteHealthHeader', target: SCREEN_HEADER_TARGET },
+      { key: 'siteHealthFixes', target: '#fixes, [data-scan-again]', lazy: true, needsProject: true },
+    ],
+  },
+  siteLinks: {
+    path: '/site-links',
+    steps: [
+      { key: 'siteLinksHeader', target: SCREEN_HEADER_TARGET },
+      { key: 'siteLinksOptIn', target: '[data-link-network="panel"]', lazy: true, needsProject: true },
+    ],
+  },
+  mapsPosts: {
+    path: '/maps-posts',
+    steps: [
+      { key: 'mapsPostsHeader', target: SCREEN_HEADER_TARGET },
       { key: 'projectScope', target: SWITCHER_TARGET, needsProject: true },
     ],
   },
@@ -130,6 +171,15 @@ export const SCREEN_TOURS: Readonly<Record<ScreenKey, { path: string; steps: rea
     steps: [
       { key: 'reportsHeader', target: SCREEN_HEADER_TARGET },
       { key: 'projectScope', target: SWITCHER_TARGET, needsProject: true },
+    ],
+  },
+  // The account's own screen: no project step, because nothing on it is scoped
+  // to a project.
+  billing: {
+    path: '/billing',
+    steps: [
+      { key: 'billingHeader', target: SCREEN_HEADER_TARGET },
+      { key: 'billingPlan', target: '[data-plan-card]', lazy: true },
     ],
   },
 }

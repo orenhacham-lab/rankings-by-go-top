@@ -55,7 +55,7 @@ import { randomUUID } from 'crypto'
 import type { createAdminClient, ServiceRoleClient } from '@/lib/supabase/admin'
 import { getUserEntitlement } from '@/lib/subscription'
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
-import { articlesPerWeekFor, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
+import { articlesPerMonthPerSite, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
 import { isPlanCode } from '@/lib/plans/catalog'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { insertPendingIdeas } from '@/lib/content/recommendations/topic-idea-store'
@@ -116,7 +116,7 @@ export function topUpTarget(input: {
   const monthly = Math.max(0, Math.floor(input.monthlyArticles))
   if (monthly === 0) return 0
   const poolRate = input.pool && input.planRhythm
-    ? Math.ceil((articlesPerWeekFor(monthly, input.planRhythm.activeQueues) * 30) / 7)
+    ? articlesPerMonthPerSite(monthly, input.planRhythm.activeQueues)
     : input.pool ? poolMonthlyRate(input.pool) : 0
   const raw = input.pool
     ? Math.min(poolRate, monthly)

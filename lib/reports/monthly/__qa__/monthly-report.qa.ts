@@ -29,12 +29,13 @@ import {
 } from '../aggregate'
 import { generateMonthlyReport, runMonthlyReportCron, reportableMonth } from '../generate'
 import {
-  handleMonthlyCron, handleMonthlyGenerate, handleMonthlyGet, handlePreferencesGet, handlePreferencesPut,
+  handleMonthlyCron, handleMonthlyGenerate, handleMonthlyGet, handleMonthlyPdf, handlePreferencesGet, handlePreferencesPut,
   type MonthlyCronDeps, type MonthlyRouteDeps,
 } from '../http'
 import { lastCompleteMonth, monthRange, nextReportAt, periodMonthOf } from '../period'
 import { insertReport, loadMonthInputs, readPreferences, type OwnedProject } from '../store'
 import type { MonthlyReportData } from '../types'
+import { generateMonthlyReportHTML, monthlyReportFileName } from '../pdf'
 import { sendWeeklySummary, WEEKLY_EMAIL_SENDING_ENABLED } from '../weekly-email'
 import MonthlyReportView from '../../../../components/reports/monthly/MonthlyReportView'
 import { MonthlyReportsBody } from '../../../../components/reports/monthly/MonthlyReports'
@@ -490,7 +491,7 @@ async function main() {
     const emptyData = aggregateMonth(emptyInputs())
     for (const lang of ['he', 'en'] as const) {
       const c = monthlyCopy(lang)
-      const html = render(createElement(MonthlyReportView, { data: emptyData, generatedAt: '2026-09-01T08:31:00Z', generatedBy: 'cron', language: lang, projectLabel: 'site.test' }))
+      const html = render(createElement(MonthlyReportView, { projectId: 'p1', data: emptyData, generatedAt: '2026-09-01T08:31:00Z', generatedBy: 'cron', language: lang, projectLabel: 'site.test' }))
       const txt = textOf(html)
       const explains = (t: string) => [c.noKeywords, c.aiNone, c.gscNotConnected, c.planEmpty].every((s) => t.includes(s)) && t.includes(c.publishedNone(lang === 'he' ? 'אוגוסט' : 'August'))
       check(`E1 (${lang}): every section of an empty month says why and what fills it`, explains(txt), txt.slice(0, 300))
@@ -498,12 +499,12 @@ async function main() {
         html.includes('data-empty-month="true"') && txt.includes(lang === 'he' ? 'אוגוסט 2026' : 'August 2026') && !/NaN|undefined|null/.test(txt))
       check(`E3 (${lang}): all six sections are there`, ['improved', 'dropped', 'published', 'ai', 'gsc', 'plan'].every((s) => html.includes(`data-monthly-section="${s}"`)))
       if (lang === 'he') {
-        const readyZero = render(createElement(MonthlyReportView, { data: { ...emptyData, ai: { state: 'ready', answers: 0, mentions: 0, citations: 0, mentionRate: null } }, generatedAt: '2026-09-01T08:31:00Z', generatedBy: 'cron', language: lang, projectLabel: 'x' }))
+        const readyZero = render(createElement(MonthlyReportView, { projectId: 'p1', data: { ...emptyData, ai: { state: 'ready', answers: 0, mentions: 0, citations: 0, mentionRate: null } }, generatedAt: '2026-09-01T08:31:00Z', generatedBy: 'cron', language: lang, projectLabel: 'x' }))
         check('E-MUT: showing AI zeros instead of the reason fails E1', !explains(textOf(readyZero)))
       }
     }
     const filled = aggregateMonth(await loadMonthInputs(new FakeAdmin(tables()) as never, OWNED, MONTH))
-    const fhtml = render(createElement(MonthlyReportView, { data: filled, generatedAt: '2026-09-01T08:31:00Z', generatedBy: 'owner', language: 'he', projectLabel: 'site.test' }))
+    const fhtml = render(createElement(MonthlyReportView, { projectId: 'p1', data: filled, generatedAt: '2026-09-01T08:31:00Z', generatedBy: 'owner', language: 'he', projectLabel: 'site.test' }))
     const ftxt = textOf(fhtml)
     check('E4: a filled report lists the moves, the articles, the plan, and is not marked empty',
       fhtml.includes('data-empty-month="false"') && ftxt.includes('kw t3') && ftxt.includes('kw t2') && ftxt.includes('Article a1') && ftxt.includes('Scheduled for September') && ftxt.includes('420'))
@@ -558,15 +559,117 @@ async function main() {
     check('M-MUT2: a hook that loads resend fails M8', mails(strip(read('lib/reports/monthly/weekly-email.ts')) + "\nconst { Resend } = await import('resend')"))
   }
 
+  // ── R) THE DOWNLOAD (owner, 4 October 2026: "can the monthly report be
+  // downloadable?", and does it carry the Search Console figures) ─────────────
+  console.log('\nR) the monthly report as a file to keep')
+  {
+    // A month with something in every section, so the file can be checked for
+    // each one — the Search Console figures above all.
+    const rank = rankFixture()
+    const full = aggregateMonth({
+      ...emptyInputs(),
+      targets: rank.targets,
+      checks: rank.checks,
+      articles: articleFixture(),
+      ai: [{ mentioned: true, target_cited: true }, { mentioned: true, target_cited: false }, { mentioned: false, target_cited: false }],
+      gsc: {
+        connected: true,
+        current: { start_date: '2026-08-01', end_date: '2026-08-28', total_clicks: 412, total_impressions: 9310 },
+        previous: { start_date: '2026-07-04', end_date: '2026-07-31', total_clicks: 301, total_impressions: 8120 },
+      },
+      plan: { ...EMPTY_PLAN, scheduled: [{ title: 'Next month\'s article', scheduled_at: iso('2026-09-12T08:00:00Z') }], queuedCount: 2, readyCount: 1 },
+    })
+    const pdfUrl = (projectId: string | null, extra = '') =>
+      new Request(`https://app.test/api/reports/monthly/pdf?${projectId ? `projectId=${projectId}` : ''}${extra}`)
+    const rendered: string[] = []
+    const renderPdf = async (html: string) => { rendered.push(html); return new TextEncoder().encode('%PDF-1.4 ').buffer as ArrayBuffer }
+    const withPdf = (admin: unknown, userId: string | null = OWNER) => ({ ...routeDeps(admin, userId), renderPdf })
+
+    const t0 = tables()
+    // generated_at is the column's own default in the database, so the stored
+    // row is written here the way the loader will read it.
+    t0.project_monthly_reports.push({
+      project_id: P, user_id: OWNER, period_month: periodMonthOf(MONTH),
+      generated_by: 'owner', generated_at: NOW.toISOString(), schema_version: 1, data: full,
+    })
+    const admin = new UniqueReportsAdmin(t0)
+    const res = await handleMonthlyPdf(pdfUrl(P, `&month=${MONTH}`), withPdf(admin))
+    check('R1: the owner gets a PDF back, as an attachment named after the month',
+      res.status === 200 && res.headers.get('content-type') === 'application/pdf'
+      && (res.headers.get('content-disposition') ?? '').includes(monthlyReportFileName(MONTH)),
+      [res.status, res.headers.get('content-type'), res.headers.get('content-disposition')].join(' | '))
+    check('R2: the file is rendered from the report, not from anything the caller sent', rendered.length === 1 && rendered[0]!.includes('<!DOCTYPE html>'))
+
+    // The owner's question: does the download carry Search Console?
+    const he = monthlyCopy('he')
+    const html = rendered[0] ?? ''
+    const text = textOf(html)
+    check('R3: the download carries the Search Console section, with the clicks and the impressions',
+      text.includes(he.gscTitle) && text.includes(he.gscClicks) && text.includes(he.gscImpressions), text.slice(0, 200))
+    check('R4: and the rest of the report: what climbed, what slipped, what was published, AI visibility and next month\'s plan',
+      [he.improvedTitle, he.publishedTitle, he.aiTitle].every((s) => text.includes(s)) && text.includes(he.planSub), text.slice(0, 300))
+    check('R5: it says the same words the screen does, from the one dictionary (no second set of copy)',
+      text.includes(he.tiles.firstPage) && text.includes(he.tiles.clicks))
+
+    // Ownership, exactly as the other routes: a project that is not the
+    // caller's answers 404, never 403, and a signed-out caller 401.
+    check('R6: a signed-out caller is refused', (await handleMonthlyPdf(pdfUrl(P), withPdf(admin, null))).status === 401)
+    check('R7: another account\'s project answers 404, never 403', (await handleMonthlyPdf(pdfUrl(P), withPdf(admin, 'someone-else'))).status === 404)
+    check('R8: a malformed month is refused before anything is read', (await handleMonthlyPdf(pdfUrl(P, '&month=August'), withPdf(admin))).status === 400)
+    check('R9: a month with no stored report answers 404, not an empty file', (await handleMonthlyPdf(pdfUrl(P, '&month=2026-01'), withPdf(admin))).status === 404)
+
+    // The renderer is the one thing that can be unavailable; the route answers
+    // its own code and never a provider's message.
+    const down = await handleMonthlyPdf(pdfUrl(P, `&month=${MONTH}`), { ...routeDeps(admin), renderPdf: async () => null })
+    const downBody = await down.text()
+    check('R10: a failed render answers one stable code, with no provider detail', down.status === 503 && downBody.includes('unavailable') && !/pdfshift/i.test(downBody), downBody.slice(0, 120))
+    check('R11: with no renderer configured at all it is the same answer, not a crash', (await handleMonthlyPdf(pdfUrl(P, `&month=${MONTH}`), routeDeps(admin))).status === 503)
+
+    // The language is only which of the product's own languages the words come
+    // in; nothing from the query reaches the page as content.
+    const esHtml = generateMonthlyReportHTML({ data: full, projectLabel: 'site.test', generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'es' })
+    check('R12: the file is produced in each of the product\'s languages', esHtml.includes(monthlyCopy('es').gscTitle) && esHtml.includes('lang="es"'))
+    const injected = generateMonthlyReportHTML({ data: full, projectLabel: '<script>alert(1)</script>', generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'he' })
+    check('R13: a project name is escaped, never markup in the file', !injected.includes('<script>') && injected.includes('&lt;script&gt;'))
+    check('R14: Hebrew is laid out right to left, English is not',
+      generateMonthlyReportHTML({ data: full, projectLabel: 'x', generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'he' }).includes('dir="rtl"')
+      && generateMonthlyReportHTML({ data: full, projectLabel: 'x', generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'en' }).includes('dir="ltr"'))
+    const emptyHtml = generateMonthlyReportHTML({ data: aggregateMonth(emptyInputs()), projectLabel: 'x', generatedAt: NOW.toISOString(), generatedBy: 'cron', language: 'he' })
+    check('R15: an empty month downloads too, and every section says why it is empty',
+      [he.noKeywords, he.aiNone, he.gscNotConnected, he.planEmpty].every((s) => textOf(emptyHtml).includes(s)))
+    check('R16: the file name carries no path and no name a browser would mishandle', /^monthly-report-[0-9-]+\.pdf$/.test(monthlyReportFileName('2026-08')) && monthlyReportFileName('../../etc') === 'monthly-report-.pdf')
+
+    // The screen offers it: the button is on the report, and it is absent when
+    // there is no project to ask about.
+    const view = render(createElement(MonthlyReportView, { projectId: P, data: full, generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'he', projectLabel: 'site.test' }))
+    check('R17: the report screen offers the download', view.includes('data-monthly-download') && textOf(view).includes(he.download))
+    const noProject = render(createElement(MonthlyReportView, { projectId: null, data: full, generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'he', projectLabel: 'site.test' }))
+    check('R-MUT: with no project there is nothing to download and the button is not offered', !noProject.includes('data-monthly-download'))
+  }
+
   // ── P) no provider, no model, no Shopify ───────────────────────────────────
   console.log('\nP) no provider or model, nothing Shopify')
   {
     check('P1: the whole suite made no network request', fetched.length === 0, fetched.join())
-    const server = ['aggregate.ts', 'store.ts', 'generate.ts', 'http.ts', 'period.ts', 'types.ts', 'live-deps.ts'].map((f) => strip(read(`lib/reports/monthly/${f}`)))
-    const allowed = /^(\.\/[\w-]+|@\/lib\/supabase\/(admin|server))$/
+    const PURE = ['aggregate.ts', 'store.ts', 'generate.ts', 'http.ts', 'period.ts', 'types.ts', 'pdf.ts']
+    const pure = PURE.map((f) => strip(read(`lib/reports/monthly/${f}`)))
+    const server = [...pure, strip(read('lib/reports/monthly/live-deps.ts'))]
+    /**
+     * What the report's server code may reach: its own files, the Supabase
+     * clients, the product's own locale helpers (pure, no provider), and the
+     * dashboard dictionary the download renders its words from.
+     */
+    const allowed = /^(\.\/[\w-]+|@\/lib\/supabase\/(admin|server)|@\/lib\/i18n\/[\w/-]+|@\/components\/reports\/monthly\/copy)$/
     const imports = (list: string[]) => list.flatMap((s) => [...s.matchAll(/from '([^']+)'/g)].map((m) => m[1])).filter((m) => !allowed.test(m))
-    check('P2: the server code imports only its own files and the Supabase clients', imports(server).length === 0, imports(server).join())
-    check('P-MUT: importing a model client fails P2', imports([...server, "import { gemini } from '@/lib/ai-visibility/gemini-semantic-classifier'"]).length === 1)
+    // live-deps is the WIRING: it is the only file allowed to name the thing
+    // that leaves the process (the PDF renderer for the download).
+    const WIRING_ONLY = '@/lib/export/pdfshift'
+    check('P2: the report\'s pure server code imports only its own files, the Supabase clients and the product\'s own words', imports(pure).length === 0, imports(pure).join())
+    check('P2a: the one import that leaves the process is in the wiring alone, and it is the PDF renderer the download needs',
+      imports(server).length === 1 && imports(server)[0] === WIRING_ONLY && pure.every((s) => !s.includes(WIRING_ONLY)),
+      imports(server).join())
+    check('P-MUT: importing a model client fails P2', imports([...pure, "import { gemini } from '@/lib/ai-visibility/gemini-semantic-classifier'"]).length === 1)
+    check('P-MUT1a: the renderer reached from a pure module fails P2a', imports([...pure, `import { renderPdfFromHtml } from '${WIRING_ONLY}'`]).length === 1)
     const noFetch = (list: string[]) => list.every((s) => !/\bfetch\(|gemini|openai|anthropic|serper|dataforseo|scrapellm/i.test(s))
     check('P3: no fetch and no provider name in the server code', noFetch(server))
     check('P-MUT2: a fetch in the aggregation fails P3', !noFetch([...server, "await fetch('https://api.example')"]))

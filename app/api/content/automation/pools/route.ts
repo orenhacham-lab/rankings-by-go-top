@@ -40,7 +40,7 @@ function cleanPublishDays(v: unknown): number[] {
 /** First/next publish slot: the plan's rhythm when there is one, else the
  *  owner's weekdays / interval; never Friday or Saturday. */
 function firstSlot(publishTime: string, timezone: string, publishDays: number[], intervalDays: number, rhythm: PublishRhythm): string {
-  return makeSlotAfter({ publishTime, timeZone: timezone, perDay: rhythm.plan?.perDay ?? null, publishDays, intervalDays, anchorIso: null })(Date.now())
+  return makeSlotAfter({ publishTime, timeZone: timezone, perDay: rhythm.plan?.perDay ?? null, publishDays, intervalDays, anchorIso: null, planIntervalDays: rhythm.plan?.intervalDays ?? null })(Date.now())
 }
 
 /**
@@ -54,7 +54,17 @@ function firstSlot(publishTime: string, timezone: string, publishDays: number[],
  * and says the dates were set when the account opened.
  */
 function rhythmDTO(rhythm: PublishRhythm) {
-  if (rhythm.plan) return { source: 'plan' as const, perWeek: rhythm.plan.perWeek, weekdays: rhythmWeekdays(rhythm.plan.perDay), perDay: rhythm.plan.perDay }
+  if (rhythm.plan) {
+    return {
+      source: 'plan' as const,
+      perWeek: rhythm.plan.perWeek,
+      weekdays: rhythm.plan.perDay ? rhythmWeekdays(rhythm.plan.perDay) : [],
+      perDay: rhythm.plan.perDay,
+      // Set instead of the weekdays when the account has more sites than a
+      // weekly rhythm can serve: this site publishes every N days.
+      intervalDays: rhythm.plan.intervalDays,
+    }
+  }
   if (rhythm.trial) return { source: 'trial' as const }
   return { source: 'owner' as const }
 }
@@ -116,9 +126,24 @@ export async function GET(request: Request) {
   const ptime = pool.publishTime || DEFAULT_PUBLISH_TIME
   const perDay = rhythm.plan?.perDay ?? null
   const stored = pool.nextPublishAt || (pool.isActive ? firstSlot(ptime, pool.timezone, pool.publishDays, pool.intervalDays, rhythm) : null)
-  const slotAfter = makeSlotAfter({ publishTime: ptime, timeZone: pool.timezone, perDay, publishDays: pool.publishDays, intervalDays: pool.intervalDays, anchorIso: stored })
+  const slotAfter = makeSlotAfter({ publishTime: ptime, timeZone: pool.timezone, perDay, publishDays: pool.publishDays, intervalDays: pool.intervalDays, anchorIso: stored, planIntervalDays: rhythm.plan?.intervalDays ?? null })
   const readyNow = items.filter((i) => i.status === 'generated').length
-  const articlesLeft = rhythm.allowance ? rhythm.allowance.remaining + readyNow : 0
+  /**
+   * THE ALLOWANCE IS THE ACCOUNT'S, THE SCREEN IS ONE PROJECT'S.
+   *
+   * `remaining` is what is left for the whole account this cycle. Showing all
+   * of it on every project's screen promised each of them the whole plan: an
+   * account on Basic with two projects projected four dates on each, while the
+   * ledger — which is account-wide — would only ever publish four between
+   * them. The weekly rhythm already divides by the active queues
+   * (articlesPerWeekFor); this divides the allowance the same way, rounding
+   * DOWN so a projection never promises an article the cycle will not produce.
+   * Articles already generated belong to this project, so they are added after
+   * the split.
+   */
+  const queues = Math.max(1, rhythm.plan?.activeQueues ?? 1)
+  const shareOf = (n: number) => Math.floor(Math.max(0, n) / queues)
+  const articlesLeft = rhythm.allowance ? shareOf(rhythm.allowance.remaining) + readyNow : 0
   // A stored slot the runner would move (a Friday/Saturday, or a day the plan's
   // rhythm does not publish on) is shown where the runner will move it.
   let base = stored
@@ -126,14 +151,14 @@ export async function GET(request: Request) {
     const fromMs = Math.max(Date.now(), Date.parse(stored))
     const cadenceNextIso = slotAfter(fromMs)
     base = rhythm.allowance
-      ? spreadNextPublishAt({ cadenceNextIso, nowMs: fromMs, periodEndIso: rhythm.allowance.periodEnd, remaining: rhythm.allowance.remaining, ready: readyNow, slotAfter })
+      ? spreadNextPublishAt({ cadenceNextIso, nowMs: fromMs, periodEndIso: rhythm.allowance.periodEnd, remaining: shareOf(rhythm.allowance.remaining), ready: readyNow, slotAfter })
       : cadenceNextIso
   }
   const pendingCount = items.filter((i) => PENDING.includes(i.status)).length
   const projectedDates = base
     ? projectPublishDates({
       firstIso: base, count: pendingCount, slotAfter,
-      cycle: rhythm.allowance ? { periodStartIso: rhythm.allowance.periodStart, periodEndIso: rhythm.allowance.periodEnd, articlesLeft, perCycle: rhythm.allowance.limit } : null,
+      cycle: rhythm.allowance ? { periodStartIso: rhythm.allowance.periodStart, periodEndIso: rhythm.allowance.periodEnd, articlesLeft, perCycle: shareOf(rhythm.allowance.limit) } : null,
     })
     : []
   let pendingIndex = 0

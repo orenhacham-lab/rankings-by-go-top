@@ -626,7 +626,7 @@ function main() {
   const order = orderOffenders(httpSrc)
   check('auth → own project (session client) → flag → body → entitlement → caps → claim → create → after()', order.length === 0, order.join(' ; '))
   check('MUTATION CONTROL: redeeming the token before the caps is caught',
-    orderOffenders(httpSrc.replace('const caps = await checkSeedCaps(admin, scope, now, deps.env)', 'const early = await deps.consumeClaim(admin, "", now)\n    const caps = await checkSeedCaps(admin, scope, now, deps.env)')).length > 0)
+    orderOffenders(httpSrc.replace('const caps = await checkSeedCaps(admin, scope, now, deps.env, accountCap)', 'const early = await deps.consumeClaim(admin, "", now)\n    const caps = await checkSeedCaps(admin, scope, now, deps.env, accountCap)')).length > 0)
   check('MUTATION CONTROL: reading the project with the service role is caught',
     orderOffenders(httpSrc.replace('readOwnProject(session.db, projectId, session.userId)', 'readOwnProject(deps.admin(), projectId, session.userId)')).length > 0)
   // `continue`: after the same gate and entitlement, before the caps (it

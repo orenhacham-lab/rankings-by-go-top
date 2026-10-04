@@ -53,7 +53,7 @@ const WORKING_WEEKDAYS = [0, 1, 2, 3, 4]
  * subscription. A trial says its dates were fixed when the account opened; a
  * paid plan says what the plan gives.
  */
-type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[] } | { source: 'trial' } | { source: 'owner' }
+type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[]; intervalDays?: number | null } | { source: 'trial' } | { source: 'owner' }
 interface QueueItem {
   id: string
   topicId: string | null
@@ -510,9 +510,13 @@ export default function AutomationSchedule({
   // screen says what the plan gives (the dates below are the real ones).
   const planRhythm = rhythm?.source === 'plan' ? rhythm : null
   const rhythmLine = planRhythm
-    ? (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
-      .replace('{n}', String(planRhythm.perWeek))
-      .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
+    // More sites than a weekly rhythm can serve: this one publishes every N
+    // days instead of on a fixed weekday, so the line names the gap.
+    ? planRhythm.intervalDays
+      ? t.planRhythmGapLine.replace('{n}', String(planRhythm.intervalDays))
+      : (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
+        .replace('{n}', String(planRhythm.perWeek))
+        .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
     : rhythm?.source === 'trial' ? t.trialRhythmLine : null
 
   // Flat inside the strategy's "advanced" card, below a divider (final review R14).

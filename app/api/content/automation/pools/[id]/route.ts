@@ -76,7 +76,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ? null
     : keepStoredSlot
       ? pool.next_publish_at
-      : makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: scheduleRhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null })(Date.now())
+      : makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: scheduleRhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null, planIntervalDays: scheduleRhythm.plan?.intervalDays ?? null })(Date.now())
 
   const { data, error } = await auth.admin.from('article_pools').update(patch).eq('id', id).select(POOL_SELECT).single()
   if (error || !data) {

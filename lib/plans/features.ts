@@ -35,6 +35,7 @@
  * all read it without pulling anything into a page bundle.
  */
 
+import { MAX_ARTICLES_PER_WEEK_PER_SITE as PER_SITE } from '@/lib/content/automation/schedule'
 import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from './catalog'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
@@ -50,6 +51,13 @@ function isSingleProject(code: PlanCode): boolean {
 }
 
 /**
+ * A MULTI-SITE PLAN ALSO STATES ITS PER-SITE RATE, because the account-wide
+ * total is not what any one website receives: no site takes more than one
+ * article a working day (MAX_ARTICLES_PER_WEEK_PER_SITE). Without the clause
+ * a Premium customer with a single website would read "50 a month" and get
+ * around 21, so the number is templated from the same constant the scheduler
+ * caps by and cannot drift from it.
+ *
  * THE FIVE LIMIT LINES, each addressable by name so the ORDER can be a
  * decision rather than an accident of how the array was typed.
  *
@@ -71,7 +79,7 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
     return {
       articles: single
         ? `${c.maxArticlesPerPeriodAccountWide} artículos al mes, escritos y publicados en tu web automáticamente`
-        : `${c.maxArticlesPerPeriodAccountWide} artículos al mes, escritos y publicados automáticamente, compartidos entre todas tus webs`,
+        : `${c.maxArticlesPerPeriodAccountWide} artículos al mes, escritos y publicados automáticamente, compartidos entre todas tus webs, hasta ${PER_SITE} a la semana por web`,
       projects: single ? '1 web' : `Hasta ${c.maxProjects} webs`,
       keywords: single
         ? `Seguimiento de hasta ${c.maxKeywordsPerProject} palabras clave`
@@ -90,7 +98,7 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
       // published to the customer's site without them lifting a finger.
       articles: single
         ? `${c.maxArticlesPerPeriodAccountWide} articles a month, written and published to your website automatically`
-        : `${c.maxArticlesPerPeriodAccountWide} articles a month, written and published automatically, shared across all your websites`,
+        : `${c.maxArticlesPerPeriodAccountWide} articles a month, written and published automatically, shared across all your websites, up to ${PER_SITE} a week per website`,
       projects: single ? '1 website' : `Up to ${c.maxProjects} websites`,
       keywords: single ? `Track up to ${c.maxKeywordsPerProject} keywords` : `Track up to ${c.maxKeywordsPerProject} keywords per website`,
       google: single
@@ -104,7 +112,7 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
   return {
     articles: single
       ? `${c.maxArticlesPerPeriodAccountWide} מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית`
-      : `${c.maxArticlesPerPeriodAccountWide} מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם`,
+      : `${c.maxArticlesPerPeriodAccountWide} מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד ${PER_SITE} בשבוע לכל אתר`,
     projects: single ? 'אתר אחד' : `עד ${c.maxProjects} אתרים`,
     keywords: single ? `מעקב אחרי עד ${c.maxKeywordsPerProject} מילות מפתח` : `מעקב אחרי עד ${c.maxKeywordsPerProject} מילות מפתח לכל אתר`,
     google: single

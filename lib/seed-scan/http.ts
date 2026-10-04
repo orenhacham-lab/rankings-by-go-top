@@ -84,6 +84,31 @@ import {
 export const RESCAN_COOLDOWN_MS = 24 * 60 * 60 * 1000
 /** Runs one user may start per UTC day, across all of their projects. SEED_SCAN_USER_DAILY_CAP. */
 export const DEFAULT_USER_DAILY_CAP = 10
+
+/**
+ * THE ACCOUNT'S DAILY CAP IS NEVER BELOW THE NUMBER OF WEBSITES IT MAY HAVE.
+ *
+ * The cap counts an account's runs across ALL of its projects, so a flat ten a
+ * day meant an account could only ever map ten of its websites on the day it
+ * set them up: the owner mapped ten projects and every FURTHER project then
+ * answered "you have reached today's mapping limit" although it had never been
+ * mapped (4 October 2026). It would have met a Premium customer (10 websites)
+ * on their first day and an Agency customer (100) immediately.
+ *
+ * The cap's job is to stop ONE account using up the global daily budget, not to
+ * stop an account mapping the websites it is paying for. So it is the larger of
+ * the configured number and the account's own website allowance, and an admin
+ * account — unmetered everywhere else in the product — has none.
+ *
+ * What stops the same site being mapped again and again is a different rule and
+ * is unchanged: RESCAN_COOLDOWN_MS, 24 hours, per project. The global daily cap
+ * is unchanged too, and still bounds everything.
+ */
+export function userDailyCap(input: { isAdmin: boolean; siteAllowance: number; configured: number }): number | 'none' {
+  if (input.isAdmin) return 'none'
+  const allowance = Number.isFinite(input.siteAllowance) ? Math.max(0, Math.floor(input.siteAllowance)) : 0
+  return Math.max(input.configured, allowance)
+}
 /** Runs all users together may start per UTC day. SEED_SCAN_GLOBAL_DAILY_CAP. */
 export const DEFAULT_GLOBAL_DAILY_CAP = 300
 const MAX_BODY_CHARS = 4_096
@@ -108,6 +133,13 @@ export type SeedRouteDeps = {
   session: () => Promise<SeedSession>
   admin: () => ServiceRoleClient
   isAdmin: (admin: ServiceRoleClient, userId: string) => Promise<boolean>
+  /**
+   * How many websites the account is entitled to (the plan's maxProjects). The
+   * day's cap is never below it, so an account can map the websites it pays
+   * for — see userDailyCap. A failed read answers 0, which only ever falls back
+   * to the configured number.
+   */
+  siteAllowance: (admin: ServiceRoleClient, userId: string) => Promise<number>
   /** The existing entitlement decision (lib/subscription.ts explainAccess). */
   access: (admin: ServiceRoleClient, userId: string) => Promise<{ allowed: boolean; authority: string }>
   consumeClaim: (admin: ServiceRoleClient, token: string, now: Date) => Promise<ClaimOutcome>
@@ -251,6 +283,11 @@ export async function checkSeedCaps(
   scope: SeedScope,
   now: Date,
   env: Record<string, string | undefined>,
+  /**
+   * The account's own ceiling for the day (userDailyCap). Left out it is the
+   * configured number, as before; `'none'` is an account with no cap of its own.
+   */
+  accountCap: number | 'none' | null = null,
 ): Promise<Caps> {
   const internal: Caps = { ok: false, status: 500, code: 'internal' }
 
@@ -267,10 +304,16 @@ export async function checkSeedCaps(
 
   const dayStart = utcDayStart(now)
   const tomorrow = dayStart.getTime() + 24 * 60 * 60 * 1000
-  const mine = await countUserSeedRunsSince(admin, scope.userId, dayStart)
-  if (mine === 'error') return internal
-  if (mine >= capFromEnv(env.SEED_SCAN_USER_DAILY_CAP, DEFAULT_USER_DAILY_CAP)) {
-    return { ok: false, status: 429, code: 'user_daily_cap', retryAfterSeconds: secondsUntil(now, tomorrow) }
+  // An account with no cap of its own (an admin) is still bounded by the global
+  // cap below and by the per-project cooldown above.
+  // Called without a ceiling (an older caller) it is the configured number, as before.
+  const cap = accountCap === null ? capFromEnv(env.SEED_SCAN_USER_DAILY_CAP, DEFAULT_USER_DAILY_CAP) : accountCap
+  if (cap !== 'none') {
+    const mine = await countUserSeedRunsSince(admin, scope.userId, dayStart)
+    if (mine === 'error') return internal
+    if (mine >= cap) {
+      return { ok: false, status: 429, code: 'user_daily_cap', retryAfterSeconds: secondsUntil(now, tomorrow) }
+    }
   }
   const everyone = await countAllSeedRunsSince(admin, dayStart)
   if (everyone === 'error') return internal
@@ -306,10 +349,17 @@ export async function handleSeedPost(request: Request, projectId: string, deps: 
     if (!access.allowed) return refuse(403, 'entitlement_required')
 
     const scope: SeedScope = { projectId: project.id, userId }
+    // The day's cap for THIS account: never below the websites it may have, and
+    // none at all for an admin. A failed read of either is the strict answer.
+    let accountCap: number | 'none' = capFromEnv(deps.env.SEED_SCAN_USER_DAILY_CAP, DEFAULT_USER_DAILY_CAP)
+    try {
+      const [isAdmin, siteAllowance] = await Promise.all([deps.isAdmin(admin, userId), deps.siteAllowance(admin, userId)])
+      accountCap = userDailyCap({ isAdmin, siteAllowance, configured: accountCap })
+    } catch { /* the configured number stands */ }
     // Stage B of the latest run: it starts no new run, so no caps; its own checks.
     if (body.action === 'continue') return handleSeedContinue(body, { admin, scope, targetDomain: project.target_domain }, deps)
     const now = deps.now()
-    const caps = await checkSeedCaps(admin, scope, now, deps.env)
+    const caps = await checkSeedCaps(admin, scope, now, deps.env, accountCap)
     if (!caps.ok) return refuse(caps.status, caps.code, caps.retryAfterSeconds)
 
     const siteKey = projectSiteKey(project.target_domain)

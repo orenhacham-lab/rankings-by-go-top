@@ -57,6 +57,9 @@ const he = {
   coversFrom: (date: string) => `הפרויקט נפתח ב-${date}, ולכן הדוח מתחיל מאותו יום.`,
   copy: 'העתקת הסיכום',
   copied: 'הסיכום הועתק',
+  download: 'הורדת הדוח',
+  downloading: 'מכינים את הקובץ…',
+  downloadFailed: 'לא הצלחנו להכין את הקובץ. נסו שוב בעוד רגע.',
   headlineParts: {
     firstPage: (n: string) => `${n} מילים בעמוד הראשון של גוגל`,
     improved: (n: string) => `${n} מילים טיפסו`,
@@ -165,6 +168,9 @@ const en: MonthlyCopy = {
   coversFrom: (date) => `The project was opened on ${date}, so the report starts from that day.`,
   copy: 'Copy summary',
   copied: 'Summary copied',
+  download: 'Download the report',
+  downloading: 'Preparing the file…',
+  downloadFailed: 'We could not prepare the file. Please try again in a moment.',
   headlineParts: {
     firstPage: (n) => `${n} keywords on Google’s first page`,
     improved: (n) => `${n} climbed`,
@@ -271,6 +277,9 @@ const es: MonthlyCopy = {
   coversFrom: (date) => `El proyecto se abrió el ${date}, así que el informe empieza ese día.`,
   copy: 'Copiar el resumen',
   copied: 'Resumen copiado',
+  download: 'Descargar el informe',
+  downloading: 'Preparando el archivo…',
+  downloadFailed: 'No hemos podido preparar el archivo. Vuelve a intentarlo en un momento.',
   headlineParts: {
     firstPage: (n) => `${n} palabras clave en la primera página de Google`,
     improved: (n) => `${n} han subido`,

@@ -16,13 +16,18 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { readUsageAllowance } from '@/lib/billing/usage-allowance'
 import { getUserEntitlement } from '@/lib/subscription'
 import { isPlanCode, type PlanCode } from '@/lib/plans/catalog'
-import { articlesPerWeekFor, weeklyRhythm } from '@/lib/content/automation/schedule'
+import { perSiteRate, weeklyRhythm } from '@/lib/content/automation/schedule'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 export interface PublishRhythm {
   allowance: { periodStart: string | null; periodEnd: string; remaining: number; limit: number } | null
-  plan: { code: PlanCode; monthly: number; activeQueues: number; perWeek: number; perDay: number[] } | null
+  /**
+   * `perDay` is the weekly rhythm; it is NULL when the site's share is too
+   * small for one and `intervalDays` carries the rate instead (perSiteRate).
+   * Exactly one of the two is set.
+   */
+  plan: { code: PlanCode; monthly: number; activeQueues: number; perWeek: number; perDay: number[] | null; intervalDays: number | null } | null
   /**
    * THE TRIAL DOES NOT CHOOSE ITS OWN RHYTHM (owner, 4 October 2026: "a trial
    * account should have no option to pick the cadence or to create an article;
@@ -53,8 +58,16 @@ export async function readPublishRhythm(admin: Admin, userId: string | null | un
     if (!isPlanCode(a.plan) || !(a.limit > 0)) return { allowance, plan: null, trial }
     const { count } = await admin.from('article_pools').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('is_active', true)
     const activeQueues = Math.max(1, (count ?? 0) + (opts.countThisQueue ? 1 : 0))
-    const perWeek = articlesPerWeekFor(a.limit, activeQueues)
-    return { allowance, plan: { code: a.plan, monthly: a.limit, activeQueues, perWeek, perDay: weeklyRhythm(perWeek) }, trial }
+    const rate = perSiteRate(a.limit, activeQueues)
+    return {
+      allowance,
+      plan: {
+        code: a.plan, monthly: a.limit, activeQueues, perWeek: rate.perWeek,
+        perDay: rate.intervalDays ? null : weeklyRhythm(rate.perWeek),
+        intervalDays: rate.intervalDays,
+      },
+      trial,
+    }
   } catch {
     return NO_RHYTHM
   }

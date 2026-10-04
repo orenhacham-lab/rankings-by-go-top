@@ -251,7 +251,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
           // spread over what is left of the billing cycle when that is known.
           const rhythm = await readPublishRhythmForProject(admin, pool.project_id)
           const perDay = rhythm.plan?.perDay ?? null
-          const slotAfter = makeSlotAfter({ publishTime, timeZone: tz, perDay, publishDays: pool.publish_days, intervalDays, anchorIso: pool.next_publish_at })
+          const slotAfter = makeSlotAfter({ publishTime, timeZone: tz, perDay, publishDays: pool.publish_days, intervalDays, anchorIso: pool.next_publish_at, planIntervalDays: rhythm.plan?.intervalDays ?? null })
           const nextSlotAfter = async (fromMs: number) => {
             const cadenceNextIso = slotAfter(fromMs)
             return rhythm.allowance
