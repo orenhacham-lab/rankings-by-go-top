@@ -63,6 +63,11 @@ interface QueueItem {
 interface ApprovedTopic { id: string; topic: string; status: string }
 
 
+/** The statuses that still have a publish ahead of them — the API's own list
+ *  (app/api/content/automation/pools/route.ts), which is what decides whether a
+ *  row carries a projected slot or a date it already has. */
+const PENDING_STATUSES = ['queued', 'scheduled', 'generating', 'generated', 'publishing']
+
 export default function AutomationSchedule({
   projectId,
   uiLocale,
@@ -145,6 +150,7 @@ export default function AutomationSchedule({
   const weekdayOptions = WORKING_WEEKDAYS.map((i) => ({ value: String(i), label: t.weekdays[i] as string }))
   const [approvedExpanded, setApprovedExpanded] = useState(false)
   const [queueExpanded, setQueueExpanded] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -379,11 +385,23 @@ export default function AutomationSchedule({
     }
   }
 
+  /**
+   * Reorder within the UPCOMING list.
+   *
+   * The arrows used to act on the whole list, published history included, so on
+   * an old queue "up" swapped an article that is still to come with one that
+   * went out in July. The queue's order only ever meant the order of what is
+   * still to come; the server is still sent the full order, with the finished
+   * rows where they already were.
+   */
   async function move(index: number, dir: -1 | 1) {
-    const next = [...items]
     const j = index + dir
-    if (j < 0 || j >= next.length) return
-    ;[next[index], next[j]] = [next[j]!, next[index]!]
+    if (j < 0 || j >= upcoming.length) return
+    const a = items.findIndex((x) => x.id === upcoming[index]!.id)
+    const b = items.findIndex((x) => x.id === upcoming[j]!.id)
+    if (a < 0 || b < 0) return
+    const next = [...items]
+    ;[next[a], next[b]] = [next[b]!, next[a]!]
     setItems(next)
     if (!pool) return
     await fetch(`/api/content/automation/pools/${pool.id}/items`, {
@@ -392,6 +410,79 @@ export default function AutomationSchedule({
     })
     onChanged?.()
   }
+
+  /**
+   * WHAT IS STILL TO COME, AND WHAT ALREADY WENT OUT — two lists, not one.
+   *
+   * The queue is stored and returned in `position` order, which is the order
+   * the runner will work through. The screen showed that one list whole, so an
+   * account with months of history opened on its THREE OLDEST PUBLISHED
+   * articles — July, on a screen whose job is to say what happens next — and
+   * where a published row had drifted to a position after the pending ones,
+   * the dates ran backwards in the middle of the list. Reported by the owner,
+   * 4 October 2026: "the publishing queues are a mess and the dates are out of
+   * order."
+   *
+   * Upcoming keeps the queue's own order, which IS its date order: the API
+   * hands each pending item the slot the runner will publish it in, in this
+   * order. History is newest first, the way a log reads, and is closed until
+   * asked for.
+   */
+  const upcoming = items.filter((i) => PENDING_STATUSES.includes(i.status))
+  const history = items
+    .filter((i) => !PENDING_STATUSES.includes(i.status))
+    .sort((a, b) => (Date.parse(b.projectedPublishAt ?? '') || 0) - (Date.parse(a.projectedPublishAt ?? '') || 0))
+
+  /** One queue row. `reorderable` is what tells the upcoming list from the
+   *  finished one: only what is still to come has an order to change. */
+  const renderRow = (it: QueueItem, idx: number, reorderable: boolean) => (
+            <div key={it.id} className="flex flex-wrap items-center gap-3 py-3">
+              {reorderable && (
+                <div className="flex flex-col">
+                  <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={t.moveUp}
+                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronUp aria-hidden="true" className="size-4" /></button>
+                  <button type="button" onClick={() => move(idx, 1)} disabled={idx === upcoming.length - 1} aria-label={t.moveDown}
+                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronDown aria-hidden="true" className="size-4" /></button>
+                </div>
+              )}
+              <div className="flex-1 min-w-[10rem]">
+                <div className="truncate text-copy font-medium text-ink">{it.topicTitle}</div>
+                <div className="text-caption text-muted">{fmtDay(it.projectedPublishAt, PENDING_STATUSES.includes(it.status))}{it.lastError ? ` · ${reasonLabel(it.lastError)}` : ''}</div>
+              </div>
+              <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
+              <div className="flex items-center gap-1">
+                {it.status === 'publishing' && <span className="text-caption text-muted">{t.publishingNow}</span>}
+                {it.status === 'published' && <span className="text-caption text-ok">{t.publishedDone}</span>}
+                {/* The row's one inline action; the rest is in the row menu. */}
+                {/* "Publish now" belongs to the project's first article only (lib/content/strategy/first-article.ts);
+                    every other article goes out on the plan's rhythm. A failed publish keeps its retry. */}
+                {it.status === 'generated' && canPublishFirstNow({ articles: articlesForFirst, queue: items, itemId: it.id }) && (
+                  <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                    {busyItem === it.id ? t.publishingNow : t.publishNow}
+                  </Button>
+                )}
+                {it.status === 'failed' && it.articleId && (
+                  <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                    {busyItem === it.id ? t.publishingNow : t.retry}
+                  </Button>
+                )}
+                {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
+                  <Button size="sm" variant="secondary" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                    {busyItem === it.id ? t.generatingArticle : t.generateNow}
+                  </Button>
+                )}
+                {(() => {
+                  const menu: RowMenuItem[] = []
+                  if (it.status === 'published' && it.wpPostUrl) menu.push({ key: 'post', label: t.openPost, onSelect: () => window.open(it.wpPostUrl!, '_blank', 'noopener,noreferrer'), icon: <ExternalLink className="size-4" aria-hidden="true" /> })
+                  if (it.status === 'generated' && it.articleId) menu.push({ key: 'editor', label: t.openEditor, href: `/content/articles/${it.articleId}`, icon: <FileText className="size-4" aria-hidden="true" /> })
+                  if (it.status === 'skipped' || it.status === 'paused') menu.push({ key: 'unskip', label: t.retry, onSelect: () => itemAction(it.id, 'unskip'), disabled: busyItem === it.id, icon: <RotateCcw className="size-4" aria-hidden="true" /> })
+                  if (it.status === 'queued') menu.push({ key: 'skip', label: t.skip, onSelect: () => itemAction(it.id, 'skip'), disabled: busyItem === it.id, icon: <SkipForward className="size-4 rtl:-scale-x-100" aria-hidden="true" /> })
+                  if (it.status !== 'publishing') menu.push({ key: 'remove', label: t.remove, danger: true, onSelect: () => itemAction(it.id, 'remove'), disabled: busyItem === it.id, icon: <Trash2 className="size-4" aria-hidden="true" /> })
+                  return menu.length > 0 ? <RowMenu label={`${t.queueTitle}: ${it.topicTitle}`} items={menu} /> : null
+                })()}
+              </div>
+            </div>
+  )
 
   // Date-only (no exact hour, since a daily cron can't guarantee the minute).
   // For still-pending items we append "· during the day".
@@ -586,70 +677,48 @@ export default function AutomationSchedule({
             <span className="sr-only">{t.queueTitle}</span>
             {[0, 1].map((i) => <Skeleton key={i} className="h-16 rounded-inset" />)}
           </div>
-        ) : items.length === 0 ? (
+        ) : upcoming.length === 0 ? (
           <p className="rounded-inset border border-dashed border-line-strong px-4 py-5 text-center text-copy text-muted">{t.queueEmpty}</p>
         ) : (
           <div className="list-enter divide-y divide-line border-y border-line">
-            {(queueExpanded ? items : items.slice(0, 3)).map((it, idx) => (
-              <div key={it.id} className="flex flex-wrap items-center gap-3 py-3">
-                <div className="flex flex-col">
-                  <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={t.moveUp}
-                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronUp aria-hidden="true" className="size-4" /></button>
-                  <button type="button" onClick={() => move(idx, 1)} disabled={idx === items.length - 1} aria-label={t.moveDown}
-                    className="rounded-control p-0.5 text-muted transition-colors hover:bg-sunk hover:text-ink disabled:opacity-30"><ChevronDown aria-hidden="true" className="size-4" /></button>
-                </div>
-                <div className="flex-1 min-w-[10rem]">
-                  <div className="truncate text-copy font-medium text-ink">{it.topicTitle}</div>
-                  <div className="text-caption text-muted">{fmtDay(it.projectedPublishAt, ['queued', 'scheduled', 'generated', 'generating', 'publishing'].includes(it.status))}{it.lastError ? ` · ${reasonLabel(it.lastError)}` : ''}</div>
-                </div>
-                <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
-                <div className="flex items-center gap-1">
-                  {it.status === 'publishing' && <span className="text-caption text-muted">{t.publishingNow}</span>}
-                  {it.status === 'published' && <span className="text-caption text-ok">{t.publishedDone}</span>}
-                  {/* The row's one inline action; the rest is in the row menu. */}
-                  {/* "Publish now" belongs to the project's first article only (lib/content/strategy/first-article.ts);
-                      every other article goes out on the plan's rhythm. A failed publish keeps its retry. */}
-                  {it.status === 'generated' && canPublishFirstNow({ articles: articlesForFirst, queue: items, itemId: it.id }) && (
-                    <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
-                      {busyItem === it.id ? t.publishingNow : t.publishNow}
-                    </Button>
-                  )}
-                  {it.status === 'failed' && it.articleId && (
-                    <Button size="sm" variant="secondary" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
-                      {busyItem === it.id ? t.publishingNow : t.retry}
-                    </Button>
-                  )}
-                  {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
-                    <Button size="sm" variant="secondary" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
-                      {busyItem === it.id ? t.generatingArticle : t.generateNow}
-                    </Button>
-                  )}
-                  {(() => {
-                    const menu: RowMenuItem[] = []
-                    if (it.status === 'published' && it.wpPostUrl) menu.push({ key: 'post', label: t.openPost, onSelect: () => window.open(it.wpPostUrl!, '_blank', 'noopener,noreferrer'), icon: <ExternalLink className="size-4" aria-hidden="true" /> })
-                    if (it.status === 'generated' && it.articleId) menu.push({ key: 'editor', label: t.openEditor, href: `/content/articles/${it.articleId}`, icon: <FileText className="size-4" aria-hidden="true" /> })
-                    if (it.status === 'skipped' || it.status === 'paused') menu.push({ key: 'unskip', label: t.retry, onSelect: () => itemAction(it.id, 'unskip'), disabled: busyItem === it.id, icon: <RotateCcw className="size-4" aria-hidden="true" /> })
-                    if (it.status === 'queued') menu.push({ key: 'skip', label: t.skip, onSelect: () => itemAction(it.id, 'skip'), disabled: busyItem === it.id, icon: <SkipForward className="size-4 rtl:-scale-x-100" aria-hidden="true" /> })
-                    if (it.status !== 'publishing') menu.push({ key: 'remove', label: t.remove, danger: true, onSelect: () => itemAction(it.id, 'remove'), disabled: busyItem === it.id, icon: <Trash2 className="size-4" aria-hidden="true" /> })
-                    return menu.length > 0 ? <RowMenu label={`${t.queueTitle}: ${it.topicTitle}`} items={menu} /> : null
-                  })()}
-                </div>
-              </div>
-            ))}
-            {items.length > 3 && (
+            {(queueExpanded ? upcoming : upcoming.slice(0, 3)).map((it, idx) => renderRow(it, idx, true))}
+            {upcoming.length > 3 && (
               <div className="py-3">
                 <button
                   type="button"
                   onClick={() => setQueueExpanded((v) => !v)}
                   className="inline-flex h-8 items-center justify-center gap-1 rounded-pill border border-line bg-surface px-3.5 text-caption font-semibold text-action shadow-control transition-colors hover:border-line-strong hover:bg-action-soft"
                 >
-                  {queueExpanded ? t.showLess : `${t.showMore} (${items.length - 3})`}
+                  {queueExpanded ? t.showLess : `${t.showMore} (${upcoming.length - 3})`}
                 </button>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* WHAT ALREADY WENT OUT — closed until asked for. It is a log, so it
+          reads newest first and has no arrows: its order is a fact, not a
+          choice. Keeping it out of the queue above is what stops a screen
+          about the next article from opening on one published in July. */}
+      {history.length > 0 && (
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            aria-expanded={historyOpen}
+            className="inline-flex items-center gap-1.5 rounded-control text-copy font-semibold text-ink hover:text-action focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+          >
+            <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 transition-transform duration-150', historyOpen && 'rotate-180')} />
+            {t.publishedTitle} ({history.length})
+          </button>
+          {historyOpen && (
+            <div className="mt-2 list-enter divide-y divide-line border-y border-line">
+              {history.map((it) => renderRow(it, 0, false))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Admin/QA tools — collapsed by default so normal clients aren't confused
           by the manual run action. */}

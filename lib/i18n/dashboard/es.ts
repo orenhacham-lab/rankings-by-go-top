@@ -1207,6 +1207,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       addSelected: 'Añadir a la cola',
       queueTitle: 'Cola de publicación',
       queueEmpty: 'La cola está vacía. Añade temas aprobados para empezar.',
+      publishedTitle: 'Ya publicados',
       remove: 'Quitar',
       retry: 'Reintentar',
       skip: 'Saltar',
