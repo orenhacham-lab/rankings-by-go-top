@@ -535,7 +535,13 @@ export function buildStrategyBoard(input: {
   }
 
   // Every idea card was added after every other card; the swapped ones go last.
-  const ordered = [...cards.filter((c) => c.column !== 'ideas'), ...deferLast(cards.filter((c) => c.column === 'ideas'), input.deferred ?? [])]
+  // The other three columns are put in the order of the date each card shows.
+  const ordered = [
+    ...byColumnDate(cards.filter((c) => c.column === 'planned')),
+    ...byColumnDate(cards.filter((c) => c.column === 'written')),
+    ...[...cards.filter((c) => c.column === 'published')].sort(newestFirst),
+    ...deferLast(cards.filter((c) => c.column === 'ideas'), input.deferred ?? []),
+  ]
 
   const counts: Record<StrategyColumn, number> = { ideas: 0, planned: 0, written: 0, published: 0 }
   for (const c of ordered) counts[c.column]++
@@ -550,6 +556,47 @@ export function buildStrategyBoard(input: {
     hasArticles: data.articles.length > 0,
     counts,
   }
+}
+
+/**
+ * THE ORDER OF A COLUMN, which is the order of the dates its cards show.
+ *
+ * The cards used to arrive in whatever order the topics and articles were read
+ * in, so "planned" put a topic added in July next to an article due tomorrow and
+ * the dates ran up and down the column. The owner reported it on 5 October 2026,
+ * on the projects of an admin account, which carry the most rows.
+ *
+ * "Planned" and "written" answer what happens next, so a card with a real publish
+ * date comes first, soonest first. The rest have no date of their own but the day
+ * they were added or written, so they follow, newest first. "Published" is a log,
+ * newest first. A card whose date cannot be read goes last, which is the opposite
+ * of where Date.parse of nothing would put it.
+ */
+const DATED_KINDS: readonly StrategyDateKind[] = ['publishTarget', 'scheduled']
+
+function timeOf(iso: string | null | undefined): number | null {
+  const t = Date.parse(iso ?? '')
+  return Number.isFinite(t) ? t : null
+}
+
+function compareBy(a: StrategyCard, b: StrategyCard, direction: 1 | -1): number {
+  const x = timeOf(a.date)
+  const y = timeOf(b.date)
+  if (x === null && y === null) return 0
+  if (x === null) return 1
+  if (y === null) return -1
+  return x === y ? 0 : (x < y ? -1 : 1) * direction
+}
+
+export function soonestFirst(a: StrategyCard, b: StrategyCard): number { return compareBy(a, b, 1) }
+export function newestFirst(a: StrategyCard, b: StrategyCard): number { return compareBy(a, b, -1) }
+
+/** A date of its own first, soonest first; then the undated ones, newest first. */
+export function byColumnDate(cards: StrategyCard[]): StrategyCard[] {
+  const dated = cards.filter((c) => DATED_KINDS.includes(c.dateKind) && timeOf(c.date) !== null)
+  const keys = new Set(dated.map((c) => c.key))
+  const rest = cards.filter((c) => !keys.has(c.key))
+  return [...dated.sort(soonestFirst), ...rest.sort(newestFirst)]
 }
 
 /** A stable order: the cards not swapped keep theirs, then the swapped ones, oldest swap first. */

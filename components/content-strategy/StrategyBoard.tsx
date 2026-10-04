@@ -152,6 +152,15 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
   const cards = column === 'ideas' ? [...raw].sort((a, b) => IDEA_GROUP_ORDER.indexOf(ideaGroupOf(a)) - IDEA_GROUP_ORDER.indexOf(ideaGroupOf(b))) : raw
   const shown = open ? cards : cards.slice(0, COLUMN_PREVIEW)
   const hidden = cards.length - shown.length
+  /**
+   * Swap is offered while the column holds another idea to swap for, which is what
+   * the action needs. It used to be offered only while the column held MORE than it
+   * shows, so it came and went for no reason the customer could see: absent with
+   * five ideas or fewer, and gone again the moment "show more" was open (owner
+   * report, 5 October 2026).
+   */
+  const canSwap = cards.length > 1
+  const swapped = column === 'ideas' && act ? act.actions.deferred.length : 0
   // The ideas column names each kind of card with its own count when there is more than one (the
   // dashboard's "N topics waiting" is the first group's number).
   const totals = column === 'ideas' ? ideaGroupCounts(cards) : null
@@ -173,6 +182,14 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
           {note}
         </p>
       )}
+      {swapped > 0 && (
+        <p data-idea-swapped={swapped} className="-mt-1 mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-caption text-muted">
+          {s.ideaActions.swappedNote(swapped)}
+          <button type="button" onClick={() => act?.actions.undoSwap()} data-idea-action="undo-swap" className="font-semibold text-action underline-offset-2 hover:underline">
+            {s.ideaActions.undoSwap}
+          </button>
+        </p>
+      )}
       {cards.length === 0 ? (
         <p className="rounded-control border border-dashed border-line-strong/70 px-3 py-4 text-caption text-muted">{s.columnEmpty[column]}</p>
       ) : (
@@ -184,7 +201,7 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
                   {s.ideaGroups[g.kind]} <span className="tabular-nums text-muted">({g.total})</span>
                 </p>
                 <ul className="space-y-2">
-                  {g.cards.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} /></li>)}
+                  {g.cards.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={canSwap} insight={insights?.get(c.key)} /></li>)}
                 </ul>
               </div>
             ))}
@@ -192,7 +209,7 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
         ) : (
           <ul className="space-y-2">
             {/* Swap brings the next pending idea in, so it is offered while the column holds more than it shows. */}
-            {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} /></li>)}
+            {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={canSwap} insight={insights?.get(c.key)} /></li>)}
           </ul>
         )
       )}

@@ -2312,7 +2312,13 @@ export const dashboardHe = {
       existing: 'כבר יש נושא כזה בתוכנית, אז לא נוצרה כפילות.',
       covered: 'באתר כבר יש תוכן על הנושא הזה, אז לא נוצר נושא נוסף.',
       rejected: 'הרעיון הוסר ולא יוצע שוב.',
-      swapped: 'הנושא הוחלף ברעיון הבא.',
+      swapped: 'הנושא הוחלף ברעיון הבא. הוא עבר לסוף הרשימה ולא נמחק.',
+      // A swap moves the idea to the end of the column, so with more ideas than the
+      // column shows the card leaves the view. Without this line a customer reads
+      // that as "the swap deleted my idea" (owner report, 5 October 2026).
+      swappedNote: (n: number) => (n === 1 ? 'רעיון אחד שהחלפתם עבר לסוף הרשימה. שום דבר לא נמחק.' : `${n} רעיונות שהחלפתם עברו לסוף הרשימה. שום דבר לא נמחק.`),
+      undoSwap: 'החזר אותם',
+      swapUndone: 'הרעיונות חזרו לסדר שלהם.',
       approveError: 'לא הצלחנו לאשר את הרעיון. נסו שוב בעוד רגע.',
       rejectError: 'לא הצלחנו להסיר את הרעיון. נסו שוב בעוד רגע.',
       addKeyword: 'הוסף מילת מפתח',

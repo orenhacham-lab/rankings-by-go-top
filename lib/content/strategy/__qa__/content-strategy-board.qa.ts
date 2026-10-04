@@ -337,6 +337,98 @@ function main() {
     }
   }
 
+  // ---------------------------------------------------------------- O) the order of a column
+  //
+  // The owner reported on 5 October 2026 that the planned articles were not in date
+  // order on the projects of his admin account. The cards used to arrive in the order
+  // the rows were read in, and every card shows a date, so the column read as broken.
+  {
+    console.log('\nO) each column is in the order of the date its cards show')
+    const topic = (id: string, title: string, createdAt: string) => ({
+      id, title, primaryKeyword: null, status: 'approved' as const, source: 'manual' as const, reason: null, createdAt,
+    })
+    const slot = (topicId: string, position: number, projectedPublishAt: string): StrategyQueueItem => ({
+      id: `q-${topicId}`, topicId, articleId: null, topicTitle: null, status: 'queued', position, projectedPublishAt,
+    })
+    // Read in the worst possible order: the furthest date first, an undated topic in the middle.
+    const data: StrategyData = {
+      ideas: [],
+      topics: [
+        topic('t-far', 'Due in three weeks', '2026-07-01T00:00:00Z'),
+        topic('t-old', 'Added in July, never queued', '2026-07-02T00:00:00Z'),
+        topic('t-soon', 'Due tomorrow', '2026-09-01T00:00:00Z'),
+        topic('t-new', 'Added yesterday, never queued', '2026-10-03T00:00:00Z'),
+      ],
+      articles: [],
+    }
+    const queue = [slot('t-far', 1, '2026-10-25T06:00:00Z'), slot('t-soon', 2, '2026-10-05T06:00:00Z')]
+    const planned = buildStrategyBoard({ data, queue, seed: NO_SEED_PLAN }).cards.filter((c) => c.column === 'planned')
+    check('O1: a card with a real publish date comes first, soonest first; the undated ones follow, newest first',
+      JSON.stringify(planned.map((c) => c.title)) === JSON.stringify(['Due tomorrow', 'Due in three weeks', 'Added yesterday, never queued', 'Added in July, never queued']),
+      JSON.stringify(planned.map((c) => c.title)))
+    check('O1a: every dated card is ahead of every undated one, whatever order the rows were read in',
+      planned.findIndex((c) => c.dateKind === 'added') > planned.map((c) => c.dateKind).lastIndexOf('publishTarget'))
+    check('O2: the dates of the dated cards ascend',
+      (() => {
+        const dates = planned.filter((c) => c.dateKind === 'publishTarget').map((c) => Date.parse(c.date ?? ''))
+        return dates.every((d, i) => i === 0 || dates[i - 1] <= d)
+      })())
+    // MUT: the same rows with no sort at all keep the order they were read in, which is what was wrong.
+    check('O2-MUT: the unsorted order is a different order, so O1 is what the sort decides',
+      JSON.stringify(data.topics.map((t) => t.title)) !== JSON.stringify(planned.map((c) => c.title)))
+
+    // Written: an article scheduled for a day, one waiting on its queue slot, one neither.
+    const article = (id: string, title: string, over: Record<string, unknown> = {}) => ({
+      id, title, status: 'draft' as const, topicId: null, scheduledAt: null, publishedAt: null, createdAt: '2026-08-01T00:00:00Z', ...over,
+    })
+    const written = buildStrategyBoard({
+      data: { ideas: [], topics: [], articles: [
+        article('a-late', 'Scheduled for the 20th', { scheduledAt: '2026-10-20T06:00:00Z' }),
+        article('a-plain', 'Written in August, no date', {}),
+        article('a-early', 'Scheduled for the 6th', { scheduledAt: '2026-10-06T06:00:00Z' }),
+        article('a-newer', 'Written in September, no date', { createdAt: '2026-09-15T00:00:00Z' }),
+      ] } as unknown as StrategyData,
+      queue: null, seed: NO_SEED_PLAN,
+    }).cards.filter((c) => c.column === 'written')
+    check('O3: the written column reads the same way: the scheduled ones first, soonest first',
+      JSON.stringify(written.map((c) => c.title)) === JSON.stringify(['Scheduled for the 6th', 'Scheduled for the 20th', 'Written in September, no date', 'Written in August, no date']),
+      JSON.stringify(written.map((c) => c.title)))
+
+    const published = buildStrategyBoard({
+      data: { ideas: [], topics: [], articles: [
+        article('p-old', 'Published in July', { status: 'published', publishedAt: '2026-07-10T06:00:00Z' }),
+        article('p-new', 'Published in October', { status: 'published', publishedAt: '2026-10-01T06:00:00Z' }),
+        article('p-mid', 'Published in August', { status: 'published', publishedAt: '2026-08-10T06:00:00Z' }),
+      ] } as unknown as StrategyData,
+      queue: null, seed: NO_SEED_PLAN,
+    }).cards.filter((c) => c.column === 'published')
+    check('O4: what is already out is a log: newest first',
+      JSON.stringify(published.map((c) => c.title)) === JSON.stringify(['Published in October', 'Published in August', 'Published in July']),
+      JSON.stringify(published.map((c) => c.title)))
+
+    const noDate = buildStrategyBoard({
+      data: { ideas: [], topics: [], articles: [
+        article('n-bad', 'No readable date', { status: 'published', publishedAt: 'not a date', createdAt: 'not a date' }),
+        article('n-ok', 'A real date', { status: 'published', publishedAt: '2026-09-09T06:00:00Z' }),
+      ] } as unknown as StrategyData,
+      queue: null, seed: NO_SEED_PLAN,
+    }).cards.filter((c) => c.column === 'published')
+    check('O5: a card whose date cannot be read goes last, not to the top',
+      JSON.stringify(noDate.map((c) => c.title)) === JSON.stringify(['A real date', 'No readable date']),
+      JSON.stringify(noDate.map((c) => c.title)))
+    check('O6: the ideas column keeps its own order (score, then the swapped ones last), not a date order',
+      (() => {
+        const ideas = buildStrategyBoard({
+          data: { ideas: [
+            { id: 'i-low', title: 'Low score, newest', primaryKeyword: null, score: 1, reason: null, source: null, createdAt: '2026-10-01T00:00:00Z' },
+            { id: 'i-high', title: 'High score, oldest', primaryKeyword: null, score: 9, reason: null, source: null, createdAt: '2026-07-01T00:00:00Z' },
+          ], topics: [], articles: [] } as unknown as StrategyData,
+          queue: null, seed: NO_SEED_PLAN,
+        }).cards.filter((c) => c.column === 'ideas')
+        return JSON.stringify(ideas.map((c) => c.title)) === JSON.stringify(['High score, oldest', 'Low score, newest'])
+      })())
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }
