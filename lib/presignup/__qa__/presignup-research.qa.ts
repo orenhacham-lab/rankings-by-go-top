@@ -535,6 +535,44 @@ async function main() {
     check('mutation control: at 23h the same kind of token IS redeemed (so the expiry check is not vacuous)', ok.ok === true)
   }
 
+  // ── 9b) the consent box points at a policy the visitor can read ─────────
+  console.log('\n9b) The consent and its privacy link, per language')
+  {
+    const src = read('components/free-check/FreeCheckResearch.tsx')
+    /*
+     * The consent sentence and the policy link beside it are the disclosure.
+     * This used to read `locale === 'en' ? '/en/privacy' : '/privacy'`, which
+     * sent a Spanish visitor to the HEBREW document: a policy in a language
+     * they were never shown is not a disclosure. The check is written against
+     * the RULE, not the current list of languages, so the next language is
+     * covered without editing this file.
+     */
+    const href = /const privacyHref = ([^\n]+)/.exec(src)?.[1] ?? ''
+    check('the privacy link is Hebrew-unprefixed and every other language its own prefix',
+      /locale === 'he' \? '\/privacy' : `\/\$\{locale\}\/privacy`/.test(href), href)
+    check('mutation control: pinning the link to one language fails the rule',
+      !/locale === 'he' \? '\/privacy' : `\/\$\{locale\}\/privacy`/.test("const privacyHref = locale === 'en' ? '/en/privacy' : '/privacy'"))
+
+    /*
+     * The stored proof must be in the words the visitor actually read, which
+     * is why reportConsentText is per locale and Spanish has its own version
+     * id. Each language's sentence must say all three things: the report, the
+     * marketing it is bundled with, and that consent can be withdrawn.
+     */
+    for (const locale of ['he', 'en', 'es'] as const) {
+      const text = reportConsentText(locale)
+      check(`${locale}: the stored consent carries its own version id`,
+        text.endsWith(locale === 'es' ? '[report-email-es-v1]' : '[report-email-v1]'), text.slice(-30))
+      check(`${locale}: it names Go Top as the sender`, /Go Top/.test(text))
+    }
+    check('the Spanish sentence is its own, not a copy of another language',
+      reportConsentText('es') !== reportConsentText('he') && reportConsentText('es') !== reportConsentText('en'))
+    check('the Spanish sentence says the report, the marketing and the withdrawal',
+      /informe/i.test(reportConsentText('es'))
+      && /comercial|marketing/i.test(reportConsentText('es'))
+      && /retirar/i.test(reportConsentText('es')))
+  }
+
   // ── 10) Google sign-in ───────────────────────────────────────────────────
   console.log('\n10) Continue with Google')
   {
