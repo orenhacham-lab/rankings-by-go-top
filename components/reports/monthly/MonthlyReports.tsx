@@ -26,8 +26,10 @@ import type { useToasts } from '@/components/ui/Toast'
 
 export const MONTHLY_REPORTS_ANCHOR = 'monthly-reports'
 
-export function MonthlyReportsBody({ body, language: l, projectLabel, selected, onSelect, onGenerate, generating, switching }: {
+export function MonthlyReportsBody({ body, projectId, language: l, projectLabel, selected, onSelect, onGenerate, generating, switching }: {
   body: MonthlyGetResponse
+  /** Passed through to the report's download; null in a render with no project. */
+  projectId?: string | null
   language: PublicLocale
   projectLabel: string
   selected: string | null
@@ -115,7 +117,7 @@ export function MonthlyReportsBody({ body, language: l, projectLabel, selected, 
         </nav>
         <div className={cn('min-w-0 transition-opacity duration-150', switching && 'opacity-60')} aria-busy={switching || undefined}>
           {body.report ? (
-            <MonthlyReportView key={body.report.month} data={body.report.data} generatedAt={body.report.generatedAt}
+            <MonthlyReportView key={body.report.month} projectId={projectId ?? null} data={body.report.data} generatedAt={body.report.generatedAt}
               generatedBy={body.report.generatedBy} language={l} projectLabel={projectLabel} />
           ) : null}
         </div>
@@ -171,7 +173,7 @@ export default function MonthlyReports({ projectId, projectLabel, language, toas
         </div>
       )}
       {load.status === 'ready' && (
-        <MonthlyReportsBody body={load.body} language={language} projectLabel={projectLabel} selected={month}
+        <MonthlyReportsBody body={load.body} projectId={projectId} language={language} projectLabel={projectLabel} selected={month}
           onSelect={setMonth} onGenerate={onGenerate} generating={generating} switching={switching} />
       )}
     </section>

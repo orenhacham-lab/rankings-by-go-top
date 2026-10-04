@@ -18,7 +18,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  articlesPerWeekFor, MAX_ARTICLES_PER_WEEK_PER_SITE, weeklyRhythm, rhythmWeekdays, nextRhythmSlotAt, makeSlotAfter, localWeekday,
+  articlesPerWeekFor, articlesPerMonthPerSite, perSiteRate, MAX_ARTICLES_PER_WEEK_PER_SITE, WEEKLY_FIT_TOLERANCE,
+  weeklyRhythm, rhythmWeekdays, nextRhythmSlotAt, makeSlotAfter, localWeekday,
   slotFitsRhythm, projectPublishDates, spreadNextPublishAt, daySlotMinutes,
 } from '@/lib/content/automation/schedule'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
@@ -60,10 +61,96 @@ check(
 // with no ceiling, which is what put 13 a week into a single site.
 check('A-MUT: without the ceiling a single site would be scheduled 13 and 50 a week', uncapped(50) === 13 && uncapped(200) === 50 && articlesPerWeekFor(50) !== uncapped(50))
 check(
-  'A4: an account allowance is shared by its active queues (50 over 3 → 4), never below 1, and the per-site ceiling still holds above it (50 over 2 → 5, not 6)',
-  articlesPerWeekFor(50, 3) === 4 && articlesPerWeekFor(4, 9) === 1 && articlesPerWeekFor(50, 2) === 5 && uncapped(50, 2) === 6,
+  'A4: an account allowance is shared by its active queues (50 over 3 → 4), and the per-site ceiling holds above it (50 over 2 → 5, not 6)',
+  articlesPerWeekFor(50, 3) === 4 && articlesPerWeekFor(50, 2) === 5 && uncapped(50, 2) === 6,
 )
+check('A4a: a share too small for a weekly rhythm reports no weekly rate at all, rather than being rounded up to one', articlesPerWeekFor(4, 9) === 0 && perSiteRate(4, 9).intervalDays !== null)
 check('A5: no allowance → no rhythm', articlesPerWeekFor(0) === 0 && articlesPerWeekFor(NaN) === 0)
+
+// A-II) EVERY SITE COUNT A PLAN ALLOWS, not just the ones a customer has today.
+// The account's allowance is the ceiling: the sum of what its sites are
+// scheduled for must not exceed it by more than the cycle spread absorbs.
+const MONTH_WEEKS = 30.44 / 7
+let worstPlan = ''
+let worstRatio = 0
+for (const c of Object.values(PLAN_CATALOG)) {
+  const monthly = c.maxArticlesPerPeriodAccountWide
+  for (let sites = 1; sites <= c.maxProjects; sites++) {
+    const r = perSiteRate(monthly, sites)
+    // The rate itself, not the rounded-up topic target: a site on a 14-day gap
+    // publishes 30.44/14 a month, not ceil(30/14).
+    const scheduled = sites * (r.intervalDays ? 30.44 / r.intervalDays : r.perWeek * MONTH_WEEKS)
+    const ratio = scheduled / monthly
+    if (ratio > worstRatio) { worstRatio = ratio; worstPlan = `${c.code} with ${sites} site(s): ${Math.round(scheduled)} a month vs ${monthly}` }
+  }
+}
+check(`A6: no plan, at any site count it allows, is scheduled for more than 1.15x its monthly allowance (worst: ${worstPlan})`, worstRatio <= 1.15, worstPlan)
+check(
+  'A7: a share no weekly rhythm fits becomes a gap in days that matches it (Agency over 100 sites → one every 15 days, over 20 sites → every 3)',
+  perSiteRate(200, 100).perWeek === 0 && perSiteRate(200, 100).intervalDays === 15 && perSiteRate(200, 20).intervalDays === 3,
+  [perSiteRate(200, 100), perSiteRate(200, 20)],
+)
+check(
+  'A8: a share a weekly rhythm does fit keeps the weekday rhythm and no gap (Agency over 12 sites → 4 a week)',
+  perSiteRate(200, 12).intervalDays === null && perSiteRate(200, 12).perWeek === 4,
+  perSiteRate(200, 12),
+)
+check(
+  'A9: the tolerance is set so the single-site plans keep exactly the rhythm they have today — Basic a weekly Sunday (4 a month is 0.92 of a week, 8% off) and Advanced 3 a week',
+  WEEKLY_FIT_TOLERANCE >= 0.09 && perSiteRate(4, 1).perWeek === 1 && perSiteRate(4, 1).intervalDays === null && perSiteRate(12, 1).perWeek === 3 && perSiteRate(12, 1).intervalDays === null,
+)
+check(
+  'A9a: above the per-site ceiling the rate is the ceiling, not a gap: the rest of the allowance waits for the account\'s other sites',
+  perSiteRate(50, 1).perWeek === MAX_ARTICLES_PER_WEEK_PER_SITE && perSiteRate(200, 1).perWeek === MAX_ARTICLES_PER_WEEK_PER_SITE
+    && perSiteRate(50, 1).intervalDays === null && perSiteRate(200, 1).intervalDays === null,
+)
+check('A10: exactly one of the two shapes is ever set', Object.values(PLAN_CATALOG).every((c) => {
+  for (let s = 1; s <= c.maxProjects; s++) {
+    const r = perSiteRate(c.maxArticlesPerPeriodAccountWide, s)
+    if ((r.perWeek > 0) === (r.intervalDays !== null)) return false
+  }
+  return true
+}))
+// A-MUT2: the floor-at-one this replaced. It is what put an Agency account's
+// 100 sites on 435 articles a month against an allowance of 200.
+const flooredMonthly = (monthly: number, sites: number) => Math.ceil(Math.min(5, Math.max(1, Math.round(monthly / 4 / sites))) * MONTH_WEEKS) * sites
+const rateMonthly = (monthly: number, sites: number) => {
+  const r = perSiteRate(monthly, sites)
+  return sites * (r.intervalDays ? 30.44 / r.intervalDays : r.perWeek * MONTH_WEEKS)
+}
+check(
+  'A-MUT2: rounding each site to the nearest week would schedule an Agency account for 261 a month over 30 sites and 435 over 100, against an allowance of 200',
+  flooredMonthly(200, 30) > 1.15 * 200 && flooredMonthly(200, 100) > 2 * 200 && rateMonthly(200, 30) <= 1.15 * 200 && rateMonthly(200, 100) <= 1.15 * 200,
+  [flooredMonthly(200, 30), flooredMonthly(200, 100), Math.round(rateMonthly(200, 30)), Math.round(rateMonthly(200, 100))],
+)
+
+check(
+  'A13: the topic top-up target covers what the site will actually publish in a month, in both shapes (never fewer topics than articles)',
+  Object.values(PLAN_CATALOG).every((c) => {
+    for (let s = 1; s <= c.maxProjects; s++) {
+      const r = perSiteRate(c.maxArticlesPerPeriodAccountWide, s)
+      const real = r.intervalDays ? 30.44 / r.intervalDays : r.perWeek * MONTH_WEEKS
+      if (articlesPerMonthPerSite(c.maxArticlesPerPeriodAccountWide, s) < Math.floor(real)) return false
+    }
+    return true
+  }),
+)
+
+// A-III) THE PLAN'S GAP OUTRANKS THE OWNER'S OWN WEEKDAYS, or an account with
+// more sites than a weekly rhythm can serve would publish on every day the
+// owner once picked and blow through the allowance anyway.
+const TZ_IL = 'Asia/Jerusalem'
+const ownerEveryWeekday = [0, 1, 2, 3, 4]
+const withPlanGap = makeSlotAfter({ publishTime: '09:00', timeZone: TZ_IL, perDay: null, publishDays: ownerEveryWeekday, intervalDays: 7, anchorIso: '2026-10-04T06:00:00Z', planIntervalDays: 15 })
+const withoutPlanGap = makeSlotAfter({ publishTime: '09:00', timeZone: TZ_IL, perDay: null, publishDays: ownerEveryWeekday, intervalDays: 7, anchorIso: '2026-10-04T06:00:00Z' })
+const gapDays = (iso: string) => Math.round((Date.parse(iso) - Date.parse('2026-10-04T06:00:00Z')) / 86400000)
+check(`A11: the plan's gap is used, not the owner's weekdays (${gapDays(withPlanGap(Date.parse('2026-10-04T06:00:00Z')))} days away)`, gapDays(withPlanGap(Date.parse('2026-10-04T06:00:00Z'))) >= 14)
+check('A11-MUT: without the plan gap the same pool would publish on the owner\'s next weekday', gapDays(withoutPlanGap(Date.parse('2026-10-04T06:00:00Z'))) <= 2)
+check('A12: a plan gap still never lands on Friday or Saturday', (() => {
+  let at = Date.parse('2026-10-04T06:00:00Z')
+  for (let i = 0; i < 12; i++) { const iso = withPlanGap(at); if ([5, 6].includes(localWeekday(Date.parse(iso), TZ_IL))) return false; at = Date.parse(iso) }
+  return true
+})())
 
 // B) the days
 check('B1: 1 a week → Sunday', same(rhythmWeekdays(weeklyRhythm(1)), [0]))
@@ -157,7 +244,7 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
 }
 async function runner() {
   const r = await quiet(() => readPublishRhythm(seed({ plan: 'advanced', nextIso: '2026-10-07T06:00:00Z' }) as unknown as Admin, 'u1'))
-  check('G0: an Advanced account reads as 3 a week on Sun/Tue/Thu', r.plan?.perWeek === 3 && same(r.plan && rhythmWeekdays(r.plan.perDay), [0, 2, 4]) && !!r.allowance, r)
+  check('G0: an Advanced account reads as 3 a week on Sun/Tue/Thu', r.plan?.perWeek === 3 && same(r.plan?.perDay && rhythmWeekdays(r.plan.perDay), [0, 2, 4]) && r.plan?.intervalDays === null && !!r.allowance, r)
   const adminR = await quiet(() => readPublishRhythm(seed({ plan: 'advanced', role: 'admin', nextIso: '2026-10-07T06:00:00Z' }) as unknown as Admin, 'u1'))
   check('G0b: an admin has no plan rhythm (owner schedule)', adminR.plan === null, adminR)
 

@@ -148,14 +148,14 @@ function main() {
     const EXPECT_EN: Record<PlanCode, string> = {
       regular: '4 articles a month, written and published to your website automatically',
       advanced: '12 articles a month, written and published to your website automatically',
-      premium: '50 articles a month, written and published automatically, shared across all your websites',
-      large_agency: '200 articles a month, written and published automatically, shared across all your websites',
+      premium: '50 articles a month, written and published automatically, shared across all your websites, up to 5 a week per website',
+      large_agency: '200 articles a month, written and published automatically, shared across all your websites, up to 5 a week per website',
     }
     const EXPECT_HE: Record<PlanCode, string> = {
       regular: '4 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
       advanced: '12 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
-      premium: '50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
-      large_agency: '200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
+      premium: '50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר',
+      large_agency: '200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר',
     }
     for (const code of PLAN_CODES) {
       check(`B1-en-${code}: the exact agreed English article line`,
@@ -174,8 +174,8 @@ function main() {
     // THE CONDITION, stated as a rule rather than as four literals.
     check('B4: the account-wide clause appears exactly on the multi-project plans',
       PLAN_CODES.every((c) => {
-        const shared = planArticleLine(c, 'en').includes('shared across all your websites')
-          && planArticleLine(c, 'he').includes('משותפים לכל האתרים שלכם')
+        const shared = planArticleLine(c, 'en').includes('shared across all your websites, up to 5 a week per website')
+          && planArticleLine(c, 'he').includes('משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר')
         const plain = !planArticleLine(c, 'en').includes('shared across')
           && !planArticleLine(c, 'he').includes('משותפים')
         return PLAN_CATALOG[c].maxProjects > 1 ? shared : plain
@@ -198,11 +198,11 @@ function main() {
         'Track up to 50 keywords', 'Up to 50 Google ranking checks a month', 'Up to 10 AI visibility checks a month'],
       advanced: ['12 articles a month, written and published to your website automatically', '1 website',
         'Track up to 100 keywords', 'Up to 100 Google ranking checks a month', 'Up to 20 AI visibility checks a month'],
-      premium: ['50 articles a month, written and published automatically, shared across all your websites',
+      premium: ['50 articles a month, written and published automatically, shared across all your websites, up to 5 a week per website',
         'Up to 10 websites', 'Track up to 100 keywords per website',
         'Up to 200 Google ranking checks a month per website',
         'Up to 20 AI visibility checks a month per website'],
-      large_agency: ['200 articles a month, written and published automatically, shared across all your websites',
+      large_agency: ['200 articles a month, written and published automatically, shared across all your websites, up to 5 a week per website',
         'Up to 100 websites', 'Track up to 200 keywords per website',
         'Up to 400 Google ranking checks a month per website',
         'Up to 50 AI visibility checks a month per website'],
@@ -212,10 +212,10 @@ function main() {
         'עד 50 בדיקות מיקום בגוגל בחודש', 'עד 10 בדיקות נראות ב-AI בחודש'],
       advanced: ['12 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית', 'אתר אחד', 'מעקב אחרי עד 100 מילות מפתח',
         'עד 100 בדיקות מיקום בגוגל בחודש', 'עד 20 בדיקות נראות ב-AI בחודש'],
-      premium: ['50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם', 'עד 10 אתרים',
+      premium: ['50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר', 'עד 10 אתרים',
         'מעקב אחרי עד 100 מילות מפתח לכל אתר', 'עד 200 בדיקות מיקום בגוגל בחודש לכל אתר',
         'עד 20 בדיקות נראות ב-AI בחודש לכל אתר'],
-      large_agency: ['200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם', 'עד 100 אתרים',
+      large_agency: ['200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר', 'עד 100 אתרים',
         'מעקב אחרי עד 200 מילות מפתח לכל אתר', 'עד 400 בדיקות מיקום בגוגל בחודש לכל אתר',
         'עד 50 בדיקות נראות ב-AI בחודש לכל אתר'],
     }

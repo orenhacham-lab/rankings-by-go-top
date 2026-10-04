@@ -40,7 +40,7 @@ function cleanPublishDays(v: unknown): number[] {
 /** First/next publish slot: the plan's rhythm when there is one, else the
  *  owner's weekdays / interval; never Friday or Saturday. */
 function firstSlot(publishTime: string, timezone: string, publishDays: number[], intervalDays: number, rhythm: PublishRhythm): string {
-  return makeSlotAfter({ publishTime, timeZone: timezone, perDay: rhythm.plan?.perDay ?? null, publishDays, intervalDays, anchorIso: null })(Date.now())
+  return makeSlotAfter({ publishTime, timeZone: timezone, perDay: rhythm.plan?.perDay ?? null, publishDays, intervalDays, anchorIso: null, planIntervalDays: rhythm.plan?.intervalDays ?? null })(Date.now())
 }
 
 /**
@@ -54,7 +54,17 @@ function firstSlot(publishTime: string, timezone: string, publishDays: number[],
  * and says the dates were set when the account opened.
  */
 function rhythmDTO(rhythm: PublishRhythm) {
-  if (rhythm.plan) return { source: 'plan' as const, perWeek: rhythm.plan.perWeek, weekdays: rhythmWeekdays(rhythm.plan.perDay), perDay: rhythm.plan.perDay }
+  if (rhythm.plan) {
+    return {
+      source: 'plan' as const,
+      perWeek: rhythm.plan.perWeek,
+      weekdays: rhythm.plan.perDay ? rhythmWeekdays(rhythm.plan.perDay) : [],
+      perDay: rhythm.plan.perDay,
+      // Set instead of the weekdays when the account has more sites than a
+      // weekly rhythm can serve: this site publishes every N days.
+      intervalDays: rhythm.plan.intervalDays,
+    }
+  }
   if (rhythm.trial) return { source: 'trial' as const }
   return { source: 'owner' as const }
 }
@@ -116,7 +126,7 @@ export async function GET(request: Request) {
   const ptime = pool.publishTime || DEFAULT_PUBLISH_TIME
   const perDay = rhythm.plan?.perDay ?? null
   const stored = pool.nextPublishAt || (pool.isActive ? firstSlot(ptime, pool.timezone, pool.publishDays, pool.intervalDays, rhythm) : null)
-  const slotAfter = makeSlotAfter({ publishTime: ptime, timeZone: pool.timezone, perDay, publishDays: pool.publishDays, intervalDays: pool.intervalDays, anchorIso: stored })
+  const slotAfter = makeSlotAfter({ publishTime: ptime, timeZone: pool.timezone, perDay, publishDays: pool.publishDays, intervalDays: pool.intervalDays, anchorIso: stored, planIntervalDays: rhythm.plan?.intervalDays ?? null })
   const readyNow = items.filter((i) => i.status === 'generated').length
   /**
    * THE ALLOWANCE IS THE ACCOUNT'S, THE SCREEN IS ONE PROJECT'S.

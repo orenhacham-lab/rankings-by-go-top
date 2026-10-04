@@ -8,6 +8,7 @@
  *   GET  /api/reports/monthly/preferences?projectId=        the weekly-email switch
  *   PUT  /api/reports/monthly/preferences  { projectId, weeklyEmailSummary }
  *   GET|POST /api/reports/monthly/cron                      the 1st's run (CRON_SECRET)
+ *   GET  /api/reports/monthly/pdf?projectId=[&month=][&lang=] the same report, to keep
  *
  * proxy.ts does not cover /api/*, so each handler checks everything itself, in
  * this order: a signed-in user, a well-formed project id, and that THIS user owns
@@ -28,12 +29,23 @@ import {
   MonthlyReportUnavailable, type OwnedProject, type StoredReport,
 } from './store'
 import type { MonthlyReportSummary } from './types'
+import { generateMonthlyReportHTML, monthlyReportFileName } from './pdf'
+import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export interface MonthlyRouteDeps {
   /** The signed-in user's id, or null. */
   userId: () => Promise<string | null>
   admin: () => ServiceRoleClient
   now: () => Date
+  /**
+   * Rendering the download's HTML to a PDF. Injected because it is the one step
+   * that leaves the process (PDFShift, already a disclosed sub-processor for the
+   * ranking report), so the QA suite exercises the whole route without it.
+   * Resolves to null when it is not configured or the render fails: the route
+   * then answers its own code, never a provider's message.
+   */
+  renderPdf?: (html: string) => Promise<ArrayBuffer | null>
 }
 
 export type MonthlyErrorCode = 'invalid_request' | 'unauthorized' | 'not_found' | 'internal' | 'unavailable'
@@ -110,6 +122,61 @@ export async function handleMonthlyGet(request: Request, deps: MonthlyRouteDeps)
     }
     return refuse(500, 'internal')
   }
+}
+
+/**
+ * GET /api/reports/monthly/pdf — the stored monthly report as a PDF to keep.
+ *
+ * The same stored snapshot the screen shows, rendered from the same dictionary
+ * (./pdf), so a downloaded report and the screen can never disagree. The
+ * Search Console section is part of it, which the older ranking-report download
+ * has never had.
+ *
+ * `lang` only chooses which of the product's own languages the words come in; an
+ * unknown value falls back to Hebrew, and nothing from the query reaches the
+ * page as content.
+ */
+export async function handleMonthlyPdf(request: Request, deps: MonthlyRouteDeps): Promise<Response> {
+  const url = new URL(request.url)
+  const o = await owned(deps, url.searchParams.get('projectId'))
+  if ('refusal' in o) return o.refusal
+  const monthParam = url.searchParams.get('month')
+  if (monthParam !== null && !isMonthKey(monthParam)) return refuse(400, 'invalid_request')
+  const language: PublicLocale = normalizeDashboardUiLocale(url.searchParams.get('lang')) ?? 'he'
+
+  let report: StoredReport | null
+  let projectLabel = ''
+  try {
+    if (monthParam) {
+      report = await readReport(o.admin, o.project, monthParam)
+    } else {
+      report = (await listReports(o.admin, o.project)).latest
+    }
+    const { data } = await o.admin.from('projects').select('name').eq('id', o.project.id).eq('user_id', o.project.user_id).maybeSingle()
+    projectLabel = typeof (data as { name?: unknown } | null)?.name === 'string' ? (data as { name: string }).name : ''
+  } catch (e) {
+    return refuse(e instanceof MonthlyReportUnavailable ? 404 : 500, e instanceof MonthlyReportUnavailable ? 'unavailable' : 'internal')
+  }
+  if (!report) return refuse(404, 'not_found')
+
+  const html = generateMonthlyReportHTML({
+    data: report.data,
+    projectLabel,
+    generatedAt: report.generatedAt,
+    generatedBy: report.generatedBy,
+    language,
+  })
+
+  const pdf = deps.renderPdf ? await deps.renderPdf(html).catch(() => null) : null
+  if (!pdf) return refuse(503, 'unavailable')
+  return new Response(pdf, {
+    status: 200,
+    headers: {
+      ...NO_STORE,
+      'content-type': 'application/pdf',
+      'content-disposition': `attachment; filename="${monthlyReportFileName(report.month)}"`,
+    },
+  })
 }
 
 async function jsonBody(request: Request): Promise<Record<string, unknown> | null> {

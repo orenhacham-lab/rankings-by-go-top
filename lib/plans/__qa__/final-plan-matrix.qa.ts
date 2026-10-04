@@ -220,14 +220,14 @@ async function main() {
     const MONTHLY_EN: Record<PlanCode, string> = {
       regular: '4 articles a month, written and published to your website automatically',
       advanced: '12 articles a month, written and published to your website automatically',
-      premium: '50 articles a month, written and published automatically, shared across all your websites',
-      large_agency: '200 articles a month, written and published automatically, shared across all your websites',
+      premium: '50 articles a month, written and published automatically, shared across all your websites, up to 5 a week per website',
+      large_agency: '200 articles a month, written and published automatically, shared across all your websites, up to 5 a week per website',
     }
     const MONTHLY_HE: Record<PlanCode, string> = {
       regular: '4 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
       advanced: '12 מאמרים בחודש, נכתבים ומתפרסמים באתר שלכם אוטומטית',
-      premium: '50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
-      large_agency: '200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם',
+      premium: '50 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר',
+      large_agency: '200 מאמרים בחודש, נכתבים ומתפרסמים אוטומטית, משותפים לכל האתרים שלכם, עד 5 בשבוע לכל אתר',
     }
     for (const code of PLAN_CODES) {
       check(`E6-en-${code}: the article line is the exact agreed English wording`,
