@@ -126,6 +126,37 @@ async function main() {
       !/const scheduleLocked = rhythm !== null && rhythm\.source !== 'owner'/.test("const planRhythm = rhythm?.source === 'plan' ? rhythm : null"))
   }
 
+  console.log('\nD) one project\u2019s share of the account\u2019s allowance')
+  {
+    // The allowance is the ACCOUNT's and the screen is one PROJECT's. Showing
+    // all of it on every project promised each of them the whole plan: an
+    // account on Basic (4 a month) with two projects projected four dates on
+    // each, while the ledger — account-wide — would only ever publish four
+    // between them.
+    const list = strip(read('app/api/content/automation/pools/route.ts'))
+    check('D1: the route divides the allowance by the account\u2019s active queues',
+      /const queues = Math\.max\(1, rhythm\.plan\?\.activeQueues \?\? 1\)/.test(list)
+      && /const shareOf = \(n: number\) => Math\.floor\(Math\.max\(0, n\) \/ queues\)/.test(list))
+    check('D2: it rounds DOWN, so a projection never promises an article the cycle will not produce',
+      /Math\.floor\(Math\.max\(0, n\) \/ queues\)/.test(list))
+    check('D3: the share is used for the projection, the cycle size and the spread',
+      /articlesLeft = rhythm\.allowance \? shareOf\(rhythm\.allowance\.remaining\) \+ readyNow/.test(list)
+      && /perCycle: shareOf\(rhythm\.allowance\.limit\)/.test(list)
+      && /remaining: shareOf\(rhythm\.allowance\.remaining\)/.test(list))
+    check('D4: articles already generated belong to this project and are added after the split',
+      /shareOf\(rhythm\.allowance\.remaining\) \+ readyNow/.test(list))
+    // An account with no plan rhythm — an admin, or a trial — has one queue's
+    // worth by definition, so nothing about those two changes.
+    const share = (n: number, queues: number) => Math.floor(Math.max(0, n) / Math.max(1, queues))
+    check('D5: one project on Basic still sees the whole 4', share(4, 1) === 4)
+    check('D6: two projects on Basic see 2 each, which is the 4 the ledger will publish', share(4, 2) === 2 && share(4, 2) * 2 === 4)
+    check('D7: an admin and a trial have no plan rhythm, so their count is unchanged', share(1, 1) === 1)
+    // MUTATION CONTROL
+    check('D-MUT: the old line, which showed the account\u2019s whole remaining on every project, fails D3',
+      !/articlesLeft = rhythm\.allowance \? shareOf\(rhythm\.allowance\.remaining\) \+ readyNow/
+        .test('const articlesLeft = rhythm.allowance ? rhythm.allowance.remaining + readyNow : 0'))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
