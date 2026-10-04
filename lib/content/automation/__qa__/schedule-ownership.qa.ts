@@ -139,11 +139,19 @@ async function main() {
     // each, while the ledger — account-wide — would only ever publish four
     // between them.
     const list = strip(read('app/api/content/automation/pools/route.ts'))
-    check('D1: the route divides the allowance by the account\u2019s active queues',
+    // NARROWED 4 October 2026: the divisor is no longer always the number of
+    // queues. The claim is the same - one project is shown ITS share of the
+    // account's allowance, never all of it - but the share is now this
+    // website's fraction of the allowance, which is 1/queues while nobody has
+    // set a share of their own and that website's share once somebody has.
+    check('D1: the route shows one project its own fraction of the account’s allowance',
       /const queues = Math\.max\(1, rhythm\.plan\?\.activeQueues \?\? 1\)/.test(list)
-      && /const shareOf = \(n: number\) => Math\.floor\(Math\.max\(0, n\) \/ queues\)/.test(list))
+      && /const shareFraction = rhythm\.plan && rhythm\.plan\.monthly > 0 \? rhythm\.plan\.monthlyForThisSite \/ rhythm\.plan\.monthly : 1 \/ queues/.test(list)
+      && /const shareOf = \(n: number\) => Math\.floor\(Math\.max\(0, n\) \* shareFraction\)/.test(list))
     check('D2: it rounds DOWN, so a projection never promises an article the cycle will not produce',
-      /Math\.floor\(Math\.max\(0, n\) \/ queues\)/.test(list))
+      /Math\.floor\(Math\.max\(0, n\) \* shareFraction\)/.test(list))
+    check('D2a: and with no share set that fraction IS one over the active queues, so nothing moved',
+      /: 1 \/ queues/.test(list))
     check('D3: the share is used for the projection, the cycle size and the spread',
       /articlesLeft = rhythm\.allowance \? shareOf\(rhythm\.allowance\.remaining\) \+ readyNow/.test(list)
       && /perCycle: shareOf\(rhythm\.allowance\.limit\)/.test(list)

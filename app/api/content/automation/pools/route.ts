@@ -63,6 +63,22 @@ function rhythmDTO(rhythm: PublishRhythm) {
       // Set instead of the weekdays when the account has more sites than a
       // weekly rhythm can serve: this site publishes every N days.
       intervalDays: rhythm.plan.intervalDays,
+      /**
+       * The split, which IS the customer's. `share` is the number they set for
+       * this website, null while it takes the even share; `siteMonthly` is what
+       * the site gets either way, `accountMonthly` what the plan gives the whole
+       * account; `maxShare` is the most it may be given now (the
+       * per-site ceiling, or what the account's other websites have left,
+       * whichever is smaller); `multiSite` is false on a one-site plan, where
+       * there is nothing to divide and the field is not offered.
+       */
+      share: rhythm.plan.monthlyShare,
+      // The plan's own monthly allowance, which is on the pricing page; what is
+      // LEFT of it this cycle still does not leave the server.
+      accountMonthly: rhythm.plan.monthly,
+      siteMonthly: rhythm.plan.monthlyForThisSite,
+      maxShare: rhythm.plan.maxShare,
+      multiSite: rhythm.plan.multiSite,
     }
   }
   if (rhythm.trial) return { source: 'trial' as const }
@@ -88,7 +104,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Failed to load pool' }, { status: 500 })
   }
   const poolActive = (poolRow as { is_active?: boolean } | null)?.is_active === true
-  const rhythm = await readPublishRhythm(auth.admin, auth.project.user_id, { countThisQueue: !poolActive })
+  const rhythm = await readPublishRhythm(auth.admin, auth.project.user_id, { countThisQueue: !poolActive, projectId: auth.project.id })
   if (!poolRow) return Response.json({ pool: null, items: [], rhythm: rhythmDTO(rhythm) })
 
   const pool = toPoolDTO(poolRow as PoolRow)
@@ -142,7 +158,12 @@ export async function GET(request: Request) {
    * the split.
    */
   const queues = Math.max(1, rhythm.plan?.activeQueues ?? 1)
-  const shareOf = (n: number) => Math.floor(Math.max(0, n) / queues)
+  // This site's slice of what is left. The even split is the default, so the
+  // fraction is normally 1/queues; a website whose owner gave it a share of its
+  // own gets that share's fraction instead, which is the same question asked of
+  // the same numbers (monthlyForSite).
+  const shareFraction = rhythm.plan && rhythm.plan.monthly > 0 ? rhythm.plan.monthlyForThisSite / rhythm.plan.monthly : 1 / queues
+  const shareOf = (n: number) => Math.floor(Math.max(0, n) * shareFraction)
   const articlesLeft = rhythm.allowance ? shareOf(rhythm.allowance.remaining) + readyNow : 0
   // A stored slot the runner would move (a Friday/Saturday, or a day the plan's
   // rhythm does not publish on) is shown where the runner will move it.
@@ -255,7 +276,7 @@ export async function POST(request: Request) {
   // is_active / publish_days are only changed when explicitly present in the body.
   const isActive = 'isActive' in body ? body.isActive === true : (prev?.is_active ?? false)
   const publishDays = 'publishDays' in body ? cleanPublishDays(body.publishDays) : (Array.isArray(prev?.publish_days) ? prev!.publish_days : [])
-  const rhythm = isActive ? await readPublishRhythm(auth.admin, auth.project.user_id, { countThisQueue: !prev?.is_active }) : null
+  const rhythm = isActive ? await readPublishRhythm(auth.admin, auth.project.user_id, { countThisQueue: !prev?.is_active, projectId: auth.project.id }) : null
   const nextPublishAt = isActive && rhythm ? firstSlot(publishTime, timezone, publishDays, resolveIntervalDays(cadence, intervalDays), rhythm) : null
 
   const patch = { name, cadence, interval_days: intervalDays, publish_time: publishTime, timezone, is_active: isActive, publish_days: publishDays.length ? publishDays : null, next_publish_at: nextPublishAt, updated_at: new Date().toISOString() }

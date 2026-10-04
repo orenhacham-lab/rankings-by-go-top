@@ -268,16 +268,74 @@ export interface PerSiteRate {
  */
 export function perSiteRate(monthlyAllowance: number, activeQueues = 1): PerSiteRate {
   if (!(monthlyAllowance > 0)) return { perWeek: 0, intervalDays: null }
-  const queues = Math.max(1, Math.floor(activeQueues))
-  const perWeek = monthlyAllowance / queues / WEEKS_PER_MONTH
+  return rateForMonthly(monthlyAllowance / Math.max(1, Math.floor(activeQueues)))
+}
+
+/**
+ * The same rate from the site's own monthly count, however that count was
+ * reached: an even split of the account's allowance, or the number its owner
+ * set for this website (monthlyForSite). The ceiling and the fit rule are the
+ * rate's, not the split's, so a chosen share is held to exactly the same
+ * limits as a share nobody chose.
+ */
+export function rateForMonthly(monthlyPerSite: number): PerSiteRate {
+  if (!(monthlyPerSite > 0)) return { perWeek: 0, intervalDays: null }
+  const perWeek = monthlyPerSite / WEEKS_PER_MONTH
   // Above the ceiling the rate is deliberately not the share, so no fit is
   // asked for: the site publishes once a working day and the rest of the
   // allowance waits for the account's other sites.
   if (perWeek >= MAX_ARTICLES_PER_WEEK_PER_SITE) return { perWeek: MAX_ARTICLES_PER_WEEK_PER_SITE, intervalDays: null }
   const whole = Math.round(perWeek)
   if (whole >= 1 && Math.abs(whole - perWeek) <= WEEKLY_FIT_TOLERANCE * perWeek) return { perWeek: whole, intervalDays: null }
-  const days = Math.round((queues * WEEKS_PER_MONTH * 7) / monthlyAllowance)
+  const days = Math.round((WEEKS_PER_MONTH * 7) / monthlyPerSite)
   return { perWeek: 0, intervalDays: Math.min(90, Math.max(2, days)) }
+}
+
+/**
+ * THE MOST ONE WEBSITE MAY BE GIVEN A MONTH.
+ *
+ * The ceiling is a weekly one (one article a working day), and a month is
+ * WEEKS_PER_MONTH weeks, so this is the monthly form of the same limit. It is
+ * floored, because a share is a whole number of articles and the ceiling must
+ * not be rounded up past what the rate will actually publish.
+ */
+export const MAX_MONTHLY_SHARE_PER_SITE = Math.floor(MAX_ARTICLES_PER_WEEK_PER_SITE * WEEKS_PER_MONTH)
+
+/**
+ * HOW MANY OF THE ACCOUNT'S MONTHLY ARTICLES THIS WEBSITE GETS.
+ *
+ * The even split is the default and the answer whenever nobody has said
+ * otherwise. An owner who does say otherwise (article_pools.monthly_share, a
+ * Premium or Agency account deciding that its main website matters more than
+ * the small one it took on last week) sets a number for some of their sites;
+ * the sites with no number of their own share what those leave, evenly.
+ *
+ * A declared share is capped by what the OTHER declared shares have not already
+ * claimed. That is not a second opinion about the limit the write path enforces
+ * — it is what keeps a stale or half-written set of numbers from scheduling
+ * more than the account may publish, because the write path can only ever have
+ * checked the account as it was at that moment.
+ *
+ * The result is deliberately fractional for the even case: it is a rate, and
+ * `rateForMonthly` is what turns it into days or a weekly rhythm.
+ */
+export function monthlyForSite(input: {
+  monthlyAllowance: number
+  /** Every OTHER queue counted in the split: its declared share, or null for the even share. */
+  otherShares: (number | null)[]
+  /** This queue's own declared share, or null for the even share. */
+  mine: number | null
+}): number {
+  const allowance = Number.isFinite(input.monthlyAllowance) ? Math.floor(input.monthlyAllowance) : 0
+  if (!(allowance > 0)) return 0
+  const share = (v: number | null) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : null)
+  const others = input.otherShares.map(share)
+  const claimed = others.reduce<number>((sum, v) => sum + (v ?? 0), 0)
+  const left = Math.max(0, allowance - claimed)
+  const mine = share(input.mine)
+  if (mine !== null) return Math.min(mine, left)
+  const evenQueues = others.filter((v) => v === null).length + 1
+  return left / evenQueues
 }
 
 /**
@@ -291,7 +349,13 @@ export function articlesPerWeekFor(monthlyAllowance: number, activeQueues = 1): 
 
 /** What one site publishes in about a month, whichever shape its rate has. */
 export function articlesPerMonthPerSite(monthlyAllowance: number, activeQueues = 1): number {
-  const rate = perSiteRate(monthlyAllowance, activeQueues)
+  if (!(monthlyAllowance > 0)) return 0
+  return articlesPerMonthForShare(monthlyAllowance / Math.max(1, Math.floor(activeQueues)))
+}
+
+/** The same count from the site's own monthly share, however it was reached. */
+export function articlesPerMonthForShare(monthlyPerSite: number): number {
+  const rate = rateForMonthly(monthlyPerSite)
   if (rate.intervalDays) return Math.ceil(30 / rate.intervalDays)
   return Math.ceil(rate.perWeek * WEEKS_PER_MONTH)
 }
