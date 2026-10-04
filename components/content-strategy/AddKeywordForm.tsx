@@ -26,7 +26,7 @@ type Dict = ReturnType<typeof getDashboardDictionary>
 
 export function AddKeywordButton({ dict, open, onOpen }: { dict: Dict; open: boolean; onOpen: () => void }) {
   return (
-    <Button size="sm" variant="secondary" onClick={onOpen} aria-expanded={open} data-add-keyword-toggle>
+    <Button size="sm" variant="primary" onClick={onOpen} aria-expanded={open} data-add-keyword-toggle>
       <Plus aria-hidden="true" className="size-4" /> {dict.contentStrategy.ideaActions.addKeyword}
     </Button>
   )

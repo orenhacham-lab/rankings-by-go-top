@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * The content strategy board's own actions on an idea: approve, not a fit, swap, and
+ * The content strategy board's own actions on an idea: approve, not a fit, and
  * "add a keyword". Every request, and what each answer means, is in
  * lib/content/strategy/ideas.ts; this hook sends them on a click and nothing else, keeps
  * the board showing what was just done until a fresh read shows it too (optimistic),
@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
-  applyIdeaOverrides, approveRequest, deferIdea, keywordRequest, normalizeKeyword, overrideSettled,
+  applyIdeaOverrides, approveRequest, keywordRequest, normalizeKeyword, overrideSettled,
   readApproveOutcome, readApprovedTopicId, readCreatedOverlap, readRejectOutcome, rejectRequest,
   type IdeaOutcome, type IdeaOverride, type IdeaRequest, type IdeaTarget,
 } from '@/lib/content/strategy/ideas'
@@ -34,11 +34,10 @@ type Scoped = {
   projectId: string
   overrides: Held[]
   busy: Record<string, IdeaBusy>
-  deferred: string[]
   approvedNow: string[]
   announcement: string
 }
-const empty = (projectId: string): Scoped => ({ projectId, overrides: [], busy: {}, deferred: [], approvedNow: [], announcement: '' })
+const empty = (projectId: string): Scoped => ({ projectId, overrides: [], busy: {}, approvedNow: [], announcement: '' })
 
 async function send(req: IdeaRequest): Promise<{ ok: boolean; body: unknown }> {
   const controller = new AbortController()
@@ -160,21 +159,6 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged, 
     inFlight.current.delete(t.key)
   }, [projectId, a, ops, say, onChanged])
 
-  /** No request: the next pending idea takes its place, and nothing is rejected. */
-  const swap = useCallback((t: IdeaTarget) => {
-    update((s) => ({ ...s, deferred: deferIdea(s.deferred, t.key), announcement: a.swapped }))
-  }, [a, update])
-
-  /**
-   * Every swap undone at once. A swap moves the idea behind the others, so in a
-   * column with more ideas than it shows the card leaves the view and reads as a
-   * deletion (owner report, 5 October 2026). Nothing was deleted, and this is the
-   * way back: the ideas return to their own order.
-   */
-  const undoSwap = useCallback(() => {
-    update((s) => (s.deferred.length === 0 ? s : { ...s, deferred: [], announcement: a.swapUndone }))
-  }, [a, update])
-
   /** `ok` when the field can close (added, or already there); otherwise the line to show under it. */
   const addKeyword = useCallback(async (raw: string): Promise<{ ok: boolean; error?: string }> => {
     const keyword = normalizeKeyword(raw)
@@ -212,7 +196,7 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged, 
 
   const approvedNow = useMemo(() => new Set(scope.approvedNow), [scope.approvedNow])
 
-  return { approve, reject, swap, undoSwap, addKeyword, view, prune, busy: scope.busy, deferred: scope.deferred, approvedNow, announcement: scope.announcement }
+  return { approve, reject, addKeyword, view, prune, busy: scope.busy, approvedNow, announcement: scope.announcement }
 }
 
 export type IdeaActions = ReturnType<typeof useIdeaActions>

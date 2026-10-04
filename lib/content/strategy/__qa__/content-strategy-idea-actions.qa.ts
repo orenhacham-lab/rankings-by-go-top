@@ -25,7 +25,7 @@ import { join } from 'path'
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
 import { rejectIdeas, markIdeasApprovedForTopics } from '../../recommendations/topic-idea-store'
 import {
-  IDEA_ENDPOINTS, applyIdeaOverrides, approveRequest, canRejectIdea, deferIdea, ideaTargetFromCard, keywordRequest,
+  IDEA_ENDPOINTS, applyIdeaOverrides, approveRequest, canRejectIdea, ideaTargetFromCard, keywordRequest,
   normalizeKeyword, overrideSettled, readApproveOutcome, readRejectOutcome, rejectRequest,
   type IdeaOverride, type IdeaTarget,
 } from '../ideas'
@@ -55,8 +55,8 @@ const DATA: StrategyData = {
   topics: [],
   articles: [],
 }
-const board = (data: StrategyData, deferred: string[] = [], seed: SeedPlan = NO_SEED_PLAN) => buildStrategyBoard({ data, queue: [], seed, deferred })
-const column = (data: StrategyData, col: string, deferred: string[] = []) => board(data, deferred).cards.filter((c) => c.column === col).map((c) => c.title)
+const board = (data: StrategyData, seed: SeedPlan = NO_SEED_PLAN) => buildStrategyBoard({ data, queue: [], seed })
+const column = (data: StrategyData, col: string) => board(data).cards.filter((c) => c.column === col).map((c) => c.title)
 
 async function main() {
   console.log('Content strategy — acting on ideas from the board')
@@ -124,7 +124,7 @@ async function main() {
   }
 
   // ── B) the board ────────────────────────────────────────────────────────
-  console.log('\nB) the board shows what was just done, and swaps without asking anything')
+  console.log('\nB) the board shows what was just done, without asking anything')
   {
     const approve: IdeaOverride = { kind: 'approve', key: 'idea:i2', ideaId: 'i2', title: 'Trail shoes guide', keyword: 'trail shoes', reason: 'Competitors rank', at: '2026-09-28T10:00:00Z' }
     const after = applyIdeaOverrides(DATA, [approve])
@@ -139,21 +139,21 @@ async function main() {
     check('B4: a rejected idea leaves the column', !column(applyIdeaOverrides(DATA, [rejectO]), 'ideas').includes('How to choose running shoes'))
     const kwO: IdeaOverride = { kind: 'keyword', key: 'keyword:trail runners', title: 'trail runners', at: '2026-09-28T10:00:00Z' }
     check('B5: an added keyword is planned at once', column(applyIdeaOverrides(DATA, [kwO]), 'planned').includes('trail runners'))
-    // Swap: the next pending idea takes the place, and nothing is sent or rejected.
-    const first = board(DATA).next
-    const swapped = board(DATA, deferIdea([], first!.cardKey!)).next
-    check('B6: "swap" on the next article brings the next pending idea', first?.ideaId === 'i1' && swapped?.ideaId === 'i2' && swapped.alternatives === 2)
-    check('B6-MUT: without the swap the next article stays', board(DATA, []).next?.ideaId === 'i1')
-    check('B7: a swapped idea is still on the board, last', JSON.stringify(column(DATA, 'ideas', ['idea:i1'])) === JSON.stringify(['Trail shoes guide', 'Merino socks explained', 'How to choose running shoes']))
-    check('B8: swapping every idea cycles through them', board(DATA, deferIdea(deferIdea(deferIdea([], 'idea:i1'), 'idea:i2'), 'idea:i3')).next?.ideaId === 'i1'
-      && board(DATA, deferIdea(['idea:i1', 'idea:i2', 'idea:i3'], 'idea:i1')).next?.ideaId === 'i2')
+    // The next article is the best idea by score, and it stays put: there is no
+    // client-side reordering of the ideas any more (see section W).
+    check('B6: the next article is the highest-scoring idea', board(DATA).next?.ideaId === 'i1')
+    check('B7: the ideas column is in score order, newest first within a score',
+      JSON.stringify(column(DATA, 'ideas')) === JSON.stringify(['How to choose running shoes', 'Trail shoes guide', 'Merino socks explained']),
+      JSON.stringify(column(DATA, 'ideas')))
+    check('B8: the same rows always give the same board (nothing in it is remembered between reads)',
+      JSON.stringify(board(DATA).cards) === JSON.stringify(board(DATA).cards))
     const card = board(DATA).cards.find((c) => c.key === 'idea:i3')!
     const t = ideaTargetFromCard(card)
     check('B9: a plan card carries what approving it sends (its id, score and source)', !!t && t.ideaId === 'i3' && t.score === 0.7 && t.source === 'site_scan')
     check('B9-MUT: a planned card is not an idea to act on', ideaTargetFromCard({ ...card, column: 'planned' }) === null)
     const seed: SeedPlan = { ...NO_SEED_PLAN, state: 'building', topics: ['Trail running for beginners', 'Road shoes'], scannedAt: '2026-09-27T00:00:00Z' }
     const scanNext = buildStrategyBoard({ data: { ideas: [], topics: [], articles: [] }, queue: [], seed }).next
-    check('B10: a scan topic as the next article is a card the actions apply to', scanNext?.kind === 'scan' && scanNext.cardKey === 'scan:0' && scanNext.alternatives === 1)
+    check('B10: a scan topic as the next article is a card the actions apply to', scanNext?.kind === 'scan' && scanNext.cardKey === 'scan:0')
   }
 
   // ── E) the routes it calls ──────────────────────────────────────────────
@@ -227,10 +227,11 @@ async function main() {
       && /\{card\.column === 'ideas' && act && <IdeaButtons /.test(s)
     check('U2: every idea card on the board has its approve button, which calls the action in place', approvesInPlace(boardSrc))
     check('U2-MUT: a board whose idea cards have no actions fails U2', !approvesInPlace(boardSrc.replace("{card.column === 'ideas' && act && <IdeaButtons ", '{false && <IdeaButtons ')))
-    const nextActs = (s: string) => /ideaActs\.act\.actions\.approve\(ideaActs\.idea\)/.test(s) && /ideaActs\.act\.actions\.swap\(ideaActs\.idea\)/.test(s)
+    // "Swap" used to be the card's middle action; it was removed (section W).
+    const nextActs = (s: string) => /ideaActs\.act\.actions\.approve\(ideaActs\.idea\)/.test(s)
       && /ideaActs\.act\.actions\.reject\(ideaActs\.idea\)/.test(s) && /next\.kind === 'idea' \|\| next\.kind === 'scan'/.test(s)
-    check('U3: the next-article card approves, swaps and rejects its idea in place', nextActs(card))
-    check('U3-MUT: a card without "swap" fails U3', !nextActs(card.replace('ideaActs.act.actions.swap(ideaActs.idea)', 'void 0')))
+    check('U3: the next-article card approves and rejects its idea in place', nextActs(card))
+    check('U3-MUT: a card without "not a fit" fails U3', !nextActs(card.replace('ideaActs.act.actions.reject(ideaActs.idea)', 'void 0')))
     const wired = (s: string) => /idea=\{nextIdea\}/.test(s) && /act=\{act\}/.test(s) && /<StrategyBoard [^>]*act=\{act\}/.test(s)
     check('U4: the screen hands the actions to the card and to the board', wired(screen))
     check('U4-MUT: a board without actions fails U4', !wired(screen.replace(/<StrategyBoard ([^>]*) act=\{act\}/, '<StrategyBoard $1')))
@@ -284,40 +285,40 @@ async function main() {
     check('N5-MUT: navigating to the list from it fails N5', !emptyCard(screen.replace("() => { setView('board'); setAdding(true) }", "() => { setView('list') }")))
   }
 
-  // ------------------------------------------------- W) "swap" appears, and never looks like a delete
+  // ------------------------------------------- W) the board's actions, and what is NOT there
   //
-  // Two faults the owner reported on 5 October 2026: the button "sometimes does not
-  // appear on the board", and "clicking it makes the idea disappear". The first was
-  // the condition — the button was offered only while the column held MORE ideas
-  // than it shows, so it was absent with five ideas or fewer and gone again once
-  // "show more" was open. The second is what a swap does: the idea moves behind the
-  // others, so in a long column the card leaves the view. Nothing is deleted, and
-  // now the column says so and offers the way back.
-  console.log('\nW) the swap button: when it is offered, and that it never reads as a delete')
+  // "Swap" was removed on 5 October 2026 at the owner's call. It created nothing: it
+  // moved the idea behind the others, so in a column longer than its preview the card
+  // left the view and read as a delete, and the button itself appeared only while the
+  // column hid cards. What a customer actually wants — a topic of their own — is "add
+  // a keyword", which costs nothing, asks no model and is immediate. These checks hold
+  // the removal: the button is gone everywhere, nothing of its machinery is left, and
+  // the thing that replaced it is the board's primary action.
+  console.log('\nW) the board acts on an idea in two ways, and offers a keyword of your own')
   {
     const boardSrc = strip(read('components/content-strategy/StrategyBoard.tsx'))
     const listSrc = strip(read('components/content-strategy/StrategyList.tsx'))
+    const nextSrc = strip(read('components/content-strategy/NextArticleCard.tsx'))
     const hook = strip(read('components/content-strategy/useIdeaActions.ts'))
-    const offered = (s: string) => /const canSwap = cards\.length > 1/.test(s) && /canSwap=\{canSwap\}/.test(s) && !/canSwap=\{hidden > 0\}/.test(s)
-    check('W1: swap is offered whenever the column holds another idea to swap for', offered(boardSrc))
-    check('W1a: the list view asks the same question', offered(listSrc))
-    check('W1-MUT: the old condition (only while the column hides something) fails W1',
-      !offered(boardSrc.replace('const canSwap = cards.length > 1', 'const canSwap = hidden > 0')))
-    const saysSo = (s: string) => /data-idea-swapped=/.test(s) && /s\.ideaActions\.swappedNote\(swapped\)/.test(s)
-      && /data-idea-action="undo-swap"/.test(s) && /act\?\.actions\.undoSwap\(\)/.test(s)
-    check('W2: a column with a swapped idea says it moved and nothing was deleted, and offers it back', saysSo(boardSrc))
-    check('W2a: the list view says the same', saysSo(listSrc))
-    check('W2-MUT: a column that says nothing after a swap fails W2', !saysSo(boardSrc.replace('data-idea-action="undo-swap"', 'data-idea-action="x"')))
-    check('W3: the undo is the hook\u2019s, clears every swap, and still asks the server nothing',
-      /const undoSwap = useCallback\(\(\) => \{[\s\S]{0,260}deferred: \[\]/.test(hook) && /return \{ approve, reject, swap, undoSwap,/.test(hook))
-    check('W3-MUT: an undo that keeps the swaps fails W3',
-      !/const undoSwap = useCallback\(\(\) => \{[\s\S]{0,260}deferred: \[\]/.test(hook.replace('{ ...s, deferred: [], announcement: a.swapUndone }', '{ ...s, announcement: a.swapUndone }')))
-    check('W4: the swapped idea is still on the board after the swap, last in its column',
-      board(DATA, deferIdea([], 'idea:i1')).cards.filter((c) => c.column === 'ideas').some((c) => c.ideaId === 'i1'))
+    const screen = strip(read('components/content-strategy/ContentStrategyScreen.tsx'))
+    const form = strip(read('components/content-strategy/AddKeywordForm.tsx'))
+    const noSwap = (src: string) => !/data-idea-action="swap"/.test(src) && !/actions\.swap\(/.test(src) && !/canSwap/.test(src)
+    check('W1: no surface offers "swap" any more', [boardSrc, listSrc, nextSrc].every(noSwap))
+    check('W1-MUT: a surface that still called it fails W1', !noSwap(`${boardSrc}\nact.actions.swap(target)`))
+    check('W2: the hook has no swap, no undo and no remembered order', noSwap(hook) && !/undoSwap/.test(hook) && !/deferred/.test(hook))
+    check('W3: the board model has no deferred order left either',
+      !/deferred/.test(strip(read('lib/content/strategy/board.ts'))) && !/deferIdea/.test(strip(read('lib/content/strategy/ideas.ts'))))
+    check('W4: the two actions that remain are on every idea card', /data-idea-action="approve"/.test(boardSrc) && /data-idea-action="reject"/.test(boardSrc))
+    check('W5: a keyword of your own is the primary button, in both views, and asks no model',
+      /variant="primary"[^>]*data-add-keyword-toggle|data-add-keyword-toggle/.test(form)
+      && /variant="primary"/.test(form)
+      && /automationEnabled && !!board && !planEmpty && <AddKeywordButton/.test(screen))
+    check('W5-MUT: a button limited to the board view fails W5', !/automationEnabled && !!board && !planEmpty && <AddKeywordButton/.test(screen.replace("automationEnabled && !!board", "automationEnabled && view === 'board' && !!board")))
     for (const loc of ['he', 'en', 'es'] as const) {
-      const a = getDashboardDictionary(loc).contentStrategy.ideaActions
-      check(`W5 (${loc}): the words of the note, the undo and the announcement exist, and count one idea apart from several`,
-        !!a.undoSwap && !!a.swapUndone && a.swappedNote(1) !== a.swappedNote(3) && a.swappedNote(3).includes('3'))
+      const cs = getDashboardDictionary(loc).contentStrategy
+      const words = JSON.stringify(cs.ideaActions)
+      check(`W6 (${loc}): not a word of "swap" is left in the screen's copy`, !/swap/i.test(words) && !('swap' in cs.ideaActions))
+      check(`W7 (${loc}): the empty ideas column says a keyword of your own is an option`, cs.columnEmpty.ideas.length > 40 && !!cs.ideaActions.addKeyword)
     }
   }
 
