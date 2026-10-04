@@ -30,7 +30,7 @@ import { buttonClasses, CheckList, Eyebrow } from '@/components/public/marketing
 import { cn } from '@/lib/utils'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { FreeCheckErrorCode, FreeCheckResponse, FreeCheckResult } from '@/lib/free-check/types'
-import { toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
+import { type PublicLocale } from '@/lib/i18n/locales'
 import { authHref } from '@/lib/i18n/auth-href'
 
 type Phase = 'form' | 'scanning' | 'results'
@@ -50,8 +50,10 @@ export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: Publi
   const dir = locale === 'he' ? 'rtl' : 'ltr'
   // Sign-in and sign-up exist in Hebrew and English only, so a Spanish visitor
   // is sent to the English form rather than to a Hebrew one they cannot read.
-  const loginHref = authHref('login', toBilingualLocale(locale))
-  const signupHref = authHref('signup', toBilingualLocale(locale))
+  // The form in the language of the page the visitor is on, not a narrowed
+  // one: a Spanish free check now leads to the Spanish sign-up.
+  const loginHref = authHref('login', locale)
+  const signupHref = authHref('signup', locale)
 
   const [phase, setPhase] = useState<Phase>('form')
   const [url, setUrl] = useState(initialUrl)

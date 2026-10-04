@@ -7,6 +7,7 @@ import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
   explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
 } from '@/lib/i18n/request-locale'
+import { normalizeStoredLocale, type PublicLocale } from '@/lib/i18n/locales'
 import {
   isRestrictedPath, logRestrictedAttempt, noticeLocaleForPath,
   restrictionForRequest, sanctionsNotice,
@@ -224,9 +225,12 @@ export async function proxy(request: NextRequest) {
 
 /** The `?lang=` value, normalised, or null. Kept beside the proxy so the cookie
  *  and the header can never be written from different readings of it. */
-function normalizedLangParam(raw: string | null): 'he' | 'en' | null {
-  const v = (raw ?? '').trim().toLowerCase()
-  return v === 'he' || v === 'en' ? v : null
+function normalizedLangParam(raw: string | null): PublicLocale | null {
+  // Spanish included, and only while the Spanish build is on — that is what
+  // normalizeStoredLocale guarantees. A hand-rolled he|en check here is what
+  // dropped `?lang=es` and reset a Spanish sign-up to Hebrew on its first
+  // dashboard load.
+  return normalizeStoredLocale(typeof raw === 'string' ? raw.trim().toLowerCase() : raw)
 }
 
 function redirectToBilling(request: NextRequest) {

@@ -816,6 +816,7 @@ export const dashboardEn = {
       addSelected: 'Add to queue',
       queueTitle: 'Publishing queue',
       queueEmpty: 'The queue is empty. Add approved topics to get started.',
+      publishedTitle: 'Already published',
       remove: 'Remove',
       retry: 'Retry',
       skip: 'Skip',

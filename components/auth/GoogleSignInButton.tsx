@@ -16,12 +16,12 @@
 import { useState, useSyncExternalStore } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { googleDirectConfigured, googleRedirectTo, googleSignInCopy, googleStartPath, googleSignInEnabled, googleSignInVisible, isFramed } from '@/lib/auth/google-signin'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 // A page never moves in or out of a frame: nothing to subscribe to.
 const noSubscription = () => () => {}
 
-export default function GoogleSignInButton({ lang, nextPath, disabled = false }: { lang: Locale; nextPath: string; disabled?: boolean }) {
+export default function GoogleSignInButton({ lang, nextPath, disabled = false }: { lang: PublicLocale; nextPath: string; disabled?: boolean }) {
   const t = googleSignInCopy(lang)
   // The server renders as if unframed; the browser's first render corrects it.
   const framed = useSyncExternalStore(noSubscription, isFramed, () => false)

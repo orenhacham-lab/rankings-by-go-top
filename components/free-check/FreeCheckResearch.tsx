@@ -167,8 +167,8 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: PublicL
                 serverNow={serverNow}
                 onContinued={() => {}}
                 preview={{
-                  signupHref: authHref('signup', toBilingualLocale(locale), { claim: claimToken }),
-                  loginHref: authHref('login', toBilingualLocale(locale)),
+                  signupHref: authHref('signup', locale, { claim: claimToken }),
+                  loginHref: authHref('login', locale),
                   lockedCompetitors: view.locked.competitors,
                   lockedKeywords: view.locked.keywords,
                   after: claimToken ? <ReportRequest locale={locale} token={claimToken} /> : null,

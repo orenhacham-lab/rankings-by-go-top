@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
@@ -67,6 +68,30 @@ const LOGIN_UI = {
       linkInvalid: 'This confirmation link is invalid or has expired. Sign in, or sign up again to get a new link.',
     },
   },
+  es: {
+    subtitle: 'Seguimiento de posiciones en Google y visibilidad en IA',
+    logoAlt: 'Logotipo de Go Top SEO',
+    heading: 'Iniciar sesión',
+    emailLabel: 'Correo electrónico',
+    emailPlaceholder: 'tu@ejemplo.com',
+    passwordLabel: 'Contraseña',
+    passwordPlaceholder: '••••••••',
+    loginBtn: 'Iniciar sesión',
+    forgotPassword: '¿Olvidaste tu contraseña?',
+    dontHaveAccount: '¿No tienes cuenta?',
+    startTrial: 'Empieza gratis',
+    accessibility: 'Accesibilidad',
+    privacy: 'Privacidad',
+    articles: 'Artículos',
+    accessibilityHref: '/es/accessibility',
+    privacyHref: '/es/privacy',
+    articlesHref: '/es/articles',
+    err: {
+      badCredentials: 'Correo electrónico o contraseña incorrectos',
+      emailNotConfirmed: 'Tu correo electrónico todavía no está confirmado. Abre el mensaje de confirmación que te enviamos y pulsa el enlace.',
+      linkInvalid: 'Este enlace de confirmación no es válido o ha caducado. Inicia sesión, o vuelve a registrarte para recibir uno nuevo.',
+    },
+  },
 } as const
 
 export function AuthForm() {
@@ -85,7 +110,7 @@ export function AuthForm() {
   // this request. That last step is the fix: without it every request without an
   // /en URL or a ?lang rendered Hebrew, including one the server had already
   // resolved to English and labelled lang="en" dir="ltr".
-  const lang: 'he' | 'en' = resolveAuthLocale({ pathname, langParam, serverLocale })
+  const lang: PublicLocale = resolveAuthLocale({ pathname, langParam, serverLocale })
   const isEn = lang === 'en'
   const t = LOGIN_UI[lang]
 

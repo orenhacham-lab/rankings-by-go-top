@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { keepSeedClaim, seedClaimDestination } from './claim-action'
@@ -139,6 +140,66 @@ const SIGNUP_UI = {
       emailConfirmationRequired: 'Your account was created. Please check your email to confirm your signup.',
     },
   },
+  es: {
+    subtitle: 'Seguimiento de posiciones en Google y visibilidad en IA',
+    logoAlt: 'Logotipo de Go Top SEO',
+    heading: 'Crea tu cuenta gratis',
+    intro: 'Unos datos y ya estás dentro. Los datos de tu negocio los leemos de tu web en el paso siguiente.',
+    fullName: 'Nombre y apellidos',
+    fullNamePlaceholder: 'Ana García',
+    company: 'Empresa',
+    companyOptional: '(opcional)',
+    companyPlaceholder: 'El nombre de tu negocio o empresa',
+    phone: 'Teléfono',
+    phonePlaceholder: '+34 600 123 456',
+    email: 'Correo electrónico',
+    emailPlaceholder: 'tu@ejemplo.com',
+    password: 'Contraseña',
+    passwordPlaceholder: '••••••••',
+    passwordHint: 'Al menos 8 caracteres',
+    confirmPassword: 'Confirma la contraseña',
+    confirmPasswordPlaceholder: 'Escribe la contraseña otra vez',
+    showPassword: 'Mostrar la contraseña',
+    hidePassword: 'Ocultar la contraseña',
+    consentBefore: 'Al crear una cuenta aceptas los ',
+    terms: 'Términos del servicio',
+    consentMiddle: ' y la ',
+    privacyPolicy: 'Política de privacidad',
+    consentAfter: '.',
+    termsHref: '/es/terms',
+    privacyPolicyHref: '/es/privacy',
+    signupBtn: 'Crear cuenta gratis',
+    trialBadge: '7 días de prueba gratis',
+    alreadyHaveAccount: '¿Ya tienes cuenta?',
+    signIn: 'Iniciar sesión',
+    accessibility: 'Accesibilidad',
+    privacy: 'Privacidad',
+    articles: 'Artículos',
+    accessibilityHref: '/es/accessibility',
+    privacyHref: '/es/privacy',
+    articlesHref: '/es/articles',
+    err: {
+      invalidEmail: 'El correo electrónico no es válido',
+      passwordTooShort: 'La contraseña debe tener al menos 8 caracteres',
+      fieldRequired: 'Este campo es obligatorio',
+      fullNameInvalid: 'Escribe tu nombre completo (al menos 2 caracteres)',
+      phoneInvalid: 'Escribe un número de teléfono válido',
+      passwordMismatch: 'Las contraseñas no coinciden. Escribe la misma en los dos campos.',
+      emailExists: 'Este correo electrónico ya está registrado. Inicia sesión.',
+      emailRateLimit: 'Se han enviado demasiadas solicitudes de registro en poco tiempo. Inténtalo de nuevo en unos minutos o usa otro correo electrónico.',
+      signupFailed: 'Ha ocurrido un error al crear la cuenta. Inténtalo de nuevo.',
+      weakPasswordLength: (min: number) => `La contraseña debe tener al menos ${min} caracteres`,
+      weakPasswordCharacters: 'La contraseña debe incluir minúsculas, mayúsculas, números y símbolos, según los requisitos de seguridad',
+      weakPasswordPwned: 'Esta contraseña ha aparecido en filtraciones de datos conocidas. Elige otra.',
+      weakPassword: 'Esta contraseña no cumple los requisitos de seguridad. Elige una más fuerte.',
+      createTrialFailed: 'Ha ocurrido un error al activar tu periodo de prueba. Inténtalo de nuevo.',
+    },
+    success: {
+      accountCreated: '¡Cuenta creada! Te llevamos al panel…',
+      accountCreatedFromScan: 'Tu cuenta está lista. Abrimos el proyecto de tu análisis…',
+      emailConfirmationRequired: 'Tu cuenta se ha creado. Revisa tu correo electrónico para confirmar el registro.',
+    },
+  },
 } as const
 
 export function SignupForm() {
@@ -151,7 +212,7 @@ export function SignupForm() {
   // this request. That last step is the fix: without it every request without an
   // /en URL or a ?lang rendered Hebrew, including one the server had already
   // resolved to English and labelled lang="en" dir="ltr".
-  const lang: 'he' | 'en' = resolveAuthLocale({ pathname, langParam, serverLocale })
+  const lang: PublicLocale = resolveAuthLocale({ pathname, langParam, serverLocale })
   const isEn = lang === 'en'
   const t = SIGNUP_UI[lang]
 

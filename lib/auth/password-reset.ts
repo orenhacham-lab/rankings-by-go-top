@@ -19,7 +19,7 @@
  * No provider text reaches the page: every outcome is a code the page maps to
  * its own dictionary.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /** Where the recovery link lands after Supabase: its fixed, same-origin path. */
 export const RESET_PASSWORD_PATH = '/reset-password'
@@ -31,7 +31,7 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * The redirect the recovery email carries: our own callback, next fixed to the
  * reset page (never a caller-supplied path), and the form's language.
  */
-export function recoveryRedirectTo(origin: string, locale: Locale): string {
+export function recoveryRedirectTo(origin: string, locale: PublicLocale): string {
   return `${origin}/api/auth/callback?next=${encodeURIComponent(RESET_PASSWORD_PATH)}&lang=${locale}`
 }
 

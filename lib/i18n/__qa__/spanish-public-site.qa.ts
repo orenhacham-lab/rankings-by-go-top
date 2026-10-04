@@ -342,15 +342,27 @@ function main() {
   // ── 7) Nothing bilingual was widened by accident ────────────────────────────
   console.log('\n7) the dashboard and the auth forms are untouched')
   {
-    // Sign-up has no Spanish, so every Spanish page must send a visitor to the
-    // ENGLISH form — explicitly, never to a Hebrew one.
+    // Sign-up HAS Spanish since 4 October 2026 (app/(auth)/es/*), so every
+    // Spanish page must send a visitor to the SPANISH form — and still never to
+    // a Hebrew one. Until then the rule here was "the English form, explicitly",
+    // which is what left a Spanish visitor changing language at the sign-up.
     const spanishPages = pageFiles().map((rel) => ({ rel, src: strip(read(rel)) }))
     for (const { rel, src } of spanishPages) {
       const hebrewAuth = /href="\/(signup|login)(\?|")/.test(src) || /authHref\('(signup|login)', 'he'\)/.test(src)
       check(`7a: ${rel.split('/es/')[1]} sends nobody to the HEBREW auth form`, !hebrewAuth)
     }
-    check('7b: the Spanish home page links to the English sign-up explicitly',
-      /authHref\('signup', 'en'\)/.test(strip(read('app/(public)/es/page.tsx'))))
+    check('7b: the Spanish home page links to the SPANISH sign-up explicitly',
+      /authHref\('signup', 'es'\)/.test(strip(read('app/(public)/es/page.tsx'))))
+    // The four Spanish auth routes exist and are gated by the same flag as the
+    // public tree, so "off" means absent there too.
+    for (const page of ['login', 'signup', 'forgot-password', 'reset-password']) {
+      check(`7b-${page}: app/(auth)/es/${page} exists`, existsSync(join(ROOT, 'app', '(auth)', 'es', page, 'page.tsx')))
+    }
+    const authGate = strip(read('app/(auth)/es/layout.tsx'))
+    check('7b-gate: the Spanish auth tree is behind the same flag as the public tree',
+      /if \(!spanishSiteEnabled\(\)\) notFound\(\)/.test(authGate))
+    check('7b-gate MUT: a layout without the gate fails that check',
+      !/if \(!spanishSiteEnabled\(\)\) notFound\(\)/.test(authGate.replace('if (!spanishSiteEnabled()) notFound()', 'return children')))
     // The dashboard now has a Spanish dictionary too, and it is PARTIAL by
     // design: what it has not translated answers in English. The guard that
     // owns that wave is lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts,

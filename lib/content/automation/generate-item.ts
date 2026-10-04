@@ -150,7 +150,32 @@ export async function generatePoolItem(
     if (!gen.ok) {
       let status = 'failed'
       let reason: string = gen.kind
-      if (gen.kind === 'required_anchor_missing_url' || gen.kind === 'cta_details_missing') {
+      /**
+       * THE PLAN SAYING "NOT NOW" IS NOT A FAILED ARTICLE.
+       *
+       * (Shopify billing_required is NOT in this: an unresolved Shopify plan
+       * needs the merchant to choose one, and the queue's "needs attention"
+       * alert is driven by `failed`. Quieting that would hide a thing only
+       * they can fix. An exhausted allowance fixes itself.)
+       *
+       * An account with no article left this period — a trial, whose whole
+       * allowance is the one article written when the account opened, or a
+       * paid cycle that is spent — had its next queue item marked `failed`.
+       * Nothing about the item was wrong, and `failed` does not come back on
+       * its own: the item sat at the top of the queue with no date, reading as
+       * an error, and SUBSCRIBING DID NOT RESUME IT — someone had to press
+       * retry. The owner saw exactly this on the arc media trial, 4 October
+       * 2026, and described what it should do instead: the next article is
+       * simply scheduled, and it does not go out unless they subscribe.
+       *
+       * So the item goes back to `queued`, keeping its place and the date the
+       * screen projects for it, with the reason on the row. The next cycle, or
+       * the customer subscribing, is all it needs. The retry budget is not
+       * touched either way (`transient` below).
+       */
+      if (gen.kind === 'quota_exceeded') {
+        status = 'queued'; reason = gen.kind
+      } else if (gen.kind === 'required_anchor_missing_url' || gen.kind === 'cta_details_missing') {
         status = 'quality_check_failed'; reason = gen.kind
       } else if (gen.kind === 'generation') {
         status = QUALITY_REASONS.has(gen.reason) ? 'quality_check_failed' : 'failed'

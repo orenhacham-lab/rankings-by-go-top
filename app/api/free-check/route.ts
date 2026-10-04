@@ -25,7 +25,7 @@ import { runFreeCheck } from '@/lib/free-check/run'
 import { checkGate, clientIpFrom, hashClient, recordRun } from '@/lib/free-check/store'
 import { domainKey, normalizeCheckUrl } from '@/lib/free-check/url-guard'
 import type { FreeCheckErrorCode, FreeCheckResponse } from '@/lib/free-check/types'
-import { LOCALES, type Locale } from '@/lib/i18n/locales'
+import { PUBLIC_LOCALES, toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/locales'
 import { runAfterResponse } from '@/lib/notifications/after-response'
 import { notifyFreeCheckCompleted } from '@/lib/notifications/operator-alerts'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -55,7 +55,15 @@ export async function POST(request: Request) {
   const payload = (body ?? {}) as { url?: unknown; locale?: unknown }
   if (typeof payload.url !== 'string') return fail('invalid_url', 400)
 
-  const locale: Locale = typeof payload.locale === 'string' && (LOCALES as string[]).includes(payload.locale) ? (payload.locale as Locale) : 'he'
+  // The page's language, which since /es went live can be Spanish. Reading it
+  // as he|en alone sent a Spanish visitor a HEBREW check; the findings are
+  // built from bilingual copy, so Spanish is checked in English, as the rest
+  // of the Spanish free-check screen already is.
+  const publicLocale: PublicLocale =
+    typeof payload.locale === 'string' && (PUBLIC_LOCALES as string[]).includes(payload.locale)
+      ? (payload.locale as PublicLocale)
+      : 'he'
+  const locale: Locale = toBilingualLocale(publicLocale)
 
   const admitted = normalizeCheckUrl(payload.url)
   if (!admitted.ok) {

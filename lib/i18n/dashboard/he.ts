@@ -817,6 +817,7 @@ export const dashboardHe = {
       addSelected: 'הוסף לתור',
       queueTitle: 'תור פרסום',
       queueEmpty: 'התור ריק. הוסיפו נושאים מאושרים כדי להתחיל.',
+      publishedTitle: 'כבר פורסמו',
       remove: 'הסר',
       retry: 'נסה שוב',
       skip: 'דלג',

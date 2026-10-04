@@ -20,18 +20,19 @@
  * Shopify links do not come through here: the embedded app builds its own with
  * authUrlWithLocale (lib/shopify/handoff-url.ts), always in English.
  */
-import type { Locale } from './locales'
+import { LOCALE_PREFIX, type PublicLocale } from './locales'
 import { LANGUAGE_PARAM } from './request-locale'
 
 export type AuthPage = 'login' | 'signup' | 'forgot-password'
 
 /** The sign-in or sign-up page in `locale`, with any extra query (e.g. a plan or a claim token). */
-export function authHref(page: AuthPage, locale: Locale, query: Record<string, string | null | undefined> = {}): string {
+export function authHref(page: AuthPage, locale: PublicLocale, query: Record<string, string | null | undefined> = {}): string {
   const params = new URLSearchParams()
   if (locale === 'he') params.set(LANGUAGE_PARAM, 'he')
   for (const [k, v] of Object.entries(query)) if (typeof v === 'string' && v.length > 0) params.set(k, v)
   const qs = params.toString()
-  const path = locale === 'en' ? `/en/${page}` : `/${page}`
+  // Each language's own route, from the one prefix table: '' · '/en' · '/es'.
+  const path = `${LOCALE_PREFIX[locale]}/${page}`
   return qs ? `${path}?${qs}` : path
 }
 
@@ -41,7 +42,7 @@ export function authHref(page: AuthPage, locale: Locale, query: Record<string, s
  * path already carries (the Shopify handoff's) is kept as it is. `path` must
  * already be sanitized (sanitizeNextPath): this only appends a parameter.
  */
-export function withLocaleParam(path: string, locale: Locale): string {
+export function withLocaleParam(path: string, locale: PublicLocale): string {
   const hashAt = path.indexOf('#')
   const base = hashAt >= 0 ? path.slice(0, hashAt) : path
   const hash = hashAt >= 0 ? path.slice(hashAt) : ''

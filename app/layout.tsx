@@ -83,6 +83,7 @@ export default async function RootLayout({
   // up after hydration.
   const { isAuthenticated, locale } = await getRootRequestContext()
   const { lang, dir } = documentLocaleAttributes(locale)
+  const schema = getSiteMetadata(locale)
 
   return (
     <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
@@ -102,7 +103,11 @@ export default async function RootLayout({
         */}
         <script dangerouslySetInnerHTML={{ __html: GOOGLE_CONSENT_DEFAULT_SCRIPT }} />
 
-        {/* JSON-LD Schema for SEO */}
+        {/* JSON-LD Schema for SEO — IN THE REQUEST'S LANGUAGE.
+            Its two descriptions were hard-coded Hebrew, so the Spanish and the
+            English pages told a crawler, in Hebrew, what the product does. The
+            document's own <html lang> and <title> already follow the resolved
+            locale (generateMetadata above); this now reads the same table. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -114,7 +119,7 @@ export default async function RootLayout({
                 alternateName: ['Rankings by Go Top'],
                 url: 'https://www.gotopseo.com',
                 logo: 'https://www.gotopseo.com/gotop-primary.png',
-                description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
+                description: schema.description,
                 sameAs: ['https://www.gotop.co.il'],
                 contactPoint: {
                   '@type': 'ContactPoint',
@@ -135,7 +140,7 @@ export default async function RootLayout({
                 alternateName: ['Rankings by Go Top'],
                 publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
                 brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
-                description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
+                description: schema.description,
                 url: 'https://www.gotopseo.com',
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
