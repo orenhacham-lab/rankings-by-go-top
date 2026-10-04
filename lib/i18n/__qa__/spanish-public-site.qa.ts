@@ -445,6 +445,23 @@ function main() {
       twoWayFailureUrl('https://a.example', 'es') !== 'https://a.example/es/login?error=google')
   }
 
+  // ---- The switcher reads as a control, not a label -------------------------
+  // With three languages it became a menu behind a globe icon, and a visitor had
+  // no reason to think the language could be changed at all (owner, 5 October
+  // 2026). The chevron is the affordance.
+  {
+    console.log('\nThe language switcher looks like something you can open')
+    const src = strip(read('components/LanguageSwitcher.tsx'))
+    check('S1: the menu trigger carries a chevron beside the globe', /<ChevronDown/.test(src) && /import \{[^}]*ChevronDown[^}]*\} from 'lucide-react'/.test(src))
+    check('S2: the chevron turns while the menu is open, so its state is visible', /open && '-rotate-180'/.test(src))
+    check('S3: it is decoration, never announced twice to a screen reader', /<ChevronDown[\s\S]{0,260}aria-hidden="true"/.test(src))
+    check('S4: the trigger still says it opens a menu and whether it is open', /aria-haspopup="menu"/.test(src) && /aria-expanded=\{open\}/.test(src))
+    check('S1-MUT: a trigger with no chevron fails S1', !/<ChevronDown/.test(src.replace(/<ChevronDown[\s\S]*?\/>/, '')))
+    // The two-language link is a link to the other language by name; it needs no chevron.
+    check('S5: with two languages it is still one plain link, not a menu',
+      /if \(others\.length === 1\)/.test(src) && availableLocales(false).length === 2)
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
