@@ -4770,6 +4770,15 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       trendPending: 'La tendencia se va formando con cada sincronización semanal',
       trendOf: (label: string) => `${label} en las últimas sincronizaciones`,
     },
+    exportReport: {
+      label: 'Descargar el informe',
+      excel: 'Excel',
+      csv: 'CSV',
+      about: 'Los clics, las impresiones y la posición media de los últimos 28 días, por consulta y por página, con tus palabras clave en seguimiento.',
+      note: 'La posición del archivo es la media de Google durante el periodo, no nuestra comprobación de posición.',
+      failed: 'No hemos podido descargar el informe. Vuelve a intentarlo.',
+      working: 'Preparando el archivo',
+    },
     keywords: {
       title: 'Tus posiciones en Google según Search Console',
       about: 'Las búsquedas en las que Google mostró tu web, las más vistas primero, con la posición media, los clics y las impresiones que indica Google, y un clic para monitorizar cualquiera de ellas.',

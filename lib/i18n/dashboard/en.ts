@@ -3325,6 +3325,16 @@ export const dashboardEn = {
       trendPending: 'The trend builds up with each weekly sync',
       trendOf: (label: string) => `${label} over the last syncs`,
     },
+    // The download under the performance section: the same 28-day figures as a file.
+    exportReport: {
+      label: 'Download the report',
+      excel: 'Excel',
+      csv: 'CSV',
+      about: 'The last 28 days of clicks, impressions and average position, per query and per page, with your tracked keywords.',
+      note: 'The position in the file is Google’s average over the window, not our own rank check.',
+      failed: 'We could not download the report. Please try again.',
+      working: 'Preparing the file',
+    },
     // The Search Console section of the Keywords tab (wave 8), under the keywords table:
     // the searches Google already shows the site for that are not tracked yet.
     keywords: {

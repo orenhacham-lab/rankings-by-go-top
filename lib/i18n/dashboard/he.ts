@@ -3335,6 +3335,18 @@ export const dashboardHe = {
       trendPending: 'המגמה נבנית עם כל סנכרון שבועי',
       trendOf: (label: string) => `${label} לאורך הסנכרונים האחרונים`,
     },
+    // The download under the performance section: the same 28-day figures as a file.
+    // "של גוגל" is in the note because a reader who takes this for the scan report
+    // would read the gap between the two position numbers as a mistake.
+    exportReport: {
+      label: 'הורדת הדוח',
+      excel: 'Excel',
+      csv: 'CSV',
+      about: 'הקליקים, החשיפות והמיקום הממוצע של 28 הימים האחרונים לפי ביטוי ולפי עמוד, כולל הביטויים שבמעקב.',
+      note: 'המיקום בקובץ הוא הממוצע של גוגל לאורך הטווח, ולא בדיקת המיקום שלנו.',
+      failed: 'לא הצלחנו להוריד את הדוח. נסו שוב.',
+      working: 'מכינים את הקובץ',
+    },
     // The Search Console section of the Keywords tab (wave 8), under the keywords table:
     // the searches Google already shows the site for that are not tracked yet.
     keywords: {
