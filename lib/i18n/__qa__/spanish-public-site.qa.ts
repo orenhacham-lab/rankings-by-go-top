@@ -23,7 +23,7 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { PUBLIC_LOCALES, LOCALE_PREFIX, getLocaleConfig, normalizePublicLocale, toBilingualLocale, type PublicLocale } from '../locales'
+import { PUBLIC_LOCALES, LOCALE_PREFIX, getLocaleConfig, localeHomeHref, normalizePublicLocale, toBilingualLocale, type PublicLocale } from '../locales'
 import { spanishSiteEnabled } from '../spanish-site'
 import { isSpanishPath, routeContentLocale } from '../request-locale'
 import { getPublicDictionary } from '../getPublicDictionary'
@@ -460,6 +460,30 @@ function main() {
     // The two-language link is a link to the other language by name; it needs no chevron.
     check('S5: with two languages it is still one plain link, not a menu',
       /if \(others\.length === 1\)/.test(src) && availableLocales(false).length === 2)
+  }
+
+  // ---- The logo goes home in the language you are reading -------------------
+  // The lockup and the "home" link each spelled their href out by hand, from the
+  // two-language era, so a Spanish visitor clicking the logo landed on the HEBREW
+  // home page (owner, 5 October 2026). localeHomeHref is the one answer.
+  {
+    console.log('\nThe nav goes home in the page\'s own language')
+    const nav = strip(read('components/PublicNav.tsx'))
+    const usesHelper = (src: string) => (src.match(/localeHomeHref\(locale\)/g) ?? []).length >= 2
+    check('N1: the lockup and the home link both use localeHomeHref', usesHelper(nav))
+    check('N2: no hand-written "English or Hebrew" home href is left', !/'\/en' \? '\/en' : '\/'/.test(nav) && !/'\/en\/' \? '\/en'/.test(nav))
+    check('N3: localeHomeHref answers each language\'s own home',
+      localeHomeHref('he') === '/' && localeHomeHref('en') === '/en' && localeHomeHref('es') === '/es')
+    // The home link matches its own page only; every other link also matches its subtree.
+    const active = (src: string) => /homeHrefs\.has\(href\) \? pathname === href/.test(src)
+      && /PUBLIC_LOCALES\.map\(localeHomeHref\)/.test(src)
+    check('N4: every language\'s home is an exact match, so /es/pricing does not light up "home"', active(nav))
+    check('N1-MUT: the old two-language lockup fails N1 and N2', (() => {
+      const old = nav.replace(/localeHomeHref\(locale\)/, "prefix === '/en' ? '/en' : '/'")
+      return !usesHelper(old) && /'\/en' \? '\/en' : '\/'/.test(old)
+    })())
+    check('N4-MUT: listing the home hrefs by hand again fails N4',
+      !active(nav.replace('PUBLIC_LOCALES.map(localeHomeHref)', "['/', '/en']")))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
