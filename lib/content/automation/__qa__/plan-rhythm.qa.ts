@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  articlesPerWeekFor, weeklyRhythm, rhythmWeekdays, nextRhythmSlotAt, makeSlotAfter, localWeekday,
+  articlesPerWeekFor, MAX_ARTICLES_PER_WEEK_PER_SITE, weeklyRhythm, rhythmWeekdays, nextRhythmSlotAt, makeSlotAfter, localWeekday,
   slotFitsRhythm, projectPublishDates, spreadNextPublishAt, daySlotMinutes,
 } from '@/lib/content/automation/schedule'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
@@ -46,8 +46,23 @@ const plans = Object.fromEntries(Object.values(PLAN_CATALOG).map((p) => [p.code,
 check('A0: the catalog allowances (read only): regular 4, advanced 12, premium 50, agency 200', same(plans, { regular: 4, advanced: 12, premium: 50, large_agency: 200 }), plans)
 check('A1: 4 a month → 1 a week', articlesPerWeekFor(4) === 1)
 check('A2: 12 a month → 3 a week', articlesPerWeekFor(12) === 3)
-check('A3: 50 → 13, 200 → 50', articlesPerWeekFor(50) === 13 && articlesPerWeekFor(200) === 50)
-check('A4: an account allowance is shared by its active queues (50 over 2 → 6), never below 1', articlesPerWeekFor(50, 2) === 6 && articlesPerWeekFor(4, 9) === 1)
+// The rate before the ceiling, for the controls below: divide and floor at 1,
+// with nothing stopping 13 a week landing on one site.
+const uncapped = (monthly: number, queues = 1) => (monthly > 0 ? Math.max(1, Math.round(monthly / 4 / Math.max(1, Math.floor(queues)))) : 0)
+check('A3: a multi-site allowance on ONE site is held at the per-site ceiling, not divided by 4 (50 → 5, 200 → 5)', articlesPerWeekFor(50) === 5 && articlesPerWeekFor(200) === 5)
+check('A3a: the ceiling is one article a working day', MAX_ARTICLES_PER_WEEK_PER_SITE === 5)
+check('A3b: the ceiling is the widest shape the weekday spread has, so it never stacks two on a day', same(weeklyRhythm(MAX_ARTICLES_PER_WEEK_PER_SITE), [1, 1, 1, 1, 1, 0, 0]))
+check(
+  'A3c: the ceiling binds only above it — Basic and Advanced keep the rate their allowance gives',
+  articlesPerWeekFor(PLAN_CATALOG.regular.maxArticlesPerPeriodAccountWide) === 1 && articlesPerWeekFor(PLAN_CATALOG.advanced.maxArticlesPerPeriodAccountWide) === 3,
+)
+// A-MUT: a cap stated but not applied. The old code divided and floored at 1
+// with no ceiling, which is what put 13 a week into a single site.
+check('A-MUT: without the ceiling a single site would be scheduled 13 and 50 a week', uncapped(50) === 13 && uncapped(200) === 50 && articlesPerWeekFor(50) !== uncapped(50))
+check(
+  'A4: an account allowance is shared by its active queues (50 over 3 → 4), never below 1, and the per-site ceiling still holds above it (50 over 2 → 5, not 6)',
+  articlesPerWeekFor(50, 3) === 4 && articlesPerWeekFor(4, 9) === 1 && articlesPerWeekFor(50, 2) === 5 && uncapped(50, 2) === 6,
+)
 check('A5: no allowance → no rhythm', articlesPerWeekFor(0) === 0 && articlesPerWeekFor(NaN) === 0)
 
 // B) the days

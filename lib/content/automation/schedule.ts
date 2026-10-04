@@ -209,13 +209,33 @@ export const isNoPublishWeekday = (wd: number) => NO_PUBLISH_WEEKDAYS.includes(w
 const RHYTHM_DAYS: Record<number, number[]> = { 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 2, 4], 5: [0, 1, 2, 3, 4] }
 
 /**
+ * NO SITE TAKES MORE THAN ONE ARTICLE A WORKING DAY (owner, 4 October 2026:
+ * "if a customer added their first project and you pushed 200 articles into
+ * one site straight away, that is not reasonable").
+ *
+ * The monthly allowance stays account-wide and shared between the account's
+ * sites; this is the ceiling on what ONE of them absorbs. It only ever binds
+ * on a multi-site plan with fewer sites than its allowance assumes: Premium
+ * (50 a month) with a single site was scheduled 13 a week, three on some days,
+ * and Agency (200) 50 a week — around ten a day into the same site. Basic (1 a
+ * week) and Advanced (3) are under the ceiling and unchanged.
+ *
+ * Five is also the widest rhythm the weekday spread has a shape for
+ * (RHYTHM_DAYS tops out at Sun-Thu); above it `weeklyRhythm` starts stacking
+ * several articles on the same day.
+ */
+export const MAX_ARTICLES_PER_WEEK_PER_SITE = 5
+
+/**
  * Articles a week from a monthly allowance. The allowance is account-wide, so
- * when several queues of the account are active they share it.
+ * when several queues of the account are active they share it, and no single
+ * queue goes above MAX_ARTICLES_PER_WEEK_PER_SITE.
  * 0 when there is no allowance to divide.
  */
 export function articlesPerWeekFor(monthlyAllowance: number, activeQueues = 1): number {
   if (!(monthlyAllowance > 0)) return 0
-  return Math.max(1, Math.round(monthlyAllowance / 4 / Math.max(1, Math.floor(activeQueues))))
+  const share = Math.round(monthlyAllowance / 4 / Math.max(1, Math.floor(activeQueues)))
+  return Math.min(MAX_ARTICLES_PER_WEEK_PER_SITE, Math.max(1, share))
 }
 
 /** Articles per weekday (index 0=Sun … 6=Sat) for a weekly count. Fri/Sat are always 0. */
