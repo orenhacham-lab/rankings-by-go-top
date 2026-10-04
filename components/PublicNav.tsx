@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { BarChart3, ChevronDown, FileText, MapPin, Menu, Search, Sparkles, Telescope, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { LOCALE_PREFIX, toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
 import { buttonClasses } from '@/components/public/marketing'
@@ -38,8 +38,11 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   // The auth pages in THIS page's language (lib/i18n/auth-href.ts). They exist in
   // Hebrew and English only, so a Spanish visitor is sent to the English form —
   // the one they can read — until the dashboard is translated.
-  const signupHref = authHref('signup', toBilingualLocale(locale))
-  const loginHref = authHref('login', toBilingualLocale(locale))
+  // The nav's own language, not a narrowed one: the page a visitor is reading
+  // decides the form they get, so a Spanish page links the Spanish form
+  // (owner, 4 October 2026 — one language from the site to the dashboard).
+  const signupHref = authHref('signup', locale)
+  const loginHref = authHref('login', locale)
 
   const scrollThreshold = tone === 'inverse' ? 80 : 8
   useEffect(() => {

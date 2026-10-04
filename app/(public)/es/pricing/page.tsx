@@ -1,3 +1,4 @@
+import { authHref } from '@/lib/i18n/auth-href'
 import { Check, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
@@ -146,7 +147,7 @@ export default async function SpanishPricingPage() {
                   </div>
 
                   <ButtonLink
-                    href={user ? '/dashboard' : `/en/signup?plan=${code}`}
+                    href={user ? '/dashboard' : authHref('signup', 'es', { plan: code })}
                     variant={highlighted ? 'primary' : 'secondary'}
                     size="lg"
                     className="w-full"
@@ -172,7 +173,7 @@ export default async function SpanishPricingPage() {
         <PricingClose
           copy={copy}
           checkHref="/es/free-check"
-          startHref={user ? '/dashboard' : '/en/signup'}
+          startHref={user ? '/dashboard' : authHref('signup', 'es')}
           signedIn={!!user}
         />
       </main>

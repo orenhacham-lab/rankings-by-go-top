@@ -30,7 +30,9 @@ import { join } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { resolveAuthLocale } from '../auth-locale'
-import type { Locale } from '../locales'
+import { authHref } from '../auth-href'
+import { resolveRequestLocale, localeParamToPersist } from '../request-locale'
+import type { Locale, PublicLocale } from '../locales'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -70,9 +72,14 @@ const LOGIN = require(join(ROOT, 'app/(auth)/login/page.tsx'))
 const SIGNUP = require(join(ROOT, 'app/(auth)/signup/page.tsx'))
 const EN_LOGIN = require(join(ROOT, 'app/(auth)/en/login/page.tsx'))
 const EN_SIGNUP = require(join(ROOT, 'app/(auth)/en/signup/page.tsx'))
+// The Spanish routes exist only while the flag is on, and `require` runs at
+// module load — so the flag is set before these two are pulled in.
+process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'
+const ES_LOGIN = require(join(ROOT, 'app/(auth)/es/login/page.tsx'))
+const ES_SIGNUP = require(join(ROOT, 'app/(auth)/es/signup/page.tsx'))
 
 /** The dictionaries the pages actually ship, read out of their own source. */
-function uiStrings(rel: string, locale: Locale): Record<string, string> {
+function uiStrings(rel: string, locale: PublicLocale): Record<string, string> {
   const src = read(rel)
   const block = src.slice(src.indexOf(`  ${locale}: {`))
   const out: Record<string, string> = {}
@@ -86,7 +93,7 @@ function uiStrings(rel: string, locale: Locale): Record<string, string> {
 }
 
 /** Render a page through the REAL provider, with NO effects executed. */
-function firstRender(Page: any, serverLocale: Locale, pathname: string, search = ''): string {
+function firstRender(Page: any, serverLocale: PublicLocale, pathname: string, search = ''): string {
   PATHNAME = pathname
   SEARCH = new URLSearchParams(search)
   return renderToStaticMarkup(
@@ -299,6 +306,56 @@ async function main() {
     const hookCode = hook.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
     check('G6: …and production returns ONE constant, identical on server and client',
       /return REQUEST_FALLBACK_LOCALE/.test(hookCode) && !/document\.documentElement\.lang/.test(hookCode))
+  }
+
+
+  // ── H) Spanish, the third language of the auth surface ────────────────────
+  // The owner's rule, 4 October 2026: a customer who comes in on the Spanish
+  // site signs up, signs in and uses the app in Spanish, with no language
+  // change on the way. The forms knew two languages, so /es visitors were
+  // handed the English form and, after signing in, a Hebrew dashboard.
+  console.log('\nH) /es/login and /es/signup are Spanish, end to end')
+  {
+    for (const [label, mod, rel, path, keys] of [
+      ['login', ES_LOGIN, 'app/(auth)/login/page.tsx', '/es/login',
+        ['heading', 'emailLabel', 'passwordLabel', 'loginBtn', 'dontHaveAccount', 'startTrial', 'subtitle', 'accessibility', 'privacy', 'articles']],
+      ['signup', ES_SIGNUP, 'app/(auth)/signup/page.tsx', '/es/signup',
+        ['heading', 'intro', 'email', 'password', 'passwordHint', 'terms', 'privacyPolicy', 'signupBtn', 'trialBadge', 'alreadyHaveAccount', 'signIn']],
+    ] as const) {
+      // The SERVER locale is Hebrew on purpose: the route alone must decide.
+      const html = firstRender(mod.default, 'he', path)
+      const es = uiStrings(rel, 'es')
+      check(`H1 ${label}: the route decides Spanish even against a Hebrew server locale`,
+        resolveAuthLocale({ pathname: path, serverLocale: 'he' }) === 'es')
+      check(`H2 ${label}: no Hebrew anywhere in the first render`,
+        !HEBREW.test(html), (html.match(/[֐-׿][^<]{0,40}/g) ?? []).slice(0, 3).join(' | '))
+      const missing = (keys as readonly string[]).filter((k) => !es[k] || !html.includes(esc(es[k]!)))
+      check(`H3 ${label}: every visible label is the Spanish one`, missing.length === 0, JSON.stringify(missing))
+      check(`H4 ${label}: its footer and consent links stay inside /es`,
+        !/href="\/(en\/)?(terms|privacy|accessibility|articles)"/.test(html), (html.match(/href="\/[a-z/-]*"/g) ?? []).slice(0, 8).join(' '))
+      check(`H5 ${label}: the form is laid out left to right`, /dir="ltr"/.test(html))
+    }
+    // The links BETWEEN the auth pages keep the language, or the visitor falls
+    // out of Spanish on the first click.
+    for (const page of ['login', 'signup', 'forgot-password'] as const) {
+      check(`H6: authHref('${page}', 'es') is the Spanish route`, authHref(page, 'es') === `/es/${page}`, authHref(page, 'es'))
+    }
+    // The hand-off that was dropped: the sign-in stamps ?lang=es on its
+    // destination, and the dashboard must read it.
+    check('H7: /dashboard?lang=es resolves to Spanish',
+      resolveRequestLocale({ pathname: '/dashboard', langParam: 'es' }) === 'es')
+    check('H8: …and the proxy stores it over a Hebrew choice', localeParamToPersist('he', 'es') === 'es')
+    check('H9: …while an English stamp still does not overwrite a Spanish choice',
+      localeParamToPersist('es', 'en') === null)
+    // SHOPIFY IS UNTOUCHED: English by route, whatever the reader stored.
+    check('H10: a Shopify surface stays English with a Spanish cookie',
+      resolveRequestLocale({ pathname: '/shopify/app', cookieValue: 'es' }) === 'en'
+      && resolveAuthLocale({ pathname: '/en/login', serverLocale: 'es' }) === 'en')
+    // MUTATION CONTROLS.
+    check('H11: mutation control — the old two-language selector answers English for /es/login',
+      (((p: string): string => (p.startsWith('/en/') ? 'en' : 'he'))('/es/login')) !== 'es')
+    check('H12: mutation control — a bilingual ?lang= reader drops the Spanish stamp',
+      (((v: string): string | null => (v === 'he' || v === 'en' ? v : null))('es')) === null)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

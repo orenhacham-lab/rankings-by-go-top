@@ -28,15 +28,25 @@
  * effect anywhere in the path and therefore nothing to flip after hydration.
  */
 
-import type { Locale } from './locales'
-import { isEnglishPath } from './request-locale'
-import { normalizeLocale } from './dashboard/locale'
+import type { PublicLocale } from './locales'
+import { isEnglishPath, isSpanishPath } from './request-locale'
+import { normalizeDashboardUiLocale } from './dashboard/locale'
 
+/**
+ * SPANISH JOINED THE THREE (owner, 4 October 2026): "a customer comes in on the
+ * Spanish site, signs up, signs in, and everything is in Spanish". The auth
+ * surface was the break in that chain — it knew two languages, so a Spanish
+ * visitor was handed the Hebrew or English form. `/es/login` is now the Spanish
+ * route and says so itself, exactly as `/en/login` does, and the Spanish tree's
+ * own gate (app/(auth)/es/layout.tsx) keeps those URLs from existing while the
+ * Spanish site is off — so this can never label a 404 'es'.
+ */
 export function resolveAuthLocale(input: {
   pathname?: string | null
   langParam?: string | null
-  serverLocale?: Locale | null
-}): Locale {
+  serverLocale?: PublicLocale | null
+}): PublicLocale {
   if (isEnglishPath(input.pathname)) return 'en'
-  return normalizeLocale(input.langParam) ?? input.serverLocale ?? 'he'
+  if (isSpanishPath(input.pathname)) return 'es'
+  return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

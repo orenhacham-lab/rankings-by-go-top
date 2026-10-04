@@ -11,6 +11,7 @@ import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
 import { landingHe } from '../../../lib/i18n/public/landing-he'
 import { landingEn } from '../../../lib/i18n/public/landing-en'
+import { PUBLIC_LOCALES } from '../../../lib/i18n/locales'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -119,8 +120,14 @@ function main() {
     check('D3: the free-check claim, the email confirmation and the default client are unchanged', claimOk(src))
     check('MUT: dropping the claim fails D3', !claimOk(src.replace('keepSeedClaim(claimParam)', 'void 0')))
     const dict = src.slice(src.indexOf('const SIGNUP_UI'), src.indexOf('} as const'))
-    const both = ['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid'].every((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === 2)
-    check('D4: every new string exists in both the Hebrew and the English dictionary', both)
+    // One entry per language the form ships, derived from PUBLIC_LOCALES rather
+    // than pinned at two — Spanish joined the form on 4 October 2026, and a
+    // hard-coded 2 would have read that as a missing string.
+    const langs = PUBLIC_LOCALES.filter((l) => dict.includes(`  ${l}: {`)).length
+    const keys = ['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid']
+    const both = langs >= 2 && keys.every((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === langs)
+    check(`D4: every new string exists in all ${langs} of the form's dictionaries`, both,
+      keys.filter((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length !== langs).join(', '))
     check('MUT: a key missing from one language fails D4', !['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid'].every((k) => (dict.replace("phone: 'טלפון',", '').match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === 2))
   }
 

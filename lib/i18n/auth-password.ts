@@ -1,9 +1,9 @@
 /**
  * Copy for the password-reset pages (/forgot-password, /reset-password and
- * their /en twins), both languages. Every outcome of lib/auth/password-reset.ts
+ * their /en and /es twins), all three languages. Every outcome of lib/auth/password-reset.ts
  * has its own line here, so no provider text is ever shown.
  */
-import type { Locale } from './locales'
+import type { PublicLocale } from './locales'
 
 export const PASSWORD_UI = {
   he: {
@@ -92,8 +92,51 @@ export const PASSWORD_UI = {
       },
     },
   },
+  es: {
+    subtitle: 'Seguimiento de posiciones en Google y visibilidad en IA',
+    logoAlt: 'Logotipo de Go Top SEO',
+    backToLogin: 'Volver a iniciar sesión',
+    footer: {
+      accessibility: 'Accesibilidad',
+      privacy: 'Privacidad',
+      articles: 'Artículos',
+      accessibilityHref: '/es/accessibility',
+      privacyHref: '/es/privacy',
+      articlesHref: '/es/articles',
+    },
+    forgot: {
+      heading: '¿Olvidaste tu contraseña?',
+      intro: 'Escribe el correo electrónico de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva.',
+      emailLabel: 'Correo electrónico',
+      emailPlaceholder: 'tu@ejemplo.com',
+      submit: 'Enviar enlace',
+      sentHeading: 'Revisa tu correo',
+      sent: (email: string) => `Si existe una cuenta con ${email}, le hemos enviado un enlace para elegir una contraseña nueva. El enlace caduca al poco tiempo. ¿No lo encuentras? Revisa también la carpeta de spam.`,
+      sendAgain: 'Usar otra dirección',
+      invalidEmail: 'El correo electrónico no es válido',
+      unavailable: 'No hemos podido enviar la solicitud. Revisa tu conexión a internet e inténtalo de nuevo.',
+      linkExpired: 'Este enlace no es válido o ha caducado. Escribe tu correo electrónico para recibir uno nuevo.',
+    },
+    reset: {
+      heading: 'Elige una contraseña nueva',
+      passwordLabel: 'Contraseña nueva',
+      confirmLabel: 'Confirma la contraseña nueva',
+      hint: 'Al menos 8 caracteres',
+      submit: 'Guardar contraseña',
+      updated: 'Tu contraseña se ha actualizado. Te llevamos a tu cuenta…',
+      requestNew: 'Pedir un enlace nuevo',
+      err: {
+        too_short: 'La contraseña debe tener al menos 8 caracteres',
+        mismatch: 'Las contraseñas no coinciden',
+        same_password: 'La contraseña nueva es igual a la anterior. Elige otra.',
+        weak_password: 'Esta contraseña es demasiado débil. Elige una más larga, con letras y números.',
+        link_expired: 'Este enlace no es válido o ha caducado. Pide uno nuevo.',
+        failed: 'No hemos podido guardar la contraseña. Inténtalo de nuevo.',
+      },
+    },
+  },
 } as const
 
-export function passwordUi(locale: Locale) {
+export function passwordUi(locale: PublicLocale) {
   return PASSWORD_UI[locale]
 }

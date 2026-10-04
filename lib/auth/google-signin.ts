@@ -19,7 +19,8 @@
  * the sign-up page set before the visitor left (lib/onboarding/claim-cookie.ts,
  * SameSite=Lax), which the browser sends again when Google redirects back.
  */
-import type { Locale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
+import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 
 /** The flag as the browser bundle sees it: inlined at build time. */
@@ -48,21 +49,26 @@ export function googleDirectConfigured(value: string | undefined = process.env.N
 }
 
 /** The same-origin start of that flow, with a sanitized `next` and the form's language. */
-export function googleStartPath(nextPath: string, lang: Locale): string {
+export function googleStartPath(nextPath: string, lang: PublicLocale): string {
   const params = new URLSearchParams({ next: sanitizeNextPath(nextPath, '/dashboard'), lang })
   return `/api/auth/google?${params.toString()}`
 }
 
 /** Where a Google sign-in that did not complete lands: the sign-in form, in its language, with one generic line. */
 export function googleSignInFailureUrl(origin: string, lang: string | null | undefined): string {
-  const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)
+  // The form in the language that sent them, from the one prefix table: a
+  // two-way check sent a Spanish visitor back to the Hebrew form.
+  const stated = normalizeDashboardUiLocale(lang)
+  const failed = new URL(`${LOCALE_PREFIX[stated ?? 'he']}/login`, origin)
   failed.searchParams.set('error', 'google')
-  if (lang === 'he') failed.searchParams.set('lang', 'he')
+  // Only a language the caller actually stated is restated on the Hebrew route;
+  // nothing stated leaves the request contract to decide, as before.
+  if (stated === 'he') failed.searchParams.set('lang', 'he')
   return failed.toString()
 }
 
 /** Where Google returns to: the auth callback on this origin, with a sanitized `next` and the form's language. */
-export function googleRedirectTo(origin: string, nextPath: string, lang: Locale): string {
+export function googleRedirectTo(origin: string, nextPath: string, lang: PublicLocale): string {
   const url = new URL('/api/auth/callback', origin)
   url.searchParams.set('next', sanitizeNextPath(nextPath, '/dashboard'))
   url.searchParams.set('lang', lang)
@@ -73,9 +79,10 @@ export function googleRedirectTo(origin: string, nextPath: string, lang: Locale)
 const COPY = {
   he: { label: 'המשך עם Google', or: 'או', failed: 'לא הצלחנו להתחיל את ההתחברות עם Google. נסו שוב, או המשיכו עם אימייל.', returnFailed: 'ההתחברות עם Google לא הושלמה. נסו שוב, או המשיכו עם אימייל.' },
   en: { label: 'Continue with Google', or: 'or', failed: "We couldn't start signing in with Google. Try again, or continue with email.", returnFailed: "Signing in with Google didn't complete. Try again, or continue with email." },
+  es: { label: 'Continuar con Google', or: 'o', failed: 'No hemos podido iniciar el acceso con Google. Inténtalo de nuevo o continúa con tu correo electrónico.', returnFailed: 'El acceso con Google no se ha completado. Inténtalo de nuevo o continúa con tu correo electrónico.' },
 } as const
 
-export function googleSignInCopy(lang: Locale): (typeof COPY)[Locale] {
+export function googleSignInCopy(lang: PublicLocale): (typeof COPY)[PublicLocale] {
   return COPY[lang] ?? COPY.en
 }
 

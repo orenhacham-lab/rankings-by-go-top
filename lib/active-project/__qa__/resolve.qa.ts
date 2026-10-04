@@ -20,7 +20,14 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 const ROOT = join(__dirname, '..', '..', '..')
-const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+/**
+ * A file that vanished between the directory walk and the read is not a
+ * finding. This suite scans every source file, and the suites that run beside
+ * it write a mutated copy next to the original (`*.mut3.ts`) and delete it
+ * again — so under the parallel runner this threw ENOENT and the whole suite
+ * reported NO_SUMMARY, twice, for a file that was never part of the codebase.
+ */
+const read = (p: string) => { try { return readFileSync(join(ROOT, p), 'utf8') } catch { return '' } }
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
 
 const P = (id: string, updated_at?: string): ActiveProjectLite => ({ id, name: id, updated_at })

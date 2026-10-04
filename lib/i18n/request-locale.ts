@@ -196,14 +196,18 @@ export function resolveRequestLocale(input: {
   // cookie, seed, parameter or header may relabel content it did not write.
   const fixed = routePublicLocale(input.pathname)
   if (fixed) return fixed
-  // The COOKIE is read with normalizeStoredLocale, which accepts Spanish; every
-  // other step stays bilingual. The cookie is the reader's own stored choice and
-  // the only way a dashboard — which has no /es URL to be fixed by — can be
-  // Spanish. `?lang=` stays bilingual because it is a hand-off between
-  // surfaces, and the seed is the signup language, which has no Spanish form yet.
-  return normalizeLocale(input.langParam)
+  // The cookie, the `?lang=` hand-off and the signup seed all accept Spanish
+  // now. They used to stay bilingual on the grounds that there was no Spanish
+  // form to hand off FROM — true until 4 October 2026, when the owner's rule
+  // ("a customer comes in on the Spanish site, signs up, signs in, and
+  // everything is in Spanish") gave /es its own auth routes. With the param
+  // still bilingual, `/dashboard?lang=es` — the stamp the Spanish sign-in puts
+  // on its destination — was dropped, and the first dashboard after signing up
+  // in Spanish came back Hebrew. Each of the three is read with
+  // normalizeStoredLocale, so Spanish is accepted only while the flag is on.
+  return normalizeStoredLocale(input.langParam)
     ?? normalizeStoredLocale(input.cookieValue)
-    ?? normalizeLocale(input.seed)
+    ?? normalizeStoredLocale(input.seed)
     ?? localeFromAcceptLanguage(input.acceptLanguage)
     ?? REQUEST_FALLBACK_LOCALE
 }
@@ -221,7 +225,7 @@ export function explicitRequestLocale(input: {
   cookieValue?: string | null
 }): PublicLocale | null {
   return routePublicLocale(input.pathname)
-    ?? normalizeLocale(input.langParam)
+    ?? normalizeStoredLocale(input.langParam)
     ?? normalizeStoredLocale(input.cookieValue)
 }
 
@@ -242,9 +246,12 @@ export function explicitRequestLocale(input: {
  * that genuinely differs still is, because then something asked for it: an
  * `/en/*` route, the OAuth callback, a link from the English sitemap.
  */
-export function localeParamToPersist(storedValue: string | null | undefined, langParam: Locale | null): Locale | null {
+export function localeParamToPersist(storedValue: string | null | undefined, langParam: PublicLocale | null): PublicLocale | null {
   if (!langParam) return null
   const stored = normalizeStoredLocale(storedValue)
+  // A parameter that merely restates the stored choice, once narrowed to the
+  // language the sending surface had, is not a choice. A Spanish parameter is
+  // never a narrowing, so it is always written.
   return stored && toBilingualLocale(stored) === langParam ? null : langParam
 }
 

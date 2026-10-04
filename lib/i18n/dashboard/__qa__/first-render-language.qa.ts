@@ -33,6 +33,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { DashboardLanguageProvider } from '../useDashboardLanguage'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { resolveRequestLocale } from '../../request-locale'
 import type { Locale } from '../../locales'
 
 let pass = 0, fail = 0
@@ -296,14 +297,32 @@ async function main() {
     // across every public locale (a /es route answers Spanish); the bilingual
     // routeContentLocale is a narrowing of it. The PRECEDENCE below is what
     // this check is about, and it is unchanged.
-    // The cookie step now reads normalizeStoredLocale, which accepts Spanish:
-    // the dashboard has no /es URL to be fixed by, so the stored choice is the
-    // only place its language can come from. The PRECEDENCE this checks — route,
-    // then ?lang=, then cookie, then seed, then Accept-Language, then English —
-    // is unchanged, and that is what the check is about.
-    check('H1: route → cookie → seed → Accept-Language → English, unchanged',
+    // The `?lang=`, cookie and seed steps all read normalizeStoredLocale, which
+    // accepts Spanish. They were bilingual while there was no Spanish form to
+    // hand off from; since 4 October 2026 there is (app/(auth)/es/*), and with
+    // the parameter still bilingual the Spanish sign-in's own `?lang=es` stamp
+    // was dropped and the first dashboard came back Hebrew. The PRECEDENCE this
+    // checks — route, then ?lang=, then cookie, then seed, then
+    // Accept-Language, then English — is unchanged, and that is the check.
+    check('H1: route → ?lang= → cookie → seed → Accept-Language → English, unchanged',
       /const fixed = routePublicLocale\(input\.pathname\)/.test(rl)
-      && /normalizeStoredLocale\(input\.cookieValue\)\s*\n\s*\?\? normalizeLocale\(input\.seed\)\s*\n\s*\?\? localeFromAcceptLanguage\(input\.acceptLanguage\)\s*\n\s*\?\? REQUEST_FALLBACK_LOCALE/.test(rl))
+      && /normalizeStoredLocale\(input\.langParam\)\s*\n\s*\?\? normalizeStoredLocale\(input\.cookieValue\)\s*\n\s*\?\? normalizeStoredLocale\(input\.seed\)\s*\n\s*\?\? localeFromAcceptLanguage\(input\.acceptLanguage\)\s*\n\s*\?\? REQUEST_FALLBACK_LOCALE/.test(rl))
+    // Spanish is accepted only while the flag is on — that is the whole
+    // language's gate — so the flag is on for this one check and off again
+    // after it, which is also what proves the gate still holds.
+    const previous = process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED
+    process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'
+    const spanishHandoff = resolveRequestLocale({ pathname: '/dashboard', langParam: 'es' }) === 'es'
+      && resolveRequestLocale({ pathname: '/dashboard', cookieValue: 'es' }) === 'es'
+      && resolveRequestLocale({ pathname: '/dashboard', seed: 'es' }) === 'es'
+    process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'false'
+    const refusedWithFlagOff = resolveRequestLocale({ pathname: '/dashboard', langParam: 'es' }) !== 'es'
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED
+    else process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = previous
+    check('H1a: …and every one of those three steps accepts Spanish, so the hand-off survives', spanishHandoff)
+    check('H1a-gate: …and refuses it with the Spanish flag off', refusedWithFlagOff)
+    check('H1b: MUTATION CONTROL — a bilingual reading of the stamp answers Hebrew instead',
+      (((v: string): string | null => (v === 'he' || v === 'en' ? v : null))('es')) === null)
     // The state it starts from is now the UI locale (the one that can be
     // Spanish); `language` is derived from it. The guarantee this checks — the
     // first render comes from the SERVER's value, not from a constant corrected

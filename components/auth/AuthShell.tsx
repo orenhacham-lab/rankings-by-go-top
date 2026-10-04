@@ -5,8 +5,10 @@ import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
 import { Check, TrendingUp } from 'lucide-react'
 import { AUTH_BRAND, type AuthBrandVariant } from '@/lib/i18n/auth-brand'
+import { LOCALE_PREFIX, getLocaleConfig, type PublicLocale } from '@/lib/i18n/locales'
 import { landingHe } from '@/lib/i18n/public/landing-he'
 import { landingEn } from '@/lib/i18n/public/landing-en'
+import { landingEs } from '@/lib/i18n/public/landing-es'
 import HeroBackdrop from '@/components/public/HeroBackdrop'
 import { cn } from '@/lib/utils'
 
@@ -69,7 +71,7 @@ export default function AuthShell({
   variant = 'login',
   children,
 }: {
-  locale: 'he' | 'en'
+  locale: PublicLocale
   logoAlt: string
   subtitle: string
   footer: AuthFooterCopy
@@ -80,14 +82,16 @@ export default function AuthShell({
 }) {
   const brand = AUTH_BRAND[locale]
   const copy = brand[variant]
-  const landing = locale === 'en' ? landingEn : landingHe
-  const homeHref = locale === 'en' ? '/en' : '/'
+  // Each language's own landing copy and its own home, from one table — a
+  // two-way ternary here is what gave the Spanish forms an English panel.
+  const landing = locale === 'es' ? landingEs : locale === 'en' ? landingEn : landingHe
+  const homeHref = LOCALE_PREFIX[locale] || '/'
   const rank = landing.demo.rank
   const rows = [{ keyword: rank.keyword, from: rank.from, to: rank.to }, ...rank.rows].slice(0, 4)
 
   return (
     <main
-      dir={locale === 'en' ? 'ltr' : 'rtl'}
+      dir={getLocaleConfig(locale).dir}
       data-auth-shell
       data-auth-variant={variant}
       className="relative min-h-screen bg-canvas lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]"

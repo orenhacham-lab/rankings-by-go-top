@@ -7,6 +7,8 @@
  * does: no invented customers, totals or press.
  */
 
+import type { PublicLocale } from './locales'
+
 export type AuthBrandVariant = 'login' | 'signup' | 'recover'
 
 export interface AuthBrandCopy {
@@ -16,7 +18,7 @@ export interface AuthBrandCopy {
   points: [string, string, string]
 }
 
-export const AUTH_BRAND: Record<'he' | 'en', Record<AuthBrandVariant, AuthBrandCopy> & { glimpse: string; mobileTrust: [string, string] }> = {
+export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrandCopy> & { glimpse: string; mobileTrust: [string, string] }> = {
   he: {
     login: {
       eyebrow: 'ברוכים השבים',
@@ -73,5 +75,33 @@ export const AUTH_BRAND: Record<'he' | 'en', Record<AuthBrandVariant, AuthBrandC
     },
     glimpse: 'Tracked keywords',
     mobileTrust: ['No credit card', 'Cancel anytime'],
+  },
+  es: {
+    login: {
+      eyebrow: 'Bienvenido de nuevo',
+      points: [
+        'Tus posiciones en Google y Google Maps, en un solo lugar',
+        'Tu plan de contenidos y tus artículos, listos para continuar',
+        'Lo que ChatGPT y Gemini dicen de tu negocio',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google y los buscadores con IA, en una sola plataforma',
+      points: [
+        'Un análisis completo de tu web en minutos',
+        'Un mes de contenidos, planificado para tu sector',
+        'Posiciones en Google y visibilidad en IA, con seguimiento',
+      ],
+    },
+    recover: {
+      eyebrow: 'Vuelve a tu cuenta',
+      points: [
+        'El enlace va solo a la dirección de la cuenta',
+        'Sirve una vez y durante poco tiempo',
+        'Tus datos y tus proyectos se quedan como están',
+      ],
+    },
+    glimpse: 'Palabras clave en seguimiento',
+    mobileTrust: ['Sin tarjeta de crédito', 'Cancela cuando quieras'],
   },
 }
