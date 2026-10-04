@@ -22,6 +22,7 @@
  */
 import { LOCALE_PREFIX, type PublicLocale } from './locales'
 import { LANGUAGE_PARAM } from './request-locale'
+import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 export type AuthPage = 'login' | 'signup' | 'forgot-password'
 
@@ -52,4 +53,31 @@ export function withLocaleParam(path: string, locale: PublicLocale): string {
   if (params.has(LANGUAGE_PARAM)) return path
   params.set(LANGUAGE_PARAM, locale)
   return `${pathname}?${params.toString()}${hash}`
+}
+
+/**
+ * An auth page on this origin in the language the caller STATED, for the
+ * redirects that come BACK from a failure: a Google sign-in that did not
+ * complete, an expired e-mail confirmation, a dead password-recovery link.
+ *
+ * THE DEFECT THIS REPLACES. Each of those three callers wrote its own
+ * `lang === 'en' ? '/en/x' : '/x'`. The prefix table has three entries, so a
+ * Spanish visitor whose sign-in failed was returned to the HEBREW form — the
+ * one language they certainly cannot read — with an error message on it.
+ *
+ * `error` is set before the language so the query reads the way it always has.
+ * A language the caller did not state is left to the request contract, exactly
+ * as before: the neutral route, with no `lang` on it.
+ */
+export function statedAuthUrl(
+  origin: string,
+  page: AuthPage,
+  lang: string | null | undefined,
+  error: { param: string; value: string },
+): URL {
+  const stated = normalizeDashboardUiLocale(lang)
+  const url = new URL(`${LOCALE_PREFIX[stated ?? 'he']}/${page}`, origin)
+  url.searchParams.set(error.param, error.value)
+  if (stated === 'he') url.searchParams.set(LANGUAGE_PARAM, 'he')
+  return url
 }

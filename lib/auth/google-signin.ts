@@ -22,6 +22,7 @@
 import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
+import { statedAuthUrl } from '@/lib/i18n/auth-href'
 
 /** The flag as the browser bundle sees it: inlined at build time. */
 export function googleSignInEnabled(value: string | undefined = process.env.NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED): boolean {
@@ -58,13 +59,7 @@ export function googleStartPath(nextPath: string, lang: PublicLocale): string {
 export function googleSignInFailureUrl(origin: string, lang: string | null | undefined): string {
   // The form in the language that sent them, from the one prefix table: a
   // two-way check sent a Spanish visitor back to the Hebrew form.
-  const stated = normalizeDashboardUiLocale(lang)
-  const failed = new URL(`${LOCALE_PREFIX[stated ?? 'he']}/login`, origin)
-  failed.searchParams.set('error', 'google')
-  // Only a language the caller actually stated is restated on the Hebrew route;
-  // nothing stated leaves the request contract to decide, as before.
-  if (stated === 'he') failed.searchParams.set('lang', 'he')
-  return failed.toString()
+  return statedAuthUrl(origin, 'login', lang, { param: 'error', value: 'google' }).toString()
 }
 
 /** Where Google returns to: the auth callback on this origin, with a sanitized `next` and the form's language. */

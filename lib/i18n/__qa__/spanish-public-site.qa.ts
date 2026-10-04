@@ -39,6 +39,9 @@ import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER, PLAN_AUDIENCE_LABEL,
 import { PLAN_CATALOG, type PlanCode } from '../../plans/catalog'
 import { counterpartPath, availableLocales } from '../../../components/LanguageSwitcher'
 import { buildHreflangAlternates } from '../../seo/hreflang'
+import { statedAuthUrl } from '../auth-href'
+import { googleSignInFailureUrl } from '../../auth/google-signin'
+import { recoveryFailureUrl } from '../../auth/password-reset'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -299,10 +302,13 @@ function main() {
       !allSpanishStrings().some((s) => /\/(es|en)\/(es|en)\//.test(s.text)),
       allSpanishStrings().filter((s) => /\/(es|en)\/(es|en)\//.test(s.text)).map((s) => s.path).join(' / '))
     // Every absolute internal path named in the Spanish copy must be a page
-    // that exists — in the Spanish tree, or the English one where Spanish has
-    // nothing (sign-up, and the legal documents).
+    // that exists — in the Spanish public tree, in the Spanish AUTH tree (which
+    // is a route group of its own, so pageFiles cannot see it), or the English
+    // one where Spanish has nothing.
     const EXISTS = new Set<string>([
       ...pageFiles().map((rel) => rel.replace('app/(public)', '').replace(/\/page\.tsx$/, '') || '/es'),
+      ...readdirSync(join(ROOT, 'app', '(auth)', 'es'), { withFileTypes: true })
+        .filter((e) => e.isDirectory()).map((e) => `/es/${e.name}`),
       '/en', '/en/signup', '/en/login', '/en/privacy', '/en/terms', '/en/refund-policy', '/en/accessibility',
       '/en/pricing', '/en/free-check', '/en/about', '/en/articles', '/en/sitemap', '/',
     ])
@@ -347,9 +353,17 @@ function main() {
     // a Hebrew one. Until then the rule here was "the English form, explicitly",
     // which is what left a Spanish visitor changing language at the sign-up.
     const spanishPages = pageFiles().map((rel) => ({ rel, src: strip(read(rel)) }))
+    // WHAT 7a USED TO MISS. It forbade only the Hebrew route, so `/en/signup`
+    // passed — and three Spanish pages carried it (the articles page's two
+    // calls to action, the sitemap's account group) plus the `es` block of
+    // FEATURE_COMMON, which is the main call to action on all six Spanish
+    // feature pages. A Spanish reader clicked "Empezar la prueba gratuita" and
+    // got an English form. The rule is now the positive one: a Spanish page
+    // states 'es' and nothing else.
     for (const { rel, src } of spanishPages) {
-      const hebrewAuth = /href="\/(signup|login)(\?|")/.test(src) || /authHref\('(signup|login)', 'he'\)/.test(src)
-      check(`7a: ${rel.split('/es/')[1]} sends nobody to the HEBREW auth form`, !hebrewAuth)
+      const foreignAuth = /href="\/(en\/)?(signup|login|forgot-password|reset-password)(\?|")/.test(src)
+        || /authHref\('(signup|login|forgot-password)', '(he|en)'\)/.test(src)
+      check(`7a: ${rel.split('/es/')[1]} sends nobody to a non-Spanish auth form`, !foreignAuth)
     }
     check('7b: the Spanish home page links to the SPANISH sign-up explicitly',
       /authHref\('signup', 'es'\)/.test(strip(read('app/(public)/es/page.tsx'))))
@@ -372,8 +386,63 @@ function main() {
     const dicts = readdirSync(dashDir).filter((f) => /^[a-z]{2}\.ts$/.test(f)).sort()
     check('7c: the dashboard has exactly the three dictionaries we have decided on',
       JSON.stringify(dicts) === JSON.stringify(['en.ts', 'es.ts', 'he.ts']), dicts.join(','))
+    // 7d) THE SHARED SURFACES A SPANISH VISITOR REACHES THROUGH ANOTHER FILE.
+    // None of these lives under app/(public)/es, so the loop above cannot see
+    // them, and each one was wrong until 4 October 2026.
+    const featureCommon = strip(read('lib/i18n/public/feature-common.ts'))
+    check('7d1: the feature pages\u2019 Spanish trial button goes to the Spanish sign-up',
+      FEATURE_COMMON.es.trial.href === '/es/signup')
+    check('7d2: \u2026and it says so through authHref, not a literal path',
+      /trial: \{ label: `Prueba gratis \$\{DAYS\} d\u00edas`, href: authHref\('signup', 'es'\) \}/.test(featureCommon))
+    check('7d3: every Spanish feature-page link stays inside /es',
+      [FEATURE_COMMON.es.check.href, FEATURE_COMMON.es.trial.href, FEATURE_COMMON.es.pricing.href].every((h) => h.startsWith('/es/')))
+    // A FAILURE must come back in the visitor's own language. Each of these
+    // three callers wrote its own `lang === 'en' ? ... : ...`, so Spanish fell
+    // to the HEBREW form — with an error message on it.
+    // These three read the language through the stored-locale normalizer, which
+    // admits 'es' only while the Spanish site is on — so the flag is set around
+    // the calls rather than trusting whatever this run happens to have, and the
+    // OFF state is checked too: with no Spanish routes to redirect to, a
+    // failure must fall back to the neutral form, never to a 404.
+    const withSpanish = <T,>(on: boolean, fn: () => T): T => {
+      const previous = process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED
+      process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = on ? 'true' : 'false'
+      try { return fn() } finally {
+        if (previous === undefined) delete process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED
+        else process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = previous
+      }
+    }
+    check('7d4: a Google sign-in that fails returns a Spanish visitor to /es/login',
+      withSpanish(true, () => googleSignInFailureUrl('https://a.example', 'es')) === 'https://a.example/es/login?error=google')
+    check('7d5: \u2026and a dead recovery link to /es/forgot-password',
+      withSpanish(true, () => recoveryFailureUrl('https://a.example', 'es').toString()) === 'https://a.example/es/forgot-password?error=link')
+    check('7d6: the three languages each get their own form, and an unstated one the neutral route',
+      withSpanish(true, () =>
+        statedAuthUrl('https://a.example', 'login', 'he', { param: 'error', value: 'oauth' }).toString() === 'https://a.example/login?error=oauth&lang=he'
+        && statedAuthUrl('https://a.example', 'login', 'en', { param: 'error', value: 'oauth' }).toString() === 'https://a.example/en/login?error=oauth'
+        && statedAuthUrl('https://a.example', 'login', 'es', { param: 'error', value: 'oauth' }).toString() === 'https://a.example/es/login?error=oauth'
+        && statedAuthUrl('https://a.example', 'login', null, { param: 'error', value: 'oauth' }).toString() === 'https://a.example/login?error=oauth'))
+    check('7d6-off: with the Spanish site off, a stated \u2018es\u2019 falls back to the neutral form, not to a 404',
+      withSpanish(false, () => statedAuthUrl('https://a.example', 'login', 'es', { param: 'error', value: 'oauth' }).toString()) === 'https://a.example/login?error=oauth')
+    check('7d7: the callback and the recovery helper both go through it, so none can drift again',
+      /statedAuthUrl\(origin, 'login', lang, \{ param: 'error', value: 'oauth' \}\)/.test(strip(read('app/api/auth/callback/route.ts')))
+      && /statedAuthUrl\(origin, 'forgot-password', lang, \{ param: 'error', value: 'link' \}\)/.test(strip(read('lib/auth/password-reset.ts'))))
+    // The floating widgets each carry their own language ternary, which is why
+    // they are kept off every auth screen by path. The Spanish four were added
+    // the moment the routes existed.
+    const widgetGate = strip(read('components/public/PublicSiteWidgets.tsx'))
+    for (const page of ['login', 'signup', 'forgot-password', 'reset-password']) {
+      check(`7d8-${page}: nothing floats over /es/${page}`, widgetGate.includes(`'/es/${page}'`))
+    }
+
     // MUTATION CONTROL
     check('7-MUT: a Hebrew auth link would fail 7a', /href="\/(signup|login)(\?|")/.test('<a href="/signup?x">'))
+    check('7-MUT2: the ENGLISH link that 7a used to allow now fails it',
+      /href="\/(en\/)?(signup|login|forgot-password|reset-password)(\?|")/.test('<ButtonLink href="/en/signup" size="lg">'))
+    const twoWayFailureUrl = (origin: string, lang: string): string =>
+      `${origin}${lang === 'en' ? '/en' : ''}/login?error=google`
+    check('7-MUT3: the two-way failure URL this replaced answers Hebrew for Spanish, failing 7d4',
+      twoWayFailureUrl('https://a.example', 'es') !== 'https://a.example/es/login?error=google')
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

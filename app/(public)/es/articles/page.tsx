@@ -5,6 +5,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { ButtonLink, PageHero, Section } from '@/components/public/marketing'
 import { ArticlesPromo, type ArticlesPromoCopy } from '@/components/public/ArticlesPromo'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata = {
   title: 'Artículos sobre SEO, posiciones y visibilidad en IA | Go Top SEO',
@@ -49,7 +50,7 @@ export default function SpanishArticlesPage() {
               empezar a seguir tus posiciones hoy con la prueba gratuita de 7 días.
             </p>
             <div className="mt-4 flex w-full flex-col items-stretch justify-center gap-2 sm:w-auto sm:flex-row sm:items-center">
-              <ButtonLink href="/en/signup" size="lg">Empezar la prueba gratuita</ButtonLink>
+              <ButtonLink href={authHref('signup', 'es')} size="lg">Empezar la prueba gratuita</ButtonLink>
               <ButtonLink href="/es/pricing" variant="secondary" size="lg">Ver precios</ButtonLink>
             </div>
           </div>
@@ -68,7 +69,7 @@ const PROMO: ArticlesPromoCopy = {
   badge: 'Go Top SEO',
   title: ['Sigue tus posiciones', 'en Google cuando lo necesites'],
   body: 'Plataforma profesional para seguir tus posiciones en Google orgánico y en Google Maps. Lanza un análisis cuando quieras, o deja que se ejecute solo una vez al mes. Informes detallados, seguimiento de tendencias y soporte personal.',
-  signup: { label: 'Empezar la prueba gratuita', href: '/en/signup' },
+  signup: { label: 'Empezar la prueba gratuita', href: authHref('signup', 'es') },
   pricing: { label: 'Ver precios', href: '/es/pricing' },
   stats: [
     { num: '1000+', label: 'Palabras clave' },

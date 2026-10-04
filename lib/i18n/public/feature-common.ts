@@ -28,16 +28,14 @@ export const FEATURE_COMMON: Record<PublicLocale, FeatureCommon> = {
   },
   en: {
     check: { label: 'Check my site for free', href: '/en/free-check' },
-    trial: { label: `Start a ${DAYS}-day free trial`, href: '/en/signup' },
+    trial: { label: `Start a ${DAYS}-day free trial`, href: authHref('signup', 'en') },
     pricing: { label: 'See pricing', href: '/en/pricing' },
     trust: [`${DAYS}-day free trial`, 'No credit card', 'Cancel anytime'],
     closeBody: `The free check shows where your site stands, no signup needed. Or open a ${DAYS}-day trial, no credit card.`,
   },
   es: {
     check: { label: 'Analiza tu sitio gratis', href: '/es/free-check' },
-    // Sign-up is a BILINGUAL surface: a Spanish reader is sent to its English
-    // form, which is the one they can read, until the dashboard is translated.
-    trial: { label: `Prueba gratis ${DAYS} días`, href: '/en/signup' },
+    trial: { label: `Prueba gratis ${DAYS} días`, href: authHref('signup', 'es') },
     pricing: { label: 'Ver precios', href: '/es/pricing' },
     trust: [`${DAYS} días de prueba gratis`, 'Sin tarjeta de crédito', 'Cancela cuando quieras'],
     closeBody: `El análisis gratuito muestra cómo está tu sitio, sin registrarte. O abre una prueba de ${DAYS} días, sin tarjeta de crédito.`,
