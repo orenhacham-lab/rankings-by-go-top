@@ -1228,6 +1228,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       weekdays: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'],
       planRhythmLine: 'Tu plan marca el ritmo de publicación: {n} artículos por semana ({days}).',
       planRhythmLineOne: 'Tu plan marca el ritmo de publicación: un artículo por semana ({days}).',
+      trialRhythmLine: 'Durante la prueba el ritmo es fijo: el primer artículo se escribe al abrir la cuenta y el siguiente una semana después. Al suscribirte, tu plan marca el ritmo.',
       noWeekendNote: 'No se publica nada el viernes ni el sábado.',
       publishDayNote: 'Los artículos se publican el día elegido, durante la ejecución diaria de la automatización.',
       duringDay: '· a lo largo del día',

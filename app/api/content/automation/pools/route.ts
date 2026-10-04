@@ -43,11 +43,20 @@ function firstSlot(publishTime: string, timezone: string, publishDays: number[],
   return makeSlotAfter({ publishTime, timeZone: timezone, perDay: rhythm.plan?.perDay ?? null, publishDays, intervalDays, anchorIso: null })(Date.now())
 }
 
-/** What the screen says about the rhythm (no allowance numbers leave the server). */
+/**
+ * What the screen says about the rhythm (no allowance numbers leave the server).
+ *
+ * 'owner' means the picker: the account chooses its own days. It is NOT the
+ * customer's (owner, 4 October 2026: "not only on a trial — customers with a
+ * subscription don't control this either, it is set by the plan"), so it is
+ * reached only by an account with no plan and no trial, which is an admin.
+ * A paid plan gets 'plan' and says what the plan gives; a trial gets 'trial'
+ * and says the dates were set when the account opened.
+ */
 function rhythmDTO(rhythm: PublishRhythm) {
-  return rhythm.plan
-    ? { source: 'plan' as const, perWeek: rhythm.plan.perWeek, weekdays: rhythmWeekdays(rhythm.plan.perDay), perDay: rhythm.plan.perDay }
-    : { source: 'owner' as const }
+  if (rhythm.plan) return { source: 'plan' as const, perWeek: rhythm.plan.perWeek, weekdays: rhythmWeekdays(rhythm.plan.perDay), perDay: rhythm.plan.perDay }
+  if (rhythm.trial) return { source: 'trial' as const }
+  return { source: 'owner' as const }
 }
 
 export async function GET(request: Request) {
