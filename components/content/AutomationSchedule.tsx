@@ -53,7 +53,21 @@ const WORKING_WEEKDAYS = [0, 1, 2, 3, 4]
  * subscription. A trial says its dates were fixed when the account opened; a
  * paid plan says what the plan gives.
  */
-type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[] } | { source: 'trial' } | { source: 'owner' }
+type Rhythm =
+  | {
+    source: 'plan'
+    perWeek: number
+    weekdays: number[]
+    intervalDays?: number | null
+    /** The split, which IS the customer's: see the share panel below. */
+    share?: number | null
+    accountMonthly?: number
+    siteMonthly?: number
+    maxShare?: number
+    multiSite?: boolean
+  }
+  | { source: 'trial' }
+  | { source: 'owner' }
 interface QueueItem {
   id: string
   topicId: string | null
@@ -153,6 +167,17 @@ export default function AutomationSchedule({
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
   const [weekdays, setWeekdays] = useState<number[]>(DEFAULT_DAYS_1)
   const [rhythm, setRhythm] = useState<Rhythm | null>(null)
+  /**
+   * THE ONE SCHEDULE FIELD A PAYING CUSTOMER DOES OWN.
+   *
+   * The plan decides the days, the times and the ceiling. How much of the
+   * account's monthly allowance each of its websites gets is the customer's,
+   * because only they know which of their websites matters more. Empty means
+   * the even split, which is the default and what every account has today.
+   */
+  const [shareInput, setShareInput] = useState('')
+  const [savingShare, setSavingShare] = useState(false)
+  const [shareMsg, setShareMsg] = useState<{ text: string; ok: boolean } | null>(null)
   // Anything but 'owner' means the schedule is not this account's to change:
   // the picker, the save button and "create the article now" are all withheld.
   const scheduleLocked = rhythm !== null && rhythm.source !== 'owner'
@@ -181,7 +206,9 @@ export default function AutomationSchedule({
       setPool(p)
       setItems(Array.isArray(pd.items) ? pd.items : [])
       setHealth(pd.health ?? null)
-      setRhythm(pd.rhythm && typeof pd.rhythm === 'object' ? pd.rhythm as Rhythm : null)
+      const nextRhythm: Rhythm | null = pd.rhythm && typeof pd.rhythm === 'object' ? pd.rhythm as Rhythm : null
+      setRhythm(nextRhythm)
+      setShareInput(nextRhythm?.source === 'plan' && typeof nextRhythm.share === 'number' ? String(nextRhythm.share) : '')
       if (p) {
         const days = (Array.isArray(p.publishDays) ? p.publishDays : []).filter((d) => WORKING_WEEKDAYS.includes(d))
         // Preset from weekday count first, else fall back to interval-days.
@@ -230,6 +257,39 @@ export default function AutomationSchedule({
       onChanged?.()
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function saveShare() {
+    if (!pool || savingShare) return
+    setSavingShare(true); setShareMsg(null)
+    const raw = shareInput.trim()
+    try {
+      const res = await fetch(`/api/content/automation/pools/${pool.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monthlyShare: raw === '' ? null : Number(raw) }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // The server decides, and says how much room is left; the screen only
+        // repeats its number, never its own guess.
+        const max = typeof d?.maxShare === 'number' ? String(d.maxShare) : '—'
+        setShareMsg({
+          text: d?.error === 'share_too_large' ? t.shareTooLarge.replace('{max}', max)
+            : d?.error === 'share_invalid' ? t.shareInvalid
+              : t.shareFailed,
+          ok: false,
+        })
+        return
+      }
+      setShareMsg({ text: t.shareSaved, ok: true })
+      await load()
+      onChanged?.()
+    } catch {
+      setShareMsg({ text: t.shareFailed, ok: false })
+    } finally {
+      setSavingShare(false)
     }
   }
 
@@ -510,10 +570,54 @@ export default function AutomationSchedule({
   // screen says what the plan gives (the dates below are the real ones).
   const planRhythm = rhythm?.source === 'plan' ? rhythm : null
   const rhythmLine = planRhythm
-    ? (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
-      .replace('{n}', String(planRhythm.perWeek))
-      .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
+    // More sites than a weekly rhythm can serve: this one publishes every N
+    // days instead of on a fixed weekday, so the line names the gap.
+    ? planRhythm.intervalDays
+      ? t.planRhythmGapLine.replace('{n}', String(planRhythm.intervalDays))
+      : (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
+        .replace('{n}', String(planRhythm.perWeek))
+        .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
     : rhythm?.source === 'trial' ? t.trialRhythmLine : null
+
+  /**
+   * The split panel. Offered only on a plan with more than one website — on a
+   * one-site plan there is nothing to divide — and only once the queue exists,
+   * since the number is stored on the queue.
+   */
+  const shareRhythm = planRhythm && planRhythm.multiSite === true && pool ? planRhythm : null
+  const sharePanel = shareRhythm ? (
+    <div className="mt-3" data-article-share="">
+      <div className="text-copy font-semibold text-ink">{t.shareTitle}</div>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <label className="inline-flex flex-col gap-1.5 text-caption font-semibold text-ink">
+          {t.shareLabel}
+          <input
+            type="number"
+            min={1}
+            max={shareRhythm.maxShare ?? undefined}
+            inputMode="numeric"
+            value={shareInput}
+            placeholder={t.shareEven}
+            aria-label={t.shareLabel}
+            onChange={(e) => { setShareInput(e.target.value); setShareMsg(null) }}
+            disabled={savingShare}
+            data-article-share-input=""
+            className={cn(FIELD_CLASSES, 'h-9 w-28 py-1')}
+          />
+        </label>
+        <Button size="sm" variant="secondary" onClick={() => saveShare()} disabled={savingShare} data-article-share-save="">
+          {t.shareSave}
+        </Button>
+      </div>
+      <p className="mt-2 max-w-prose text-caption text-muted" data-article-share-help="">
+        {t.shareHelp
+          .replace('{left}', String(shareRhythm.maxShare ?? 0))
+          .replace('{total}', String(shareRhythm.accountMonthly ?? 0))
+          .replace('{max}', String(shareRhythm.maxShare ?? 0))}
+      </p>
+      {shareMsg && <Notice tone={shareMsg.ok ? 'ok' : 'bad'} className="mt-2">{shareMsg.text}</Notice>}
+    </div>
+  ) : null
 
   // Flat inside the strategy's "advanced" card, below a divider (final review R14).
   return (
@@ -534,7 +638,10 @@ export default function AutomationSchedule({
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
           {/* Cadence — the owner's choice only when the plan does not set it */}
           {scheduleLocked ? (
-            <p className="min-w-0 max-w-prose text-copy text-body" data-plan-rhythm="">{rhythmLine}</p>
+            <div className="min-w-0">
+              <p className="min-w-0 max-w-prose text-copy text-body" data-plan-rhythm="">{rhythmLine}</p>
+              {sharePanel}
+            </div>
           ) : (<>
           <div className="min-w-0 max-w-full">
             <div className="mb-1.5 text-caption font-semibold text-ink">{t.cadenceLabel}</div>

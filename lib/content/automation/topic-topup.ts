@@ -55,7 +55,7 @@ import { randomUUID } from 'crypto'
 import type { createAdminClient, ServiceRoleClient } from '@/lib/supabase/admin'
 import { getUserEntitlement } from '@/lib/subscription'
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
-import { articlesPerWeekFor, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
+import { articlesPerMonthForShare, articlesPerMonthPerSite, monthlyForSite, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
 import { isPlanCode } from '@/lib/plans/catalog'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { insertPendingIdeas } from '@/lib/content/recommendations/topic-idea-store'
@@ -110,13 +110,20 @@ export function poolMonthlyRate(pool: PoolLite): number {
  */
 export function topUpTarget(input: {
   monthlyArticles: number; ownerProjects: number; pool: PoolLite | null
-  /** A paid plan sets the pool's rhythm (monthly ÷ 4 a week, shared by the owner's active queues). */
-  planRhythm?: { activeQueues: number } | null
+  /**
+   * A paid plan sets the pool's rhythm. `activeQueues` is the even split;
+   * `monthlyForThisSite` is this website's actual monthly count when its owner
+   * gave it a share of its own, and takes precedence — a website given a bigger
+   * share needs the topics to fill it, or the queue runs dry at the old rate.
+   */
+  planRhythm?: { activeQueues: number; monthlyForThisSite?: number } | null
 }): number {
   const monthly = Math.max(0, Math.floor(input.monthlyArticles))
   if (monthly === 0) return 0
   const poolRate = input.pool && input.planRhythm
-    ? Math.ceil((articlesPerWeekFor(monthly, input.planRhythm.activeQueues) * 30) / 7)
+    ? typeof input.planRhythm.monthlyForThisSite === 'number'
+      ? articlesPerMonthForShare(input.planRhythm.monthlyForThisSite)
+      : articlesPerMonthPerSite(monthly, input.planRhythm.activeQueues)
     : input.pool ? poolMonthlyRate(input.pool) : 0
   const raw = input.pool
     ? Math.min(poolRate, monthly)
@@ -324,7 +331,7 @@ export async function runTopicTopUp(
     .eq('is_active', true).order('created_at', { ascending: true }).limit(MAX_PROJECT_ROWS)
   if (projErr) return { ...summary, state: 'failed' }
   const projects = ((projectRows ?? []) as (ProjectRow & { is_active?: boolean | null })[]).filter((p) => p.id && p.user_id)
-  const { data: poolRows } = await admin.from('article_pools').select('id, project_id, user_id, cadence, interval_days, publish_days').eq('is_active', true)
+  const { data: poolRows } = await admin.from('article_pools').select('id, project_id, user_id, cadence, interval_days, publish_days, monthly_share').eq('is_active', true)
   const poolByProject = new Map<string, PoolRow>()
   for (const p of (poolRows ?? []) as PoolRow[]) if (!poolByProject.has(p.project_id)) poolByProject.set(p.project_id, p)
 
@@ -332,6 +339,14 @@ export async function runTopicTopUp(
   for (const p of projects) ownerProjects.set(p.user_id, (ownerProjects.get(p.user_id) ?? 0) + 1)
   const activeQueues = new Map<string, number>()
   for (const p of (poolRows ?? []) as PoolRow[]) activeQueues.set(p.user_id, (activeQueues.get(p.user_id) ?? 0) + 1)
+  // Every active queue's declared share, per owner, so each project's own
+  // monthly count can be worked out the same way the scheduler works it out.
+  const sharesByOwner = new Map<string, { projectId: string; share: number | null }[]>()
+  for (const p of (poolRows ?? []) as (PoolRow & { monthly_share?: number | null })[]) {
+    const list = sharesByOwner.get(p.user_id) ?? []
+    list.push({ projectId: p.project_id, share: p.monthly_share ?? null })
+    sharesByOwner.set(p.user_id, list)
+  }
   const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>()
   const stillShort: { project: ProjectRow; pool: PoolRow | null; target: number; index: OverlapIndex }[] = []
 
@@ -350,9 +365,15 @@ export async function runTopicTopUp(
       if (!ent.entitled) { summary.notEntitled++; continue }
       const pool = poolByProject.get(project.id) ?? null
       if (pool && pool.user_id !== project.user_id) continue // a pool must be its project owner's
+      const owned = sharesByOwner.get(project.user_id) ?? []
+      const monthlyForThisSite = monthlyForSite({
+        monthlyAllowance: ent.monthlyArticles,
+        otherShares: owned.filter((x) => x.projectId !== project.id).map((x) => x.share),
+        mine: (pool as (PoolRow & { monthly_share?: number | null }) | null)?.monthly_share ?? null,
+      })
       const target = topUpTarget({
         monthlyArticles: ent.monthlyArticles, ownerProjects: ownerProjects.get(project.user_id) ?? 1, pool,
-        planRhythm: ent.planRhythm ? { activeQueues: activeQueues.get(project.user_id) ?? 1 } : null,
+        planRhythm: ent.planRhythm ? { activeQueues: activeQueues.get(project.user_id) ?? 1, monthlyForThisSite } : null,
       })
       if (target === 0 || (await countSupply(admin, scope, pool)) >= target) { summary.enough++; continue }
       const index = await deps.loadIndex(scope)

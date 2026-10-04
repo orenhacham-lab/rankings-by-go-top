@@ -13,6 +13,7 @@ import { Suspense, type ReactNode } from 'react'
 import { ContentWorkspaceProvider } from '@/components/content/workspace/ContentWorkspaceProvider'
 import ContentWorkspaceShell from '@/components/content/workspace/ContentWorkspaceShell'
 import ContentNotAvailable from '@/components/content/ContentNotAvailable'
+import ProjectScoped from '@/components/layout/ProjectScoped'
 import { Skeleton } from '@/components/ui/Skeleton'
 
 export default function ContentLayout({ children }: { children: ReactNode }) {
@@ -22,9 +23,14 @@ export default function ContentLayout({ children }: { children: ReactNode }) {
 
   return (
     <Suspense fallback={<div aria-busy="true" className="space-y-4 py-8"><Skeleton className="h-10 w-1/3" /><Skeleton className="h-40 w-full rounded-card" /></div>}>
-      <ContentWorkspaceProvider>
-        <ContentWorkspaceShell>{children}</ContentWorkspaceShell>
-      </ContentWorkspaceProvider>
+      {/* The workspace holds this project's topics, queue and selections in its
+          own state, so switching the project in the top bar starts it over
+          instead of leaving the previous project's content on screen. */}
+      <ProjectScoped>
+        <ContentWorkspaceProvider>
+          <ContentWorkspaceShell>{children}</ContentWorkspaceShell>
+        </ContentWorkspaceProvider>
+      </ProjectScoped>
     </Suspense>
   )
 }

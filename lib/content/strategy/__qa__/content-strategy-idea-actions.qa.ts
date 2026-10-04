@@ -284,6 +284,43 @@ async function main() {
     check('N5-MUT: navigating to the list from it fails N5', !emptyCard(screen.replace("() => { setView('board'); setAdding(true) }", "() => { setView('list') }")))
   }
 
+  // ------------------------------------------------- W) "swap" appears, and never looks like a delete
+  //
+  // Two faults the owner reported on 5 October 2026: the button "sometimes does not
+  // appear on the board", and "clicking it makes the idea disappear". The first was
+  // the condition — the button was offered only while the column held MORE ideas
+  // than it shows, so it was absent with five ideas or fewer and gone again once
+  // "show more" was open. The second is what a swap does: the idea moves behind the
+  // others, so in a long column the card leaves the view. Nothing is deleted, and
+  // now the column says so and offers the way back.
+  console.log('\nW) the swap button: when it is offered, and that it never reads as a delete')
+  {
+    const boardSrc = strip(read('components/content-strategy/StrategyBoard.tsx'))
+    const listSrc = strip(read('components/content-strategy/StrategyList.tsx'))
+    const hook = strip(read('components/content-strategy/useIdeaActions.ts'))
+    const offered = (s: string) => /const canSwap = cards\.length > 1/.test(s) && /canSwap=\{canSwap\}/.test(s) && !/canSwap=\{hidden > 0\}/.test(s)
+    check('W1: swap is offered whenever the column holds another idea to swap for', offered(boardSrc))
+    check('W1a: the list view asks the same question', offered(listSrc))
+    check('W1-MUT: the old condition (only while the column hides something) fails W1',
+      !offered(boardSrc.replace('const canSwap = cards.length > 1', 'const canSwap = hidden > 0')))
+    const saysSo = (s: string) => /data-idea-swapped=/.test(s) && /s\.ideaActions\.swappedNote\(swapped\)/.test(s)
+      && /data-idea-action="undo-swap"/.test(s) && /act\?\.actions\.undoSwap\(\)/.test(s)
+    check('W2: a column with a swapped idea says it moved and nothing was deleted, and offers it back', saysSo(boardSrc))
+    check('W2a: the list view says the same', saysSo(listSrc))
+    check('W2-MUT: a column that says nothing after a swap fails W2', !saysSo(boardSrc.replace('data-idea-action="undo-swap"', 'data-idea-action="x"')))
+    check('W3: the undo is the hook\u2019s, clears every swap, and still asks the server nothing',
+      /const undoSwap = useCallback\(\(\) => \{[\s\S]{0,260}deferred: \[\]/.test(hook) && /return \{ approve, reject, swap, undoSwap,/.test(hook))
+    check('W3-MUT: an undo that keeps the swaps fails W3',
+      !/const undoSwap = useCallback\(\(\) => \{[\s\S]{0,260}deferred: \[\]/.test(hook.replace('{ ...s, deferred: [], announcement: a.swapUndone }', '{ ...s, announcement: a.swapUndone }')))
+    check('W4: the swapped idea is still on the board after the swap, last in its column',
+      board(DATA, deferIdea([], 'idea:i1')).cards.filter((c) => c.column === 'ideas').some((c) => c.ideaId === 'i1'))
+    for (const loc of ['he', 'en', 'es'] as const) {
+      const a = getDashboardDictionary(loc).contentStrategy.ideaActions
+      check(`W5 (${loc}): the words of the note, the undo and the announcement exist, and count one idea apart from several`,
+        !!a.undoSwap && !!a.swapUndone && a.swappedNote(1) !== a.swappedNote(3) && a.swappedNote(3).includes('3'))
+    }
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }

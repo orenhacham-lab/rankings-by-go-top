@@ -8,11 +8,40 @@
 
 import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { authPool, toPoolDTO, type PoolRow } from '@/lib/content/automation/api'
-import { makeSlotAfter, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { makeSlotAfter, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, MAX_MONTHLY_SHARE_PER_SITE, type Cadence } from '@/lib/content/automation/schedule'
 import { readPublishRhythmForProject } from '@/lib/content/automation/plan-rhythm'
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'custom']
 const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at, publish_days'
+
+/**
+ * HOW MANY OF THE ACCOUNT'S MONTHLY ARTICLES THIS WEBSITE IS TO GET.
+ *
+ * The SPLIT is the customer's and the RHYTHM is the plan's, which is why this
+ * one field is read where every other schedule field is dropped for a paid
+ * plan: the plan decides the days and the ceiling, the owner decides how much
+ * of their own allowance each of their websites gets.
+ *
+ * Three answers, each a stable code:
+ *  - `share_not_available`: there is nothing to divide. No plan (an admin or a
+ *    trial — their allowance is not split), or a plan with one website.
+ *  - `share_too_large`: more than the per-site ceiling (one article a working
+ *    day), or more than the account's other websites have left unclaimed.
+ *  - a number, or null to go back to the even split.
+ *
+ * Hiding the field is not enforcement — proxy.ts excludes /api/* — so this runs
+ * on the server and reads the room from the account as it is right now.
+ */
+function readMonthlyShare(raw: unknown, plan: { multiSite: boolean; maxShare: number } | null):
+  { ok: true; value: number | null } | { ok: false; code: string; maxShare: number } {
+  if (!plan || !plan.multiSite) return { ok: false, code: 'share_not_available', maxShare: 0 }
+  if (raw === null || raw === '') return { ok: true, value: null }
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return { ok: false, code: 'share_invalid', maxShare: plan.maxShare }
+  const ceiling = Math.min(MAX_MONTHLY_SHARE_PER_SITE, plan.maxShare)
+  if (n > ceiling) return { ok: false, code: 'share_too_large', maxShare: ceiling }
+  return { ok: true, value: n }
+}
 
 function cleanPublishDays(v: unknown): number[] {
   if (!Array.isArray(v)) return []
@@ -43,8 +72,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // move them. The schedule fields are therefore dropped for anyone whose
   // rhythm is not their own: a paid plan or a trial. Pause and resume, and the
   // queue's own order, are untouched.
-  const scheduleRhythm = await readPublishRhythmForProject(auth.admin, pool.project_id, { countThisQueue: !pool.is_active })
+  let scheduleRhythm = await readPublishRhythmForProject(auth.admin, pool.project_id, { countThisQueue: !pool.is_active })
   const scheduleIsTheirs = !scheduleRhythm.plan && !scheduleRhythm.trial
+
+  // The split, which the plan does NOT own: read for a multi-site plan, and
+  // refused with a stable code for anyone with nothing to divide.
+  //
+  // It is written BEFORE the slot below is computed, and the rhythm is then
+  // read again, because the share is what the rhythm is derived from: writing
+  // it afterwards would store a date belonging to the share it replaced.
+  if ('monthlyShare' in body) {
+    const share = readMonthlyShare(body.monthlyShare, scheduleRhythm.plan)
+    if (!share.ok) return Response.json({ error: share.code, maxShare: share.maxShare }, { status: 400 })
+    if (share.value !== (scheduleRhythm.plan?.monthlyShare ?? null)) {
+      const { error: shareErr } = await auth.admin.from('article_pools').update({ monthly_share: share.value }).eq('id', id)
+      if (shareErr) {
+        console.error('[automation-pool] share update failed', { message: shareErr.message })
+        return Response.json({ error: 'Failed to update pool' }, { status: 500 })
+      }
+      scheduleRhythm = await readPublishRhythmForProject(auth.admin, pool.project_id, { countThisQueue: !pool.is_active })
+    }
+  }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (scheduleIsTheirs) {
@@ -76,7 +124,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ? null
     : keepStoredSlot
       ? pool.next_publish_at
-      : makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: scheduleRhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null })(Date.now())
+      : makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: scheduleRhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null, planIntervalDays: scheduleRhythm.plan?.intervalDays ?? null })(Date.now())
 
   const { data, error } = await auth.admin.from('article_pools').update(patch).eq('id', id).select(POOL_SELECT).single()
   if (error || !data) {

@@ -13,7 +13,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import {
-  ArrowRight, Bot, CalendarClock, Check, Copy, FileText, LineChart, Search, Sparkles, TrendingDown, TrendingUp,
+  ArrowRight, Bot, CalendarClock, Check, Copy, Download, FileText, LineChart, Search, Sparkles, TrendingDown, TrendingUp,
 } from 'lucide-react'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { KeywordMove, MonthlyReportData } from '@/lib/reports/monthly/types'
@@ -27,6 +27,8 @@ import { headline, plainTextSummary } from './summary'
 
 
 export interface MonthlyReportViewProps {
+  /** The project the report is for: the download asks the server for it by id. */
+  projectId: string | null
   data: MonthlyReportData
   generatedAt: string
   generatedBy: 'cron' | 'owner'
@@ -127,10 +129,12 @@ function Moves({ data, t, l, direction }: { data: MonthlyReportData; t: MonthlyC
   )
 }
 
-export default function MonthlyReportView({ data, generatedAt, generatedBy, language: l, projectLabel }: MonthlyReportViewProps) {
+export default function MonthlyReportView({ projectId, data, generatedAt, generatedBy, language: l, projectLabel }: MonthlyReportViewProps) {
   const t = monthlyCopy(l)
   const r = data.rankings
   const [copied, setCopied] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadFailed, setDownloadFailed] = useState(false)
   const month = monthName(data.month, l)
   const gscReady = data.gsc.state === 'ready' && data.gsc.current
   const firstPageDelta = r.firstPageStart !== null ? r.firstPageEnd - r.firstPageStart : 0
@@ -142,6 +146,37 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch { /* the clipboard is not available: nothing to undo */ }
+  }
+
+  /**
+   * The report as a PDF to keep (the owner asked for it, 4 October 2026). The
+   * server renders the SAME stored snapshot this screen shows
+   * (lib/reports/monthly/pdf.ts), Search Console included, so the file cannot
+   * disagree with the page. A failure says so here; nothing downloads a
+   * provider's error page.
+   */
+  async function downloadReport() {
+    if (!projectId || downloading) return
+    setDownloading(true)
+    setDownloadFailed(false)
+    try {
+      const url = `/api/reports/monthly/pdf?projectId=${encodeURIComponent(projectId)}&month=${encodeURIComponent(data.month)}&lang=${encodeURIComponent(l)}`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('refused')
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = `${data.month}-${projectLabel || 'report'}.pdf`.replace(/[\\/:*?"<>|]/g, '-')
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(href)
+    } catch {
+      setDownloadFailed(true)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -157,12 +192,22 @@ export default function MonthlyReportView({ data, generatedAt, generatedBy, lang
             <p data-headline="" className="mt-2 max-w-prose text-copy text-contrast-ink/85">{headline(data, l)}</p>
             {data.coversFrom && <p className="mt-2 text-caption text-contrast-ink/70">{t.coversFrom(dayMonth(data.coversFrom, l))}</p>}
           </div>
-          <button type="button" onClick={copySummary}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-control bg-white/10 px-3 text-caption font-semibold text-contrast-ink ring-1 ring-white/15 transition-colors duration-150 ease-snappy hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">
-            {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
-            <span aria-live="polite">{copied ? t.copied : t.copy}</span>
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button type="button" onClick={copySummary}
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-control bg-white/10 px-3 text-caption font-semibold text-contrast-ink ring-1 ring-white/15 transition-colors duration-150 ease-snappy hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">
+              {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
+              <span aria-live="polite">{copied ? t.copied : t.copy}</span>
+            </button>
+            {projectId && (
+              <button type="button" onClick={downloadReport} disabled={downloading} data-monthly-download=""
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-control bg-white/10 px-3 text-caption font-semibold text-contrast-ink ring-1 ring-white/15 transition-colors duration-150 ease-snappy hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 disabled:opacity-60">
+                <Download aria-hidden="true" className="size-4" />
+                <span aria-live="polite">{downloading ? t.downloading : t.download}</span>
+              </button>
+            )}
+          </div>
         </div>
+        {downloadFailed && <p role="status" data-monthly-download-failed="" className="mt-3 text-caption text-contrast-ink/85">{t.downloadFailed}</p>}
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Figure label={t.tiles.firstPage}
             value={r.state === 'ready' ? count(r.firstPageEnd, l) : '—'}

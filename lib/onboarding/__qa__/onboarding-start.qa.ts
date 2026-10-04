@@ -112,6 +112,7 @@ function setup(o: Opts = {}) {
     session,
     admin: () => w.admin,
     isAdmin,
+    siteAllowance: async () => 0,
     access: async () => ({ allowed: true, authority: 'website' }),
     consumeClaim: (admin, token, now) => consumeClaimToken(token, admin, now),
     schedule: () => {},

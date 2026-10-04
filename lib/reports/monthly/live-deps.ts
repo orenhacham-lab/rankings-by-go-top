@@ -5,6 +5,7 @@
  */
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { renderPdfFromHtml } from '@/lib/export/pdfshift'
 import type { MonthlyRouteDeps } from './http'
 
 export function liveMonthlyDeps(): MonthlyRouteDeps {
@@ -16,5 +17,6 @@ export function liveMonthlyDeps(): MonthlyRouteDeps {
     },
     admin: () => createAdminClient(),
     now: () => new Date(),
+    renderPdf: renderPdfFromHtml,
   }
 }

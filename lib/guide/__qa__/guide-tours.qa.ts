@@ -76,8 +76,13 @@ console.log('\nB) which screen has a tour, and when one starts on its own')
     screenForPath('/dashboard') === 'dashboard' && screenForPath('/keywords') === 'keywords'
     && screenForPath('/keyword-research') === 'keywordResearch' && screenForPath('/content/strategy') === 'strategy'
     && screenForPath('/ai-visibility') === 'aiVisibility' && screenForPath('/settings') === 'settings' && screenForPath('/reports') === 'reports')
-  check('B2: a trailing slash is the same screen; billing and a keyword\'s history have none',
-    screenForPath('/keywords/') === 'keywords' && screenForPath('/billing') === null && screenForPath('/keywords/abc/history') === null && screenForPath(null) === null)
+  check('B2: a trailing slash is the same screen; a screen that is not in the list has no tour',
+    screenForPath('/keywords/') === 'keywords' && screenForPath('/billing/') === 'billing'
+    && screenForPath('/keywords/abc/history') === null && screenForPath('/projects') === null && screenForPath(null) === null)
+check('B2a: every screen the sidebar leads to has a tour of its own (owner, 4 October 2026)', (() => {
+  const nav = ['/dashboard', '/keyword-research', '/keywords', '/content', '/site-links', '/maps-posts', '/ai-visibility', '/site-health', '/reports', '/settings', '/billing']
+  return nav.every((href) => screenForPath(href) !== null)
+})(), ['/dashboard', '/keyword-research', '/keywords', '/content', '/site-links', '/maps-posts', '/ai-visibility', '/site-health', '/reports', '/settings', '/billing'].filter((h) => screenForPath(h) === null).join(' '))
 
   const base = { pathname: '/dashboard', newAccount: true, projectsResolved: true, fullTour: 'new' as FullTourState, screenSeen: () => false }
   check('B3: a new account on the dashboard gets the full tour', autoTour(base)?.kind === 'full')
@@ -90,7 +95,7 @@ console.log('\nB) which screen has a tour, and when one starts on its own')
   const screen = autoTour({ ...after, pathname: '/keywords' })
   check('B7: once the full tour is over, a screen\'s own tour starts the first time', screen?.kind === 'screen' && screen.screen === 'keywords')
   check('B8: …and never again once seen', autoTour({ ...after, pathname: '/keywords', screenSeen: (s: ScreenKey) => s === 'keywords' }) === null)
-  check('B9: a screen without a tour starts nothing', autoTour({ ...after, pathname: '/billing' }) === null)
+  check('B9: a screen without a tour starts nothing', autoTour({ ...after, pathname: '/projects' }) === null && autoTour({ ...after, pathname: '/keywords/abc/history' }) === null)
 
   const now = new Date('2026-09-28T12:00:00Z')
   check('B10: an account created 13 days ago is new, 15 days ago is not, an unknown date is not',

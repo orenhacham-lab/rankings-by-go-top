@@ -92,6 +92,9 @@ function Stage({ column, cards, lang, dict, act, insights }: {
   const [open, setOpen] = useState(false)
   const shown = open ? cards : cards.slice(0, LIST_PREVIEW)
   const hidden = cards.length - shown.length
+  // Swap needs another idea to swap for, nothing more: see the same note on the board.
+  const canSwap = cards.length > 1
+  const swapped = column === 'ideas' && act ? act.actions.deferred.length : 0
   return (
     <section aria-labelledby={`strategy-list-${column}`} data-strategy-stage={column} className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
       <header className="flex items-center justify-between gap-2 border-b border-line bg-sunk/60 px-4 py-2.5">
@@ -101,6 +104,14 @@ function Stage({ column, cards, lang, dict, act, insights }: {
         </h3>
         <span className={cn('min-w-6 rounded-pill px-2 text-center text-caption font-semibold tabular-nums', ACCENT[column].count)}>{formatCount(cards.length, lang)}</span>
       </header>
+      {swapped > 0 && (
+        <p data-idea-swapped={swapped} className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-4 py-2 text-caption text-muted">
+          {s.ideaActions.swappedNote(swapped)}
+          <button type="button" onClick={() => act?.actions.undoSwap()} data-idea-action="undo-swap" className="font-semibold text-action underline-offset-2 hover:underline">
+            {s.ideaActions.undoSwap}
+          </button>
+        </p>
+      )}
       {cards.length === 0 ? (
         <p className="px-4 py-3 text-caption text-muted">{l.empty}</p>
       ) : (
@@ -109,7 +120,7 @@ function Stage({ column, cards, lang, dict, act, insights }: {
             <span>{l.topic}</span><span>{l.date}</span><span className="md:justify-self-end">{l.actions}</span>
           </div>
           <ul className="divide-y divide-line">
-            {shown.map((c) => <Row key={c.key} card={c} lang={lang} dict={dict} act={act} canSwap={hidden > 0} insight={insights?.get(c.key)} />)}
+            {shown.map((c) => <Row key={c.key} card={c} lang={lang} dict={dict} act={act} canSwap={canSwap} insight={insights?.get(c.key)} />)}
           </ul>
           {cards.length > LIST_PREVIEW && (
             <button

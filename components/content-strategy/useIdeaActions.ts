@@ -165,6 +165,16 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged, 
     update((s) => ({ ...s, deferred: deferIdea(s.deferred, t.key), announcement: a.swapped }))
   }, [a, update])
 
+  /**
+   * Every swap undone at once. A swap moves the idea behind the others, so in a
+   * column with more ideas than it shows the card leaves the view and reads as a
+   * deletion (owner report, 5 October 2026). Nothing was deleted, and this is the
+   * way back: the ideas return to their own order.
+   */
+  const undoSwap = useCallback(() => {
+    update((s) => (s.deferred.length === 0 ? s : { ...s, deferred: [], announcement: a.swapUndone }))
+  }, [a, update])
+
   /** `ok` when the field can close (added, or already there); otherwise the line to show under it. */
   const addKeyword = useCallback(async (raw: string): Promise<{ ok: boolean; error?: string }> => {
     const keyword = normalizeKeyword(raw)
@@ -202,7 +212,7 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged, 
 
   const approvedNow = useMemo(() => new Set(scope.approvedNow), [scope.approvedNow])
 
-  return { approve, reject, swap, addKeyword, view, prune, busy: scope.busy, deferred: scope.deferred, approvedNow, announcement: scope.announcement }
+  return { approve, reject, swap, undoSwap, addKeyword, view, prune, busy: scope.busy, deferred: scope.deferred, approvedNow, announcement: scope.announcement }
 }
 
 export type IdeaActions = ReturnType<typeof useIdeaActions>

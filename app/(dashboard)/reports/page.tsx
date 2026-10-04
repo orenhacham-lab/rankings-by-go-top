@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+import ProjectScoped from '@/components/layout/ProjectScoped'
 import { createClient } from '@/lib/supabase/client'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
@@ -795,7 +796,9 @@ export default function ReportsPage() {
   const dict = getDashboardDictionary(uiLocale)
   return (
     <Suspense fallback={<div>{dict.reports.loading}</div>}>
-      <ReportsContent />
+      <ProjectScoped>
+        <ReportsContent />
+      </ProjectScoped>
     </Suspense>
   )
 }

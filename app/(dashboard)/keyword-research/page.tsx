@@ -49,6 +49,7 @@ import SiteAvatar from '@/components/ui/SiteAvatar'
 import { useFirstEntrance } from '@/components/ui/motion'
 import { NO_LANDSCAPE } from '@/components/keyword-research/landscape'
 import CompetitiveResearch, { COMPETITIVE_ID } from '@/components/keyword-research/competitive/CompetitiveResearch'
+import ProjectScoped from '@/components/layout/ProjectScoped'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -161,6 +162,12 @@ function CompetitionBadge({ c }: { c: ReturnType<typeof competitionCell> }) {
 }
 
 export default function KeywordResearchPage() {
+  // The screen keeps the project's research in its own state, so it starts over
+  // when the project changes (see ProjectScoped).
+  return <ProjectScoped><KeywordResearchScreen /></ProjectScoped>
+}
+
+function KeywordResearchScreen() {
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
   const t = dict.keywordResearch

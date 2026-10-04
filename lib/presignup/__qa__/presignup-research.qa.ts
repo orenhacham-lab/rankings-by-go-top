@@ -401,6 +401,7 @@ async function main() {
       session: async () => ({ userId: USER, db: new FakeAdmin(s.tables) as unknown as SupabaseClient }),
       admin: () => s.admin,
       isAdmin: async () => false,
+      siteAllowance: async () => 0,
       access: async () => ({ allowed: true, authority: 'website' }),
       consumeClaim: (admin, t, now) => consumeClaimToken(t, admin, now),
       schedule: (task) => void scheduled.push(task),
