@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261004000000_free_check_locale_widen.sql
+-- EXECUTED PROBE — 20261004210933_free_check_locale_widen.sql
 --
 -- Applies, in a DISPOSABLE PostgreSQL cluster, the free check's ledger, the
 -- migration that created the two free-check tables with a bilingual `locale`
@@ -69,8 +69,8 @@ SELECT chk('before', 'a Spanish research run is refused', NOT run_accepts('es'))
 SELECT chk('before', 'a Spanish consent record is refused', NOT report_accepts('es'));
 SELECT chk('before', 'Hebrew and English are accepted', run_accepts('he') AND run_accepts('en'));
 
-\i supabase/migrations/20261004000000_free_check_locale_widen.sql
-\i supabase/migrations/20261004000000_free_check_locale_widen.sql
+\i supabase/migrations/20261004210933_free_check_locale_widen.sql
+\i supabase/migrations/20261004210933_free_check_locale_widen.sql
 
 -- ── after ──────────────────────────────────────────────────────────────────
 SELECT chk('after', 'a Spanish research run is accepted', run_accepts('es'));
