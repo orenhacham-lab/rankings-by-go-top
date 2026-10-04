@@ -4687,7 +4687,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     homePage: 'Página de inicio',
     origin: { ours: 'Nuestro artículo' },
     cannibal: 'Compite con otra página',
-    cannibalDetail: '{n} de tus páginas reciben impresiones por «{query}»',
+    cannibalDetail: '{n} de tus páginas se reparten las impresiones por «{query}»',
     actions: {
       improve: 'Mejorar el artículo',
       improveWhy: 'Posición {pos} en Google para «{query}», cerca de la primera página',

@@ -3239,7 +3239,7 @@ export const dashboardEn = {
     homePage: 'Home page',
     origin: { ours: 'Our article' },
     cannibal: 'Competes with another page',
-    cannibalDetail: '{n} of your pages get impressions for "{query}"',
+    cannibalDetail: '{n} of your pages split the impressions for "{query}"',
     actions: {
       improve: 'Improve the article',
       improveWhy: 'Position {pos} on Google for "{query}", close to the first page',

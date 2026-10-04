@@ -71,10 +71,21 @@ const A_ROWS = {
     row('running shoes', '/collections/running/', 1, 20, 'http://www.shop.example.org'),
     row('running shoes', '/collections/running?utm_source=x', 1, 5),
   ],
-  caseQ: [row('Running Shoes', '/collections/running', 10, 500), row(' running shoes ', '/products/trail-2', 1, 30)],
+  caseQ: [row('Running Shoes', '/collections/running', 10, 500), row(' running shoes ', '/products/trail-2', 1, 200)],
   riskiest: [
     row('socks', '/products/socks', 1, 50), row('socks', '/collections/running', 1, 60),
-    row('running shoes', '/collections/running', 10, 900), row('running shoes', '/pages/about', 0, 40),
+    row('running shoes', '/collections/running', 10, 900), row('running shoes', '/pages/about', 0, 300),
+  ],
+  // One page takes a token share of a query the rest of the site owns. This is the
+  // shape that stamped "47 of your pages…" on nearly every row (owner, 5 Oct 2026).
+  sliver: [row('gifts', '/collections/gifts', 10, 500), row('gifts', '/products/mug', 0, 10)],
+  // Each page holds half, but the query is too small for one stray view to decide.
+  tiny: [row('gifts', '/collections/gifts', 0, 8), row('gifts', '/products/mug', 0, 8)],
+  // '/p' really splits both queries, but draws more of its own traffic from the
+  // SMALLER one. The old rule labelled it by the site-wide total and said 'big'.
+  mine: [
+    row('big', '/p', 0, 200), row('big', '/q', 0, 800),
+    row('small', '/p', 0, 300), row('small', '/r', 0, 100),
   ],
 }
 function cannibalChecks(m: Model) {
@@ -87,6 +98,9 @@ function cannibalChecks(m: Model) {
     A5: m.cannibalizationByPage(A_ROWS.caseQ).size === 2,
     A6: m.cannibalizationByPage(A_ROWS.riskiest).get('/collections/running')?.query === 'running shoes'
       && m.cannibalizationByPage(A_ROWS.riskiest).get('/products/socks')?.query === 'socks',
+    A9: m.cannibalizationByPage(A_ROWS.sliver).size === 0,
+    A10: m.cannibalizationByPage(A_ROWS.tiny).size === 0,
+    A11: m.cannibalizationByPage(A_ROWS.mine).get('/p')?.query === 'small',
   }
   return res
 }
@@ -101,6 +115,12 @@ async function main() {
     check('A4: one page spelled three ways (www, trailing slash, UTM) is one page, not a risk', r.A4)
     check('A5: the same query in another case or with spaces is the same query', r.A5)
     check('A6: a page in two shared queries carries the one with more impressions', r.A6)
+    // The fix for "almost every page looks cannibalized" (owner, 5 October 2026): the
+    // same rule the keyword-research screen already states, each page holding at least
+    // COMPETING_MIN_SHARE of a query with at least COMPETING_MIN_IMPRESSIONS.
+    check('A9: a page with a token share of someone else\'s query is not a risk', r.A9)
+    check('A10: a query below the impressions floor is not a risk', r.A10)
+    check('A11: a page is labelled by the shared query IT draws most from, not the site\'s biggest', r.A11)
     // A custom domain on the store and the myshopify host in Search Console: matched by path.
     const items = REAL_MODEL.mergeSources([REAL_MODEL.sourceFromShopify([
       { shopify_gid: 'gid://shopify/Collection/1', entity_type: 'collection', title: 'Running', handle: 'running', canonical_url: 'https://acme.myshopify.com/collections/running', is_active: true },
@@ -111,10 +131,16 @@ async function main() {
     const top = REAL_MODEL.pageMetrics([row('a', '/p', 5, 100), row('b', '/p', 9, 10), row('c', '/p', 9, 50)])
     check('A8: the top query is the one with the most clicks, impressions breaking a tie', top.get('/p')?.topQuery === 'c' && top.get('/p')?.clicks === 23)
 
-    const m1 = mutant<Model>('lib/content/existing-content/model.ts', 'if (e.pages.size < 2) continue', 'if (e.pages.size < 1) continue')
+    const m1 = mutant<Model>('lib/content/existing-content/model.ts', 'if (real.length < 2) continue', 'if (real.length < 1) continue')
     check('MUTATION CONTROL: the threshold the control breaks is where it expects it', m1.found)
     check('MUTATION CONTROL: a copy that flags a query with ONE page is caught by A2', !!m1.mod && !cannibalChecks(m1.mod).A2)
-    const m2 = mutant<Model>('lib/content/existing-content/model.ts', 'if (impressions <= 0) continue', '')
+    const m4 = mutant<Model>('lib/content/existing-content/model.ts', 'imp / e.impressions >= COMPETING_MIN_SHARE', 'imp > 0')
+    check('MUTATION CONTROL: a copy that flags any shared impression is caught by A9', m4.found && !!m4.mod && !cannibalChecks(m4.mod).A9)
+    const m5 = mutant<Model>('lib/content/existing-content/model.ts', 'if (e.impressions < COMPETING_MIN_IMPRESSIONS) continue', '')
+    check('MUTATION CONTROL: a copy with no impressions floor is caught by A10', m5.found && !!m5.mod && !cannibalChecks(m5.mod).A10)
+    const m6 = mutant<Model>('lib/content/existing-content/model.ts', 'out.set(page, { query, pages: real.length, mine })', 'out.set(page, { query, pages: real.length, mine: e.impressions })')
+    check('MUTATION CONTROL: a copy that ranks by the site-wide total is caught by A11', m6.found && !!m6.mod && !cannibalChecks(m6.mod).A11)
+    const m2 = mutant<Model>('lib/content/existing-content/model.ts', 'imp / e.impressions >= COMPETING_MIN_SHARE', 'imp / e.impressions >= 0')
     check('MUTATION CONTROL: a copy that counts zero-impression pages is caught by A3', m2.found && !!m2.mod && !cannibalChecks(m2.mod).A3)
     const m3 = mutant<Model>('lib/content/existing-content/model.ts', "const q = String(r.query || '').trim().toLowerCase()", "const q = String(r.query || '')")
     check('MUTATION CONTROL: a copy that splits one query by case is caught by A5', m3.found && !!m3.mod && !cannibalChecks(m3.mod).A5)

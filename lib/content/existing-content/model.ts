@@ -26,6 +26,7 @@
  * figures as query rows.
  */
 import { urlMatchKeys } from '@/lib/content/internal-links'
+import { COMPETING_MIN_IMPRESSIONS, COMPETING_MIN_SHARE } from '@/lib/keyword-research/competitive'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { isContentUrl, resolveKind, titleFromUrl, type KindEvidence, type SiteKind } from './classify'
 import { normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
@@ -376,34 +377,47 @@ export function pageMetrics(rows: readonly GscRowLite[]): Map<string, ExistingCo
 }
 
 /**
- * Cannibalization RISK: a query for which TWO OR MORE of the site's own pages get
- * impressions. Every row of a sync is the site's own (one property), so every page
- * in it counts. Returned per page: the riskiest of its shared queries (the one with
- * the most impressions across the competing pages) and how many pages share it.
+ * Cannibalization RISK: a query that TWO OR MORE of the site's own pages each take a
+ * real share of. "A real share" is the SAME rule the keyword-research screen already
+ * teaches the merchant (lib/keyword-research/competitive.ts): each page holds at least
+ * COMPETING_MIN_SHARE of the query's impressions, and the query itself has at least
+ * COMPETING_MIN_IMPRESSIONS.
  *
- * It is a risk, not a verdict: two pages can rightly answer one query. That is why
- * the screen names the query and the count, and leaves the judgement to the merchant.
+ * It used to flag any query two pages shared with a single impression, and then label
+ * each page with whichever shared query had the most impressions ACROSS the site. One
+ * broad term the whole site gets stray impressions on therefore stamped the same
+ * sentence ("47 of your pages…") on nearly every row, and the screen read as if the
+ * entire site were cannibalized (owner, 5 October 2026). Now a page is flagged only
+ * where it genuinely splits a query, and it is labelled with the shared query THAT
+ * PAGE gets the most impressions from, so the reason differs per row and is actionable.
+ *
+ * It is a risk, not a verdict: two pages can rightly answer one query. That is why the
+ * screen names the query and the count, and leaves the judgement to the merchant.
  */
 export function cannibalizationByPage(rows: readonly GscRowLite[]): Map<string, { query: string; pages: number }> {
-  const byQuery = new Map<string, { pages: Set<string>; impressions: number }>()
+  const byQuery = new Map<string, { pages: Map<string, number>; impressions: number }>()
   for (const r of rows) {
-    const impressions = Number(r.impressions) || 0
-    if (impressions <= 0) continue
+    // No zero-impression early-out: a page with no impressions has a zero share and
+    // the share rule below drops it, so one rule decides, not two.
+    const impressions = Math.max(0, Number(r.impressions) || 0)
     const q = String(r.query || '').trim().toLowerCase()
     const key = pageKey(r.page)
     if (!q || !key) continue
-    const e = byQuery.get(q) ?? { pages: new Set<string>(), impressions: 0 }
-    e.pages.add(key)
+    const e = byQuery.get(q) ?? { pages: new Map<string, number>(), impressions: 0 }
+    e.pages.set(key, (e.pages.get(key) ?? 0) + impressions)
     e.impressions += impressions
     byQuery.set(q, e)
   }
-  const out = new Map<string, { query: string; pages: number; impressions: number }>()
+  // Per page, the shared query THIS page draws the most impressions from.
+  const out = new Map<string, { query: string; pages: number; mine: number }>()
   for (const [query, e] of byQuery) {
-    if (e.pages.size < 2) continue
-    for (const page of e.pages) {
+    if (e.impressions < COMPETING_MIN_IMPRESSIONS) continue
+    const real = [...e.pages].filter(([, imp]) => imp / e.impressions >= COMPETING_MIN_SHARE)
+    if (real.length < 2) continue
+    for (const [page, mine] of real) {
       const cur = out.get(page)
-      if (!cur || e.impressions > cur.impressions || (e.impressions === cur.impressions && query < cur.query)) {
-        out.set(page, { query, pages: e.pages.size, impressions: e.impressions })
+      if (!cur || mine > cur.mine || (mine === cur.mine && query < cur.query)) {
+        out.set(page, { query, pages: real.length, mine })
       }
     }
   }
