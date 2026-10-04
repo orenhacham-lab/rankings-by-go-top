@@ -46,8 +46,14 @@ const DEFAULT_DAYS_1 = [0]      // Sunday
 const DEFAULT_DAYS_2 = [0, 3]   // Sunday + Wednesday (never Saturday by default)
 /** Nothing is published on Friday or Saturday, so they are never offered. */
 const WORKING_WEEKDAYS = [0, 1, 2, 3, 4]
-/** Who sets the rhythm: the plan (paid plans) or the owner's own choice (admin, trial). */
-type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[] } | { source: 'owner' }
+/**
+ * Who sets the rhythm. 'owner' — the account picks its own days — is reached
+ * only by an account with no plan and no trial, which is an admin: the owner's
+ * rule of 4 October 2026 is that no customer controls this, on a trial or on a
+ * subscription. A trial says its dates were fixed when the account opened; a
+ * paid plan says what the plan gives.
+ */
+type Rhythm = { source: 'plan'; perWeek: number; weekdays: number[] } | { source: 'trial' } | { source: 'owner' }
 interface QueueItem {
   id: string
   topicId: string | null
@@ -147,6 +153,9 @@ export default function AutomationSchedule({
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
   const [weekdays, setWeekdays] = useState<number[]>(DEFAULT_DAYS_1)
   const [rhythm, setRhythm] = useState<Rhythm | null>(null)
+  // Anything but 'owner' means the schedule is not this account's to change:
+  // the picker, the save button and "create the article now" are all withheld.
+  const scheduleLocked = rhythm !== null && rhythm.source !== 'owner'
   const weekdayOptions = WORKING_WEEKDAYS.map((i) => ({ value: String(i), label: t.weekdays[i] as string }))
   const [approvedExpanded, setApprovedExpanded] = useState(false)
   const [queueExpanded, setQueueExpanded] = useState(false)
@@ -466,7 +475,7 @@ export default function AutomationSchedule({
                     {busyItem === it.id ? t.publishingNow : t.retry}
                   </Button>
                 )}
-                {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
+                {!scheduleLocked && (it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
                   <Button size="sm" variant="secondary" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                     {busyItem === it.id ? t.generatingArticle : t.generateNow}
                   </Button>
@@ -504,7 +513,7 @@ export default function AutomationSchedule({
     ? (planRhythm.perWeek === 1 ? t.planRhythmLineOne : t.planRhythmLine)
       .replace('{n}', String(planRhythm.perWeek))
       .replace('{days}', planRhythm.weekdays.map((d) => t.weekdays[d]).join(', '))
-    : null
+    : rhythm?.source === 'trial' ? t.trialRhythmLine : null
 
   // Flat inside the strategy's "advanced" card, below a divider (final review R14).
   return (
@@ -524,7 +533,7 @@ export default function AutomationSchedule({
       <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
           {/* Cadence — the owner's choice only when the plan does not set it */}
-          {rhythm?.source === 'plan' ? (
+          {scheduleLocked ? (
             <p className="min-w-0 max-w-prose text-copy text-body" data-plan-rhythm="">{rhythmLine}</p>
           ) : (<>
           <div className="min-w-0 max-w-full">
@@ -580,14 +589,14 @@ export default function AutomationSchedule({
 
           {/* Actions */}
           <div className="ms-auto flex items-center gap-2">
-            {!planRhythm && <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>}
+            {!scheduleLocked && <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>}
             <Button size="sm" variant="secondary" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
           </div>
         </div>
 
         {/* Publish-day note + next publish on one compact line */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-0.5">
-          <p className="text-caption text-muted">{planRhythm ? t.noWeekendNote : `${t.publishDayNote} ${t.noWeekendNote}`}</p>
+          <p className="text-caption text-muted">{scheduleLocked ? t.noWeekendNote : `${t.publishDayNote} ${t.noWeekendNote}`}</p>
           <div className="text-caption text-muted">
             {t.nextPublish}: <span className="font-semibold text-ink">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
           </div>

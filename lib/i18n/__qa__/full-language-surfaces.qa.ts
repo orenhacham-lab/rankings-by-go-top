@@ -169,8 +169,17 @@ async function main() {
     check('B11: …and an English one to /en/login?error=oauth', en === 'https://app.example/en/login?error=oauth', en)
     check('B12: …and one without a language to /login?error=oauth, as before', none === 'https://app.example/login?error=oauth', none)
     const cb = strip(read('app/api/auth/callback/route.ts'))
-    const cbLocalized = (src: string) => /lang === 'en' \? '\/en\/login' : '\/login'/.test(src) && /if \(lang === 'he'\) failed\.searchParams\.set\('lang', 'he'\)/.test(src)
-    check('B13: the callback source builds both language-specific failure URLs', cbLocalized(cb))
+    // NARROWED 4 October 2026: the callback used to write its own two-way
+    // `lang === 'en' ? '/en/login' : '/login'`, which answered a THIRD
+    // language with the Hebrew form. It now goes through statedAuthUrl, the
+    // one helper that reads the prefix table — so the claim is the same and
+    // the source cannot drift back to a two-way check.
+    const cbLocalized = (src: string) =>
+      /statedAuthUrl\(origin, 'login', lang, \{ param: 'error', value: 'oauth' \}\)/.test(src)
+      && !/lang === 'en' \? '\/en\/login' : '\/login'/.test(src)
+    check('B13: the callback builds its failure URL from the one prefix table, per language', cbLocalized(cb))
+    check('B13-MUT: the old two-way check fails B13',
+      !cbLocalized("const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)"))
     check('MUTATION CONTROL: the old single `/login?error=oauth` redirect is caught', !cbLocalized("return NextResponse.redirect(`${origin}/login?error=oauth`)"))
   }
 

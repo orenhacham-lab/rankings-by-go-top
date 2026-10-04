@@ -837,6 +837,7 @@ export const dashboardEn = {
       weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
       planRhythmLine: 'Your plan sets the publishing rhythm: {n} articles a week ({days}).',
       planRhythmLineOne: 'Your plan sets the publishing rhythm: one article a week ({days}).',
+      trialRhythmLine: 'During the trial the rhythm is fixed: the first article is written when the account opens, the next one a week later. Once you subscribe, your plan sets the rhythm.',
       noWeekendNote: 'Nothing is published on Friday or Saturday.',
       publishDayNote: 'Articles publish on the chosen day, during the daily automation run.',
       duringDay: '· during the day',

@@ -36,7 +36,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if ('error' in owned) return Response.json({ error: owned.error }, { status: owned.status })
   const { auth, pool } = owned
 
+  // WHO MAY CHANGE THE SCHEDULE. Hiding the picker is not enforcement: this is
+  // an API route, and the matcher in proxy.ts excludes /api/*. A plan's rhythm
+  // already overrode these columns when the runner read them, but a trial's did
+  // not — its dates are the ones set when the account opened, and a PATCH could
+  // move them. The schedule fields are therefore dropped for anyone whose
+  // rhythm is not their own: a paid plan or a trial. Pause and resume, and the
+  // queue's own order, are untouched.
+  const scheduleRhythm = await readPublishRhythmForProject(auth.admin, pool.project_id, { countThisQueue: !pool.is_active })
+  const scheduleIsTheirs = !scheduleRhythm.plan && !scheduleRhythm.trial
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (scheduleIsTheirs) {
   if ('cadence' in body && CADENCES.includes(body.cadence as Cadence)) patch.cadence = body.cadence
   if ('intervalDays' in body) {
     const n = typeof body.intervalDays === 'number' ? Math.floor(body.intervalDays) : null
@@ -44,9 +55,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if ('publishTime' in body && typeof body.publishTime === 'string' && /^\d{1,2}:\d{2}$/.test(body.publishTime)) patch.publish_time = body.publishTime
   if ('timezone' in body && typeof body.timezone === 'string' && body.timezone.trim()) patch.timezone = body.timezone.trim()
+  if ('publishDays' in body) { const days = cleanPublishDays(body.publishDays); patch.publish_days = days.length ? days : null }
+  }
   if ('name' in body && typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim()
   if ('isActive' in body) patch.is_active = body.isActive === true
-  if ('publishDays' in body) { const days = cleanPublishDays(body.publishDays); patch.publish_days = days.length ? days : null }
 
   // Resulting active state + schedule fields → recompute next_publish_at.
   const nextActive = 'is_active' in patch ? (patch.is_active as boolean) : pool.is_active
@@ -56,10 +68,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // The plan's rhythm when there is one (read only), else the owner's own
   // schedule; never Friday or Saturday.
   const nextInterval = resolveIntervalDays(((patch.cadence as Cadence) ?? pool.cadence) as Cadence, 'interval_days' in patch ? (patch.interval_days as number | null) : pool.interval_days)
-  const rhythm = nextActive ? await readPublishRhythmForProject(auth.admin, pool.project_id, { countThisQueue: !pool.is_active }) : null
-  patch.next_publish_at = nextActive && rhythm
-    ? makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: rhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null })(Date.now())
-    : null
+  // A pause clears the slot; a resume recomputes it. A trial keeps the slot it
+  // was given when the account opened, since recomputing it from an empty
+  // weekday list would quietly move the first article to today.
+  const keepStoredSlot = scheduleRhythm.trial && !scheduleRhythm.plan && pool.next_publish_at
+  patch.next_publish_at = !nextActive
+    ? null
+    : keepStoredSlot
+      ? pool.next_publish_at
+      : makeSlotAfter({ publishTime: nextTime, timeZone: nextTz, perDay: scheduleRhythm.plan?.perDay ?? null, publishDays: nextDays, intervalDays: nextInterval, anchorIso: null })(Date.now())
 
   const { data, error } = await auth.admin.from('article_pools').update(patch).eq('id', id).select(POOL_SELECT).single()
   if (error || !data) {

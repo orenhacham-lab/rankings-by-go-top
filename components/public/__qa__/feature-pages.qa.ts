@@ -56,13 +56,21 @@ function main() {
   const badA = PAGES.filter((p) => !ctasOk(read(p.rel))).map((p) => p.rel)
   check(`A1: all ${PAGES.length} pages lead and close with the free check, then the trial`, badA.length === 0, badA.join(', '))
   const common = read('lib/i18n/public/feature-common.ts')
+  // NARROWED 4 October 2026: Spanish joined, and all three sign-up links now
+  // state their language through authHref instead of one of them carrying a
+  // literal '/en/signup' — which is what sent a Spanish reader to the English
+  // form. The claim is unchanged: each language leads to its OWN pages.
   const commonOk = (common: string) =>
     /check: \{ label: [^\n]+href: '\/free-check' \}/.test(common) && /check: \{ label: [^\n]+href: '\/en\/free-check' \}/.test(common)
-    && /trial: \{ label: [^\n]+href: authHref\('signup', 'he'\) \}/.test(common) && /trial: \{ label: [^\n]+href: '\/en\/signup' \}/.test(common)
+    && /check: \{ label: [^\n]+href: '\/es\/free-check' \}/.test(common)
+    && (['he', 'en', 'es'] as const).every((l) => new RegExp(`trial: \\{ label: [^\\n]+href: authHref\\('signup', '${l}'\\) \\}`).test(common))
+    && !/href: '\/(en|es)?\/?signup'/.test(common)
     && /TRIAL_CATALOG\.days/.test(common) && !/\b7 ימי|7-day/.test(common)
   check('A2: the shared calls to action point at each language\'s own free check and signup', commonOk(common))
   check('MUTATION CONTROL: an English free check pointing at the Hebrew page is caught',
     !commonOk(common.replace("href: '/en/free-check'", "href: '/free-check'")))
+  check('MUTATION CONTROL: the Spanish trial pointing at the English sign-up is caught',
+    !commonOk(common.replace("href: authHref('signup', 'es')", "href: '/en/signup'")))
   const ai = read(PAGES[0].rel)
   check('MUTATION CONTROL: a hero that leads with the trial is caught', !ctasOk(ai.replace('primary: C.check,\n    secondary: C.trial,', 'primary: C.trial,\n    secondary: C.check,')))
 

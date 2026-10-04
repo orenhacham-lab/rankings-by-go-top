@@ -186,7 +186,14 @@ const rhythmSrc = src('lib/content/automation/plan-rhythm.ts')
 check('H1: the pools route projects with the runner\'s functions (no plain weekly projection left)', /projectPublishDates\(/.test(route) && /makeSlotAfter\(/.test(route) && !/projectedPublishAt\(/.test(route) && /rhythm: rhythmDTO\(rhythm\)/.test(route))
 check('H2: create and update both take the first slot from the plan rhythm', /firstSlot\([^)]*rhythm\)/.test(route) && /readPublishRhythm\(/.test(route) && /readPublishRhythmForProject\(/.test(patch) && /makeSlotAfter\(/.test(patch))
 check('H3: the rhythm read writes nothing', !/\.(insert|update|upsert|delete)\(/.test(rhythmSrc))
-check('H4: the screen states the rhythm when the plan sets it and hides the day picker', /rhythm\?\.source === 'plan'/.test(screen) && /t\.planRhythmLineOne : t\.planRhythmLine\)/.test(screen) && /data-plan-rhythm="">\{rhythmLine\}</.test(screen) && /t\.noWeekendNote/.test(screen) && /\{!planRhythm && <Button[^\n]{0,60}saveSettings/.test(screen))
+// NARROWED 4 October 2026: the condition is no longer "a paid plan" but "the
+// schedule is not this account's own" — a trial is locked too (the owner's
+// rule: no customer controls the cadence). The claim is unchanged: when the
+// account does not set the rhythm, the screen states it and offers neither the
+// day picker nor the save button. See
+// lib/content/automation/__qa__/schedule-ownership.qa.ts.
+check('H4: the screen states the rhythm when the account does not set it, and hides the day picker', /rhythm\?\.source === 'plan'/.test(screen) && /const scheduleLocked = rhythm !== null && rhythm\.source !== 'owner'/.test(screen) && /t\.planRhythmLineOne : t\.planRhythmLine\)/.test(screen) && /data-plan-rhythm="">\{rhythmLine\}</.test(screen) && /t\.noWeekendNote/.test(screen) && /\{!scheduleLocked && <Button[^\n]{0,60}saveSettings/.test(screen))
+check('H4-MUT: a screen that locks only a paid plan fails H4', !/\{!scheduleLocked && <Button[^\n]{0,60}saveSettings/.test('{!planRhythm && <Button size="sm" onClick={() => saveSettings()}'))
 check('H5: the screen never offers Friday or Saturday', /WORKING_WEEKDAYS/.test(screen) && !/t\.weekdays\.map\(/.test(screen))
 for (const lang of ['he', 'en'] as const) {
   const dict = readFileSync(join(root, `lib/i18n/dashboard/${lang}.ts`), 'utf8')

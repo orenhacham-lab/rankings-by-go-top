@@ -20,6 +20,7 @@
  * its own dictionary.
  */
 import type { PublicLocale } from '@/lib/i18n/locales'
+import { statedAuthUrl } from '@/lib/i18n/auth-href'
 
 /** Where the recovery link lands after Supabase: its fixed, same-origin path. */
 export const RESET_PASSWORD_PATH = '/reset-password'
@@ -85,8 +86,5 @@ export async function setNewPassword(client: UpdateClient, password: string, con
  * page's own `next`; every other failure keeps the sign-in page.
  */
 export function recoveryFailureUrl(origin: string, lang: string | null): URL {
-  const url = new URL(lang === 'en' ? '/en/forgot-password' : '/forgot-password', origin)
-  url.searchParams.set('error', 'link')
-  if (lang === 'he') url.searchParams.set('lang', 'he')
-  return url
+  return statedAuthUrl(origin, 'forgot-password', lang, { param: 'error', value: 'link' })
 }

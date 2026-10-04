@@ -47,7 +47,12 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 const ROOT = join(__dirname, '..', '..')
-const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+// A neighbouring suite's temporary mutation file (*.mut2.tsx) can vanish
+// mid-scan under the parallel runner, which crashed this suite outright. A
+// file that is not there contributes nothing rather than killing the run.
+const read = (p: string) => {
+  try { return readFileSync(join(ROOT, p), 'utf8') } catch { return '' }
+}
 
 function walk(dir: string): string[] {
   const abs = join(ROOT, dir)

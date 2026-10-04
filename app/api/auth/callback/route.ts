@@ -13,6 +13,7 @@ import { SEED_CLAIM_COOKIE } from '@/lib/onboarding/claim-cookie'
 import { afterSignupPath } from '@/lib/onboarding/claim-start'
 import { GOOGLE_FLOW_COOKIE, completeGoogleSignIn, googleDirectConfig, googleFlowCookieOptions, matchGoogleState } from '@/lib/auth/google-direct'
 import { googleSignInFailureUrl } from '@/lib/auth/google-signin'
+import { statedAuthUrl } from '@/lib/i18n/auth-href'
 
 /**
  * Supabase auth callback (email confirmation and Supabase-hosted OAuth, PKCE).
@@ -82,9 +83,7 @@ export async function GET(request: NextRequest) {
   // A password-recovery link that could not be exchanged (expired, used
   // twice) goes back to the request form, which says so and offers a new one.
   if (next === RESET_PASSWORD_PATH) return NextResponse.redirect(recoveryFailureUrl(origin, lang).toString())
-  const failed = new URL(lang === 'en' ? '/en/login' : '/login', origin)
-  failed.searchParams.set('error', 'oauth')
-  if (lang === 'he') failed.searchParams.set('lang', 'he')
+  const failed = statedAuthUrl(origin, 'login', lang, { param: 'error', value: 'oauth' })
   return NextResponse.redirect(failed.toString())
 }
 

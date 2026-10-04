@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
+import { authHref } from '@/lib/i18n/auth-href'
 
 export const metadata = {
   title: 'Mapa del sitio | Go Top SEO',
@@ -26,14 +27,10 @@ export default function SpanishSitemapPage() {
       ],
     },
     {
-      // Sign-in and sign-up have no Spanish version yet (the dashboard is
-      // Hebrew and English), so these point at the English forms and the
-      // group says so rather than letting a visitor discover it.
       title: 'Cuenta',
-      description: 'El registro y el acceso están por ahora en inglés.',
       links: [
-        { label: 'Acceder', href: '/en/login' },
-        { label: 'Empezar la prueba gratuita', href: '/en/signup' },
+        { label: 'Acceder', href: authHref('login', 'es') },
+        { label: 'Empezar la prueba gratuita', href: authHref('signup', 'es') },
       ],
     },
     {
