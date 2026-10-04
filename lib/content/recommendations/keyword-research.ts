@@ -22,7 +22,7 @@ import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/
 import { tokens, slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
 import type { TopicSuggestion } from './types'
-import { languageNameInEnglish } from '@/lib/content/language'
+import { contentLanguageOrEnglish, languageNameInEnglish, type ContentLanguage } from '@/lib/content/language'
 import { REASON_TEXT } from './reason-text'
 
 // Phase 3F.3.1 — broadened (but still bounded) so the source doesn't exhaust
@@ -315,7 +315,7 @@ export interface ClustersToTopicsResult { topics: GeminiClusterTopic[]; rejected
  */
 /** Pure prompt builder (exported for snapshot tests — proves the instructions
  *  are actually present in the request). */
-export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): string {
+export function buildClustersPrompt(clusters: ClusterInput[], language: ContentLanguage, businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): string {
   const langLabel = languageNameInEnglish(language)
   const year = new Date().getFullYear()
   return [
@@ -346,7 +346,7 @@ export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | '
   ].filter(Boolean).join('\n')
 }
 
-export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = '', controller?: RunCostController): Promise<ClustersToTopicsResult> {
+export async function clustersToTopics(clusters: ClusterInput[], language: ContentLanguage, businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = '', controller?: RunCostController): Promise<ClustersToTopicsResult> {
   const prompt = buildClustersPrompt(clusters, language, businessCtx, offerContext, pendingBlock, projectBlock)
   const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: outputBudgetFor(clusters.length) }, controller, { source: 'keyword_research_url', callPurpose: 'primary', requestedIdeaCount: clusters.length })
   if (!ok) return { topics: [], rejected: [], ok: false }
@@ -403,7 +403,14 @@ export async function recommendFromKeywordResearch(
   input: KeywordResearchInput,
 ): Promise<{ suggestions: TopicSuggestion[]; meta: KeywordResearchMeta }> {
   const country = isValidCountry(input.country) ? input.country : 'IL'
-  const language = (isValidLanguage(input.language) ? input.language : 'he') as 'he' | 'en'
+  // TWO DIFFERENT LANGUAGES, and they used to be one. `language` is what Google
+  // Ads is asked for — one of the research languages, which are more than the
+  // languages we write in. `prose` is what the owner READS: the topic titles and
+  // the reason sentences. Collapsing the two meant the Ads list decided the
+  // prose, so a Spanish project (Spanish was not a research language) fell back
+  // to 'he' and a Spanish site was handed Hebrew topic titles.
+  const language = isValidLanguage(input.language) ? input.language : 'he'
+  const prose = contentLanguageOrEnglish(input.language)
   const seeds = input.seedUrls.filter(Boolean).slice(0, MAX_URL_SEEDS)
 
   // 1) Fetch keyword ideas (capped calls, graceful failure).
@@ -518,7 +525,7 @@ export async function recommendFromKeywordResearch(
   // deterministic "[keyword]: המדריך המלא" fallback (an unusable batch returns
   // fewer/none, with rejected classifications counted in diagnostics).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
-  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '', input.projectBlock ?? '', input.controller)
+  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, prose, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '', input.projectBlock ?? '', input.controller)
   const clusterByPrimary = new Map(clusterInputs.map((c) => [normalizeText(c.primaryKeyword), c]))
 
   const suggestions: TopicSuggestion[] = []
@@ -541,7 +548,7 @@ export async function recommendFromKeywordResearch(
       ...(Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : []),
       ...merged.map((c) => c.primaryKeyword),
     ])).slice(0, 4)
-    const reasonText = REASON_TEXT[language]
+    const reasonText = REASON_TEXT[prose]
     const reasonBase = reasonText.foundInSearchData(volume.toLocaleString(reasonText.numberLocale))
     const editorial = (g.evidenceSummary && g.evidenceSummary.trim()) || (g.reason && g.reason.trim()) || ''
     suggestions.push({

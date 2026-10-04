@@ -73,3 +73,24 @@ export function contentScript(language: ContentLanguage): 'hebrew' | 'latin' {
 export function toHebrewOrEnglish(language: ContentLanguage): 'he' | 'en' {
   return language === 'he' ? 'he' : 'en'
 }
+
+/**
+ * Like `normalizeContentLanguage`, but a language the content layer does not
+ * know yet reads as ENGLISH rather than Hebrew.
+ *
+ * The keyword-research screen offers more languages than we write content in,
+ * because the language only decides which keyword ideas Google returns.
+ * Portuguese is the live example: it is a research language today and will be a
+ * content language when pt-BR launches. Rendering a latin-script language's
+ * topics in Hebrew prose is worse than rendering them in English, so this is the
+ * fallback for anything researched in a language we cannot write in yet.
+ *
+ * An empty or missing value is not an unknown language, it is no language, and
+ * keeps the Hebrew default every caller had before.
+ */
+export function contentLanguageOrEnglish(value: unknown): ContentLanguage {
+  const s = String(value ?? '').toLowerCase().trim()
+  if (!s) return DEFAULT_CONTENT_LANGUAGE
+  const known = /^(en|es|cas|he|iw)/.test(s)
+  return known ? normalizeContentLanguage(s) : 'en'
+}
