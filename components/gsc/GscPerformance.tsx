@@ -30,6 +30,7 @@ import { performanceDelta, previousPeriod, type PerformanceMetric, type TrendPoi
 import { useGscMetrics, useGscStatus } from './gsc-data'
 import GscSetupPrompt, { GscLoadError } from './GscSetupPrompt'
 import GscSparkline from './GscSparkline'
+import GscExportDownload from './GscExportDownload'
 import { formatCount, formatDay, formatPercent, formatPosition } from './format'
 
 function pickPoints(body: Record<string, unknown>): TrendPoint[] {
@@ -113,6 +114,7 @@ export default function GscPerformance({ projectId, className }: { projectId: st
         })}
       </div>
       )}
+      {state === 'ready' && <GscExportDownload projectId={projectId} className="mt-3" />}
       {(state === 'error' || (state === 'ready' && trend.data.state === 'error')) && <GscLoadError className="mt-3" onRetry={retry} />}
     </section>
   )

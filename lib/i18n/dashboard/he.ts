@@ -848,6 +848,15 @@ export const dashboardHe = {
       planRhythmLineOne: 'קצב הפרסום נקבע לפי המנוי שלך: מאמר אחד בשבוע ({days}).',
       planRhythmGapLine: 'קצב הפרסום נקבע לפי המנוי שלך ומתחלק בין כל האתרים שלך: באתר הזה מאמר כל {n} ימים.',
       trialRhythmLine: 'בתקופת הניסיון קצב הפרסום קבוע: המאמר הראשון נוצר עם פתיחת החשבון, והבא אחריו שבוע לאחר מכן. אחרי המעבר למנוי, המנוי קובע את הקצב.',
+      shareTitle: 'חלוקת המאמרים בין האתרים שלך',
+      shareLabel: 'מאמרים בחודש לאתר הזה',
+      shareHelp: 'ברירת המחדל היא חלוקה שווה בין כל האתרים הפעילים. אפשר לקבוע כאן מספר לאתר הזה, ושאר האתרים יתחלקו במה שנשאר. נשארו {left} מתוך {total} מאמרים בחודש, ולכל אתר אפשר עד {max}.',
+      shareEven: 'חלוקה שווה',
+      shareSave: 'שמירה',
+      shareSaved: 'החלוקה נשמרה.',
+      shareTooLarge: 'המספר גדול מדי. לאתר הזה אפשר עכשיו עד {max} מאמרים בחודש.',
+      shareInvalid: 'הכניסו מספר שלם מ-1 ומעלה, או השאירו ריק לחלוקה שווה.',
+      shareFailed: 'השמירה לא הצליחה. נסו שוב.',
       noWeekendNote: 'לא מפרסמים בשישי ובשבת.',
       publishDayNote: 'המאמרים יתפרסמו ביום שנבחר, בהרצת האוטומציה היומית.',
       duringDay: '· במהלך היום',
@@ -2303,7 +2312,13 @@ export const dashboardHe = {
       existing: 'כבר יש נושא כזה בתוכנית, אז לא נוצרה כפילות.',
       covered: 'באתר כבר יש תוכן על הנושא הזה, אז לא נוצר נושא נוסף.',
       rejected: 'הרעיון הוסר ולא יוצע שוב.',
-      swapped: 'הנושא הוחלף ברעיון הבא.',
+      swapped: 'הנושא הוחלף ברעיון הבא. הוא עבר לסוף הרשימה ולא נמחק.',
+      // A swap moves the idea to the end of the column, so with more ideas than the
+      // column shows the card leaves the view. Without this line a customer reads
+      // that as "the swap deleted my idea" (owner report, 5 October 2026).
+      swappedNote: (n: number) => (n === 1 ? 'רעיון אחד שהחלפתם עבר לסוף הרשימה. שום דבר לא נמחק.' : `${n} רעיונות שהחלפתם עברו לסוף הרשימה. שום דבר לא נמחק.`),
+      undoSwap: 'החזר אותם',
+      swapUndone: 'הרעיונות חזרו לסדר שלהם.',
       approveError: 'לא הצלחנו לאשר את הרעיון. נסו שוב בעוד רגע.',
       rejectError: 'לא הצלחנו להסיר את הרעיון. נסו שוב בעוד רגע.',
       addKeyword: 'הוסף מילת מפתח',
@@ -3325,6 +3340,18 @@ export const dashboardHe = {
       vsPrevious: 'לעומת 28 הימים הקודמים',
       trendPending: 'המגמה נבנית עם כל סנכרון שבועי',
       trendOf: (label: string) => `${label} לאורך הסנכרונים האחרונים`,
+    },
+    // The download under the performance section: the same 28-day figures as a file.
+    // "של גוגל" is in the note because a reader who takes this for the scan report
+    // would read the gap between the two position numbers as a mistake.
+    exportReport: {
+      label: 'הורדת הדוח',
+      excel: 'Excel',
+      csv: 'CSV',
+      about: 'הקליקים, החשיפות והמיקום הממוצע של 28 הימים האחרונים לפי ביטוי ולפי עמוד, כולל הביטויים שבמעקב.',
+      note: 'המיקום בקובץ הוא הממוצע של גוגל לאורך הטווח, ולא בדיקת המיקום שלנו.',
+      failed: 'לא הצלחנו להוריד את הדוח. נסו שוב.',
+      working: 'מכינים את הקובץ',
     },
     // The Search Console section of the Keywords tab (wave 8), under the keywords table:
     // the searches Google already shows the site for that are not tracked yet.
