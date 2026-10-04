@@ -136,6 +136,18 @@ console.log('\nD) the wiring')
   const improve = (s: string) => /\) : page \? \(/.test(s) && /t\('qa_improve_page'\)/.test(s)
   check('D5: a question a page already answers offers "improve that page" instead of a new article', improve(card))
   check('D6: MUT removing the page branch fails D5', !improve(card.replace(') : page ? (', ') : false ? (')))
+  // The uncovered case is the useful finding, so it is said in words and not left to
+  // be read off a missing line (owner, 5 October 2026).
+  const saysGap = (s: string) => /data-question-no-page=""/.test(s) && /t\('qa_no_page_answers'\)/.test(s)
+  check('D5b: a question no page answers says so, next to "write an article"', saysGap(card))
+  check('D5c: MUT the bare button with no line fails D5b', !saysGap(card.replace("{t('qa_no_page_answers')}", '')))
+  // "Automatic" on this screen means the monthly check and nothing else; the business
+  // profile says where it came from instead.
+  const he = createI18n('he')
+  const profileKeys = ['auto_detect', 'auto_detected', 'manually_set', 'reset_to_auto', 'profile_reset'] as const
+  const oneAuto = profileKeys.every((k) => !/אוטומט/.test(he(k as never)))
+  check('D5d: the business profile never says "automatic" (that word is the monthly check\'s)', oneAuto)
+  check('D5e: the monthly check itself still says it', /אוטומט/.test(he('question_auto_monthly' as never)))
   const route = code('app/api/ai-visibility/question-context/route.ts')
   const fenced = (s: string) => /from\('article_topics'\)[\s\S]{0,160}\.eq\('project_id', projectId\)\s*\.eq\('user_id', userId\)/.test(s) &&
     /from\('generated_articles'\)[\s\S]{0,160}\.eq\('project_id', projectId\)\s*\.eq\('user_id', userId\)/.test(s) && /authContentProject\(/.test(s)
