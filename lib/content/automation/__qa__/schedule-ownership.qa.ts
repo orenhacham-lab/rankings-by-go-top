@@ -80,7 +80,12 @@ async function main() {
   console.log('\nB) what the server tells the screen, and what it accepts back')
   {
     const list = strip(read('app/api/content/automation/pools/route.ts'))
-    check('B1: a paid plan is reported as the plan’s', /if \(rhythm\.plan\) return \{ source: 'plan' as const/.test(list))
+    check('B1: a paid plan is reported as the plan’s', /if \(rhythm\.plan\) \{[\s\S]{0,400}?source: 'plan' as const/.test(list))
+    // A site whose share is below one a week publishes every N days instead of
+    // on weekdays, so the screen is told the interval and an EMPTY weekday list
+    // rather than weekdays the plan does not actually allow.
+    check('B1a: the weekday list is the plan’s own rhythm, and is empty when an interval carries the rate',
+      /weekdays: rhythm\.plan\.perDay \? rhythmWeekdays\([\s\S]{0,40}?\) : \[\]/.test(list) && /intervalDays: rhythm\.plan\.intervalDays/.test(list))
     check('B2: a trial is reported as a trial, not as the owner’s own choice', /if \(rhythm\.trial\) return \{ source: 'trial' as const \}/.test(list))
     check('B3: …and only what is neither falls through to the picker', /return \{ source: 'owner' as const \}/.test(list))
     const patch = strip(read('app/api/content/automation/pools/[id]/route.ts'))

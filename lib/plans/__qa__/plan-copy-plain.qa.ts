@@ -23,6 +23,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MAX_ARTICLES_PER_WEEK_PER_SITE } from '../../content/automation/schedule'
 import { PLAN_CATALOG, PLAN_CODES, TRIAL_CATALOG, type PlanCode } from '../catalog'
 import { planLimitLines, planArticleLine, trialLimitLines, CHECKS_EXPLAINER } from '../features'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
@@ -239,8 +240,19 @@ function main() {
       && n('premium').maxArticlesPerPeriodAccountWide === 50 && n('large_agency').maxArticlesPerPeriodAccountWide === 200
       && n('advanced').maxProjects === 1 && n('premium').maxProjects === 10)
     const f = strip(read('lib/plans/features.ts'))
-    check('E2: the wording module imports nothing but the catalog and the locale type (pure text)',
-      [...f.matchAll(/^import .*$/gm)].every((m) => /from '\.\/catalog'|from '@\/lib\/i18n\/locales'/.test(m[0])))
+    // Pure text, with ONE exception: the per-site weekly ceiling, imported as a
+    // number so the multi-site line cannot promise a rate the scheduler refuses
+    // to publish. Nothing else from the scheduling module may come in.
+    check('E2: the wording module imports nothing but the catalog, the locale type and the per-site ceiling',
+      [...f.matchAll(/^import .*$/gm)].every((m) => /from '\.\/catalog'|from '@\/lib\/i18n\/locales'/.test(m[0])
+        || m[0] === "import { MAX_ARTICLES_PER_WEEK_PER_SITE as PER_SITE } from '@/lib/content/automation/schedule'"),
+      [...f.matchAll(/^import .*$/gm)].map((m) => m[0]).join(' | '))
+    check('E2a: the multi-site line states that ceiling from the constant, never a typed number',
+      MAX_ARTICLES_PER_WEEK_PER_SITE === 5
+      && planLimitLines('premium', 'en').some((l) => l.includes(`up to ${MAX_ARTICLES_PER_WEEK_PER_SITE} a week per website`))
+      && planLimitLines('large_agency', 'he').some((l) => l.includes(`עד ${MAX_ARTICLES_PER_WEEK_PER_SITE} בשבוע לכל אתר`))
+      && !/up to 5 a week per website|עד 5 בשבוע לכל אתר/.test(f),
+      planLimitLines('premium', 'en').join(' | '))
   }
 
   console.log('\nF) the guard itself: the real lines pass, each broken copy fails (so none of the controls above is vacuous)')

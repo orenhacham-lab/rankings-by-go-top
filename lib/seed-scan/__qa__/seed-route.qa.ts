@@ -19,7 +19,7 @@ import { hashClaimToken } from '@/lib/free-check'
 import { consumeClaimToken } from '@/lib/free-check'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { handleSeedGet, handleSeedPost, RESCAN_COOLDOWN_MS, type SeedRouteDeps } from '../http'
+import { DEFAULT_USER_DAILY_CAP, handleSeedGet, handleSeedPost, RESCAN_COOLDOWN_MS, userDailyCap, type SeedRouteDeps } from '../http'
 import { runStageA } from '../runner'
 import { restoreClaimToken } from '../claim'
 import { LEASE_MS, MAX_RESUME_AGE_MS } from '../store'
@@ -63,6 +63,9 @@ type Opts = {
   userHooks?: Record<string, unknown>
   sessionThrows?: boolean
   isAdminThrows?: boolean
+  /** The websites the account may have: the day's cap is never below it. */
+  siteAllowance?: number
+  siteAllowanceThrows?: boolean
 }
 
 /** Two clients over one database, each recording the tables it touched. */
@@ -95,6 +98,10 @@ function setup(o: Opts = {}) {
     isAdmin: async (_admin, userId) => {
       if (o.isAdminThrows) throw new Error(SECRET)
       return (o.admins ?? []).includes(userId)
+    },
+    siteAllowance: async () => {
+      if (o.siteAllowanceThrows) throw new Error(SECRET)
+      return o.siteAllowance ?? 0
     },
     access: async (admin, userId) => {
       accessCalls.push({ admin, userId })
@@ -309,11 +316,16 @@ async function main() {
     check('a FAILED run an hour ago does not hold a retry back', r.status === 202 && r.json.trigger === 'rescan', r.text)
   }
   {
+    // The day's cap counts the WHOLE account, across every project, so until
+    // 4 October 2026 a flat ten meant an account could map only ten of its
+    // websites on the day it added them and every further one answered "you
+    // have reached today's mapping limit" although it had never been mapped.
+    // The cap now never sits below the websites the account may have.
     const mine = Array.from({ length: 10 }, (_, i) => doneRun({ project_id: `p-${i}`, created_at: new Date(NOW.getTime() - (i + 1) * 60_000).toISOString() }))
-    const s = setup({ extra: { project_seed_runs: mine } })
+    const s = setup({ extra: { project_seed_runs: [...mine] } })
     const r = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s.deps))
     const midnight = Date.UTC(2026, 8, 28) - NOW.getTime()
-    check('ten runs today across this user\'s projects → 429 user_daily_cap', r.status === 429 && isStableRefusal(r, 'user_daily_cap'), r.text)
+    check('an account entitled to no website: ten runs today → 429 user_daily_cap', r.status === 429 && isStableRefusal(r, 'user_daily_cap'), r.text)
     check('…retry after UTC midnight', r.json.retryAfterSeconds === midnight / 1000, String(r.json.retryAfterSeconds))
     const s2 = setup({ extra: { project_seed_runs: mine.slice(0, 2) }, env: { SEED_SCAN_USER_DAILY_CAP: '2' } })
     const r2 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s2.deps))
@@ -325,6 +337,48 @@ async function main() {
     const s4 = setup({ extra: { project_seed_runs: yesterday } })
     const r4 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s4.deps))
     check('runs from before UTC midnight do not count', r4.status === 202, r4.text)
+
+    // The bug itself: an agency account mapping its websites one after another.
+    const s5 = setup({ extra: { project_seed_runs: [...mine] }, siteAllowance: 100 })
+    const r5 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s5.deps))
+    check('an account entitled to 100 websites maps its eleventh today → 202, not the daily limit', r5.status === 202, r5.text)
+    const hundred = Array.from({ length: 100 }, (_, i) => doneRun({ project_id: `q-${i}`, created_at: new Date(NOW.getTime() - (i + 1) * 60_000).toISOString() }))
+    const s6 = setup({ extra: { project_seed_runs: [...hundred] }, siteAllowance: 100 })
+    const r6 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s6.deps))
+    check('…and once it has mapped all 100 today, the cap binds again', r6.status === 429 && isStableRefusal(r6, 'user_daily_cap'), r6.text)
+    const s7 = setup({ extra: { project_seed_runs: [...mine] }, siteAllowance: 3 })
+    const r7 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s7.deps))
+    check('an allowance below the configured number never lowers the cap', r7.status === 429 && isStableRefusal(r7, 'user_daily_cap'), r7.text)
+    const s8 = setup({ extra: { project_seed_runs: [...mine] }, siteAllowanceThrows: true })
+    const r8 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s8.deps))
+    check('an unreadable allowance leaves the configured number standing', r8.status === 429 && isStableRefusal(r8, 'user_daily_cap'), r8.text)
+
+    // An admin account is unmetered everywhere else in the product.
+    const s9 = setup({ extra: { project_seed_runs: [...mine] }, admins: [USER] })
+    const r9 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s9.deps))
+    check('an admin account has no cap of its own', r9.status === 202, r9.text)
+    const s10 = setup({ extra: { project_seed_runs: [doneRun({ created_at: new Date(NOW.getTime() - 2 * 3600_000).toISOString() })] }, admins: [USER] })
+    const r10 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s10.deps))
+    check('…but this project\'s own 24h cooldown still binds it', r10.status === 429 && isStableRefusal(r10, 'rescan_too_soon'), r10.text)
+    const s11 = setup({
+      extra: { project_seed_runs: Array.from({ length: 300 }, (_, i) => doneRun({ user_id: `u-${i}`, project_id: `g-${i}`, created_at: new Date(NOW.getTime() - 60_000).toISOString() })) },
+      admins: [USER],
+    })
+    const r11 = await call(handleSeedPost(post({ action: 'start' }), PROJECT, s11.deps))
+    check('…and so does the global daily cap', r11.status === 429 && isStableRefusal(r11, 'global_daily_cap'), r11.text)
+
+    // The rule itself, and the control: the flat number is what used to refuse.
+    check('userDailyCap: the larger of the configured number and the allowance',
+      userDailyCap({ isAdmin: false, siteAllowance: 100, configured: 10 }) === 100
+      && userDailyCap({ isAdmin: false, siteAllowance: 1, configured: 10 }) === 10
+      && userDailyCap({ isAdmin: true, siteAllowance: 1, configured: 10 }) === 'none')
+    check('userDailyCap: a nonsense allowance is read as none at all',
+      userDailyCap({ isAdmin: false, siteAllowance: Number.NaN, configured: 10 }) === 10
+      && userDailyCap({ isAdmin: false, siteAllowance: -5, configured: 10 }) === 10
+      && userDailyCap({ isAdmin: false, siteAllowance: 7.9, configured: 0 }) === 7)
+    const flat = (i: { configured: number }) => i.configured
+    check('CONTROL: the flat cap is what refused the eleventh website of a hundred',
+      flat({ configured: DEFAULT_USER_DAILY_CAP }) <= 10 && (userDailyCap({ isAdmin: false, siteAllowance: 100, configured: DEFAULT_USER_DAILY_CAP }) as number) > 10)
   }
   {
     const everyone = Array.from({ length: 300 }, (_, i) => doneRun({ user_id: `u-${i}`, project_id: `p-${i}`, created_at: new Date(NOW.getTime() - 60_000).toISOString() }))

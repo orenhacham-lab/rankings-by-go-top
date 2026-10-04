@@ -38,6 +38,7 @@ import { addSeedKeywords } from '@/lib/seed-scan/tracking'
 import { explainAccess } from '@/lib/subscription'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getUserEntitlement } from '@/lib/subscription'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -58,6 +59,13 @@ function liveDeps(): SeedRouteDeps {
     },
     admin: () => createAdminClient(),
     isAdmin: (admin, userId) => isAdminUser(admin, userId),
+    siteAllowance: async (admin, userId) => {
+      try {
+        return (await getUserEntitlement(userId, admin)).limits.maxProjects
+      } catch {
+        return 0
+      }
+    },
     access: (admin, userId) => explainAccess(userId, admin),
     consumeClaim: (admin, token, now) => consumeClaimToken(token, admin, now),
     schedule: (task) => after(task),
