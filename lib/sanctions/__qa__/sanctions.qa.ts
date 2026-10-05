@@ -27,14 +27,15 @@ import {
   SANCTIONS_COUNTRY_HEADER, isRestrictedPath, noticeLocaleForPath,
   restrictionForDeclaredCountry, restrictionForRequest, sanctionsNotice,
 } from '../guard'
+import { LOCALE_PREFIX, PUBLIC_LOCALES } from '@/lib/i18n/locales'
 
 let passed = 0
 let failed = 0
 
-function chk(name: string, ok: boolean): void {
+function chk(name: string, ok: boolean, detail?: string): void {
   if (ok) { passed++; return }
   failed++
-  console.error(`FAIL  ${name}`)
+  console.error(`FAIL  ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
 /** Source with comments stripped, per the repo convention: a promise in a comment is not an implementation. */
@@ -84,25 +85,54 @@ chk('C9 CONTROL: a three-letter code is not accepted as alpha-2', normalizeCount
 // ───────────────────────────────────────────────────────────────────────────
 // D. What a refused person is told: no country, no law, no provider error.
 // ───────────────────────────────────────────────────────────────────────────
-const notices = [sanctionsNotice('he'), sanctionsNotice('en'), sanctionsNotice('es')]
-chk('D1 every published language has its own notice', new Set(notices).size === 3)
+const notices = PUBLIC_LOCALES.map((locale) => sanctionsNotice(locale))
+chk('D1 every published language has its own notice, and none repeats another',
+  new Set(notices).size === PUBLIC_LOCALES.length, `${new Set(notices).size} distinct of ${PUBLIC_LOCALES.length}`)
 chk('D2 an unknown language still gets a notice', sanctionsNotice('fr').length > 0)
 for (const n of notices) {
   chk('D3 the notice names no country', !/Iran|Iraq|Syria|Lebanon|Cuba|Korea|איראן|עיראק|סוריה|לבנון/i.test(n))
   chk('D4 the notice names no statute or sanctions programme', !/Ordinance|OFAC|sanction|פקודת|סנקצ/i.test(n))
-  chk('D5 the notice offers a way to reach a person', /contact|escríbanos|לכתוב לנו/i.test(n))
+  chk('D5 the notice offers a way to reach a person', /contact|escríbanos|escreva para nós|לכתוב לנו/i.test(n))
 }
-chk('D6 the pages where a dealing starts are the restricted ones',
-  isRestrictedPath('/signup') && isRestrictedPath('/en/signup') && isRestrictedPath('/es/signup')
-  && isRestrictedPath('/billing') && isRestrictedPath('/free-check'))
+/*
+ * D6 reads the language list rather than naming languages, because naming them
+ * is what went wrong. On 5 October 2026 /pt-BR went live while the restricted
+ * prefixes still said he, en and es, so `/pt-BR/signup` — the one page where
+ * email signup can be refused at all, since it calls supabase.auth.signUp from
+ * the browser — was open to a visitor from a restricted country. The guard that
+ * stood here named the same three languages, so it passed throughout.
+ */
+for (const locale of PUBLIC_LOCALES) {
+  const prefix = LOCALE_PREFIX[locale]
+  chk(`D6 ${locale}: signup is restricted`, isRestrictedPath(`${prefix}/signup`), `${prefix}/signup`)
+  chk(`D6 ${locale}: the free check is restricted`, isRestrictedPath(`${prefix}/free-check`), `${prefix}/free-check`)
+  chk(`D6 ${locale}: login is NOT restricted`, !isRestrictedPath(`${prefix}/login`), `${prefix}/login`)
+}
+chk('D6 billing is restricted whatever the language', isRestrictedPath('/billing'))
 // Signing in to an account that already exists is not a new dealing, and
 // browsing the public site is not one either. Blocking them buys no legal
 // protection and locks out customers who travel, so it must not happen.
 chk('D7 login and the public site are NOT blocked',
   !isRestrictedPath('/login') && !isRestrictedPath('/') && !isRestrictedPath('/pricing') && !isRestrictedPath('/terms'))
 chk('D8 a path that merely starts with the same letters is not blocked', !isRestrictedPath('/signup-help'))
-chk('D9 the notice language follows the path', noticeLocaleForPath('/en/signup') === 'en'
-  && noticeLocaleForPath('/es/signup') === 'es' && noticeLocaleForPath('/signup') === 'he')
+for (const locale of PUBLIC_LOCALES) {
+  chk(`D9 ${locale}: the notice language follows the path`,
+    noticeLocaleForPath(`${LOCALE_PREFIX[locale]}/signup`) === locale,
+    `${LOCALE_PREFIX[locale]}/signup → ${noticeLocaleForPath(`${LOCALE_PREFIX[locale]}/signup`)}`)
+}
+chk('D9 a path under no language prefix is answered in Hebrew', noticeLocaleForPath('/signup') === 'he')
+// Mutation controls for the two rules above: both are derived from the language
+// list, so the thing to prove is that dropping a language from the derivation
+// really does fail. Simulated here rather than by editing the source, because
+// the source builds the list in one expression.
+const handWritten = ['/signup', '/en/signup', '/es/signup', '/free-check', '/en/free-check', '/es/free-check', '/billing']
+const handWrittenRestricted = (pathname: string) => handWritten.some((q) => pathname === q || pathname.startsWith(`${q}/`))
+chk('D10 mutation control: the hand-written list leaves a published language open',
+  PUBLIC_LOCALES.some((locale) => !handWrittenRestricted(`${LOCALE_PREFIX[locale]}/signup`)))
+const handWrittenLocale = (pathname: string) =>
+  pathname === '/en' || pathname.startsWith('/en/') ? 'en' : pathname === '/es' || pathname.startsWith('/es/') ? 'es' : 'he'
+chk('D11 mutation control: the hand-written language read answers Hebrew to a published language',
+  PUBLIC_LOCALES.some((locale) => handWrittenLocale(`${LOCALE_PREFIX[locale]}/signup`) !== locale))
 
 // ───────────────────────────────────────────────────────────────────────────
 // E. The hooks exist. One per path where an account or a payment can start.
