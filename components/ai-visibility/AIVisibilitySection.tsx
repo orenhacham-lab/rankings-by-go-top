@@ -1911,6 +1911,7 @@ export default function AIVisibilitySection({
 
       {/* TAB BAR */}
       <div
+        data-ai-tablist=""
         role="tablist"
         aria-label={t('ai_visibility')}
         className="-mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0"
@@ -2075,7 +2076,7 @@ export default function AIVisibilitySection({
 
       {/* TAB: INSIGHTS & RECOMMENDATIONS — strategic sections only */}
       {currentTab === 'insights' && (
-        <>
+        <div data-ai-insights="" className="space-y-6">
           {/* AI VISIBILITY SUMMARY — high-level snapshot + recommended action */}
           {globalMetrics && (
             <AIVisibilitySummarySection
@@ -2110,7 +2111,7 @@ export default function AIVisibilitySection({
             t={t}
             isRTL={isHebrew}
           />
-        </>
+        </div>
       )}
 
       {/* TAB 2: AI QUERIES */}
@@ -2155,12 +2156,12 @@ export default function AIVisibilitySection({
                 button that opens the same questions in a window only confused. */}
             <div className={allPrompts.length > 0 ? 'grid grid-cols-2 gap-2 sm:flex' : 'grid grid-cols-1 gap-2 sm:flex'}>
               {allPrompts.length > 0 && (
-                <Button variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
+                <Button data-ai-recommend="" variant="secondary" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }}>
                   <Sparkles aria-hidden="true" className="size-4" />
                   {t('recommend_questions')}
                 </Button>
               )}
-              <Button onClick={() => setShowNewPrompt(true)}>
+              <Button data-ai-new-query="" onClick={() => setShowNewPrompt(true)}>
                 <Plus aria-hidden="true" className="size-4" />
                 {t('new_query')}
               </Button>
@@ -2637,7 +2638,7 @@ export default function AIVisibilitySection({
 
       {/* TAB 3: COMPETITORS */}
       {currentTab === 'competitors' && (
-        <>
+        <div data-ai-competitors-panel="" className="space-y-6">
           {/* Competitors are added and removed in settings once the page passes a slot (W6d). */}
           {competitorsSlot ?? (
           <CompetitorsPanel
@@ -2647,7 +2648,7 @@ export default function AIVisibilitySection({
           />
           )}
           <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
-        </>
+        </div>
       )}
 
       {/* RESULT DETAIL DRAWER */}

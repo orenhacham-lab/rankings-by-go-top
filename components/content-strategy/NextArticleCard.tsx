@@ -224,6 +224,7 @@ export default function NextArticleCard({
   const busy = ideaActs ? ideaActs.act.actions.busy[ideaActs.idea.key] : undefined
 
   return (
+    <div data-next-article>
     <Card tone="ink" className="p-5 md:p-8" >
       <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] md:gap-8">
         {/* The date tile: when it goes live, or that it is not queued yet. */}
@@ -327,5 +328,6 @@ export default function NextArticleCard({
         </div>
       </div>
     </Card>
+    </div>
   )
 }

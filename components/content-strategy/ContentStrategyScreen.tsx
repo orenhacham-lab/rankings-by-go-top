@@ -385,7 +385,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
               primary button and it is here in both views. It took the place of "swap",
               which only reordered the ideas (owner's call, 5 October 2026). */}
             {automationEnabled && !!board && !planEmpty && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
-            <ViewSwitch view={view} onChange={setView} dict={dict} />
+            <div data-strategy-views="" className="inline-flex"><ViewSwitch view={view} onChange={setView} dict={dict} /></div>
           </div>
         </div>
 

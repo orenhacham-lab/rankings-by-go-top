@@ -1040,7 +1040,7 @@ function KeywordResearchScreen() {
       <div hidden={scanMode && !formOpen ? true : undefined} className="mb-8 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
         <form onSubmit={submitResearch} className="space-y-4">
           {/* Research type: one segmented control; the form still carries its value by name. */}
-          <div className="flex flex-col gap-1.5">
+          <div data-research-type="" className="flex flex-col gap-1.5">
             <span id="research-type-label" className={FIELD_LABEL_CLASSES}>{t.form.researchType}</span>
             <input type="hidden" name="researchType" value={researchType} />
             <Segmented

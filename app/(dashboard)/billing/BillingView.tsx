@@ -195,6 +195,7 @@ export default function BillingView({
       ) : (
         <>
           {hasActiveSubscription && (
+            <div data-billing-manage="">
             <Card className="mb-8">
               <h2 className="mb-3 text-section font-semibold text-ink">{t.manage.title}</h2>
               {renewalCancelled ? (
@@ -222,6 +223,7 @@ export default function BillingView({
                 </Notice>
               )}
             </Card>
+            </div>
           )}
 
           {/* w17 — one quiet line: which currency applies, and why. No switcher. */}

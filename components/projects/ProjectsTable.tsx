@@ -71,6 +71,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
       <div className="relative mb-4 w-full max-w-sm">
         <Search aria-hidden className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted" />
         <input
+          data-projects-search=""
           type="search"
           placeholder={dict.projects.searchPlaceholder}
           aria-label={dict.projects.searchPlaceholder}
@@ -83,6 +84,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
       {/* PRIORITY COLUMNS: a phone shows the project (its domain under the name),
           its status and the actions; client, cadence and last check return as the
           screen widens. The domain has its own column from md up. */}
+      <div data-projects-table="">
       <Table>
         <TableHead>
           <tr className="max-sm:[&>th]:px-2.5">
@@ -153,13 +155,14 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
                 <ActiveBadge active={project.is_active} />
               </Td>
               <Td className="w-12">
-                <RowMenu label={dict.projects.table.moreActions(project.name)} items={menu} />
+                <div data-project-row-menu="" className="inline-flex"><RowMenu label={dict.projects.table.moreActions(project.name)} items={menu} /></div>
               </Td>
             </TableRow>
             )
           })}
         </TableBody>
       </Table>
+      </div>
 
       {editingProject && (
         <Modal

@@ -73,7 +73,7 @@ export default function SettingsIndex({ items, title }: { items: { id: string; l
 
   const position = active ? items.findIndex((i) => i.id === active) : -1
   return (
-    <nav aria-label={title} className="rounded-card border border-line bg-surface/80 p-3 shadow-card backdrop-blur-sm">
+    <nav data-settings-index="" aria-label={title} className="rounded-card border border-line bg-surface/80 p-3 shadow-card backdrop-blur-sm">
       <div className="flex items-center justify-between gap-2 px-2 pb-2.5 pt-1">
         <p className="text-caption font-semibold text-ink">{title}</p>
         {position >= 0 && (
