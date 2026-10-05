@@ -42,6 +42,8 @@ export const chromePtBR: DeepPartial<DashboardDictionary> = {
     errorLogs: 'Registro de erros',
     support: 'Suporte pelo WhatsApp',
     supportAria: 'Suporte pelo WhatsApp (abre em uma nova janela)',
+    accessibility: 'Declaração de acessibilidade',
+    accessibilityAria: 'Nossa declaração de acessibilidade (abre em uma nova janela)',
     logout: 'Sair',
     navLabel: 'Navegação principal',
     skipToContent: 'Ir para o conteúdo',

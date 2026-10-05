@@ -28,6 +28,8 @@ export const dashboardEn = {
     errorLogs: 'Error Logs',
     support: 'WhatsApp support',
     supportAria: 'WhatsApp support (opens in a new window)',
+    accessibility: 'Accessibility statement',
+    accessibilityAria: 'Our accessibility statement (opens in a new window)',
     logout: 'Log out',
     navLabel: 'Main navigation',
     skipToContent: 'Skip to content',

@@ -50,6 +50,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     errorLogs: 'Registro de errores',
     support: 'Soporte por WhatsApp',
     supportAria: 'Soporte por WhatsApp (se abre en una ventana nueva)',
+    accessibility: 'Declaración de accesibilidad',
+    accessibilityAria: 'Nuestra declaración de accesibilidad (se abre en una ventana nueva)',
     logout: 'Cerrar sesión',
     navLabel: 'Navegación principal',
     skipToContent: 'Ir al contenido',
