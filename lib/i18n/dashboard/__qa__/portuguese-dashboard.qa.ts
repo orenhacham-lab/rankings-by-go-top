@@ -133,8 +133,28 @@ check('4c: the auth pages take the PORTUGUESE landing copy, not the Hebrew one',
   /locale === 'pt-BR' \? landingPtBR/.test(src('components/auth/AuthShell.tsx')))
 check('4d: the 451 notice does not answer Hebrew to a Portuguese visitor',
   !HEBREW.test(sanctionsNotice('pt-BR')))
-check('4e: the free check reads pt-BR as itself instead of falling through to Hebrew',
-  /v === 'pt-BR'/.test(src('lib/presignup/http.ts')))
+/*
+ * 4e used to assert the literal `v === 'pt-BR'` in that file. That is the
+ * defect this whole wave is about: the read it pinned was a hand-written list
+ * of languages, and a guard that quotes such a list freezes it instead of
+ * catching it — it was green on the morning /pt-BR shipped with pt-BR absent
+ * from the list one line up. What is asserted now is the deferral to the one
+ * language list, with a mutation control for each of the two shapes that went
+ * wrong. The behaviour itself — a pt-BR report request storing the PORTUGUESE
+ * consent sentence under its own version id — is proved end to end, through a
+ * real research and report, in lib/presignup/__qa__/presignup-research.qa.ts,
+ * for every public locale rather than for pt-BR alone.
+ */
+const freeCheckRead = (c: string) =>
+  /const readPublicLocale = \(v: unknown\): PublicLocale => normalizePublicLocale\(v\) \?\? 'he'/.test(c)
+  && !/readPublicLocale = [^\n]*v === '/.test(c)
+const freeCheckSrc = src('lib/presignup/http.ts')
+check('4e: the free check reads its language from the one list, so pt-BR is never Hebrew',
+  freeCheckRead(freeCheckSrc))
+check('4e mutation: a two-language read fails the guard',
+  !freeCheckRead(freeCheckSrc.replace("normalizePublicLocale(v) ?? 'he'", "v === 'en' ? 'en' : 'he'")))
+check('4e mutation: a hand-written list that happens to include pt-BR fails it too',
+  !freeCheckRead(freeCheckSrc.replace("normalizePublicLocale(v) ?? 'he'", "v === 'en' || v === 'es' || v === 'pt-BR' ? v : 'he'")))
 const tPt = createI18n('pt-BR'), tEs = createI18n('es')
 check('4f: the AI-visibility strings answer Portuguese',
   !HEBREW.test(tPt('ai_visibility')) && tPt('ai_visibility') !== tEs('ai_visibility'))

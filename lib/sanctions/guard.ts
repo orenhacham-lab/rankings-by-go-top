@@ -32,6 +32,7 @@
  */
 
 import { normalizeCountry } from '@/lib/billing/market'
+import { LOCALE_PREFIX, PUBLIC_LOCALES, normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
 import { countryRestriction, type CountryRestriction, type RestrictionReason } from './countries'
 
 export type { CountryRestriction, RestrictionReason }
@@ -84,19 +85,26 @@ export function restrictionForDeclaredCountry(value: unknown): CountryRestrictio
  * given a way to reach a human, which is all they can act on. The detail goes
  * to our own logs, where it is useful and where it cannot be mined.
  */
-const NOTICE: Record<'he' | 'en' | 'es', string> = {
+const NOTICE: Record<PublicLocale, string> = {
   he: 'השירות אינו זמין במדינה שממנה בוצעה הפנייה, מטעמי ציות לדין. אם לדעתך מדובר בטעות, אפשר לכתוב לנו.',
   en: 'The service is not available in the country this request came from, for legal compliance reasons. If you believe this is a mistake, please contact us.',
   es: 'El servicio no está disponible en el país desde el que se realizó esta solicitud, por motivos de cumplimiento legal. Si cree que es un error, escríbanos.',
+  'pt-BR': 'O serviço não está disponível no país de onde esta solicitação foi feita, por motivos de conformidade legal. Se você acredita que isso é um erro, escreva para nós.',
 }
 
+/**
+ * Typed `Record<PublicLocale, …>` on purpose: a new language cannot be added to
+ * the site without the compiler asking for this sentence too. The read below
+ * goes through `normalizePublicLocale` for the same reason — a hand-written
+ * list of languages here was how /pt-BR visitors were shown Hebrew.
+ *
+ * So the `?? 'he'` is not a language fallback — there is no such thing here,
+ * because an unwritten language cannot compile. It is what a value that is not
+ * a public locale at all gets, and the site's own default language is the right
+ * answer to that.
+ */
 export function sanctionsNotice(locale: unknown): string {
-  // Any public language this notice has not been written in yet reads ENGLISH,
-  // not Hebrew: a Brazilian visitor was being shown the Hebrew sentence in a
-  // left-to-right page. The Portuguese wording is the legal thread's to write.
-  if (locale === 'he') return NOTICE.he
-  if (locale === 'es') return NOTICE.es
-  return NOTICE.en
+  return NOTICE[normalizePublicLocale(locale) ?? 'he']
 }
 
 /**
@@ -118,17 +126,40 @@ export function sanctionsNotice(locale: unknown): string {
  *
  * `/login` is deliberately absent: see the note at the top of this file.
  */
-const RESTRICTED_PATH_PREFIXES = ['/signup', '/en/signup', '/es/signup', '/free-check', '/en/free-check', '/es/free-check', '/billing'] as const
+/*
+ * DERIVED FROM THE LANGUAGE LIST, never written out by hand.
+ *
+ * It used to be written out, and on 5 October 2026 /pt-BR went live with
+ * `/pt-BR/signup` missing from it. That page is the one the comment above calls
+ * the only place email signup can be refused at all, because it calls
+ * `supabase.auth.signUp` from the browser — so for as long as it was missing, a
+ * visitor from a restricted country could create an account through the
+ * Portuguese signup page and nothing in our code would have seen the attempt.
+ *
+ * So the prefixes are built from PUBLIC_LOCALES: a fifth language is covered
+ * the day it joins that list.
+ */
+const RESTRICTED_LOCALE_PATHS = ['/signup', '/free-check'] as const
+
+const RESTRICTED_PATH_PREFIXES: readonly string[] = [
+  ...PUBLIC_LOCALES.flatMap((locale) => RESTRICTED_LOCALE_PATHS.map((path) => `${LOCALE_PREFIX[locale]}${path}`)),
+  '/billing',
+]
 
 export function isRestrictedPath(pathname: string): boolean {
   return RESTRICTED_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
-/** The language to answer a refused page in, from the path alone (no cookie, no session). */
-export function noticeLocaleForPath(pathname: string): 'he' | 'en' | 'es' {
-  if (pathname === '/en' || pathname.startsWith('/en/')) return 'en'
-  if (pathname === '/es' || pathname.startsWith('/es/')) return 'es'
-  return 'he'
+/**
+ * The language to answer a refused page in, from the path alone (no cookie, no
+ * session). Read off LOCALE_PREFIX rather than listed, so it cannot fall behind
+ * the languages the site actually serves; Hebrew is the bare root, so it is the
+ * answer when no prefix matches.
+ */
+export function noticeLocaleForPath(pathname: string): PublicLocale {
+  const match = PUBLIC_LOCALES.filter((locale) => LOCALE_PREFIX[locale] !== '')
+    .find((locale) => pathname === LOCALE_PREFIX[locale] || pathname.startsWith(`${LOCALE_PREFIX[locale]}/`))
+  return match ?? 'he'
 }
 
 /**

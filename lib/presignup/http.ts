@@ -28,7 +28,7 @@
  * Logs carry ids and stable codes only: no address, no site, no provider text.
  */
 import { hashClaimToken, isWellFormedClaimToken, normalizeCheckUrl, domainKey, type FreeCheckResult } from '@/lib/free-check'
-import { toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/locales'
+import { normalizePublicLocale, toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/locales'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { admitResearch, finishResearchRun } from './gate'
 import type { AnonymousResearch } from './run'
@@ -85,8 +85,20 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
  * stored as the Hebrew sentence under the Hebrew version id — a record of
  * words they were never shown. Found 3 October 2026, the evening /es was
  * published.
+ *
+ * It was then fixed by adding 'es' to the list by hand, and so it broke again
+ * the moment /pt-BR went live on 5 October 2026: a Brazilian visitor's consent
+ * was stored as the Hebrew sentence under 'report-email-v2'. A consent record
+ * is the proof that a specific person agreed to specific words, so a record in
+ * a language the person was never shown proves nothing (GDPR Art. 7(2) and
+ * 12(1) want the request intelligible to them; LGPD arts. 8-9 and the
+ * Brazilian Consumer Code's art. 31 want it in Portuguese).
+ *
+ * So the list is gone. This defers to `normalizePublicLocale`, which reads
+ * PUBLIC_LOCALES and was itself made to do that after the same mistake, so a
+ * fifth language needs no edit here.
  */
-const readPublicLocale = (v: unknown): PublicLocale => (v === 'en' || v === 'es' || v === 'pt-BR' ? v : 'he')
+const readPublicLocale = (v: unknown): PublicLocale => normalizePublicLocale(v) ?? 'he'
 
 /**
  * The language the research itself is written in, and the one the ledger row

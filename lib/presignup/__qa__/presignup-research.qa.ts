@@ -21,6 +21,7 @@ import { issueClaimToken } from '@/lib/free-check/claim'
 import { recordRun } from '@/lib/free-check/store'
 import { googleRedirectTo, googleSignInEnabled, googleSignInVisible } from '@/lib/auth/google-signin'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
+import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 import { handleSeedPost, type SeedRouteDeps } from '@/lib/seed-scan/http'
 import { runStageA } from '@/lib/seed-scan/runner'
 import { MAX_ACTIVE_COMPETITORS } from '@/lib/seed-scan/settings'
@@ -384,12 +385,43 @@ async function main() {
       check('a Spanish research hands back a claim token', false, 'no token')
     }
 
+    /*
+     * EVERY public language, not the ones someone remembered to list.
+     *
+     * This block exists because the hand-written list was wrong twice. It
+     * answered `he` to anything but 'en' until /es went live, was fixed by
+     * adding 'es', and so was wrong again within hours of /pt-BR going live on
+     * 5 October 2026: a Brazilian visitor's consent was stored as the HEBREW
+     * sentence under report-email-v2. The guard that stood here pinned that
+     * hand-written list by regex, so it froze the bug instead of catching it.
+     *
+     * So the check is now behavioural and derived from PUBLIC_LOCALES: a fifth
+     * language is covered the day it is added to that list, with no edit here.
+     */
+    for (const locale of PUBLIC_LOCALES.filter((l) => l !== 'he')) {
+      const site = setup()
+      const tok = resultOf(await call(handleResearchPost(researchReq({ url: HE_WP.target, locale }, `client-${locale}`), site.deps)))?.claimToken ?? ''
+      if (!tok) { check(`a ${locale} research hands back a claim token`, false, 'no token'); continue }
+      await call(handleReportRequest(reportReq({ token: tok, email: 'owner@site.example', consent: true, locale }), site.deps))
+      const row = (site.tables[REPORT_REQUESTS_TABLE] ?? [])[0] ?? {}
+      check(`a ${locale} consent is stored in ${locale}, with that language's own version id`,
+        row.consent_text === consentRecord(locale, false),
+        String(row.consent_text).slice(0, 70))
+      check(`…and a ${locale} consent is never the Hebrew sentence`, row.consent_text !== consentRecord('he', false))
+    }
+
     const httpSrc = code(read('lib/presignup/http.ts'))
-    const esGuard = (c: string) => /const readPublicLocale = \(v: unknown\): PublicLocale => \(v === 'en' \|\| v === 'es' \|\| v === 'pt-BR' \? v : 'he'\)/.test(c)
+    // The source side of the same rule: the reader must defer to the one list
+    // and must not carry locale literals of its own, which is how it went wrong
+    // both times.
+    const localeGuard = (c: string) => /const readPublicLocale = \(v: unknown\): PublicLocale => normalizePublicLocale\(v\) \?\? 'he'/.test(c)
       && /const readLocale = \(v: unknown\): Locale => toBilingualLocale\(readPublicLocale\(v\)\)/.test(c)
-    check('source: the page\'s language is read as a PUBLIC locale and narrowed for the ledger', esGuard(httpSrc))
-    check('mutation control: the old two-language read fails the guard',
-      !esGuard(httpSrc.replace("v === 'en' || v === 'es' || v === 'pt-BR' ? v : 'he'", "v === 'en' ? 'en' : 'he'")))
+      && !/readPublicLocale = [^\n]*v === '(en|es|pt-BR)'/.test(c)
+    check('source: the page\'s language is read from PUBLIC_LOCALES and narrowed for the ledger', localeGuard(httpSrc))
+    check('mutation control: the two-language read fails the guard',
+      !localeGuard(httpSrc.replace("normalizePublicLocale(v) ?? 'he'", "v === 'en' ? 'en' : 'he'")))
+    check('mutation control: a hand-written list of languages fails the guard',
+      !localeGuard(httpSrc.replace("normalizePublicLocale(v) ?? 'he'", "v === 'en' || v === 'es' ? v : 'he'")))
 
     const src = code(read('lib/presignup/http.ts'))
     const consentGuard = (c: string) => /if \(body\.consent !== true\) return answer\(400, \{ ok: false, code: 'consent_required' \}\)/.test(c) && /consent_text: consentRecord\(publicLocale, marketing\)/.test(c)
