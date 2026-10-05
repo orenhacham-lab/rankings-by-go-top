@@ -3326,6 +3326,8 @@ export const dashboardEn = {
       label: 'Download the report',
       excel: 'Excel',
       csv: 'CSV',
+      summary: 'Two-page summary',
+      summaryAbout: 'The short version: your four headline figures, the queries you rank for just off the first page, and your best pages.',
       about: 'The last 28 days of clicks, impressions and average position, per query and per page, with your tracked keywords.',
       note: 'The position in the file is Google’s average over the window, not our own rank check.',
       failed: 'We could not download the report. Please try again.',

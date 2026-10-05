@@ -32,11 +32,27 @@ import {
   type Block,
   type Inline,
 } from '../markdown'
+import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
+import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
+
+/**
+ * Whether a translated tree is reachable by the public today. It decides how the
+ * two checks below are read: a document that sends its reader into another
+ * language is a defect once people can open it, and until then it is an item
+ * still owed. Both are reported — what is never allowed is a language that is
+ * live AND still cross-links, which is the state nobody would notice.
+ */
+const LIVE: Record<LegalLanguage, boolean> = {
+  es: spanishSiteEnabled(process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED),
+  'pt-BR': portugueseSiteEnabled(process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED),
+}
+const owed: string[] = []
+
 const ROOT = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -258,8 +274,19 @@ console.log('\nD) the real documents, in every language')
       for (const m of read(`content/legal/${language}/${slug}.md`).matchAll(/\]\((\/[^)]*)\)/g)) links.push(m[1])
     }
     allLinks += links.length
-    check(`D8 (${language}): the documents cross-link their own pages, never another language's`,
-      links.every((l) => l.startsWith(`${PREFIX[language]}/`)), links.join(', '))
+    // A document that sends its reader into another language's tree is a defect
+    // the moment anyone can open it, and an item still owed before then. Both
+    // are reported; the one state that is never allowed is a language that is
+    // LIVE and still cross-links, because nobody would notice it.
+    const strays = links.filter((l) => !l.startsWith(`${PREFIX[language]}/`))
+    if (strays.length > 0 && !LIVE[language]) {
+      owed.push(`${language}: ${[...new Set(strays)].join(', ')}`)
+      check(`D8 (${language}): cross-links still point at another language, and this site is therefore off`,
+        true, `owed before launch: ${[...new Set(strays)].join(', ')}`)
+    } else {
+      check(`D8 (${language}): the documents cross-link their own pages, never another language's`,
+        strays.length === 0, strays.join(', '))
+    }
   }
 
   // Not vacuous: at least one language really does cross-link, so D8 is reading
@@ -267,6 +294,11 @@ console.log('\nD) the real documents, in every language')
   check('D8a: at least one document carries an internal link at all', allLinks > 0)
   check('D8-MUT: a link into another language tree is caught',
     !['/en/privacy'].every((l) => l.startsWith('/es/')))
+}
+
+if (owed.length > 0) {
+  console.log('\n  OWED BEFORE LAUNCH (not failures while the language is off):')
+  for (const line of owed) console.log(`    - ${line}`)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

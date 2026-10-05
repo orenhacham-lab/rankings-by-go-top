@@ -14,19 +14,22 @@
  *
  * The answers are stable codes, never provider text:
  *   404 gsc_disabled      Search Console is off on this server
+ *   502 pdf_unavailable   the PDF provider refused or is not configured
  *   400 invalid_window / invalid_format
  *   409 no_sync           nothing has been synced for this window yet
  *   500 export_read_failed
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import { gscExportLabels } from './labels'
+import { gscExportLabels, gscPdfLabels } from './labels'
 import { gscExportFileName, gscExportSheets, toCsv, type GscExportInput } from './sheets'
+import { generateGscSummaryHTML, gscSummaryFileName } from './pdf-summary'
+import { normalizeExportLanguage } from '@/lib/export/i18n'
 import { keywordAverages, type KeywordTarget, type QueryPositionRow } from '@/lib/gsc/tab-metrics'
 
 /** A run stores at most 50,000 rows; the read is bounded by the same number. */
 export const MAX_EXPORT_ROWS = 50_000
 const FETCH_CHUNK = 1_000
-export const EXPORT_FORMATS = ['xlsx', 'csv'] as const
+export const EXPORT_FORMATS = ['xlsx', 'csv', 'pdf'] as const
 export type ExportFormat = (typeof EXPORT_FORMATS)[number]
 
 export interface GscExportRun {
@@ -52,6 +55,14 @@ export interface GscExportDeps {
   latestRun: (admin: ServiceRoleClient, projectId: string, windowDays: number) => Promise<GscExportRun | null>
   /** Turns the report's rows into the bytes of a workbook. */
   workbook: (sheets: ReturnType<typeof gscExportSheets>) => Promise<Uint8Array>
+  /**
+   * HTML to PDF bytes, or null when the provider refuses or is not configured.
+   * Injected so the summary can be rendered and read in a QA suite without
+   * leaving the process.
+   */
+  pdf: (html: string) => Promise<ArrayBuffer | null>
+  /** The moment printed on the summary, injected so a test can fix it. */
+  now: () => Date
   windows: readonly number[]
 }
 
@@ -164,7 +175,11 @@ export async function handleGscExport(request: Request, deps: GscExportDeps): Pr
   }
 
   const sheets = gscExportSheets(input)
-  const fileName = gscExportFileName(run.window_days, run.end_date, format)
+  // The summary names itself differently, so the name is settled per format
+  // rather than once: gscExportFileName only knows the two spreadsheets.
+  const fileName = format === 'pdf'
+    ? gscSummaryFileName(run.window_days, run.end_date)
+    : gscExportFileName(run.window_days, run.end_date, format)
   const headers: Record<string, string> = {
     'content-disposition': `attachment; filename="${fileName}"`,
     'cache-control': 'no-store',
@@ -177,6 +192,21 @@ export async function handleGscExport(request: Request, deps: GscExportDeps): Pr
     // The BOM is what makes Excel read it as UTF-8; without it Hebrew arrives as
     // mojibake on a Windows machine.
     return new Response(`\uFEFF${body}`, { headers: { ...headers, 'content-type': 'text/csv; charset=utf-8' } })
+  }
+
+  if (format === 'pdf') {
+    // The two-page summary, from the same input the workbook is built from.
+    const html = generateGscSummaryHTML({
+      ...input,
+      pdf: gscPdfLabels(url.searchParams.get('language')),
+      language: normalizeExportLanguage(url.searchParams.get('language')),
+      generatedAt: deps.now().toISOString().slice(0, 10),
+    })
+    const pdfBytes = await deps.pdf(html)
+    // A provider that refuses is not the customer's fault and not their problem:
+    // a stable code, never the provider's text.
+    if (!pdfBytes) return refuse(502, 'pdf_unavailable')
+    return new Response(pdfBytes, { headers: { ...headers, 'content-type': 'application/pdf' } })
   }
 
   let bytes: Uint8Array

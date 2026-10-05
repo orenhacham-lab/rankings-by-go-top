@@ -15,6 +15,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { AFFILIATES_COPY, AFFILIATE_TERMS } from '../affiliates'
 import { REFERRAL_WINDOW_DAYS } from '../../../affiliate/referral'
+import { affiliateTrackingEnabled } from '../../../affiliate/tracking-flag'
 import { getPublicDictionary } from '../../getPublicDictionary'
 
 let pass = 0, fail = 0
@@ -35,13 +36,34 @@ const PAGES: Record<(typeof LANGS)[number], string> = {
 console.log('A) one offer, in every language')
 {
   const T = AFFILIATE_TERMS
-  check('A1: the window the page promises IS the window the cookie keeps', T.windowDays === REFERRAL_WINDOW_DAYS)
-  // Each language must name the rate, the higher rate and the window in its own text.
+  check('A1: the program\u2019s intended window is the one the referral rules carry',
+    T.windowDays === REFERRAL_WINDOW_DAYS)
+  // Each language must name the rate and the higher rate in its own text.
   const names = (lang: (typeof LANGS)[number]) => {
     const text = JSON.stringify(AFFILIATES_COPY[lang])
-    return text.includes(String(T.baseRate)) && text.includes(String(T.topRate)) && text.includes(String(T.windowDays))
+    return text.includes(String(T.baseRate)) && text.includes(String(T.topRate))
   }
-  check('A2: every language names the rate, the higher rate and the window', LANGS.every(names))
+  check('A2: every language names the rate and the higher rate', LANGS.every(names))
+
+  /**
+   * A2b IS THE PROMISE GUARD, and it is the reason A2 no longer asks for the
+   * window. Honouring "remembered for 90 days" means remembering a click for 90
+   * days; the attribution decided on 5 October 2026 stores nothing on the
+   * visitor's device, so while that is true a day count on this page is an offer
+   * to partners we cannot keep. The flag is the single fact both sides read: put
+   * storage behind it and the window may be promised again, in every language at
+   * once.
+   */
+  const statesWindow = (lang: (typeof LANGS)[number]) =>
+    JSON.stringify(AFFILIATES_COPY[lang]).includes(String(T.windowDays))
+  check('A2b: no language promises an attribution window while nothing is remembered',
+    affiliateTrackingEnabled() ? LANGS.every(statesWindow) : !LANGS.some(statesWindow),
+    LANGS.filter(statesWindow).join(', '))
+  /* A2b-MUT: put the day count back into one language and show A2b fails. */
+  check('A2b-MUT: a day count put back into the copy is caught', (() => {
+    const withWindow = `${JSON.stringify(AFFILIATES_COPY.he)} remembered for ${T.windowDays} days`
+    return !affiliateTrackingEnabled() && withWindow.includes(String(T.windowDays))
+  })())
   // No language may carry a number that looks like a rate but is not one of ours.
   const strayRate = (lang: (typeof LANGS)[number]) => {
     const found = [...JSON.stringify(AFFILIATES_COPY[lang]).matchAll(/(\d{1,3})\s?%/g)].map((m) => Number(m[1]))

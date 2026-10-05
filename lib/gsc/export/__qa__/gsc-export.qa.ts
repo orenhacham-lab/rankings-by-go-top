@@ -19,6 +19,11 @@ import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { gscExportLabels } from '../labels'
 import { ctrPercent, gscExportFileName, gscExportSheets, keywordsSheet, onePlace, pagesSheet, summarySheet, toCsv, type ExportSheet, type GscExportInput } from '../sheets'
 import { handleGscExport, type GscExportDeps, type GscExportRun } from '../http'
+import { gscPdfLabels } from '../labels'
+import {
+  MIN_IMPRESSIONS, OPPORTUNITY_MAX_POSITION, OPPORTUNITY_MIN_POSITION,
+  generateGscSummaryHTML, gscSummaryFileName, opportunities, rollUp, topPages, topQueries,
+} from '../pdf-summary'
 import { safeSheetName, sheetsToXlsx } from '../workbook'
 
 let passed = 0
@@ -172,6 +177,8 @@ function deps(over: Partial<GscExportDeps> = {}, admin = world()): GscExportDeps
     auth: async () => ({ ok: true as const, admin: admin as never, projectId: 'p1', userId: 'u1' }),
     latestRun: async () => RUN,
     workbook: async (sheets) => new TextEncoder().encode(JSON.stringify(sheets.map((s) => s.rows.length))),
+    pdf: async (html) => new TextEncoder().encode(html).buffer as ArrayBuffer,
+    now: () => new Date('2026-10-05T00:00:00.000Z'),
     ...over,
   }
 }
@@ -188,7 +195,7 @@ async function routeChecks() {
   const badWindow = await handleGscExport(url('&window=7'), deps())
   eq('C3 a window we never synced is refused', [badWindow.status, (await badWindow.json()).error], [400, 'invalid_window'])
 
-  const badFormat = await handleGscExport(url('&format=pdf'), deps())
+  const badFormat = await handleGscExport(url('&format=docx'), deps())
   eq('C4 a format we do not write is refused', [badFormat.status, (await badFormat.json()).error], [400, 'invalid_format'])
 
   const noRun = await handleGscExport(url(), deps({ latestRun: async () => null }))
@@ -208,6 +215,24 @@ async function routeChecks() {
     xlsx.headers.get('cache-control'),
   ], [200, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'attachment; filename="search-console-28d-2026-10-04.xlsx"', 'no-store'])
   eq('C9 all four sheets are written', JSON.parse(new TextDecoder().decode(new Uint8Array(await xlsx.arrayBuffer()))).length, 4)
+
+
+  const pdf = await handleGscExport(url('&format=pdf'), deps())
+  eq('C16 the summary comes back as a PDF, as an attachment, uncached', [
+    pdf.status,
+    pdf.headers.get('content-type'),
+    pdf.headers.get('content-disposition'),
+    pdf.headers.get('cache-control'),
+  ], [200, 'application/pdf', 'attachment; filename="search-console-summary-28d-2026-10-04.pdf"', 'no-store'])
+  {
+    const body = new TextDecoder().decode(new Uint8Array(await pdf.arrayBuffer()))
+    check('C17 the summary carries this project’s own rows and no other customer’s',
+      body.includes('נעליים') && !body.includes('סודי') && !body.includes('other.com'))
+  }
+
+  const noProvider = await handleGscExport(url('&format=pdf'), deps({ pdf: async () => null }))
+  eq('C18 a PDF provider that refuses is a stable code, never its own message',
+    [noProvider.status, (await noProvider.json()).error], [502, 'pdf_unavailable'])
 
   const csv = await handleGscExport(url('&format=csv'), deps())
   const body = await csv.text()
@@ -281,6 +306,144 @@ check('F5 the three dashboard languages all carry the words of the download', ((
 
 /* F-MUT: hide the refusal and show F2 fails. */
 check('F-MUT a control that swallows a refusal is caught', !COMPONENT.replace('setFailed(true)', '').includes('setFailed(true)'))
+
+
+/* ------------------------------------------- G. the two-page summary (PDF) */
+
+const PDF = strip(read('lib/gsc/export/pdf-summary.ts'))
+
+// A property with a long tail: one row below the floor, one on the first page,
+// one far from it, and two real chances.
+function summaryInput(over: Partial<GscExportInput> = {}) {
+  const rows: GscExportInput['rows'] = [
+    { query: 'chance a', page: 'https://example.com/a', clicks: 10, impressions: 400, ctr: 0.025, position: 6.4 },
+    { query: 'chance a', page: 'https://example.com/b', clicks: 2, impressions: 100, ctr: 0.02, position: 11.0 },
+    { query: 'chance b', page: 'https://example.com/b', clicks: 1, impressions: 120, ctr: 0.008, position: 14.2 },
+    { query: 'already first', page: 'https://example.com/a', clicks: 90, impressions: 300, ctr: 0.3, position: 2.1 },
+    { query: 'far away', page: 'https://example.com/c', clicks: 0, impressions: 200, ctr: 0, position: 44.0 },
+    { query: 'noise', page: 'https://example.com/d', clicks: 0, impressions: 3, ctr: 0, position: 7.0 },
+  ]
+  return {
+    ...input({ rows, ...over }),
+    pdf: gscPdfLabels('he'),
+    language: 'he' as const,
+    generatedAt: '2026-10-05',
+  }
+}
+
+const sQueries = rollUp(summaryInput().rows, 'query')
+const sPages = rollUp(summaryInput().rows, 'page')
+
+{
+  const a = sQueries.find((q) => q.key === 'chance a')!
+  eq('G1 a query is rolled up across its pages: clicks and impressions sum', [a.clicks, a.impressions], [12, 500])
+  // (6.4*400 + 11.0*100) / 500 = 7.32
+  check('G2 the rolled-up position is weighted by impressions, not averaged', Math.abs((a.position ?? 0) - 7.32) < 1e-9, a.position)
+  check('G3 the rolled-up CTR is recomputed from the two sums', Math.abs((a.ctr ?? 0) - 12 / 500) < 1e-12, a.ctr)
+}
+
+// The page roll-up must agree with the spreadsheet's own, or the two downloads
+// disagree about the same page.
+{
+  const sheet = pagesSheet(input({ rows: summaryInput().rows }))
+  const fromSheet = new Map(sheet.rows.slice(1).map((r) => [String(r[0]), [r[1], r[2], r[3], r[4]]]))
+  const mine = sPages.map((p) => [p.key, [p.clicks, p.impressions, ctrPercent(p.ctr), onePlace(p.position)]] as const)
+  check('G4 the summary and the spreadsheet agree on every page', mine.every(([key, vals]) =>
+    JSON.stringify(fromSheet.get(key)) === JSON.stringify(vals)), mine)
+}
+
+{
+  const chances = opportunities(sQueries)
+  eq('G5 only the queries close to the first page are called chances, most searched first',
+    chances.map((c) => c.key), ['chance a', 'chance b'])
+  check('G6 a query already on the first page is not a chance', !chances.some((c) => c.key === 'already first'))
+  check('G7 a query far from the first page is not a chance', !chances.some((c) => c.key === 'far away'))
+  check('G8 a row Google reported a handful of times is left out of every table',
+    !chances.some((c) => c.key === 'noise')
+    && !topQueries(sQueries).some((q) => q.key === 'noise')
+    && !topPages(sPages).some((p) => p.key === 'https://example.com/d'))
+}
+
+/* G-MUT (behaviour): with the floor at zero the noisy row WOULD appear, which is
+ * what proves the floor is doing the excluding rather than the sort order. */
+check('G-MUT1 the floor is what excludes the noise',
+  rollUp(summaryInput().rows, 'query').some((q) => q.key === 'noise' && q.impressions < MIN_IMPRESSIONS))
+
+{
+  const html = generateGscSummaryHTML(summaryInput())
+  const P = gscPdfLabels('he')
+  check('G9 the page states the filter it applied, with both numbers',
+    html.includes(esc0(P.filterNote(MIN_IMPRESSIONS, OPPORTUNITY_MIN_POSITION, OPPORTUNITY_MAX_POSITION))))
+  check('G10 the headline figures are Google’s own property totals, not sums of the rows',
+    html.includes('4,000') || html.includes('4000'), html.slice(0, 0))
+  check('G11 it is two pages: one break, not one per section',
+    (html.match(/page-two/g) ?? []).length === 2)
+  check('G12 the summary carries the sentence that keeps it apart from our rank check',
+    html.includes(esc0(labels.positionNote)))
+  check('G13 a query is printed left to right even on a Hebrew page, so a URL stays readable',
+    /<td dir="ltr" class="text">/.test(html))
+  check('G14 the document declares the reader’s own language and direction',
+    html.includes('<html dir="rtl" lang="he">'))
+}
+
+/* A query carrying HTML is text from outside the product. */
+{
+  const html = generateGscSummaryHTML(summaryInput({
+    rows: [{ query: '<script>alert(1)</script>', page: 'https://example.com/a', clicks: 1, impressions: 50, ctr: 0.02, position: 8 }],
+  }))
+  check('G15 a query that carries HTML is escaped, never rendered',
+    html.includes('&lt;script&gt;') && !html.includes('<script>alert'))
+}
+
+/* G-MUT2: the same page with the escaping taken out — the predicate G15 uses
+ * must fail on it, or G15 would pass on an unescaped page too. */
+check('G-MUT2 an unescaped query would be caught', (() => {
+  const raw = '<script>alert(1)</script>'
+  const unescaped = generateGscSummaryHTML(summaryInput({
+    rows: [{ query: raw, page: 'https://example.com/a', clicks: 1, impressions: 50, ctr: 0.02, position: 8 }],
+  })).replace('&lt;script&gt;alert(1)&lt;/script&gt;', raw)
+  const guard = (html: string) => html.includes('&lt;script&gt;') && !html.includes('<script>alert')
+  return !guard(unescaped)
+})())
+
+{
+  const empty = generateGscSummaryHTML(summaryInput({ rows: [], keywords: [] }))
+  const P = gscPdfLabels('he')
+  check('G16 a property with nothing above the floor says so, rather than printing empty tables',
+    empty.includes(esc0(P.nothingBody(MIN_IMPRESSIONS))) && !empty.includes('<table>'))
+}
+
+eq('G17 the file names itself, in ASCII, so no browser renames it',
+  gscSummaryFileName(28, '2026-10-04'), 'search-console-summary-28d-2026-10-04.pdf')
+check('G18 a run with no end date still produces an openable name',
+  /^search-console-summary-28d-latest\.pdf$/.test(gscSummaryFileName(28, null)))
+
+check('G19 all four languages carry the summary’s own words', (() => {
+  const langs = ['he', 'en', 'es', 'pt-BR'] as const
+  return langs.every((l) => {
+    const L = gscPdfLabels(l)
+    return L.title.length > 0 && L.opportunitiesTitle.length > 0 && L.filterNote(10, 4, 20).includes('10')
+  })
+})())
+check('G20 no language was left reading the English summary by accident', (() => {
+  const en = gscPdfLabels('en')
+  return (['he', 'es', 'pt-BR'] as const).every((l) => gscPdfLabels(l).opportunitiesTitle !== en.opportunitiesTitle)
+})())
+
+check('G21 the PDF provider is injected, so this feature never calls it directly',
+  !PDF.includes('pdfshift') && !HTTP.includes('pdfshift') && ROUTE.includes('renderPdfFromHtml'))
+check('G22 the summary is built from the same input as the workbook',
+  PDF.includes("from './sheets'") && HTTP.includes('generateGscSummaryHTML'))
+check('G23 the control offers the summary and asks for it in the reader’s language',
+  COMPONENT.includes("download('pdf')") && /language=\$\{encodeURIComponent\(uiLocale\)\}/.test(COMPONENT))
+
+/* The words the page prints are escaped the same way the page escapes them, so a
+ * label with an apostrophe does not fail a guard for the wrong reason. */
+function esc0(text: string): string {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
 
 routeChecks().then(() => {
   console.log(`${passed} passed, ${failed} failed`)

@@ -1,7 +1,8 @@
 /**
- * GET /api/gsc/export?projectId=...&window=28|90&format=xlsx|csv&language=he|en|es
+ * GET /api/gsc/export?projectId=...&window=28|90&format=xlsx|csv|pdf&language=he|en|es|pt-BR
  *
- * The Search Console positions report as a downloadable file. Read-only over the
+ * The Search Console positions report as a downloadable file: the full
+ * spreadsheet (xlsx, csv) or the two-page summary (pdf). Read-only over the
  * latest succeeded sync of the window — the same rows the screens show, in a
  * file. The live rank report's export (lib/export/*) is not touched by this: see
  * lib/gsc/export/sheets.ts for why the two reports stay apart.
@@ -16,6 +17,7 @@ import { latestSucceededRun } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
 import { handleGscExport, type GscExportRun } from '@/lib/gsc/export/http'
 import { sheetsToXlsx } from '@/lib/gsc/export/workbook'
+import { renderPdfFromHtml } from '@/lib/export/pdfshift'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,5 +36,7 @@ export async function GET(request: Request) {
       return (run ?? null) as GscExportRun | null
     },
     workbook: async (sheets) => sheetsToXlsx(sheets),
+    pdf: renderPdfFromHtml,
+    now: () => new Date(),
   })
 }

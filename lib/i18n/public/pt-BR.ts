@@ -67,6 +67,7 @@ export const ptBR = {
     privacy: 'Política de privacidade',
     terms: 'Termos de uso',
     refundPolicy: 'Política de cancelamento e reembolso',
+    affiliateTerms: 'Contrato do Programa de Parceiros',
     accessibility: 'Acessibilidade',
     contact: 'Contato',
     copyright: '© 2026 Go Top SEO. Todos os direitos reservados.',

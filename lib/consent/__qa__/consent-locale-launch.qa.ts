@@ -65,11 +65,11 @@ console.log('A) the code knows every public language')
 console.log('\nB) the database is read from the migrations, not assumed')
 {
   check('B1: the CHECK is found at all', ALLOWED.size > 0, [...ALLOWED].join(' '))
-  check('B2: it allows the three languages that are live today',
-    ['he', 'en', 'es'].every((l) => ALLOWED.has(l)), [...ALLOWED].join(' '))
+  check('B2: it allows every language the public site can serve',
+    PUBLIC_LOCALES.every((l) => ALLOWED.has(l)), [...ALLOWED].join(' '))
   const fake = "CONSTRAINT consent_events_locale CHECK (locale IN ('he','en'))"
-  check('B2-MUT: a constraint missing a live language fails B2',
-    !['he', 'en', 'es'].every((l) => new Set([...fake.matchAll(/'([^']+)'/g)].map((m) => m[1])).has(l)))
+  check('B2-MUT: a constraint missing a public language fails B2',
+    !PUBLIC_LOCALES.every((l) => new Set([...fake.matchAll(/'([^']+)'/g)].map((m) => m[1])).has(l)))
 }
 
 console.log('\nC) the launch order')
@@ -79,15 +79,23 @@ console.log('\nC) the launch order')
   const live = unstorable.filter((l) => (GATE[l] ?? (() => true))())
   check('C1: no public language is live while the consent log would refuse its rows',
     live.length === 0, `live but unstorable: ${live.join(' ')}`)
-  check('C2: pt-BR is exactly that case today, and its site is off',
-    !ALLOWED.has('pt-BR') ? !portugueseSiteEnabled(process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED) : true)
+  // Until 5 October 2026 pt-BR was exactly the case C1 guards: in the code and
+  // refused by the log. The widening (20261005050636) cleared it, so what C2
+  // asserts now is that the prerequisite is MET — and C1-MUT below puts it back
+  // to prove C1 still reads the constraint rather than a constant.
+  check('C2: the Portuguese launch prerequisite is met — the log can store its rows',
+    ALLOWED.has('pt-BR'), [...ALLOWED].join(' '))
   check('C3: the gate is a real gate — "true" and nothing else turns it on',
     portugueseSiteEnabled('true') && !portugueseSiteEnabled('TRUE') && !portugueseSiteEnabled(undefined) && !portugueseSiteEnabled(''))
   // The same rule with pt-BR's gate replaced by one that is always on: the rule
   // must then report it as live, proving C1 is reading the gate and not a constant.
+  // The same rule against a constraint that does NOT list pt-BR, with its gate
+  // forced on: C1 must then report it, which proves C1 reads both the migration
+  // and the gate rather than passing because everything happens to be fine.
+  const narrowed = new Set(['he', 'en', 'es'])
   const alwaysOn: Partial<Record<PublicLocale, () => boolean>> = { ...GATE, 'pt-BR': () => true }
-  check('C1-MUT: a gate that is always on fails C1',
-    PUBLIC_LOCALES.filter((l) => !ALLOWED.has(l)).filter((l) => (alwaysOn[l] ?? (() => true))()).length > 0)
+  check('C1-MUT: a language live while the log would refuse it fails C1',
+    PUBLIC_LOCALES.filter((l) => !narrowed.has(l)).filter((l) => (alwaysOn[l] ?? (() => true))()).length > 0)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

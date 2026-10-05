@@ -15,11 +15,12 @@ import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { LOCALE_CONFIG, LOCALE_PREFIX, INTL_LOCALE } from '@/lib/i18n/locales'
 
 /** The breadcrumb and footer say the same thing, so both read one dictionary. */
-const CRUMB_KEY: Record<LegalSlug, 'terms' | 'privacy' | 'refundPolicy' | 'accessibility'> = {
+const CRUMB_KEY: Record<LegalSlug, 'terms' | 'privacy' | 'refundPolicy' | 'accessibility' | 'affiliateTerms'> = {
   terms: 'terms',
   privacy: 'privacy',
   'refund-policy': 'refundPolicy',
   accessibility: 'accessibility',
+  'affiliate-terms': 'affiliateTerms',
 }
 
 /** "Last updated", in the language's own words and its own date order. */

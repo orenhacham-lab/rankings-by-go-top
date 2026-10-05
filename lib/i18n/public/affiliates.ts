@@ -21,7 +21,16 @@ export const AFFILIATE_TERMS = {
   /** The higher rate, from this many active paying referrals onwards. */
   topRate: 40,
   topRateFrom: 10,
-  /** Last-click attribution window, the same number the cookie uses. */
+  /**
+   * The program's INTENDED last-click window, and the number the referral rules
+   * in lib/affiliate/referral.ts carry. It is deliberately NOT promised on the
+   * page: honouring a window means remembering a click for that long, and the
+   * attribution decided on 5 October 2026 stores nothing on the visitor's
+   * device at all (lib/affiliate/tracking-flag.ts). A page that promised 90
+   * days while nothing is remembered would be an offer to partners we could not
+   * keep, which is why __qa__/affiliates-page.qa.ts fails if any language puts a
+   * day count back into the copy while there is no storage to support it.
+   */
   windowDays: REFERRAL_WINDOW_DAYS,
   /** Paid once the balance passes this, 30 days after the customer's payment settles. */
   minPayoutUsd: 100,
@@ -59,12 +68,12 @@ const T = AFFILIATE_TERMS
 export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
   he: {
     metaTitle: 'תוכנית שותפים | Go Top SEO',
-    metaDescription: `הרוויחו ${T.baseRate}% מכל תשלום, כל עוד הלקוח ממשיך, ועד ${T.topRate}% משותפים ותיקים. חלון ייחוס ${T.windowDays} יום. תוכנית השותפים של Go Top SEO.`,
+    metaDescription: `הרוויחו ${T.baseRate}% מכל תשלום, כל עוד הלקוח ממשיך, ועד ${T.topRate}% משותפים ותיקים. תוכנית השותפים של Go Top SEO.`,
     eyebrow: 'תוכנית שותפים',
     title: 'ממליצים עלינו ממילא?',
     accent: `קבלו ${T.baseRate}% מכל תשלום`,
     subtitle: `על כל לקוח שמגיע דרככם אתם מקבלים ${T.baseRate}% מכל תשלום שלו, לא רק מהראשון, וכל עוד הוא לקוח. שותף עם ${T.topRateFrom} לקוחות משלמים פעילים עובר ל-${T.topRate}%.`,
-    trust: [`${T.baseRate}% מכל תשלום`, `עד ${T.topRate}%`, `חלון ${T.windowDays} יום`],
+    trust: [`${T.baseRate}% מכל תשלום`, `עד ${T.topRate}%`, 'עמלה חוזרת כל חודש'],
     apply: 'להגשת מועמדות',
     talk: 'לדבר איתנו בוואטסאפ',
     whatsappMessage: 'היי, אני רוצה להצטרף לתוכנית השותפים',
@@ -78,7 +87,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     howTitle: 'איך זה עובד',
     how: [
       { title: 'מגישים מועמדות', body: 'מספרים לנו מי אתם ואיפה הקהל שלכם, אתר, רשימה, ערוץ או לקוחות. אנחנו עוברים על כל בקשה ידנית ומאשרים.' },
-      { title: 'מקבלים קישור אישי', body: `הקישור שלכם עובד על כל עמוד באתר. מי שלוחץ עליו נזכר אצלנו ${T.windowDays} יום, גם אם נרשם רק שבועיים אחר כך.` },
+      { title: 'מקבלים קישור אישי', body: 'הקישור שלכם עובד על כל עמוד באתר. כל מי שנרשם דרכו נרשם עליכם.' },
       { title: 'מקבלים כסף', body: `העמלה נצברת על כל תשלום. היא משתחררת ${T.holdDays} יום אחרי שהתשלום של הלקוח התיישב, ומשולמת כשהיתרה עוברת ${T.minPayoutIls} שקל או ${T.minPayoutUsd} דולר.` },
     ],
     rulesTitle: 'הכללים, בלי אותיות קטנות',
@@ -95,7 +104,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     faq: [
       { q: 'מתי מקבלים את הכסף?', a: `העמלה נצברת מיד, משתחררת ${T.holdDays} יום אחרי שהתשלום של הלקוח התיישב, כדי שחלון הביטול יעבור, ומשולמת כשהיתרה עוברת ${T.minPayoutIls} שקל או ${T.minPayoutUsd} דולר. התשלום בפייפאל, ב-Wise או בהעברה בנקאית, מה שנוח לכם.` },
       { q: 'מה קורה אם הלקוח התחיל בניסיון?', a: 'הניסיון הוא שבעה ימים ואין עליו עמלה, כי אין תשלום. ברגע שהוא הופך ללקוח משלם, העמלה מתחילה לרוץ מהתשלום הראשון.' },
-      { q: 'כמה זמן הקישור נזכר?', a: `${T.windowDays} יום, לפי הקליק האחרון. אם מישהו לחץ על הקישור שלכם ונרשם חודשיים אחר כך, הוא עדיין שלכם.` },
+      { q: 'איך יודעים שהלקוח הגיע דרכי?', a: 'לפי הקליק האחרון על הקישור שלכם בדרך להרשמה. כל בקשה וכל עמלה עוברות אצלנו בדיקה של אדם, כך שאם מקרה מסוים לא ברור אנחנו בודקים אותו ולא מפילים אותו עליכם. אם נרחיב את הייחוס גם לקליק שחוזר אחרי כמה שבועות, נעדכן את השותפים בכתב לפני.' },
       { q: 'אני כבר לקוח. אפשר לקבל עמלה על עצמי?', a: 'לא. הקישור מצטרף רק לחשבון חדש, והחשבון שלכם והפרויקטים שלכם מוחרגים. אבל אתם בהחלט יכולים להמליץ לאחרים ולקבל על זה.' },
       { q: 'יש מינימום לקוחות?', a: `אין. הכסף משולם כשהיתרה עוברת ${T.minPayoutIls} שקל, ועד אז הוא פשוט ממשיך להיצבר.` },
     ],
@@ -104,12 +113,12 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
   },
   en: {
     metaTitle: 'Affiliate program | Go Top SEO',
-    metaDescription: `Earn ${T.baseRate}% of every payment for as long as the customer stays, and up to ${T.topRate}% once you bring ${T.topRateFrom}. A ${T.windowDays}-day attribution window. The Go Top SEO affiliate program.`,
+    metaDescription: `Earn ${T.baseRate}% of every payment for as long as the customer stays, and up to ${T.topRate}% once you bring ${T.topRateFrom}. The Go Top SEO affiliate program.`,
     eyebrow: 'Affiliate program',
     title: 'Already recommending us?',
     accent: `Take ${T.baseRate}% of every payment`,
     subtitle: `For every customer who comes through you, you earn ${T.baseRate}% of every payment they make, not just the first, for as long as they stay. Bring ${T.topRateFrom} active paying customers and you move to ${T.topRate}%.`,
-    trust: [`${T.baseRate}% of every payment`, `Up to ${T.topRate}%`, `${T.windowDays}-day window`],
+    trust: [`${T.baseRate}% of every payment`, `Up to ${T.topRate}%`, 'Recurring every month'],
     apply: 'Apply to join',
     talk: 'Talk to us on WhatsApp',
     whatsappMessage: 'Hi, I would like to join the affiliate program',
@@ -123,7 +132,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     howTitle: 'How it works',
     how: [
       { title: 'Apply', body: 'Tell us who you are and where your audience is: a site, a list, a channel or your own clients. We read every application ourselves and approve it.' },
-      { title: 'Get your link', body: `Your link works on every page of the site. Anyone who clicks it is remembered for ${T.windowDays} days, even if they sign up a fortnight later.` },
+      { title: 'Get your link', body: 'Your link works on every page of the site. Anyone who signs up through it is credited to you.' },
       { title: 'Get paid', body: `Commission builds on every payment. It is released ${T.holdDays} days after the customer's payment settles, and paid once your balance passes $${T.minPayoutUsd} or ₪${T.minPayoutIls}.` },
     ],
     rulesTitle: 'The rules, with no small print',
@@ -140,7 +149,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     faq: [
       { q: 'When do I get paid?', a: `Commission builds immediately, is released ${T.holdDays} days after the customer's payment settles so the refund window has passed, and is paid once your balance passes $${T.minPayoutUsd} or ₪${T.minPayoutIls}. By PayPal, Wise or bank transfer, whichever suits you.` },
       { q: 'What if the customer is on the trial?', a: 'The trial is seven days and earns nothing, because nothing is paid. The moment they become a paying customer, commission starts from their first payment.' },
-      { q: 'How long is the link remembered?', a: `${T.windowDays} days, on last click. If someone clicks your link and signs up two months later, they are still yours.` },
+      { q: 'How do you know the customer came through me?', a: 'By the last click on your link on the way to signing up. Every application and every commission is reviewed by a person, so a case that is not clear cut gets looked at rather than going against you. If we extend crediting to a click that comes back weeks later, partners will be told in writing first.' },
       { q: 'I am already a customer. Can I earn on myself?', a: 'No. A link attaches to a new account only, and your own account and projects are excluded. You can certainly recommend us to others and earn on that.' },
       { q: 'Is there a minimum number of customers?', a: `None. You are paid once your balance passes $${T.minPayoutUsd}, and until then it simply keeps building.` },
     ],
@@ -149,12 +158,12 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
   },
   es: {
     metaTitle: 'Programa de afiliados | Go Top SEO',
-    metaDescription: `Gana el ${T.baseRate}% de cada pago mientras el cliente siga, y hasta el ${T.topRate}% cuando traigas ${T.topRateFrom}. Ventana de atribución de ${T.windowDays} días. Programa de afiliados de Go Top SEO.`,
+    metaDescription: `Gana el ${T.baseRate}% de cada pago mientras el cliente siga, y hasta el ${T.topRate}% cuando traigas ${T.topRateFrom}. Programa de afiliados de Go Top SEO.`,
     eyebrow: 'Programa de afiliados',
     title: '¿Ya nos recomiendas?',
     accent: `Llévate el ${T.baseRate}% de cada pago`,
     subtitle: `Por cada cliente que llegue a través de ti ganas el ${T.baseRate}% de cada pago que haga, no solo del primero, mientras siga con nosotros. Con ${T.topRateFrom} clientes activos que pagan, pasas al ${T.topRate}%.`,
-    trust: [`${T.baseRate}% de cada pago`, `Hasta el ${T.topRate}%`, `Ventana de ${T.windowDays} días`],
+    trust: [`${T.baseRate}% de cada pago`, `Hasta el ${T.topRate}%`, 'Recurrente cada mes'],
     apply: 'Solicitar unirme',
     talk: 'Hablar por WhatsApp',
     whatsappMessage: 'Hola, quiero unirme al programa de afiliados',
@@ -168,7 +177,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     howTitle: 'Cómo funciona',
     how: [
       { title: 'Solicítalo', body: 'Cuéntanos quién eres y dónde está tu público: una web, una lista, un canal o tus propios clientes. Leemos cada solicitud a mano y la aprobamos.' },
-      { title: 'Recibe tu enlace', body: `Tu enlace funciona en cualquier página de la web. Quien haga clic se recuerda durante ${T.windowDays} días, aunque se registre dos semanas después.` },
+      { title: 'Recibe tu enlace', body: 'Tu enlace funciona en cualquier página de la web. Quien se registre a través de él se te atribuye.' },
       { title: 'Cobra', body: `La comisión se acumula con cada pago. Se libera ${T.holdDays} días después de que el pago del cliente quede firme y se abona cuando tu saldo supera los ${T.minPayoutUsd} $.` },
     ],
     rulesTitle: 'Las reglas, sin letra pequeña',
@@ -185,7 +194,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     faq: [
       { q: '¿Cuándo cobro?', a: `La comisión se acumula al momento, se libera ${T.holdDays} días después de que el pago del cliente quede firme para que pase la ventana de reembolso, y se abona cuando tu saldo supera los ${T.minPayoutUsd} $. Por PayPal, Wise o transferencia bancaria, lo que prefieras.` },
       { q: '¿Y si el cliente está en la prueba gratuita?', a: 'La prueba dura siete días y no genera comisión, porque no hay pago. En cuanto pasa a ser cliente de pago, la comisión empieza desde su primer pago.' },
-      { q: '¿Cuánto se recuerda el enlace?', a: `${T.windowDays} días, por último clic. Si alguien pulsa tu enlace y se registra dos meses después, sigue siendo tuyo.` },
+      { q: '¿Cómo sabéis que el cliente vino por mí?', a: 'Por el último clic en tu enlace de camino al registro. Cada solicitud y cada comisión las revisa una persona, así que un caso que no esté claro se mira en lugar de ir en tu contra. Si ampliamos la atribución a un clic que vuelve semanas después, se avisará a los socios por escrito antes.' },
       { q: 'Ya soy cliente. ¿Puedo cobrar por mí mismo?', a: 'No. Un enlace solo se asocia a una cuenta nueva, y tu cuenta y tus proyectos quedan excluidos. Lo que sí puedes es recomendarnos a otros y cobrar por ello.' },
       { q: '¿Hay un mínimo de clientes?', a: `Ninguno. Cobras cuando tu saldo supera los ${T.minPayoutUsd} $, y hasta entonces simplemente sigue acumulándose.` },
     ],
@@ -194,12 +203,12 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
   },
   'pt-BR': {
     metaTitle: 'Programa de afiliados | Go Top SEO',
-    metaDescription: `Ganhe ${T.baseRate}% de cada pagamento enquanto o cliente continuar, e até ${T.topRate}% quando você trouxer ${T.topRateFrom}. Janela de atribuição de ${T.windowDays} dias. Programa de afiliados da Go Top SEO.`,
+    metaDescription: `Ganhe ${T.baseRate}% de cada pagamento enquanto o cliente continuar, e até ${T.topRate}% quando você trouxer ${T.topRateFrom}. Programa de afiliados da Go Top SEO.`,
     eyebrow: 'Programa de afiliados',
     title: 'Já indica a gente?',
     accent: `Leve ${T.baseRate}% de cada pagamento`,
     subtitle: `Para cada cliente que chega por você, você ganha ${T.baseRate}% de cada pagamento que ele faz, não só do primeiro, enquanto ele continuar com a gente. Com ${T.topRateFrom} clientes pagantes ativos, você passa para ${T.topRate}%.`,
-    trust: [`${T.baseRate}% de cada pagamento`, `Até ${T.topRate}%`, `Janela de ${T.windowDays} dias`],
+    trust: [`${T.baseRate}% de cada pagamento`, `Até ${T.topRate}%`, 'Recorrente todo mês'],
     apply: 'Quero me candidatar',
     talk: 'Falar no WhatsApp',
     whatsappMessage: 'Olá, quero entrar no programa de afiliados',
@@ -213,7 +222,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     howTitle: 'Como funciona',
     how: [
       { title: 'Candidate-se', body: 'Conte quem você é e onde está o seu público: um site, uma lista, um canal ou os seus próprios clientes. Lemos cada candidatura à mão e aprovamos.' },
-      { title: 'Receba seu link', body: `Seu link funciona em qualquer página do site. Quem clicar é lembrado por ${T.windowDays} dias, mesmo que se cadastre duas semanas depois.` },
+      { title: 'Receba seu link', body: 'Seu link funciona em qualquer página do site. Quem se cadastrar por ele é creditado a você.' },
       { title: 'Receba o pagamento', body: `A comissão acumula a cada pagamento. Ela é liberada ${T.holdDays} dias depois de o pagamento do cliente ficar firme e é paga quando seu saldo passa de ${T.minPayoutUsd} dólares.` },
     ],
     rulesTitle: 'As regras, sem letras miúdas',
@@ -230,7 +239,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     faq: [
       { q: 'Quando eu recebo?', a: `A comissão acumula na hora, é liberada ${T.holdDays} dias depois de o pagamento do cliente ficar firme, para a janela de reembolso passar, e é paga quando seu saldo passa de ${T.minPayoutUsd} dólares. Por PayPal, Wise ou transferência bancária, como você preferir.` },
       { q: 'E se o cliente estiver no teste gratuito?', a: 'O teste dura sete dias e não gera comissão, porque não há pagamento. Assim que ele passa a ser cliente pagante, a comissão começa no primeiro pagamento dele.' },
-      { q: 'Por quanto tempo o link é lembrado?', a: `${T.windowDays} dias, pelo último clique. Se alguém clicar no seu link e se cadastrar dois meses depois, ele continua sendo seu.` },
+      { q: 'Como vocês sabem que o cliente veio por mim?', a: 'Pelo último clique no seu link no caminho do cadastro. Cada inscrição e cada comissão passam pela análise de uma pessoa, então um caso que não esteja claro é verificado em vez de pesar contra você. Se estendermos o crédito para um clique que volta semanas depois, os parceiros serão avisados por escrito antes.' },
       { q: 'Já sou cliente. Posso receber por mim mesmo?', a: 'Não. Um link só se liga a uma conta nova, e a sua própria conta e os seus projetos ficam de fora. O que você pode é indicar a gente para outras pessoas e receber por isso.' },
       { q: 'Existe um mínimo de clientes?', a: `Nenhum. Você recebe quando seu saldo passa de ${T.minPayoutUsd} dólares, e até lá ele simplesmente continua acumulando.` },
     ],

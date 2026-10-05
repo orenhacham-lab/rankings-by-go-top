@@ -50,6 +50,7 @@ export default function PortugueseSitemapPage() {
         { label: 'Termos de uso', href: '/pt-BR/terms' },
         { label: 'Política de cancelamento e reembolso', href: '/pt-BR/refund-policy' },
         { label: 'Acessibilidade', href: '/pt-BR/accessibility' },
+        { label: 'Contrato do Programa de Parceiros', href: '/pt-BR/affiliate-terms' },
       ],
     },
   ]

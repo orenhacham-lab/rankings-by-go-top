@@ -4770,6 +4770,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       label: 'Descargar el informe',
       excel: 'Excel',
       csv: 'CSV',
+      summary: 'Resumen de dos páginas',
+      summaryAbout: 'La versión corta: tus cuatro cifras principales, las consultas por las que apareces justo fuera de la primera página y tus mejores páginas.',
       about: 'Los clics, las impresiones y la posición media de los últimos 28 días, por consulta y por página, con tus palabras clave en seguimiento.',
       note: 'La posición del archivo es la media de Google durante el periodo, no nuestra comprobación de posición.',
       failed: 'No hemos podido descargar el informe. Vuelve a intentarlo.',
