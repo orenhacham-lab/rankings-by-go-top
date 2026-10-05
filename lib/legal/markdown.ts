@@ -182,9 +182,9 @@ export function parseLegalMarkdown(raw: string, where = 'document'): LegalDocume
   return { frontMatter, blocks }
 }
 
-export type LegalSlug = 'terms' | 'privacy' | 'refund-policy' | 'accessibility'
+export type LegalSlug = 'terms' | 'privacy' | 'refund-policy' | 'accessibility' | 'affiliate-terms'
 
-export const LEGAL_SLUGS: readonly LegalSlug[] = ['terms', 'privacy', 'refund-policy', 'accessibility']
+export const LEGAL_SLUGS: readonly LegalSlug[] = ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms']
 
 /**
  * Read one Spanish legal document from the repository.

@@ -64,6 +64,7 @@ export default function SitemapPage() {
         { label: 'מדיניות פרטיות', href: '/privacy' },
         { label: 'תקנון ותנאי שימוש', href: '/terms' },
         { label: 'מדיניות ביטול והחזרים', href: '/refund-policy' },
+        { label: 'תנאי תוכנית השותפים', href: '/affiliate-terms' },
       ],
     },
   ]

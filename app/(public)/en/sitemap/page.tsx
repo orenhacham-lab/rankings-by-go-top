@@ -49,6 +49,7 @@ export default function EnglishSitemapPage() {
         { label: 'Terms of Use', href: '/en/terms' },
         { label: 'Cancellation and Refund Policy', href: '/en/refund-policy' },
         { label: 'Accessibility', href: '/en/accessibility' },
+        { label: 'Partner Program Agreement', href: '/en/affiliate-terms' },
       ],
     },
   ]

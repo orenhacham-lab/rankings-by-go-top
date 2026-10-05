@@ -55,6 +55,7 @@ export const en = {
     privacy: 'Privacy Policy',
     terms: 'Terms of Use',
     refundPolicy: 'Cancellation and Refund Policy',
+    affiliateTerms: 'Partner Program Agreement',
     accessibility: 'Accessibility',
     contact: 'Contact',
     copyright: '© 2026 Go Top SEO. All rights reserved.',
