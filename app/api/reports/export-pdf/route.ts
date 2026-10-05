@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateReportHTML, generateAIReportHTML } from '@/lib/export/pdf'
 import { normalizeExportLanguage } from '@/lib/export/i18n'
+import { reportSiteIcon } from '@/lib/reports/report-site-icon'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 
 export async function POST(req: Request) {
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // The site's icon from the project's own scans (RLS: the caller's own rows), next to its name.
+    const siteIcon = await reportSiteIcon(supabase, projectId, (projectData as Project).target_domain ?? null)
+
     let html: string
 
     if (reportType === 'ai') {
@@ -56,6 +60,7 @@ export async function POST(req: Request) {
         html = generateAIReportHTML({
           client: projectData.clients as Client,
           project: projectData as Project,
+          siteIcon,
           summary: aiReportData.summary,
           results: aiReportData.results || [],
           language,
@@ -115,6 +120,7 @@ export async function POST(req: Request) {
           targets: targetsData as TrackingTarget[],
           latestResults,
           language,
+          siteIcon,
         })
       } catch (htmlError) {
         console.error('[export-pdf] HTML generation failed:', htmlError)

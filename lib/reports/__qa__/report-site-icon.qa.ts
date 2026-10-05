@@ -12,6 +12,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { reportSiteIcon } from '../report-site-icon'
+import { generateReportHTML, generateAIReportHTML } from '@/lib/export/pdf'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -60,6 +61,18 @@ async function main() {
   const helper = strip(readFileSync(join(process.cwd(), 'lib/reports/report-site-icon.ts'), 'utf8'))
   check('C1: the Search Console PDF gets the icon', /siteIcon: await reportSiteIcon\(auth\.admin, auth\.projectId, domain\)/.test(gsc))
   check('C2: the monthly PDF gets the icon', /siteIcon = await reportSiteIcon\(o\.admin, o\.project\.id,/.test(monthly) && /\n\s+siteIcon,\n/.test(monthly))
+  const rankRoute = strip(readFileSync(join(process.cwd(), 'app/api/reports/export-pdf/route.ts'), 'utf8'))
+  check('C4: the rankings and AI reports get the icon of the project being exported',
+    /const siteIcon = await reportSiteIcon\(supabase, projectId,/.test(rankRoute) && (rankRoute.match(/\n\s+siteIcon,\n/g) ?? []).length === 2)
+  const base = { client: { name: 'BUY BUY' }, project: { name: 'BUY BUY', target_domain: 'buy-buy.co.il' } } as any // eslint-disable-line @typescript-eslint/no-explicit-any
+  const rank = generateReportHTML({ ...base, targets: [], latestResults: {}, language: 'he', siteIcon: 'https://buy-buy.co.il/icon.png' })
+  const ai = generateAIReportHTML({ ...base, summary: { totalScans: 0, totalResults: 0, mentionedCount: 0, citedCount: 0, totalCitations: 0, mentionRate: 0, citationRate: 0, engineBreakdown: {} }, results: [], siteIcon: 'https://buy-buy.co.il/icon.png' } as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+  const inName = (html: string) => /<div class="project-name"><img class="site-icon" src="https:\/\/buy-buy\.co\.il\/icon\.png" alt="" width="28" height="28" referrerpolicy="no-referrer">BUY BUY<\/div>/.test(html)
+  check('C5: in the rankings report the icon sits on the brand-name line', inName(rank))
+  check('C6: and in the AI visibility report', inName(ai))
+  check('C7: no icon, no image: the rankings report header is as before',
+    !generateReportHTML({ ...base, targets: [], latestResults: {}, language: 'he' }).includes('<img'))
+  check('MUT C5: a report without the icon is caught', !inName(rank.replace(/<img class="site-icon"[^>]*>/, '')))
   const noFetch = (src: string) => !/\bfetch\(/.test(src)
   check('C3: nothing in the helper fetches the icon', noFetch(helper))
   check('MUT C3: a fetch in the helper is caught', !noFetch(helper + '\nawait fetch(icon)'))
