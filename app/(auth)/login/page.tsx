@@ -92,6 +92,30 @@ const LOGIN_UI = {
       linkInvalid: 'Este enlace de confirmación no es válido o ha caducado. Inicia sesión, o vuelve a registrarte para recibir uno nuevo.',
     },
   },
+  'pt-BR': {
+    subtitle: 'Acompanhamento de posições no Google e visibilidade em IA',
+    logoAlt: 'Logotipo da Go Top SEO',
+    heading: 'Entrar',
+    emailLabel: 'E-mail',
+    emailPlaceholder: 'voce@exemplo.com',
+    passwordLabel: 'Senha',
+    passwordPlaceholder: '••••••••',
+    loginBtn: 'Entrar',
+    forgotPassword: 'Esqueceu sua senha?',
+    dontHaveAccount: 'Ainda não tem conta?',
+    startTrial: 'Comece de graça',
+    accessibility: 'Acessibilidade',
+    privacy: 'Privacidade',
+    articles: 'Artigos',
+    accessibilityHref: '/pt-BR/accessibility',
+    privacyHref: '/pt-BR/privacy',
+    articlesHref: '/pt-BR/articles',
+    err: {
+      badCredentials: 'E-mail ou senha incorretos',
+      emailNotConfirmed: 'Seu e-mail ainda não foi confirmado. Abra a mensagem de confirmação que enviamos e clique no link.',
+      linkInvalid: 'Este link de confirmação não é válido ou expirou. Entre na sua conta, ou cadastre-se de novo para receber um novo.',
+    },
+  },
 } as const
 
 export function AuthForm() {

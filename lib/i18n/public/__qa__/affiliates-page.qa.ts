@@ -24,11 +24,12 @@ function check(name: string, cond: boolean, detail?: string) {
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-const LANGS = ['he', 'en', 'es'] as const
+const LANGS = ['he', 'en', 'es', 'pt-BR'] as const
 const PAGES: Record<(typeof LANGS)[number], string> = {
   he: 'app/(public)/affiliates/page.tsx',
   en: 'app/(public)/en/affiliates/page.tsx',
   es: 'app/(public)/es/affiliates/page.tsx',
+  'pt-BR': 'app/(public)/pt-BR/affiliates/page.tsx',
 }
 
 console.log('A) one offer, in every language')
@@ -63,17 +64,24 @@ console.log('\nB) the page, in every language')
   for (const lang of LANGS) {
     check(`B1 (${lang}): the route exists`, existsSync(join(ROOT, PAGES[lang])))
   }
-  const he = strip(read(PAGES.he)), en = strip(read(PAGES.en)), es = strip(read(PAGES.es))
-  check('B2: each route renders its own language', /locale="he"/.test(he) && /locale="en"/.test(en) && /locale="es"/.test(es))
+  const src = Object.fromEntries(LANGS.map((l) => [l, strip(read(PAGES[l]))])) as Record<(typeof LANGS)[number], string>
+  const all = LANGS.map((l) => src[l])
+  check('B2: each route renders its own language', LANGS.every((l) => new RegExp(`locale="${l}"`).test(src[l])))
+  const CANONICAL: Record<(typeof LANGS)[number], string> = {
+    he: '/affiliates', en: '/en/affiliates', es: '/es/affiliates', 'pt-BR': '/pt-BR/affiliates',
+  }
   check('B3: each canonical is its own URL',
-    he.includes("'https://www.gotopseo.com/affiliates'") && en.includes("'https://www.gotopseo.com/en/affiliates'")
-    && es.includes("'https://www.gotopseo.com/es/affiliates'"))
-  check('B4: all three declare the same hreflang set (Spanish is dropped by the flag, not here)',
-    [he, en, es].every((s) => /buildHreflangAlternates\('\/affiliates', '\/en\/affiliates', '\/es\/affiliates'\)/.test(s)))
+    LANGS.every((l) => src[l].includes(`'https://www.gotopseo.com${CANONICAL[l]}'`)),
+    LANGS.filter((l) => !src[l].includes(`'https://www.gotopseo.com${CANONICAL[l]}'`)).join(' '))
+  // The Portuguese URL is DERIVED from the Spanish one inside the helper
+  // (lib/seo/hreflang.ts), so every route states the same three paths and a
+  // gated language is dropped by its flag rather than by a route forgetting it.
+  check('B4: all four declare the same hreflang set (a gated language is dropped by its flag, not here)',
+    all.every((s2) => /buildHreflangAlternates\('\/affiliates', '\/en\/affiliates', '\/es\/affiliates'\)/.test(s2)))
   check('B5: the title and description come from the shared copy, never retyped per route',
-    [he, en, es].every((s) => /title: C\.metaTitle/.test(s) && /description: C\.metaDescription/.test(s)))
+    all.every((s2) => /title: C\.metaTitle/.test(s2) && /description: C\.metaDescription/.test(s2)))
   check('B3-MUT: a route that reuses the Hebrew canonical fails B3',
-    !en.replace("'https://www.gotopseo.com/en/affiliates'", "'https://www.gotopseo.com/affiliates'").includes("'https://www.gotopseo.com/en/affiliates'"))
+    !src.en.replace("'https://www.gotopseo.com/en/affiliates'", "'https://www.gotopseo.com/affiliates'").includes("'https://www.gotopseo.com/en/affiliates'"))
 }
 
 console.log('\nC) reachable and listed')
@@ -83,10 +91,17 @@ console.log('\nC) reachable and listed')
   check('C1: the footer links to it, in the reader\'s own language', linked(footer))
   check('C2: every language names that link', LANGS.every((l) => !!getPublicDictionary(l).footer.affiliates))
   const sitemap = strip(read('app/sitemap.xml/route.ts'))
-  check('C3: all three are in the sitemap', /\/affiliates`/.test(sitemap)
-    && /\/en\/affiliates`/.test(sitemap) && /\/es\/affiliates`/.test(sitemap))
-  check('C4: the Spanish one sits inside the flag, like every other Spanish URL',
-    sitemap.indexOf('/es/affiliates') > sitemap.indexOf('spanishSiteEnabled()'))
+  // Hebrew and English are listed URL by URL; the translated trees come from one
+  // shared path list, so /affiliates appearing in it covers Spanish and
+  // Portuguese at once and the two cannot drift apart.
+  check('C3: every language is in the sitemap', /\/affiliates`/.test(sitemap)
+    && /\/en\/affiliates`/.test(sitemap) && /path: '\/affiliates'/.test(sitemap))
+  check('C4: a translated tree is listed only inside its own flag',
+    /const spanishPages = spanishSiteEnabled\(\) \? treePages\('\/es'\) : \[\]/.test(sitemap)
+    && /const portuguesePages = portugueseSiteEnabled\(\) \? treePages\('\/pt-BR'\) : \[\]/.test(sitemap))
+  check('C4-MUT: a tree listed unconditionally fails C4',
+    !/const spanishPages = spanishSiteEnabled\(\) \? treePages\('\/es'\) : \[\]/
+      .test(sitemap.replace("const spanishPages = spanishSiteEnabled() ? treePages('/es') : []", "const spanishPages = treePages('/es')")))
   check('C1-MUT: a footer without the link fails C1', !linked(footer.replace(/href=\{`\$\{prefix\}\/affiliates`\}/, 'href="/"')))
 }
 
@@ -98,6 +113,7 @@ console.log('\nD) what the page must say')
     he: [/אישור|מאשרים|מועמדות/, /לא על עצמכם|החשבון שלכם/, /חשבונית/],
     en: [/approve|application|apply/i, /your own account/i, /invoice/i],
     es: [/aprob|solicitud|solicít/i, /tu propia cuenta/i, /factura/i],
+    'pt-BR': [/aprov|candidatura|candidat/i, /sua própria conta/i, /nota fiscal/i],
   }
   for (const lang of LANGS) {
     const text = JSON.stringify(AFFILIATES_COPY[lang])
@@ -115,7 +131,7 @@ console.log('\nD) what the page must say')
 console.log('\nE) what it must NOT say')
 {
   // Zero paying customers today, so no page may imply a track record or earnings.
-  const forbidden = [/guaranteed/i, /מובטח/, /garantizad/i, /passive income/i, /הכנסה פסיבית/]
+  const forbidden = [/guaranteed/i, /מובטח/, /garantizad/i, /garantid/i, /passive income/i, /הכנסה פסיבית/, /renda passiva/i]
   for (const lang of LANGS) {
     const text = JSON.stringify(AFFILIATES_COPY[lang])
     check(`E1 (${lang}): no guarantee and no "passive income" promise`, !forbidden.some((re) => re.test(text)))

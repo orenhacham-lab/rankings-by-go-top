@@ -159,6 +159,7 @@ export const es = {
     he: 'עברית',
     en: 'English',
     es: 'Español',
+    'pt-BR': 'Português (Brasil)',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

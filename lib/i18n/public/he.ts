@@ -149,6 +149,7 @@ export const he = {
     he: 'עברית',
     en: 'English',
     es: 'Español',
+    'pt-BR': 'Português (Brasil)',
     aria: 'שינוי שפת האתר',
   },
   cookie: {

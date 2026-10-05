@@ -151,6 +151,7 @@ export const en = {
     he: 'עברית',
     en: 'English',
     es: 'Español',
+    'pt-BR': 'Português (Brasil)',
     aria: 'Change the site language',
   },
   cookie: {

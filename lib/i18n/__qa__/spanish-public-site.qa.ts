@@ -166,14 +166,14 @@ function main() {
       check(`3b2: …and the ${legal} text it renders`,
         existsSync(join(ROOT, 'content', 'legal', 'es', `${legal}.md`)))
     }
-    // A legal page says `slug="…"` and the locale lives once, in
-    // SpanishLegalPage; every other page carries `locale="es"` itself.
+    // A legal page states its language on the shared frame; every other page
+    // carries `locale="es"` itself.
     const sharedFrame = (rel: string) =>
-      /locale="es"/.test(strip(read(rel))) || /SpanishLegalPage slug="/.test(strip(read(rel)))
+      /locale="es"/.test(strip(read(rel))) || /TranslatedLegalPage slug="[a-z-]+" language="es"/.test(strip(read(rel)))
     check('3c: every /es page renders through the SHARED components, not a second design',
       pageFiles().every(sharedFrame), pageFiles().filter((rel) => !sharedFrame(rel)).join(', '))
-    check('3c2: and the legal frame itself renders as Spanish',
-      /locale="es"/.test(strip(read('components/public/SpanishLegalPage.tsx'))))
+    check('3c2: and the legal frame takes the language it is given, rather than pinning one',
+      /locale=\{language\}/.test(strip(read('components/public/TranslatedLegalPage.tsx'))))
     // MUTATION CONTROL
     check('3-MUT: a page list missing a file fails 3a', !existsSync(join(ES_DIR, 'pricing/nope.tsx')))
   }

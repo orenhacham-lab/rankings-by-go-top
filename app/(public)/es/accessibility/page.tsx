@@ -1,4 +1,4 @@
-import { SpanishLegalPage, spanishLegalMetadata } from '@/components/public/SpanishLegalPage'
+import { TranslatedLegalPage, translatedLegalMetadata } from '@/components/public/TranslatedLegalPage'
 
 // NOT force-static. The root layout decides <html lang/dir> from the request,
 // so a prerendered legal page came out as lang="en" on a Spanish URL — the one
@@ -7,8 +7,8 @@ import { SpanishLegalPage, spanishLegalMetadata } from '@/components/public/Span
 // per process (lib/legal/markdown.ts) and the files ship with the server trace
 // (outputFileTracingIncludes in next.config.ts).
 
-export const metadata = spanishLegalMetadata('accessibility')
+export const metadata = translatedLegalMetadata('accessibility', 'es')
 
 export default function SpanishAccessibilityPage() {
-  return <SpanishLegalPage slug="accessibility" />
+  return <TranslatedLegalPage slug="accessibility" language="es" />
 }

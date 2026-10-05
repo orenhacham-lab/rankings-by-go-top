@@ -2,7 +2,7 @@
  * The affiliate program's public page, in every language the site speaks.
  *
  * The NUMBERS live here once (AFFILIATE_TERMS) and every language reads them, so
- * Hebrew, English and Spanish can never promise different rates — a page that said
+ * no two languages can ever promise different rates — a page that said
  * 30% in one language and 25% in another would be an offer we could not honour.
  * lib/affiliate/referral.ts owns the same window in code, and the guard
  * __qa__/affiliates-page.qa.ts holds the two to the same number.
@@ -13,6 +13,7 @@
  * affiliate dashboard and the payouts come once the attribution table exists.
  */
 import { REFERRAL_WINDOW_DAYS } from '@/lib/affiliate/referral'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export const AFFILIATE_TERMS = {
   /** Commission on every payment, for as long as the customer keeps paying. */
@@ -55,7 +56,7 @@ export type AffiliateCopy = {
 
 const T = AFFILIATE_TERMS
 
-export const AFFILIATES_COPY: Record<'he' | 'en' | 'es', AffiliateCopy> = {
+export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
   he: {
     metaTitle: 'תוכנית שותפים | Go Top SEO',
     metaDescription: `הרוויחו ${T.baseRate}% מכל תשלום, כל עוד הלקוח ממשיך, ועד ${T.topRate}% משותפים ותיקים. חלון ייחוס ${T.windowDays} יום. תוכנית השותפים של Go Top SEO.`,
@@ -190,5 +191,50 @@ export const AFFILIATES_COPY: Record<'he' | 'en' | 'es', AffiliateCopy> = {
     ],
     closeTitle: '¿Te encaja?',
     closeBody: 'Cuéntanos quién eres y dónde está tu público. Respondemos a todas las solicitudes.',
+  },
+  'pt-BR': {
+    metaTitle: 'Programa de afiliados | Go Top SEO',
+    metaDescription: `Ganhe ${T.baseRate}% de cada pagamento enquanto o cliente continuar, e até ${T.topRate}% quando você trouxer ${T.topRateFrom}. Janela de atribuição de ${T.windowDays} dias. Programa de afiliados da Go Top SEO.`,
+    eyebrow: 'Programa de afiliados',
+    title: 'Já indica a gente?',
+    accent: `Leve ${T.baseRate}% de cada pagamento`,
+    subtitle: `Para cada cliente que chega por você, você ganha ${T.baseRate}% de cada pagamento que ele faz, não só do primeiro, enquanto ele continuar com a gente. Com ${T.topRateFrom} clientes pagantes ativos, você passa para ${T.topRate}%.`,
+    trust: [`${T.baseRate}% de cada pagamento`, `Até ${T.topRate}%`, `Janela de ${T.windowDays} dias`],
+    apply: 'Quero me candidatar',
+    talk: 'Falar no WhatsApp',
+    whatsappMessage: 'Olá, quero entrar no programa de afiliados',
+    whyTitle: 'Por que vale a pena',
+    whyIntro: 'Quase todos os programas do setor pagam uma vez só por cliente. Aqui o pagamento volta todo mês.',
+    why: [
+      { title: 'Recorrente e sem teto', body: `${T.baseRate}% de cada pagamento, todo mês, enquanto o cliente continuar. Sem limite de doze meses e sem data de fim.` },
+      { title: 'Um produto que fica', body: 'O sistema escreve e publica conteúdo todo mês, então o cliente que entra costuma ficar. Uma comissão recorrente só vale algo se o produto também valer.' },
+      { title: 'Um público que já pergunta a você', body: 'Donos de sites, de lojas e agências já perguntam a você o que fazer com o SEO. Esta é a resposta, e você é pago por ela.' },
+    ],
+    howTitle: 'Como funciona',
+    how: [
+      { title: 'Candidate-se', body: 'Conte quem você é e onde está o seu público: um site, uma lista, um canal ou os seus próprios clientes. Lemos cada candidatura à mão e aprovamos.' },
+      { title: 'Receba seu link', body: `Seu link funciona em qualquer página do site. Quem clicar é lembrado por ${T.windowDays} dias, mesmo que se cadastre duas semanas depois.` },
+      { title: 'Receba o pagamento', body: `A comissão acumula a cada pagamento. Ela é liberada ${T.holdDays} dias depois de o pagamento do cliente ficar firme e é paga quando seu saldo passa de ${T.minPayoutUsd} dólares.` },
+    ],
+    rulesTitle: 'As regras, sem letras miúdas',
+    rulesIntro: 'Melhor saber agora do que depois de fazer o trabalho.',
+    rules: [
+      { title: 'Não por você mesmo', body: 'Sem comissão pela sua própria conta, pela sua empresa ou por um funcionário dela. Uma agência que cadastra um cliente real recebe, e é exatamente esse o público que queremos.' },
+      { title: 'Sem anúncios com a nossa marca', body: 'Nada de mídia paga sobre a marca Go Top nem suas variações.' },
+      { title: 'Sem sites de cupom', body: 'Nem ofertas do tipo «cadastre-se comigo e eu devolvo uma parte».' },
+      { title: 'Diga que você recebe comissão', body: 'Em alguns países é obrigatório, e com quem confia em você é o justo em todos.' },
+      { title: 'Um reembolso reverte', body: 'A comissão de um cliente que pede reembolso ou faz um chargeback é revertida e descontada do pagamento seguinte.' },
+      { title: 'Nota fiscal', body: 'Afiliados em Israel emitem nota fiscal para nós. Fora de Israel, a nota fiscal segue a regra do seu país, e quem não tem atividade registrada pode receber crédito na conta.' },
+    ],
+    faqTitle: 'Perguntas',
+    faq: [
+      { q: 'Quando eu recebo?', a: `A comissão acumula na hora, é liberada ${T.holdDays} dias depois de o pagamento do cliente ficar firme, para a janela de reembolso passar, e é paga quando seu saldo passa de ${T.minPayoutUsd} dólares. Por PayPal, Wise ou transferência bancária, como você preferir.` },
+      { q: 'E se o cliente estiver no teste gratuito?', a: 'O teste dura sete dias e não gera comissão, porque não há pagamento. Assim que ele passa a ser cliente pagante, a comissão começa no primeiro pagamento dele.' },
+      { q: 'Por quanto tempo o link é lembrado?', a: `${T.windowDays} dias, pelo último clique. Se alguém clicar no seu link e se cadastrar dois meses depois, ele continua sendo seu.` },
+      { q: 'Já sou cliente. Posso receber por mim mesmo?', a: 'Não. Um link só se liga a uma conta nova, e a sua própria conta e os seus projetos ficam de fora. O que você pode é indicar a gente para outras pessoas e receber por isso.' },
+      { q: 'Existe um mínimo de clientes?', a: `Nenhum. Você recebe quando seu saldo passa de ${T.minPayoutUsd} dólares, e até lá ele simplesmente continua acumulando.` },
+    ],
+    closeTitle: 'Faz sentido para você?',
+    closeBody: 'Conte quem você é e onde está o seu público. Respondemos a todas as candidaturas.',
   },
 }

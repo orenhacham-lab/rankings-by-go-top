@@ -59,8 +59,16 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * one failure this table exists to prevent. Any new public language has to be
  * added here AND to the constraint in
  * supabase/migrations/20261003000000_consent_events.sql, in that order.
+ *
+ * `pt-BR` is at that first step and no further: the language exists in the code
+ * so that a Brazilian visitor's decision is filed as Portuguese rather than as
+ * Hebrew, but the log's CHECK still lists he/en/es, so the database would refuse
+ * the row. Widening it is one additive line and belongs to the legal thread, not
+ * here. Until it is applied, the Portuguese site stays off — which is what
+ * lib/consent/__qa__/consent-locale-launch.qa.ts enforces, so the flag cannot be
+ * turned on into silent data loss.
  */
-export const CONSENT_LOCALES = ['he', 'en', 'es'] as const
+export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR'] as const
 
 export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
 

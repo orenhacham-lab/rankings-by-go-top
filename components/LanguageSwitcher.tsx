@@ -7,6 +7,7 @@ import { Check, ChevronDown, Languages } from 'lucide-react'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
+import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { cn } from '@/lib/utils'
 
 /**
@@ -33,9 +34,15 @@ export function counterpartPath(pathname: string, from: PublicLocale, to: Public
   return `${toPrefix}${hebrewPath}`
 }
 
-/** The locales a visitor may switch to right now. Spanish only while its site is on. */
-export function availableLocales(spanishOn = spanishSiteEnabled()): PublicLocale[] {
-  return PUBLIC_LOCALES.filter((l) => l !== 'es' || spanishOn)
+/**
+ * The locales a visitor may switch to right now. A gated language appears only
+ * while its own site is on, so the switcher can never offer a tree that 404s.
+ */
+export function availableLocales(
+  spanishOn = spanishSiteEnabled(),
+  portugueseOn = portugueseSiteEnabled(),
+): PublicLocale[] {
+  return PUBLIC_LOCALES.filter((l) => (l === 'es' ? spanishOn : l === 'pt-BR' ? portugueseOn : true))
 }
 
 /**

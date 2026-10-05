@@ -52,6 +52,7 @@ import { normalizeStoredLocale, toBilingualLocale, type Locale, type PublicLocal
 import { normalizeLocale } from './dashboard/locale'
 import { localeFromAcceptLanguage } from './accept-language'
 import { spanishSiteEnabled } from './spanish-site'
+import { portugueseSiteEnabled } from './portuguese-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -84,6 +85,13 @@ export function isSpanishPath(pathname: string | null | undefined, enabled = spa
   if (!enabled) return false
   const p = pathname || ''
   return p === '/es' || p.startsWith('/es/')
+}
+
+/** The same, for the Brazilian Portuguese tree and its own flag. */
+export function isPortuguesePath(pathname: string | null | undefined, enabled = portugueseSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/pt-BR' || p.startsWith('/pt-BR/')
 }
 
 /**
@@ -129,6 +137,7 @@ export function routePublicLocale(pathname: string | null | undefined): PublicLo
   const p = pathname || ''
   if (isEnglishPath(p)) return 'en'
   if (isSpanishPath(p)) return 'es'
+  if (isPortuguesePath(p)) return 'pt-BR'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'

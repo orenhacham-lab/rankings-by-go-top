@@ -5,17 +5,21 @@
  *
  * Anything that is not a known locale is Hebrew/RTL: Hebrew is the product's
  * default and the safe direction for an unknown or absent value. A locale whose
- * own script is latin (English, Spanish) is LTR, and labelling a Spanish
- * document `lang="he" dir="rtl"` would mis-order its punctuation on the first
+ * own script is latin (English, Spanish, Portuguese) is LTR, and labelling such
+ * a document `lang="he" dir="rtl"` would mis-order its punctuation on the first
  * paint, before any client code runs.
+ *
+ * `lang` is whatever the locale table says, never a hand-kept union: the union
+ * used to list three languages and the cast that satisfied it hid a fourth from
+ * the compiler.
  */
 import { LOCALE_CONFIG, normalizePublicLocale } from './locales'
 
-export type DocumentLocaleAttributes = { lang: 'he' | 'en' | 'es'; dir: 'rtl' | 'ltr' }
+export type DocumentLocaleAttributes = { lang: string; dir: 'rtl' | 'ltr' }
 
 export function documentLocaleAttributes(locale: string | null | undefined): DocumentLocaleAttributes {
   const known = normalizePublicLocale(locale)
   if (!known) return { lang: 'he', dir: 'rtl' }
   const { lang, dir } = LOCALE_CONFIG[known]
-  return { lang: lang as 'he' | 'en' | 'es', dir }
+  return { lang, dir }
 }

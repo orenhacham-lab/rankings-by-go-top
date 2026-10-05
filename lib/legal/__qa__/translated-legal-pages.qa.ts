@@ -1,23 +1,24 @@
 /**
- * The Spanish legal pages: /es/terms, /es/privacy, /es/refund-policy and
- * /es/accessibility.
+ * The TRANSLATED legal pages — Spanish at /es/* and Brazilian Portuguese at
+ * /pt-BR/* — their four slugs each.
  *
- * The documents are Markdown under content/legal/es/, written by the legal
- * thread; this tree renders them. Three things can go wrong and none of them
- * is visible in a diff:
+ * The documents are Markdown under content/legal/<language>/, written by the
+ * legal thread; these trees render them. Three things can go wrong and none of
+ * them is visible in a diff:
  *
  *   A  the reader renders the six constructs the documents use, and refuses
  *      anything else rather than printing it as literal asterisks
  *   B  no document can smuggle a link scheme past it
- *   C  the four routes exist, are behind the one /es gate, are static (so the
- *      file read happens at build time and never at runtime), and the footer
- *      and the sitemap point at them instead of the English pages
- *   D  the four real documents parse, carry their front matter, and keep the
+ *   C  every route exists, sits behind its own language's single gate, is
+ *      rendered per request (so the document declares its own language), and
+ *      the footer and the sitemap point at it instead of the English page
+ *   D  every real document parses, carries its front matter, and keeps the
  *      company's registered name untranslated
  *
- * Every rule has a mutation control.
+ * Both languages run the same rules, because the second language is where a
+ * Spanish-only guard would have gone quiet. Every rule has a mutation control.
  *
- * Run: npx tsx lib/legal/__qa__/spanish-legal-pages.qa.ts
+ * Run: npx tsx lib/legal/__qa__/translated-legal-pages.qa.ts
  */
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
@@ -26,6 +27,8 @@ import {
   parseLegalMarkdown,
   readLegalDocument,
   LEGAL_SLUGS,
+  LEGAL_LANGUAGES,
+  type LegalLanguage,
   type Block,
   type Inline,
 } from '../markdown'
@@ -144,93 +147,126 @@ console.log('\nB) no link scheme gets past it')
 
 console.log('\nC) the routes, the gate and the links')
 {
-  for (const slug of LEGAL_SLUGS) {
-    const page = `app/(public)/es/${slug}/page.tsx`
-    const src = existsSync(join(ROOT, page)) ? strip(read(page)) : ''
-    check(`C1: /es/${slug} is a route`, !!src)
-    check(`C2: …rendered by the shared frame`, /SpanishLegalPage slug="/.test(src))
-    // NOT prerendered, and the reason is the opposite of what this used to
-    // assert. The root layout decides <html lang/dir> from the request, so a
-    // force-static legal page came out as lang="en" on a Spanish URL. The
-    // read it was protecting is handled instead by the per-process cache in
-    // lib/legal/markdown.ts and by tracing the files into the server bundle.
-    check(`C3: …rendered per request, so the document declares Spanish`,
-      !/export const dynamic = 'force-static'/.test(src))
+  /** Each language's prefix, its flag's name in code, and its sitemap page. */
+  const TREE: Record<LegalLanguage, { prefix: string; gate: string }> = {
+    es: { prefix: '/es', gate: 'spanishSiteEnabled' },
+    'pt-BR': { prefix: '/pt-BR', gate: 'portugueseSiteEnabled' },
   }
 
-  // The /es tree has ONE gate, in its layout: the pages carry no flag check,
-  // so a new one cannot forget to be gated.
-  const layout = strip(read('app/(public)/es/layout.tsx'))
-  check('C4: the one /es gate still 404s the whole tree when the flag is off',
-    /if \(!spanishSiteEnabled\(\)\) notFound\(\)/.test(layout))
-  check('C5: and no legal page carries a gate of its own',
-    LEGAL_SLUGS.every((s) => !/spanishSiteEnabled/.test(strip(read(`app/(public)/es/${s}/page.tsx`)))))
+  for (const language of LEGAL_LANGUAGES) {
+    const { prefix, gate } = TREE[language]
+    for (const slug of LEGAL_SLUGS) {
+      const page = `app/(public)${prefix}/${slug}/page.tsx`
+      const src = existsSync(join(ROOT, page)) ? strip(read(page)) : ''
+      check(`C1 (${language}): ${prefix}/${slug} is a route`, !!src)
+      check(`C2 (${language}): …rendered by the shared frame, in its own language`,
+        new RegExp(`TranslatedLegalPage slug="${slug}" language="${language}"`).test(src))
+      // NOT prerendered, and the reason is the opposite of what this used to
+      // assert. The root layout decides <html lang/dir> from the request, so a
+      // force-static legal page came out as lang="en" on a translated URL. The
+      // read it was protecting is handled instead by the per-process cache in
+      // lib/legal/markdown.ts and by tracing the files into the server bundle.
+      check(`C3 (${language}): …rendered per request, so the document declares its language`,
+        !/export const dynamic = 'force-static'/.test(src))
+    }
 
-  // The two things that replace force-static. Either one missing is a page
-  // that either re-reads the disk on every request or cannot find the file at
-  // all once deployed.
+    // Each tree has ONE gate, in its layout: the pages carry no flag check, so
+    // a new one cannot forget to be gated.
+    const layout = strip(read(`app/(public)${prefix}/layout.tsx`))
+    check(`C4 (${language}): the one ${prefix} gate still 404s the whole tree when the flag is off`,
+      new RegExp(`if \\(!${gate}\\(\\)\\) notFound\\(\\)`).test(layout))
+    check(`C5 (${language}): and no legal page carries a gate of its own`,
+      LEGAL_SLUGS.every((s2) => !new RegExp(gate).test(strip(read(`app/(public)${prefix}/${s2}/page.tsx`)))))
+
+    // Read RAW, not stripped: the glob itself contains `/**/`, which the
+    // comment-stripping regex reads as the start of a block comment and swallows.
+    const conf = read('next.config.ts')
+    check(`C3b (${language}): the Markdown ships with the server trace`,
+      /outputFileTracingIncludes/.test(conf) && conf.includes(`./content/legal/${language}/**/*`))
+
+    const sitemap = strip(read(`app/(public)${prefix}/sitemap/page.tsx`))
+    check(`C7 (${language}): the sitemap page lists this language's documents`,
+      LEGAL_SLUGS.every((s2) => sitemap.includes(`href: '${prefix}/${s2}'`)),
+      LEGAL_SLUGS.filter((s2) => !sitemap.includes(`href: '${prefix}/${s2}'`)).join(', '))
+    check(`C8 (${language}): and no longer the English ones`,
+      !/href: '\/en\/(privacy|terms|refund-policy|accessibility)'/.test(sitemap))
+  }
+
+  // The two things that replace force-static. Either one missing is a page that
+  // either re-reads the disk on every request or cannot find the file at all
+  // once deployed.
   const md = strip(read('lib/legal/markdown.ts'))
-  check('C3a: the parse is cached per process', /const cache = new Map<LegalSlug, LegalDocument>\(\)/.test(md)
-    && /cache\.set\(slug, doc\)/.test(md))
-  // Read RAW, not stripped: the glob itself contains `/**/`, which the
-  // comment-stripping regex reads as the start of a block comment and swallows.
+  check('C3a: the parse is cached per process, per language and slug',
+    /const cache = new Map<string, LegalDocument>\(\)/.test(md) && /cache\.set\(key, doc\)/.test(md))
   const conf = read('next.config.ts')
-  check('C3b: and the Markdown ships with the server trace',
-    /outputFileTracingIncludes/.test(conf) && /content\/legal\/es\/\*\*\/\*/.test(conf))
   check('MUTATION — a config without the trace include is caught',
-    !/content\/legal\/es\/\*\*\/\*/.test(conf.replace(/'\.\/content\/legal\/es\/\*\*\/\*'/, "'./other/**/*'")))
+    !conf.replace("'./content/legal/pt-BR/**/*'", "'./other/**/*'").includes('./content/legal/pt-BR/**/*'))
 
   const footer = strip(read('components/Footer.tsx'))
   check('C6: the footer sends each language to its own documents', /const legalPrefix = prefix/.test(footer))
-  const sitemap = strip(read('app/(public)/es/sitemap/page.tsx'))
-  check('C7: the Spanish sitemap lists the Spanish documents',
-    LEGAL_SLUGS.every((s) => sitemap.includes(`href: '/es/${s}'`)),
-    LEGAL_SLUGS.filter((s) => !sitemap.includes(`href: '/es/${s}'`)).join(', '))
-  check('C8: and no longer the English ones',
-    !/href: '\/en\/(privacy|terms|refund-policy|accessibility)'/.test(sitemap))
 
-  // The whole legal tree is noindex, and the Spanish site is preview-only on
-  // top of that.
-  const frame = strip(read('components/public/SpanishLegalPage.tsx'))
-  check('C9: the Spanish legal metadata is noindex, like the other two languages',
+  // The whole legal tree is noindex, and a gated language is unreachable on top
+  // of that.
+  const frame = strip(read('components/public/TranslatedLegalPage.tsx'))
+  check('C9: the translated legal metadata is noindex, like the other two languages',
     /robots: 'noindex, nofollow'/.test(frame))
+  check('C9-MUT: a frame that dropped the noindex is caught',
+    !/robots: 'noindex, nofollow'/.test(frame.replace(/robots: 'noindex, nofollow'/, "robots: 'index'")))
 }
 
-console.log('\nD) the four real documents')
+console.log('\nD) the real documents, in every language')
 {
-  for (const slug of LEGAL_SLUGS) {
-    const path = `content/legal/es/${slug}.md`
-    check(`D1: ${slug} is there`, existsSync(join(ROOT, path)))
-    let doc: ReturnType<typeof readLegalDocument> | null = null
-    check(`D2: …and parses`, !threw(() => { doc = readLegalDocument(slug) }))
-    if (!doc) continue
-    const d = doc as ReturnType<typeof readLegalDocument>
-    check(`D3: …with a Spanish title and the English page it came from`,
-      d.frontMatter.locale === 'es' && /^app\/\(public\)\/en\//.test(d.frontMatter.source),
-      `${d.frontMatter.locale} / ${d.frontMatter.source}`)
-    check(`D4: …and a body with headings`, d.blocks.filter((b) => b.kind === 'heading').length >= 2)
-    const body = d.blocks.map(blockText).join('\n')
-    check(`D5: …in Spanish, with no Hebrew left in`, !/[֐-׿]/.test(body))
-    // THE COMPANY'S REGISTERED NAME IS NEVER TRANSLATED (Oren, 2026-10-03):
-    // the Hebrew pages carry the Hebrew name, English and every other language
-    // carry the English name exactly as registered.
-    const named = /GO TOP MARKETING GRUO LTD/.test(body)
-    const translated = /GO TOP (?:MARKETING|MARKETING Y|DE MARKETING)[^.]*(?:DIGITAL|S\.L|SL)\b/i.test(body) ||
-      /Go Top Marketing y Publicidad/i.test(body)
-    check(`D6: …and the registered company name is not translated`, !translated, body.match(/GO TOP[^.\n]{0,60}/i)?.[0])
-    if (slug === 'terms' || slug === 'privacy') {
-      check(`D7: ${slug} names the company as registered`, named)
+  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR' }
+  /** A translation of the registered company name is a mistake in any language. */
+  const TRANSLATED_NAME = [
+    /GO TOP (?:MARKETING|MARKETING Y|DE MARKETING)[^.]*(?:DIGITAL|S\.L|SL)\b/i,
+    /Go Top Marketing y Publicidad/i,
+    /Go Top Marketing e Publicidade/i,
+  ]
+  let allLinks = 0
+
+  for (const language of LEGAL_LANGUAGES) {
+    for (const slug of LEGAL_SLUGS) {
+      const path = `content/legal/${language}/${slug}.md`
+      check(`D1 (${language}): ${slug} is there`, existsSync(join(ROOT, path)))
+      let doc: ReturnType<typeof readLegalDocument> | null = null
+      check(`D2 (${language}): …and parses`, !threw(() => { doc = readLegalDocument(slug, language) }))
+      if (!doc) continue
+      const d = doc as ReturnType<typeof readLegalDocument>
+      check(`D3 (${language}): …declaring its own language and the English page it came from`,
+        d.frontMatter.locale === language && /^app\/\(public\)\/en\//.test(d.frontMatter.source),
+        `${d.frontMatter.locale} / ${d.frontMatter.source}`)
+      check(`D4 (${language}): …and a body with headings`, d.blocks.filter((b) => b.kind === 'heading').length >= 2)
+      const body = d.blocks.map(blockText).join('\n')
+      check(`D5 (${language}): …translated, with no Hebrew left in`, !/[֐-׿]/.test(body))
+      // THE COMPANY'S REGISTERED NAME IS NEVER TRANSLATED (Oren, 2026-10-03):
+      // the Hebrew pages carry the Hebrew name, English and every other language
+      // carry the English name exactly as registered.
+      const named = /GO TOP MARKETING GRUO LTD/.test(body)
+      check(`D6 (${language}): …and the registered company name is not translated`,
+        !TRANSLATED_NAME.some((re) => re.test(body)), body.match(/GO TOP[^.\n]{0,60}/i)?.[0])
+      if (slug === 'terms' || slug === 'privacy') {
+        check(`D7 (${language}): ${slug} names the company as registered`, named)
+      }
     }
+
+    // Every internal link in a document points at a page of ITS OWN language.
+    // A document may have none; what it may not do is send its reader to
+    // another language's page.
+    const links: string[] = []
+    for (const slug of LEGAL_SLUGS) {
+      for (const m of read(`content/legal/${language}/${slug}.md`).matchAll(/\]\((\/[^)]*)\)/g)) links.push(m[1])
+    }
+    allLinks += links.length
+    check(`D8 (${language}): the documents cross-link their own pages, never another language's`,
+      links.every((l) => l.startsWith(`${PREFIX[language]}/`)), links.join(', '))
   }
 
-  // Every internal link in the Spanish documents points at a Spanish page.
-  const links: string[] = []
-  for (const slug of LEGAL_SLUGS) {
-    const raw = read(`content/legal/es/${slug}.md`)
-    for (const m of raw.matchAll(/\]\((\/[^)]*)\)/g)) links.push(m[1])
-  }
-  check('D8: the documents cross-link the Spanish pages, not the English ones',
-    links.length > 0 && links.every((l) => l.startsWith('/es/')), links.join(', '))
+  // Not vacuous: at least one language really does cross-link, so D8 is reading
+  // links rather than empty lists.
+  check('D8a: at least one document carries an internal link at all', allLinks > 0)
+  check('D8-MUT: a link into another language tree is caught',
+    !['/en/privacy'].every((l) => l.startsWith('/es/')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

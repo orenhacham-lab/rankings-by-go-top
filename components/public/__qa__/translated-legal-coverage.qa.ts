@@ -284,7 +284,9 @@ console.log('\nmutation controls')
   check('a translated company name is caught',
     TRANSLATED_NAME.test('GO TOP MARKETING E PUBLICIDADE LTDA'))
   check('a link into a language tree with no page behind it is caught',
-    [...'ver os [termos](/pt-BR/terms) aqui'.matchAll(/\]\((\/[a-zA-Z-]+\/[^)]*)\)/g)]
+    // The example has to be a page that really is not there. It used to be
+    // /pt-BR/terms, which exists now that the Portuguese tree is built.
+    [...'ver o [kit de imprensa](/pt-BR/press-kit) aqui'.matchAll(/\]\((\/[a-zA-Z-]+\/[^)]*)\)/g)]
       .map((m) => m[1]).filter((h) => LOCALES.some((l) => h.startsWith(`/${l}/`)))
       .filter((h) => !routeExists(h)).length === 1)
   check('...and a link to one that does exist is not flagged', routeExists('/es/refund-policy'))

@@ -507,9 +507,9 @@ async function main() {
     // which an earlier version of this guard did not scan at all.
     const publicDirs = ['(public)', '(legal)'].flatMap((group) =>
       readdirSync(join(ROOT, 'app', group), { withFileTypes: true })
-        // 'en' and 'es' are the non-Hebrew trees: their own guards cover them
+        // The non-Hebrew trees are covered by their own guards
         // (8b, 8b1 and lib/i18n/__qa__/spanish-public-site.qa.ts).
-        .filter((d) => d.isDirectory() && d.name !== 'en' && d.name !== 'es')
+        .filter((d) => d.isDirectory() && d.name !== 'en' && d.name !== 'es' && d.name !== 'pt-BR')
         .map((d) => d.name))
     const missing = publicDirs.filter((d) => routeContentLocale(`/${d}`) !== 'he')
     check('8e: every directory in app/(public) AND app/(legal) is covered',
@@ -541,14 +541,18 @@ async function main() {
     const walk = (dir: string): string[] => fs.readdirSync(join(ROOT, dir), { withFileTypes: true })
       .flatMap((e) => e.isDirectory() ? walk(`${dir}/${e.name}`) : (e.name === 'page.tsx' ? [`${dir}/${e.name}`] : []))
     const treeLocale = (file: string) => /^app\/\(public\)\/en\//.test(file) ? 'en'
-      : /^app\/\(public\)\/es\//.test(file) ? 'es' : 'he'
+      : /^app\/\(public\)\/es\//.test(file) ? 'es'
+      : /^app\/\(public\)\/pt-BR\//.test(file) ? 'pt-BR' : 'he'
     const offenders: string[] = []
     for (const file of walk('app/(public)')) {
       const src = fs.readFileSync(join(ROOT, file), 'utf8')
       for (const tag of ['Footer', 'PublicNav']) {
         for (const m of src.matchAll(new RegExp(`<${tag}(\\s[^>]*)?/?>`, 'g'))) {
           const attrs = m[1] ?? ''
-          const stated = /locale=\{?["']?([a-z]{2})/.exec(attrs)?.[1]
+          // The whole locale value, not its first two letters: a pattern that
+          // stopped at [a-z]{2} read locale="pt-BR" as 'pt' and reported every
+          // Portuguese page as an offender.
+          const stated = /locale=\{?["']([a-z]{2}(?:-[A-Z]{2})?)["']/.exec(attrs)?.[1]
             ?? (/locale=\{locale\}/.test(attrs) ? treeLocale(file) : undefined)
           if (stated !== treeLocale(file)) offenders.push(`${file}: <${tag}${attrs}> in the ${treeLocale(file)} tree`)
         }

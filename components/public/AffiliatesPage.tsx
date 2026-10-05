@@ -1,5 +1,5 @@
 /**
- * The affiliate program's page, one component for all three languages.
+ * The affiliate program's page, one component for every language.
  *
  * It is a FeaturePage like every other marketing page, so it inherits the site's
  * bands, spacing and dark/light handling rather than inventing a layout. The copy and
@@ -20,7 +20,7 @@ import type { PublicLocale } from '@/lib/i18n/locales'
 const WHY_ICONS = [InfinityIcon, BadgePercent, Users] as const
 const RULE_ICONS = [ShieldCheck, Megaphone, TicketPercent, Megaphone, RotateCcw, Receipt] as const
 
-export function affiliatesContent(locale: Exclude<PublicLocale, never>): FeaturePageContent {
+export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
   const c = AFFILIATES_COPY[locale]
   const apply = { label: c.apply, href: `mailto:${EMAIL}?subject=${encodeURIComponent(c.eyebrow)}` }
   const talk = { label: c.talk, href: whatsappHelpUrl(c.whatsappMessage) }
@@ -59,6 +59,6 @@ export function affiliatesContent(locale: Exclude<PublicLocale, never>): Feature
   }
 }
 
-export default function AffiliatesPage({ locale }: { locale: 'he' | 'en' | 'es' }) {
+export default function AffiliatesPage({ locale }: { locale: PublicLocale }) {
   return <FeaturePage locale={locale} content={affiliatesContent(locale)} />
 }

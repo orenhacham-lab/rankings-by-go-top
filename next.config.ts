@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   // pages throw ENOENT in production while working perfectly in dev.
   outputFileTracingIncludes: {
     '/es/*': ['./content/legal/es/**/*'],
+    '/pt-BR/*': ['./content/legal/pt-BR/**/*'],
   },
   images: {
     remotePatterns: [
