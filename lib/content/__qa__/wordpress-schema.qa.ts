@@ -25,7 +25,8 @@ import { join } from 'path'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { generatePluginKey, pairingCode } from '@/lib/site-fix/plugin-auth'
 import { validSchema } from '@/lib/site-fix/whitelist'
-import { publishArticleSchemaToWordPress, schemaJobId, wordpressSchemaGraph } from '../wordpress-schema'
+import { businessProfilesNode, publishArticleSchemaToWordPress, schemaJobId, wordpressSchemaGraph } from '../wordpress-schema'
+import { buildStructuredData } from '../structured-data'
 
 let passed = 0
 let failed = 0
@@ -129,6 +130,24 @@ async function main() {
   check('Y5: neither known: the full markup, as before', graphOf(unknownBoth).map((n) => n['@type']).join() === 'BlogPosting,FAQPage')
   const wpSrc = strip(read('lib/content/wordpress-publish.ts'))
   check('Y6: publishing asks the site which SEO plugin it runs', /detectSeoPlugin:\s*\(\)\s*=>\s*detectSeoPlugin\(creds\)/.test(wpSrc))
+  const withProfiles = buildStructuredData({ headline: 'H', url: POST_URL, language: 'en', datePublished: '2026-09-29T10:00:00Z', dateModified: '2026-09-29T10:00:00Z',
+    publisher: { name: 'Boots & Co', url: 'shop.example.org', sameAs: ['https://www.facebook.com/boots', 'https://www.instagram.com/boots'] }, faq: [{ question: 'Q?', answer: 'A.' }] })
+  const orgNode = businessProfilesNode(withProfiles)
+  const yGraph = wordpressSchemaGraph([...orgNode, ...withProfiles.filter((b) => b['@type'] === 'FAQPage')])
+  check('Y7: with Yoast the official profiles still go out, as the site\'s Organization under Yoast\'s own @id',
+    orgNode.length === 1 && orgNode[0]['@id'] === 'https://shop.example.org/#organization' && (orgNode[0].sameAs as string[]).length === 2 &&
+    !!yGraph && validSchema(yGraph) && ((yGraph['@graph'] as Record<string, unknown>[]).map((n) => n['@type']).join() === 'Organization,FAQPage'), JSON.stringify(yGraph).slice(0, 300))
+  const noProfiles = buildStructuredData({ headline: 'H', url: POST_URL, publisher: { name: 'Boots & Co', url: 'shop.example.org', sameAs: [] } })
+  check('Y8: no profiles set: no Organization node is added next to Yoast\'s', businessProfilesNode(noProfiles).length === 0)
+  const schemaSrc = strip(read('lib/content/wordpress-schema.ts'))
+  check('Y9: the Yoast branch sends the profiles node', /ARTICLE_MARKUP_PLUGINS\.has\(seoPlugin\)\s*\?\s*\[\.\.\.businessProfilesNode\(blocks\)/.test(schemaSrc))
+  check('MUTATION CONTROL: Y9 catches the profiles node dropped', !/ARTICLE_MARKUP_PLUGINS\.has\(seoPlugin\)\s*\?\s*\[\.\.\.businessProfilesNode\(blocks\)/.test(schemaSrc.replace('[...businessProfilesNode(blocks), ...blocks', '[...blocks')))
+  for (const [lang, f] of [['he', 'lib/i18n/dashboard/he.ts'], ['en', 'lib/i18n/dashboard/en.ts'], ['es', 'lib/i18n/dashboard/es.ts'], ['pt-BR', 'lib/i18n/dashboard/pt-BR/project-settings.ts']]) {
+    const body = (read(f).match(/officialProfiles: \{[\s\S]*?body: '((?:[^'\\]|\\.)*)'/) ?? [])[1] ?? ''
+    check(`Y10 ${lang}: the profiles copy names where they apply (WordPress with the plugin, webhook) and that Shopify does not get them`,
+      /WordPress/.test(body) && /Shopify/.test(body) && /webhook/i.test(body) && !/(כל מאמר יכלול|Every article carries|Cada artículo los lleva|Cada artigo os leva)/.test(body), body.slice(0, 120))
+  }
+
   const noFilter = await mutant<typeof import('../wordpress-schema')>('lib/content/wordpress-schema.ts', (s) => s.replace("ARTICLE_MARKUP_PLUGINS.has(seoPlugin) ?", 'false ?'))
   const mY = transport()
   await noFilter.publishArticleSchemaToWordPress(db({}) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo('yoast'), post: mY.post })

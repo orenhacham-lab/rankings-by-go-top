@@ -28,7 +28,10 @@
  * YOAST OR RANK MATH ON THE SITE: they already print the page's article markup
  * in their own graph, so ours would be a second, possibly contradicting one
  * (another author, other dates). Then only the FAQPage is sent, which they do
- * not make for our articles; with no FAQ, nothing is sent (`seo_plugin_article`).
+ * not make for our articles, and the business's official profiles (Settings,
+ * sameAs) as the site's Organization under the @id Yoast and Rank Math give
+ * theirs ("<site>/#organization"), so the links still reach the page and
+ * describe the same entity. With neither, nothing is sent (`seo_plugin_article`).
  * The site is asked at publish time (its REST namespaces); when it does not
  * answer, what the Bridge plugin last reported (site_fix_plugin_links.seo_plugin).
  * Neither known: the full markup, since a duplicate does no harm and a missing
@@ -96,6 +99,24 @@ export function wordpressSchemaGraph(blocks: JsonLd[]): JsonLd | null {
     if (entities.length === 0) nodes.splice(nodes.indexOf(faq!), 1)
     if (!nodes.length) return null
   }
+}
+
+/**
+ * The business behind the article, with its official profiles, as one
+ * Organization node for a site whose SEO plugin prints the article markup.
+ * [] when the owner set no profiles: then there is nothing to add to theirs.
+ */
+export function businessProfilesNode(blocks: JsonLd[]): JsonLd[] {
+  const article = blocks.find((b) => b['@type'] === 'BlogPosting' || b['@type'] === 'Article')
+  const org = article?.publisher as JsonLd | undefined
+  const sameAs = Array.isArray(org?.sameAs) ? (org!.sameAs as unknown[]).filter((u) => typeof u === 'string') : []
+  if (!org || !sameAs.length) return []
+  const node: JsonLd = { '@context': 'https://schema.org', '@type': 'Organization' }
+  if (typeof org.url === 'string') node['@id'] = `${org.url.replace(/\/?$/, '/')}#organization`
+  node.name = org.name
+  if (typeof org.url === 'string') node.url = org.url
+  node.sameAs = sameAs
+  return [node]
 }
 
 /** A stable job id (UUID-shaped, as the plugin requires) for this article and this exact markup. */
@@ -169,7 +190,7 @@ export async function publishArticleSchemaToWordPress(
     // The site asked now; when it does not answer, what the Bridge plugin last reported.
     const live: SeoPlugin = deps.detectSeoPlugin ? await deps.detectSeoPlugin().catch(() => 'unknown' as const) : 'unknown'
     const seoPlugin: string = live === 'unknown' || live === 'permission_error' ? (row.seo_plugin ?? 'unknown') : live
-    const sent = ARTICLE_MARKUP_PLUGINS.has(seoPlugin) ? blocks.filter((b) => b['@type'] === 'FAQPage') : blocks
+    const sent = ARTICLE_MARKUP_PLUGINS.has(seoPlugin) ? [...businessProfilesNode(blocks), ...blocks.filter((b) => b['@type'] === 'FAQPage')] : blocks
     if (!sent.length) return 'seo_plugin_article'
     const graph = wordpressSchemaGraph(sent)
     if (!graph) return 'too_large'

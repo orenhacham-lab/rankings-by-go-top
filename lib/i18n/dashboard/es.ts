@@ -2986,7 +2986,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     officialProfiles: {
       title: 'Perfiles oficiales del negocio',
       navLabel: 'Perfiles oficiales',
-      body: 'Enlaces a las páginas oficiales del negocio en Google y en las redes sociales. Cada artículo los lleva en el marcado que leen Google y los asistentes de IA, para que sepan que es un mismo negocio.',
+      body: 'Enlaces a las páginas oficiales del negocio en Google y en las redes sociales. Se incluyen en el marcado que leen Google y los asistentes de IA, para que sepan que es un mismo negocio: automáticamente en los artículos publicados en WordPress mientras el plugin de GO TOP de Salud de la web está conectado, y en los artículos enviados por webhook. También puedes copiar el código de cualquier artículo a mano. En Shopify, y en WordPress sin el plugin, no se añaden al sitio automáticamente.',
       whyTitle: '¿Por qué ayuda esto?',
       why: 'Google y los asistentes de IA como ChatGPT y Gemini componen la imagen de un negocio a partir de muchas fuentes. Cuando todos los artículos de tu web apuntan a las mismas páginas oficiales, les resulta más fácil ver que la web, el perfil de Google y las páginas sociales son un mismo negocio, y mostrar información correcta sobre ti. No garantiza una mención en las respuestas, pero elimina las dudas sobre quién eres.',
       readOnly: 'Estos campos todavía no están abiertos a edición en tu cuenta.',
