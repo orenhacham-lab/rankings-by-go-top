@@ -86,7 +86,7 @@ console.log('\nC) the launch order')
   check('C2: the Portuguese launch prerequisite is met — the log can store its rows',
     ALLOWED.has('pt-BR'), [...ALLOWED].join(' '))
   check('C3: the gate is a real gate — "true" and nothing else turns it on',
-    portugueseSiteEnabled('true') && !portugueseSiteEnabled('TRUE') && !portugueseSiteEnabled(undefined) && !portugueseSiteEnabled(''))
+    portugueseSiteEnabled('true') && !portugueseSiteEnabled('TRUE') && !portugueseSiteEnabled('1') && !portugueseSiteEnabled('yes') && !portugueseSiteEnabled(''))
   // The same rule with pt-BR's gate replaced by one that is always on: the rule
   // must then report it as live, proving C1 is reading the gate and not a constant.
   // The same rule against a constraint that does NOT list pt-BR, with its gate
