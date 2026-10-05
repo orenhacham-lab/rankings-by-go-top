@@ -59,6 +59,14 @@ export type AffiliateCopy = {
   rules: { title: string; body: string }[]
   faqTitle: string
   faq: { q: string; a: string }[]
+  /**
+   * The page states rates, payout thresholds and reversal rules, which makes it
+   * an offer — so it has to point at the agreement that binds it, in the
+   * reader's own language. The legal thread asked for this and it is right:
+   * terms a partner cannot find are terms they never agreed to.
+   */
+  termsNote: string
+  termsLink: string
   closeTitle: string
   closeBody: string
 }
@@ -108,6 +116,8 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { q: 'אני כבר לקוח. אפשר לקבל עמלה על עצמי?', a: 'לא. הקישור מצטרף רק לחשבון חדש, והחשבון שלכם והפרויקטים שלכם מוחרגים. אבל אתם בהחלט יכולים להמליץ לאחרים ולקבל על זה.' },
       { q: 'יש מינימום לקוחות?', a: `אין. הכסף משולם כשהיתרה עוברת ${T.minPayoutIls} שקל, ועד אז הוא פשוט ממשיך להיצבר.` },
     ],
+    termsNote: 'הכללים האלה והתנאים המלאים של התוכנית, כולל אופן הייחוס, מועדי התשלום וביטול עמלה, מופיעים בהסכם.',
+    termsLink: 'להסכם תוכנית השותפים',
     closeTitle: 'נשמע מתאים לכם?',
     closeBody: 'ספרו לנו מי אתם ואיפה הקהל שלכם. אנחנו עונים לכל בקשה.',
   },
@@ -153,6 +163,8 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { q: 'I am already a customer. Can I earn on myself?', a: 'No. A link attaches to a new account only, and your own account and projects are excluded. You can certainly recommend us to others and earn on that.' },
       { q: 'Is there a minimum number of customers?', a: `None. You are paid once your balance passes $${T.minPayoutUsd}, and until then it simply keeps building.` },
     ],
+    termsNote: 'These rules and the program’s full terms, including how a referral is credited, when commission is paid and when it is reversed, are in the agreement.',
+    termsLink: 'Read the Partner Program Agreement',
     closeTitle: 'Sound like you?',
     closeBody: 'Tell us who you are and where your audience is. We answer every application.',
   },
@@ -198,6 +210,8 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { q: 'Ya soy cliente. ¿Puedo cobrar por mí mismo?', a: 'No. Un enlace solo se asocia a una cuenta nueva, y tu cuenta y tus proyectos quedan excluidos. Lo que sí puedes es recomendarnos a otros y cobrar por ello.' },
       { q: '¿Hay un mínimo de clientes?', a: `Ninguno. Cobras cuando tu saldo supera los ${T.minPayoutUsd} $, y hasta entonces simplemente sigue acumulándose.` },
     ],
+    termsNote: 'Estas reglas y las condiciones completas del programa, incluido cómo se atribuye una recomendación, cuándo se paga la comisión y cuándo se revierte, están en el acuerdo.',
+    termsLink: 'Leer el Acuerdo del Programa de Socios',
     closeTitle: '¿Te encaja?',
     closeBody: 'Cuéntanos quién eres y dónde está tu público. Respondemos a todas las solicitudes.',
   },
@@ -243,6 +257,8 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { q: 'Já sou cliente. Posso receber por mim mesmo?', a: 'Não. Um link só se liga a uma conta nova, e a sua própria conta e os seus projetos ficam de fora. O que você pode é indicar a gente para outras pessoas e receber por isso.' },
       { q: 'Existe um mínimo de clientes?', a: `Nenhum. Você recebe quando seu saldo passa de ${T.minPayoutUsd} dólares, e até lá ele simplesmente continua acumulando.` },
     ],
+    termsNote: 'Estas regras e os termos completos do programa, incluindo como uma indicação é creditada, quando a comissão é paga e quando ela é revertida, estão no contrato.',
+    termsLink: 'Ler o Contrato do Programa de Parceiros',
     closeTitle: 'Faz sentido para você?',
     closeBody: 'Conte quem você é e onde está o seu público. Respondemos a todas as candidaturas.',
   },

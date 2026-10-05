@@ -14,6 +14,7 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { AFFILIATES_COPY, AFFILIATE_TERMS } from '../affiliates'
+import { LOCALE_PREFIX } from '../../locales'
 import { REFERRAL_WINDOW_DAYS } from '../../../affiliate/referral'
 import { affiliateTrackingEnabled } from '../../../affiliate/tracking-flag'
 import { getPublicDictionary } from '../../getPublicDictionary'
@@ -160,6 +161,41 @@ console.log('\nE) what it must NOT say')
   }
   check('E1-MUT: a copy promising guaranteed income fails E1',
     forbidden.some((re) => re.test(JSON.stringify({ x: 'guaranteed monthly income' }))))
+}
+
+console.log('F) the offer points at the terms that bind it')
+{
+  /**
+   * The page states rates, payout thresholds and reversal rules, so it is an
+   * offer. An offer a partner cannot trace to its agreement is terms they never
+   * agreed to — the legal thread raised it and it was right. Each language must
+   * carry the sentence, the link label, and a link to ITS OWN copy of the
+   * agreement: an English partner sent to the Hebrew document has not been shown
+   * the terms either.
+   */
+  const PAGE = strip(read('components/public/AffiliatesPage.tsx'))
+  check('F1: the page links to the agreement, built from the reader’s own locale prefix',
+    PAGE.includes('${LOCALE_PREFIX[locale]}/affiliate-terms'))
+  check('F2: every language carries the sentence and the link label',
+    LANGS.every((l) => AFFILIATES_COPY[l].termsNote.length > 20 && AFFILIATES_COPY[l].termsLink.length > 3))
+  check('F3: no language was left reading another language’s words', (() => {
+    const notes = LANGS.map((l) => AFFILIATES_COPY[l].termsNote)
+    return new Set(notes).size === notes.length
+  })())
+  // Every route the link can resolve to must actually exist, or the page points
+  // a partner at a 404 where the terms should be.
+  check('F4: the agreement exists at every language’s route', LANGS.every((l) => {
+    const prefix = LOCALE_PREFIX[l]
+    return existsSync(join(ROOT, `app/(public)${prefix}/affiliate-terms/page.tsx`))
+      || (prefix === '' && existsSync(join(ROOT, 'app/(legal)/affiliate-terms/page.tsx')))
+  }), LANGS.filter((l) => {
+    const prefix = LOCALE_PREFIX[l]
+    return !existsSync(join(ROOT, `app/(public)${prefix}/affiliate-terms/page.tsx`))
+      && !(prefix === '' && existsSync(join(ROOT, 'app/(legal)/affiliate-terms/page.tsx')))
+  }).join(', '))
+  /* F1-MUT: the same page with the link taken out — F1 must fail on it. */
+  check('F1-MUT: a page that drops the link is caught',
+    !PAGE.replace('${LOCALE_PREFIX[locale]}/affiliate-terms', '#').includes('${LOCALE_PREFIX[locale]}/affiliate-terms'))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
