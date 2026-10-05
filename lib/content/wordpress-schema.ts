@@ -25,6 +25,15 @@
  * WordPress and is not ours to put there); the outcome says `no_plugin`.
  * Shopify and Wix: never called (standing decision: no schema there).
  *
+ * YOAST OR RANK MATH ON THE SITE: they already print the page's article markup
+ * in their own graph, so ours would be a second, possibly contradicting one
+ * (another author, other dates). Then only the FAQPage is sent, which they do
+ * not make for our articles; with no FAQ, nothing is sent (`seo_plugin_article`).
+ * The site is asked at publish time (its REST namespaces); when it does not
+ * answer, what the Bridge plugin last reported (site_fix_plugin_links.seo_plugin).
+ * Neither known: the full markup, since a duplicate does no harm and a missing
+ * article markup on a plain site would.
+ *
  * NEVER FAILS A PUBLISH: every outcome is a code, logged once; nothing a site
  * says is shown to anyone. The service role bypasses RLS, so every read names
  * the project and its owner.
@@ -36,16 +45,23 @@ import { buildStructuredData, type JsonLd, type StructuredDataFaq } from '@/lib/
 import { pluginFix, type PluginLink, type PluginPost } from '@/lib/site-fix/plugin-client'
 import { readPluginLink } from '@/lib/site-fix/store'
 import { LIMITS, validSchema } from '@/lib/site-fix/whitelist'
+import type { SeoPlugin } from '@/lib/content/wordpress-taxonomy'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 export type ArticleSchemaOutcome =
   | 'applied' | 'already'
   | 'no_plugin' | 'plugin_not_connected' | 'not_published' | 'no_url' | 'no_article' | 'no_markup' | 'too_large'
+  | 'seo_plugin_article'
   | 'plugin_refused' | 'error'
+
+/** The SEO plugins that print their own article markup (lib/content/wordpress-taxonomy.ts SeoPlugin). */
+const ARTICLE_MARKUP_PLUGINS: ReadonlySet<string> = new Set(['yoast', 'rankmath'])
 
 export interface ArticleSchemaDeps {
   decrypt: (s: string) => string
+  /** The site's SEO plugin, asked only once the Bridge plugin is known to be connected. */
+  detectSeoPlugin?: () => Promise<SeoPlugin>
   post?: PluginPost
   now?: () => Date
 }
@@ -150,7 +166,12 @@ export async function publishArticleSchemaToWordPress(
       faq: Array.isArray(article.faq_json) ? article.faq_json : [],
     })
     if (!blocks.length) return 'no_markup'
-    const graph = wordpressSchemaGraph(blocks)
+    // The site asked now; when it does not answer, what the Bridge plugin last reported.
+    const live: SeoPlugin = deps.detectSeoPlugin ? await deps.detectSeoPlugin().catch(() => 'unknown' as const) : 'unknown'
+    const seoPlugin: string = live === 'unknown' || live === 'permission_error' ? (row.seo_plugin ?? 'unknown') : live
+    const sent = ARTICLE_MARKUP_PLUGINS.has(seoPlugin) ? blocks.filter((b) => b['@type'] === 'FAQPage') : blocks
+    if (!sent.length) return 'seo_plugin_article'
+    const graph = wordpressSchemaGraph(sent)
     if (!graph) return 'too_large'
 
     const answer = await pluginFix(link, { jobId: schemaJobId(article.id, graph), type: 'schema_jsonld', url: postUrl, value: { schema: graph }, expected: null }, deps.post)

@@ -13,7 +13,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { uploadMedia, createPost, updatePost, getCategories, getTags, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
+import { uploadMedia, createPost, updatePost, getCategories, getTags, detectSeoPlugin, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { reconcileInlineImagesForWordPress, injectInlineImages, type InlineWpResult } from '@/lib/content/inline-images'
 import { applyArticleDesign } from '@/lib/content/article-style/publish'
@@ -206,7 +206,7 @@ export async function wpCreatePost(
     // plugin when it is connected, never into the post content. Best-effort; never fails the publish.
     let schema: ArticleSchemaOutcome | undefined
     if (status === 'publish' && article.id) {
-      schema = await publishArticleSchemaToWordPress(admin, { articleId: article.id, postUrl: post.link, status }, opts.schemaDeps ?? { decrypt: decryptCredential })
+      schema = await publishArticleSchemaToWordPress(admin, { articleId: article.id, postUrl: post.link, status }, opts.schemaDeps ?? { decrypt: decryptCredential, detectSeoPlugin: () => detectSeoPlugin(creds) })
       if (schema !== 'no_plugin') console.log('[wordpress-publish] article schema', { outcome: schema })
     }
     return {
