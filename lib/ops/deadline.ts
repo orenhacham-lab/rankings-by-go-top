@@ -44,7 +44,7 @@ export class DeadlineExceededError extends Error {
  */
 export class Deadline {
   private readonly endsAt: number
-  constructor(budgetMs: number, private readonly nowFn: () => number = Date.now) {
+  constructor(readonly budgetMs: number, private readonly nowFn: () => number = Date.now) {
     this.endsAt = nowFn() + budgetMs
   }
   remaining(): number {

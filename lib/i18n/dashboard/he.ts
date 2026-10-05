@@ -4201,6 +4201,8 @@ export const dashboardHe = {
       volumesRetry: 'נסו שוב',
     },
     table: {
+      fromArticle: 'נוסף מהמאמר',
+      openArticle: 'פתיחת המאמר',
       keyword: 'מילת מפתח',
       scanType: 'סוג סריקה',
       searchVolume: 'נפח חיפוש',

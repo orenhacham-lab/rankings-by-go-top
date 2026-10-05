@@ -3558,6 +3558,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       volumesRetry: 'Volver a intentarlo',
     },
     table: {
+      fromArticle: 'Añadida desde el artículo',
+      openArticle: 'Abrir el artículo',
       keyword: 'Palabra clave',
       scanType: 'Tipo de análisis',
       searchVolume: 'Volumen de búsqueda',

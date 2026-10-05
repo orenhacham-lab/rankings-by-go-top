@@ -4182,6 +4182,8 @@ export const dashboardEn = {
       volumesRetry: 'Try again',
     },
     table: {
+      fromArticle: 'Added from the article',
+      openArticle: 'Open the article',
       keyword: 'Keyword',
       scanType: 'Scan type',
       searchVolume: 'Search volume',
