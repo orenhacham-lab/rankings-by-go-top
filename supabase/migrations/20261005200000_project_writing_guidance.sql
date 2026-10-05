@@ -5,7 +5,9 @@
 -- article settings row the owner already reads and writes under RLS. No new
 -- table, no policy change: the row's existing owner-only policies cover it.
 --
---   writing_guidance  {instructions, exclusions, rules}
+--   writing_guidance  {mention_business, instructions, exclusions, rules}
+--     mention_business  boolean: name the business in the articles the system
+--                   writes (absent = on); the owner's switch
 --     instructions  text, <= 2000 characters: standing instructions
 --     exclusions    <= 20 strings of <= 120: what the business does not sell
 --     rules         <= 30 objects {text <= 300, at, article_id}: notes the
@@ -36,7 +38,8 @@ ALTER TABLE public.project_article_styles ADD CONSTRAINT project_article_styles_
   jsonb_typeof(writing_guidance) = 'object'
   AND pg_column_size(writing_guidance) <= 32768
   AND NOT jsonb_path_exists(writing_guidance,
-    'strict $.keyvalue() ? (!(@.key like_regex "^(instructions|exclusions|rules)$"))')
+    'strict $.keyvalue() ? (!(@.key like_regex "^(mention_business|instructions|exclusions|rules)$"))')
+  AND (NOT writing_guidance ? 'mention_business' OR jsonb_typeof(writing_guidance -> 'mention_business') = 'boolean')
   AND (NOT writing_guidance ? 'instructions' OR (jsonb_typeof(writing_guidance -> 'instructions') = 'string'
        AND char_length(writing_guidance ->> 'instructions') <= 2000))
   AND (NOT writing_guidance ? 'exclusions' OR (jsonb_typeof(writing_guidance -> 'exclusions') = 'array'
@@ -53,6 +56,6 @@ ALTER TABLE public.project_article_styles ADD CONSTRAINT project_article_styles_
 );
 
 COMMENT ON COLUMN public.project_article_styles.writing_guidance IS
-  'The owner''s writing guidance for the project''s articles: {instructions, exclusions[], rules[{text, at, article_id}]}. ''{}'' = none (the pre-existing behaviour).';
+  'The owner''s writing guidance for the project''s articles: {mention_business, instructions, exclusions[], rules[{text, at, article_id}]}. ''{}'' = none (the pre-existing behaviour).';
 
 COMMIT;

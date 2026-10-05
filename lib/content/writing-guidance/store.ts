@@ -19,7 +19,7 @@ export const WRITING_GUIDANCE_COLUMN = 'writing_guidance'
 
 export type GuidanceRead = { state: 'saved' | 'default' | 'missing_column' | 'error'; guidance: WritingGuidance }
 
-const none = (): WritingGuidance => ({ instructions: '', exclusions: [], rules: [] })
+const none = (): WritingGuidance => ({ mentionBusiness: true, instructions: '', exclusions: [], rules: [] })
 
 /** The project's guidance, read for its owner (any client: the owner's RLS one or the service role). */
 export async function readProjectWritingGuidance(db: SupabaseClient, projectId: string, ownerId: string): Promise<GuidanceRead> {

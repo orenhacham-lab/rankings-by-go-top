@@ -33,6 +33,11 @@ export type WritingRule = {
 }
 
 export type WritingGuidance = {
+  /**
+   * Name the business in the articles the system writes (E-E-A-T). On unless the
+   * owner switched it off; a choice made in a topic's brief form still wins.
+   */
+  mentionBusiness: boolean
   instructions: string
   exclusions: string[]
   rules: WritingRule[]
@@ -46,7 +51,7 @@ export const GUIDANCE_LIMITS = {
   rules: 30,
 } as const
 
-export const EMPTY_GUIDANCE: WritingGuidance = Object.freeze({ instructions: '', exclusions: [], rules: [] }) as unknown as WritingGuidance
+export const EMPTY_GUIDANCE: WritingGuidance = Object.freeze({ mentionBusiness: true, instructions: '', exclusions: [], rules: [] }) as unknown as WritingGuidance
 
 const CONTROL_EXCEPT_NEWLINE = /[\u0000-\u0009\u000b-\u001f\u007f‎‏‪-‮⁦-⁩]/g
 const CONTROL = /[\u0000-\u001f\u007f‎‏‪-‮⁦-⁩]/g
@@ -115,9 +120,11 @@ function cleanRules(input: unknown): WritingRule[] {
 
 /** A stored value (or anything) → guidance. Lenient: whatever is not valid is left out. */
 export function toWritingGuidance(value: unknown): WritingGuidance {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { instructions: '', exclusions: [], rules: [] }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { mentionBusiness: true, instructions: '', exclusions: [], rules: [] }
   const v = value as Record<string, unknown>
+  const mention = v.mentionBusiness ?? v.mention_business
   return {
+    mentionBusiness: mention !== false,
     instructions: cleanText(v.instructions, GUIDANCE_LIMITS.instructions),
     exclusions: cleanList(v.exclusions, GUIDANCE_LIMITS.exclusion, GUIDANCE_LIMITS.exclusions),
     rules: cleanRules(v.rules),
@@ -128,7 +135,7 @@ export function isEmptyGuidance(g: WritingGuidance | null | undefined): boolean 
   return !g || (!g.instructions && g.exclusions.length === 0 && g.rules.length === 0)
 }
 
-export type GuidanceField = 'instructions' | 'exclusions' | 'rules'
+export type GuidanceField = 'mentionBusiness' | 'instructions' | 'exclusions' | 'rules'
 export type ParsedGuidance = { ok: true; guidance: WritingGuidance } | { ok: false; invalid: GuidanceField[] }
 
 /**
@@ -140,6 +147,7 @@ export function parseGuidanceInput(input: unknown): ParsedGuidance {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, invalid: [] }
   const v = input as Record<string, unknown>
   const invalid: GuidanceField[] = []
+  if (v.mentionBusiness !== undefined && typeof v.mentionBusiness !== 'boolean') invalid.push('mentionBusiness')
   if (v.instructions !== undefined && typeof v.instructions !== 'string') invalid.push('instructions')
   else if (typeof v.instructions === 'string' && v.instructions.trim().length > GUIDANCE_LIMITS.instructions) invalid.push('instructions')
   const listOk = (raw: unknown, each: number, max: number, pick: (x: unknown) => unknown) =>
@@ -168,7 +176,7 @@ export function withRule(g: WritingGuidance, rule: WritingRule): AddRuleOutcome 
 }
 
 export function sameGuidance(a: WritingGuidance, b: WritingGuidance): boolean {
-  return a.instructions === b.instructions
+  return a.mentionBusiness === b.mentionBusiness && a.instructions === b.instructions
     && a.exclusions.length === b.exclusions.length && a.exclusions.every((x, i) => x === b.exclusions[i])
     && a.rules.length === b.rules.length && a.rules.every((r, i) => r.text === b.rules[i].text)
 }
@@ -176,6 +184,7 @@ export function sameGuidance(a: WritingGuidance, b: WritingGuidance): boolean {
 /** The stored JSON (snake_case, the migration's CHECK reads these keys). */
 export function toGuidanceRow(g: WritingGuidance): Record<string, unknown> {
   return {
+    mention_business: g.mentionBusiness,
     instructions: g.instructions,
     exclusions: g.exclusions,
     rules: g.rules.map((r) => ({ text: r.text, at: r.at, article_id: r.articleId })),

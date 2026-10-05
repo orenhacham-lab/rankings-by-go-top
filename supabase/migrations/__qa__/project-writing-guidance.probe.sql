@@ -114,7 +114,7 @@ BEGIN
   -- Always allowed (regression): none, a full valid value, the limits exactly.
   r := set_g('{}');
   PERFORM chk(ph, 'empty is allowed -> ' || r, r = 'ok:1');
-  r := set_g('{"instructions": "כתבו בגוף ראשון רבים.\nאל תזכירו מחירים.", "exclusions": ["תיקוני צנרת", "משלוחים לאילת"], "rules": [{"text": "האחריות היא שנתיים", "at": "2026-10-05T20:00:00.000Z", "article_id": "b1111111-1111-1111-1111-111111111111"}, {"text": "בלי מחירים", "at": "2026-10-05T20:01:00.000Z", "article_id": null}]}');
+  r := set_g('{"mention_business": false, "instructions": "כתבו בגוף ראשון רבים.\nאל תזכירו מחירים.", "exclusions": ["תיקוני צנרת", "משלוחים לאילת"], "rules": [{"text": "האחריות היא שנתיים", "at": "2026-10-05T20:00:00.000Z", "article_id": "b1111111-1111-1111-1111-111111111111"}, {"text": "בלי מחירים", "at": "2026-10-05T20:01:00.000Z", "article_id": null}]}');
   PERFORM chk(ph, 'a full valid value is allowed -> ' || r, r = 'ok:1');
   r := set_g(jsonb_build_object('instructions', repeat('א', 2000), 'exclusions', (SELECT jsonb_agg(repeat('ב', 120)) FROM generate_series(1, 20)),
     'rules', (SELECT jsonb_agg(jsonb_build_object('text', repeat('ג', 300), 'at', '2026-10-05T20:00:00.000Z', 'article_id', NULL)) FROM generate_series(1, 30))));
@@ -122,6 +122,7 @@ BEGIN
 
   FOR label, bad IN VALUES
     ('an unknown key', '{"instructions": "x", "script": "x"}'::jsonb),
+    ('mention_business as a string', '{"mention_business": "false"}'::jsonb),
     ('instructions over 2000', jsonb_build_object('instructions', repeat('א', 2001))),
     ('instructions as a number', '{"instructions": 5}'::jsonb),
     ('an exclusion over 120', jsonb_build_object('exclusions', jsonb_build_array(repeat('ב', 121)))),

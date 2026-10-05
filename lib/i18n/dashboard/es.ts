@@ -2813,6 +2813,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       title: 'Pautas de redacción de tus artículos',
       navLabel: 'Pautas de redacción',
       body: 'Lo que escribas aquí se incluye en cada artículo que escribimos para el negocio, para que los artículos se ajusten a tu negocio y no al sector en general.',
+      mentionLabel: 'Mencionar el nombre del negocio en los artículos',
+      mentionHint: 'Recomendado. Los artículos nombran el negocio 2-3 veces donde encaja, para que Google y los asistentes de IA lo asocien con su sector. Nunca en el título, y sin inventar experiencia ni logros.',
       readOnly: 'Estas pautas todavía no se pueden editar en tu cuenta.',
       appliesNext: 'Los cambios se aplican a los próximos artículos. Los artículos ya escritos no cambian.',
       instructionsLabel: 'Instrucciones fijas',

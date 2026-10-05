@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NotebookPen, Plus, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Switch from '@/components/ui/Switch'
 import { Skeleton } from '@/components/ui/Skeleton'
 import SettingsCard, { FieldLabel, fieldClass } from './SettingsCard'
 import SaveBar, { showSaveBar, type SaveState } from './SaveBar'
@@ -86,6 +87,7 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
     setSave({ kind: 'saving' })
     setTooLong(false)
     const res = await saveWritingGuidanceAction(projectId, {
+      mentionBusiness: draft.mentionBusiness,
       instructions: draft.instructions,
       exclusions: draft.exclusions,
       rules: draft.rules.map((r) => ({ text: r.text })),
@@ -123,6 +125,16 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
     >
       <div className="space-y-6" data-writing-guidance="">
         {disabled && <Notice tone="info">{w.readOnly}</Notice>}
+
+        <div data-writing-mention="">
+          <Switch
+            checked={draft.mentionBusiness}
+            disabled={disabled}
+            onChange={(next) => setDraft({ ...draft, mentionBusiness: next })}
+            label={w.mentionLabel}
+            description={w.mentionHint}
+          />
+        </div>
 
         <div>
           <FieldLabel htmlFor="writing-instructions" aside={<span className="text-caption text-muted tabular-nums">{fill(w.count, { n: draft.instructions.length, max: GUIDANCE_LIMITS.instructions })}</span>}>
