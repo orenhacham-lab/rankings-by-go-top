@@ -26,6 +26,8 @@ export const dashboardHe = {
     errorLogs: 'לוג שגיאות',
     support: 'תמיכה ב-WhatsApp',
     supportAria: 'תמיכה ב-WhatsApp (נפתח בחלון חדש)',
+    accessibility: 'הצהרת נגישות',
+    accessibilityAria: 'הצהרת הנגישות שלנו (נפתחת בחלון חדש)',
     logout: 'יציאה',
     navLabel: 'ניווט ראשי',
     skipToContent: 'דלגו לתוכן',

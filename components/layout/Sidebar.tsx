@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
 import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
+import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -32,6 +33,7 @@ import {
   ClipboardList,
   LogOut,
   Library,
+  Accessibility,
   Menu,
   X,
   Waypoints,
@@ -333,7 +335,7 @@ const QUIET_ROW = cn(
 )
 
 /** Support, the two preferences and logout: the same foot on the rail and in the drawer. */
-function RailFoot({ dict, isAdmin }: { dict: ReturnType<typeof getDashboardDictionary>; isAdmin: boolean }) {
+function RailFoot({ dict, isAdmin, uiLocale }: { dict: ReturnType<typeof getDashboardDictionary>; isAdmin: boolean; uiLocale: PublicLocale }) {
   return (
     <div className="space-y-2">
       {!isAdmin && (
@@ -349,6 +351,27 @@ function RailFoot({ dict, isAdmin }: { dict: ReturnType<typeof getDashboardDicti
           <span>{dict.sidebar.support}</span>
         </a>
       )}
+      {/*
+        The accessibility statement is a public declaration, and reg. 35 of the
+        Israeli accessibility-to-service regulations wants it reachable from the
+        service it describes — ours claims "the site and the platform", so the
+        platform has to offer it too, not only the marketing site's footer. The
+        href carries the reader's own language prefix, taken from the one locale
+        list rather than written out, so a fifth language needs nothing here.
+        It opens in a new tab because the statement lives outside the app shell
+        and a logged-in reader should not lose the screen they were on.
+      */}
+      <a
+        href={`${LOCALE_PREFIX[uiLocale]}/accessibility`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={dict.sidebar.accessibilityAria}
+        data-rail="accessibility"
+        className={QUIET_ROW}
+      >
+        <Accessibility {...NAV_ICON} aria-hidden="true" className="shrink-0 text-rail-muted group-hover:text-rail-ink" />
+        <span>{dict.sidebar.accessibility}</span>
+      </a>
       {/* Two controls side by side fit while there are two languages. A third
           chip does not: half the rail's width cannot hold "עברית" beside EN and
           ES, and the measured result was the Hebrew label spilling out of its
@@ -521,7 +544,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                 </div>
               </nav>
               <div className="shrink-0 border-t border-rail-line px-3 py-3">
-                <RailFoot dict={dict} isAdmin={isAdmin} />
+                <RailFoot dict={dict} isAdmin={isAdmin} uiLocale={uiLocale} />
               </div>
             </div>
           </div>
@@ -544,7 +567,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
 
         {/* Desktop foot: support, then the two preferences, then logout. */}
         <div className="hidden shrink-0 border-t border-rail-line px-3 py-3 md:block">
-          <RailFoot dict={dict} isAdmin={isAdmin} />
+          <RailFoot dict={dict} isAdmin={isAdmin} uiLocale={uiLocale} />
         </div>
       </div>
     </aside>
