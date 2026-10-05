@@ -73,9 +73,33 @@ export function shouldRenderPublicWidgets(isAuthenticated: boolean, pathname: st
   return !isNonPublicArea(pathname)
 }
 
-export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
+/**
+ * THE CONSENT NOTICE IS RENDERED BEFORE THE PAGE, NOT AFTER IT.
+ *
+ * It looks the same either way, because it is fixed-positioned. What changes is
+ * the TAB ORDER. Rendered with the other floating widgets, at the end of the
+ * document, the notice was tab stop 47 on the home page: a visitor with a mouse
+ * refused cookies in one click, and a visitor using only a keyboard had to pass
+ * the whole page first. Refusing has to be as easy as accepting (GDPR Art. 7
+ * and the EDPB's cookie-banner guidance), and "as easy" cannot mean 46 extra
+ * keystrokes. So the root layout renders this one above `children`, and the
+ * rest of the widgets stay below it. Measured by
+ * lib/__qa__/reviewer-journey/public-a11y.js, which fails if the notice is not
+ * among the first stops.
+ */
+export function PublicConsentNotice({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname()
   const [, setCookieOpen] = useState(false)
+
+  if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
+    return null
+  }
+
+  return <CookieConsent onOpenChange={setCookieOpen} />
+}
+
+export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
+  const pathname = usePathname()
 
   if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
     return null
@@ -86,7 +110,6 @@ export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated
       <AccessibilityWidget />
       <WhatsAppFloat />
       <MobileContactBar />
-      <CookieConsent onOpenChange={setCookieOpen} />
     </>
   )
 }

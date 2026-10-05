@@ -337,6 +337,43 @@ const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
   }
 }
 
+// ── 10) the accessibility statement says how it was verified ───────────────
+/*
+ * An accessibility statement is a public declaration, so an inaccurate one is
+ * its own exposure: in Israel under the deception provisions of the Consumer
+ * Protection Law, 1981, and in the EU under the model statement the EAA builds
+ * on, which expects the evaluation method to be named. The statement therefore
+ * says exactly what is checked automatically, that an automated pass is not
+ * all of it, and that no audit by a person using assistive technology has been
+ * done yet — which is the stated reason it says "partially" rather than
+ * "fully". The three facts are held together: a statement that keeps the word
+ * "partially" while dropping the reason, or that claims full conformance, has
+ * to fail here rather than in front of a regulator.
+ */
+const HEBREW_A11Y = 'app/(legal)/accessibility/page.tsx'
+const A11Y_METHOD: Record<string, RegExp[]> = {
+  he: [/כיצד נבדקנו/, /WCAG 2\.1/, /טכנולוגיה\s*\n?\s*מסייעת/, /טרם נעשתה/, /חלקית/],
+  en: [/How we are checked/, /WCAG 2\.1/, /assistive technology/, /has not been carried out/, /partially/i],
+  es: [/C[óo]mo se nos comprueba/, /WCAG 2\.1/, /tecnolog[íi]a de asistencia/, /todav[íi]a no se ha realizado/, /parcialmente/i],
+  'pt-BR': [/Como somos verificados/, /WCAG 2\.1/, /tecnologia assistiva/, /ainda n[ãa]o foi feita/, /parcialmente/i],
+}
+{
+  const enA11ySource = frontMatter(text[LOCALES[0]].accessibility).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_A11Y) ? readFileSync(HEBREW_A11Y, 'utf8') : ''],
+    ['en', enA11ySource && existsSync(enA11ySource) ? readFileSync(enA11ySource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].accessibility]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/accessibility: the page was read`, src.length > 0)
+    for (const must of A11Y_METHOD[name] ?? []) {
+      check(`${name}/accessibility: states ${must.source.slice(0, 34)}`, must.test(src))
+    }
+    check(`${name}/accessibility: claims no full conformance`,
+      !/fully conformant|totalmente conformes?|מותאמים במלואם|plenamente conforme/i.test(src))
+  }
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
@@ -359,6 +396,10 @@ console.log('\nmutation controls')
     (privacy.match(/^## /gm) ?? []).length + 1 !== (privacy.match(/^## /gm) ?? []).length)
   check('a 14-day refund promise slipped into a translation is caught',
     /\b14 dias\b/i.test('Reembolso incondicional em 14 dias.'))
+  check('an accessibility statement that drops the reason for "partially" is caught',
+    !/טרם נעשתה/.test(readFileSync(HEBREW_A11Y, 'utf8').replace(/טרם נעשתה/g, 'נעשתה')))
+  check('a statement that claims full conformance is caught',
+    /totalmente conformes/i.test('el sitio y la plataforma son totalmente conformes con la norma'))
   check('front matter claiming the wrong locale is caught',
     frontMatter('---\nlocale: en\n---').locale !== 'pt-BR')
   check('European Portuguese in a Brazilian document is caught',
