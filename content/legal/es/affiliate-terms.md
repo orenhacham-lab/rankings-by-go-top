@@ -20,8 +20,8 @@ Este acuerdo se suma a nuestros [Términos de Uso](/es/terms) y a nuestra [Polí
 ## 2. Definiciones
 
 - **Enlace de referido**: el enlace o código personal que le entregamos tras la aprobación y que le identifica como origen de una visita.
-- **Ventana de atribución**: 90 días desde el día en que un visitante llega a nuestro sitio a través de su enlace de referido.
-- **Cliente referido**: un cliente nuevo que abre una cuenta con nosotros dentro de la ventana de atribución y cuya cuenta le atribuimos conforme a la sección 4.
+- **Referencia**: una visita que llegó a nuestro sitio a través de su enlace de referido, y el registro que vino después por ese mismo camino.
+- **Cliente referido**: un cliente nuevo que abre una cuenta con nosotros en una Referencia que atribuimos a usted conforme al apartado 4.
 - **Pago válido**: un pago de suscripción que un cliente referido haya abonado efectivamente, que hayamos recibido efectivamente y que no haya sido reembolsado, revertido ni objeto de contracargo.
 - **Comisión**: el importe que le corresponde por un pago válido conforme a la sección 5.
 
@@ -35,9 +35,9 @@ No aceptamos socios en países o territorios que no estamos autorizados a atende
 
 ## 4. El enlace de referido y cómo se atribuye una referencia
 
-La atribución es por último clic: cuando un visitante ha llegado a nosotros a través de más de un enlace de referido, la cuenta se atribuye al más reciente dentro de su ventana de atribución. Una cuenta abierta después de que la ventana de atribución haya terminado no se le atribuye.
+La atribución es por el último clic en su enlace de referido camino al registro: cuando un visitante ha llegado a nosotros a través de más de un enlace de referido, la cuenta se atribuye al más reciente de ellos.
 
-La atribución depende de lo que el navegador y la configuración del visitante nos permitan registrar, y de las decisiones que el visitante tome en nuestro banner de cookies. Un visitante que rechace el almacenamiento no esencial, que lo borre, que utilice otro navegador o dispositivo, o que lo bloquee con una extensión, puede no quedar atribuido a usted. No garantizamos que toda visita a través de su enlace de referido dé lugar a una atribución, y no respondemos por una referencia que no hayamos podido registrar.
+Su código viaja en el propio enlace de referido. No colocamos ninguna cookie para el Programa de Socios ni guardamos nada en el dispositivo del visitante, de modo que lo que el visitante elija en nuestro aviso de cookies no afecta su atribución ni en un sentido ni en el otro. Lo que sí se desprende de ello: un visitante que se marcha y vuelve más tarde sin su enlace, en el mismo dispositivo o en otro, puede no quedar atribuido a usted. No garantizamos que toda visita a través de su enlace de referido dé lugar a una atribución, y no respondemos por una referencia que no hayamos podido registrar. Si en algún momento ampliamos el reconocimiento a una visita que vuelve más tarde, lo que exigiría guardar algo, se lo comunicaremos por escrito a los socios antes de que empiece y diremos qué se guarda.
 
 Actuamos conforme a nuestros registros. Si considera que una referencia se registró de forma incorrecta, escríbanos dentro de los 60 días siguientes a la apertura de la cuenta y revisaremos el registro y le comunicaremos lo que encontremos.
 
@@ -149,7 +149,7 @@ Cuando resolvamos este acuerdo por haber incumplido la sección 8, la sección 9
 
 ## 20. Cambios en el Programa y en este acuerdo
 
-Podremos modificar el porcentaje de comisión, la ventana de atribución, el periodo de retención, el importe mínimo de pago o cualquier otra condición del Programa. Le avisaremos por correo electrónico a la dirección de su cuenta de socio al menos 14 días antes de que el cambio surta efecto. Un cambio no es retroactivo: una comisión ya devengada se calcula conforme a las condiciones vigentes cuando se realizó el pago válido. Si no acepta un cambio, puede resolver este acuerdo antes de que surta efecto; seguir utilizando su enlace de referido después de esa fecha supone aceptarlo.
+Podremos modificar el porcentaje de comisión, la forma en que se atribuye una referencia, el periodo de retención, el importe mínimo de pago o cualquier otra condición del Programa. Le avisaremos por correo electrónico a la dirección de su cuenta de socio al menos 14 días antes de que el cambio surta efecto. Un cambio no es retroactivo: una comisión ya devengada se calcula conforme a las condiciones vigentes cuando se realizó el pago válido. Si no acepta un cambio, puede resolver este acuerdo antes de que surta efecto; seguir utilizando su enlace de referido después de esa fecha supone aceptarlo.
 
 ## 21. Cesión
 

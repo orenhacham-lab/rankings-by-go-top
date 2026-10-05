@@ -333,9 +333,10 @@ export default function EnglishPrivacyPage() {
           <li><strong>Paying commission:</strong> the provider the partner chooses &mdash; PayPal, Wise or a bank
           transfer &mdash; receives the details it needs in order to pay. Invoices and withholding certificates are
           kept for seven years, as Israeli bookkeeping rules require.</li>
-          <li><strong>Crediting a referral:</strong> this needs a cookie, and a cookie of that kind needs your
-          consent. See &ldquo;Cookies&rdquo; below for the single cookie involved and for what happens when you
-          refuse it.</li>
+          <li><strong>Crediting a referral:</strong> the partner&rsquo;s code travels in the link itself. We
+          set no cookie for the program and store nothing on your device, so what you choose about cookies does
+          not affect it in either direction. If we ever credit a visit that comes back later, which would mean
+          storing something, this policy will say so and your consent will be asked first.</li>
         </ul>
         <p className="mt-4">
           As of the date of this policy the program runs by application only: we receive applications and approve
@@ -434,12 +435,12 @@ export default function EnglishPrivacyPage() {
           &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
           easy as giving consent, and costs you nothing in the service.
         </p>
-        <p className="mt-4">
-          <strong>The partner program:</strong> if you reach the site through a partner link and you have allowed
-          marketing cookies, we set one cookie of our own domain, gt_ref, which keeps that partner&rsquo;s code for
-          90 days so that the partner who sent you is credited. The site works without it: if you refuse, no cookie
-          is set and the referral is simply not credited. As of the date of this policy referral tracking is
-          switched off and this cookie is not set at all.
+        <p className="mt-3">
+            <strong>The partner program:</strong> it sets no cookie at all. If you reach the site through a
+          partner link, that partner&rsquo;s code is carried in the link itself and nothing is written to your
+          device, which is why the program does not appear among the categories above and why your choice on
+          this notice neither helps nor hinders it. A cookie that keeps a partner&rsquo;s code is not strictly
+          necessary for the site to work, so we would have needed your consent for one; we chose not to need it.
         </p>
         <p className="mt-4">
           If your browser sends a Global Privacy Control signal, we treat it as a refusal: no

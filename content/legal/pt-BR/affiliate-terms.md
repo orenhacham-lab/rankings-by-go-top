@@ -20,8 +20,8 @@ Este contrato se soma aos nossos [Termos de Uso](/pt-BR/terms) e à nossa [Polí
 ## 2. Definições
 
 - **Link de indicação**: o link ou código pessoal que entregamos a você depois da aprovação e que identifica você como origem de uma visita.
-- **Janela de atribuição**: 90 dias a partir do dia em que um visitante chega ao nosso site pelo seu link de indicação.
-- **Cliente indicado**: um cliente novo que abre uma conta conosco dentro da janela de atribuição e cuja conta atribuímos a você conforme a seção 4.
+- **Indicação**: uma visita que chegou ao nosso site pelo seu link de indicação, e o cadastro que veio depois por esse mesmo caminho.
+- **Cliente indicado**: um cliente novo que abre uma conta conosco em uma Indicação que atribuímos a você conforme a seção 4.
 - **Pagamento válido**: um pagamento de assinatura que um cliente indicado efetivamente fez, que efetivamente recebemos e que não foi reembolsado, revertido nem objeto de contestação de cobrança.
 - **Comissão**: o valor devido a você sobre um pagamento válido conforme a seção 5.
 
@@ -35,9 +35,9 @@ Não aceitamos parceiros em países ou territórios que não temos permissão pa
 
 ## 4. O link de indicação e como uma indicação é atribuída
 
-A atribuição é pelo último clique: quando um visitante chegou até nós por mais de um link de indicação, a conta é atribuída ao mais recente dentro da respectiva janela de atribuição. Uma conta aberta depois do fim da janela de atribuição não é atribuída a você.
+A atribuição é pelo último clique no seu link de indicação no caminho até o cadastro: quando um visitante chegou até nós por mais de um link de indicação, a conta é atribuída ao mais recente deles.
 
-A atribuição depende do que o navegador e as configurações do visitante nos permitem registrar, e das escolhas que o visitante faz no nosso banner de cookies. Um visitante que recusa o armazenamento não essencial, que o apaga, que usa outro navegador ou dispositivo, ou que o bloqueia com uma extensão, pode não ser atribuído a você. Não garantimos que toda visita pelo seu link de indicação resulte em atribuição, e não respondemos por uma indicação que não conseguimos registrar.
+O seu código viaja no próprio link de indicação. Não colocamos nenhum cookie para o Programa de Parceiros nem guardamos nada no dispositivo do visitante, de modo que o que o visitante escolhe no nosso aviso de cookies não afeta a sua atribuição nem para um lado nem para o outro. O que decorre disso: um visitante que sai e volta mais tarde sem o seu link, no mesmo dispositivo ou em outro, pode não ser atribuído a você. Não garantimos que toda visita pelo seu link de indicação resulte em atribuição, e não respondemos por uma indicação que não conseguimos registrar. Se em algum momento estendermos o crédito a uma visita que volta mais tarde, o que exigiria guardar algo, avisaremos os parceiros por escrito antes de começar e diremos o que é guardado.
 
 Agimos conforme os nossos registros. Se você considerar que uma indicação foi registrada de forma incorreta, escreva para nós dentro de 60 dias da abertura da conta: vamos revisar o registro e dizer o que encontramos.
 
@@ -149,7 +149,7 @@ Quando rescindirmos este contrato porque você violou a seção 8, a seção 9 o
 
 ## 20. Mudanças no Programa e neste contrato
 
-Podemos mudar o percentual de comissão, a janela de atribuição, o período de retenção, o valor mínimo de pagamento ou qualquer outra condição do Programa. Avisaremos você por e-mail no endereço da sua conta de parceiro com pelo menos 14 dias de antecedência da mudança. A mudança não é retroativa: uma comissão já ganha é calculada pelas condições vigentes quando o pagamento válido foi feito. Se você não aceitar uma mudança, pode rescindir este contrato antes de ela entrar em vigor; continuar usando o seu link de indicação depois dessa data é aceitá-la.
+Podemos mudar o percentual de comissão, a forma como uma indicação é atribuída, o período de retenção, o valor mínimo de pagamento ou qualquer outra condição do Programa. Avisaremos você por e-mail no endereço da sua conta de parceiro com pelo menos 14 dias de antecedência da mudança. A mudança não é retroativa: uma comissão já ganha é calculada pelas condições vigentes quando o pagamento válido foi feito. Se você não aceitar uma mudança, pode rescindir este contrato antes de ela entrar em vigor; continuar usando o seu link de indicação depois dessa data é aceitá-la.
 
 ## 21. Cessão
 

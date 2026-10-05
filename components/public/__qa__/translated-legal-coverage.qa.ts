@@ -309,17 +309,36 @@ const PROGRAM_NUMBERS = ['30%', '40%', '90', '30', '100', '350'] as const
   }
 }
 
-// ── 9) the referral cookie, disclosed in every language or in none ──────────
+// ── 9) the partner program claims no cookie and no day count ───────────────
 /*
- * ePrivacy art. 5(3): an attribution cookie is not strictly necessary, because
- * the site works without it and only the credit is lost, so it needs consent
- * and it needs to be named where the reader can find it. The name and the
- * lifetime are the two facts a reader cannot verify for themselves, so they
- * are held identical across the Hebrew page, the English page and every
- * translation. A language that gains the cookie in code and not in text, or
- * loses the sentence in a rewrite, fails here rather than live.
+ * The design changed on 2026-10-05 and the text had to follow it. The policy
+ * used to describe one cookie, gt_ref, keeping a partner's code for 90 days.
+ * That cookie was set BEFORE consent in the first draft, which ePrivacy art.
+ * 5(3) forbids for an attribution cookie — the site works without it and only
+ * the credit is lost, so it is not strictly necessary — and the mechanism that
+ * replaced it stores nothing at all: the code rides in the link and is read on
+ * the way to signing up.
+ *
+ * So the documents must now claim the ABSENCE, and claim it identically. Two
+ * failures are guarded, and they are opposite in kind:
+ *
+ *   - a day count or a cookie name coming back into any document while nothing
+ *     stores one, which would promise a partner a memory that does not exist
+ *     and would describe to a visitor a cookie that is never written;
+ *   - a language that loses the sentence saying no cookie is set, which leaves
+ *     a reader unable to tell whether their refusal costs the partner the
+ *     commission. It does not, and every language has to say so.
+ *
+ * The marketing page is held to the same thing from the other side by the
+ * build thread's own guard. If storage is ever added, both sides change in one
+ * commit, with the consent ask, and this section is what makes that unavoidable.
  */
-const REFERRAL_COOKIE = ['gt_ref', '90'] as const
+const NO_REFERRAL_STORAGE: Record<string, RegExp[]> = {
+  he: [/אינה שומרת עוגייה כלל/, /נוסע בקישור/],
+  en: [/sets no cookie at all/, /travels in the link itself/],
+  es: [/no instala ninguna cookie/, /viaja en el propio enlace/],
+  'pt-BR': [/n[ãa]o grava nenhum cookie/, /viaja no pr[óo]prio link/],
+}
 const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
 {
   const enSource = frontMatter(text[LOCALES[0]].privacy).source
@@ -330,10 +349,25 @@ const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
   ]
   for (const [name, src] of pages) {
     check(`${name}/privacy: the page was read`, src.length > 0)
-    for (const fact of REFERRAL_COOKIE) {
-      check(`${name}/privacy: the referral cookie's ${fact === 'gt_ref' ? 'name' : 'lifetime in days'} is stated`,
-        src.includes(fact))
+    check(`${name}/privacy: no referral cookie is named`, !/gt_ref/.test(src))
+    for (const must of NO_REFERRAL_STORAGE[name] ?? []) {
+      check(`${name}/privacy: states ${must.source.slice(0, 32)}`, must.test(src))
     }
+  }
+  // The agreement cannot promise a window the mechanism has no way to honour.
+  const AGREEMENTS: [string, string][] = [
+    ['he', 'app/(legal)/affiliate-terms/page.tsx'],
+    ['en', frontMatter(text[LOCALES[0]]['affiliate-terms']).source],
+  ]
+  for (const [name, path] of AGREEMENTS) {
+    const src = path && existsSync(path) ? readFileSync(path, 'utf8') : ''
+    check(`${name}/affiliate-terms: the page was read`, src.length > 0)
+    check(`${name}/affiliate-terms: no attribution window in days`,
+      !/(Attribution Window|חלון השיוך)/.test(src))
+  }
+  for (const l of LOCALES) {
+    check(`${l}/affiliate-terms: no attribution window in days`,
+      !/(ventana de atribuci[óo]n|janela de atribui[çc][ãa]o)/i.test(text[l]['affiliate-terms']))
   }
 }
 
@@ -414,8 +448,10 @@ console.log('\nmutation controls')
       && /art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms']))
   check('a Brazilian document that drops the seven-day right is caught',
     !/art\.\s*49/.test(text['pt-BR']['refund-policy'].replace(/art\.\s*49/g, '')) && /art\.\s*49/.test(text['pt-BR']['refund-policy']))
-  check('a privacy policy that stops naming the referral cookie is caught',
-    !text['pt-BR'].privacy.replace(/gt_ref/g, '').includes('gt_ref') && text['pt-BR'].privacy.includes('gt_ref'))
+  check('a day count put back into a partner document is caught',
+    /\b90 d[íi]as\b/.test('conserva el código de ese socio durante 90 días'))
+  check('a policy that stops saying no cookie is set is caught',
+    !/sets no cookie at all/.test('The partner program: if you reach the site through a partner link'))
   check('a translation that drops the promise about a referred customer\'s details is caught',
     !/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/
       .test(text.es.privacy.replace(/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/g, ''))
