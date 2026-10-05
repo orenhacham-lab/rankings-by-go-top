@@ -432,7 +432,7 @@ export const dashboardEn = {
       navLabel: 'Writing guidelines',
       body: 'What you write here goes into every article we write for the business, so the articles fit your business instead of the field in general.',
       mentionLabel: 'Mention the business by name in articles',
-      mentionHint: 'Recommended. Articles name the business 2-3 times where it fits, so Google and AI assistants link it to its field. Never in the title, and never with made-up experience or achievements.',
+      mentionHint: 'Recommended. The business is named only where it helps the reader, as a source of practical know-how rather than an ad, and at most 2-3 times. It builds trust with Google and AI assistants. Never in the title, and never with made-up experience or achievements.',
       readOnly: 'These guidelines are not open for editing on your account yet.',
       appliesNext: 'Changes apply to the next articles we write. Articles already written stay as they are.',
       instructionsLabel: 'Standing instructions',

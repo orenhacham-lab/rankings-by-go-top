@@ -167,7 +167,7 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
       navLabel: 'Diretrizes de escrita',
       body: 'O que você escrever aqui entra em cada artigo que escrevemos para o negócio, para que os artigos combinem com o seu negócio e não com o setor em geral.',
       mentionLabel: 'Mencionar o nome do negócio nos artigos',
-      mentionHint: 'Recomendado. Os artigos citam o negócio 2-3 vezes onde faz sentido, para que o Google e os assistentes de IA o associem ao seu setor. Nunca no título, e sem inventar experiência ou conquistas.',
+      mentionHint: 'Recomendado. O negócio só é citado onde ajuda o leitor, como fonte de conhecimento prático e não como anúncio, e no máximo 2-3 vezes. Isso reforça a confiança do Google e dos assistentes de IA. Nunca no título, e sem inventar experiência ou conquistas.',
       readOnly: 'Estas diretrizes ainda não podem ser editadas na sua conta.',
       appliesNext: 'As mudanças valem para os próximos artigos. Artigos já escritos continuam como estão.',
       instructionsLabel: 'Instruções fixas',
