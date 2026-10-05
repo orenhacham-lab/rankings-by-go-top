@@ -116,9 +116,12 @@ function main() {
     }
     // A document that says when it was last updated has to be telling the truth
     // about the version the reader is looking at.
+    // Per document, because they are no longer revised together: the privacy
+    // policy moved to 5 October 2026 with the partner-program section and the
+    // referral cookie, and the accessibility statement did not change.
     check('D2: every document that was changed carries the new date',
-      [HE_PRIVACY, HE_A11Y].every((p) => /3 באוקטובר 2026/.test(read(p)))
-      && [EN_PRIVACY, EN_A11Y].every((p) => /October 3, 2026/.test(read(p))))
+      /5 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 5, 2026/.test(read(EN_PRIVACY))
+      && /3 באוקטובר 2026/.test(read(HE_A11Y)) && /October 3, 2026/.test(read(EN_A11Y)))
   }
 
   console.log('\nE) the accessibility statement is a statement, with a route onwards')

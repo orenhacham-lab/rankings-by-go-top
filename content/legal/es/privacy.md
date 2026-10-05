@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-03
+lastUpdated: 2026-10-05
 register: usted
 ---
 
@@ -155,6 +155,18 @@ Unirse a la red de enlaces es opcional, se hace para cada proyecto por separado,
 - **Qué ve otro miembro:** la Empresa no publica una lista de miembros. La parte receptora ve la dirección del sitio que la enlaza y, una vez publicado, la página donde apareció el enlace. Un enlace publicado es un enlace público en el sitio.
 - **Salida:** usted puede abandonar la red en cualquier momento. Al salir se detienen las nuevas colocaciones; los enlaces ya publicados permanecen salvo que usted los elimine de su sitio, y las colocaciones permanecen en el registro.
 
+## Programa de Socios
+
+El programa de socios está dirigido a quienes recomiendan el Servicio y reciben una comisión por los clientes que se suman a través de ellos. La participación es voluntaria, cada solicitud la revisa una persona, y nada de lo descrito aquí se le aplica salvo que usted presente una solicitud.
+
+- **Cuando usted presenta una solicitud:** recibimos lo que nos envía por correo electrónico o WhatsApp: su nombre, sus datos de contacto, el sitio, el canal o el público al que piensa promocionar y, tras la aprobación, el método de pago que elija. Los usamos para resolver la solicitud y para ejecutar el acuerdo con usted.
+- **Mientras usted es socio:** almacenamos sus datos de contacto, su código de referencia, las cuentas abiertas a través de él, los pagos que generan derecho a comisión y la comisión calculada sobre ellos, los pagos que le realizamos, y las facturas y los certificados fiscales que la ley nos obliga a conservar.
+- **Qué ve un socio sobre las personas que refirió:** nada personal. Un socio ve cantidades e importes. Un socio no recibe la dirección de correo electrónico, el sitio web, el plan ni la identidad de ningún cliente que haya referido.
+- **Pago de la comisión:** el proveedor que elija el socio (PayPal, Wise o transferencia bancaria) recibe los datos que necesita para pagar. Las facturas y los certificados de retención se conservan siete años, como exigen las normas de contabilidad israelíes.
+- **Atribución de una referencia:** requiere una cookie, y una cookie de ese tipo requiere su consentimiento. Consulte «Cookies» más abajo para conocer la única cookie implicada y qué ocurre si usted la rechaza.
+
+En la fecha de esta política el programa funciona únicamente por solicitud: recibimos solicitudes y aprobamos socios manualmente, y todavía no se han construido el seguimiento de referencias, el registro de comisiones ni el pago. Cada uno de ellos se describirá aquí antes de empezar a funcionar. Los términos están en el [Acuerdo del Programa de Socios](/es/affiliate-terms), que además obliga al socio a declarar abiertamente que está remunerado.
+
 ## Proveedores de IA
 
 Algunas funciones envían datos a los siguientes servicios de IA para producir el resultado que usted solicitó:
@@ -201,6 +213,8 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado.
 
 **Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio.
+
+**El programa de socios:** si usted llega al sitio a través del enlace de un socio y ha permitido las cookies de marketing, instalamos una única cookie de nuestro propio dominio, gt_ref, que conserva el código de ese socio durante 90 días para que se acredite al socio que lo envió. El sitio funciona sin ella: si usted la rechaza, no se instala ninguna cookie y la referencia simplemente no se acredita. En la fecha de esta política el seguimiento de referencias está desactivado y esta cookie no se instala en absoluto.
 
 Si su navegador envía una señal Global Privacy Control, la tratamos como un rechazo: no se cargan cookies de medición ni de marketing, y no le mostramos el aviso.
 
@@ -324,4 +338,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 3 de octubre de 2026
+Esta política se actualizó por última vez el 5 de octubre de 2026

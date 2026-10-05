@@ -13,11 +13,12 @@ import { readLegalDocument, type LegalSlug } from '@/lib/legal/markdown'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 /** The breadcrumb and footer say the same thing, so both read one dictionary. */
-const CRUMB_KEY: Record<LegalSlug, 'terms' | 'privacy' | 'refundPolicy' | 'accessibility'> = {
+const CRUMB_KEY: Record<LegalSlug, 'terms' | 'privacy' | 'refundPolicy' | 'accessibility' | 'affiliateTerms'> = {
   terms: 'terms',
   privacy: 'privacy',
   'refund-policy': 'refundPolicy',
   accessibility: 'accessibility',
+  'affiliate-terms': 'affiliateTerms',
 }
 
 /** The date, written the way a Spanish reader expects it. */

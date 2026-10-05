@@ -52,15 +52,17 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * showing what this visitor was actually shown, so a decision taken on a
  * Spanish page must not be filed as having been read in Hebrew.
  *
- * `es` is here before the Spanish site is public on purpose. The public site
- * already serves /es on preview, and the log's CHECK constraint lists exactly
- * these values — so a Spanish visitor's decision would otherwise either be
- * mislabelled or be rejected by the database and silently lost, which is the
- * one failure this table exists to prevent. Any new public language has to be
- * added here AND to the constraint in
- * supabase/migrations/20261003000000_consent_events.sql, in that order.
+ * `es` was here before the Spanish site was public, and `pt-BR` is here the
+ * same way: the log's CHECK constraint lists exactly these values, so a
+ * visitor's decision would otherwise either be mislabelled as Hebrew — the
+ * fallback in normalizeConsentLocale below — or be rejected by the database and
+ * silently lost, which is the one failure this table exists to prevent. The
+ * constraint comes FIRST (20261005050636_consent_events_locale_widen.sql for
+ * 'pt-BR'), then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
+ * holds the two together, so a language added here and not there fails in CI
+ * rather than losing a visitor's proof in production.
  */
-export const CONSENT_LOCALES = ['he', 'en', 'es'] as const
+export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR'] as const
 
 export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
 

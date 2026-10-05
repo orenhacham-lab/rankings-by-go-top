@@ -314,6 +314,39 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Partner Program</h2>
+        <p>
+          The partner program is for people who recommend the Service and receive a commission for customers who
+          join through them. Taking part is voluntary, every application is reviewed by a person, and none of this
+          applies to you unless you apply.
+        </p>
+        <ul>
+          <li><strong>When you apply:</strong> we receive what you send us by email or WhatsApp &mdash; your name,
+          your contact details, the site, channel or audience you intend to promote to and, after approval, the
+          payout method you choose. We use them to decide on the application and to run the agreement with you.</li>
+          <li><strong>While you are a partner:</strong> we store your contact details, your referral code, the
+          accounts that opened through it, the qualifying payments and the commission calculated on them, the
+          payouts made to you, and the invoices and tax certificates the law requires us to keep.</li>
+          <li><strong>What a partner sees about the people they referred:</strong> nothing personal. A partner sees
+          counts and amounts. A partner does not receive the email address, the website, the plan or the identity of
+          any customer they referred.</li>
+          <li><strong>Paying commission:</strong> the provider the partner chooses &mdash; PayPal, Wise or a bank
+          transfer &mdash; receives the details it needs in order to pay. Invoices and withholding certificates are
+          kept for seven years, as Israeli bookkeeping rules require.</li>
+          <li><strong>Crediting a referral:</strong> this needs a cookie, and a cookie of that kind needs your
+          consent. See &ldquo;Cookies&rdquo; below for the single cookie involved and for what happens when you
+          refuse it.</li>
+        </ul>
+        <p className="mt-4">
+          As of the date of this policy the program runs by application only: we receive applications and approve
+          partners by hand, and no referral tracking, commission record or payout has been built yet. Each of them
+          will be described here before it starts running. The terms themselves are in the{' '}
+          <a href="/en/affiliate-terms">Partner Program Agreement</a>, which also requires a partner to say openly
+          that they are paid.
+        </p>
+      </section>
+
+      <section>
         <h2>AI Providers</h2>
         <p>Some features send data to the following AI services to produce the result you asked for:</p>
         <ul>
@@ -400,6 +433,13 @@ export default function EnglishPrivacyPage() {
           <strong>Changing or withdrawing your consent:</strong> at any time, through the
           &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
           easy as giving consent, and costs you nothing in the service.
+        </p>
+        <p className="mt-4">
+          <strong>The partner program:</strong> if you reach the site through a partner link and you have allowed
+          marketing cookies, we set one cookie of our own domain, gt_ref, which keeps that partner&rsquo;s code for
+          90 days so that the partner who sent you is credited. The site works without it: if you refuse, no cookie
+          is set and the referral is simply not credited. As of the date of this policy referral tracking is
+          switched off and this cookie is not set at all.
         </p>
         <p className="mt-4">
           If your browser sends a Global Privacy Control signal, we treat it as a refusal: no
@@ -675,7 +715,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 3, 2026
+          This policy was last updated on October 5, 2026
         </p>
       </section>
     </LegalDoc>
