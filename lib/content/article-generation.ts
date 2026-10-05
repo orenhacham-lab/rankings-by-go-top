@@ -238,7 +238,8 @@ export async function generateArticleForTopic(
     briefNotes: decodedNotes.notes || null,
     // E-E-A-T: the article is the business's own, so a topic the system created names the business
     // (when its name is known). A choice the owner made in the brief form is kept as made.
-    includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : !!businessName?.trim(),
+    // A Shopify store's articles keep their default (not named) until the owner decides otherwise.
+    includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : !generationContext.shopify && !!businessName?.trim(),
     brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
     includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,

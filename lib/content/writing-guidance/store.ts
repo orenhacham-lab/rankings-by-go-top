@@ -39,24 +39,59 @@ export async function readProjectWritingGuidance(db: SupabaseClient, projectId: 
   }
 }
 
-export type GenerationContext = { guidance: WritingGuidance; business: BusinessContext }
+export type GenerationContext = {
+  guidance: WritingGuidance
+  business: BusinessContext
+  /**
+   * A Shopify store (a store connection on the project, or an account Shopify
+   * bills). Its articles keep the defaults they had: no business description or
+   * city in the prompt, and the business is not named unless the brief says so.
+   * The owner's own guidance (empty unless they wrote some) still applies.
+   */
+  shopify: boolean
+}
+
+/**
+ * Whether the project is a Shopify store's: a live (not archived) store
+ * connection, or an owner whose billing authority is Shopify, the same test the
+ * link network uses. FAILS CLOSED: any read error counts as Shopify, so a
+ * Shopify store's articles are never changed by a read that did not answer.
+ */
+export async function isShopifyProject(admin: SupabaseClient, projectId: string, ownerId: string): Promise<boolean> {
+  try {
+    const [conn, gov] = await Promise.all([
+      admin.from('shopify_connections').select('project_id').eq('project_id', projectId).is('archived_at', null).limit(1),
+      admin.from('billing_governance').select('user_id, billing_authority').eq('user_id', ownerId).limit(1),
+    ])
+    if (conn.error || gov.error) return true
+    if ((conn.data ?? []).length > 0) return true
+    const g = (gov.data ?? [])[0] as { user_id?: string; billing_authority?: string | null } | undefined
+    return g?.user_id === ownerId && g.billing_authority === 'shopify'
+  } catch {
+    return true
+  }
+}
 
 /**
  * Everything generation reads about the business, for the project's owner.
  * `city` is the project's own city, used only when the settings mark the
- * business as local (project_profiles.is_local = true).
+ * business as local (project_profiles.is_local = true). Neither reaches a
+ * Shopify store's articles (see GenerationContext.shopify).
  */
 export async function readGenerationContext(admin: SupabaseClient, projectId: string, city: string | null): Promise<GenerationContext> {
-  const empty: GenerationContext = { guidance: none(), business: { description: null, city: null } }
+  const empty: GenerationContext = { guidance: none(), business: { description: null, city: null }, shopify: true }
   const owner = await projectOwner(admin, projectId)
   if (!owner) return empty
-  const [guidance, profile] = await Promise.all([
+  const [guidance, profile, shopify] = await Promise.all([
     readProjectWritingGuidance(admin, projectId, owner),
     readProfile(admin, projectId, owner),
+    isShopifyProject(admin, projectId, owner),
   ])
+  if (shopify) return { guidance: guidance.guidance, business: { description: null, city: null }, shopify: true }
   return {
     guidance: guidance.guidance,
     business: { description: profile.description, city: profile.isLocal === true && city?.trim() ? city.trim() : null },
+    shopify: false,
   }
 }
 
