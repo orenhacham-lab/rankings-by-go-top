@@ -46,7 +46,7 @@ import {
   USER,
   world,
 } from '@/lib/seed-scan/__qa__/_fixtures'
-import { reportConsentText } from '../copy'
+import { consentRecord, marketingConsentText, reportConsentText } from '../copy'
 import { handleReportRequest, handleResearchPost, REPORT_REQUESTS_TABLE, type ResearchDeps } from '../http'
 import { RESEARCH_RUNS_TABLE } from '../gate'
 import { runAnonymousStageA } from '../run'
@@ -338,7 +338,18 @@ async function main() {
     check('consent true → 200 saved, one row', ok.status === 200 && ok.json.code === 'saved' && rows().length === 1, ok.text)
     check('…the address normalized, consent true with its time, against this research', row.email === 'owner@plumber.example' && row.consent === true && row.consented_at === NOW.toISOString() && row.check_id === ledger?.id)
     check('…the consent words are the server\'s own, in the visitor\'s language, never the request\'s',
-      row.consent_text === reportConsentText('he') && !JSON.stringify(row).includes('I agree to anything') && /\[report-email-v1\]$/.test(String(row.consent_text)))
+      row.consent_text === consentRecord('he', false) && !JSON.stringify(row).includes('I agree to anything')
+      && String(row.consent_text).startsWith(reportConsentText('he')))
+    /*
+     * MARKETING WAS NOT ASKED FOR IN THAT REQUEST, so the row must say so in
+     * words. The failure this guards is the quiet one: a row that merely lacks
+     * a marketing sentence proves nothing — not whether marketing was offered,
+     * not whether it was refused. Art. 7(1) is about being able to demonstrate
+     * what happened, and an absence demonstrates nothing.
+     */
+    check('…and a request with no marketing field records the refusal explicitly',
+      /\[marketing-declined-v1\]$/.test(String(row.consent_text))
+      && !String(row.consent_text).includes('[marketing-email'))
     check('…exactly the documented columns, nothing sent', Object.keys(row).sort().join(',') === 'check_id,client_hash,consent,consent_text,consented_at,created_at,email,id,locale' && row.sent_at === undefined)
     check('…and the token is looked up, never spent', s.tables.free_site_check_claims.find((c) => c.token_hash === hashClaimToken(token))?.consumed_at === null)
     check('no address in any log line', !allLogs.includes('owner@plumber.example'))
@@ -362,9 +373,9 @@ async function main() {
       await call(handleReportRequest(reportReq({ token: esToken, email: 'dueno@sitio.example', consent: true, locale: 'es' }), es.deps))
       const esRow = (es.tables[REPORT_REQUESTS_TABLE] ?? [])[0] ?? {}
       check('…and the consent stored is the SPANISH sentence with its own version id',
-        esRow.consent_text === reportConsentText('es') && /\[report-email-es-v1\]$/.test(String(esRow.consent_text)),
+        esRow.consent_text === consentRecord('es', false) && String(esRow.consent_text).includes('[report-email-es-v2]'),
         String(esRow.consent_text).slice(0, 60))
-      check('…never the Hebrew sentence', esRow.consent_text !== reportConsentText('he'))
+      check('…never the Hebrew sentence', esRow.consent_text !== consentRecord('he', false))
       // The column still only admits he|en (the CHECK in
       // 20260928000200_free_check_research.sql), so it carries the bilingual
       // language of the research and of any email, not the page's language.
@@ -381,13 +392,32 @@ async function main() {
       !esGuard(httpSrc.replace("v === 'en' || v === 'es' ? v : 'he'", "v === 'en' ? 'en' : 'he'")))
 
     const src = code(read('lib/presignup/http.ts'))
-    const consentGuard = (c: string) => /if \(body\.consent !== true\) return answer\(400, \{ ok: false, code: 'consent_required' \}\)/.test(c) && /consent_text: reportConsentText\(publicLocale\)/.test(c)
-    check('source: consent must be exactly true, and the stored words come from reportConsentText', consentGuard(src))
+    const consentGuard = (c: string) => /if \(body\.consent !== true\) return answer\(400, \{ ok: false, code: 'consent_required' \}\)/.test(c) && /consent_text: consentRecord\(publicLocale, marketing\)/.test(c)
+    check('source: consent must be exactly true, and the stored words come from consentRecord', consentGuard(src))
     check('mutation control: a truthiness check fails the guard', !consentGuard(src.replace('body.consent !== true', '!body.consent')))
-    check('mutation control: storing the request\'s words fails the guard', !consentGuard(src.replace('consent_text: reportConsentText(publicLocale)', 'consent_text: String(body.consentText)')))
+    check('mutation control: storing the request\'s words fails the guard', !consentGuard(src.replace('consent_text: consentRecord(publicLocale, marketing)', 'consent_text: String(body.consentText)')))
+    /*
+     * Marketing is read strictly and separately. `body.marketing === true` is
+     * the only thing that grants it: a truthy read would let "false" or 0 or
+     * "off" count as agreement, and a `!== false` read would make a missing
+     * field mean yes, which is the bundling again by the back door.
+     */
+    const marketingGuard = (c: string) => /const marketing = body\.marketing === true/.test(c)
+    check('source: marketing is granted only by exactly true', marketingGuard(src))
+    check('mutation control: a truthy read fails the guard', !marketingGuard(src.replace('body.marketing === true', 'Boolean(body.marketing)')))
+    check('mutation control: defaulting a missing field to yes fails the guard', !marketingGuard(src.replace('body.marketing === true', 'body.marketing !== false')))
+    check('source: marketing never blocks the request', !/body\.marketing[\s\S]{0,80}code: 'consent_required'/.test(src))
     const screen = code(read('components/free-check/FreeCheckResearch.tsx'))
     const uncheckedGuard = (c: string) => /const \[consent, setConsent\] = useState\(false\)/.test(c) && /checked=\{consent\}/.test(c)
     check('the screen\'s consent box starts unticked', uncheckedGuard(screen))
+    const marketingBox = (c: string) => /const \[marketing, setMarketing\] = useState\(false\)/.test(c) && /checked=\{marketing\}/.test(c)
+    check('the screen\'s marketing box exists and starts unticked', marketingBox(screen))
+    check('mutation control: a pre-ticked marketing box fails the guard',
+      !marketingBox(screen.replace('const [marketing, setMarketing] = useState(false)', 'const [marketing, setMarketing] = useState(true)')))
+    check('the marketing choice is sent to the server', /JSON\.stringify\(\{ token, email, consent: true, marketing, locale \}\)/.test(screen))
+    // The report must still be reachable without the marketing box: only the
+    // first box is allowed to stop the submit.
+    check('only the report box can block the submit', /if \(!consent\) \{/.test(screen) && !/if \(!marketing\)/.test(screen))
     check('mutation control: a pre-ticked box fails the guard', !uncheckedGuard(screen.replace('useState(false)\n  const [busy', 'useState(true)\n  const [busy').replace('const [consent, setConsent] = useState(false)', 'const [consent, setConsent] = useState(true)')))
   }
 
@@ -554,23 +584,44 @@ async function main() {
       !/locale === 'he' \? '\/privacy' : `\/\$\{locale\}\/privacy`/.test("const privacyHref = locale === 'en' ? '/en/privacy' : '/privacy'"))
 
     /*
-     * The stored proof must be in the words the visitor actually read, which
-     * is why reportConsentText is per locale and Spanish has its own version
-     * id. Each language's sentence must say all three things: the report, the
-     * marketing it is bundled with, and that consent can be withdrawn.
+     * The stored proof must be in the words the visitor actually read, which is
+     * why each sentence is per locale and Spanish has its own version ids.
+     *
+     * The division is the thing being guarded here. The REQUIRED sentence may
+     * speak only of the report: the moment it mentions marketing, a visitor who
+     * wants the report they asked for is consenting to marketing to get it, and
+     * GDPR Art. 7(4) makes that consent worthless. The OPTIONAL sentence is
+     * where marketing and the withdrawal right live.
      */
-    for (const locale of ['he', 'en', 'es'] as const) {
-      const text = reportConsentText(locale)
-      check(`${locale}: the stored consent carries its own version id`,
-        text.endsWith(locale === 'es' ? '[report-email-es-v1]' : '[report-email-v1]'), text.slice(-30))
-      check(`${locale}: it names Go Top as the sender`, /Go Top/.test(text))
+    for (const locale of ['he', 'en', 'es', 'pt-BR'] as const) {
+      const report = reportConsentText(locale)
+      const marketing = marketingConsentText(locale)
+      const expected = {
+        he: '[report-email-v2]',
+        en: '[report-email-v2]',
+        es: '[report-email-es-v2]',
+        'pt-BR': '[report-email-pt-v2]',
+      }[locale]
+      check(`${locale}: the required sentence carries its own version id`,
+        report.endsWith(expected), `${report.slice(-32)} vs ${expected}`)
+      check(`${locale}: the required sentence names Go Top as the sender`, /Go Top/.test(report))
+      check(`${locale}: the required sentence does NOT ask for marketing`,
+        !/שיווקי|marketing|comercial/i.test(report), report)
+      check(`${locale}: the optional sentence does ask for marketing, and says consent can be withdrawn`,
+        /שיווקי|marketing|comercial/i.test(marketing)
+        && /להסיר|withdraw|retirar|retirar meu/i.test(marketing), marketing)
+      check(`${locale}: the two sentences carry different version ids`,
+        report.slice(report.lastIndexOf('[')) !== marketing.slice(marketing.lastIndexOf('[')))
+      // A refusal is recorded in words, and a grant is findable by its id.
+      check(`${locale}: the record states which way marketing went`,
+        consentRecord(locale, true).includes('[marketing-email')
+        && consentRecord(locale, false).includes('[marketing-declined-v1]')
+        && !consentRecord(locale, false).includes('[marketing-email'))
     }
     check('the Spanish sentence is its own, not a copy of another language',
       reportConsentText('es') !== reportConsentText('he') && reportConsentText('es') !== reportConsentText('en'))
-    check('the Spanish sentence says the report, the marketing and the withdrawal',
-      /informe/i.test(reportConsentText('es'))
-      && /comercial|marketing/i.test(reportConsentText('es'))
-      && /retirar/i.test(reportConsentText('es')))
+    check('the Spanish required sentence still names the report',
+      /informe/i.test(reportConsentText('es')))
   }
 
   // ── 10) Google sign-in ───────────────────────────────────────────────────

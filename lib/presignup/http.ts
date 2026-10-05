@@ -32,7 +32,7 @@ import { toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/lo
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { admitResearch, finishResearchRun } from './gate'
 import type { AnonymousResearch } from './run'
-import { reportConsentText } from './copy'
+import { consentRecord } from './copy'
 import { publicResult, researchSeed, researchView, storedResearchView, type ResearchLedgerSeed } from './view'
 import type { ReportRequestResponse, ResearchErrorCode, ResearchEvent, ResearchRefusal, ResearchStepView } from './types'
 
@@ -264,6 +264,13 @@ export async function handleReportRequest(request: Request, deps: ReportDeps): P
     if (!body) return answer(400, { ok: false, code: 'invalid_request' })
     // Consent is a box the visitor ticked themselves: exactly `true`, never implied.
     if (body.consent !== true) return answer(400, { ok: false, code: 'consent_required' })
+    /*
+     * The SECOND decision, and it is never required: marketing is optional, so
+     * anything that is not exactly `true` is a refusal and the request still
+     * succeeds. Reading it as truthy, or defaulting it to true when the field is
+     * missing, would recreate the bundling that GDPR Art. 7(4) voids.
+     */
+    const marketing = body.marketing === true
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
     if (email.length > 254 || !EMAIL.test(email)) return answer(400, { ok: false, code: 'invalid_email' })
     const token = typeof body.token === 'string' ? body.token : ''
@@ -309,7 +316,11 @@ export async function handleReportRequest(request: Request, deps: ReportDeps): P
       // visitor's record is the Spanish sentence with its own version id, never
       // the Hebrew or English one. `locale` beside it is the bilingual language
       // of the research and of any email we send, which is not the same thing.
-      consent_text: reportConsentText(publicLocale),
+      // BOTH decisions are in here: the report sentence, and then either the
+      // marketing sentence or the line that records the refusal. A row that
+      // merely lacked a marketing sentence would prove nothing about whether
+      // marketing was ever offered.
+      consent_text: consentRecord(publicLocale, marketing),
       locale,
       client_hash: clientHash,
       created_at: now.toISOString(),

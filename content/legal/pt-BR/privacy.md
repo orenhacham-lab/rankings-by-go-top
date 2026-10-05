@@ -161,9 +161,9 @@ O programa de parceiros é para quem recomenda o Serviço e recebe uma comissão
 - **Enquanto você é parceiro:** armazenamos seus dados de contato, seu código de indicação, as contas abertas por meio dele, os pagamentos que geram comissão e a comissão calculada sobre eles, os pagamentos feitos a você, e as notas fiscais e as certidões fiscais que a lei nos obriga a guardar.
 - **O que um parceiro vê sobre as pessoas que indicou:** nada pessoal. Um parceiro vê quantidades e valores. Um parceiro não recebe o endereço de e-mail, o site, o plano nem a identidade de nenhum cliente que tenha indicado.
 - **Pagamento da comissão:** o provedor escolhido pelo parceiro (PayPal, Wise ou transferência bancária) recebe os dados de que precisa para pagar. As notas fiscais e as certidões de retenção são mantidas por sete anos, conforme as regras de contabilidade israelenses.
-- **Atribuição de uma indicação:** exige um cookie, e um cookie desse tipo exige o seu consentimento. Veja «Cookies» abaixo para conhecer o único cookie envolvido e o que acontece se você recusá-lo.
+- **Atribuição de uma indicação:** o código do parceiro viaja no próprio link. Não gravamos nenhum cookie para o programa nem guardamos nada no seu dispositivo, de modo que o que você escolher sobre cookies não influencia nem para um lado nem para o outro. Se em algum momento creditarmos uma visita que volta mais tarde, o que implicaria guardar algo, esta política dirá isso e o seu consentimento será pedido antes.
 
-Na data desta política o programa funciona apenas por candidatura: recebemos candidaturas e aprovamos parceiros manualmente, e ainda não foram construídos o rastreamento de indicações, o registro de comissões nem o pagamento. Cada um deles será descrito aqui antes de entrar em funcionamento. Os termos estão no [Contrato do Programa de Parceiros](/en/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
+Na data desta política o programa funciona apenas por candidatura: recebemos candidaturas e aprovamos parceiros manualmente, e ainda não foram construídos o rastreamento de indicações, o registro de comissões nem o pagamento. Cada um deles será descrito aqui antes de entrar em funcionamento. Os termos estão no [Contrato do Programa de Parceiros](/pt-BR/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
 
 ## Provedores de IA
 
@@ -179,6 +179,14 @@ Enviamos e-mail por meio do provedor de envio Resend, que recebe o seu endereço
 - **Mensagens de conta e de serviço:** cadastro, verificação, cobrança e avisos sobre o uso do Serviço.
 - **Lembretes:** quando há conteúdo aguardando a sua aprovação, um lembrete pode ser enviado. Todo lembrete tem um link de cancelamento em um clique, sem necessidade de login, e o cancelamento interrompe esses lembretes. A sua preferência é armazenada conosco.
 - **Relatório mensal de progresso:** um resumo mensal do projeto, para os projetos em que você o ativou nas configurações.
+
+## Como podemos entrar em contato com você por causa de uma verificação gratuita
+
+Se você executou uma verificação gratuita de um site, podemos entrar em contato por causa dela. Por e-mail, somente para o endereço que você nos deu e somente na medida em que as caixas que você marcou permitirem: o relatório que você pediu, e novidades ou conteúdo comercial apenas se você os aceitou na caixa separada deles.
+
+Também podemos entrar em contato com a empresa cujo site foi verificado, usando os dados de contato que essa empresa publica no próprio site: um número de telefone ou um endereço geral. Fazemos isso com base no nosso interesse legítimo em oferecer um serviço a uma empresa que parece se encaixar (art. 6.1.f do RGPD), não com base no seu consentimento, e esses dados vêm do próprio site e não de algo que você nos deu. Quando ligamos, dizemos quem somos e de onde tiramos o número.
+
+Você pode pedir que paremos a qualquer momento e por qualquer canal, e nós paramos: por e-mail, por telefone, em qualquer idioma. Para o marketing direto esse é um direito absoluto (art. 21.2 do RGPD), não custa nada a você, e registramos o pedido para que uma lista posterior não o desfaça.
 
 ## Segurança dos dados
 
@@ -212,7 +220,7 @@ Dividimos os cookies em três categorias, e perguntamos a você sobre duas delas
 
 **Alterar ou retirar o consentimento:** a qualquer momento, pelo link «Configurações de cookies» no final de cada página. Retirar é exatamente tão fácil quanto consentir e não lhe custa nada no serviço.
 
-**O programa de parceiros:** se você chegar ao site pelo link de um parceiro e tiver permitido os cookies de marketing, gravamos um único cookie do nosso próprio domínio, gt_ref, que guarda o código desse parceiro por 90 dias para que o parceiro que indicou você seja creditado. O site funciona sem ele: se você recusar, nenhum cookie é gravado e a indicação simplesmente não é creditada. Na data desta política o rastreamento de indicações está desativado e esse cookie não é gravado de forma alguma.
+**O programa de parceiros:** não grava nenhum cookie. Se você chegar ao site pelo link de um parceiro, o código desse parceiro vai no próprio link e nada é escrito no seu dispositivo. É por isso que o programa não aparece entre as categorias acima, e é por isso que o que você escolhe neste aviso nem o ajuda nem o atrapalha. Um cookie que guarde o código de um parceiro não é estritamente necessário para o site funcionar, então teríamos precisado do seu consentimento para gravá-lo: escolhemos não precisar dele.
 
 Se o seu navegador enviar o sinal Global Privacy Control, nós o tratamos como recusa: nenhum cookie de medição ou de marketing é carregado, e não exibimos o aviso.
 

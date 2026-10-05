@@ -47,6 +47,18 @@ export default function EnglishAccessibilityPage() {
           parts we know are not fully accessible are listed further down this page.
         </p>
         <p className="mt-3">
+          <strong>How we are checked:</strong> every public page is audited automatically in a real
+          browser against the full set of WCAG 2.1 Level A and AA rules, in Hebrew and in English,
+          together with its heading structure, its declared language and direction, its focus order
+          and an alternative text on every image. The cookie notice is checked separately from the
+          keyboard alone, including that refusing is reached first. These checks run on every change
+          to the code, and a change that breaks them does not ship. An automated pass finds some
+          barriers and not all of them: it cannot judge whether an alternative text is actually
+          meaningful, or how a screen reader announces a widget in practice. Those are judged by a
+          person using assistive technology, and such an audit has not been carried out here yet.
+          That is why the statement says &ldquo;partially&rdquo;.
+        </p>
+        <p className="mt-3">
           <strong>Visitors from the European Union:</strong> the European Accessibility Act
           (Directive (EU) 2019/882), which applies from 28 June 2025, exempts microenterprise service
           providers — fewer than ten employees and an annual turnover or balance sheet total not
@@ -173,7 +185,7 @@ export default function EnglishAccessibilityPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This page was last updated on October 3, 2026
+          This page was last updated on October 5, 2026
         </p>
       </section>
     </LegalDoc>

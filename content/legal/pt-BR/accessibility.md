@@ -3,7 +3,7 @@ title: Acessibilidade | Go Top SEO
 description: Declaração de acessibilidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/accessibility/page.tsx
-lastUpdated: 2026-10-04
+lastUpdated: 2026-10-05
 register: voce
 extraSections: 0
 ---
@@ -19,6 +19,8 @@ Nossa plataforma é desenvolvida em conformidade com as Diretrizes de Acessibili
 Em Israel, os serviços web estão sujeitos à Norma Israelense SI 5568, baseada na WCAG 2.0 no nível AA, conforme o Regulamento de Igualdade de Direitos das Pessoas com Deficiência (Adaptações de Acessibilidade em Serviços), de 2013. Trabalhamos para adequar o site e a plataforma a essa norma no nível AA; as diretrizes WCAG 2.1 nível AA que aplicamos abrangem também os requisitos da WCAG 2.0.
 
 **Declaração de conformidade:** o site e a plataforma são *parcialmente* conformes com a norma no nível AA. Parcialmente, e não totalmente, porque algumas partes ainda não foram testadas de ponta a ponta e porque o conteúdo de terceiros está fora do nosso controle. As partes que sabemos não estar totalmente acessíveis estão listadas mais adiante nesta página.
+
+**Como somos verificados:** cada página pública é auditada automaticamente em um navegador real contra o conjunto completo de regras WCAG 2.1 de nível A e AA, em hebraico e em inglês, junto com a estrutura de títulos, o idioma e a direção declarados, a ordem de foco e o texto alternativo de cada imagem. O aviso de cookies é verificado separadamente apenas com o teclado, inclusive que a recusa seja alcançada primeiro. Essas verificações rodam a cada alteração no código, e uma alteração que as quebre não vai ao ar. Uma verificação automática encontra parte das barreiras e não todas: ela não consegue julgar se um texto alternativo é de fato compreensível, nem como um leitor de tela anuncia um componente na prática. Isso é julgado por uma pessoa que usa tecnologia assistiva, e uma auditoria dessas ainda não foi feita aqui. É por isso que a declaração diz «parcialmente».
 
 **Visitantes do Brasil:** a referência técnica brasileira para acessibilidade na web é a ABNT NBR 17060, e o art. 63 da Lei Brasileira de Inclusão (Lei nº 13.146/2015) impõe a acessibilidade dos sites mantidos por empresas com sede ou representação comercial no país. Não temos sede nem representação comercial no Brasil, de modo que essa obrigação não se dirige a nós; seguimos a WCAG 2.1 nível AA de todo modo, e a WCAG é justamente a base internacional que a norma brasileira adota. Se algo no site não funcionar para você, o canal da seção «Como relatar problemas de acessibilidade» é o mesmo para qualquer país.
 
@@ -75,4 +77,4 @@ Atualizamos a plataforma com regularidade para manter e melhorar a acessibilidad
 - [Guia de referência rápida da WCAG 2.1](https://www.w3.org/WAI/WCAG21/quickref/)
 - [Iniciativa de Acessibilidade na Web do W3C](https://www.w3.org/WAI/)
 
-Esta página foi atualizada pela última vez em 4 de outubro de 2026
+Esta página foi atualizada pela última vez em 5 de outubro de 2026

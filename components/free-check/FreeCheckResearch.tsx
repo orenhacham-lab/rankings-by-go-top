@@ -192,6 +192,14 @@ function ReportRequest({ locale, token }: { locale: PublicLocale; token: string 
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [consent, setConsent] = useState(false)
+  /*
+   * The second box, and it starts unticked like the first. It is OPTIONAL: the
+   * form submits without it and the server treats anything but `true` as a
+   * refusal. Pre-ticking it, or making the report conditional on it, is the
+   * bundling GDPR Art. 7(4) voids — which is exactly what the single box here
+   * used to do until 5 October 2026.
+   */
+  const [marketing, setMarketing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -219,7 +227,7 @@ function ReportRequest({ locale, token }: { locale: PublicLocale; token: string 
       const res = await fetch('/api/free-check/report', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token, email, consent: true, locale }),
+        body: JSON.stringify({ token, email, consent: true, marketing, locale }),
       })
       const body = (await res.json().catch(() => null)) as ReportRequestResponse | null
       if (body?.ok) {
@@ -277,6 +285,12 @@ function ReportRequest({ locale, token }: { locale: PublicLocale; token: string 
             </a>
           </>
         }
+      />
+      <Checkbox
+        checked={marketing}
+        onChange={(next) => setMarketing(next)}
+        data-report-marketing
+        label={t.marketing}
       />
       {error && (
         <div role="alert">

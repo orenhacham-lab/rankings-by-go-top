@@ -49,12 +49,12 @@ export default function EnglishAffiliateTermsPage() {
             which identifies you as the source of a visit.
           </li>
           <li>
-            <strong>Attribution Window</strong> — 90 days from the day a visitor reaches our site
-            through your Referral Link.
+            <strong>Referral</strong> — a visit that reached our site through your Referral Link, and
+            the signup that followed it on the way from that link.
           </li>
           <li>
-            <strong>Referred Customer</strong> — a new customer who opens an account with us within the
-            Attribution Window and whose account we attribute to you under section 4.
+            <strong>Referred Customer</strong> — a new customer who opens an account with us in a
+            Referral we attribute to you under section 4.
           </li>
           <li>
             <strong>Qualifying Payment</strong> — a subscription payment that a Referred Customer has
@@ -90,16 +90,19 @@ export default function EnglishAffiliateTermsPage() {
       <section>
         <h2>4. The Referral Link and how a referral is attributed</h2>
         <p>
-          Attribution is by last click: where a visitor has reached us through more than one Referral
-          Link, the account is attributed to the most recent one inside its Attribution Window. An
-          account opened after the Attribution Window has ended is not attributed to you.
+          Attribution is by the last click on your Referral Link on the way to signing up: where a
+          visitor has reached us through more than one Referral Link, the account is attributed to the
+          most recent one.
         </p>
         <p>
-          Attribution depends on what the visitor&rsquo;s browser and settings allow us to record, and on
-          the choices the visitor makes in our cookie banner. A visitor who declines non-essential
-          storage, clears it, uses a different browser or device, or blocks it with an extension may not
-          be attributed to you. We do not guarantee that every visit through your Referral Link will
-          result in attribution, and we are not liable for a referral we were unable to record.
+          Your code travels in the Referral Link itself. We set no cookie for the Partner Program and
+          store nothing on the visitor&rsquo;s device, so what the visitor chooses in our cookie notice
+          does not affect your attribution either way. What it does mean is that a visitor who leaves
+          and comes back later without your link, on the same device or another, may not be attributed
+          to you. We do not guarantee that every visit through your Referral Link will result in
+          attribution, and we are not liable for a referral we were unable to record. If we ever extend
+          crediting to a visit that returns later, which would require storing something, we will tell
+          partners in writing before it starts and say what is stored.
         </p>
         <p>
           Our records are what we act on. If you believe a referral was recorded incorrectly, write to us
@@ -395,7 +398,7 @@ export default function EnglishAffiliateTermsPage() {
       <section>
         <h2>20. Changes to the Program and to this agreement</h2>
         <p>
-          We may change the commission rate, the Attribution Window, the holding period, the minimum payout
+          We may change the commission rate, the way a referral is attributed, the holding period, the minimum payout
           or any other term of the Program. We will give you notice by email to the address on your partner
           account at least 14 days before the change takes effect. A change is not retroactive: a Commission
           already earned is calculated under the terms in force when the Qualifying Payment was made. If you

@@ -118,10 +118,11 @@ function main() {
     // about the version the reader is looking at.
     // Per document, because they are no longer revised together: the privacy
     // policy moved to 5 October 2026 with the partner-program section and the
-    // referral cookie, and the accessibility statement did not change.
+    // referral cookie, and the accessibility statement moved the same day with
+    // the section that says how it is verified.
     check('D2: every document that was changed carries the new date',
       /5 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 5, 2026/.test(read(EN_PRIVACY))
-      && /3 באוקטובר 2026/.test(read(HE_A11Y)) && /October 3, 2026/.test(read(EN_A11Y)))
+      && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }
 
   console.log('\nE) the accessibility statement is a statement, with a route onwards')

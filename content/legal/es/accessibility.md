@@ -3,7 +3,7 @@ title: Accesibilidad | Go Top SEO
 description: Declaración de accesibilidad de Go Top SEO.
 locale: es
 source: app/(public)/en/accessibility/page.tsx
-lastUpdated: 2026-10-03
+lastUpdated: 2026-10-05
 register: usted
 ---
 
@@ -18,6 +18,8 @@ Nuestra plataforma está desarrollada conforme a las Pautas de Accesibilidad par
 En Israel, los servicios web están sujetos a la Norma Israelí SI 5568, que se basa en WCAG 2.0 en el nivel AA, conforme al Reglamento de Igualdad de Derechos de las Personas con Discapacidad (Adaptaciones de Accesibilidad de los Servicios), 2013. Trabajamos para adecuar el sitio y la plataforma a esta norma en el nivel AA; las pautas WCAG 2.1 de nivel AA que aplicamos incluyen también los requisitos de WCAG 2.0.
 
 **Declaración de conformidad:** el sitio y la plataforma son *parcialmente* conformes con la norma en el nivel AA. Parcialmente, y no totalmente, porque algunas partes aún no se han probado de extremo a extremo, y porque el contenido de terceros está fuera de nuestro control. Las partes que sabemos que no son totalmente accesibles se enumeran más abajo en esta página.
+
+**Cómo se nos comprueba:** cada página pública se audita automáticamente en un navegador real frente al conjunto completo de reglas WCAG 2.1 de nivel A y AA, en hebreo y en inglés, junto con su estructura de encabezados, el idioma y la dirección que declara, el orden de foco y el texto alternativo de cada imagen. El aviso de cookies se comprueba por separado solo con el teclado, incluido que el rechazo se alcance primero. Estas comprobaciones se ejecutan en cada cambio del código, y un cambio que las rompa no se publica. Una revisión automática detecta algunas barreras y no todas: no puede juzgar si un texto alternativo resulta realmente comprensible, ni cómo anuncia un lector de pantalla un componente en la práctica. Eso lo juzga una persona que utiliza tecnología de asistencia, y una auditoría así todavía no se ha realizado aquí. Por eso la declaración dice «parcialmente».
 
 **Visitantes de la Unión Europea:** el Acta Europea de Accesibilidad (Directiva (UE) 2019/882), que se aplica desde el 28 de junio de 2025, exime de sus requisitos de accesibilidad a los prestadores de servicios que sean microempresas (con menos de diez empleados y un volumen de negocios anual o un balance general anual que no supere los 2 millones de EUR). Cumplimos esa definición, por lo que esos requisitos no se nos aplican. De todos modos seguimos WCAG 2.1 nivel AA, porque la accesibilidad no es una cuestión de obligación.
 
@@ -72,4 +74,4 @@ Actualizamos la plataforma con regularidad para mantener y mejorar la accesibili
 - [Guía de referencia rápida de WCAG 2.1](https://www.w3.org/WAI/WCAG21/quickref/)
 - [Iniciativa para la Accesibilidad Web del W3C](https://www.w3.org/WAI/)
 
-Esta página se actualizó por última vez el 3 de octubre de 2026
+Esta página se actualizó por última vez el 5 de octubre de 2026

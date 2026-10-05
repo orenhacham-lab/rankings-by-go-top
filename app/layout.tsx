@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
-import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
+import { PublicConsentNotice, PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
@@ -169,6 +169,10 @@ export default async function RootLayout({
             re-states it after a client-side navigation into another language. */}
         <DocumentLocaleSync />
         <RootThemeProvider>
+          {/* Above `children` on purpose: the notice is fixed-positioned, so this
+              changes nothing visually and everything about the tab order. See
+              PublicConsentNotice. */}
+          <PublicConsentNotice isAuthenticated={isAuthenticated} />
           {children}
           <PublicSiteWidgets isAuthenticated={isAuthenticated} />
         </RootThemeProvider>

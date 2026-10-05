@@ -163,7 +163,7 @@ El programa de socios está dirigido a quienes recomiendan el Servicio y reciben
 - **Mientras usted es socio:** almacenamos sus datos de contacto, su código de referencia, las cuentas abiertas a través de él, los pagos que generan derecho a comisión y la comisión calculada sobre ellos, los pagos que le realizamos, y las facturas y los certificados fiscales que la ley nos obliga a conservar.
 - **Qué ve un socio sobre las personas que refirió:** nada personal. Un socio ve cantidades e importes. Un socio no recibe la dirección de correo electrónico, el sitio web, el plan ni la identidad de ningún cliente que haya referido.
 - **Pago de la comisión:** el proveedor que elija el socio (PayPal, Wise o transferencia bancaria) recibe los datos que necesita para pagar. Las facturas y los certificados de retención se conservan siete años, como exigen las normas de contabilidad israelíes.
-- **Atribución de una referencia:** requiere una cookie, y una cookie de ese tipo requiere su consentimiento. Consulte «Cookies» más abajo para conocer la única cookie implicada y qué ocurre si usted la rechaza.
+- **Atribución de una referencia:** el código del socio viaja en el propio enlace. No instalamos ninguna cookie para el programa ni guardamos nada en su dispositivo, de modo que lo que usted elija sobre las cookies no influye ni en un sentido ni en el otro. Si en algún momento acreditamos una visita que vuelve más tarde, lo que implicaría guardar algo, esta política lo dirá y se le pedirá su consentimiento antes.
 
 En la fecha de esta política el programa funciona únicamente por solicitud: recibimos solicitudes y aprobamos socios manualmente, y todavía no se han construido el seguimiento de referencias, el registro de comisiones ni el pago. Cada uno de ellos se describirá aquí antes de empezar a funcionar. Los términos están en el [Acuerdo del Programa de Socios](/es/affiliate-terms), que además obliga al socio a declarar abiertamente que está remunerado.
 
@@ -181,6 +181,14 @@ Enviamos correo electrónico a través del proveedor de envío Resend, que recib
 - **Mensajes de la cuenta y del servicio:** registro, verificación, facturación y novedades sobre el uso del Servicio.
 - **Recordatorios:** cuando hay contenido pendiente de su aprobación, puede enviarse un recordatorio. Cada recordatorio incluye un enlace de cancelación de suscripción con un solo clic, sin necesidad de iniciar sesión, y al cancelar la suscripción se detienen estos recordatorios. Su preferencia se almacena con nosotros.
 - **Informe mensual de progreso:** un resumen mensual del proyecto, para los proyectos en los que usted lo activó en los ajustes.
+
+## Cómo podemos contactar con usted a raíz de una comprobación gratuita
+
+Si usted ejecutó una comprobación gratuita de un sitio web, podemos ponernos en contacto a raíz de ella. Por correo electrónico, solo a la dirección que nos dio y solo en la medida en que lo permitan las casillas que marcó: el informe que pidió, y novedades o contenido comercial únicamente si los aceptó en su propia casilla aparte.
+
+También podemos contactar con la empresa cuyo sitio web se comprobó, con los datos de contacto que esa empresa publica en su propio sitio: un número de teléfono o una dirección general. Lo hacemos por nuestro interés legítimo en ofrecer un servicio a una empresa que parece encajar (art. 6.1.f del RGPD), no por su consentimiento, y esos datos provienen del propio sitio y no de nada que usted nos haya dado. Cuando llamamos, decimos quiénes somos y de dónde sacamos el número.
+
+Puede pedirnos que paremos en cualquier momento y por cualquier canal, y paramos: por correo electrónico, por teléfono, en cualquier idioma. Para el marketing directo es un derecho absoluto (art. 21.2 del RGPD), no le cuesta nada, y lo registramos para que una lista posterior no lo deshaga.
 
 ## Seguridad de los datos
 
@@ -214,7 +222,7 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 **Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio.
 
-**El programa de socios:** si usted llega al sitio a través del enlace de un socio y ha permitido las cookies de marketing, instalamos una única cookie de nuestro propio dominio, gt_ref, que conserva el código de ese socio durante 90 días para que se acredite al socio que lo envió. El sitio funciona sin ella: si usted la rechaza, no se instala ninguna cookie y la referencia simplemente no se acredita. En la fecha de esta política el seguimiento de referencias está desactivado y esta cookie no se instala en absoluto.
+**El programa de socios:** no instala ninguna cookie. Si usted llega al sitio a través del enlace de un socio, el código de ese socio va en el propio enlace y nada se escribe en su dispositivo. Por eso el programa no figura entre las categorías anteriores, y por eso lo que usted elija en este aviso ni lo ayuda ni lo estorba. Una cookie que conserve el código de un socio no es estrictamente necesaria para que el sitio funcione, así que habríamos necesitado su consentimiento para instalarla: elegimos no necesitarla.
 
 Si su navegador envía una señal Global Privacy Control, la tratamos como un rechazo: no se cargan cookies de medición ni de marketing, y no le mostramos el aviso.
 

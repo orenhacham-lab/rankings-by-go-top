@@ -333,9 +333,10 @@ export default function EnglishPrivacyPage() {
           <li><strong>Paying commission:</strong> the provider the partner chooses &mdash; PayPal, Wise or a bank
           transfer &mdash; receives the details it needs in order to pay. Invoices and withholding certificates are
           kept for seven years, as Israeli bookkeeping rules require.</li>
-          <li><strong>Crediting a referral:</strong> this needs a cookie, and a cookie of that kind needs your
-          consent. See &ldquo;Cookies&rdquo; below for the single cookie involved and for what happens when you
-          refuse it.</li>
+          <li><strong>Crediting a referral:</strong> the partner&rsquo;s code travels in the link itself. We
+          set no cookie for the program and store nothing on your device, so what you choose about cookies does
+          not affect it in either direction. If we ever credit a visit that comes back later, which would mean
+          storing something, this policy will say so and your consent will be asked first.</li>
         </ul>
         <p className="mt-4">
           As of the date of this policy the program runs by application only: we receive applications and approve
@@ -377,6 +378,27 @@ export default function EnglishPrivacyPage() {
           <li><strong>Monthly progress report:</strong> a monthly summary of the project, for projects where you turned it
           on in the settings.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>How We May Contact You About a Free Check</h2>
+        <p>
+          If you ran a free check on a website, we may get in touch about it. By email, only to the address
+          you gave us and only as far as the boxes you ticked allow: the report you asked for, and updates or
+          marketing content only if you agreed to those on their own separate box.
+        </p>
+        <p>
+          We may also contact the business whose website was checked, using contact details that business
+          publishes on its own site &mdash; a phone number or a general address. We do that on our legitimate
+          interest in offering a service to a business that looks like a fit (GDPR Art. 6(1)(f)), not on your
+          consent, and those details come from the site itself rather than from anything you gave us. When we
+          call, we say who we are and where we got the number.
+        </p>
+        <p>
+          You can tell us to stop at any time and by any channel, and we stop &mdash; by email, by phone, in
+          every language. For direct marketing that is an absolute right (GDPR Art. 21(2)), it costs you
+          nothing, and we record it so a later list cannot undo it.
+        </p>
       </section>
 
       <section>
@@ -434,12 +456,12 @@ export default function EnglishPrivacyPage() {
           &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
           easy as giving consent, and costs you nothing in the service.
         </p>
-        <p className="mt-4">
-          <strong>The partner program:</strong> if you reach the site through a partner link and you have allowed
-          marketing cookies, we set one cookie of our own domain, gt_ref, which keeps that partner&rsquo;s code for
-          90 days so that the partner who sent you is credited. The site works without it: if you refuse, no cookie
-          is set and the referral is simply not credited. As of the date of this policy referral tracking is
-          switched off and this cookie is not set at all.
+        <p className="mt-3">
+            <strong>The partner program:</strong> it sets no cookie at all. If you reach the site through a
+          partner link, that partner&rsquo;s code is carried in the link itself and nothing is written to your
+          device, which is why the program does not appear among the categories above and why your choice on
+          this notice neither helps nor hinders it. A cookie that keeps a partner&rsquo;s code is not strictly
+          necessary for the site to work, so we would have needed your consent for one; we chose not to need it.
         </p>
         <p className="mt-4">
           If your browser sends a Global Privacy Control signal, we treat it as a refusal: no

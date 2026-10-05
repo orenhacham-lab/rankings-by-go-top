@@ -309,17 +309,36 @@ const PROGRAM_NUMBERS = ['30%', '40%', '90', '30', '100', '350'] as const
   }
 }
 
-// ── 9) the referral cookie, disclosed in every language or in none ──────────
+// ── 9) the partner program claims no cookie and no day count ───────────────
 /*
- * ePrivacy art. 5(3): an attribution cookie is not strictly necessary, because
- * the site works without it and only the credit is lost, so it needs consent
- * and it needs to be named where the reader can find it. The name and the
- * lifetime are the two facts a reader cannot verify for themselves, so they
- * are held identical across the Hebrew page, the English page and every
- * translation. A language that gains the cookie in code and not in text, or
- * loses the sentence in a rewrite, fails here rather than live.
+ * The design changed on 2026-10-05 and the text had to follow it. The policy
+ * used to describe one cookie, gt_ref, keeping a partner's code for 90 days.
+ * That cookie was set BEFORE consent in the first draft, which ePrivacy art.
+ * 5(3) forbids for an attribution cookie — the site works without it and only
+ * the credit is lost, so it is not strictly necessary — and the mechanism that
+ * replaced it stores nothing at all: the code rides in the link and is read on
+ * the way to signing up.
+ *
+ * So the documents must now claim the ABSENCE, and claim it identically. Two
+ * failures are guarded, and they are opposite in kind:
+ *
+ *   - a day count or a cookie name coming back into any document while nothing
+ *     stores one, which would promise a partner a memory that does not exist
+ *     and would describe to a visitor a cookie that is never written;
+ *   - a language that loses the sentence saying no cookie is set, which leaves
+ *     a reader unable to tell whether their refusal costs the partner the
+ *     commission. It does not, and every language has to say so.
+ *
+ * The marketing page is held to the same thing from the other side by the
+ * build thread's own guard. If storage is ever added, both sides change in one
+ * commit, with the consent ask, and this section is what makes that unavoidable.
  */
-const REFERRAL_COOKIE = ['gt_ref', '90'] as const
+const NO_REFERRAL_STORAGE: Record<string, RegExp[]> = {
+  he: [/אינה שומרת עוגייה כלל/, /נוסע בקישור/],
+  en: [/sets no cookie at all/, /travels in the link itself/],
+  es: [/no instala ninguna cookie/, /viaja en el propio enlace/],
+  'pt-BR': [/n[ãa]o grava nenhum cookie/, /viaja no pr[óo]prio link/],
+}
 const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
 {
   const enSource = frontMatter(text[LOCALES[0]].privacy).source
@@ -330,10 +349,105 @@ const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
   ]
   for (const [name, src] of pages) {
     check(`${name}/privacy: the page was read`, src.length > 0)
-    for (const fact of REFERRAL_COOKIE) {
-      check(`${name}/privacy: the referral cookie's ${fact === 'gt_ref' ? 'name' : 'lifetime in days'} is stated`,
-        src.includes(fact))
+    check(`${name}/privacy: no referral cookie is named`, !/gt_ref/.test(src))
+    for (const must of NO_REFERRAL_STORAGE[name] ?? []) {
+      check(`${name}/privacy: states ${must.source.slice(0, 32)}`, must.test(src))
     }
+  }
+  // The agreement cannot promise a window the mechanism has no way to honour.
+  const AGREEMENTS: [string, string][] = [
+    ['he', 'app/(legal)/affiliate-terms/page.tsx'],
+    ['en', frontMatter(text[LOCALES[0]]['affiliate-terms']).source],
+  ]
+  for (const [name, path] of AGREEMENTS) {
+    const src = path && existsSync(path) ? readFileSync(path, 'utf8') : ''
+    check(`${name}/affiliate-terms: the page was read`, src.length > 0)
+    check(`${name}/affiliate-terms: no attribution window in days`,
+      !/(Attribution Window|חלון השיוך)/.test(src))
+  }
+  for (const l of LOCALES) {
+    check(`${l}/affiliate-terms: no attribution window in days`,
+      !/(ventana de atribuci[óo]n|janela de atribui[çc][ãa]o)/i.test(text[l]['affiliate-terms']))
+  }
+}
+
+// ── 10) the accessibility statement says how it was verified ───────────────
+/*
+ * An accessibility statement is a public declaration, so an inaccurate one is
+ * its own exposure: in Israel under the deception provisions of the Consumer
+ * Protection Law, 1981, and in the EU under the model statement the EAA builds
+ * on, which expects the evaluation method to be named. The statement therefore
+ * says exactly what is checked automatically, that an automated pass is not
+ * all of it, and that no audit by a person using assistive technology has been
+ * done yet — which is the stated reason it says "partially" rather than
+ * "fully". The three facts are held together: a statement that keeps the word
+ * "partially" while dropping the reason, or that claims full conformance, has
+ * to fail here rather than in front of a regulator.
+ */
+const HEBREW_A11Y = 'app/(legal)/accessibility/page.tsx'
+const A11Y_METHOD: Record<string, RegExp[]> = {
+  he: [/כיצד נבדקנו/, /WCAG 2\.1/, /טכנולוגיה\s*\n?\s*מסייעת/, /טרם נעשתה/, /חלקית/],
+  en: [/How we are checked/, /WCAG 2\.1/, /assistive technology/, /has not been carried out/, /partially/i],
+  es: [/C[óo]mo se nos comprueba/, /WCAG 2\.1/, /tecnolog[íi]a de asistencia/, /todav[íi]a no se ha realizado/, /parcialmente/i],
+  'pt-BR': [/Como somos verificados/, /WCAG 2\.1/, /tecnologia assistiva/, /ainda n[ãa]o foi feita/, /parcialmente/i],
+}
+{
+  const enA11ySource = frontMatter(text[LOCALES[0]].accessibility).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_A11Y) ? readFileSync(HEBREW_A11Y, 'utf8') : ''],
+    ['en', enA11ySource && existsSync(enA11ySource) ? readFileSync(enA11ySource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].accessibility]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/accessibility: the page was read`, src.length > 0)
+    for (const must of A11Y_METHOD[name] ?? []) {
+      check(`${name}/accessibility: states ${must.source.slice(0, 34)}`, must.test(src))
+    }
+    check(`${name}/accessibility: claims no full conformance`,
+      !/fully conformant|totalmente conformes?|מותאמים במלואם|plenamente conforme/i.test(src))
+  }
+}
+
+// ── 11) outbound contact after a free check, disclosed in every language ────
+/*
+ * Oren asked on 2026-10-05 whether he may phone a number he found on the site
+ * of a business that ran a free check, when that visitor did not tick the
+ * marketing box. He may: the number was published by the business, not given to
+ * us, so the call rests on legitimate interest in a business offer (Art.
+ * 6(1)(f)) rather than on a consent that was never given for it. But Art. 13
+ * requires the purpose to be disclosed, Art. 14 requires the source to be given
+ * when the data did not come from the person, and Art. 21(2) requires the
+ * objection right to be brought to their attention at the first communication.
+ * The policy said nothing about outbound contact at all — it described WhatsApp
+ * and calls coming IN — so doing it would have been undisclosed processing.
+ *
+ * Three facts are held per language, because dropping any one of them turns a
+ * defensible practice back into an undisclosed one: that we may contact the
+ * business through details it published itself, the basis we do it on, and the
+ * absolute right to tell us to stop, in any channel.
+ */
+const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
+  he: [/עשויים גם לפנות לעסק/, /מפרסם באתר שלו/, /6\(1\)\(ו\)/, /זכות מוחלטת/, /21\(2\)/],
+  en: [/contact the business whose website was checked/, /publishes on its own site/, /6\(1\)\(f\)/, /absolute right/, /21\(2\)/],
+  es: [/contactar con la empresa cuyo sitio web se comprob/, /publica en su propio sitio/, /6\.1\.f/, /derecho absoluto/, /21\.2/],
+  'pt-BR': [/entrar em contato com a empresa cujo site foi verificado/, /publica no pr[óo]prio site/, /6\.1\.f/, /direito absoluto/, /21\.2/],
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    for (const must of OUTBOUND_CONTACT[name] ?? []) {
+      check(`${name}/privacy: outbound contact states ${must.source.slice(0, 34)}`, must.test(src))
+    }
+    // The policy must describe marketing as its own separate box, because that
+    // is what the form now does. A policy still describing one bundled tick
+    // would be a disclosure of something that no longer happens.
+    check(`${name}/privacy: marketing is described as a separate box`,
+      /בתיבה נפרדת|separate box|casilla aparte|caixa separada/i.test(src))
   }
 }
 
@@ -359,6 +473,10 @@ console.log('\nmutation controls')
     (privacy.match(/^## /gm) ?? []).length + 1 !== (privacy.match(/^## /gm) ?? []).length)
   check('a 14-day refund promise slipped into a translation is caught',
     /\b14 dias\b/i.test('Reembolso incondicional em 14 dias.'))
+  check('an accessibility statement that drops the reason for "partially" is caught',
+    !/טרם נעשתה/.test(readFileSync(HEBREW_A11Y, 'utf8').replace(/טרם נעשתה/g, 'נעשתה')))
+  check('a statement that claims full conformance is caught',
+    /totalmente conformes/i.test('el sitio y la plataforma son totalmente conformes con la norma'))
   check('front matter claiming the wrong locale is caught',
     frontMatter('---\nlocale: en\n---').locale !== 'pt-BR')
   check('European Portuguese in a Brazilian document is caught',
@@ -373,8 +491,14 @@ console.log('\nmutation controls')
       && /art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms']))
   check('a Brazilian document that drops the seven-day right is caught',
     !/art\.\s*49/.test(text['pt-BR']['refund-policy'].replace(/art\.\s*49/g, '')) && /art\.\s*49/.test(text['pt-BR']['refund-policy']))
-  check('a privacy policy that stops naming the referral cookie is caught',
-    !text['pt-BR'].privacy.replace(/gt_ref/g, '').includes('gt_ref') && text['pt-BR'].privacy.includes('gt_ref'))
+  check('a policy that drops the right to tell us to stop is caught',
+    !/זכות מוחלטת/.test(readFileSync(HEBREW_PRIVACY, 'utf8').replace(/זכות מוחלטת/g, 'זכות')))
+  check('a policy that still describes one bundled consent box is caught',
+    !/casilla aparte/.test('Acepto recibir el informe, as\u00ed como contenido comercial.'))
+  check('a day count put back into a partner document is caught',
+    /\b90 d[íi]as\b/.test('conserva el código de ese socio durante 90 días'))
+  check('a policy that stops saying no cookie is set is caught',
+    !/sets no cookie at all/.test('The partner program: if you reach the site through a partner link'))
   check('a translation that drops the promise about a referred customer\'s details is caught',
     !/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/
       .test(text.es.privacy.replace(/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/g, ''))

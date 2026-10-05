@@ -151,7 +151,7 @@ const OLD_NAME = /Rankings by Go Top/i
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
   terms: { he: /3 באוקטובר 2026/, en: /October 3, 2026/ },
   privacy: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
-  a11y: { he: /3 באוקטובר 2026/, en: /October 3, 2026/ },
+  a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
