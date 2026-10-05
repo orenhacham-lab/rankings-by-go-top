@@ -106,6 +106,41 @@ async function main() {
   const big = Array.from({ length: 20 }, (_, i) => ({ question: `Question number ${i + 1} about boots?`, answer: 'A long answer. '.repeat(70) }))
   const bigGraph = wordpressSchemaGraph([{ '@context': 'https://schema.org', '@type': 'BlogPosting', headline: 'H' }, { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: big.map((f) => ({ '@type': 'Question', name: f.question, acceptedAnswer: { '@type': 'Answer', text: f.answer } })) }])
   check('S11: an FAQ too large for the plugin is trimmed to fit, never sent over the limit', !!bigGraph && JSON.stringify(bigGraph).length <= 16000 && validSchema(bigGraph))
+  // ── Y) Yoast / Rank Math already print the article markup ───────────────
+  const graphOf = (t: ReturnType<typeof transport>) => (JSON.parse(t.sent[0]?.body ?? '{}').value?.schema?.['@graph'] ?? []) as Record<string, unknown>[]
+  const withSeo = (p: string) => ({ ...deps(undefined as never), detectSeoPlugin: async () => p as never })
+  for (const p of ['yoast', 'rankmath']) {
+    const y = transport()
+    const yo = await publishArticleSchemaToWordPress(db({}) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo(p), post: y.post })
+    const g = graphOf(y)
+    check(`Y1: ${p} on the site: only the FAQPage is sent, no second article markup`, yo === 'applied' && g.length === 1 && g[0]?.['@type'] === 'FAQPage', JSON.stringify(g).slice(0, 200))
+  }
+  const yNoFaq = transport()
+  check('Y2: Yoast and no FAQ: nothing sent (seo_plugin_article)',
+    (await publishArticleSchemaToWordPress(db({}, []) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo('yoast'), post: yNoFaq.post })) === 'seo_plugin_article' && yNoFaq.sent.length === 0)
+  const plain = transport()
+  await publishArticleSchemaToWordPress(db({ seo_plugin: 'yoast' }) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo('none'), post: plain.post })
+  check('Y3: the site answers "none" (Yoast since removed): the full markup, the live answer wins over the stored one', graphOf(plain).map((n) => n['@type']).join() === 'BlogPosting,FAQPage')
+  const stale = transport()
+  await publishArticleSchemaToWordPress(db({ seo_plugin: 'rankmath' }) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo('unknown'), post: stale.post })
+  check('Y4: the site does not answer: what the Bridge plugin last reported decides (Rank Math: FAQ only)', graphOf(stale).map((n) => n['@type']).join() === 'FAQPage')
+  const unknownBoth = transport()
+  await publishArticleSchemaToWordPress(db({ seo_plugin: null }) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo('permission_error'), post: unknownBoth.post })
+  check('Y5: neither known: the full markup, as before', graphOf(unknownBoth).map((n) => n['@type']).join() === 'BlogPosting,FAQPage')
+  const wpSrc = strip(read('lib/content/wordpress-publish.ts'))
+  check('Y6: publishing asks the site which SEO plugin it runs', /detectSeoPlugin:\s*\(\)\s*=>\s*detectSeoPlugin\(creds\)/.test(wpSrc))
+  for (const [lang, f] of [['he', 'lib/i18n/dashboard/he.ts'], ['en', 'lib/i18n/dashboard/en.ts'], ['es', 'lib/i18n/dashboard/es.ts'], ['pt-BR', 'lib/i18n/dashboard/pt-BR/project-settings.ts']]) {
+    const body = (read(f).match(/officialProfiles: \{[\s\S]*?body: '((?:[^'\\]|\\.)*)'/) ?? [])[1] ?? ''
+    check(`Y10 ${lang}: the profiles copy names where they apply (WordPress with the plugin, webhook), that Yoast/Rank Math sites take them from their own settings, and that Shopify does not get them`,
+      /WordPress/.test(body) && /Shopify/.test(body) && /webhook/i.test(body) && /Yoast/.test(body) && /Rank Math/.test(body) && !/(כל מאמר יכלול|Every article carries|Cada artículo los lleva|Cada artigo os leva)/.test(body), body.slice(0, 120))
+  }
+
+  const noFilter = await mutant<typeof import('../wordpress-schema')>('lib/content/wordpress-schema.ts', (s) => s.replace("ARTICLE_MARKUP_PLUGINS.has(seoPlugin) ?", 'false ?'))
+  const mY = transport()
+  await noFilter.publishArticleSchemaToWordPress(db({}) as never, { articleId: ART, postUrl: POST_URL, status: 'publish' }, { ...withSeo('yoast'), post: mY.post })
+  check('MUTATION CONTROL: without the Yoast check the BlogPosting is sent again (so Y1 would fail)', graphOf(mY).some((n) => n['@type'] === 'BlogPosting'))
+  check('MUTATION CONTROL: Y6 catches publishing that stops asking', !/detectSeoPlugin:\s*\(\)\s*=>\s*detectSeoPlugin\(creds\)/.test(wpSrc.replace('detectSeoPlugin: () => detectSeoPlugin(creds)', '')))
+
   const noStatus = await mutant<typeof import('../wordpress-schema')>('lib/content/wordpress-schema.ts', (s) => s.replace("    if (input.status !== 'publish') return 'not_published'\n", ''))
   const mDraft = transport()
   await noStatus.publishArticleSchemaToWordPress(db({}) as never, { articleId: ART, postUrl: POST_URL, status: 'draft' }, deps(mDraft.post))

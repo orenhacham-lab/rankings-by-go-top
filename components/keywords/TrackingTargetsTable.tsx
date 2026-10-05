@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { articleIdFromNote } from '@/lib/keywords/article-note'
 import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -272,9 +274,20 @@ export default function TrackingTargetsTable({
                 <Td className="min-w-[7rem] sm:whitespace-nowrap">
                   <span className="font-semibold text-ink">{target.keyword}</span>
                   {!target.is_active && <Badge variant="neutral" className="ms-2 align-middle">{dict.common.inactive}</Badge>}
-                  {target.notes && (
-                    <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
-                  )}
+                  {(() => {
+                    const articleId = articleIdFromNote(target.notes)
+                    if (articleId) {
+                      return (
+                        <p className="mt-0.5 text-caption text-muted">
+                          {k.fromArticle} ·{' '}
+                          <Link href={`/content/articles/${articleId}`} className="text-accent hover:underline" data-keyword-article>{k.openArticle}</Link>
+                        </p>
+                      )
+                    }
+                    return target.notes ? (
+                      <p className="mt-0.5 max-w-56 truncate text-caption text-muted" title={target.notes}>{target.notes}</p>
+                    ) : null
+                  })()}
                   {/* Search Console is Google's web search: a Maps keyword has no such average. */}
                 </Td>
                 <Td className="hidden whitespace-nowrap md:table-cell">

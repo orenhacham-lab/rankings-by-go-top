@@ -532,6 +532,8 @@ export const projectDetailPtBR: DeepPartial<DashboardDictionary> = {
       volumesRetry: 'Tentar novamente',
     },
     table: {
+      fromArticle: 'Adicionada a partir do artigo',
+      openArticle: 'Abrir o artigo',
       keyword: 'Palavra-chave',
       scanType: 'Tipo de análise',
       searchVolume: 'Volume de busca',

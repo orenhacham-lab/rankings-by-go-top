@@ -40,6 +40,9 @@ import type { TrackOutcome } from '@/components/gsc/GscUntrackedQueries'
 /** How many of a keyword's checks its row's trend line shows. */
 const TREND_CHECKS = 8
 
+/** Rounds of one "Scan all" (each covers what fits in the server's time budget). */
+const MAX_SCAN_ROUNDS = 12
+
 export default function ProjectKeywordsPanel({ project }: { project: Project }) {
   const id = project.id
   const { language, uiLocale } = useDashboardLanguage()
@@ -194,12 +197,23 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     scanAllInFlight.current = true
     setScanning(true)
     try {
-      const response = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: id }),
-      })
-      const data = await response.json()
+      // A large project is checked in rounds: when the server's time budget ends
+      // before every keyword was checked it answers `continue`, and the next
+      // request picks up exactly the keywords left. Bounded, so it always ends.
+      let response: Response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the route's JSON, read as before
+      let data: any
+      let rounds = 0
+      do {
+        response = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: id }),
+        })
+        data = await response.json()
+        rounds++
+        if (response.ok && data.continue) await loadTargets()
+      } while (response.ok && data.continue && rounds < MAX_SCAN_ROUNDS)
       if (response.ok) {
         await loadTargets()
         showScanResult(k.messages.scanComplete(data.completed, data.total), data.failed > 0 && data.completed === 0)

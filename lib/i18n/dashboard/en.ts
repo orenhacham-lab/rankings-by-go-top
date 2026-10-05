@@ -605,7 +605,7 @@ export const dashboardEn = {
     officialProfiles: {
       title: 'Official business profiles',
       navLabel: 'Official profiles',
-      body: 'Links to the business\'s official pages on Google and social networks. Every article carries them in the markup Google and AI assistants read, so they know it is one business.',
+      body: 'Links to the business\'s official pages on Google and social networks. They go into the markup Google and AI assistants read, so they know it is one business: automatically in articles published to WordPress while the GO TOP plugin from Site health is connected, and in articles sent by webhook. If the site runs Yoast or Rank Math, they print this markup themselves, so add the links in their settings. You can also copy the code from any article by hand. On Shopify, and on WordPress without the plugin, they are not added to the site automatically.',
       whyTitle: 'Why does this help?',
       why: 'Google and AI assistants such as ChatGPT and Gemini piece together a picture of a business from many sources. When every article on your site points to the same official pages, it is easier for them to see that the site, the Google profile and the social pages are one business, and to show correct information about you. It does not guarantee a mention in answers, but it removes doubt about who you are.',
       readOnly: 'These fields are not open for editing on your account yet.',
@@ -4182,6 +4182,8 @@ export const dashboardEn = {
       volumesRetry: 'Try again',
     },
     table: {
+      fromArticle: 'Added from the article',
+      openArticle: 'Open the article',
       keyword: 'Keyword',
       scanType: 'Scan type',
       searchVolume: 'Search volume',
