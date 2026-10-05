@@ -163,7 +163,7 @@ O programa de parceiros é para quem recomenda o Serviço e recebe uma comissão
 - **Pagamento da comissão:** o provedor escolhido pelo parceiro (PayPal, Wise ou transferência bancária) recebe os dados de que precisa para pagar. As notas fiscais e as certidões de retenção são mantidas por sete anos, conforme as regras de contabilidade israelenses.
 - **Atribuição de uma indicação:** exige um cookie, e um cookie desse tipo exige o seu consentimento. Veja «Cookies» abaixo para conhecer o único cookie envolvido e o que acontece se você recusá-lo.
 
-Na data desta política o programa funciona apenas por candidatura: recebemos candidaturas e aprovamos parceiros manualmente, e ainda não foram construídos o rastreamento de indicações, o registro de comissões nem o pagamento. Cada um deles será descrito aqui antes de entrar em funcionamento. Os termos estão no [Contrato do Programa de Parceiros](/en/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
+Na data desta política o programa funciona apenas por candidatura: recebemos candidaturas e aprovamos parceiros manualmente, e ainda não foram construídos o rastreamento de indicações, o registro de comissões nem o pagamento. Cada um deles será descrito aqui antes de entrar em funcionamento. Os termos estão no [Contrato do Programa de Parceiros](/pt-BR/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
 
 ## Provedores de IA
 

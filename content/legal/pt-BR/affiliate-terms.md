@@ -15,7 +15,7 @@ Go Top SEO
 
 Este contrato rege a participação no programa de parceiros da Go Top SEO (o «Programa»). É celebrado entre a GO TOP MARKETING GRUO LTD (número de sociedade 517274346) (a «Empresa», «nós») e a pessoa física ou jurídica cuja inscrição no Programa aprovarmos (o «Parceiro», «você»). Entra em vigor na data em que avisarmos que a sua inscrição foi aprovada e se aplica a toda indicação que você fizer a partir dessa data.
 
-Este contrato se soma aos nossos [Termos de Uso](/en/terms) e à nossa [Política de Privacidade](/en/privacy), e não os altera. Se você também usa o Serviço como cliente, a sua relação de cliente é regida por aqueles documentos e nada aqui a afeta.
+Este contrato se soma aos nossos [Termos de Uso](/pt-BR/terms) e à nossa [Política de Privacidade](/pt-BR/privacy), e não os altera. Se você também usa o Serviço como cliente, a sua relação de cliente é regida por aqueles documentos e nada aqui a afeta.
 
 ## 2. Definições
 
@@ -51,7 +51,7 @@ Não há comissão sobre um período de teste, sobre um pagamento que nunca foi 
 
 ## 6. Aprovação, período de retenção e pagamento
 
-Toda comissão é registrada como pendente e só se torna exigível depois que a aprovamos. Retemos uma comissão aprovada por **30 dias** a partir do pagamento válido a que se refere, prazo que coincide com o período em que aquele cliente ainda pode obter reembolso conforme a nossa [Política de Cancelamento e Reembolso](/en/refund-policy).
+Toda comissão é registrada como pendente e só se torna exigível depois que a aprovamos. Retemos uma comissão aprovada por **30 dias** a partir do pagamento válido a que se refere, prazo que coincide com o período em que aquele cliente ainda pode obter reembolso conforme a nossa [Política de Cancelamento e Reembolso](/pt-BR/refund-policy).
 
 Pagamos quando o seu saldo aprovado e retido alcança **100 USD**, ou **350 ILS** se você for pago em shekels. Abaixo desse valor, o saldo acumula. O pagamento é feito por PayPal, por Wise, por transferência bancária ou como crédito na sua própria assinatura, conforme o que você escolheu e o que está disponível no seu país. As tarifas cobradas pelo provedor de pagamento são suas, salvo acordo diverso por escrito.
 
@@ -117,7 +117,7 @@ Se você está fora de Israel, é responsável pelas suas próprias obrigações
 
 ## 14. Proteção de dados
 
-Tratamos os seus dados de parceiro — os dados da inscrição, os seus dados de pagamento e o registro das suas indicações e comissões — para operar o Programa e para pagar você, e os guardamos pelo prazo em que a lei nos obriga a guardar registros contábeis. O que fazemos com eles, e os provedores que usamos para o pagamento, estão na nossa [Política de Privacidade](/en/privacy).
+Tratamos os seus dados de parceiro — os dados da inscrição, os seus dados de pagamento e o registro das suas indicações e comissões — para operar o Programa e para pagar você, e os guardamos pelo prazo em que a lei nos obriga a guardar registros contábeis. O que fazemos com eles, e os provedores que usamos para o pagamento, estão na nossa [Política de Privacidade](/pt-BR/privacy).
 
 Você não recebe dados pessoais dos clientes que indica. Mostramos a você o número de indicações, a situação de cada assinatura para fins da sua comissão e os valores; não informamos o nome de um cliente, o endereço de e-mail, o site nem qualquer outro dado identificável, e você não pode pedir a um cliente que repasse esses dados nossos.
 
