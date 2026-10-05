@@ -87,6 +87,29 @@ console.log('\nC) the launch order')
     ALLOWED.has('pt-BR'), [...ALLOWED].join(' '))
   check('C3: the gate is a real gate — "true" and nothing else turns it on',
     portugueseSiteEnabled('true') && !portugueseSiteEnabled('TRUE') && !portugueseSiteEnabled('1') && !portugueseSiteEnabled('yes') && !portugueseSiteEnabled(''))
+  // The case that actually occurs: the variable was never set. It cannot be
+  // written as portugueseSiteEnabled(undefined) — undefined is what triggers the
+  // DEFAULT parameter, so that call reads process.env and asserts about the
+  // environment the suite happens to run in rather than about the gate (which is
+  // how three suites turned red the moment the flag was exported). The variable
+  // is removed for the read instead, and put back.
+  check('C3a: a variable that was never set leaves the gate off', (() => {
+    const had = Object.prototype.hasOwnProperty.call(process.env, 'NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED')
+    const was = process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED
+    delete process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED
+    const off = !portugueseSiteEnabled()
+    if (had) process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = was
+    return off
+  })())
+  check('C3a-MUT: the same read with the variable set to "true" turns it on', (() => {
+    const had = Object.prototype.hasOwnProperty.call(process.env, 'NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED')
+    const was = process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED
+    process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
+    const on = portugueseSiteEnabled()
+    if (had) process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = was
+    else delete process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED
+    return on
+  })())
   // The same rule with pt-BR's gate replaced by one that is always on: the rule
   // must then report it as live, proving C1 is reading the gate and not a constant.
   // The same rule against a constraint that does NOT list pt-BR, with its gate
