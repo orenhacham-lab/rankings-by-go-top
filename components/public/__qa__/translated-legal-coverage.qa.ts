@@ -408,6 +408,49 @@ const A11Y_METHOD: Record<string, RegExp[]> = {
   }
 }
 
+// ── 11) outbound contact after a free check, disclosed in every language ────
+/*
+ * Oren asked on 2026-10-05 whether he may phone a number he found on the site
+ * of a business that ran a free check, when that visitor did not tick the
+ * marketing box. He may: the number was published by the business, not given to
+ * us, so the call rests on legitimate interest in a business offer (Art.
+ * 6(1)(f)) rather than on a consent that was never given for it. But Art. 13
+ * requires the purpose to be disclosed, Art. 14 requires the source to be given
+ * when the data did not come from the person, and Art. 21(2) requires the
+ * objection right to be brought to their attention at the first communication.
+ * The policy said nothing about outbound contact at all — it described WhatsApp
+ * and calls coming IN — so doing it would have been undisclosed processing.
+ *
+ * Three facts are held per language, because dropping any one of them turns a
+ * defensible practice back into an undisclosed one: that we may contact the
+ * business through details it published itself, the basis we do it on, and the
+ * absolute right to tell us to stop, in any channel.
+ */
+const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
+  he: [/עשויים גם לפנות לעסק/, /מפרסם באתר שלו/, /6\(1\)\(ו\)/, /זכות מוחלטת/, /21\(2\)/],
+  en: [/contact the business whose website was checked/, /publishes on its own site/, /6\(1\)\(f\)/, /absolute right/, /21\(2\)/],
+  es: [/contactar con la empresa cuyo sitio web se comprob/, /publica en su propio sitio/, /6\.1\.f/, /derecho absoluto/, /21\.2/],
+  'pt-BR': [/entrar em contato com a empresa cujo site foi verificado/, /publica no pr[óo]prio site/, /6\.1\.f/, /direito absoluto/, /21\.2/],
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    for (const must of OUTBOUND_CONTACT[name] ?? []) {
+      check(`${name}/privacy: outbound contact states ${must.source.slice(0, 34)}`, must.test(src))
+    }
+    // The policy must describe marketing as its own separate box, because that
+    // is what the form now does. A policy still describing one bundled tick
+    // would be a disclosure of something that no longer happens.
+    check(`${name}/privacy: marketing is described as a separate box`,
+      /בתיבה נפרדת|separate box|casilla aparte|caixa separada/i.test(src))
+  }
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
@@ -448,6 +491,10 @@ console.log('\nmutation controls')
       && /art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms']))
   check('a Brazilian document that drops the seven-day right is caught',
     !/art\.\s*49/.test(text['pt-BR']['refund-policy'].replace(/art\.\s*49/g, '')) && /art\.\s*49/.test(text['pt-BR']['refund-policy']))
+  check('a policy that drops the right to tell us to stop is caught',
+    !/זכות מוחלטת/.test(readFileSync(HEBREW_PRIVACY, 'utf8').replace(/זכות מוחלטת/g, 'זכות')))
+  check('a policy that still describes one bundled consent box is caught',
+    !/casilla aparte/.test('Acepto recibir el informe, as\u00ed como contenido comercial.'))
   check('a day count put back into a partner document is caught',
     /\b90 d[íi]as\b/.test('conserva el código de ese socio durante 90 días'))
   check('a policy that stops saying no cookie is set is caught',

@@ -3,33 +3,79 @@
  * own (those are in the dashboard dictionary, seedOnboarding.preview, next to
  * the summary they extend).
  *
- * The consent sentence lives HERE, in one place, because the server stores the
+ * The consent sentences live HERE, in one place, because the server stores the
  * exact words the visitor agreed to (Israeli Communications Law s.30A and the
  * Privacy Protection Law require proof of explicit consent): the screen shows
- * reportConsentText(locale) and the API stores the same string, never text
- * sent by the browser. Changing it changes what future consents record, so
- * give it a new version rather than editing it in place. For the same reason the
+ * these strings and the API stores the same ones, never text sent by the
+ * browser. Changing a sentence changes what future consents record, so give it
+ * a new version rather than editing it in place. For the same reason the
  * version is PER LOCALE: the Spanish sentence is its own consent text with its
  * own id, so a Spanish consent record can never be read as agreement to the
- * Hebrew or English wording. The Spanish wording is pending the legal review
- * that owns the Spanish legal pages, and the Spanish site is off until then.
+ * Hebrew or English wording.
+ *
+ * THERE ARE TWO DECISIONS, NOT ONE, and that is the whole point of v2. Until
+ * 5 October 2026 a single mandatory box said "the report, AS WELL AS updates
+ * and marketing content": a visitor could not have the thing they asked for
+ * without also consenting to marketing. GDPR Art. 7(4) says consent is not
+ * freely given when it is bundled with something the person wants, so that
+ * marketing consent was worth nothing — and in Israel s.30A wants consent given
+ * expressly for advertising, which a bundled tick is not. s.30A carries damages
+ * of up to ILS 1,000 per message without proof of harm, which is the shape of
+ * an Israeli class action.
+ *
+ * So: the report box stays required, because the report is what the visitor
+ * asked for. Marketing is its own optional box, and the record says which way
+ * it went — `consentRecord` writes the marketing sentence when it was ticked
+ * and an explicit refusal line when it was not. An absence of words is not
+ * proof of anything; a sentence saying "not agreed to" is.
  */
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ResearchErrorCode } from './types'
 
-export const REPORT_CONSENT_VERSION = 'report-email-v1'
+export const REPORT_CONSENT_VERSION = 'report-email-v2'
 
 /** Spanish has its own id: a Spanish record must not be read as the other wording. */
-export const REPORT_CONSENT_VERSION_ES = 'report-email-es-v1'
+export const REPORT_CONSENT_VERSION_ES = 'report-email-es-v2'
 
 /** Portuguese likewise. The wording is the legal thread's, reviewed in PR #97. */
-export const REPORT_CONSENT_VERSION_PT = 'report-email-pt-v1'
+export const REPORT_CONSENT_VERSION_PT = 'report-email-pt-v2'
 
+/** The optional second decision, versioned the same way and never shared with the first. */
+export const MARKETING_CONSENT_VERSION = 'marketing-email-v1'
+export const MARKETING_CONSENT_VERSION_ES = 'marketing-email-es-v1'
+export const MARKETING_CONSENT_VERSION_PT = 'marketing-email-pt-v1'
+
+/**
+ * One id for a refusal in every language. A refusal has no wording to prove —
+ * the sentence is localized so the record reads in the visitor's language, but
+ * what it attests is the same fact everywhere: marketing was offered and
+ * declined. A query for who may be sent marketing is therefore
+ * `consent_text like '%[marketing-email%'` and never a test for absence.
+ */
+export const MARKETING_DECLINED_VERSION = 'marketing-declined-v1'
+
+/** What the required box says: the report, and nothing but the report. */
 const CONSENT: Record<PublicLocale, string> = {
-  he: 'אני מסכים/ה לקבל מ-Go Top בדוא״ל את דוח המחקר של האתר, וגם עדכונים ותוכן שיווקי. אפשר להסיר את ההסכמה בכל עת בקישור שבכל הודעה.',
-  en: 'I agree to receive this site research report from Go Top by email, as well as updates and marketing content. I can withdraw consent at any time using the link in every email.',
-  es: 'Acepto recibir de Go Top por correo electrónico el informe de investigación de este sitio, así como novedades y contenido comercial. Puedo retirar mi consentimiento en cualquier momento con el enlace que incluye cada correo.',
-  'pt-BR': 'Concordo em receber da Go Top, por e-mail, o relatório de pesquisa deste site, assim como novidades e conteúdo comercial. Posso retirar meu consentimento a qualquer momento pelo link que acompanha cada mensagem.',
+  he: 'אני מסכים/ה לקבל מ-Go Top בדוא״ל את דוח המחקר של האתר.',
+  en: 'I agree to receive this site research report from Go Top by email.',
+  es: 'Acepto recibir de Go Top por correo electrónico el informe de investigación de este sitio.',
+  'pt-BR': 'Concordo em receber da Go Top, por e-mail, o relatório de pesquisa deste site.',
+}
+
+/** What the optional box says. Ticking it is the only way marketing is allowed. */
+const MARKETING: Record<PublicLocale, string> = {
+  he: 'אני מסכים/ה לקבל מ-Go Top גם עדכונים ותוכן שיווקי בדוא״ל. אפשר להסיר את ההסכמה בכל עת בקישור שבכל הודעה.',
+  en: 'I also agree to receive updates and marketing content from Go Top by email. I can withdraw consent at any time using the link in every email.',
+  es: 'Acepto también recibir de Go Top novedades y contenido comercial por correo electrónico. Puedo retirar mi consentimiento en cualquier momento con el enlace que incluye cada correo.',
+  'pt-BR': 'Concordo também em receber da Go Top novidades e conteúdo comercial por e-mail. Posso retirar meu consentimento a qualquer momento pelo link que acompanha cada mensagem.',
+}
+
+/** What the record says when the optional box was left unticked. */
+const MARKETING_DECLINED: Record<PublicLocale, string> = {
+  he: 'עדכונים ותוכן שיווקי הוצעו ולא אושרו.',
+  en: 'Updates and marketing content were offered and not agreed to.',
+  es: 'Se ofrecieron novedades y contenido comercial y no se aceptaron.',
+  'pt-BR': 'Novidades e conteúdo comercial foram oferecidos e não foram aceitos.',
 }
 
 const CONSENT_VERSION: Record<PublicLocale, string> = {
@@ -39,8 +85,34 @@ const CONSENT_VERSION: Record<PublicLocale, string> = {
   'pt-BR': REPORT_CONSENT_VERSION_PT,
 }
 
+const MARKETING_VERSION: Record<PublicLocale, string> = {
+  he: MARKETING_CONSENT_VERSION,
+  en: MARKETING_CONSENT_VERSION,
+  es: MARKETING_CONSENT_VERSION_ES,
+  'pt-BR': MARKETING_CONSENT_VERSION_PT,
+}
+
 export function reportConsentText(locale: PublicLocale): string {
   return `${CONSENT[locale]} [${CONSENT_VERSION[locale]}]`
+}
+
+export function marketingConsentText(locale: PublicLocale): string {
+  return `${MARKETING[locale]} [${MARKETING_VERSION[locale]}]`
+}
+
+/**
+ * THE WHOLE RECORD, which is what the server stores: both decisions, in the
+ * visitor's own language, each with its own version id. It is deliberately one
+ * string rather than a second column, because the column list of
+ * free_check_report_requests is fixed and a schema change to Production needs
+ * Oren's word; a text that states both decisions proves both of them, and the
+ * marketing id is greppable for the day a sender exists.
+ */
+export function consentRecord(locale: PublicLocale, marketing: boolean): string {
+  const second = marketing
+    ? marketingConsentText(locale)
+    : `${MARKETING_DECLINED[locale]} [${MARKETING_DECLINED_VERSION}]`
+  return `${reportConsentText(locale)} ${second}`
 }
 
 export type ResearchScreenCopy = {
@@ -54,6 +126,7 @@ export type ResearchScreenCopy = {
     emailLabel: string
     emailPlaceholder: string
     consent: string
+    marketing: string
     privacy: string
     submit: string
     sending: string
@@ -84,6 +157,7 @@ const he: ResearchScreenCopy = {
     emailLabel: 'כתובת אימייל',
     emailPlaceholder: 'you@example.com',
     consent: CONSENT.he,
+    marketing: MARKETING.he,
     privacy: 'מדיניות הפרטיות',
     submit: 'שמרו את הבקשה',
     sending: 'שומרים…',
@@ -121,6 +195,7 @@ const en: ResearchScreenCopy = {
     emailLabel: 'Email address',
     emailPlaceholder: 'you@example.com',
     consent: CONSENT.en,
+    marketing: MARKETING.en,
     privacy: 'Privacy policy',
     submit: 'Save my request',
     sending: 'Saving…',
@@ -158,6 +233,7 @@ const es: ResearchScreenCopy = {
     emailLabel: 'Dirección de correo',
     emailPlaceholder: 'tu@ejemplo.com',
     consent: CONSENT.es,
+    marketing: MARKETING.es,
     privacy: 'Política de privacidad',
     submit: 'Guardar mi solicitud',
     sending: 'Guardando…',
@@ -195,6 +271,7 @@ const ptBR: ResearchScreenCopy = {
     emailLabel: 'Endereço de e-mail',
     emailPlaceholder: 'voce@exemplo.com',
     consent: CONSENT['pt-BR'],
+    marketing: MARKETING['pt-BR'],
     privacy: 'Política de privacidade',
     submit: 'Salvar minha solicitação',
     sending: 'Salvando…',

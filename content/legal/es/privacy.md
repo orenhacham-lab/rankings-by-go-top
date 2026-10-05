@@ -182,6 +182,14 @@ Enviamos correo electrónico a través del proveedor de envío Resend, que recib
 - **Recordatorios:** cuando hay contenido pendiente de su aprobación, puede enviarse un recordatorio. Cada recordatorio incluye un enlace de cancelación de suscripción con un solo clic, sin necesidad de iniciar sesión, y al cancelar la suscripción se detienen estos recordatorios. Su preferencia se almacena con nosotros.
 - **Informe mensual de progreso:** un resumen mensual del proyecto, para los proyectos en los que usted lo activó en los ajustes.
 
+## Cómo podemos contactar con usted a raíz de una comprobación gratuita
+
+Si usted ejecutó una comprobación gratuita de un sitio web, podemos ponernos en contacto a raíz de ella. Por correo electrónico, solo a la dirección que nos dio y solo en la medida en que lo permitan las casillas que marcó: el informe que pidió, y novedades o contenido comercial únicamente si los aceptó en su propia casilla aparte.
+
+También podemos contactar con la empresa cuyo sitio web se comprobó, con los datos de contacto que esa empresa publica en su propio sitio: un número de teléfono o una dirección general. Lo hacemos por nuestro interés legítimo en ofrecer un servicio a una empresa que parece encajar (art. 6.1.f del RGPD), no por su consentimiento, y esos datos provienen del propio sitio y no de nada que usted nos haya dado. Cuando llamamos, decimos quiénes somos y de dónde sacamos el número.
+
+Puede pedirnos que paremos en cualquier momento y por cualquier canal, y paramos: por correo electrónico, por teléfono, en cualquier idioma. Para el marketing directo es un derecho absoluto (art. 21.2 del RGPD), no le cuesta nada, y lo registramos para que una lista posterior no lo deshaga.
+
 ## Seguridad de los datos
 
 Utilizamos cifrado SSL/TLS en todas las comunicaciones. Sus contraseñas se almacenan cifradas mediante Supabase Auth. Mantenemos altos estándares de seguridad de los datos, pero no podemos garantizar una seguridad del 100 %.

@@ -180,6 +180,14 @@ Enviamos e-mail por meio do provedor de envio Resend, que recebe o seu endereço
 - **Lembretes:** quando há conteúdo aguardando a sua aprovação, um lembrete pode ser enviado. Todo lembrete tem um link de cancelamento em um clique, sem necessidade de login, e o cancelamento interrompe esses lembretes. A sua preferência é armazenada conosco.
 - **Relatório mensal de progresso:** um resumo mensal do projeto, para os projetos em que você o ativou nas configurações.
 
+## Como podemos entrar em contato com você por causa de uma verificação gratuita
+
+Se você executou uma verificação gratuita de um site, podemos entrar em contato por causa dela. Por e-mail, somente para o endereço que você nos deu e somente na medida em que as caixas que você marcou permitirem: o relatório que você pediu, e novidades ou conteúdo comercial apenas se você os aceitou na caixa separada deles.
+
+Também podemos entrar em contato com a empresa cujo site foi verificado, usando os dados de contato que essa empresa publica no próprio site: um número de telefone ou um endereço geral. Fazemos isso com base no nosso interesse legítimo em oferecer um serviço a uma empresa que parece se encaixar (art. 6.1.f do RGPD), não com base no seu consentimento, e esses dados vêm do próprio site e não de algo que você nos deu. Quando ligamos, dizemos quem somos e de onde tiramos o número.
+
+Você pode pedir que paremos a qualquer momento e por qualquer canal, e nós paramos: por e-mail, por telefone, em qualquer idioma. Para o marketing direto esse é um direito absoluto (art. 21.2 do RGPD), não custa nada a você, e registramos o pedido para que uma lista posterior não o desfaça.
+
 ## Segurança dos dados
 
 Usamos criptografia SSL/TLS em toda a comunicação. As suas senhas são armazenadas criptografadas pelo Supabase Auth. Mantemos padrões elevados de segurança da informação, mas não podemos garantir 100% de segurança.

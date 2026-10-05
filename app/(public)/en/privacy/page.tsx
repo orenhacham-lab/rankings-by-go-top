@@ -381,6 +381,27 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>How We May Contact You About a Free Check</h2>
+        <p>
+          If you ran a free check on a website, we may get in touch about it. By email, only to the address
+          you gave us and only as far as the boxes you ticked allow: the report you asked for, and updates or
+          marketing content only if you agreed to those on their own separate box.
+        </p>
+        <p>
+          We may also contact the business whose website was checked, using contact details that business
+          publishes on its own site &mdash; a phone number or a general address. We do that on our legitimate
+          interest in offering a service to a business that looks like a fit (GDPR Art. 6(1)(f)), not on your
+          consent, and those details come from the site itself rather than from anything you gave us. When we
+          call, we say who we are and where we got the number.
+        </p>
+        <p>
+          You can tell us to stop at any time and by any channel, and we stop &mdash; by email, by phone, in
+          every language. For direct marketing that is an absolute right (GDPR Art. 21(2)), it costs you
+          nothing, and we record it so a later list cannot undo it.
+        </p>
+      </section>
+
+      <section>
         <h2>Data Security</h2>
         <p>
           We use SSL/TLS encryption for all communication. Your passwords are stored encrypted via Supabase Auth.
