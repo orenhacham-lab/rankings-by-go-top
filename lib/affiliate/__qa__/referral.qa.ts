@@ -17,6 +17,7 @@ import {
   attachableAtSignup, clearReferralCookieString, normalizeReferralCode, readReferralParam,
   referralCookieString, referralToPersist,
 } from '../referral'
+import { affiliateTrackingEnabled } from '../tracking-flag'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -95,6 +96,29 @@ console.log('\nE) the wiring')
   check('E4: the rules are PURE — no network, no database, no environment',
     !/fetch\(|createClient|process\.env|supabase/i.test(lib))
   check('E5: MUT a rule file that reaches out fails E4', /fetch\(/.test(lib.replace('export const REFERRAL_PARAM', 'fetch(\'/x\')\nexport const REFERRAL_PARAM')))
+}
+
+console.log('\nF) NOTHING IS WRITTEN UNTIL THE DISCLOSURE EXISTS')
+{
+  // An affiliate attribution cookie is not strictly necessary (ePrivacy art.
+  // 5(3)), so it needs consent and a named category in the cookie policy. The
+  // consent record lives in localStorage, which the middleware cannot read, so
+  // the whole mechanism waits behind a flag instead of being written on arrival.
+  check('F1: the flag is OFF unless something says exactly "true"',
+    affiliateTrackingEnabled('true') && !affiliateTrackingEnabled('TRUE')
+    && !affiliateTrackingEnabled('1') && !affiliateTrackingEnabled('') && !affiliateTrackingEnabled(undefined))
+  check('F2: it is off in THIS environment, so no visitor is tracked',
+    !affiliateTrackingEnabled(process.env.NEXT_PUBLIC_AFFILIATE_TRACKING_ENABLED))
+  const middleware = strip(read('proxy.ts'))
+  const gated = /const referralToSet = affiliateTrackingEnabled\(\)\s*\?\s*referralToPersist\(/
+  check('F3: the middleware decides nothing to write while it is off', gated.test(middleware))
+  check('F3-MUT: a middleware that writes regardless of the flag fails F3',
+    !gated.test(middleware.replace(/const referralToSet = affiliateTrackingEnabled\(\)\s*\?\s*referralToPersist\(/,
+      'const referralToSet = referralToPersist(')))
+  // The rules themselves stay pure and stay tested: the flag hides the write,
+  // not the thinking, so turning it on is one line and not a rebuild.
+  check('F4: the flag file never decides a commission, only whether to remember a click',
+    !/commission|payout|amount/i.test(strip(read('lib/affiliate/tracking-flag.ts'))))
 }
 
 // ── Mutation controls on the rules themselves ────────────────────────────────
