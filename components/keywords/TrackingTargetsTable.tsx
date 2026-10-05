@@ -180,6 +180,7 @@ export default function TrackingTargetsTable({
 
   return (
     <>
+      <div data-keywords-table="">
       <Table>
         <TableHead>
           <tr className="max-sm:[&>th]:px-2.5">
@@ -375,7 +376,7 @@ export default function TrackingTargetsTable({
                         <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={isScanning ? 'animate-spin motion-reduce:animate-none' : undefined} />
                       </button>
                     )}
-                    <RowMenu label={k.moreActions(target.keyword)} items={menu} />
+                    <div data-keyword-row-menu="" className="inline-flex"><RowMenu label={k.moreActions(target.keyword)} items={menu} /></div>
                   </div>
                 </Td>
               </TableRow>
@@ -383,6 +384,7 @@ export default function TrackingTargetsTable({
           })}
         </TableBody>
       </Table>
+      </div>
 
       <DeleteConfirmDialog
         open={confirmTarget !== null}

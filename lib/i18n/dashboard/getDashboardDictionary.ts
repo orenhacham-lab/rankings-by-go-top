@@ -12,10 +12,12 @@ import type { DashboardDictionary } from './he'
  * — see lib/i18n/dashboard/merge.ts for why that is the right fallback and
  * lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts for the coverage count.
  *
- * Brazilian Portuguese is the same arrangement one wave behind: pt-BR.ts carries
- * the chrome and nothing else yet, so a Portuguese dashboard is Portuguese around
- * the edges and English inside. That is deliberate and it is why the Portuguese
- * site is still gated.
+ * Brazilian Portuguese is the same arrangement, and it is now COMPLETE: pt-BR/
+ * is a directory of parts, each owning whole sections, assembled by a flat
+ * spread in pt-BR/index.ts. It answers every path the Spanish dictionary
+ * answers, so the English underneath is a safety net rather than something a
+ * Portuguese reader meets. lib/i18n/dashboard/__qa__/portuguese-dashboard.qa.ts
+ * holds that claim, leaf for leaf.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)

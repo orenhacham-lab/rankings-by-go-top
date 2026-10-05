@@ -35,6 +35,7 @@ export default function PostsList({ projectId, posts, onChanged }: { projectId: 
   }
 
   return (
+    <div data-gbp-list="">
     <Card className="p-5 sm:p-6">
       <h2 className="mb-4 text-section font-semibold text-ink">{t.list.title}</h2>
       {error && <Notice tone="bad" className="mb-4" onDismiss={() => setError(null)}>{error}</Notice>}
@@ -82,5 +83,6 @@ export default function PostsList({ projectId, posts, onChanged }: { projectId: 
       )}
       {dialog}
     </Card>
+    </div>
   )
 }

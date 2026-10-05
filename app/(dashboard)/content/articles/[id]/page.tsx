@@ -673,6 +673,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
       <div className="space-y-4">
         <div hidden={!editing} className="space-y-4">
+        <div data-editor-metadata="">
         <Card>
           <div className="space-y-3">
             <Input label={e.title} value={title} onChange={(ev) => setTitle(ev.target.value)} />
@@ -687,12 +688,16 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <Textarea id="article-excerpt" label={e.excerpt} value={excerpt} onChange={(ev) => setExcerpt(ev.target.value)} rows={2} />
           </div>
         </Card>
+        </div>
 
+        <div data-editor-content="">
         <Card>
           <h3 className="mb-3 text-section font-semibold text-ink">{e.content}</h3>
           <ArticleContentEditor value={contentHtml} onChange={setContentHtml} dir={isHebrew ? 'rtl' : 'ltr'} />
         </Card>
+        </div>
 
+        <div data-editor-faq="">
         <Card>
           <div className="mb-1 flex items-center justify-between gap-3">
             <h3 className="text-section font-semibold text-ink">{e.faqTitle}</h3>
@@ -709,12 +714,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             ))}
           </div>
         </Card>
+        </div>
 
         <Card>
           <Input label={e.imagePrompt} value={imagePrompt} onChange={(ev) => setImagePrompt(ev.target.value)} hint={e.imagePromptHint} />
         </Card>
 
         {/* Featured image — generate/regenerate/remove. */}
+        <div data-editor-image="">
         <Card>
           <h3 className="text-section font-semibold text-ink mb-2">{e.imageTitle}</h3>
           {featuredImageUrl ? (
@@ -734,6 +741,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           )}
           <p className="text-caption text-muted mt-2">{e.imageSafetyNote}</p>
         </Card>
+        </div>
 
         {/* Phase 4D — inline article images (in-body <figure>s, separate from the
             featured image). Manages its own rows via the inline-images API and

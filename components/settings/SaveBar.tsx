@@ -53,7 +53,7 @@ export default function SaveBar({
           </span>
         ) : null}
       </p>
-      <div className="flex shrink-0 items-center gap-2">
+      <div data-settings-save="" className="flex shrink-0 items-center gap-2">
         {dirty && !saving && (
           <Button variant="ghost" size="sm" onClick={onDiscard}>
             {t.save.discard}

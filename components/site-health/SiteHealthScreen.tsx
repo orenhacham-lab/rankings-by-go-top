@@ -282,18 +282,20 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
         )}
 
         {loaded && report && report.findings.length > 0 && (
-          <section aria-label={copy.counts.findings(report.findings.length)} className={cn('space-y-4', scanning && 'pointer-events-none opacity-50')}>
+          <section data-site-health="findings" aria-label={copy.counts.findings(report.findings.length)} className={cn('space-y-4', scanning && 'pointer-events-none opacity-50')}>
             {/* Below sm the filter takes its own full-width line under the count. */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-section font-semibold text-ink">{copy.counts.findings(report.findings.length)}</h2>
-              <Segmented
-                ariaLabel={copy.filters.label}
-                value={filter}
-                onChange={setFilter}
-                fill
-                className="sm:inline-flex sm:w-auto"
-                options={(['all', 'fixable', 'guide'] as const).map((f) => ({ value: f, label: copy.filters[f] }))}
-              />
+              <div data-site-health-filter="">
+                <Segmented
+                  ariaLabel={copy.filters.label}
+                  value={filter}
+                  onChange={setFilter}
+                  fill
+                  className="sm:inline-flex sm:w-auto"
+                  options={(['all', 'fixable', 'guide'] as const).map((f) => ({ value: f, label: copy.filters[f] }))}
+                />
+              </div>
             </div>
             <div className="space-y-4">
               {visible.map((f, i) => (

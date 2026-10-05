@@ -174,6 +174,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
   const ctaOptions = [{ value: '', label: c.ctaNone }, ...GBP_CTA_TYPES.map((v) => ({ value: v, label: c.ctaTypes[v] }))]
 
   return (
+    <div data-gbp-composer="">
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex items-start gap-3">
         <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
@@ -337,7 +338,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
           </div>
         </fieldset>
 
-        <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+        <aside data-gbp-preview="" className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           <p className="mb-3 text-overline font-semibold uppercase tracking-wide text-muted">{t.preview.title}</p>
           <PostPreview
             businessName={status.location?.title ?? status.businessName}
@@ -349,5 +350,6 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
         </aside>
       </div>
     </Card>
+    </div>
   )
 }

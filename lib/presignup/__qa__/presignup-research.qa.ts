@@ -385,11 +385,11 @@ async function main() {
     }
 
     const httpSrc = code(read('lib/presignup/http.ts'))
-    const esGuard = (c: string) => /const readPublicLocale = \(v: unknown\): PublicLocale => \(v === 'en' \|\| v === 'es' \? v : 'he'\)/.test(c)
+    const esGuard = (c: string) => /const readPublicLocale = \(v: unknown\): PublicLocale => \(v === 'en' \|\| v === 'es' \|\| v === 'pt-BR' \? v : 'he'\)/.test(c)
       && /const readLocale = \(v: unknown\): Locale => toBilingualLocale\(readPublicLocale\(v\)\)/.test(c)
     check('source: the page\'s language is read as a PUBLIC locale and narrowed for the ledger', esGuard(httpSrc))
     check('mutation control: the old two-language read fails the guard',
-      !esGuard(httpSrc.replace("v === 'en' || v === 'es' ? v : 'he'", "v === 'en' ? 'en' : 'he'")))
+      !esGuard(httpSrc.replace("v === 'en' || v === 'es' || v === 'pt-BR' ? v : 'he'", "v === 'en' ? 'en' : 'he'")))
 
     const src = code(read('lib/presignup/http.ts'))
     const consentGuard = (c: string) => /if \(body\.consent !== true\) return answer\(400, \{ ok: false, code: 'consent_required' \}\)/.test(c) && /consent_text: consentRecord\(publicLocale, marketing\)/.test(c)

@@ -86,7 +86,7 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
  * words they were never shown. Found 3 October 2026, the evening /es was
  * published.
  */
-const readPublicLocale = (v: unknown): PublicLocale => (v === 'en' || v === 'es' ? v : 'he')
+const readPublicLocale = (v: unknown): PublicLocale => (v === 'en' || v === 'es' || v === 'pt-BR' ? v : 'he')
 
 /**
  * The language the research itself is written in, and the one the ledger row

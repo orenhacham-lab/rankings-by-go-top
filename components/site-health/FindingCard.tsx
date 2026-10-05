@@ -145,7 +145,7 @@ export default function FindingCard({
                     ) : queued ? (
                       <Badge variant="info"><Clock size={14} strokeWidth={2.2} aria-hidden="true" />{copy.queuedBadge}</Badge>
                     ) : mode === 'fix' ? (
-                      <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-button={finding.fixType && fixModeFor ? finding.fixType : finding.field ?? ''}>
+                      <Button variant="secondary" size="sm" onClick={() => onFix(finding, page)} aria-label={copy.fixForMeAria(pageLabel(copy, page))} data-fix-for-me="" data-fix-button={finding.fixType && fixModeFor ? finding.fixType : finding.field ?? ''}>
                         {copy.fixForMe}
                       </Button>
                     ) : mode === 'copy' ? (

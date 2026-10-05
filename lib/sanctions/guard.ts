@@ -91,7 +91,12 @@ const NOTICE: Record<'he' | 'en' | 'es', string> = {
 }
 
 export function sanctionsNotice(locale: unknown): string {
-  return locale === 'en' ? NOTICE.en : locale === 'es' ? NOTICE.es : NOTICE.he
+  // Any public language this notice has not been written in yet reads ENGLISH,
+  // not Hebrew: a Brazilian visitor was being shown the Hebrew sentence in a
+  // left-to-right page. The Portuguese wording is the legal thread's to write.
+  if (locale === 'he') return NOTICE.he
+  if (locale === 'es') return NOTICE.es
+  return NOTICE.en
 }
 
 /**

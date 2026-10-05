@@ -25,7 +25,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX, getLocaleConfig, localeHomeHref, normalizePublicLocale, toBilingualLocale, type PublicLocale } from '../locales'
 import { spanishSiteEnabled } from '../spanish-site'
-import { isSpanishPath, routeContentLocale } from '../request-locale'
+import { isSpanishPath } from '../request-locale'
 import { getPublicDictionary } from '../getPublicDictionary'
 import { getSiteMetadata } from '../site-metadata'
 import { errorPagesUi } from '../error-pages'
@@ -113,8 +113,15 @@ function main() {
     check('2c: with it ON, /es and its children are', isSpanishPath('/es', true) && isSpanishPath('/es/features/keyword-research', true))
     check('2d: a path that merely starts with the letters is not the tree',
       !isSpanishPath('/espanol', true) && !isSpanishPath('/essays', true))
-    check('2e: the route states Spanish only while the tree exists',
-      routeContentLocale('/es/pricing') === (spanishSiteEnabled() ? 'es' : null))
+    // This compared `routeContentLocale` against 'es', which it can never be:
+    // the CONTENT question is bilingual by design and Spanish narrows to
+    // English there. It passed only while the flag was unset in the test
+    // environment, where both sides were null, and turned red the moment the
+    // flag was exported — so it now asks the two questions it meant to ask,
+    // with the flag's value given rather than read from the environment.
+    check('2e: the route states Spanish only while the tree exists, and content narrows it to English',
+      isSpanishPath('/es/pricing', true) && !isSpanishPath('/es/pricing', false)
+      && toBilingualLocale('es') === 'en')
     // ONE GATE for the whole tree, in the layout every /es page is a child of,
     // so a new Spanish page cannot forget to be gated.
     const layout = strip(read('app/(public)/es/layout.tsx'))
@@ -264,9 +271,9 @@ function main() {
   console.log('\n6) the switcher — three languages, counterpart URLs')
   {
     check('6a: with the flag off, the switcher offers only Hebrew and English',
-      JSON.stringify(availableLocales(false)) === JSON.stringify(['he', 'en']))
+      JSON.stringify(availableLocales(false, false)) === JSON.stringify(['he', 'en']))
     check('6b: with it on, it offers all three',
-      JSON.stringify(availableLocales(true)) === JSON.stringify(['he', 'en', 'es']))
+      JSON.stringify(availableLocales(true, false)) === JSON.stringify(['he', 'en', 'es']))
     const cases: Array<[string, PublicLocale, PublicLocale, string]> = [
       ['/pricing', 'he', 'es', '/es/pricing'],
       ['/es/pricing', 'es', 'he', '/pricing'],
@@ -459,7 +466,7 @@ function main() {
     check('S1-MUT: a trigger with no chevron fails S1', !/<ChevronDown/.test(src.replace(/<ChevronDown[\s\S]*?\/>/, '')))
     // The two-language link is a link to the other language by name; it needs no chevron.
     check('S5: with two languages it is still one plain link, not a menu',
-      /if \(others\.length === 1\)/.test(src) && availableLocales(false).length === 2)
+      /if \(others\.length === 1\)/.test(src) && availableLocales(false, false).length === 2)
   }
 
   // ---- The logo goes home in the language you are reading -------------------

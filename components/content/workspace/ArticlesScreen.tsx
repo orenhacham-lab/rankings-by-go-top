@@ -437,7 +437,7 @@ export default function ArticlesScreen() {
       {/* Only once this project's overview says which platform: until then the
           platform is not known, and a guess drew the wrong card for a second. */}
       {data && activePlatform !== 'none' && (connectionInHero ? null :
-        <div className="mb-4">
+        <div data-articles-destination="" className="mb-4">
           {isSite ? <SiteHubCard projectId={projectId} /> : (
           <ContentHubPlatformCard projectId={projectId}>
             <div className="flex flex-wrap items-center gap-3">{connectionLine(false)}</div>
@@ -454,7 +454,7 @@ export default function ArticlesScreen() {
         title={t.articlesHeading}
         description={t.articlesSubtitle}
         // With no articles the empty state's own button is the one primary on the screen.
-        action={(data?.articles?.length ?? 0) > 0 ? <Button onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button> : undefined}
+        action={(data?.articles?.length ?? 0) > 0 ? <Button data-new-topic="" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button> : undefined}
       />
 
       {!overviewSettled ? (
@@ -469,7 +469,7 @@ export default function ArticlesScreen() {
             icon={<FileText />}
             title={t.articlesEmptyTitle}
             body={t.articlesEmptyBody}
-            action={<Button size="lg" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>}
+            action={<Button size="lg" data-new-topic="" onClick={handleCreateTopic}><Plus aria-hidden="true" className="size-4" />{t.newTopicButton}</Button>}
             secondary={(
               <Link href="/content/strategy" className="inline-flex items-center gap-1.5 font-medium text-action hover:underline">
                 <Lightbulb aria-hidden="true" className="size-4" />{t.articlesEmptyIdeas}
@@ -480,7 +480,7 @@ export default function ArticlesScreen() {
       ) : (
       <>
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div data-articles-filters="" className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative min-w-0 flex-1 basis-56 sm:max-w-xs">
           <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
           <Input
@@ -532,7 +532,7 @@ export default function ArticlesScreen() {
       )}
 
       {/* Article table */}
-      <div className="overflow-x-auto mb-6">
+      <div data-articles-table="" className="overflow-x-auto mb-6">
         <Table>
           <TableHead>
             <tr className="max-sm:[&>th]:px-2.5">

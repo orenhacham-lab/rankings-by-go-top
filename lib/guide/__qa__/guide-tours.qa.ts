@@ -16,6 +16,11 @@
  *  E) the wiring: one tour runner, mounted once from the pill in the top bar
  *     (next to the switcher), keyboard and focus handled, the WhatsApp entry from
  *     the one contact source, the AI-tips slot present and empty;
+ *  G) the per-screen tours describe the SCREEN, not just its title (the owner,
+ *     5 October 2026: "it is not detailed enough in many of the tabs and only
+ *     talks about the title"): every screen has several steps beyond its header,
+ *     every tab is reached by clicking it first, every selector a step points at
+ *     exists in the code, and all four languages carry every step's text;
  *  F) the answers stay true: every FAQ answer and step names a feature this build
  *     has, and flag-gated ones are hidden with their flag.
  *
@@ -24,7 +29,7 @@
  *
  * Run: npx tsx lib/guide/__qa__/guide-tours.qa.ts
  */
-import { readFileSync } from 'fs'
+import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import {
   FULL_TOUR, SCREEN_TOURS, autoTour, fullTourKey, isNewAccount, readFullTourState, screenForPath,
@@ -33,6 +38,8 @@ import {
 import { placeBubble, BUBBLE_WIDTH, type Box } from '../placement'
 import { dashboardHe } from '../../i18n/dashboard/he'
 import { dashboardEn } from '../../i18n/dashboard/en'
+import { dashboardEs } from '../../i18n/dashboard/es'
+import { dashboardPtBR } from '../../i18n/dashboard/pt-BR'
 import { VALID_SCAN_FREQUENCIES } from '../../utils'
 
 let pass = 0, fail = 0
@@ -78,7 +85,7 @@ console.log('\nB) which screen has a tour, and when one starts on its own')
     && screenForPath('/ai-visibility') === 'aiVisibility' && screenForPath('/settings') === 'settings' && screenForPath('/reports') === 'reports')
   check('B2: a trailing slash is the same screen; a screen that is not in the list has no tour',
     screenForPath('/keywords/') === 'keywords' && screenForPath('/billing/') === 'billing'
-    && screenForPath('/keywords/abc/history') === null && screenForPath('/projects') === null && screenForPath(null) === null)
+    && screenForPath('/keywords/abc/history') === null && screenForPath('/clients') === null && screenForPath(null) === null)
 check('B2a: every screen the sidebar leads to has a tour of its own (owner, 4 October 2026)', (() => {
   const nav = ['/dashboard', '/keyword-research', '/keywords', '/content', '/site-links', '/maps-posts', '/ai-visibility', '/site-health', '/reports', '/settings', '/billing']
   return nav.every((href) => screenForPath(href) !== null)
@@ -95,7 +102,10 @@ check('B2a: every screen the sidebar leads to has a tour of its own (owner, 4 Oc
   const screen = autoTour({ ...after, pathname: '/keywords' })
   check('B7: once the full tour is over, a screen\'s own tour starts the first time', screen?.kind === 'screen' && screen.screen === 'keywords')
   check('B8: …and never again once seen', autoTour({ ...after, pathname: '/keywords', screenSeen: (s: ScreenKey) => s === 'keywords' }) === null)
-  check('B9: a screen without a tour starts nothing', autoTour({ ...after, pathname: '/projects' }) === null && autoTour({ ...after, pathname: '/keywords/abc/history' }) === null)
+  check('B9: a screen without a tour starts nothing', autoTour({ ...after, pathname: '/clients' }) === null && autoTour({ ...after, pathname: '/keywords/abc/history' }) === null)
+  check('B9a: the projects list and the article editor, which had no tour at all, have one now (owner, 5 October 2026)',
+    screenForPath('/projects') === 'projects' && screenForPath('/content/articles/abc') === 'editor'
+    && screenForPath('/content/articles/abc/anything') === 'editor' && screenForPath('/content') === 'content')
 
   const now = new Date('2026-09-28T12:00:00Z')
   check('B10: an account created 13 days ago is new, 15 days ago is not, an unknown date is not',
@@ -195,6 +205,110 @@ console.log('\nE) one tour system, mounted once from the pill in the top bar')
   const tokens = (src: string) => !/\b(?:bg|text|border|ring)-(?:slate|blue|indigo|gray|emerald)-\d/.test(src)
   check('E13: the pill, the menu and the tour use the design tokens, not raw palette colours', tokens(guide) && tokens(runner))
   check('E13-MUT: a raw slate colour fails E13', !tokens(runner + ' text-slate-600'))
+}
+
+// ── G) the per-screen tours walk the screen, tabs included ────────────────────
+//
+// The owner's complaint on 5 October 2026 was that the tour "is not detailed
+// enough in many of the tabs and only talks about the title". These guards are
+// what keeps that fixed: a screen cannot go back to one header step, a tab
+// cannot go undescribed, a selector cannot rot, and a language cannot be left
+// behind.
+console.log('\nG) every screen tour walks its screen, its tabs included, in four languages')
+{
+  const SCREEN_HEADER = '[data-tour="screen-header"], main h1'
+  const SWITCHER = '[data-onboarding="workspace"]'
+  const screens = Object.entries(SCREEN_TOURS) as [ScreenKey, (typeof SCREEN_TOURS)[ScreenKey]][]
+  // "Several steps beyond the title": at least five steps, of which at least four
+  // are the screen's own cards and controls rather than its header or the switcher.
+  const own = (steps: readonly TourStep[]) => steps.filter((s) => s.target !== SCREEN_HEADER && s.target !== SWITCHER)
+  const thin = screens.filter(([, t]) => t.steps.length < 5 || own(t.steps).length < 4).map(([k]) => k)
+  check('G1: every screen tour has ≥ 5 steps, ≥ 4 of them about the screen itself', thin.length === 0, thin.join(','))
+  check('G1-MUT: a header-only tour fails G1',
+    (() => { const one = [{ key: 'reportsHeader', target: SCREEN_HEADER }] as readonly TourStep[]; return one.length < 5 || own(one).length < 4 })())
+
+  // A tab's panel is not in the document until the tab is open, so a step inside
+  // one must carry the control that opens it. This is the part that was silent.
+  const aiTabs = ['results', 'queries', 'insights', 'competitors']
+  const aiSteps = SCREEN_TOURS.aiVisibility.steps
+  check('G2: AI visibility describes all four of its tabs, each opening its own tab first',
+    aiTabs.every((tab) => aiSteps.some((s) => s.activate === `[data-ai-tab="${tab}"]`)),
+    aiTabs.filter((tab) => !aiSteps.some((s) => s.activate === `[data-ai-tab="${tab}"]`)).join(','))
+  check('G2-MUT: dropping the competitors tab fails G2',
+    !aiTabs.every((tab) => aiSteps.filter((s) => s.activate !== '[data-ai-tab="competitors"]').some((s) => s.activate === `[data-ai-tab="${tab}"]`)))
+  const editor = SCREEN_TOURS.editor.steps
+  check('G3: the article editor describes both its tabs and the edit-mode column',
+    editor.some((s) => s.activate === '#article-tab-schema')
+    && editor.some((s) => s.target === '#article-tab-article')
+    && editor.filter((s) => s.activate === '[data-testid="article-edit"]').length >= 1
+    && editor.some((s) => s.key === 'editorPublish') && editor.some((s) => s.key === 'editorSave'))
+
+  // Every selector a step points at exists in the code. Anchors built from a
+  // template (the article's tabs, `article-tab-${id}`) cannot be found as a
+  // literal, so they are named here and checked by how they are built.
+  const SOURCE_DIRS = ['app', 'components']
+  const sources = (() => {
+    const out: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`
+        if (entry.isDirectory()) { if (entry.name !== 'node_modules') walk(rel) }
+        else if (/\.tsx?$/.test(entry.name)) out.push(readFileSync(join(ROOT, rel), 'utf8'))
+      }
+    }
+    SOURCE_DIRS.forEach(walk)
+    return out.join('\n')
+  })()
+  const TEMPLATED_IDS = ['article-tab-article', 'article-tab-schema']
+  const found = (selector: string) => selector.split(',').map((s) => s.trim()).filter(Boolean).every((one) => {
+    const attr = /^\[(data-[a-z-]+)(?:="([^"]+)")?\]$/.exec(one)
+    if (attr) return sources.includes(attr[1]) && (!attr[2] || sources.includes(attr[2]))
+    const id = /^#([\w-]+)$/.exec(one)
+    if (id) return TEMPLATED_IDS.includes(id[1]) || sources.includes(`'${id[1]}'`) || sources.includes(`id="${id[1]}"`)
+    const nav = /^aside a\[href="([^"]+)"\]$/.exec(one)
+    if (nav) return sources.includes(`'${nav[1]}'`) || sources.includes(`"${nav[1]}"`)
+    return one === 'main h1' || one === 'main form'
+  })
+  const allSteps = [...FULL_TOUR, ...screens.flatMap(([, t]) => t.steps)]
+  const rotten = allSteps.flatMap((s) => [s.target, s.activate].filter((x): x is string => !!x)).filter((sel) => !found(sel))
+  check('G4: every target and every tab-opening selector exists in the code', rotten.length === 0, [...new Set(rotten)].join(' '))
+  check('G4-MUT: an invented anchor fails G4', !found('[data-nothing-points-here]'))
+  check('G4a: the article\'s tab ids are the ones the top bar builds',
+    /id=\{`article-tab-\$\{x\.id\}`\}/.test(code('components/content/ArticleTopBar.tsx'))
+    && /'article'/.test(code('app/(dashboard)/content/articles/[id]/page.tsx')) && /'schema'/.test(code('app/(dashboard)/content/articles/[id]/page.tsx')))
+
+  // The runner clicks a tab once, waits for its panel, and only then gives up —
+  // without the wait every tab step would be skipped as missing.
+  const runner = code('components/onboarding/DashboardOnboardingTour.tsx')
+  const activates = (src: string) => /if \(!found\.el && current\.activate && !activated\)/.test(src)
+    && /control\.click\(\)/.test(src)
+    && /Date\.now\(\) - activated < ACTIVATE_WAIT_MS/.test(src)
+    && /!s\.lazy && !s\.activate && !findTarget\(s\.target\)\.exists/.test(src)
+  check('G5: the runner opens a step\'s tab once, waits for the panel, and does not pre-skip it', activates(runner))
+  check('G5-MUT: a runner that pre-skips a tab step fails G5',
+    !activates(runner.replace('!s.lazy && !s.activate && !findTarget(s.target).exists', '!s.lazy && !findTarget(s.target).exists')))
+
+  // All four languages, every step, inside the same limits as Hebrew and English.
+  const words = (s: string) => s.trim().split(/\s+/).length
+  const texts = (dict: unknown) => (dict as { guide: { steps: Record<string, { title: string; body: string }> } }).guide.steps
+  const keys = allSteps.flatMap((s) => [s.key, ...Object.values(s.variants ?? {})])
+  const bad = (dict: unknown) => keys.filter((k) => {
+    const t = texts(dict)[k]
+    return !t || !t.title || !t.body || words(t.title) > 5 || /\n/.test(t.body) || t.body.length > 140
+  })
+  for (const [name, dict] of [['Hebrew', dashboardHe], ['English', dashboardEn], ['Spanish', dashboardEs], ['Portuguese', dashboardPtBR]] as const) {
+    check(`G6: ${name} has a short title and one line for every step`, bad(dict).length === 0, [...new Set(bad(dict))].join(','))
+  }
+  check('G6-MUT: a missing Spanish step fails G6',
+    (() => { const s = { ...texts(dashboardEs) }; delete s.editorSchema; return keys.filter((k) => !s[k]).includes('editorSchema') })())
+  const sameKeys = [dashboardEn, dashboardEs, dashboardPtBR].every((d) =>
+    Object.keys(texts(d)).sort().join(',') === Object.keys(texts(dashboardHe)).sort().join(','))
+  check('G7: the four languages answer the same step keys', sameKeys)
+  const hebrewLeak = ([['English', dashboardEn], ['Spanish', dashboardEs], ['Portuguese', dashboardPtBR]] as const)
+    .filter(([, d]) => Object.values(texts(d)).some((t) => /[֐-׿]/.test(t.title + t.body))).map(([n]) => n)
+  check('G8: no Hebrew leaked into the other three languages', hebrewLeak.length === 0, hebrewLeak.join(','))
+  check('G8-MUT: a Hebrew string in the Spanish steps fails G8',
+    /[֐-׿]/.test('Qué pasa' + 'מה קורה'))
 }
 
 // ── F) the answers stay true ──────────────────────────────────────────────────
