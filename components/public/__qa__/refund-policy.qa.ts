@@ -5,7 +5,8 @@
  *
  * Guards: both pages exist and say exactly that, they never promise a refund
  * window or a discretionary refund, the terms' refunds section matches and links
- * to the policy, the footer and both sitemaps link it, and /refund-policy is a
+ * to the policy, the footer and both HTML sitemap pages link it (the XML sitemap
+ * deliberately does not, because the page is noindex), and /refund-policy is a
  * known Hebrew public segment.
  *
  * MUTATION CONTROL. Each content pattern is re-run against the text with its
@@ -87,8 +88,23 @@ check('and the Spanish policy is a page with a text behind it',
   && /Pol[íi]tica de cancelaci[óo]n y reembolso/.test(read('content/legal/es/refund-policy.md')))
 check('he sitemap page lists it', /href: '\/refund-policy'/.test(read('app/(public)/sitemap/page.tsx')))
 check('en sitemap page lists it', /href: '\/en\/refund-policy'/.test(read('app/(public)/en/sitemap/page.tsx')))
+/**
+ * NOT in sitemap.xml, and that is the point rather than a gap. The policy is
+ * served `noindex, nofollow` like every other legal page, so an entry in the
+ * XML sitemap would ask Google to index a page we have told it not to — Search
+ * Console reports that back as an error and indexes nothing either way. What
+ * the policy actually has to be is REACHABLE, and it is: the footer in every
+ * language, both HTML sitemap pages (checked above), and the terms' refunds
+ * section link to it. The Hebrew and English trees listed it in the XML until
+ * 5 October 2026 while the Spanish tree never did; the inconsistency is what
+ * surfaced it. lib/i18n/__qa__/portuguese-public-site.qa.ts C10b holds the rule
+ * for every legal page at once.
+ */
 const xml = read('app/sitemap.xml/route.ts')
-check('sitemap.xml lists both', /\$\{baseUrl\}\/refund-policy`/.test(xml) && /\$\{baseUrl\}\/en\/refund-policy`/.test(xml))
+check('the XML sitemap does not list it, because the page is noindex',
+  !/\$\{baseUrl\}(\/en|\/es|\/pt-BR)?\/refund-policy`/.test(xml))
+check('MUTATION — an entry put back into the XML sitemap is caught',
+  /\$\{baseUrl\}(\/en|\/es|\/pt-BR)?\/refund-policy`/.test('${baseUrl}/en/refund-policy`'))
 check('refund-policy is a Hebrew public segment', /'refund-policy'/.test(read('lib/i18n/request-locale.ts')))
 check('MUTATION — a footer without the link is caught', !/href=\{`\$\{prefix\}\/refund-policy`\}/.test(footer.replace(/\/refund-policy/g, '/terms')))
 
