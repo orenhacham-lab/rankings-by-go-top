@@ -70,6 +70,11 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                 </Link>
               </li>
               <li>
+                <Link href={`${prefix}/affiliates`} className={linkClass}>
+                  {dict.footer.affiliates}
+                </Link>
+              </li>
+              <li>
                 <Link href={`${prefix}/sitemap`} className={linkClass}>
                   {dict.footer.sitemap}
                 </Link>

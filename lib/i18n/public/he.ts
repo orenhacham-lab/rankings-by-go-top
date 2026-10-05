@@ -48,6 +48,7 @@ export const he = {
     pricing: 'מחירים',
     articles: 'מאמרים',
     about: 'אודות',
+    affiliates: 'תוכנית שותפים',
     sitemap: 'מפת אתר',
     legal: 'משפטי',
     privacy: 'מדיניות פרטיות',

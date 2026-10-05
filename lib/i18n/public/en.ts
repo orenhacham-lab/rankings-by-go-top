@@ -50,6 +50,7 @@ export const en = {
     pricing: 'Pricing',
     articles: 'Articles',
     about: 'About',
+    affiliates: 'Affiliate program',
     sitemap: 'Sitemap',
     legal: 'Legal',
     privacy: 'Privacy Policy',

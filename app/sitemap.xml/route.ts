@@ -46,6 +46,12 @@ export async function GET() {
       priority: '0.8',
     },
     {
+      url: `${baseUrl}/affiliates`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.6',
+    },
+    {
       url: `${baseUrl}/articles`,
       lastmod: today,
       changefreq: 'weekly',
@@ -145,6 +151,12 @@ export async function GET() {
       priority: '0.7',
     },
     {
+      url: `${baseUrl}/en/affiliates`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.6',
+    },
+    {
       url: `${baseUrl}/en/articles`,
       lastmod: today,
       changefreq: 'weekly',
@@ -223,6 +235,7 @@ export async function GET() {
         { url: `${baseUrl}/es/free-check`, lastmod: today, changefreq: 'monthly', priority: '0.8' },
         { url: `${baseUrl}/es/pricing`, lastmod: today, changefreq: 'monthly', priority: '0.8' },
         { url: `${baseUrl}/es/about`, lastmod: today, changefreq: 'monthly', priority: '0.7' },
+        { url: `${baseUrl}/es/affiliates`, lastmod: today, changefreq: 'monthly', priority: '0.6' },
         { url: `${baseUrl}/es/articles`, lastmod: today, changefreq: 'weekly', priority: '0.7' },
         { url: `${baseUrl}/es/sitemap`, lastmod: today, changefreq: 'weekly', priority: '0.6' },
         { url: `${baseUrl}/es/features/seo-geo-content-publishing`, lastmod: today, changefreq: 'monthly', priority: '0.7' },

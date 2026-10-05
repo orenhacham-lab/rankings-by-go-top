@@ -98,7 +98,7 @@ export function isSpanishPath(pathname: string | null | undefined, enabled = spa
  * from it, so it cannot drift silently.
  */
 const PUBLIC_MARKETING_SEGMENTS = new Set([
-  'about', 'accessibility', 'articles', 'features', 'free-check', 'pricing', 'privacy', 'refund-policy', 'sitemap', 'terms',
+  'about', 'accessibility', 'affiliates', 'articles', 'features', 'free-check', 'pricing', 'privacy', 'refund-policy', 'sitemap', 'terms',
 ])
 
 /**

@@ -61,6 +61,7 @@ export const es = {
     pricing: 'Precios',
     articles: 'Artículos',
     about: 'Nosotros',
+    affiliates: 'Programa de afiliados',
     sitemap: 'Mapa del sitio',
     legal: 'Legal',
     privacy: 'Política de privacidad',
