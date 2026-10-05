@@ -411,6 +411,7 @@ function ReportsContent() {
           </div>
           <div className="w-full sm:w-72">
             <Select
+              data-report-type=""
               label={t.reportType}
               value={reportType}
               onChange={(e) => handleReportTypeChange(e.target.value as ReportType)}

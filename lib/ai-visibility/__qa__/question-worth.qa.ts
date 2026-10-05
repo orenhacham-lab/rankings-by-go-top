@@ -162,7 +162,10 @@ console.log('\nD) the wiring')
 console.log('\nE) the tab walk: one way to each thing')
 {
   const section = code('components/ai-visibility/AIVisibilitySection.tsx')
-  const oneWay = (s: string) => /allPrompts\.length > 0 && \(\s*<Button variant="secondary" onClick=\{\(\) => \{[\s\S]{0,200}?setShowSuggestions\(true\)/.test(s) &&
+  // The tour anchors the top button (`data-ai-recommend`), so a data-* attribute
+  // may precede `variant`; the rule itself — ONE such button, opening the same
+  // suggestions — is unchanged.
+  const oneWay = (s: string) => /allPrompts\.length > 0 && \(\s*<Button (?:data-[a-z-]+="" )?variant="secondary" onClick=\{\(\) => \{[\s\S]{0,200}?setShowSuggestions\(true\)/.test(s) &&
     /action=\{<Button onClick=\{pickRecommended\}>\{t\('no_queries_pick'\)\}/.test(s) && /id="ai-recommended-questions"/.test(s)
   check('E1: with no tracked question there is one way to pick (the list on the page), no extra window button', oneWay(section))
   check('E2: MUT the empty state opening the window again fails E1', !oneWay(section.replace('onClick={pickRecommended}', 'onClick={() => setShowSuggestions(true)}')))

@@ -59,7 +59,7 @@ function main() {
   // shape: an unknown KEY still reaches `entry.he`/`entry.en` on undefined and
   // throws, so a missing translation keeps surfacing. What must never appear is
   // a swallow of the entry itself.
-  check('SRC: global t() left UNGUARDED (no missing-key swallow)', /const entry = STRINGS\[key\][^\n]*\n\s*if \(heb\) return entry\.he\n\s*return \(spa && entry\.es\) \|\| entry\.en/.test(i18nCode) && !/entry\?\.|STRINGS\[key\] \?\?|if \(!entry\)/.test(i18nCode))
+  check('SRC: global t() left UNGUARDED (no missing-key swallow)', /const entry = STRINGS\[key\][^\n]*\n\s*if \(heb\) return entry\.he\n(\s*if \(por\) return entry\['pt-BR'\] \|\| entry\.en\n)?\s*return \(spa && entry\.es\) \|\| entry\.en/.test(i18nCode) && !/entry\?\.|STRINGS\[key\] \?\?|if \(!entry\)/.test(i18nCode))
 
   const compSrc = read('components/ai-visibility/PromptSuggestions.tsx')
   const compCode = compSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')

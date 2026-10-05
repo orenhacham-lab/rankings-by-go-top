@@ -92,6 +92,26 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
         : `Hasta ${c.maxAIChecksPerPeriodPerProject} comprobaciones de visibilidad en IA al mes por web`,
     }
   }
+  // Brazilian Portuguese, for the /pt-BR pricing page and the Portuguese
+  // dashboard. Without this branch the function fell through to Hebrew, which
+  // is what the live /pt-BR pricing page showed.
+  if (locale === 'pt-BR') {
+    return {
+      articles: single
+        ? `${c.maxArticlesPerPeriodAccountWide} artigos por mês, escritos e publicados no seu site automaticamente`
+        : `${c.maxArticlesPerPeriodAccountWide} artigos por mês, escritos e publicados automaticamente, compartilhados entre todos os seus sites, até ${PER_SITE} por semana em cada site`,
+      projects: single ? '1 site' : `Até ${c.maxProjects} sites`,
+      keywords: single
+        ? `Acompanhamento de até ${c.maxKeywordsPerProject} palavras-chave`
+        : `Acompanhamento de até ${c.maxKeywordsPerProject} palavras-chave por site`,
+      google: single
+        ? `Até ${c.maxGoogleChecksPerPeriodPerProject} verificações de posição no Google por mês`
+        : `Até ${c.maxGoogleChecksPerPeriodPerProject} verificações de posição no Google por mês em cada site`,
+      ai: single
+        ? `Até ${c.maxAIChecksPerPeriodPerProject} verificações de visibilidade em IA por mês`
+        : `Até ${c.maxAIChecksPerPeriodPerProject} verificações de visibilidade em IA por mês em cada site`,
+    }
+  }
   if (locale === 'en') {
     return {
       // THE MAIN VALUE, and the first line of every plan: articles written and
@@ -181,6 +201,16 @@ export function trialLimitLines(locale: PublicLocale): string[] {
       `Hasta ${t.maxGoogleChecksLifetime} comprobaciones de posición en Google durante la prueba`,
       `Hasta ${t.maxAIChecksLifetime} comprobaciones de visibilidad en IA durante la prueba`,
       `${t.days} días de prueba`,
+    ]
+  }
+  if (locale === 'pt-BR') {
+    return [
+      'Um artigo para experimentar, da redação até a publicação',
+      '1 site',
+      `Até ${t.maxKeywordsPerProject} palavras-chave`,
+      `Até ${t.maxGoogleChecksLifetime} verificações de posição no Google durante o teste`,
+      `Até ${t.maxAIChecksLifetime} verificações de visibilidade em IA durante o teste`,
+      `${t.days} dias de teste`,
     ]
   }
   if (locale === 'en') {

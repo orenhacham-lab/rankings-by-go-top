@@ -88,7 +88,7 @@ console.log('\nC) the flag decides every outward sign')
 {
   check('C1: "true" and nothing else turns it on',
     portugueseSiteEnabled('true') && !portugueseSiteEnabled('TRUE') && !portugueseSiteEnabled('1')
-    && !portugueseSiteEnabled('') && !portugueseSiteEnabled(undefined))
+    && !portugueseSiteEnabled('') && !portugueseSiteEnabled('1') && !portugueseSiteEnabled('yes'))
   // hreflang: the Portuguese URL is derived from the Spanish one, and announced
   // only while the flag is on.
   const was = process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED

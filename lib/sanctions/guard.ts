@@ -97,6 +97,11 @@ const NOTICE: Record<PublicLocale, string> = {
  * the site without the compiler asking for this sentence too. The read below
  * goes through `normalizePublicLocale` for the same reason — a hand-written
  * list of languages here was how /pt-BR visitors were shown Hebrew.
+ *
+ * So the `?? 'he'` is not a language fallback — there is no such thing here,
+ * because an unwritten language cannot compile. It is what a value that is not
+ * a public locale at all gets, and the site's own default language is the right
+ * answer to that.
  */
 export function sanctionsNotice(locale: unknown): string {
   return NOTICE[normalizePublicLocale(locale) ?? 'he']

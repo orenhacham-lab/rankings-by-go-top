@@ -104,3 +104,35 @@ screen in both states: without a connection every widget keeps its title and
 offers one link to settings; with one it shows its figures; keyword research
 shows no Search Console section and asks for no Search Console data in either
 state; and no screen logs a console error.
+
+## The Portuguese dashboard
+
+`portuguese-dashboard.js` proves that the Brazilian Portuguese dashboard
+(lib/i18n/dashboard/pt-BR/, merged over English by `getDashboardDictionary`)
+actually RENDERS in Portuguese — the dictionary QA suite beside it proves only
+that the object is complete. Signed in as the reviewer with
+`dashboard-language=pt-BR` and a `pt-BR` browser locale, on sixteen surfaces:
+200 and rendered, `<html lang="pt-BR" dir="ltr">`, **no Hebrew anywhere in the
+visible text**, and Portuguese markers read FROM THE DICTIONARY at run time —
+six of the rail's labels plus at least one marker from the screen's own section,
+found inside `<main>`, every marker first proven to differ from the English at
+the same path. One full-page 1440-wide screenshot per surface.
+
+Two controls, because a detector that measures nothing passes forever: the same
+measurement against the HEBREW dashboard must FIND Hebrew, and against the
+ENGLISH one must FAIL every Portuguese marker check.
+
+The language is gated by `NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED`, which Next
+inlines at BUILD time, so it is set on the script (which passes the ambient
+environment through to `next build`) rather than in it:
+
+    NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED=true bash scripts/qa/journeys.sh portuguese-dashboard
+
+Without the flag the journey refuses to run rather than reporting a flag as a
+product defect.
+
+Measured at the time of commit: **109 passed, 0 failed**, 16 surfaces, no Hebrew
+on any of them. The one leak it does not assert on, found in its screenshots: a
+relative timestamp on the home screen reads "Analisado 3 days ago", because
+`relativeTime` (lib/dashboard/activity.ts) is typed `'he' | 'en'` and its three
+call sites pass the bilingual `language` rather than `uiLocale`.

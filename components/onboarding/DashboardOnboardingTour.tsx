@@ -47,6 +47,16 @@ export type TourEnd = 'completed' | 'dismissed'
 const LAZY_WAIT_MS = 2500
 /** How long a sidebar entry is waited for once the phone's menu was asked to open. */
 const DRAWER_WAIT_MS = 1200
+/**
+ * How long a step inside a TAB is waited for once its tab was opened.
+ *
+ * A tab's panel is not in the document until the tab is open, so a step
+ * pointing inside one was simply skipped: the tour named a screen's title and
+ * then went quiet about everything the screen's tabs hold. A step may now name
+ * the control that reveals its target (`activate`), which the runner clicks
+ * once and then waits for, the same shape as the phone's menu above.
+ */
+const ACTIVATE_WAIT_MS = 1500
 const POLL_MS = 150
 const SPOT_PAD = 6
 const DIM = 'color-mix(in srgb, var(--color-contrast) 58%, transparent)'
@@ -92,7 +102,7 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
   // Steps that are not on this page. A step that renders later (lazy) is only
   // known to be missing once it has been waited for.
   const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set(
-    steps.flatMap((s, i) => (!s.lazy && !findTarget(s.target).exists ? [i] : [])),
+    steps.flatMap((s, i) => (!s.lazy && !s.activate && !findTarget(s.target).exists ? [i] : [])),
   ))
   const [shown, setShown] = useState<Shown | null>(null)
   const [box, setBox] = useState<Box | null>(null)
@@ -134,9 +144,22 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
     let cancelled = false
     const started = Date.now()
     let askedDrawer = 0
+    let activated = 0
     const attempt = () => {
       if (cancelled) return
       const found = findTarget(current.target)
+      // A step inside a tab (or behind a switch): click the control that reveals
+      // it, ONCE, then wait for the panel the same way a lazy step is waited
+      // for. Clicking a control the reader can see and could click themselves
+      // is the whole of it — the tour never submits a form or saves anything.
+      if (!found.el && current.activate && !activated) {
+        const control = findTarget(current.activate).el
+        if (control) { activated = Date.now(); control.click() }
+      }
+      if (!found.el && activated && Date.now() - activated < ACTIVATE_WAIT_MS) {
+        timer = window.setTimeout(attempt, POLL_MS)
+        return
+      }
       // A sidebar entry on a phone: in the closed menu. Open the menu and wait for it.
       if (!found.el && found.exists && current.navEntry && navIsDrawer()) {
         if (!askedDrawer) {

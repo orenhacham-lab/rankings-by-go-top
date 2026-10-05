@@ -418,7 +418,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
       <CompetitorSummary view={competitorView} variant="full" className="mb-6 shadow-card" />
 
       {!empty && (
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div data-keywords-toolbar="" className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Narrowing the table: a search field and the engine as one segmented control. */}
           <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative w-full sm:max-w-xs">

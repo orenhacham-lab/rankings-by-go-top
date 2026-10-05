@@ -237,7 +237,7 @@ export default function StrategyBoard({ cards, lang, dict, ideasNote = null, act
 
   return (
     <div>
-      <div className="-mx-1 mb-4 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+      <div data-strategy-months="" className="-mx-1 mb-4 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
         <Segmented<string>
           ariaLabel={s.monthsLabel}
           value={active}

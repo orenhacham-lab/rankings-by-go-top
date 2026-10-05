@@ -66,6 +66,7 @@ export function ConnectCard({ projectId, status, onChanged }: { projectId: strin
 
   if (conn?.status === 'connected') {
     return (
+      <div data-gbp-connect="">
       <Card className="p-5 sm:p-6">
         <StepHead icon={Store} overline={t.connect.overline} title={t.connect.title}
           aside={<Badge variant="success" dot>{t.connect.connected}</Badge>} />
@@ -79,10 +80,12 @@ export function ConnectCard({ projectId, status, onChanged }: { projectId: strin
         {error && <Notice tone="bad" className="mt-4">{error}</Notice>}
         {dialog}
       </Card>
+      </div>
     )
   }
 
   return (
+    <div data-gbp-connect="">
     <Card className="p-5 sm:p-6">
       <StepHead icon={Store} overline={t.connect.overline} title={conn ? t.connect.reauthTitle : t.connect.title} />
       <div className="space-y-4">
@@ -107,6 +110,7 @@ export function ConnectCard({ projectId, status, onChanged }: { projectId: strin
         </div>
       </div>
     </Card>
+    </div>
   )
 }
 
@@ -177,6 +181,7 @@ export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
   }
 
   return (
+    <div data-gbp-location="">
     <Card className="p-5 sm:p-6">
       <StepHead icon={MapPin} overline={t.location.overline} title={t.location.title}
         aside={connected && status.location && !picking ? (
@@ -222,5 +227,6 @@ export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
         </div>
       )}
     </Card>
+    </div>
   )
 }

@@ -17,7 +17,11 @@
  * again on 4 October 2026 when Spanish and Portuguese joined the research
  * languages and their markets joined the countries: seven new <option> elements,
  * the same +241 (he) / +247 (en) characters in every one of the eighteen states,
- * which is what said the re-capture hid nothing else. It is the REAL page's first render,
+ * which is what said the re-capture hid nothing else. It was taken again on
+ * 5 October 2026 when the screen tour anchored the research-type switch
+ * (`data-research-type`), so the tour can point at it: +22 characters in every
+ * one of the eighteen states, in both languages, and nothing else — checked by
+ * rendering this page against origin/main before re-capturing. It is the REAL page's first render,
  * in both languages, in nine states (empty, results, rows selected with the
  * opportunities panel open, a keyword added, add and AI errors, a search error,
  * the keyword+URL form while searching, few results, filtered and sorted). Each

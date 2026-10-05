@@ -368,7 +368,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
 
           {/* One equal column per tile from sm up; the clicks tile renders only once it
               has a figure, and the row closes up. On a phone, two per row. */}
-          <Reveal index={1} className="grid grid-cols-2 gap-3 sm:grid-flow-col sm:auto-cols-fr max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+          <Reveal index={1} data-dashboard-tiles="" className="grid grid-cols-2 gap-3 sm:grid-flow-col sm:auto-cols-fr max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
             <Link href="/keywords" className="block rounded-card transition-shadow hover:shadow-card">
               <StatTile className="h-full" label={tile.keywords} value={formatCount(rankings.tracked, language)} source={tile.keywordsSource}
                 icon={<KeyRound size={16} strokeWidth={2} />} />
