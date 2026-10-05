@@ -639,6 +639,11 @@ async function main() {
       [he.noKeywords, he.aiNone, he.gscNotConnected, he.planEmpty].every((s) => textOf(emptyHtml).includes(s)))
     check('R16: the file name carries no path and no name a browser would mishandle', /^monthly-report-[0-9-]+\.pdf$/.test(monthlyReportFileName('2026-08')) && monthlyReportFileName('../../etc') === 'monthly-report-.pdf')
 
+    const withIcon = generateMonthlyReportHTML({ data: full, projectLabel: 'x', generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'he', siteIcon: 'https://site.test/icon.png?a=1&b="2' })
+    check('R17a: the site icon from the scan sits in the header, escaped, with no referrer',
+      /<h1><img class="site-icon" src="https:\/\/site\.test\/icon\.png\?a=1&amp;b=&quot;2" alt="" width="28" height="28" referrerpolicy="no-referrer">/.test(withIcon))
+    check('R17b: no icon, no image: the header is as before', !emptyHtml.includes('<img'))
+
     // The screen offers it: the button is on the report, and it is absent when
     // there is no project to ask about.
     const view = render(createElement(MonthlyReportView, { projectId: P, data: full, generatedAt: NOW.toISOString(), generatedBy: 'owner', language: 'he', projectLabel: 'site.test' }))
@@ -659,7 +664,8 @@ async function main() {
      * clients, the product's own locale helpers (pure, no provider), and the
      * dashboard dictionary the download renders its words from.
      */
-    const allowed = /^(\.\/[\w-]+|@\/lib\/supabase\/(admin|server)|@\/lib\/i18n\/[\w/-]+|@\/components\/reports\/monthly\/copy)$/
+    // The site icon helper is pure too: it reads the stored address and builds an <img>; it fetches nothing.
+    const allowed = /^(\.\/[\w-]+|@\/lib\/supabase\/(admin|server)|@\/lib\/i18n\/[\w/-]+|@\/components\/reports\/monthly\/copy|@\/lib\/reports\/report-site-icon)$/
     const imports = (list: string[]) => list.flatMap((s) => [...s.matchAll(/from '([^']+)'/g)].map((m) => m[1])).filter((m) => !allowed.test(m))
     // live-deps is the WIRING: it is the only file allowed to name the thing
     // that leaves the process (the PDF renderer for the download).

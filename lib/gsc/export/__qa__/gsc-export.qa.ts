@@ -22,7 +22,7 @@ import { handleGscExport, type GscExportDeps, type GscExportRun } from '../http'
 import { gscPdfLabels } from '../labels'
 import {
   MIN_IMPRESSIONS, OPPORTUNITY_MAX_POSITION, OPPORTUNITY_MIN_POSITION,
-  generateGscSummaryHTML, gscSummaryFileName, opportunities, rollUp, topPages, topQueries,
+  generateGscSummaryHTML, gscSummaryFileName, opportunities, pageLink, rollUp, topPages, topQueries,
 } from '../pdf-summary'
 import { safeSheetName, sheetsToXlsx } from '../workbook'
 
@@ -412,6 +412,33 @@ check('G-MUT2 an unescaped query would be caught', (() => {
   check('G16 a property with nothing above the floor says so, rather than printing empty tables',
     empty.includes(esc0(P.nothingBody(MIN_IMPRESSIONS))) && !empty.includes('<table>'))
 }
+
+/* A page with a Hebrew path: the printed text was the whole encoded address,
+ * which the PDF reader turned into a link only up to where the line wrapped. */
+{
+  const encoded = 'https://example.com/%D7%9E%D7%90%D7%9E%D7%A8%D7%99%D7%9D/%D7%A9%D7%99%D7%A0%D7%95%D7%99-%D7%A9%D7%9D-%D7%9E%D7%A9%D7%A4%D7%97%D7%94-%D7%91%D7%99%D7%A9%D7%A8%D7%90%D7%9C/'
+  const html = generateGscSummaryHTML(summaryInput({
+    rows: [{ query: 'q', page: encoded, clicks: 9, impressions: 500, ctr: 0.02, position: 5 }],
+  }))
+  const a = html.match(/<a href="([^"]+)">([^<]*)<\/a>/)
+  check('G19 a top page is a real link whose address is the whole encoded URL, uncut', a?.[1] === encoded, a?.[1])
+  check('G20 the words shown are the readable Hebrew path, not the encoded address',
+    a?.[2] === '/מאמרים/שינוי-שם-משפחה-בישראל/' && !html.includes(`>${encoded}<`), a?.[2])
+  eq('G21 the home page shows the domain', pageLink('https://example.com/')?.label, 'example.com')
+  check('G22 anything that is not an http(s) address stays plain text', pageLink('javascript:alert(1)') === null && pageLink('not a url') === null)
+  const q = generateGscSummaryHTML(summaryInput({
+    rows: [{ query: 'https://example.com/q', page: 'https://example.com/a', clicks: 9, impressions: 500, ctr: 0.02, position: 5 }],
+  }))
+  check('G23 queries are never turned into links', !q.includes('<a href="https://example.com/q"'))
+  /* G-MUT3: the old cell (plain text) fails G19. */
+  const old = html.replace(/<a href="[^"]+">[^<]*<\/a>/, encoded)
+  check('G-MUT3 a page printed as plain text is caught', !(old.match(/<a href="([^"]+)">/)?.[1] === encoded))
+}
+
+check('G24 the site icon from the scan sits in the header, with no referrer',
+  /<h1><img class="site-icon" src="https:\/\/example\.com\/icon\.png" alt="" width="28" height="28" referrerpolicy="no-referrer">/
+    .test(generateGscSummaryHTML({ ...summaryInput(), siteIcon: 'https://example.com/icon.png' })))
+check('G25 no icon, no image', !generateGscSummaryHTML(summaryInput()).includes('<img'))
 
 eq('G17 the file names itself, in ASCII, so no browser renames it',
   gscSummaryFileName(28, '2026-10-04'), 'search-console-summary-28d-2026-10-04.pdf')

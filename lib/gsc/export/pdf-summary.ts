@@ -27,6 +27,7 @@
  */
 import { INTL_LOCALE, type PublicLocale } from '@/lib/i18n/locales'
 import { ctrPercent, onePlace, type GscExportInput } from './sheets'
+import { REPORT_SITE_ICON_CSS, reportSiteIconImg } from '@/lib/reports/report-site-icon'
 
 /** Under this many impressions over the window, a row is noise rather than data. */
 export const MIN_IMPRESSIONS = 10
@@ -62,6 +63,8 @@ export interface GscPdfInput extends GscExportInput {
   pdf: GscPdfLabels
   language: PublicLocale
   generatedAt: string
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
 }
 
 interface Rolled {
@@ -143,6 +146,21 @@ export function topPages(pages: Rolled[]): Rolled[] {
     .slice(0, TOP_PAGES)
 }
 
+/**
+ * The link for a page row: the full address as Google reported it (never cut),
+ * and a readable label, its path decoded (the domain is already in the header).
+ * Null for anything that is not an http(s) address, which stays plain text.
+ */
+export function pageLink(value: string): { href: string; label: string } | null {
+  let url: URL
+  try { url = new URL(value) } catch { return null }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
+  const tail = `${url.pathname}${url.search}`
+  let label = tail
+  try { label = decodeURI(tail) } catch { /* keep the encoded form */ }
+  return { href: url.href, label: label === '/' || label === '' ? url.host : label }
+}
+
 /** `search-console-summary-28d-2026-10-04.pdf` — ASCII only, so no browser renames it. */
 export function gscSummaryFileName(windowDays: number, endDate: string | null): string {
   const date = (endDate ?? '').replace(/[^0-9-]/g, '') || 'latest'
@@ -186,10 +204,21 @@ export function generateGscSummaryHTML(input: GscPdfInput): string {
   // A query or a page is text that came from outside, so it is escaped and
   // rendered left to right even on a Hebrew page: a URL reversed is unreadable.
   const textCell = (value: string) => `<td dir="ltr" class="text">${esc(value)}</td>`
+  // A page is a real link. Printed as plain text, the PDF reader guessed the link
+  // from the text itself, and a long (percent-encoded Hebrew) address wrapped onto
+  // a second line, so the link ended where the first line did and opened a page
+  // that does not exist. Now the whole address is the link, and the words shown
+  // are its readable path.
+  const pageCell = (value: string) => {
+    const link = pageLink(value)
+    return link
+      ? `<td dir="ltr" class="text"><a href="${esc(link.href)}">${esc(link.label)}</a></td>`
+      : textCell(value)
+  }
 
-  const rolledTable = (header: string, rows: Rolled[]) => `<table>
+  const rolledTable = (header: string, rows: Rolled[], cell = textCell) => `<table>
   <thead><tr><th>${esc(header)}</th><th>${esc(L.clicks)}</th><th>${esc(L.impressions)}</th><th>${esc(L.ctr)}</th><th>${esc(L.avgPosition)}</th></tr></thead>
-  <tbody>${rows.map((r) => `<tr>${textCell(r.key)}<td>${whole(r.clicks)}</td><td>${whole(r.impressions)}</td><td>${percent(r.ctr)}</td><td>${position(r.position)}</td></tr>`).join('')}</tbody></table>`
+  <tbody>${rows.map((r) => `<tr>${cell(r.key)}<td>${whole(r.clicks)}</td><td>${whole(r.impressions)}</td><td>${percent(r.ctr)}</td><td>${position(r.position)}</td></tr>`).join('')}</tbody></table>`
 
   const keywordsTable = `<table>
   <thead><tr><th>${esc(L.keyword)}</th><th>${esc(L.clicks)}</th><th>${esc(L.impressions)}</th><th>${esc(L.avgPosition)}</th></tr></thead>
@@ -227,7 +256,7 @@ export function generateGscSummaryHTML(input: GscPdfInput): string {
 
   const secondPage = nothing ? '' : [
     top.length ? section(P.topQueriesTitle, rolledTable(L.query, top), P.topQueriesSub(top.length)) : '',
-    bestPages.length ? section(P.topPagesTitle, rolledTable(L.page, bestPages), P.topPagesSub(bestPages.length)) : '',
+    bestPages.length ? section(P.topPagesTitle, rolledTable(L.page, bestPages, pageCell), P.topPagesSub(bestPages.length)) : '',
     shownKeywords.length
       ? section(P.keywordsTitle, keywordsTable + (keywords.length > shownKeywords.length ? `<p class="sub">${esc(P.keywordsMore(keywords.length - shownKeywords.length))}</p>` : ''))
       : '',
@@ -257,11 +286,12 @@ export function generateGscSummaryHTML(input: GscPdfInput): string {
   th { color: #6b7280; font-size: 10.5px; font-weight: 600; }
   td.text { width: 48%; word-break: break-all; }
   .page-two { break-before: page; }
+  ${REPORT_SITE_ICON_CSS}
 </style>
 </head>
 <body>
 <header>
-  <h1>${esc(`${P.title} · ${input.projectName}`)}</h1>
+  <h1>${reportSiteIconImg(input.siteIcon, esc)}${esc(`${P.title} · ${input.projectName}`)}</h1>
   <p class="meta">${esc(meta)}</p>
   <p class="meta">${esc(`${P.generatedOn}: ${input.generatedAt}`)}</p>
 </header>

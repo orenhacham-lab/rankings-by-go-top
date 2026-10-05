@@ -17,6 +17,7 @@
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { MonthlyReportData, KeywordMove, PublishedArticle, PlannedItem } from './types'
 import { count, dayMonth, decimal, monthName, monthlyCopy, monthOnly } from '@/components/reports/monthly/copy'
+import { REPORT_SITE_ICON_CSS, reportSiteIconImg } from '@/lib/reports/report-site-icon'
 
 export interface MonthlyReportPdfInput {
   data: MonthlyReportData
@@ -24,6 +25,8 @@ export interface MonthlyReportPdfInput {
   generatedAt: string
   generatedBy: 'cron' | 'owner'
   language: PublicLocale
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
 }
 
 export function escapeHtml(text: string): string {
@@ -130,11 +133,12 @@ export function generateMonthlyReportHTML(input: MonthlyReportPdfInput): string 
   .tag { color: #6b7280; font-size: 10px; }
   ul { margin: 4px 0 10px; padding-${rtl ? 'right' : 'left'}: 16px; }
   li { margin-bottom: 3px; }
+  ${REPORT_SITE_ICON_CSS}
 </style>
 </head>
 <body>
 <header>
-  <h1>${esc(`${projectLabel} · ${month}`)}</h1>
+  <h1>${reportSiteIconImg(input.siteIcon, esc)}${esc(`${projectLabel} · ${month}`)}</h1>
   <p class="meta">${esc(generatedBy === 'owner' ? t.generatedOwner(dayMonth(generatedAt, l)) : t.generatedAuto(dayMonth(generatedAt, l)))}${
   data.coversFrom ? ` · ${esc(t.coversFrom(dayMonth(data.coversFrom, l)))}` : ''}</p>
 </header>
