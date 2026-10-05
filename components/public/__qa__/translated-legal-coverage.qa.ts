@@ -52,7 +52,7 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
-const DOCS = ['terms', 'privacy', 'refund-policy', 'accessibility'] as const
+const DOCS = ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms'] as const
 type Doc = (typeof DOCS)[number]
 
 const ROOT = 'content/legal'
@@ -105,6 +105,12 @@ const REGISTER_FORBIDS: Record<string, { label: string; patterns: RegExp[] }> = 
 
 /** What a statute, not a translator, requires of a document in this language. */
 const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
+  es: [
+    { doc: 'affiliate-terms', name: 'the Spanish rule that a commercial communication must be identifiable', must: /art[íi]culo 20 de la Ley 34\/2002/ },
+    { doc: 'affiliate-terms', name: 'the FTC endorsement guides, by citation', must: /16 CFR/ },
+    { doc: 'affiliate-terms', name: 'that the partner gets no personal data of the customers they refer', must: /No recibe datos personales/i },
+    { doc: 'privacy', name: 'that a partner is not given a referred customer\'s address, site or plan', must: /no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/ },
+  ],
   'pt-BR': [
     { doc: 'refund-policy', name: 'the Consumer Code\'s seven-day withdrawal right, by article', must: /art\.\s*49/ },
     { doc: 'refund-policy', name: 'the seven-day period in words', must: /7 dias corridos/ },
@@ -117,6 +123,12 @@ const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
     { doc: 'privacy', name: 'the ANPD as the authority to complain to', must: /\bANPD\b/ },
     { doc: 'privacy', name: 'the communication channel that stands in for an appointed officer', must: /canal de comunica[çc][ãa]o/ },
     { doc: 'accessibility', name: 'the Brazilian accessibility standard', must: /NBR 17060/ },
+    { doc: 'affiliate-terms', name: 'the Consumer Code\'s rule that advertising must be identifiable, by article', must: /artigo 36/ },
+    { doc: 'affiliate-terms', name: 'the CONAR influencer guide, which is what a Brazilian partner is actually judged against', must: /CONAR/ },
+    { doc: 'affiliate-terms', name: 'the FTC endorsement guides, by citation', must: /16 CFR/ },
+    { doc: 'affiliate-terms', name: 'the Consumer Code\'s forum rule in the partner agreement too', must: /art\.\s*101/ },
+    { doc: 'affiliate-terms', name: 'that the partner gets no personal data of the customers they refer', must: /n[ãa]o recebe dados pessoais/i },
+    { doc: 'privacy', name: 'that a partner is not given a referred customer\'s address, site or plan', must: /n[ãa]o recebe o endere[çc]o de e-mail, o site, o plano/ },
   ],
 }
 
@@ -274,6 +286,57 @@ for (const locale of LOCALES) {
   }
 }
 
+// ── 9) the Program's own numbers, identical in every language ──────────────
+/*
+ * A commission rate, an attribution window or a payout threshold that came out
+ * of a translation as a different number is not a wording problem: it is a
+ * different promise, and the agreement says the version the partner accepted is
+ * the one that governs it. So each number is held against the English source,
+ * and against every translation of it, rather than being trusted to a reader.
+ */
+const PROGRAM_NUMBERS = ['30%', '40%', '90', '30', '100', '350'] as const
+{
+  const enSource = frontMatter(text[LOCALES[0]]['affiliate-terms']).source
+  const en = enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''
+  for (const n of PROGRAM_NUMBERS) {
+    check(`the English partner agreement states ${n}`, en.includes(n), enSource)
+  }
+  for (const locale of LOCALES) {
+    for (const n of PROGRAM_NUMBERS) {
+      check(`${locale}/affiliate-terms: states ${n}, like its source`,
+        text[locale]['affiliate-terms'].includes(n))
+    }
+  }
+}
+
+// ── 9) the referral cookie, disclosed in every language or in none ──────────
+/*
+ * ePrivacy art. 5(3): an attribution cookie is not strictly necessary, because
+ * the site works without it and only the credit is lost, so it needs consent
+ * and it needs to be named where the reader can find it. The name and the
+ * lifetime are the two facts a reader cannot verify for themselves, so they
+ * are held identical across the Hebrew page, the English page and every
+ * translation. A language that gains the cookie in code and not in text, or
+ * loses the sentence in a rewrite, fails here rather than live.
+ */
+const REFERRAL_COOKIE = ['gt_ref', '90'] as const
+const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    for (const fact of REFERRAL_COOKIE) {
+      check(`${name}/privacy: the referral cookie's ${fact === 'gt_ref' ? 'name' : 'lifetime in days'} is stated`,
+        src.includes(fact))
+    }
+  }
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
@@ -302,8 +365,20 @@ console.log('\nmutation controls')
     REGISTER_FORBIDS.voce.patterns.some((re) => re.test('Tu podes cancelar o teu plano quando quiseres.')))
   check('tuteo in an usted document is caught',
     REGISTER_FORBIDS.usted.patterns.some((re) => re.test('Puedes cancelar tu cuenta cuando tú quieras.')))
+  check('a commission rate changed in one language only is caught',
+    !text['pt-BR']['affiliate-terms'].replace(/30%/g, '35%').includes('30%')
+      && text['pt-BR']['affiliate-terms'].includes('30%'))
+  check('a partner agreement that drops the Spanish identification rule is caught',
+    !/art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms'].replace(/art[íi]culo 20 de la Ley 34\/2002/g, ''))
+      && /art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms']))
   check('a Brazilian document that drops the seven-day right is caught',
     !/art\.\s*49/.test(text['pt-BR']['refund-policy'].replace(/art\.\s*49/g, '')) && /art\.\s*49/.test(text['pt-BR']['refund-policy']))
+  check('a privacy policy that stops naming the referral cookie is caught',
+    !text['pt-BR'].privacy.replace(/gt_ref/g, '').includes('gt_ref') && text['pt-BR'].privacy.includes('gt_ref'))
+  check('a translation that drops the promise about a referred customer\'s details is caught',
+    !/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/
+      .test(text.es.privacy.replace(/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/g, ''))
+      && /no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/.test(text.es.privacy))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

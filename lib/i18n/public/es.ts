@@ -67,6 +67,7 @@ export const es = {
     privacy: 'Política de privacidad',
     terms: 'Términos de uso',
     refundPolicy: 'Política de cancelación y reembolso',
+    affiliateTerms: 'Acuerdo del Programa de Socios',
     accessibility: 'Accesibilidad',
     contact: 'Contacto',
     copyright: '© 2026 Go Top SEO. Todos los derechos reservados.',

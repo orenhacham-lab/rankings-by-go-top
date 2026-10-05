@@ -148,18 +148,26 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 
 // The product name and the last-updated line.
 const OLD_NAME = /Rankings by Go Top/i
+const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
+  terms: { he: /3 באוקטובר 2026/, en: /October 3, 2026/ },
+  privacy: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
+  a11y: { he: /3 באוקטובר 2026/, en: /October 3, 2026/ },
+}
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  // All three documents were revised together for the privacy, consent and
-  // accessibility work, so they all carry the same date now. A page that is
-  // changed without its date being moved is the failure this catches.
-  const dated = lang === 'he' ? /3 באוקטובר 2026/ : /October 3, 2026/
+  // The date is per document, not one date for all three: the terms and the
+  // accessibility statement were last revised on 3 October 2026, and the
+  // privacy policy on 5 October 2026, when the partner-program section and the
+  // referral cookie were added to it. A page that is changed without its date
+  // being moved is the failure this catches, which is why the expected date
+  // lives here and has to be edited deliberately.
+  const dated = LAST_UPDATED[doc][lang]
   const hit = dated.exec(p.body)
   const body = hit ? p.body.slice(0, hit.index + hit[0].length) : p.body
   check(`${lang} ${doc}: the old product name is gone from the text, metadata and code`, !OLD_NAME.test(body) && !OLD_NAME.test(p.meta) && !OLD_NAME.test(p.src))
   check(`${lang} ${doc}: the page names GO TOP`, /Go Top SEO/.test(p.text) && /Go Top SEO/.test(p.meta))
-  check(`${lang} ${doc}: last updated 3 October 2026`, dated.test(p.text))
+  check(`${lang} ${doc}: carries its own last-updated date (${dated.source})`, dated.test(p.text))
 }
 check('MUTATION — the old name put back into a page is caught', OLD_NAME.test(pages.en.terms.src + ' Rankings by Go Top') && !OLD_NAME.test(pages.en.terms.src))
 check('MUTATION — an old last-updated date is caught', !/October 3, 2026/.test(pages.en.terms.text.replace('October 3, 2026', 'September 29, 2026')))

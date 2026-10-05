@@ -50,6 +50,7 @@ export default function SpanishSitemapPage() {
         { label: 'Términos de uso', href: '/es/terms' },
         { label: 'Política de cancelación y reembolso', href: '/es/refund-policy' },
         { label: 'Accesibilidad', href: '/es/accessibility' },
+        { label: 'Acuerdo del Programa de Socios', href: '/es/affiliate-terms' },
       ],
     },
   ]

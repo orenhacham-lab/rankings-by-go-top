@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-04
+lastUpdated: 2026-10-05
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -153,6 +153,18 @@ Entrar na rede de links é opcional, é feito para cada projeto separadamente, v
 - **O que outro membro vê:** a Empresa não publica uma lista de membros. O lado que recebe vê o endereço do site que o linka e, após a publicação, a página em que o link apareceu. Um link publicado é um link público no site.
 - **Saída:** você pode sair da rede a qualquer momento. A saída interrompe novas inserções; links já publicados permanecem, a menos que você os remova do seu site, e as inserções permanecem no log.
 
+## Programa de Parceiros
+
+O programa de parceiros é para quem recomenda o Serviço e recebe uma comissão pelos clientes que entram por meio dele. A participação é voluntária, cada candidatura é analisada por uma pessoa, e nada do que está aqui se aplica a você, a menos que você se candidate.
+
+- **Quando você se candidata:** recebemos o que você nos envia por e-mail ou WhatsApp: seu nome, seus dados de contato, o site, o canal ou o público para o qual pretende divulgar e, após a aprovação, a forma de pagamento que você escolher. Usamos esses dados para decidir sobre a candidatura e para executar o contrato com você.
+- **Enquanto você é parceiro:** armazenamos seus dados de contato, seu código de indicação, as contas abertas por meio dele, os pagamentos que geram comissão e a comissão calculada sobre eles, os pagamentos feitos a você, e as notas fiscais e as certidões fiscais que a lei nos obriga a guardar.
+- **O que um parceiro vê sobre as pessoas que indicou:** nada pessoal. Um parceiro vê quantidades e valores. Um parceiro não recebe o endereço de e-mail, o site, o plano nem a identidade de nenhum cliente que tenha indicado.
+- **Pagamento da comissão:** o provedor escolhido pelo parceiro (PayPal, Wise ou transferência bancária) recebe os dados de que precisa para pagar. As notas fiscais e as certidões de retenção são mantidas por sete anos, conforme as regras de contabilidade israelenses.
+- **Atribuição de uma indicação:** exige um cookie, e um cookie desse tipo exige o seu consentimento. Veja «Cookies» abaixo para conhecer o único cookie envolvido e o que acontece se você recusá-lo.
+
+Na data desta política o programa funciona apenas por candidatura: recebemos candidaturas e aprovamos parceiros manualmente, e ainda não foram construídos o rastreamento de indicações, o registro de comissões nem o pagamento. Cada um deles será descrito aqui antes de entrar em funcionamento. Os termos estão no [Contrato do Programa de Parceiros](/en/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
+
 ## Provedores de IA
 
 Alguns recursos enviam dados aos seguintes serviços de IA para produzir o resultado que você pediu:
@@ -199,6 +211,8 @@ Dividimos os cookies em três categorias, e perguntamos a você sobre duas delas
 **Antes da sua escolha, nenhum cookie de medição ou de marketing é gravado e nenhuma requisição é feita aos servidores do Google.** Aceitar e recusar são dois botões equivalentes no aviso, e cada categoria pode ser permitida separadamente.
 
 **Alterar ou retirar o consentimento:** a qualquer momento, pelo link «Configurações de cookies» no final de cada página. Retirar é exatamente tão fácil quanto consentir e não lhe custa nada no serviço.
+
+**O programa de parceiros:** se você chegar ao site pelo link de um parceiro e tiver permitido os cookies de marketing, gravamos um único cookie do nosso próprio domínio, gt_ref, que guarda o código desse parceiro por 90 dias para que o parceiro que indicou você seja creditado. O site funciona sem ele: se você recusar, nenhum cookie é gravado e a indicação simplesmente não é creditada. Na data desta política o rastreamento de indicações está desativado e esse cookie não é gravado de forma alguma.
 
 Se o seu navegador enviar o sinal Global Privacy Control, nós o tratamos como recusa: nenhum cookie de medição ou de marketing é carregado, e não exibimos o aviso.
 
@@ -343,4 +357,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 4 de outubro de 2026
+Esta política foi atualizada pela última vez em 5 de outubro de 2026
