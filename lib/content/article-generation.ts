@@ -32,6 +32,7 @@ import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeArticleGeneration, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import { normalizeContentLanguage } from '@/lib/content/language'
+import { readGenerationContext } from '@/lib/content/writing-guidance/store'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -146,7 +147,7 @@ export async function generateArticleForTopic(
   // Project context (safe fields only).
   const { data: project } = await admin
     .from('projects')
-    .select('business_name, target_domain, ai_business_profile')
+    .select('business_name, target_domain, ai_business_profile, city')
     .eq('id', projectId)
     .maybeSingle()
   const category =
@@ -212,6 +213,10 @@ export async function generateArticleForTopic(
     planStale: approvedGuidance.diagnostics.planStale,
   })
 
+  // The owner's standing instructions, what the business does not sell, the rules left on earlier
+  // articles, and what the business is and where it serves. Empty on any failure: the prompt as before.
+  const generationContext = await readGenerationContext(admin, projectId, (project as { city?: string | null } | null)?.city ?? null)
+
   const brief: ArticleBrief = {
     language,
     topic: String(t.topic || ''),
@@ -239,6 +244,8 @@ export async function generateArticleForTopic(
     businessName,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
     category,
+    writingGuidance: generationContext.guidance,
+    businessContext: generationContext.business,
   }
 
   // Phase 3 — atomic article-credit reservation, taken immediately before

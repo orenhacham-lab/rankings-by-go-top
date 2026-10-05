@@ -30,6 +30,7 @@ import AudienceCard from '@/components/settings/AudienceCard'
 import BusinessCard from '@/components/settings/BusinessCard'
 import CompetitorsCard from '@/components/settings/CompetitorsCard'
 import ArticleStyleCard from '@/components/settings/ArticleStyleCard'
+import WritingGuidanceCard from '@/components/settings/WritingGuidanceCard'
 import OfficialProfilesCard from '@/components/settings/OfficialProfilesCard'
 import { useArticleSettings } from '@/components/settings/useArticleSettings'
 import type { RedetectChain } from '@/components/settings/useRedetect'
@@ -216,6 +217,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   if (visibility.profileCard) index.push({ id: SECTION.profile, label: t.profile.title })
   if (visibility.audienceCard) index.push({ id: SECTION.audience, label: t.audience.title })
   if (competitorsShown) index.push({ id: SECTION.competitors, label: t.competitors.title })
+  index.push({ id: SECTION.writingGuidance, label: t.writingGuidance.navLabel })
   if (article.state.status !== 'loading') {
     index.push({ id: SECTION.articleDesign, label: t.articleStyle.title }, { id: SECTION.officialProfiles, label: t.officialProfiles.navLabel })
   }
@@ -261,6 +263,8 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               onAvailability={setCompetitorsShown}
               t={t}
             />
+
+            <WritingGuidanceCard projectId={project.id} t={t} />
 
             {article.state.status === 'ready' ? (
               <>

@@ -32,6 +32,7 @@ import type { StructuredDataInput } from '@/lib/content/structured-data'
 import ShopifyPublishSettings from '@/components/content/ShopifyPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
+import ArticleWritingFeedbackCard from '@/components/content/ArticleWritingFeedbackCard'
 import { autoLinksShown, hasAutoLinks } from '@/lib/content/auto-internal-links/entries'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
@@ -649,7 +650,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               projectId={projectId}
             />
           </div>
-          {(audit || aiCard || autoLinksShown(linksJson, contentHtml).length > 0) && (
+          {(audit || aiCard || projectId || autoLinksShown(linksJson, contentHtml).length > 0) && (
             <aside aria-label={e.sidePanelLabel} className="mb-4 space-y-4 lg:sticky lg:top-24" data-article-side="">
               {audit && renderAudit(true)}
               <ArticleAutoLinksCard
@@ -662,6 +663,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                 onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}
               />
               {aiCard}
+              {projectId && <ArticleWritingFeedbackCard t={e.writingFeedback} articleId={id} projectId={projectId} />}
             </aside>
           )}
         </div>

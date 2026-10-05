@@ -10,6 +10,7 @@ export const SECTION = {
   profile: 'profile',
   audience: 'audiences',
   competitors: 'competitors',
+  writingGuidance: 'writing-guidance',
   articleDesign: 'article-design',
   officialProfiles: 'official-profiles',
   connections: 'connections',
@@ -19,10 +20,11 @@ export const SECTION = {
 
 /**
  * Sections other screens link to by hash (the onboarding summary opens
- * /settings?projectId=…#business, #audiences and #competitors). The screen
+ * /settings?projectId=…#business, #audiences and #competitors; an article's
+ * page opens #writing-guidance). The screen
  * scrolls to them on load, as it does to the two connection anchors.
  */
-export const LINKED_SECTIONS: readonly string[] = [SECTION.business, SECTION.audience, SECTION.competitors]
+export const LINKED_SECTIONS: readonly string[] = [SECTION.business, SECTION.audience, SECTION.competitors, SECTION.writingGuidance]
 
 /** Bring a section into view, smoothly unless the owner asked for less motion. */
 export function scrollToSection(id: string) {

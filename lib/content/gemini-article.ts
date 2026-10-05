@@ -20,6 +20,7 @@ import { runArticleAudit, thresholdsFor, auditSummary, includesKw, type AuditRes
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
+import { businessContextLines, guidancePromptLines, type BusinessContext, type WritingGuidance } from '@/lib/content/writing-guidance/guidance'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -56,6 +57,11 @@ export interface ArticleBrief {
   businessName: string | null
   domain: string | null
   category: string | null
+  // The owner's standing instructions, exclusions and rules from feedback
+  // (lib/content/writing-guidance). Optional: absent or empty = the prompt as before.
+  writingGuidance?: WritingGuidance | null
+  // What the business does and, for a local business, the city it serves.
+  businessContext?: BusinessContext | null
 }
 
 export interface GeneratedArticleFaq { question: string; answer: string }
@@ -197,7 +203,8 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   ],
 }
 
-function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
+/** Exported for the writing-guidance guards (lib/content/writing-guidance/__qa__). */
+export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const lang = languageNameInEnglish(brief.language)
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
   // Phase 3D — target range drives length; midpoint drives structural thresholds.
@@ -240,6 +247,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
     brief.category ? `Field: ${brief.category}.` : '',
+    ...businessContextLines(brief.businessContext),
     brief.briefNotes ? `Extra instructions from the brief (obey these): ${brief.briefNotes}` : '',
     brief.briefNotes ? `- Treat [ARTICLE ANGLE] as the STRATEGIC angle of the whole article — make it less generic and focus the piece around it.` : '',
     brief.briefNotes ? `- Treat [MUST INCLUDE] items as important content requirements: don't mention them once and move on — turn them into sections, bullet points, examples, FAQ answers, or comparison-table rows, woven naturally and prominently.` : '',
@@ -251,6 +259,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     depthKind === 'support' ? `- This is a concise supporting article: stay focused and tight; cover the essentials well without over-expanding.` : '',
     brandLine,
     ctaLine,
+    ...guidancePromptLines(brief.writingGuidance),
     ``,
     `Writing rules:`,
     `- directAnswer: a direct 2-3 sentence answer to the main question (will appear at the very top).`,
