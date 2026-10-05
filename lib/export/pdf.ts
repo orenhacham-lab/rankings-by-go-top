@@ -3,6 +3,7 @@ import { getEngineDisplayLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
 import { intlLocaleOf } from '@/lib/i18n/locales'
+import { REPORT_SITE_ICON_CSS, reportSiteIconImg } from '@/lib/reports/report-site-icon'
 
 interface ExportData {
   client: Client
@@ -10,11 +11,15 @@ interface ExportData {
   targets: TrackingTarget[]
   latestResults: Record<string, ScanResult>
   language?: ExportLanguage
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
 }
 
 interface AIExportData {
   client: Client
   project: Project
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
   summary: {
     totalScans: number
     totalResults: number
@@ -151,6 +156,8 @@ function generateReportHTML(data: ExportData): string {
           color: #1f2937;
           margin-bottom: 5px;
         }
+
+        ${REPORT_SITE_ICON_CSS}
 
         .project-meta {
           font-size: 9pt;
@@ -334,7 +341,7 @@ function generateReportHTML(data: ExportData): string {
 
         <div class="project-info">
           <div class="project-details">
-            <div class="project-name">${escapeHtml(data.project.name)}</div>
+            <div class="project-name">${reportSiteIconImg(data.siteIcon, escapeHtml)}${escapeHtml(data.project.name)}</div>
             <div class="project-meta">${escapeHtml(data.client.name)} | ${escapeHtml(data.project.target_domain)} | ${escapeHtml(now)}</div>
           </div>
         </div>
@@ -524,6 +531,8 @@ function generateAIReportHTML(data: AIExportData): string {
           margin-bottom: 5px;
         }
 
+        ${REPORT_SITE_ICON_CSS}
+
         .project-meta {
           font-size: 9pt;
           color: #6b7280;
@@ -664,7 +673,7 @@ function generateAIReportHTML(data: AIExportData): string {
 
         <div class="project-info">
           <div class="project-details">
-            <div class="project-name">${escapeHtml(data.project.name)}</div>
+            <div class="project-name">${reportSiteIconImg(data.siteIcon, escapeHtml)}${escapeHtml(data.project.name)}</div>
             <div class="project-meta">${escapeHtml(data.client.name)} | ${escapeHtml(data.project.target_domain)} | ${escapeHtml(now)}</div>
           </div>
         </div>
