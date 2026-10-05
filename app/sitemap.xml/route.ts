@@ -20,6 +20,17 @@ interface Article {
  * nothing else to notice.
  *
  * lib/i18n/__qa__/portuguese-public-site.qa.ts fails if the file comes back.
+ *
+ * WHAT IS DELIBERATELY NOT HERE: the legal pages. Every one of them, in every
+ * language, is served `noindex, nofollow` (app/(legal)/*, and the translated
+ * tree through components/public/TranslatedLegalPage.tsx). A sitemap is a list
+ * of pages asking to be indexed, so listing a noindex page is a contradiction:
+ * Search Console reports it as "Submitted URL marked noindex" and the crawl is
+ * spent on a page we do not want in the index. The Hebrew and English trees
+ * listed their four each until 5 October 2026; the Spanish tree never did,
+ * which is what made the inconsistency visible. The documents stay reachable
+ * from each language's own /sitemap page and from the footer, which is how a
+ * reader is meant to find them. The guard below holds it.
  */
 export async function GET() {
   const supabase = await createClient()
@@ -116,30 +127,6 @@ export async function GET() {
       priority: '0.8',
     },
     // Hebrew legal pages
-    {
-      url: `${baseUrl}/privacy`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
-    {
-      url: `${baseUrl}/terms`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
-    {
-      url: `${baseUrl}/refund-policy`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
-    {
-      url: `${baseUrl}/accessibility`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
     // English site root and equivalents
     {
       url: `${baseUrl}/en`,
@@ -215,30 +202,6 @@ export async function GET() {
       priority: '0.7',
     },
     // English legal pages
-    {
-      url: `${baseUrl}/en/privacy`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
-    {
-      url: `${baseUrl}/en/terms`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
-    {
-      url: `${baseUrl}/en/refund-policy`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
-    {
-      url: `${baseUrl}/en/accessibility`,
-      lastmod: today,
-      changefreq: 'yearly',
-      priority: '0.3',
-    },
   ]
 
   // A TRANSLATED TREE, only once it exists. While a language's flag is off its
