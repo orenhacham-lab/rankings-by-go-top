@@ -20,6 +20,7 @@ import { runArticleAudit, thresholdsFor, auditSummary, includesKw, type AuditRes
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
+import { businessContextLines, guidancePromptLines, type BusinessContext, type WritingGuidance } from '@/lib/content/writing-guidance/guidance'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -56,6 +57,11 @@ export interface ArticleBrief {
   businessName: string | null
   domain: string | null
   category: string | null
+  // The owner's standing instructions, exclusions and rules from feedback
+  // (lib/content/writing-guidance). Optional: absent or empty = the prompt as before.
+  writingGuidance?: WritingGuidance | null
+  // What the business does and, for a local business, the city it serves.
+  businessContext?: BusinessContext | null
 }
 
 export interface GeneratedArticleFaq { question: string; answer: string }
@@ -197,7 +203,8 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   ],
 }
 
-function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
+/** Exported for the writing-guidance guards (lib/content/writing-guidance/__qa__). */
+export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const lang = languageNameInEnglish(brief.language)
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
   // Phase 3D — target range drives length; midpoint drives structural thresholds.
@@ -219,7 +226,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const ctaLine = ctaEnabled ? ctaDetailLines.join('\n') : 'Do NOT include any call-to-action anywhere.'
   const brandName = (brief.brandNameToInclude || '').trim()
   const brandLine = brief.includeBrandName && brandName
-    ? `You MAY mention the business/brand name "${brandName}" naturally and subtly.`
+    ? `This article is published on the site of "${brandName}" and speaks for it. Name "${brandName}" ONLY where it adds E-E-A-T value for the reader: as the source of practical, first-hand guidance (how the business approaches the problem, what it checks, what it recommends to its own customers) or as a clear next step at the end. At most 2-3 mentions in the whole article and never more than one per section; if no mention would genuinely help the reader, mention it once at most, in the conclusion. Never in the title, metaTitle, slug, headings or FAQ questions, never as a sales slogan or praise ("the best", "leading", "professional team"), never in a sentence that would read the same for any business. Ground every statement about the business ONLY in the business details and owner instructions in this brief; do NOT invent experience, years in business, customer numbers, certifications, awards, guarantees or results.`
     : 'Do NOT mention any business or brand name in the article text. EXCEPTION: if one of the required link phrases below is (or contains) the business name, use it ONLY inside that exact link and add NO other brand mentions anywhere.'
   const anchorTopics = brief.anchors
     .filter((a) => a.anchor_text?.trim() && a.target_url?.trim())
@@ -240,6 +247,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
     brief.category ? `Field: ${brief.category}.` : '',
+    ...businessContextLines(brief.businessContext),
     brief.briefNotes ? `Extra instructions from the brief (obey these): ${brief.briefNotes}` : '',
     brief.briefNotes ? `- Treat [ARTICLE ANGLE] as the STRATEGIC angle of the whole article — make it less generic and focus the piece around it.` : '',
     brief.briefNotes ? `- Treat [MUST INCLUDE] items as important content requirements: don't mention them once and move on — turn them into sections, bullet points, examples, FAQ answers, or comparison-table rows, woven naturally and prominently.` : '',
@@ -251,6 +259,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     depthKind === 'support' ? `- This is a concise supporting article: stay focused and tight; cover the essentials well without over-expanding.` : '',
     brandLine,
     ctaLine,
+    ...guidancePromptLines(brief.writingGuidance),
     ``,
     `Writing rules:`,
     `- directAnswer: a direct 2-3 sentence answer to the main question (will appear at the very top).`,
