@@ -130,6 +130,25 @@ console.log('\nC) the flag decides every outward sign')
     !existsSync(join(ROOT, 'public', 'sitemap.xml')))
   check('C10a: and robots.txt still points at the path the route serves',
     read('public/robots.txt').includes('Sitemap: https://www.gotopseo.com/sitemap.xml'))
+
+  /**
+   * C10b: THE SITEMAP ASKS FOR INDEXING, SO IT MAY NOT LIST A noindex PAGE.
+   *
+   * Every legal document, in every language, is served `noindex, nofollow`.
+   * Listing one in the sitemap tells Google to index a page we have told it not
+   * to, which Search Console reports back as an error and which spends crawl on
+   * nothing. The Hebrew and English trees carried their four each until
+   * 5 October 2026 while the Spanish tree carried none, so the two halves of the
+   * file disagreed about the same question.
+   */
+  const sitemapRoute = strip(read('app/sitemap.xml/route.ts'))
+  const legalSlugs = ['privacy', 'terms', 'refund-policy', 'accessibility', 'affiliate-terms']
+  const listed = legalSlugs.filter((slug) => new RegExp(`baseUrl\\}(/en|/es|/pt-BR)?/${slug}\``).test(sitemapRoute))
+  check('C10b: the sitemap lists no legal page, because every one of them is noindex',
+    listed.length === 0, listed.join(', '))
+  /* C10b-MUT: put one back and show the guard fails. */
+  check('C10b-MUT: a legal page added to the sitemap is caught',
+    /baseUrl\}(\/en|\/es|\/pt-BR)?\/privacy`/.test('${baseUrl}/en/privacy`'))
 }
 
 console.log('\nD) the locale tables and the copy')
