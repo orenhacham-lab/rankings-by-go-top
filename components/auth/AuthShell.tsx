@@ -9,6 +9,7 @@ import { LOCALE_PREFIX, getLocaleConfig, type PublicLocale } from '@/lib/i18n/lo
 import { landingHe } from '@/lib/i18n/public/landing-he'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 import { landingEs } from '@/lib/i18n/public/landing-es'
+import { landingPtBR } from '@/lib/i18n/public/landing-pt-BR'
 import HeroBackdrop from '@/components/public/HeroBackdrop'
 import { cn } from '@/lib/utils'
 
@@ -84,7 +85,8 @@ export default function AuthShell({
   const copy = brand[variant]
   // Each language's own landing copy and its own home, from one table — a
   // two-way ternary here is what gave the Spanish forms an English panel.
-  const landing = locale === 'es' ? landingEs : locale === 'en' ? landingEn : landingHe
+  const landing =
+    locale === 'es' ? landingEs : locale === 'pt-BR' ? landingPtBR : locale === 'en' ? landingEn : landingHe
   const homeHref = LOCALE_PREFIX[locale] || '/'
   const rank = landing.demo.rank
   const rows = [{ keyword: rank.keyword, from: rank.from, to: rank.to }, ...rank.rows].slice(0, 4)
