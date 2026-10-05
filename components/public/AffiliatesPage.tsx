@@ -6,14 +6,21 @@
  * the numbers come from lib/i18n/public/affiliates.ts, which holds them once for every
  * language.
  *
+ * The page points at the AGREEMENT in the reader's own language, right after the
+ * rules. A page that states rates, payout thresholds and reversal rules is making
+ * an offer, and an offer has to be findable from the terms that bind it; the
+ * guard in lib/i18n/public/__qa__/affiliates-page.qa.ts fails if any language
+ * loses that link or points at another language's copy of it.
+ *
  * The two calls to action open a CONVERSATION (email, WhatsApp), not a form. That is
  * deliberate: every affiliate is approved by a person before they get a link, which is
  * the program's real defence against someone signing up to refer themselves. A form
  * arrives with the attribution table.
  */
-import { BadgePercent, Handshake, Infinity as InfinityIcon, Megaphone, Receipt, RotateCcw, ShieldCheck, TicketPercent, Users } from 'lucide-react'
+import { BadgePercent, FileText, Handshake, Infinity as InfinityIcon, Megaphone, Receipt, RotateCcw, ShieldCheck, TicketPercent, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
 import { AFFILIATES_COPY } from '@/lib/i18n/public/affiliates'
+import { LOCALE_PREFIX } from '@/lib/i18n/locales'
 import { EMAIL, whatsappHelpUrl } from '@/components/public/contact'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
@@ -52,6 +59,18 @@ export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
         title: c.rulesTitle,
         intro: c.rulesIntro,
         items: c.rules.map((r, i) => ({ icon: RULE_ICONS[i % RULE_ICONS.length], title: r.title, body: r.body })),
+      },
+      {
+        // Immediately after the rules, because that is where a reader who has just
+        // been told the rules looks for the document behind them.
+        kind: 'callout',
+        icon: FileText,
+        body: (
+          <p>
+            {`${c.termsNote} `}
+            <a className="underline" href={`${LOCALE_PREFIX[locale]}/affiliate-terms`}>{c.termsLink}</a>
+          </p>
+        ),
       },
       { kind: 'faq', title: c.faqTitle, items: c.faq },
     ],
