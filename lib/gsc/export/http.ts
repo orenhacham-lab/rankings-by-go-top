@@ -23,6 +23,7 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { gscExportLabels, gscPdfLabels } from './labels'
 import { gscExportFileName, gscExportSheets, toCsv, type GscExportInput } from './sheets'
 import { generateGscSummaryHTML, gscSummaryFileName } from './pdf-summary'
+import { reportSiteIcon } from '@/lib/reports/report-site-icon'
 import { normalizeExportLanguage } from '@/lib/export/i18n'
 import { keywordAverages, type KeywordTarget, type QueryPositionRow } from '@/lib/gsc/tab-metrics'
 
@@ -198,6 +199,7 @@ export async function handleGscExport(request: Request, deps: GscExportDeps): Pr
     // The two-page summary, from the same input the workbook is built from.
     const html = generateGscSummaryHTML({
       ...input,
+      siteIcon: await reportSiteIcon(auth.admin, auth.projectId, domain),
       pdf: gscPdfLabels(url.searchParams.get('language')),
       language: normalizeExportLanguage(url.searchParams.get('language')),
       generatedAt: deps.now().toISOString().slice(0, 10),

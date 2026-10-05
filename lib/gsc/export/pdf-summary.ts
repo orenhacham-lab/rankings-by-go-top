@@ -27,6 +27,7 @@
  */
 import { INTL_LOCALE, type PublicLocale } from '@/lib/i18n/locales'
 import { ctrPercent, onePlace, type GscExportInput } from './sheets'
+import { REPORT_SITE_ICON_CSS, reportSiteIconImg } from '@/lib/reports/report-site-icon'
 
 /** Under this many impressions over the window, a row is noise rather than data. */
 export const MIN_IMPRESSIONS = 10
@@ -62,6 +63,8 @@ export interface GscPdfInput extends GscExportInput {
   pdf: GscPdfLabels
   language: PublicLocale
   generatedAt: string
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
 }
 
 interface Rolled {
@@ -283,11 +286,12 @@ export function generateGscSummaryHTML(input: GscPdfInput): string {
   th { color: #6b7280; font-size: 10.5px; font-weight: 600; }
   td.text { width: 48%; word-break: break-all; }
   .page-two { break-before: page; }
+  ${REPORT_SITE_ICON_CSS}
 </style>
 </head>
 <body>
 <header>
-  <h1>${esc(`${P.title} · ${input.projectName}`)}</h1>
+  <h1>${reportSiteIconImg(input.siteIcon, esc)}${esc(`${P.title} · ${input.projectName}`)}</h1>
   <p class="meta">${esc(meta)}</p>
   <p class="meta">${esc(`${P.generatedOn}: ${input.generatedAt}`)}</p>
 </header>

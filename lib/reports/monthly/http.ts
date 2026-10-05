@@ -31,6 +31,7 @@ import {
 import type { MonthlyReportSummary } from './types'
 import { generateMonthlyReportHTML, monthlyReportFileName } from './pdf'
 import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
+import { reportSiteIcon } from '@/lib/reports/report-site-icon'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
 export interface MonthlyRouteDeps {
@@ -146,14 +147,17 @@ export async function handleMonthlyPdf(request: Request, deps: MonthlyRouteDeps)
 
   let report: StoredReport | null
   let projectLabel = ''
+  let siteIcon: string | null = null
   try {
     if (monthParam) {
       report = await readReport(o.admin, o.project, monthParam)
     } else {
       report = (await listReports(o.admin, o.project)).latest
     }
-    const { data } = await o.admin.from('projects').select('name').eq('id', o.project.id).eq('user_id', o.project.user_id).maybeSingle()
+    const { data } = await o.admin.from('projects').select('name, target_domain').eq('id', o.project.id).eq('user_id', o.project.user_id).maybeSingle()
     projectLabel = typeof (data as { name?: unknown } | null)?.name === 'string' ? (data as { name: string }).name : ''
+    const target = (data as { target_domain?: unknown } | null)?.target_domain
+    siteIcon = await reportSiteIcon(o.admin, o.project.id, typeof target === 'string' ? target : null)
   } catch (e) {
     return refuse(e instanceof MonthlyReportUnavailable ? 404 : 500, e instanceof MonthlyReportUnavailable ? 'unavailable' : 'internal')
   }
@@ -165,6 +169,7 @@ export async function handleMonthlyPdf(request: Request, deps: MonthlyRouteDeps)
     generatedAt: report.generatedAt,
     generatedBy: report.generatedBy,
     language,
+    siteIcon,
   })
 
   const pdf = deps.renderPdf ? await deps.renderPdf(html).catch(() => null) : null

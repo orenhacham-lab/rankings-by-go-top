@@ -435,6 +435,11 @@ check('G-MUT2 an unescaped query would be caught', (() => {
   check('G-MUT3 a page printed as plain text is caught', !(old.match(/<a href="([^"]+)">/)?.[1] === encoded))
 }
 
+check('G24 the site icon from the scan sits in the header, with no referrer',
+  /<h1><img class="site-icon" src="https:\/\/example\.com\/icon\.png" alt="" width="28" height="28" referrerpolicy="no-referrer">/
+    .test(generateGscSummaryHTML({ ...summaryInput(), siteIcon: 'https://example.com/icon.png' })))
+check('G25 no icon, no image', !generateGscSummaryHTML(summaryInput()).includes('<img'))
+
 eq('G17 the file names itself, in ASCII, so no browser renames it',
   gscSummaryFileName(28, '2026-10-04'), 'search-console-summary-28d-2026-10-04.pdf')
 check('G18 a run with no end date still produces an openable name',
