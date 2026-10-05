@@ -236,7 +236,9 @@ export async function generateArticleForTopic(
     ctaWhatsApp: decodedNotes.flags.cta.whatsapp || null,
     ctaUrl: decodedNotes.flags.cta.url || null,
     briefNotes: decodedNotes.notes || null,
-    includeBrandName: decodedNotes.flags.includeBrandName,
+    // E-E-A-T: the article is the business's own, so a topic the system created names the business
+    // (when its name is known). A choice the owner made in the brief form is kept as made.
+    includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : !!businessName?.trim(),
     brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
     includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,

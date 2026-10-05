@@ -441,7 +441,7 @@ export const dashboardEn = {
       exclusionsPlaceholder: 'For example: plumbing repairs',
       add: 'Add',
       remove: 'Remove: {item}',
-      rulesLabel: 'Rules from your notes on articles',
+      rulesLabel: 'Rules created from your notes',
       rulesHint: 'A note you leave on an article shows up here and applies to every article after it. You can delete a rule at any time.',
       rulesEmpty: 'No rules yet. On any article\'s page you can write what to change in the next articles.',
       ruleFromArticle: 'From a note on an article',

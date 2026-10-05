@@ -176,7 +176,7 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
       exclusionsPlaceholder: 'Por exemplo: conserto de encanamento',
       add: 'Adicionar',
       remove: 'Remover: {item}',
-      rulesLabel: 'Regras das suas notas sobre artigos',
+      rulesLabel: 'Regras criadas a partir das suas notas',
       rulesHint: 'Uma nota que você deixa em um artigo aparece aqui e vale para todos os artigos seguintes. Você pode apagar uma regra quando quiser.',
       rulesEmpty: 'Ainda não há regras. Na página de cada artigo você pode escrever o que mudar nos próximos.',
       ruleFromArticle: 'De uma nota em um artigo',

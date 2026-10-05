@@ -2823,7 +2823,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       exclusionsPlaceholder: 'Por ejemplo: reparaciones de fontanería',
       add: 'Añadir',
       remove: 'Quitar: {item}',
-      rulesLabel: 'Reglas de tus notas sobre artículos',
+      rulesLabel: 'Reglas creadas a partir de tus notas',
       rulesHint: 'Una nota que dejas en un artículo aparece aquí y se aplica a todos los artículos siguientes. Puedes borrar una regla cuando quieras.',
       rulesEmpty: 'Todavía no hay reglas. En la página de cada artículo puedes escribir qué cambiar en los próximos.',
       ruleFromArticle: 'De una nota en un artículo',

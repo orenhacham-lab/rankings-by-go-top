@@ -226,7 +226,7 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const ctaLine = ctaEnabled ? ctaDetailLines.join('\n') : 'Do NOT include any call-to-action anywhere.'
   const brandName = (brief.brandNameToInclude || '').trim()
   const brandLine = brief.includeBrandName && brandName
-    ? `You MAY mention the business/brand name "${brandName}" naturally and subtly.`
+    ? `This article is published on the site of "${brandName}" and speaks for it (E-E-A-T). Mention "${brandName}" by name naturally 2-3 times: once in the introduction or the conclusion, and where the business's own service or approach is genuinely relevant. Never more than once per section, never in the title, metaTitle or slug, and never as empty self-promotion. Do NOT invent experience, years in business, customer numbers, certifications, awards, guarantees or results that are not stated in this brief.`
     : 'Do NOT mention any business or brand name in the article text. EXCEPTION: if one of the required link phrases below is (or contains) the business name, use it ONLY inside that exact link and add NO other brand mentions anywhere.'
   const anchorTopics = brief.anchors
     .filter((a) => a.anchor_text?.trim() && a.target_url?.trim())

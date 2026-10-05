@@ -14,7 +14,10 @@
  *      unchanged; a rule keeps the time and article it came with;
  *   D) generation reads the context for the project's owner only;
  *   E) every word on screen exists in all four languages, with no Hebrew left
- *      in the others.
+ *      in the others;
+ *   F) E-E-A-T: a topic the system created names the business (when its name
+ *      is known); the owner's own choice in the brief form is kept; the
+ *      writer is told never to invent experience, numbers or awards.
  *
  * Every group has a MUTATION CONTROL (a deliberately broken copy must fail).
  * Run: npx tsx lib/content/writing-guidance/__qa__/writing-guidance.qa.ts
@@ -36,6 +39,7 @@ import {
 } from '../guidance'
 import { addRuleFromArticle, loadWritingGuidance, saveWritingGuidance, type GuidanceDeps } from '../data'
 import { readGenerationContext } from '../store'
+import { decodeBriefNotes, encodeBriefNotes } from '@/lib/content/brief-notes'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
 let passed = 0
@@ -236,6 +240,20 @@ async function main() {
   check('E-he: the Hebrew is Hebrew', heKeys(he).filter(([k]) => !/count$/.test(k)).every(([, v]) => HEBREW.test(v)))
   const fakeEs = heKeys(getDashboardDictionary('en'))
   check('MUTATION CONTROL: an English copy passed off as Spanish fails the own-words check', fakeEs.filter(([k, v]) => v === heKeys(english).find(([ek]) => ek === k)?.[1]).length > 2)
+
+  // ── F) the business is named (E-E-A-T) ───────────────────────────────────
+  console.log('\nF) the article speaks for the business')
+  const flagsOff = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false, cta: { text: '', phone: '', whatsapp: '', url: '' }, internalLinks: [], articleDepth: 'auto' as const }
+  check('F1: a topic the system created (no brief marker) carries no brand choice', decodeBriefNotes(null).brandChoiceSet === false && decodeBriefNotes('some notes').brandChoiceSet === false)
+  check('F2: the brief form\'s "off" is a choice, and kept', decodeBriefNotes(encodeBriefNotes('x', flagsOff)).brandChoiceSet === true && decodeBriefNotes(encodeBriefNotes('x', flagsOff)).flags.includeBrandName === false)
+  const genSrc = strip(read('lib/content/article-generation.ts'))
+  const brandWired = (src: string) => /includeBrandName: decodedNotes\.brandChoiceSet \? decodedNotes\.flags\.includeBrandName : !!businessName\?\.trim\(\)/.test(src)
+  check('F3: generation names the business unless the owner chose otherwise', brandWired(genSrc))
+  check('MUTATION CONTROL: the old default (never name it) is caught', !brandWired(genSrc.replace(/includeBrandName: decodedNotes\.brandChoiceSet[^,]*,/, 'includeBrandName: decodedNotes.flags.includeBrandName,')))
+  const named = buildPrompt(brief({ includeBrandName: true, brandNameToInclude: 'שיפוצי כהן' }), {})
+  check('F4: the writer names the business 2-3 times, never in the title', named.includes('Mention "שיפוצי כהן" by name naturally 2-3 times') && /never in the title/.test(named))
+  check('F5: …and never invents experience, numbers, certifications or awards', /Do NOT invent experience, years in business, customer numbers, certifications, awards/.test(named))
+  check('F6: with the choice off the old rule stands', before.includes('Do NOT mention any business or brand name'))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)
